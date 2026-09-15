@@ -948,24 +948,30 @@ class TestRealtimeEventEmission(FrappeTestCase):
 			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
 			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
 
-		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
-			if doctype == "BOM Item":
-				return [
-					frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-					frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-				]
-			return []
-
+		# Component resolution for a MADE_TO_ORDER item goes through
+		# compile_bom_vector() (a real function in a different module) --
+		# mocked directly here, same pattern already used by
+		# test_made_to_order_item_explodes_into_bom_components above, rather
+		# than trying to drive it indirectly via frappe.db.get_value/get_all
+		# (the legacy no-policy fallback path, which this test doesn't take
+		# since it now passes policy=MADE_TO_ORDER explicitly).
 		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
 			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
 		), patch(
-			f"{MODULE}.frappe.db.get_value", return_value=None
-		), patch(
-			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+			f"{MODULE}.frappe.get_all", return_value=[]
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
 		), patch(
 			f"{MODULE}.frappe.generate_hash", return_value="GRP-REALTIME"
+		), patch(
+			f"{MODULE}.compile_bom_vector",
+			return_value={
+				"item_code": "MENU-A",
+				"components": [
+					{"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+					{"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+				],
+			},
 		), patch(
 			f"{MODULE}.frappe.publish_realtime"
 		) as mock_publish:
@@ -976,6 +982,7 @@ class TestRealtimeEventEmission(FrappeTestCase):
 				branch="Branch A",
 				company="Company A",
 				order_ref="ORDER-REALTIME",
+				policy="MADE_TO_ORDER",
 			)
 
 		# Should emit one event per component (FLOUR, SUGAR)
@@ -1128,14 +1135,6 @@ class TestRealtimeEventEmission(FrappeTestCase):
 			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
 			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
 
-		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
-			if doctype == "BOM Item":
-				return [
-					frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-					frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-				]
-			return []
-
 		affected_by_component = {
 			"FLOUR": [{"top_level_item": "MENU-A", "qty_per_unit": 2, "stock_uom": "Kg"}],
 			"SUGAR": [{"top_level_item": "MENU-A", "qty_per_unit": 1, "stock_uom": "Kg"}],
@@ -1144,16 +1143,30 @@ class TestRealtimeEventEmission(FrappeTestCase):
 		def get_items_affected_side_effect(component_item, branch, company):
 			return affected_by_component.get(component_item, [])
 
+		# Component resolution for a MADE_TO_ORDER item goes through
+		# compile_bom_vector() (a real function in a different module) --
+		# mocked directly here, same pattern already used by
+		# test_made_to_order_item_explodes_into_bom_components above, rather
+		# than trying to drive it indirectly via frappe.db.get_value/get_all
+		# (the legacy no-policy fallback path, which this test doesn't take
+		# since it now passes policy=MADE_TO_ORDER explicitly).
 		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
 			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
 		), patch(
-			f"{MODULE}.frappe.db.get_value", return_value=None
-		), patch(
-			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+			f"{MODULE}.frappe.get_all", return_value=[]
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
 		), patch(
 			f"{MODULE}.frappe.generate_hash", return_value="GRP-FANOUT"
+		), patch(
+			f"{MODULE}.compile_bom_vector",
+			return_value={
+				"item_code": "MENU-A",
+				"components": [
+					{"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+					{"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+				],
+			},
 		), patch(
 			f"{BOM_MODULE}.get_items_affected_by_component", side_effect=get_items_affected_side_effect
 		), patch(
@@ -1166,6 +1179,7 @@ class TestRealtimeEventEmission(FrappeTestCase):
 				branch="Branch A",
 				company="Company A",
 				order_ref="ORDER-FANOUT",
+				policy="MADE_TO_ORDER",
 			)
 
 		calls = mock_publish.call_args_list
