@@ -59,7 +59,8 @@ class BenchClient:
     """Thin wrapper around a Frappe bench's HTTP API for one authenticated session."""
 
     def __init__(self, base_url: str, api_key: str | None = None, api_secret: str | None = None,
-                 cookies: dict[str, str] | None = None, timeout: float = 15.0):
+                 cookies: dict[str, str] | None = None, timeout: float = 15.0,
+                 host_header: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
@@ -67,6 +68,14 @@ class BenchClient:
             self.session.headers["Authorization"] = f"token {api_key}:{api_secret}"
         if cookies:
             self.session.cookies.update(cookies)
+        if host_header:
+            # Multi-tenant Frappe resolves the site purely off the Host header.
+            # Needed when hitting a bench's raw dev-server port directly (e.g.
+            # http://localhost:8114) rather than through the real
+            # nginx/traefik-routed hostname -- found while pointing this harness
+            # at a real bench (sa-testcov-verify) that only listens on its own
+            # port, not :80/:443 with SNI routing.
+            self.session.headers["Host"] = host_header
 
     def call(self, method: str, args: dict[str, Any] | None = None) -> Any:
         """Call a whitelisted Frappe method via /api/method/<dotted.path>."""
@@ -91,15 +100,27 @@ class OrderActor:
     because they legitimately differ between investigations (POS order vs KOT ticket vs
     self-order flow) -- this class only encodes the *shape* of the lifecycle:
     create -> add items -> submit -> pay -> close, each optionally skippable.
+
+    Set config["flow"] = "ury_pos" to drive the real URY app's order lifecycle, reverse
+    engineered from `ury/ury/doctype/ury_order/ury_order.py` (found: there is no separate
+    create/add_item/submit split -- one whitelisted `sync_order` call both creates a draft
+    `POS Invoice` (first call, `invoice=None`) and re-syncs its item list on every
+    subsequent call for the same table; payment + submit are a *second*, separate
+    whitelisted call, `make_invoice`, not three more granular ones). Any other value keeps
+    the original generic 5-step create/add_item/submit/pay/close shape for a differently
+    shaped app.
     """
 
     def __init__(self, actor_id: int, client: BenchClient, endpoints: dict[str, str],
-                 item_pool: list[dict[str, Any]], branch: str | None = None):
+                 item_pool: list[dict[str, Any]], branch: str | None = None,
+                 flow: str = "generic", extra: dict[str, Any] | None = None):
         self.actor_id = actor_id
         self.client = client
         self.endpoints = endpoints
         self.item_pool = item_pool
         self.branch = branch
+        self.flow = flow
+        self.extra = extra or {}
 
     def _timed(self, fn, *args, **kwargs):
         t0 = time.monotonic()
@@ -107,6 +128,93 @@ class OrderActor:
         return result, (time.monotonic() - t0) * 1000.0
 
     def run_once(self) -> ActorResult:
+        if self.flow == "ury_pos":
+            return self._run_once_ury_pos()
+        return self._run_once_generic()
+
+    def _run_once_ury_pos(self) -> ActorResult:
+        """Real URY POS order lifecycle: sync_order (create+add items) -> make_invoice
+        (apply payment + submit). Deliberately racy: `table` is picked from a shared pool
+        so concurrent actors can target the same table -- sync_order's own
+        table-occupied/last_modified_time staleness check is exactly the concurrency
+        control under test here, not something this harness works around."""
+        import random as _random
+        table = _random.choice(self.extra["tables"])
+        result = ActorResult(actor_id=self.actor_id, order_ref=None, started_at=time.time())
+        try:
+            items = _random.sample(self.item_pool, k=min(len(self.item_pool), _random.randint(1, 3)))
+            sync_args = {
+                "items": [
+                    {"item": it["item"], "item_name": it.get("item_name", it["item"]),
+                     "rate": it["rate"], "qty": it.get("qty", 1)}
+                    for it in items
+                ],
+                "cashier": self.extra["cashier"],
+                "owner": self.extra["owner"],
+                "mode_of_payment": self.extra.get("mode_of_payment", "Cash"),
+                "customer": self.extra["customer"],
+                "no_of_pax": 2,
+                "last_invoice": None,
+                "waiter": self.extra["waiter"],
+                "pos_profile": self.extra["pos_profile"],
+                "table": table,
+                "invoice": None,
+                "order_type": "Dine In",
+            }
+            order, ms = self._timed(self.client.call, self.endpoints["create"], sync_args)
+            result.latencies_ms["create"] = ms
+            if not isinstance(order, dict) or order.get("status") == "Failure" or not order.get("name"):
+                result.error = f"sync_order (create) did not return a usable invoice: {order!r}"
+                result.finished_at = time.time()
+                return result
+            invoice_name = order["name"]
+            result.order_ref = invoice_name
+            result.steps_completed.append("create")
+
+            # 2. re-sync (add another item) against the just-created invoice, exercising
+            # the update path (invoice= set, last_invoice unset -- matches what the real
+            # frontend does when a Captain keeps adding items before printing/billing).
+            more_items = _random.sample(self.item_pool, k=1)
+            sync_args2 = dict(sync_args)
+            sync_args2["items"] = sync_args["items"] + [
+                {"item": it["item"], "item_name": it.get("item_name", it["item"]),
+                 "rate": it["rate"], "qty": it.get("qty", 1)}
+                for it in more_items
+            ]
+            sync_args2["invoice"] = invoice_name
+            sync_args2["table"] = table
+            order2, ms = self._timed(self.client.call, self.endpoints["add_item"], sync_args2)
+            result.latencies_ms["add_item_total"] = ms
+            if not isinstance(order2, dict) or order2.get("status") == "Failure":
+                result.error = f"sync_order (re-sync) rejected: {order2!r}"
+                result.finished_at = time.time()
+                return result
+            result.steps_completed.append("add_items")
+
+            # 3+4. pay+submit in one call (make_invoice) -- this app has no separate
+            # submit step; payment application and doc.submit() happen together server-side.
+            grand_total = order2.get("grand_total") or order2.get("rounded_total")
+            pay_args = {
+                "customer": self.extra["customer"],
+                "payments": [{"mode_of_payment": self.extra.get("mode_of_payment", "Cash"),
+                               "amount": grand_total}],
+                "cashier": self.extra["cashier"],
+                "pos_profile": self.extra["pos_profile"],
+                "owner": self.extra["owner"],
+                "table": table,
+                "invoice": invoice_name,
+            }
+            paid, ms = self._timed(self.client.call, self.endpoints["pay"], pay_args)
+            result.latencies_ms["pay"] = ms
+            result.steps_completed.append("submit")
+            result.steps_completed.append("pay")
+        except Exception as exc:  # noqa: BLE001
+            result.error = f"{type(exc).__name__}: {exc}"
+        finally:
+            result.finished_at = time.time()
+        return result
+
+    def _run_once_generic(self) -> ActorResult:
         result = ActorResult(actor_id=self.actor_id, order_ref=None, started_at=time.time())
         try:
             # 1. create
@@ -187,7 +295,18 @@ def main():
         api_key=cfg.get("api_key"),
         api_secret=cfg.get("api_secret"),
         cookies=cfg.get("cookies"),
+        host_header=cfg.get("host_header"),
     )
+    flow = cfg.get("flow", "generic")
+    extra = {
+        "tables": cfg.get("tables"),
+        "cashier": cfg.get("cashier"),
+        "owner": cfg.get("owner"),
+        "waiter": cfg.get("waiter"),
+        "pos_profile": cfg.get("pos_profile"),
+        "customer": cfg.get("customer"),
+        "mode_of_payment": cfg.get("mode_of_payment", "Cash"),
+    }
 
     if args.dry_run:
         c = client_factory()
@@ -207,7 +326,8 @@ def main():
 
     with open(args.out, "w") as out_fh:
         def worker(i):
-            actor = OrderActor(i, client_factory(), cfg["endpoints"], cfg["item_pool"], cfg.get("branch"))
+            actor = OrderActor(i, client_factory(), cfg["endpoints"], cfg["item_pool"], cfg.get("branch"),
+                                flow=flow, extra=extra)
             results_by_actor[i] = run_actor_loop(actor, args.orders_per_actor, out_lock, out_fh)
 
         for i in range(args.concurrency):

@@ -124,13 +124,29 @@ def check_reservation_atomicity(query, cfg: dict, report: InvariantReport):
     reservation_table = res_cfg.get("reservation_table", "tabStock Reservation Entry")
     order_field = res_cfg.get("order_field", "voucher_no")
     order_table = res_cfg.get("order_table", "tabSales Order")
+    # active_statuses: the set of reservation statuses considered "still holding
+    # stock" for this doctype. Default kept for backward compat with the original
+    # ERPNext Stock Reservation Entry shape (exclude terminal Cancelled/Delivered).
+    # A schema with an explicit active-state enum (e.g. URY Stock Reservation's
+    # Reserved/Fulfilled/Released) should instead pass active_statuses=["Reserved"]
+    # -- found while adapting this checker to a real non-ERPNext-standard reservation
+    # doctype: the NOT-IN-terminal-states default silently misclassifies a
+    # Fulfilled/Released row pointing at a cancelled order as a violation, when only
+    # a still-Reserved row pointing at a cancelled/missing order is a real orphan.
+    active_statuses = res_cfg.get("active_statuses")
+    if active_statuses:
+        status_clause = "r.status IN %(active_statuses)s"
+        params = {"active_statuses": tuple(active_statuses)}
+    else:
+        status_clause = "r.status NOT IN ('Cancelled', 'Delivered')"
+        params = None
     rows = query(f"""
         SELECT r.name AS reservation_name, r.{order_field} AS order_ref
         FROM `{reservation_table}` r
         LEFT JOIN `{order_table}` o ON o.name = r.{order_field}
-        WHERE r.status NOT IN ('Cancelled', 'Delivered')
+        WHERE {status_clause}
           AND (o.name IS NULL OR o.docstatus = 2)
-    """)
+    """, params)
     for row in rows:
         report.add(
             "reservation-atomicity",
