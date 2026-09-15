@@ -348,3 +348,110 @@ class TestResolveServiceRequest(FrappeTestCase):
         self.assertEqual(mock_doc.resolved_at, second_time)
         self.assertEqual(mock_doc.resolved_by, "Captain Jane")
         mock_doc.save.assert_called_once()
+
+
+class TestServiceRequestRealPermissionBoundary(FrappeTestCase):
+    """Real (non-mocked) coverage of the frappe.PermissionError guards in
+    acknowledge_service_request() and resolve_service_request().
+
+    Every test above mocks frappe.has_permission itself (always True), so the
+    actual doctype-level 'write' permission check on URY Service Request has
+    never run for real against a real session/role-permission table -- same
+    class of gap as round 3's branch-operational-state/service-line findings.
+    Builds a real Branch -> URY Room -> URY Restaurant -> URY Table -> URY
+    Service Request fixture chain (per each doctype's own required-field
+    list) rather than mocking get_doc, so the has_permission(doc=req) call
+    evaluates against a real document.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from ury.ury.tests.factories import make_branch
+
+        cls.branch = make_branch(branch="P4R4 SR Branch")
+        company = frappe.db.get_value("Company", {}, "name") or "_Test Company"
+
+        # Both URY Room and URY Restaurant use "autoname": "prompt"/"Prompt"
+        # (confirmed by reading their doctype JSON), so `name` must be set
+        # explicitly -- omitting it hits Frappe's own "Please set the
+        # document name" ValidationError before this fixture is ever
+        # created, not a bug in the guard under test.
+        if frappe.db.exists("URY Room", "P4R4 SR Room"):
+            cls.room = frappe.get_doc("URY Room", "P4R4 SR Room")
+        else:
+            cls.room = frappe.get_doc({
+                "doctype": "URY Room",
+                "name": "P4R4 SR Room",
+                "room_name": "P4R4 SR Room",
+                "branch": cls.branch.name,
+            }).insert(ignore_permissions=True, ignore_mandatory=True)
+
+        if frappe.db.exists("URY Restaurant", {"branch": cls.branch.name}):
+            cls.restaurant = frappe.get_doc("URY Restaurant", {"branch": cls.branch.name})
+        else:
+            cls.restaurant = frappe.get_doc({
+                "doctype": "URY Restaurant",
+                "name": "P4R4 SR Restaurant",
+                "company": company,
+                "invoice_series_prefix": "P4R4SR",
+                "branch": cls.branch.name,
+                "default_room": cls.room.name,
+            }).insert(ignore_permissions=True, ignore_mandatory=True)
+
+        # URY Table also autonames via "prompt" -- confirmed via its
+        # doctype JSON's autoname field, not assumed.
+        if frappe.db.exists("URY Table", "P4R4 SR Table"):
+            cls.table = frappe.get_doc("URY Table", "P4R4 SR Table")
+        else:
+            cls.table = frappe.get_doc({
+                "doctype": "URY Table",
+                "name": "P4R4 SR Table",
+                "restaurant": cls.restaurant.name,
+                "restaurant_room": cls.room.name,
+                "branch": cls.branch.name,
+            }).insert(ignore_permissions=True, ignore_mandatory=True)
+
+        cls.request = frappe.get_doc({
+            "doctype": "URY Service Request",
+            "request_type": "Assistance",
+            "table": cls.table.name,
+            "status": "Open",
+        }).insert(ignore_permissions=True, ignore_mandatory=True)
+
+        email = "p4r4-roleless-svcreq@ury.test"
+        if frappe.db.exists("User", email):
+            frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+        cls.roleless_user = frappe.get_doc({
+            "doctype": "User",
+            "email": email,
+            "first_name": "P4R4RolelessSvcReq",
+            "send_welcome_email": 0,
+            "enabled": 1,
+        }).insert(ignore_permissions=True)
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+        # Reset status mutated by a prior (possibly-successful) test run so
+        # each test starts from a known state.
+        frappe.db.set_value("URY Service Request", self.request.name, "status", "Open")
+
+    def test_roleless_user_denied_acknowledge_for_real(self):
+        frappe.set_user(self.roleless_user.name)
+        with self.assertRaises(frappe.PermissionError):
+            acknowledge_service_request(self.request.name)
+
+    def test_roleless_user_denied_resolve_for_real(self):
+        frappe.set_user(self.roleless_user.name)
+        with self.assertRaises(frappe.PermissionError):
+            resolve_service_request(self.request.name)
+
+    def test_administrator_may_acknowledge_for_real(self):
+        frappe.set_user("Administrator")
+        result = acknowledge_service_request(self.request.name)
+        self.assertEqual(result["status"], "Acknowledged")
+
+    def test_administrator_may_resolve_for_real(self):
+        frappe.set_user("Administrator")
+        result = resolve_service_request(self.request.name)
+        self.assertEqual(result["status"], "Resolved")

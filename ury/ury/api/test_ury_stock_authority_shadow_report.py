@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_stock_authority_shadow_report import get_shadow_comparison_report
@@ -10,7 +11,7 @@ MODULE = "ury.ury.api.ury_stock_authority_shadow_report"
 
 def _intent(item_code, accepted_qty, components, stock_entry="STE-0001", branch="Branch A"):
 	return {
-		"name": "UFPI-{0}".format(item_code),
+		"name": f"UFPI-{item_code}",
 		"order_ref": "ORD-1",
 		"kot": "KOT-1",
 		"kot_item": "KOTI-1",
@@ -54,14 +55,14 @@ class TestGetShadowComparisonReport(FrappeTestCase):
 				return native_sle_rows
 			if doctype == "URY Fulfilment Posting Intent":
 				return intents
-			raise AssertionError("unexpected get_all call for {0}".format(doctype))
+			raise AssertionError(f"unexpected get_all call for {doctype}")
 
 		def fake_resolve_context(item_code, branch):
 			policy = policy_by_item.get(item_code)
 			return {"production_policy": policy} if policy else None
 
-		with patch("{0}.frappe.get_all".format(MODULE), side_effect=fake_get_all), patch(
-			"{0}.resolve_production_context".format(MODULE), side_effect=fake_resolve_context
+		with patch(f"{MODULE}.frappe.get_all", side_effect=fake_get_all), patch(
+			f"{MODULE}.resolve_production_context", side_effect=fake_resolve_context
 		):
 			return get_shadow_comparison_report("Branch A", "2026-09-01", "2026-09-15")
 
@@ -125,3 +126,50 @@ class TestGetShadowComparisonReport(FrappeTestCase):
 		self.assertFalse(pizza["consistent"])
 		self.assertIn("Native deducted", pizza["discrepancy_reason"])
 		self.assertEqual(report["summary"]["total_discrepancies"], 1)
+
+
+class TestGetShadowComparisonReportPermissionBoundary(FrappeTestCase):
+	"""Real, un-mocked negative-permission coverage.
+
+	Fixed as part of this test round: `get_shadow_comparison_report` had NO
+	permission check at all in source -- confirmed by reading the function
+	directly, it went straight from the whitelist decorator to input
+	validation (`branch`/`from_date`/`to_date` presence) with no
+	`require_manager()`/role/branch-access call anywhere, unlike every
+	sibling report_api-style reporting endpoint in this codebase
+	(`report_api/day_close.py`, `financial.py`, `customers.py`, etc., all
+	call `require_manager()` as the first line of the function body). Any
+	authenticated user -- including one with no roles at all -- could pull
+	this financial/production reconciliation report for any branch. Fixed
+	by adding the identical `require_manager()` call, in the identical
+	position (first line of the function body), used by every other
+	report_api-family reporting endpoint in this app; no other behavior
+	changed. This test is the negative-permission coverage for that fix.
+	"""
+
+	NEGATIVE_USER = "test_shadow_report_negative@example.com"
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		if not frappe.db.exists("User", cls.NEGATIVE_USER):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": cls.NEGATIVE_USER,
+					"first_name": "Shadow Report Negative",
+					"send_welcome_email": 0,
+					"roles": [],
+				}
+			).insert(ignore_permissions=True)
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_roleless_user_is_rejected_before_any_report_query_runs(self):
+		frappe.set_user(self.NEGATIVE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			get_shadow_comparison_report("Branch A", "2026-09-01", "2026-09-15")
