@@ -13,6 +13,8 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from ury.ury.tests.factories import make_user
+
 from ury.ury.api.ury_kot_validation import (
     get_unprocessed_invoices,
     process_invoice,
@@ -32,20 +34,7 @@ TEST_SUPERVISOR = "_test_kot_validation_supervisor@example.com"
 
 def _create_test_user(email, roles):
     """Helper to create a test user with specified roles."""
-    if frappe.db.exists("User", email):
-        frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-    user = frappe.get_doc(
-        {
-            "doctype": "User",
-            "email": email,
-            "first_name": email.split("@")[0],
-            "send_welcome_email": 0,
-            "enabled": 1,
-        }
-    ).insert(ignore_permissions=True)
-    for role in roles:
-        user.add_roles(role)
-    return user
+    return make_user(email=email, roles=roles, first_name=email.split("@")[0], enabled=1)
 
 
 class _InvoiceStub(frappe._dict):

@@ -2,6 +2,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api import ury_ai_settings
+from ury.ury.tests.factories import make_user
 
 TEST_NON_MANAGER = "_test_ury_ai_settings_non_manager@example.com"
 TEST_MANAGER = "_test_ury_ai_settings_manager@example.com"
@@ -83,20 +84,7 @@ class TestURYAISettingsPermissions(FrappeTestCase):
                 frappe.delete_doc("User", user, force=True, ignore_permissions=True)
 
     def _create_user(self, email, roles):
-        if frappe.db.exists("User", email):
-            frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-        user = frappe.get_doc(
-            {
-                "doctype": "User",
-                "email": email,
-                "first_name": email.split("@")[0],
-                "send_welcome_email": 0,
-                "enabled": 1,
-            }
-        ).insert(ignore_permissions=True)
-        for role in roles:
-            user.add_roles(role)
-        return user
+        return make_user(email=email, roles=roles, first_name=email.split("@")[0], enabled=1)
 
     def test_non_manager_cannot_get_ai_settings(self):
         frappe.set_user(TEST_NON_MANAGER)

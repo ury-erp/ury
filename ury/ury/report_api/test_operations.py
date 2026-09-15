@@ -2,6 +2,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.report_api import operations
+from ury.ury.tests.factories import make_user
 
 TEST_NON_MANAGER = "_test_ury_operations_non_manager@example.com"
 
@@ -13,13 +14,7 @@ class TestRequireManagerGate(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		if not frappe.db.exists("User", TEST_NON_MANAGER):
-			frappe.get_doc({
-				"doctype": "User",
-				"email": TEST_NON_MANAGER,
-				"first_name": "NonManager",
-				"send_welcome_email": 0,
-				"roles": [{"role": "Employee"}],
-			}).insert(ignore_permissions=True)
+			make_user(email=TEST_NON_MANAGER, roles=["Employee"], first_name="NonManager")
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
