@@ -40,6 +40,30 @@ class URYBranchStockPolicy(Document):
 		self._validate_gate_dependencies()
 		self._stamp_enabling_actor()
 
+	def on_update(self):
+		self._clear_policy_cache()
+
+	def on_trash(self):
+		self._clear_policy_cache()
+
+	def _clear_policy_cache(self):
+		"""Drop this branch's request-scoped tier memo (I-1 hardening).
+
+		`ury.ury.api.ury_stock_policy` memoises the resolved tier on
+		`frappe.local` for the lifetime of one request/job. That memo is not
+		reachable from a normal web request today (see
+		tracks/sa-pos-followups-and-ux/ITEMS_1_2_3.md Item 1), but a
+		migration/patch process or a long-lived background job can both
+		write and re-read a policy row within the same unit of work, and
+		every test in a bench test run shares one `frappe.local`. Clearing
+		the memo on write keeps `get_branch_stock_policy` honest in both
+		cases. `clear_branch_stock_policy_cache` already swallows all
+		exceptions, so this can never break a save.
+		"""
+		from ury.ury.api.ury_stock_policy import clear_branch_stock_policy_cache
+
+		clear_branch_stock_policy_cache(self.branch)
+
 	def _validate_gate_dependencies(self):
 		if self.realtime_production_posting_enabled and not self.reservation_control_enabled:
 			frappe.throw(
