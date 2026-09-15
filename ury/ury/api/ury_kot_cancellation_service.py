@@ -36,16 +36,29 @@ Four cancellation cases (V3-50's exact V3-54 test list):
   2. `cancel_after_start`: KOT execution is IN_PREPARATION. Requires an
      explicit, server-verified manager confirmation (mirrors V3-53's
      `manager_override` pattern -- see `_verify_manager_confirmation`
-     below). Transitions to CANCELLED_AFTER_START. Records that ingredients
-     already consumed are NOT restored; a LATER, separate disposition action
-     (wastage via V3-33, or a manager-approved exception) is required and is
-     explicitly NOT implemented here -- this function only records the
-     cancellation and the outstanding disposition requirement.
+     below). Transitions to CANCELLED_AFTER_START. Ingredients already
+     consumed are NOT restored -- instead their consumption is CAPTURED as
+     Draft `URY Issue Wastage` rows (see "Disposition route" below).
 
   3. `cancel_after_ready`: KOT execution is READY. Same manager-confirmation
-     requirement. Transitions to CANCELLED_AFTER_READY. Records that
-     finished-good disposition (return-to-stock via V3-32, wastage via
-     V3-33, or staff-meal) is a LATER, separate action NOT implemented here.
+     requirement. Transitions to CANCELLED_AFTER_READY, and captures the same
+     Draft write-off rows.
+
+Disposition route (G-08, resolved): cases 2 and 3 call
+`ury_wastage.capture_kot_cancellation_wastage`, which reads back the
+`URY Fulfilment Posting Intent` rows that actually POSTED for this KOT and
+mirrors their frozen payload -- the exact component/qty/warehouse triples the
+submitted `Manufacture` Stock Entry consumed -- into one Draft
+`URY Issue Wastage` row per component, tagged
+`source_type = "KOT Cancellation"`. Those rows are inert: they post nothing,
+and (per `ury_issue_authorization.sum_issue_sourced_wastage`) they never
+decrement any Issue Authorization's material entitlement. A Stock Manager
+approving them is what posts a `Material Issue` Stock Entry against the
+branch's explicitly configured expense account and cost center. Case 1
+(`cancel_before_start`) captures NOTHING: a QUEUED KOT consumed nothing, so
+there is nothing to write off. Capture is fail-OPEN -- the cancellation is
+already committed by then and must never be blocked by a write-off failure;
+errors surface on the result as `wastage_capture_error`.
 
   4. `cancel_partial`: a KOT with some items started and some not. V3-53
      deliberately chose KOT-level (not item-level) execution state, so this
@@ -85,13 +98,21 @@ concurrent load without a live bench/DB; any concurrency-specific test for
 this module would carry the same NOT EXECUTED caveat V3-53's
 `test_concurrent_start_by_two_chefs_not_executed` carries.
 
-NO STOCK RESTORATION: grep this file (and it alone) for any of
-`bin`, `stock_entry`, `warehouse`, `return_to_central_store`,
-`stock_qty`, `actual_qty` -- none appear. The only external service calls
-this module makes are `ury.ury.api.ury_reservation_service.release_reservation`
-and `.cancel_reservation`, both of which (per that module's own docstring)
-never mutate `Bin` either -- "restoring capacity" there is nothing more than
-a reservation status transition, not a stock mutation.
+NO STOCK RESTORATION: this module still never restores, recreates or
+un-consumes any quantity. It contains no call to `Bin`, no stock quantity
+mutation, and no reversal of any `Manufacture` Stock Entry -- a cooked dish
+does not un-cook itself. The only external service calls it makes are:
+
+  * `ury.ury.api.ury_reservation_service.release_reservation` /
+    `.cancel_reservation`, which (per that module's own docstring) never
+    mutate `Bin` either -- "restoring capacity" there is nothing more than a
+    reservation status transition; and
+  * `ury.ury.api.ury_wastage.capture_kot_cancellation_wastage`, which only
+    INSERTS Draft `URY Issue Wastage` records. That function's own posting
+    path (`_post_stock_entry`) is reachable exclusively from
+    `ury_wastage.approve_wastage`, i.e. from a separate, explicitly
+    authorized human approval -- never from this module. Nothing any function
+    here does can reach a ledger.
 """
 
 import frappe
@@ -114,6 +135,7 @@ from ury.ury.api.ury_kot_execution_service import (
 	append_audit,
 )
 from ury.ury.api import ury_reservation_service
+from ury.ury.api import ury_wastage
 
 
 # Reason codes. Reuses V3-53's stable set where applicable, plus this
@@ -222,6 +244,9 @@ def _write_cancellation(kot, locked, target_state, actor, event, reason, branch,
 		)
 
 	doc.state = target_state
+	# First-class field per AC-8: queryable without parsing audit_log JSON,
+	# in addition to (not instead of) the existing audit_log entry below.
+	doc.cancellation_reason = reason
 	append_audit(doc, actor, event=event, reason=reason)
 
 	if locked:
@@ -232,13 +257,76 @@ def _write_cancellation(kot, locked, target_state, actor, event, reason, branch,
 	return doc.as_dict()
 
 
+def _capture_disposition_wastage(result, kot, execution_name, disposition, reason_category, reason_notes, actor, branch, company):
+	"""Capture Draft write-off rows for a post-production cancellation.
+
+	Routes to `ury_wastage.capture_kot_cancellation_wastage`, which mirrors
+	the `Manufacture` Stock Entry this KOT's production actually posted into
+	one Draft `URY Issue Wastage` row per consumed component. Draft rows never
+	touch the ledger and never decrement any Issue Authorization's
+	entitlement; a Stock Manager approving them is what posts the
+	`Material Issue`.
+
+	Deliberately fail-OPEN: the state transition to CANCELLED_AFTER_* has
+	already been written by the time this runs, and a floor cancellation must
+	never be blocked (or silently rolled back) because a write-off could not
+	be captured. Any failure is reported on the result under
+	`wastage_capture_error` so a caller or report can find it, rather than
+	raising back over a completed cancellation.
+	"""
+	# Resolve the default here as well as inside the capture, so the value
+	# reported back on the result is the one actually used rather than a bare
+	# None the caller would have to re-derive.
+	disposition = disposition or ury_wastage.DEFAULT_KOT_CANCELLATION_DISPOSITION
+	result["wastage_disposition"] = disposition
+	try:
+		captured = ury_wastage.capture_kot_cancellation_wastage(
+			kot=kot,
+			disposition=disposition,
+			reason_category=reason_category,
+			reason_notes=reason_notes,
+			kot_execution=execution_name,
+			branch=branch,
+			company=company,
+			actor=actor,
+		)
+	except Exception as exc:  # noqa: BLE001 -- see fail-open rationale above
+		result["wastage_rows"] = []
+		result["wastage_capture_error"] = str(exc)
+		try:
+			frappe.log_error(
+				frappe.get_traceback(),
+				"URY KOT cancellation wastage capture failed for {0}".format(kot),
+			)
+		except Exception:
+			# The error log is itself a DB write. If even that fails, the
+			# cancellation still stands -- the error is already on the result.
+			pass
+		return result
+
+	result["wastage_rows"] = [doc.get("name") for doc in captured.get("created") or []]
+	result["wastage_idempotent_replay"] = captured.get("idempotent_replay")
+	result["wastage_derivation"] = captured.get("derivation")
+	if captured.get("existing"):
+		result["wastage_existing_rows"] = captured["existing"]
+	return result
+
+
 # ---------------------------------------------------------------------------
 # Case 1: cancel before start
 # ---------------------------------------------------------------------------
 
 
 @frappe.whitelist()
-def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
+def cancel_before_start(
+	kot,
+	actor=None,
+	reason=None,
+	reservation_name=None,
+	disposition=None,
+	reason_category=None,
+	reason_notes=None,
+):
 	"""QUEUED -> CANCELLED_BEFORE_START.
 
 	Only valid if the execution is still QUEUED (never started). Releases
@@ -250,6 +338,24 @@ def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
 	`reservation_name` is not supplied, no reservation call is made (there
 	may be no reservation associated with this KOT), and this function still
 	records the cancellation.
+
+	Captures NO wastage in the ordinary case. A QUEUED KOT never started
+	production, so nothing was consumed and there is nothing to write off --
+	creating a write-off row here would invent a cost that does not exist. See
+	`test_cancel_before_start_captures_no_wastage`.
+
+	THE ONE EXCEPTION (item 6 x item 9): `URY Item Production
+	Configuration.production_posting_trigger_state` can be set to QUEUED, in
+	which case production posts a real, submitted `Manufacture` Stock Entry
+	while the KOT is still QUEUED. For such a KOT "QUEUED" no longer implies
+	"consumed nothing", and skipping the capture would leave consumed raw
+	materials and a finished good in the ledger against no sale and with no
+	write-off -- exactly the hole G-08 was resolved to close for the other two
+	states. So the capture runs here too, but ONLY when
+	`ury_wastage.kot_has_posted_consumption(kot)` confirms a POSTED intent
+	exists; it never falls back to the BOM explosion, because for a genuinely
+	untouched QUEUED KOT there is nothing to derive. Captured rows are Draft
+	and inert, so the disposition decision still belongs to the approver.
 	"""
 	_require_execution_doctype()
 	_require_kot(kot)
@@ -283,6 +389,22 @@ def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
 		branch=branch, company=company, production_unit=production_unit,
 	)
 	result["reservation_release_result"] = released
+	if ury_wastage.kot_has_posted_consumption(kot):
+		# See the docstring's "ONE EXCEPTION": this KOT's item is configured
+		# to post production at QUEUED, so raw materials really were consumed
+		# even though preparation never started.
+		_capture_disposition_wastage(
+			result,
+			kot=kot,
+			execution_name=result.get("name"),
+			disposition=disposition,
+			reason_category=reason_category,
+			reason_notes=reason_notes,
+			actor=actor,
+			branch=branch,
+			company=company,
+		)
+		result["disposition_required"] = True
 	return result
 
 
@@ -292,16 +414,41 @@ def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
 
 
 @frappe.whitelist()
-def cancel_after_start(kot, actor=None, reason=None, manager_confirmed_by=None):
+def cancel_after_start(
+	kot,
+	actor=None,
+	reason=None,
+	manager_confirmed_by=None,
+	disposition=None,
+	reason_category=None,
+	reason_notes=None,
+):
 	"""IN_PREPARATION -> CANCELLED_AFTER_START.
 
 	Requires a server-verified manager confirmation (see
 	`_verify_manager_confirmation`). Does NOT call any stock-recreation or
-	stock-restoration function -- ingredients already consumed by
-	production are NOT restored here. This function only records the
-	cancellation and the fact that a LATER, separate disposition action
-	(wastage via V3-33, or a manager-approved exception) is required; that
-	disposition action is explicitly out of scope for this task.
+	stock-restoration function -- ingredients already consumed by production
+	are NOT restored here, and never will be: a dish does not un-cook itself.
+
+	IMPLEMENTED DISPOSITION ROUTE: what this call now does instead of leaving
+	the question open is capture the consumption as a Draft write-off. After
+	the state transition is written, `_capture_disposition_wastage` creates
+	one Draft `URY Issue Wastage` row per consumed component, sourced from the
+	`URY Fulfilment Posting Intent` rows that actually posted for this KOT (so
+	the write-off mirrors the real `Manufacture` entry), tagged
+	`source_type = "KOT Cancellation"`. Draft rows are inert: they touch no
+	ledger and decrement no Issue Authorization entitlement. A Stock Manager
+	approving them via `ury_wastage.approve_wastage` is what posts the
+	`Material Issue` Stock Entry against the branch's explicitly configured
+	wastage/damage/staff-meal expense account and cost center.
+
+	`disposition` defaults to "Wastage" and may be "Damaged", "Staff Meal" or
+	"Re-plated"; "Re-plated" captures the record but posts no stock, because
+	the food legitimately stayed in inventory.
+
+	`disposition_required` is still returned True -- the Draft rows genuinely
+	do still require a human approval decision -- but it now names the route
+	that exists rather than the absence of one.
 	"""
 	_require_execution_doctype()
 	_require_kot(kot)
@@ -328,11 +475,28 @@ def cancel_after_start(kot, actor=None, reason=None, manager_confirmed_by=None):
 		branch=branch, company=company, production_unit=production_unit,
 	)
 	result["manager_confirmed_by"] = confirmed_by
+	_capture_disposition_wastage(
+		result,
+		kot=kot,
+		execution_name=result.get("name"),
+		disposition=disposition,
+		reason_category=reason_category,
+		reason_notes=reason_notes,
+		actor=actor,
+		branch=branch,
+		company=company,
+	)
 	result["disposition_required"] = True
 	result["disposition_note"] = (
-		"Ingredients already consumed are NOT restored by this call. A later, "
-		"separate disposition action (wastage / manager-approved exception) "
-		"is required and is not implemented here."
+		"Ingredients already consumed are NOT restored by this call. Their "
+		"consumption has been captured as Draft URY Issue Wastage rows "
+		"(source_type='KOT Cancellation', see `wastage_rows`), mirroring the "
+		"Manufacture Stock Entry production actually posted for this KOT. "
+		"Those rows are inert until a Stock Manager approves them via "
+		"ury_wastage.approve_wastage, which posts a Material Issue Stock Entry "
+		"against the branch's configured expense account and cost center. "
+		"Zero rows means this KOT posted no production and consumed nothing in "
+		"the ledger."
 	)
 	return result
 
@@ -343,35 +507,54 @@ def cancel_after_start(kot, actor=None, reason=None, manager_confirmed_by=None):
 
 
 @frappe.whitelist()
-def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
+def cancel_after_ready(
+	kot,
+	actor=None,
+	reason=None,
+	manager_confirmed_by=None,
+	disposition=None,
+	reason_category=None,
+	reason_notes=None,
+):
 	"""READY -> CANCELLED_AFTER_READY.
 
-	Same manager-confirmation requirement as `cancel_after_start`. This
-	function only marks the state -- it never itself disposes of the
-	finished good. Finished-good disposition (return-to-stock via V3-32,
-	wastage via V3-33, or staff-meal) is a LATER, separate action this task
-	does not implement.
+	Same manager-confirmation requirement as `cancel_after_start`.
 
-	TODO (tracked, deliberate): under POS Stock Authority V2 a made-to-order
-	item that reached READY has already posted a real, submitted `Manufacture`
-	Stock Entry -- its raw materials are genuinely consumed and its finished
-	good genuinely exists in the department warehouse. Cancelling here means
-	that stock is now held against no sale: the sale-side deduction at POS
-	Closing Entry will never happen for it, so the finished good sits in the
-	warehouse indefinitely and the consumed raws are never charged anywhere.
+	Under POS Stock Authority V2 a made-to-order item that reached READY has
+	already posted a real, submitted `Manufacture` Stock Entry -- its raw
+	materials are genuinely consumed and its finished good genuinely exists in
+	the department warehouse. Cancelling here means that stock is held against
+	no sale: the sale-side deduction at POS Closing Entry will never happen for
+	it.
 
-	This function deliberately does NOT try to reverse or write off that
-	entry. Reversing it would be wrong (the food really was cooked), and
-	routing it to waste, staff-meal or re-plate requires a food-waste
-	accounting model -- which account, which cost center, whose approval --
-	that this codebase does not have. Inventing one here would put
-	unreviewed entries into a real financial ledger. The safe default is to
-	leave the stock where it is, correctly recorded, and surface the
-	decision: `disposition_required` below is returned True precisely so a
-	caller/report can find these.
+	G-08 RESOLVED -- the food-waste accounting model this function used to
+	refuse to invent now exists, as explicit configuration rather than
+	inference. Its three former objections are answered as follows:
 
-	Recorded as gap G-08 and Phase 3 follow-up in
-	tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md.
+	  * *which account* -- named `Branch` fields `wastage_expense_account`,
+	    `damage_expense_account` and `staff_meal_expense_account`, selected by
+	    the row's `disposition`. No `LIKE '%Wastage%'` name-matching anywhere;
+	    an unset field fails the approval closed with a message naming the
+	    branch and the field.
+	  * *which cost center* -- the named `Branch.wastage_cost_center` field,
+	    same fail-closed rule.
+	  * *whose approval* -- `ury_wastage.APPROVE_ROLES` (Stock Manager /
+	    System Manager). A POS manager who can confirm this cancellation can
+	    capture the Draft write-off, but only an approver can put it in the
+	    ledger. Nothing this function does reaches the GL.
+
+	So this call still never reverses the `Manufacture` entry (reversing would
+	be wrong -- the food really was cooked). It captures the consumption as
+	Draft `URY Issue Wastage` rows (`source_type = "KOT Cancellation"`, one per
+	consumed component, mirroring that entry's own frozen payload), and a
+	separate human approval turns them into a `Material Issue` write-off.
+	`disposition_required` is still returned True because that approval
+	decision genuinely is still outstanding.
+
+	`disposition` defaults to "Wastage"; "Damaged" and "Staff Meal" post to
+	their own configured accounts, and "Re-plated" records the event but posts
+	nothing (the finished good legitimately stays in stock).
+
 	The related reservation-side hazard (G-09) IS handled:
 	`ury_order_reservation_service.release_order_reservations` skips
 	already-Fulfilled groups instead of throwing, so cancelling a partly
@@ -402,14 +585,28 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 		branch=branch, company=company, production_unit=production_unit,
 	)
 	result["manager_confirmed_by"] = confirmed_by
+	_capture_disposition_wastage(
+		result,
+		kot=kot,
+		execution_name=result.get("name"),
+		disposition=disposition,
+		reason_category=reason_category,
+		reason_notes=reason_notes,
+		actor=actor,
+		branch=branch,
+		company=company,
+	)
 	result["disposition_required"] = True
 	result["disposition_note"] = (
-		"This call only marks CANCELLED_AFTER_READY. Finished-good disposition "
-		"(return-to-stock, wastage, or staff-meal) is a later, separate action "
-		"not implemented here. If production already posted for this item, its "
-		"raw materials are consumed and its finished good exists in the "
-		"department warehouse against no sale; routing that to waste requires a "
-		"food-waste accounting decision this app does not model yet."
+		"Marked CANCELLED_AFTER_READY. The raw materials production consumed for "
+		"this KOT have been captured as Draft URY Issue Wastage rows "
+		"(source_type='KOT Cancellation', see `wastage_rows`), mirroring the "
+		"Manufacture Stock Entry that actually posted. Those rows are inert: they "
+		"touch no ledger and decrement no Issue Authorization entitlement until a "
+		"Stock Manager approves them, which posts a Material Issue against the "
+		"branch's configured expense account and cost center for the chosen "
+		"disposition (Re-plated posts nothing). Zero rows means this KOT posted no "
+		"production and consumed nothing in the ledger."
 	)
 	return result
 

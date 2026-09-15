@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":3}},{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}}]",
+ "content": "[{\"id\":\"uryShortHdr\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\",\"col\":12}},{\"id\":\"uryShortcut0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS\",\"col\":3}},{\"id\":\"uryShortcut1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Profile\",\"col\":3}},{\"id\":\"uryShortcut2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Branch\",\"col\":3}},{\"id\":\"uryShortcut3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Closing Entry\",\"col\":3}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":3}},{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}}]",
  "creation": "2023-11-30 12:04:38.330350",
  "custom_blocks": [
   {
@@ -111,7 +111,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-01-16 11:47:19.008936",
+ "modified": "2026-09-15 15:24:26.228869",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
@@ -132,6 +132,39 @@
   }
  ],
  "sequence_id": 31.0,
- "shortcuts": [],
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "",
+   "icon": "point-of-sale",
+   "label": "POS",
+   "type": "URL",
+   "url": "/pos"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "icon": "setting-gear",
+   "label": "POS Profile",
+   "link_to": "POS Profile",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "icon": "point-of-sale",
+   "label": "Branch",
+   "link_to": "Branch",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "icon": "point-of-sale",
+   "label": "POS Closing Entry",
+   "link_to": "POS Closing Entry",
+   "type": "DocType"
+  }
+ ],
  "title": "URY"
 }

@@ -699,6 +699,121 @@ def append_audit(doc, actor, event, reason=None, frozen_context=None):
 	doc.audit_log = json.dumps(entries, sort_keys=True, default=str)
 
 
+def _component_never_stocked(component_item, warehouse, locked_bin="__unset__"):
+	"""True if `component_item`/`warehouse` has never carried positive stock.
+
+	NEVER_STOCKED (per Item 4 / G-13 design, §5.1): no `Bin` row exists for
+	(component, warehouse) at all, or a `Bin` row exists but the running
+	balance (`qty_after_transaction`) recorded against it has never been
+	positive -- i.e. no Stock Ledger Entry ever brought stock in. Anything
+	else (a Bin that has held positive stock before, however long ago) is
+	DEPLETED, not NEVER_STOCKED, even if it now reads zero.
+
+	`locked_bin` is an optional caller-supplied Bin row snapshot (e.g. from
+	`_lock_bin_row`) -- pass `None` explicitly only when the caller has
+	already confirmed no Bin row exists. Callers (such as the read-only
+	`ury_availability` module) that have not looked up the Bin row at all
+	should omit this argument so it is looked up here instead.
+	"""
+	if locked_bin == "__unset__":
+		locked_bin = frappe.db.get_value(
+			BIN_DOCTYPE, {"item_code": component_item, "warehouse": warehouse}, "name"
+		)
+
+	if locked_bin is None:
+		return True
+
+	ever_positive = frappe.db.sql(
+		"""
+		SELECT 1
+		FROM `tabStock Ledger Entry`
+		WHERE item_code = %(item_code)s
+		  AND warehouse = %(warehouse)s
+		  AND is_cancelled = 0
+		  AND qty_after_transaction > 0
+		LIMIT 1
+		""",
+		{"item_code": component_item, "warehouse": warehouse},
+	)
+	return not ever_positive
+
+
+def _raise_shortfall_error(item_code, warehouse, shortfalls, locked_bins, frozen_context):
+	"""Raise the Item 4 (§5.1) enriched shortfall error.
+
+	Names the item, the warehouse actually checked, the production
+	unit/department chain that resolved it, each shortfall component's
+	required/available quantities, a NEVER_STOCKED vs DEPLETED
+	classification per component, and the three numbered remedies. Keeps
+	the existing throw type (`frappe.ValidationError`) and the
+	all-shortfalls-collected behaviour -- this only enriches the message
+	built from the shortfalls already gathered by the caller.
+	"""
+	frozen_context = frozen_context or {}
+	department = frozen_context.get("department")
+	production_unit = frozen_context.get("production_unit")
+
+	if production_unit and department:
+		chain = _(
+			"is produced by {department} (production unit {production_unit}), "
+			"which draws all of its ingredients from warehouse {warehouse}."
+		).format(department=department, production_unit=production_unit, warehouse=warehouse)
+	elif department:
+		chain = _(
+			"is produced by {department}, which draws all of its ingredients from warehouse {warehouse}."
+		).format(department=department, warehouse=warehouse)
+	else:
+		chain = _("draws all of its ingredients from warehouse {warehouse}.").format(warehouse=warehouse)
+
+	component_lines = []
+	for row in shortfalls:
+		component_item = row["component_item"]
+		# Rounded for display only -- both `required` and `available` carry
+		# ordinary binary-float drift (see `create_reservation`'s QTY_TOLERANCE
+		# comment), and plain `round()` (unlike `frappe.utils.flt(x, precision)`)
+		# needs no DB read, so it is safe to use here despite still being
+		# inside the Bin-lock critical section for earlier shortfalls in the
+		# same call.
+		required = round(row["required"], 3)
+		available = round(row["available"], 3)
+		never_stocked = _component_never_stocked(
+			component_item, warehouse, locked_bins.get(component_item)
+		)
+		if never_stocked:
+			line = "- {component} - required {required}, available {available}. This item has never been stocked in {warehouse}.".format(
+				component=component_item, required=required, available=available, warehouse=warehouse
+			)
+		else:
+			short_by = round(required - available, 3)
+			line = "- {component} - required {required}, available {available} (short by {short_by}).".format(
+				component=component_item, required=required, available=available, short_by=short_by
+			)
+		component_lines.append(line)
+
+	message = _(
+		"Cannot accept this order -- ingredients are missing from this item's own stock location.\n\n"
+		"{item_code} {chain}\n\n"
+		"{component_lines}\n\n"
+		"In URY, each department keeps its own stock of every raw material it uses. "
+		"A department can never draw ingredients from another department's warehouse, "
+		"even if the same item is in stock there. To fix this:\n"
+		"1. Transfer the ingredient in - create a Stock Entry (Material Transfer) from "
+		"your central/main store into {warehouse}. This is the normal fix.\n"
+		"2. Or change the item's department - if {item_code} should actually be produced "
+		"by the department that already holds this ingredient, update its URY Item "
+		"Production Configuration.\n"
+		"3. Or correct the recipe - if this ingredient does not belong in this recipe, "
+		"fix the BOM."
+	).format(
+		item_code=item_code,
+		chain=chain,
+		component_lines="\n".join(component_lines),
+		warehouse=warehouse,
+	)
+
+	frappe.throw(message, frappe.ValidationError)
+
+
 @frappe.whitelist()
 def create_reservation(
 	item_code,
@@ -793,18 +908,7 @@ def create_reservation(
 				)
 
 	if shortfalls:
-		frappe.throw(
-			_("Insufficient capacity for {0}: {1}").format(
-				item_code,
-				", ".join(
-					"{0} (required {1}, available {2})".format(
-						row["component_item"], row["required"], row["available"]
-					)
-					for row in shortfalls
-				),
-			),
-			frappe.ValidationError,
-		)
+		_raise_shortfall_error(item_code, warehouse, shortfalls, locked_bins, frozen_context)
 
 	# Sales Plan committed_qty tracking: this reservation's `qty` is the
 	# TOP-LEVEL item's requested quantity (not a per-component quantity, which

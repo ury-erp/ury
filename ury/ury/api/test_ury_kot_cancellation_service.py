@@ -114,6 +114,20 @@ def _new_doc_recorder(existing_rows=None):
 	return _get_doc, created
 
 
+def _captured(names, derivation="posting_intent", existing=None):
+	"""Shape of `ury_wastage.capture_kot_cancellation_wastage`'s return value."""
+	import frappe
+
+	return {
+		"kot": "KOT-1",
+		"disposition": "Wastage",
+		"created": [frappe._dict({"name": name}) for name in names],
+		"idempotent_replay": False,
+		"existing": existing or [],
+		"derivation": derivation,
+	}
+
+
 def _existing_row(name="EXEC-1", state=QUEUED):
 	import frappe
 
@@ -205,6 +219,9 @@ class TestCancelAfterStartNoMaterialRestore(FrappeTestCase):
 		) as mock_session, patch(
 			f"{MODULE}.frappe.get_roles", return_value=["URY Manager"]
 		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage",
+			return_value=_captured(["W-1"]),
+		) as mock_capture, patch(
 			f"{MODULE}.ury_reservation_service.release_reservation"
 		) as mock_release, patch(
 			f"{MODULE}.ury_reservation_service.cancel_reservation"
@@ -221,6 +238,10 @@ class TestCancelAfterStartNoMaterialRestore(FrappeTestCase):
 		# No reservation/stock-restoration call of any kind is made here.
 		mock_release.assert_not_called()
 		mock_cancel_resv.assert_not_called()
+		# Item 9: consumption is CAPTURED as Draft wastage, never restored.
+		mock_capture.assert_called_once()
+		self.assertEqual(result["wastage_rows"], ["W-1"])
+		self.assertEqual(result["wastage_disposition"], "Wastage")
 
 	def test_cancel_after_start_without_manager_role_rejected(self):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
@@ -284,6 +305,9 @@ class TestCancelAfterReadyMarksStateOnly(FrappeTestCase):
 			f"{MODULE}.frappe.session"
 		) as mock_session, patch(
 			f"{MODULE}.frappe.get_roles", return_value=["URY Manager"]
+		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage",
+			return_value=_captured(["W-1", "W-2"]),
 		):
 			mock_session.user = "manager1@example.com"
 
@@ -293,7 +317,12 @@ class TestCancelAfterReadyMarksStateOnly(FrappeTestCase):
 
 		self.assertEqual(result["state"], CANCELLED_AFTER_READY)
 		self.assertTrue(result["disposition_required"])
-		self.assertIn("not implemented here", result["disposition_note"])
+		# Item 9 AC 11: the docstring/note now describes the IMPLEMENTED route
+		# rather than the absence of one.
+		self.assertNotIn("not implemented here", result["disposition_note"])
+		self.assertNotIn("does not model yet", result["disposition_note"])
+		self.assertIn("Draft URY Issue Wastage rows", result["disposition_note"])
+		self.assertEqual(result["wastage_rows"], ["W-1", "W-2"])
 		# The doc that was saved was only mutated to the new state -- no
 		# other field indicating a disposition/return/wastage action exists.
 		self.assertEqual(created[0]["state"], CANCELLED_AFTER_READY)
@@ -382,8 +411,173 @@ class TestManagerConfirmationVerifiedServerSide(FrappeTestCase):
 			f"{MODULE}.frappe.session"
 		) as mock_session, patch(
 			f"{MODULE}.frappe.get_roles", return_value=["URY Manager"]
+		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage",
+			return_value=_captured([]),
 		):
 			mock_session.user = "manager1@example.com"
 			result = cancel_after_start("KOT-1")
 
 		self.assertEqual(result["manager_confirmed_by"], "manager1@example.com")
+
+
+# ---------------------------------------------------------------------------
+# Item 9 -- wastage capture wiring (acceptance criteria 3, 4, 11)
+# ---------------------------------------------------------------------------
+
+
+class TestCancellationWastageCaptureWiring(FrappeTestCase):
+	def setUp(self):
+		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+		now_patcher.start()
+		self.addCleanup(now_patcher.stop)
+
+	def _cancel(self, fn, state, capture, **kwargs):
+		get_doc_side_effect, created = _new_doc_recorder()
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
+			f"{MODULE}.frappe.db.sql", return_value=[dict(_existing_row(state=state))]
+		), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.frappe.get_roles", return_value=["URY Manager"]
+		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage", **capture
+		) as mock_capture:
+			mock_session.user = "manager1@example.com"
+			result = fn("KOT-1", **kwargs)
+		return result, mock_capture
+
+	def test_cancel_after_start_captures_with_the_kots_own_scope(self):
+		"""AC 3: the capture runs, scoped to this KOT/execution/branch/company."""
+		result, capture = self._cancel(
+			cancel_after_start, IN_PREPARATION, {"return_value": _captured(["W-1", "W-2"])}
+		)
+
+		self.assertEqual(result["state"], CANCELLED_AFTER_START)
+		kwargs = capture.call_args.kwargs
+		self.assertEqual(kwargs["kot"], "KOT-1")
+		self.assertEqual(kwargs["branch"], "Branch A")
+		self.assertEqual(kwargs["company"], "Company A")
+		self.assertEqual(kwargs["disposition"], "Wastage")
+		self.assertEqual(kwargs["kot_execution"], result["name"])
+		self.assertEqual(result["wastage_rows"], ["W-1", "W-2"])
+		self.assertEqual(result["wastage_derivation"], "posting_intent")
+
+	def test_cancel_after_ready_forwards_an_explicit_disposition(self):
+		result, capture = self._cancel(
+			cancel_after_ready,
+			READY,
+			{"return_value": _captured(["W-1"])},
+			disposition="Staff Meal",
+			reason_category="Other",
+			reason_notes="given to kitchen staff",
+		)
+		kwargs = capture.call_args.kwargs
+		self.assertEqual(kwargs["disposition"], "Staff Meal")
+		self.assertEqual(kwargs["reason_category"], "Other")
+		self.assertEqual(kwargs["reason_notes"], "given to kitchen staff")
+		self.assertEqual(result["wastage_disposition"], "Staff Meal")
+
+	def test_cancel_before_start_captures_no_wastage(self):
+		"""AC 4: CANCELLED_BEFORE_START consumed nothing, so writes off nothing."""
+		get_doc_side_effect, created = _new_doc_recorder()
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(f"{MODULE}.frappe.db.sql", return_value=[]), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage"
+		) as mock_capture:
+			mock_session.user = "waiter1@example.com"
+			result = cancel_before_start("KOT-1", actor="waiter1@example.com")
+
+		mock_capture.assert_not_called()
+		self.assertEqual(result["state"], CANCELLED_BEFORE_START)
+		self.assertNotIn("wastage_rows", result)
+
+	def test_capture_failure_never_blocks_a_completed_cancellation(self):
+		"""Fail-open: the state transition is already committed by then."""
+		result, capture = self._cancel(
+			cancel_after_ready,
+			READY,
+			{"side_effect": RuntimeError("wastage account lookup exploded")},
+		)
+
+		self.assertEqual(result["state"], CANCELLED_AFTER_READY)
+		self.assertEqual(result["wastage_rows"], [])
+		self.assertIn("exploded", result["wastage_capture_error"])
+
+	def test_idempotent_replay_is_surfaced_not_duplicated(self):
+		replay = _captured([], existing=["W-EXISTING"])
+		replay["idempotent_replay"] = True
+		result, _capture = self._cancel(
+			cancel_after_start, IN_PREPARATION, {"return_value": replay}
+		)
+
+		self.assertEqual(result["wastage_rows"], [])
+		self.assertTrue(result["wastage_idempotent_replay"])
+		self.assertEqual(result["wastage_existing_rows"], ["W-EXISTING"])
+
+	def test_disposition_notes_describe_the_implemented_route(self):
+		"""AC 11: both notes name the route that exists, not its absence."""
+		for fn, state in ((cancel_after_start, IN_PREPARATION), (cancel_after_ready, READY)):
+			result, _capture = self._cancel(fn, state, {"return_value": _captured(["W-1"])})
+			note = result["disposition_note"]
+			self.assertNotIn("not implemented here", note)
+			self.assertNotIn("does not model yet", note)
+			self.assertIn("URY Issue Wastage", note)
+			self.assertIn("approve", note.lower())
+
+	def test_module_no_longer_documents_g08_as_an_open_gap(self):
+		import inspect
+
+		from ury.ury.api import ury_kot_cancellation_service
+
+		source = inspect.getsource(ury_kot_cancellation_service)
+		self.assertIn("G-08 RESOLVED", source)
+		self.assertNotIn("TODO (tracked, deliberate)", source)
+		# It still must never restore or reverse consumed stock.
+		self.assertNotIn("reverse_stock", source)
+
+	def test_cancel_before_start_captures_when_production_posted_at_queued(self):
+		"""Review fix: item 6 lets `production_posting_trigger_state = QUEUED`
+		post a real Manufacture Stock Entry while the KOT is still QUEUED, so
+		"QUEUED" no longer implies "consumed nothing". When a POSTED intent
+		exists, cancel_before_start must capture the write-off too -- otherwise
+		consumed raws and a finished good sit in the ledger against no sale
+		with no write-off, which is exactly the hole G-08 closed for the other
+		two states.
+		"""
+		get_doc_side_effect, _created = _new_doc_recorder()
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(f"{MODULE}.frappe.db.sql", return_value=[]), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.ury_wastage.kot_has_posted_consumption", return_value=True
+		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage",
+			return_value=_captured(["W-Q1"]),
+		) as mock_capture:
+			mock_session.user = "manager1@example.com"
+			result = cancel_before_start(
+				"KOT-1", actor="manager1@example.com", disposition="Staff Meal"
+			)
+
+		mock_capture.assert_called_once()
+		self.assertEqual(result["state"], CANCELLED_BEFORE_START)
+		self.assertEqual(mock_capture.call_args.kwargs["disposition"], "Staff Meal")
+		self.assertEqual(result["wastage_rows"], ["W-Q1"])
+		self.assertTrue(result["disposition_required"])

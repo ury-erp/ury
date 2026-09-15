@@ -162,13 +162,46 @@ export async function reprintKot(invoiceNumber: string): Promise<void> {
 }
 
 /**
- * Cancels an order/invoice with the provided reason
+ * Cancels an order/invoice.
  * @param invoice_id The invoice ID to cancel
- * @param reason The reason for cancellation
+ * @param reason The required cancellation reason -- a value from the shared
+ *   `CANCEL_REASONS` vocabulary (`frontend/src/services/departmentStock.ts`),
+ *   validated server-side against `ury_wastage.CANCEL_REASONS`.
+ * @param reasonNotes Optional free-text detail alongside `reason`.
+ * @param disposition Required only when the order's KOT execution state is
+ *   IN_PREPARATION/READY -- a value from `CANCEL_DISPOSITIONS`. Threaded into
+ *   `ury_wastage.capture_kot_cancellation_wastage()`'s disposition instead of
+ *   relying on that function's own default.
  */
-export async function cancelOrder(invoice_id: string, reason: string): Promise<void> {
+export interface OrderCancellationContext {
+  kots: Array<{ kot: string; state: string }>;
+  requires_disposition: boolean;
+  cancel_reasons: string[];
+  dispositions: string[];
+}
+
+/**
+ * Read-only context for the cancel dialog: whether this order's KOT already
+ * progressed past QUEUED (so the disposition control must be shown), plus the
+ * server's cancel-reason/disposition vocabulary.
+ */
+export async function getOrderCancellationContext(invoice_id: string): Promise<OrderCancellationContext> {
+  const res: any = await call.get('ury.ury.doctype.ury_order.ury_order.get_order_cancellation_context', {
+    invoice_id,
+  });
+  return (res?.message ?? res) as OrderCancellationContext;
+}
+
+export async function cancelOrder(
+  invoice_id: string,
+  reason: string,
+  reasonNotes?: string,
+  disposition?: string,
+): Promise<void> {
   await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
     invoice_id,
     reason,
+    reason_notes: reasonNotes,
+    disposition,
   });
 }

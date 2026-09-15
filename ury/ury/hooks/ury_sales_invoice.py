@@ -263,6 +263,52 @@ def fulfil_reservations_on_consolidation(doc, method=None):
     are logged; `expire_stale_reservations` (registered in `scheduler_events`)
     is the backstop that keeps a missed close-out from leaking capacity
     forever.
+
+    Cancellation of the consolidated invoice (G-14): this handler is
+    registered on `Sales Invoice.on_submit` only and has no `on_cancel`
+    counterpart. When the POS Closing Entry that produced this consolidated
+    invoice is later cancelled, native ERPNext reverses the stock ledger
+    entries this invoice wrote, but the `URY Stock Reservation` groups this
+    handler already moved `Reserved -> Fulfilled` are deliberately left
+    `Fulfilled`, and the `fulfilled_qty` it added to the corresponding
+    `Sales Plan Commit` via `apply_commit_delta` is likewise not rolled back.
+    This is a conscious choice, not an oversight:
+
+      - **Re-closing is a safe no-op on the reservation side.** On a
+        subsequent closing of the same session, `_fulfil_reservations_for_
+        consolidated_invoice` only ever queries groups with
+        `status == Reserved`; a group already `Fulfilled` from the
+        cancelled closing simply is not selected again, so
+        `fulfil_reservation_if_pending` never re-fires and `fulfilled_qty`
+        is not double-incremented on the re-close either. The group ends up
+        exactly where a normal, uncancelled close would have left it.
+      - **The transient `Bin`-vs-reservation over-count self-heals on
+        re-close.** Immediately after the cancel, `Bin` is re-credited by
+        the SLE reversal while the reservation stays `Fulfilled` (a
+        terminal state, excluded from `ACTIVE_STATUSES` and therefore not
+        subtracted in `get_available_capacity()`), so availability is
+        briefly over-stated by the session's qty. The moment the session is
+        re-closed, `Bin` is debited again by the new consolidated invoice's
+        SLEs and the over-count disappears. For a MADE_TO_ORDER item this
+        `Bin` re-credit is itself notional (the food is physically gone),
+        but that is native ERPNext's standard behaviour for cancelling an
+        `update_stock` invoice and is the expected cost of an accounting
+        correction, not something this handler needs to compensate for.
+      - **The only real asymmetry** is that a cancel which is *never*
+        followed by a re-close leaves `fulfilled_qty` on the `Sales Plan
+        Commit` permanently claiming a sale that was undone. This is judged
+        low severity (a closing entry left cancelled-and-unreclosed is
+        itself an abnormal, actionable operational state) and is
+        deliberately not addressed by adding a `Sales Invoice.on_cancel`
+        revert here: doing so correctly would require distinguishing
+        groups this handler fulfilled from groups fulfilled by the
+        fulfilment posting service at production time (POS Stock Authority
+        V2, MADE_TO_ORDER) via the group's `audit_log`, since reverting the
+        latter to `Reserved` would be wrong -- their ingredients really
+        were consumed. See the track doc
+        `tracks/sa-pos-followups-and-ux/ITEM_7_CANCELLATION_REVERSAL.md`,
+        section 3 (G-14), option (A), for the full analysis and the
+        rejected option (B).
     """
     if not doc.get("is_consolidated"):
         return

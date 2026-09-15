@@ -19,7 +19,15 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill, cancelOrder } from '../lib/order-api';
+import { splitBill, cancelOrder, getOrderCancellationContext, type OrderCancellationContext } from '../lib/order-api';
+import { Select, SelectItem } from '@ury/ui';
+import {
+  CANCEL_REASONS,
+  CANCEL_DISPOSITIONS,
+  departmentStockService,
+  type CancelDisposition,
+  type CancellationWastageEstimate,
+} from '../../../services/departmentStock';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -117,7 +125,13 @@ export default function Orders() {
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState('');
+  const [cancelReasonNotes, setCancelReasonNotes] = React.useState('');
+  const [cancelDisposition, setCancelDisposition] = React.useState<CancelDisposition | ''>('');
   const [cancelLoading, setCancelLoading] = React.useState(false);
+  const [cancelContext, setCancelContext] = React.useState<OrderCancellationContext | null>(null);
+  const [cancelContextLoading, setCancelContextLoading] = React.useState(false);
+  const [cancelEstimate, setCancelEstimate] = React.useState<CancellationWastageEstimate | null>(null);
+  const [cancelEstimateLoading, setCancelEstimateLoading] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
   const [showSplitDialog, setShowSplitDialog] = React.useState(false);
@@ -210,18 +224,83 @@ export default function Orders() {
     }
   };
 
+  // Load cancellation context (KOT execution state) whenever the dialog
+  // opens for a given order, so the disposition control is shown only when
+  // AC-5 requires it (IN_PREPARATION/READY), not for a still-QUEUED KOT.
+  useEffect(() => {
+    if (!cancelDialogOpen || !selectedOrder) {
+      setCancelContext(null);
+      setCancelReason('');
+      setCancelReasonNotes('');
+      setCancelDisposition('');
+      setCancelEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    setCancelContextLoading(true);
+    getOrderCancellationContext(selectedOrder.name)
+      .then((ctx) => {
+        if (!cancelled) setCancelContext(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setCancelContext(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCancelContextLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cancelDialogOpen, selectedOrder]);
+
+  const firstPostProductionKot = useMemo(() => {
+    if (!cancelContext) return null;
+    return cancelContext.kots.find((row) => row.state === 'IN_PREPARATION' || row.state === 'READY') || null;
+  }, [cancelContext]);
+
+  // Show the estimated write-off value (AC-6) once a disposition is chosen
+  // for a post-production cancellation.
+  useEffect(() => {
+    if (!firstPostProductionKot || !cancelDisposition) {
+      setCancelEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    setCancelEstimateLoading(true);
+    departmentStockService
+      .estimateCancellationWastageValue(firstPostProductionKot.kot, cancelDisposition)
+      .then((estimate) => {
+        if (!cancelled) setCancelEstimate(estimate);
+      })
+      .catch(() => {
+        if (!cancelled) setCancelEstimate(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCancelEstimateLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [firstPostProductionKot, cancelDisposition]);
+
   async function handleCancelOrder() {
     if (!selectedOrder) return;
-    if (!cancelReason.trim()) {
+    if (!cancelReason) {
       showToast.error(t('errors.enter_cancel_reason'));
+      return;
+    }
+    if (cancelContext?.requires_disposition && !cancelDisposition) {
+      showToast.error(t('errors.enter_cancel_disposition'));
       return;
     }
     setCancelLoading(true);
     try {
-      await cancelOrder(selectedOrder.name, cancelReason);
+      await cancelOrder(selectedOrder.name, cancelReason, cancelReasonNotes || undefined, cancelDisposition || undefined);
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
+      setCancelReasonNotes('');
+      setCancelDisposition('');
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
@@ -675,14 +754,53 @@ export default function Orders() {
                     {t('errors.enter_cancel_reason')}
                   </DialogDescription>
                 </DialogHeader>
-                <div className="px-6 mb-3">
-                <Textarea
-                  placeholder={t('order.enter_cancel_reason')}
+                <div className="px-6 mb-3 space-y-3">
+                <Select
                   value={cancelReason}
-                  onChange={e => setCancelReason(e.target.value)}
+                  onValueChange={setCancelReason}
                   disabled={cancelLoading}
-                  autoFocus
+                  placeholder={t('order.select_cancel_reason')}
+                >
+                  {CANCEL_REASONS.map((reasonOption) => (
+                    <SelectItem key={reasonOption} value={reasonOption}>
+                      {reasonOption}
+                    </SelectItem>
+                  ))}
+                </Select>
+                <Textarea
+                  placeholder={t('order.cancel_reason_notes')}
+                  value={cancelReasonNotes}
+                  onChange={e => setCancelReasonNotes(e.target.value)}
+                  disabled={cancelLoading}
                 />
+                {cancelContextLoading ? (
+                  <Spinner className="h-4 w-4" />
+                ) : cancelContext?.requires_disposition ? (
+                  <>
+                    <Select
+                      value={cancelDisposition}
+                      onValueChange={(value) => setCancelDisposition(value as CancelDisposition)}
+                      disabled={cancelLoading}
+                      placeholder={t('order.select_disposition')}
+                    >
+                      {CANCEL_DISPOSITIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    {cancelDisposition ? (
+                      <div className="text-sm text-muted-foreground">
+                        {t('order.estimated_writeoff')}:{' '}
+                        {cancelEstimateLoading
+                          ? '...'
+                          : cancelEstimate
+                          ? formatCurrency(cancelEstimate.estimated_total)
+                          : '--'}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>

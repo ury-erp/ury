@@ -18,6 +18,20 @@ Pinned here:
   5. Empty `pos_transactions` (a shift with no sales) -> trivial pass.
   6. An unexpected exception inside the reconciliation -> blocked with a
      manager-readable message, never a raw traceback.
+
+PR #386 review follow-up, Item 2 (hook-ordering self-sufficiency):
+
+  7. `_session_invoice_names` self-calls `populate_pos_transactions`, so an
+     empty `pos_transactions` with submitted unconsolidated POS Invoices
+     still in the period is caught rather than silently passed -- even
+     when simulating T5 running BEFORE `ury_pos_closing_entry.validate`
+     (i.e. hook order reversed).
+  8. A genuinely empty shift (no matching POS Invoices at all) still
+     passes, per the existing `_reconcile_session` contract.
+  9. Caller-supplied `pos_transactions` is never overwritten by the extra
+     `populate_pos_transactions` call.
+  10. The literal order of `hooks.py`'s "POS Closing Entry" `validate` list
+      is asserted directly, so a future reorder shows up as a red test.
 """
 
 from unittest.mock import patch
@@ -27,6 +41,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_stock_policy import StockPolicy
 from ury.ury.hooks.ury_pos_closing_reconciliation import (
+	drain_session_postings,
 	validate_closing_reconciliation,
 )
 
@@ -152,7 +167,7 @@ class TestClosingReconciliation(FrappeTestCase):
 			_verify_invoice_production,
 		)
 
-		def _boom(invoice_doc, strict=False):
+		def _boom(invoice_doc, strict=False, retry=True):
 			frappe.throw("Production posting is missing for item Biryani on KOT KOT-3.")
 
 		with patch(
@@ -174,6 +189,10 @@ class TestClosingReconciliation(FrappeTestCase):
 		# here would let a not-yet-POSTED intent advisory-pass both gates.
 		_, kwargs = mock_verify.call_args
 		self.assertTrue(kwargs.get("strict"))
+		# Item 3: T5 must call with retry=False too, so `validate` performs
+		# zero document writes -- the drain pass in `before_validate` is now
+		# the only place that write happens.
+		self.assertFalse(kwargs.get("retry"))
 
 	def test_unreadable_invoice_is_reported_not_crashed(self):
 		from ury.ury.hooks.ury_pos_closing_reconciliation import (
@@ -295,3 +314,414 @@ class TestClosingReconciliation(FrappeTestCase):
 		with patch(f"{MODULE}._reconcile_session") as reconcile:
 			validate_closing_reconciliation(doc)
 		self.assertEqual(reconcile.call_count, 0)
+
+	# -- 7-10. Item 2 follow-up: hook-ordering self-sufficiency ----------
+
+	def test_empty_transactions_with_unconsolidated_invoices_is_not_a_silent_pass(self):
+		"""Simulates T5 running BEFORE `ury_pos_closing_entry.validate` (a
+		hypothetical hook reorder): `pos_transactions` is empty even though
+		submitted, unconsolidated POS Invoices exist for this session. The
+		self-population call is left to run for real (not mocked) -- it
+		finds the same invoices via its own query and would normally
+		repopulate `pos_transactions` -- but here we mock its own
+		`frappe.get_all` to look like no invoices were found either, so the
+		fail-open window is exercised: the confirming query in
+		`_confirm_genuinely_empty` (mocked to return a row) must catch it
+		and route into the system-error throw."""
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_all",
+			return_value=[{"name": "POSINV-99", "consolidated_invoice": None}],
+		), patch(
+			f"{MODULE}.frappe.log_error"
+		) as log_error:
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				validate_closing_reconciliation(doc)
+
+		message = str(ctx.exception)
+		self.assertIn("system error", message.lower())
+		self.assertEqual(log_error.call_count, 1)
+		# Never a silent pass: pos_transactions is still empty and yet we
+		# raised, rather than `_reconcile_session` returning [].
+		self.assertEqual(doc.pos_transactions, [])
+
+	def test_genuinely_empty_shift_still_passes(self):
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		):
+			validate_closing_reconciliation(doc)  # must not raise
+
+	def test_caller_supplied_pos_transactions_not_overwritten(self):
+		doc = _closing(["POSINV-1"])
+
+		# `ury_pos_closing_entry` and `ury_pos_closing_reconciliation` both
+		# do a plain `import frappe`, so `MODULE.frappe` and
+		# `ury_pos_closing_entry.frappe` are the *same* module object --
+		# patching `frappe.get_all` via either module-qualified path patches
+		# the one shared attribute. Patching it twice under a single `with`
+		# (as an earlier version of this test did, one patch per module)
+		# silently makes the later patch win for *all* callers, which let a
+		# real `frappe.get_all` call from `_verify_reservations_resolvable`
+		# (its "URY Stock Reservation" lookup, unrelated to
+		# `populate_pos_transactions`) get attributed to the wrong mock and
+		# fail an over-broad `assert_not_called()`. Use a single patch with
+		# a side effect that only objects to the specific query
+		# `populate_pos_transactions` would issue (a "POS Invoice" lookup),
+		# so the assertion is scoped to what this test actually claims:
+		# populate_pos_transactions's own `:44` guard returns before ever
+		# issuing its query, because pos_transactions is non-empty -- the
+		# caller-supplied row is never overwritten. Other, unrelated
+		# `frappe.get_all` calls in the same code path (like the stock
+		# reservation lookup) are expected and allowed.
+		def _get_all_side_effect(doctype, *args, **kwargs):
+			if doctype == "POS Invoice":
+				raise AssertionError(
+					"populate_pos_transactions must not query POS Invoice "
+					"when pos_transactions is already caller-supplied"
+				)
+			return []
+
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}._verify_invoice_production", return_value=None
+		) as verify, patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_side_effect
+		) as get_all:
+			validate_closing_reconciliation(doc)  # must not raise
+
+		self.assertEqual(len(doc.pos_transactions), 1)
+		self.assertEqual(doc.pos_transactions[0].pos_invoice, "POSINV-1")
+		self.assertEqual(verify.call_count, 1)
+		# Sanity check that the side effect actually ran (i.e. this test
+		# would fail loudly if populate_pos_transactions ever did query
+		# "POS Invoice" again).
+		self.assertTrue(get_all.called)
+
+	def test_hook_order_entry_populate_precedes_reconciliation(self):
+		"""Documents the current order as defence-in-depth (not a
+		correctness requirement, per the extended `hooks.py` comment): a
+		future reorder is now caught by fix (a)+(b) above, but this test
+		still pins the order so a reorder is visible as a diff, not just a
+		latent risk."""
+		validate_hooks = frappe.get_hooks("doc_events").get("POS Closing Entry", {}).get(
+			"validate", []
+		)
+		entry_index = validate_hooks.index("ury.ury.hooks.ury_pos_closing_entry.validate")
+		reconciliation_index = validate_hooks.index(
+			"ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation"
+		)
+		self.assertLess(entry_index, reconciliation_index)
+
+	def test_gate_off_skips_self_population_too(self):
+		"""Acceptance criterion 5: the gate-off no-op must precede ANY new
+		work, including the self-population call added for this fix."""
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_OFF,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all"
+		) as entry_get_all, patch(
+			f"{MODULE}.frappe.get_all"
+		) as recon_get_all:
+			validate_closing_reconciliation(doc)
+
+		entry_get_all.assert_not_called()
+		recon_get_all.assert_not_called()
+
+
+class TestDrainSessionPostings(FrappeTestCase):
+	"""Item 3: `POS Closing Entry.before_validate` drain pass.
+
+	This is the ONLY place in the closing flow allowed to write documents
+	(call `process_posting_intent`). `validate_closing_reconciliation`
+	itself must remain provably write-free -- see `test_ury_feature_flags`'s
+	`retry=False` tests and `test_verification_failure_is_translated_not_swallowed`
+	above, which pin T5's call as `strict=True, retry=False`.
+	"""
+
+	def test_gate_off_is_a_total_no_op(self):
+		doc = _closing(["POSINV-1"])
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_OFF,
+		), patch(f"{MODULE}.frappe.get_all") as get_all, patch(
+			f"{MODULE}.frappe.db.get_value"
+		) as get_value:
+			drain_session_postings(doc)
+
+		self.assertEqual(get_all.call_count, 0)
+		self.assertEqual(get_value.call_count, 0)
+
+	def test_drain_attempts_a_retrying_verify_for_every_session_invoice(self):
+		doc = _closing(["POSINV-1", "POSINV-2"])
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			side_effect=lambda dt, name, fields, as_dict=True: frappe._dict(
+				{"name": name, "branch": "BR-1", "company": "Co"}
+			),
+		), patch(
+			"ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice"
+		) as mock_verify:
+			drain_session_postings(doc)
+
+		self.assertEqual(mock_verify.call_count, 2)
+		for call in mock_verify.call_args_list:
+			_, kwargs = call
+			# Opportunistic self-heal, not the enforcement point: must
+			# attempt the write (retry=True) and must never itself be the
+			# thing that decides the shift can't close (strict=False, and
+			# any resulting exception is swallowed -- see the next test).
+			self.assertFalse(kwargs.get("strict"))
+			self.assertTrue(kwargs.get("retry"))
+
+	def test_drain_never_raises_and_continues_past_a_failing_invoice(self):
+		doc = _closing(["POSINV-BAD", "POSINV-OK"])
+
+		def boom_then_ok(invoice_doc, strict=False, retry=True):
+			if invoice_doc.name == "POSINV-BAD":
+				frappe.throw("still not posted")
+			return None
+
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			side_effect=lambda dt, name, fields, as_dict=True: frappe._dict(
+				{"name": name, "branch": "BR-1", "company": "Co"}
+			),
+		), patch(
+			"ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice",
+			side_effect=boom_then_ok,
+		) as mock_verify:
+			drain_session_postings(doc)  # must not raise
+
+		self.assertEqual(mock_verify.call_count, 2)
+
+	def test_drain_skips_unreadable_invoice(self):
+		doc = _closing(["POSINV-GONE"])
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			"ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice"
+		) as mock_verify:
+			drain_session_postings(doc)  # must not raise
+
+		mock_verify.assert_not_called()
+
+	def test_self_heal_end_to_end_drain_then_validate_passes(self):
+		"""Acceptance criterion 2: a closing entry with one PENDING intent for
+		an otherwise-clean shift posts the Stock Entry in `before_validate`
+		and then passes `validate_closing_reconciliation` (retry=False,
+		re-reading only)."""
+		doc = _closing(["POSINV-1"])
+		state = {"status": "PENDING"}
+
+		def fake_process_posting_intent(name):
+			state["status"] = "POSTED"
+
+		def get_all(doctype, **kwargs):
+			if doctype == "URY KOT":
+				return [frappe._dict({"name": "KOT-001"})]
+			if doctype == "URY KOT Item Execution":
+				return [
+					frappe._dict(
+						{
+							"name": "EXEC-1",
+							"kot_item": "KOTITEM-1",
+							"state": "READY",
+							"idempotency_key": "rev-1",
+							"branch": "BR-1",
+							"company": "Co",
+						}
+					)
+				]
+			if doctype == "URY Fulfilment Posting Intent":
+				return [
+					frappe._dict(
+						{
+							"name": "INTENT-1",
+							"status": state["status"],
+							"accepted_revision": "rev-1",
+							"accepted_qty": 1,
+						}
+					)
+				]
+			# Reservations lookup inside `validate_closing_reconciliation`.
+			return []
+
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			side_effect=lambda dt, name, fields=None, as_dict=True: frappe._dict(
+				{"name": name, "branch": "BR-1", "company": "Co"}
+			),
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.db.get_value",
+			return_value=frappe._dict({"item": "BURGER", "quantity": 1}),
+		), patch(
+			"ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+		), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.process_posting_intent",
+			side_effect=fake_process_posting_intent,
+		):
+			# `frappe.get_all` is one shared module attribute across both
+			# `ury_feature_flags` and `ury_pos_closing_reconciliation` (same
+			# `frappe` module object) -- `get_all` above already returns []
+			# for anything that isn't KOT/execution/intent, which covers
+			# `_verify_reservations_resolvable`'s reservation-group query too.
+			# Simulate hook order: before_validate runs first, then validate.
+			drain_session_postings(doc)
+			self.assertEqual(state["status"], "POSTED")
+
+			validate_closing_reconciliation(doc)  # must not raise
+
+	def test_genuinely_stuck_intent_still_blocks_after_drain(self):
+		"""Acceptance criterion 4: if the drain pass's retry genuinely can't
+		post (e.g. a real failure, not just lag), T5's strict=True,
+		retry=False call still blocks -- it does not get to retry again and
+		does not silently pass."""
+		doc = _closing(["POSINV-1"])
+
+		def get_all(doctype, **kwargs):
+			if doctype == "URY KOT":
+				return [frappe._dict({"name": "KOT-001"})]
+			if doctype == "URY KOT Item Execution":
+				return [
+					frappe._dict(
+						{
+							"name": "EXEC-1",
+							"kot_item": "KOTITEM-1",
+							"state": "READY",
+							"idempotency_key": "rev-1",
+							"branch": "BR-1",
+							"company": "Co",
+						}
+					)
+				]
+			if doctype == "URY Fulfilment Posting Intent":
+				# Never transitions to POSTED, no matter how many times the
+				# drain retried it.
+				return [
+					frappe._dict(
+						{
+							"name": "INTENT-1",
+							"status": "FAILED",
+							"accepted_revision": "rev-1",
+							"accepted_qty": 1,
+						}
+					)
+				]
+			return []
+
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			side_effect=lambda dt, name, fields=None, as_dict=True: frappe._dict(
+				{"name": name, "branch": "BR-1", "company": "Co"}
+			),
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.db.get_value",
+			return_value=frappe._dict({"item": "BURGER", "quantity": 1}),
+		), patch(
+			"ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+		), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.process_posting_intent"
+		):
+			with self.assertRaises(frappe.ValidationError):
+				validate_closing_reconciliation(doc)
+
+	def test_repeated_drain_does_not_retry_an_already_posted_intent(self):
+		"""Acceptance criterion 5: once an intent is POSTED, a later drain
+		pass (a second save cycle) must not call `process_posting_intent`
+		for it again."""
+		doc = _closing(["POSINV-1"])
+
+		def get_all(doctype, **kwargs):
+			if doctype == "URY KOT":
+				return [frappe._dict({"name": "KOT-001"})]
+			if doctype == "URY KOT Item Execution":
+				return [
+					frappe._dict(
+						{
+							"name": "EXEC-1",
+							"kot_item": "KOTITEM-1",
+							"state": "READY",
+							"idempotency_key": "rev-1",
+							"branch": "BR-1",
+							"company": "Co",
+						}
+					)
+				]
+			if doctype == "URY Fulfilment Posting Intent":
+				return [
+					frappe._dict(
+						{
+							"name": "INTENT-1",
+							"status": "POSTED",
+							"accepted_revision": "rev-1",
+							"accepted_qty": 1,
+						}
+					)
+				]
+			return []
+
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			side_effect=lambda dt, name, fields=None, as_dict=True: frappe._dict(
+				{"name": name, "branch": "BR-1", "company": "Co"}
+			),
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+		), patch(
+			"ury.ury.api.ury_feature_flags.frappe.db.get_value",
+			return_value=frappe._dict({"item": "BURGER", "quantity": 1}),
+		), patch(
+			"ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+		), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.process_posting_intent"
+		) as mock_process:
+			# Three save cycles: draft save, draft save again, submit.
+			drain_session_postings(doc)
+			drain_session_postings(doc)
+			drain_session_postings(doc)
+
+		mock_process.assert_not_called()

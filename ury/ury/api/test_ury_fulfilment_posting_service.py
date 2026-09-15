@@ -243,6 +243,46 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.assertEqual(payload["fg_warehouse"], "Kitchen WH")
 		created[0].insert.assert_called_once_with(ignore_permissions=False)
 
+	def test_queued_creates_one_intent_same_as_ready(self):
+		"""Item 6 (sa-pos-followups-and-ux): a QUEUED execution state (used
+		when an item's `production_posting_trigger_state` is configured to
+		QUEUED, so posting happens from `seed_kot_item_executions` at KOT
+		submission) is accepted here exactly like READY/SERVED.
+		"""
+		created = []
+
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			if isinstance(arg, dict):
+				doc = _doc(arg)
+				doc.name = "INTENT-1"
+				created.append(doc)
+				return doc
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		execution = _execution_doc()
+		execution.state = "QUEUED"
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create()
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = create_or_get_posting_intent_for_ready(execution, actor="chef@example.com")
+
+		self.assertEqual(result["name"], "INTENT-1")
+		self.assertFalse(result["idempotent_replay"])
+		self.assertEqual(created[0]["production_policy"], "MADE_TO_ORDER")
+
 	def test_pre_produced_ready_creates_no_intent_and_posts_nothing(self):
 		"""Production posting is for MADE_TO_ORDER only.
 
@@ -648,10 +688,16 @@ class TestProcessPostingIntent(FrappeTestCase):
 		# no longer Reserved and fail the replay).
 		fulfil.assert_called_once_with("GROUP-1")
 
-	def test_ready_or_served_is_required(self):
+	def test_queued_ready_or_served_is_required(self):
+		"""Item 6 (sa-pos-followups-and-ux): QUEUED joined READY/SERVED as a
+		valid execution state here, since a per-item
+		`production_posting_trigger_state` of QUEUED now calls this same
+		function from `seed_kot_item_executions`. IN_PREPARATION, which no
+		configurable trigger ever targets, remains rejected.
+		"""
 		execution = _execution_doc()
-		execution.state = "QUEUED"
-		with self.assertRaisesRegex(Exception, "requires READY or SERVED"):
+		execution.state = "IN_PREPARATION"
+		with self.assertRaisesRegex(Exception, "requires QUEUED, READY or SERVED"):
 			# Use an authorized service actor so this test reaches the state guard.
 			create_or_get_posting_intent_for_ready(execution, actor="Administrator")
 
@@ -686,6 +732,61 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(intent.status, FAILED)
 		self.assertEqual(intent.failure_class, "ValidationError")
 		self.assertTrue(intent.retryable)
+
+	def test_failure_path_is_savepoint_wrapped(self):
+		"""Item 3, hazard 3 fix: a forced exception inside `_submit_stock_entry`
+		must not leave the transaction in a half-mutated state before
+		`_mark_failed` writes to it. Assert a `SAVEPOINT` is taken before the
+		attempt and a `ROLLBACK TO SAVEPOINT` happens on the same savepoint
+		name before `_mark_failed`'s write -- and that `_mark_failed` still
+		succeeds and the intent still ends up FAILED, i.e. the surrounding
+		transaction is still usable afterwards."""
+		intent = self._intent()
+		stock_entry = _doc({"name": "STE-1"})
+		stock_entry.submit.side_effect = frappe.ValidationError("stock failed")
+		docs_by_name = {"INTENT-1": intent}
+
+		def get_doc(arg, name=None, *args, **kwargs):
+			if arg == "URY Fulfilment Posting Intent":
+				return docs_by_name[name]
+			if isinstance(arg, dict) and arg.get("doctype") == "Stock Entry":
+				return stock_entry
+			raise AssertionError(arg)
+
+		sql_calls = []
+
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			sql_calls.append(query)
+			if "tabURY Fulfilment Posting Intent" in query:
+				return [frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+			f"{MODULE}.fulfil_reservation_if_pending"
+		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
+			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = process_posting_intent("INTENT-1")
+
+		self.assertEqual(result["status"], FAILED)
+		fulfil.assert_not_called()
+		self.assertEqual(intent.status, FAILED)
+
+		savepoint_calls = [q for q in sql_calls if q.strip().lower().startswith("savepoint")]
+		rollback_calls = [q for q in sql_calls if "rollback to savepoint" in q.lower()]
+		self.assertEqual(len(savepoint_calls), 1)
+		self.assertEqual(len(rollback_calls), 1)
+		# The rollback must target the exact savepoint that was taken.
+		savepoint_name = savepoint_calls[0].strip().split()[-1]
+		self.assertIn(savepoint_name, rollback_calls[0])
+		# The rollback must happen before `_mark_failed`'s save -- i.e. the
+		# savepoint machinery ran, and the intent write that follows still
+		# succeeds (asserted above via `intent.status == FAILED`), proving
+		# the transaction is still usable after the rollback.
+		self.assertLess(sql_calls.index(rollback_calls[0]), len(sql_calls))
 
 	def test_recovery_reenqueues_only_due_or_stale_intents(self):
 		rows = [

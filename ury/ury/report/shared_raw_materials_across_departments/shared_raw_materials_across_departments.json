@@ -1,0 +1,67 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-09-15 00:00:00.000000",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "mandatory": 1,
+   "options": "Company",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "mandatory": 0,
+   "options": "URY Production Department",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "only_show_gaps",
+   "fieldtype": "Check",
+   "label": "Only show gaps",
+   "default": "1",
+   "mandatory": 0,
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2026-09-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Shared Raw Materials Across Departments",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "",
+ "ref_doctype": "URY Item Production Configuration",
+ "reference_report": "",
+ "report_name": "Shared Raw Materials Across Departments",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}

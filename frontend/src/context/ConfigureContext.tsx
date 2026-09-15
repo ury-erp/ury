@@ -51,7 +51,7 @@ export interface UserData {
   email: string;
   name: string;
   passwordPlaceholder: string;
-  role: string;
+  roles: string[];
 }
 
 export type SectionId = 'branch' | 'rooms' | 'tables' | 'menu' | 'payment' | 'users';
@@ -200,7 +200,7 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
         email: 'cashier@example.com',
         name: 'Cashier',
         passwordPlaceholder: generateRandomPassword(),
-        role: 'URY Cashier',
+        roles: ['URY Cashier'],
       },
     ]
   );

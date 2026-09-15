@@ -209,7 +209,7 @@ doc_events = {
             "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_cancel",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
@@ -237,14 +237,38 @@ doc_events = {
         },
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
+        # Item 3: drain-the-queue pass for lagging fulfilment postings, run
+        # in `before_validate` (before core's own `validate` chain below)
+        # rather than inside `validate` itself. Gated on
+        # `closing_reconciliation_enabled` exactly like T5; complete no-op
+        # when that tier gate is off. Safe on every draft save and on
+        # submit -- `process_posting_intent`/`_claim_intent` are idempotent,
+        # so repeated drain passes across multiple saves never double-post.
+        # This is the ONLY place in this session's closing flow allowed to
+        # write documents; see the comment on the `validate` entry below.
+        "before_validate": "ury.ury.hooks.ury_pos_closing_reconciliation.drain_session_postings",
         "validate":[
             "ury.ury.hooks.ury_pos_closing_entry.validate",
             "ury.ury.utils.stock_count_gate.validate_pos_closing_entry",
             # T5 / I-10: session-scoped closing reconciliation. Runs AFTER
             # `ury_pos_closing_entry.validate`, which is what populates
-            # `pos_transactions` for the custom frontend's path -- this
-            # handler reads that table, so the order matters. No-op unless
-            # the branch has `closing_reconciliation_enabled` (tier gate 3).
+            # `pos_transactions` for the custom frontend's path. Keeping it
+            # after that entry here is defence-in-depth, not a correctness
+            # requirement: `ury_pos_closing_reconciliation._session_invoice_names`
+            # self-calls `populate_pos_transactions` before reading the
+            # table (safe because of that function's own
+            # `if doc.get("pos_transactions"): return` guard), and
+            # additionally confirms via a direct query that an empty table
+            # really is an empty shift rather than a silently-skipped
+            # session, so this handler's correctness no longer depends on
+            # this list's order. No-op unless the branch has
+            # `closing_reconciliation_enabled` (tier gate 3).
+            #
+            # Item 3: as of the `before_validate` drain pass above, this
+            # step calls `_verify_fulfilment_posted_for_invoice` with
+            # `strict=True, retry=False` -- it performs zero document
+            # writes, only re-reading intents the drain pass already acted
+            # on. `validate` itself is therefore provably side-effect-free.
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
         ],
         },
@@ -493,6 +517,11 @@ fixtures = [
                     "Branch-custom_aggregators",
                     "Branch-custom_make_unpaid",
                     "Branch-custom_no_taxes",
+                    "Branch-ury_wastage_accounting_section",
+                    "Branch-wastage_expense_account",
+                    "Branch-damage_expense_account",
+                    "Branch-staff_meal_expense_account",
+                    "Branch-wastage_cost_center",
                     "Price List-restaurant_menu",
                     "POS Profile-custom_enable_discount",
                     "POS Invoice-custom_comments",
@@ -554,7 +583,12 @@ fixtures = [
                     "Stock Entry-branch",
                     "Stock Entry-custom_ury_posting_intent",
                     "POS Profile-cash_discount_account",
-                    "Sales Invoice-cash_discount_journal_entry"
+                    "Sales Invoice-cash_discount_journal_entry",
+                    "POS Profile-payments_accounting_tab",
+                    "POS Profile-restaurant_pos_behaviour_tab",
+                    "POS Profile-roles_restrictions_tab",
+                    "POS Profile-printers_disposables_tab",
+                    "POS Profile-item_customer_defaults_tab"
                 },
             ]
         ],
@@ -566,7 +600,8 @@ fixtures = [
                 "name",
                 "in",
                 {
-                    "POS Closing Entry Detail-closing_amount-label"
+                    "POS Closing Entry Detail-closing_amount-label",
+                    "POS Profile-main-field_order"
                 }
             ]
         ],

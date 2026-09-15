@@ -37,6 +37,15 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
     modifiedTime: null,
     print_format: null,
     cancelReason: null,
+    cancelReasonNotes: null,
+    // Mirrors `ury.ury.api.ury_wastage.CANCEL_REASONS` -- fetched fresh in
+    // `showCancelInvoiceModal` so this list never drifts from the server's.
+    cancelReasons: [],
+    cancelDisposition: null,
+    cancelDispositions: [],
+    cancelDispositionRequired: false,
+    cancelEstimate: null,
+    cancelPostProductionKot: null,
     invoiceNumber: null,
     multipleCashier:null,
     tableInvoiceNo: null,
@@ -665,6 +674,10 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           if (result.message === true) {
             this.cancelInvoiceFlag = true;
             this.cancelReason = "";
+            this.cancelReasonNotes = "";
+            this.cancelDisposition = "";
+            this.cancelEstimate = null;
+            this.fetchCancellationContext();
           } else {
             this.alert.createAlert(
               "Message",
@@ -679,6 +692,53 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           // console.error(error)
         });
     },
+    // Reads the cancel-reason/disposition vocabulary and whether this
+    // order's KOT already progressed past QUEUED (item 10, AC-5), so the
+    // disposition control is shown only when required.
+    fetchCancellationContext() {
+      const recentOrders = usetoggleRecentOrder();
+      let invoiceNo =
+        recentOrders.invoiceNumber ||
+        this.invoiceNumber ||
+        this.table.invoiceNo;
+      if (!invoiceNo) return;
+
+      this.call
+        .get("ury.ury.doctype.ury_order.ury_order.get_order_cancellation_context", {
+          invoice_id: invoiceNo,
+        })
+        .then((result) => {
+          const ctx = result.message || {};
+          this.cancelReasons = ctx.cancel_reasons || [];
+          this.cancelDispositions = ctx.dispositions || [];
+          this.cancelDispositionRequired = !!ctx.requires_disposition;
+          const kots = ctx.kots || [];
+          const postProduction = kots.find(
+            (row) => row.state === "IN_PREPARATION" || row.state === "READY"
+          );
+          this.cancelPostProductionKot = postProduction ? postProduction.kot : null;
+        })
+        .catch((error) => console.error(error));
+    },
+    // Called whenever `cancelDisposition` changes in the template, once a
+    // KOT is known to have already posted production (AC-6: show the
+    // estimated write-off value before confirmation).
+    fetchCancellationEstimate() {
+      const kot = this.cancelPostProductionKot;
+      if (!kot || !this.cancelDisposition) {
+        this.cancelEstimate = null;
+        return;
+      }
+      this.call
+        .get("ury.ury.api.ury_wastage.estimate_kot_cancellation_wastage_value", {
+          kot,
+          disposition: this.cancelDisposition,
+        })
+        .then((result) => {
+          this.cancelEstimate = result.message || null;
+        })
+        .catch((error) => console.error(error));
+    },
     cancelInvoice: async function () {
       const recentOrders = usetoggleRecentOrder();
       let invoiceNo =
@@ -689,6 +749,8 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       const updatedFields = {
         invoice_id: invoiceNo,
         reason: this.cancelReason,
+        reason_notes: this.cancelReasonNotes,
+        disposition: this.cancelDisposition || undefined,
       };
       this.call
         .post("ury.ury.doctype.ury_order.ury_order.cancel_order", updatedFields)

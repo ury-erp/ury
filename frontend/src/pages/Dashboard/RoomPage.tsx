@@ -24,6 +24,19 @@ interface PrinterSetting {
   printer: string;
 }
 
+// URY Room has no room_name field -- the docname itself is stored as
+// "${room_name} - ${branch}". This strips the " - <branch>" suffix so the
+// list view and the edit drawer show the same "Room Name" everywhere
+// (see ITEM_18_BRANCH_MANAGEMENT.md #6/#18b), instead of the list view
+// showing the full suffixed docname.
+const stripRoomBranchSuffix = (room: { name: string; branch?: string }): string => {
+  let displayName = room.name;
+  if (room.branch && displayName.endsWith(` - ${room.branch}`)) {
+    displayName = displayName.substring(0, displayName.length - (` - ${room.branch}`).length);
+  }
+  return displayName;
+};
+
 export const RoomPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [rooms, setRooms] = useState<UryRoomRecord[]>([]);
@@ -102,10 +115,7 @@ export const RoomPage: React.FC = () => {
   const openEditDrawer = async (room: any) => {
     setEditingRoom(room);
     // Derive display name from room.name, stripping branch suffix if present
-    let displayName = room.name;
-    if (room.branch && displayName.endsWith(` - ${room.branch}`)) {
-      displayName = displayName.substring(0, displayName.length - (` - ${room.branch}`).length);
-    }
+    const displayName = stripRoomBranchSuffix(room);
     // Store the original display name to use for rename detection later
     setOriginalRoomDisplayName(displayName);
     setNewRoom({
@@ -256,7 +266,7 @@ export const RoomPage: React.FC = () => {
         <>
           {(() => {
             const roomColumns: DataTableColumn<UryRoomRecord>[] = [
-              { key: 'name', header: 'Room Name' },
+              { key: 'name', header: 'Room Name', render: (room) => stripRoomBranchSuffix(room) },
               {
                 key: 'room_type',
                 header: 'Room Type',

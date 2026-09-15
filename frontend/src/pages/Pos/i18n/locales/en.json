@@ -63,6 +63,10 @@
     "taxes_charges": "Taxes & Charges",
     "cancel_order": "Cancel order",
     "enter_cancel_reason": "Enter cancel reason",
+    "select_cancel_reason": "Select a reason",
+    "cancel_reason_notes": "Additional details (optional)",
+    "select_disposition": "What happened to the food?",
+    "estimated_writeoff": "Estimated write-off value",
     "print": "Print",
     "payment": "Payment",
     "order_actions": "Order actions"
@@ -168,6 +172,7 @@
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
+    "enter_cancel_disposition": "Please select what happened to the food before confirming cancellation.",
     "dine_in_restricted": "Dine In is not available for your role",
     "order_modified": "This order has been modified. Please reload the page to retrieve the latest edits.",
     "order_sync_failed": "Could not sync this order. Please reload the page and try again."

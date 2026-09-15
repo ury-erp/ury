@@ -14,8 +14,10 @@
   "production_unit",
   "production_policy",
   "sourcing_mode",
+  "production_posting_trigger_state",
   "bom",
   "controlled_by_sales_plan",
+  "no_plan_enforcement_mode",
   "allow_over_plan_sale",
   "availability_mode",
   "direct_retail_warehouse",
@@ -49,7 +51,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Department",
-   "options": "URY Production Department"
+   "options": "URY Production Department",
+   "description": "The department that produces this item. All of this item's BOM ingredients are issued from this department's own warehouse (specifically, the warehouse on its Production Unit, falling back to the department warehouse). URY never sources ingredients across departments: if two departments use the same raw material, each must hold its own stock of it, transferred in from a central store by an ordinary Stock Entry."
   },
   {
    "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
@@ -75,10 +78,20 @@
    "options": "IN_HOUSE\nEXTERNAL_RECEIPT"
   },
   {
+   "default": "READY",
+   "depends_on": "eval:doc.production_policy==\"MADE_TO_ORDER\"",
+   "description": "Only meaningful when Production Policy is MADE_TO_ORDER. Chooses which KOT item execution state triggers production posting (creation of the Manufacture Stock Entry / posting intent) for this item: QUEUED (at KOT submission, before preparation begins), READY (default, current behavior -- when the item is marked ready), or SERVED (deferred until the item is served to the guest). A missing row or unset value falls back to READY. Independent of and still gated by URY Branch Stock Policy.realtime_production_posting_enabled.",
+   "fieldname": "production_posting_trigger_state",
+   "fieldtype": "Select",
+   "label": "Production Posting Trigger State",
+   "options": "READY\nSERVED\nQUEUED"
+  },
+  {
    "fieldname": "bom",
    "fieldtype": "Link",
    "label": "BOM",
-   "options": "BOM"
+   "options": "BOM",
+   "description": "The recipe used when this item is produced. Every component in this BOM must be stocked in this item's own department warehouse -- see the Department field."
   },
   {
    "default": "1",
@@ -86,6 +99,15 @@
    "fieldname": "controlled_by_sales_plan",
    "fieldtype": "Check",
    "label": "Controlled by Sales Plan"
+  },
+  {
+   "default": "Hard",
+   "depends_on": "eval:doc.controlled_by_sales_plan",
+   "description": "Only applies when Controlled by Sales Plan is checked and no active Sales Plan row covers this item for today's branch/department. Hard: block the sale until a plan is created/approved. Soft: allow the sale on stock/capacity alone and flag it for review. Left non-mandatory on purpose: rows created before this field existed store NULL, and a reqd flag would make every one of them unsaveable until re-edited. Every reader treats a blank value as Hard.",
+   "fieldname": "no_plan_enforcement_mode",
+   "fieldtype": "Select",
+   "label": "No-Plan Enforcement Mode",
+   "options": "Hard\nSoft"
   },
   {
    "default": "0",

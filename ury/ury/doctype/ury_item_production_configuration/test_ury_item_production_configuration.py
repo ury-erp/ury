@@ -501,4 +501,87 @@ class TestURYItemProductionConfiguration(FrappeTestCase):
                     # Verify error message mentions the component and departments
                     self.assertIn("Component A", str(context.exception))
                     self.assertIn("Dept-001", str(context.exception))
+
+    def test_department_and_bom_field_descriptions_present(self):
+        """AC-5: the IPC form's `department`/`bom` field descriptions carry
+        the Item 4 (§5.2 B-1) proposed wording -- the proactive help text
+        that explains ingredients are issued from this item's own
+        department/production-unit warehouse, never sourced cross-department.
+        """
+        import json
+        import os
+
+        json_path = os.path.join(os.path.dirname(__file__), "ury_item_production_configuration.json")
+        with open(json_path) as f:
+            meta = json.load(f)
+
+        by_fieldname = {f["fieldname"]: f for f in meta["fields"]}
+
+        department_description = by_fieldname["department"].get("description") or ""
+        self.assertIn("own warehouse", department_description)
+        self.assertIn("URY never sources ingredients across departments", department_description)
+
+        bom_description = by_fieldname["bom"].get("description") or ""
+        self.assertIn("own department warehouse", bom_description)
+
+    def test_save_with_unstocked_bom_components_succeeds_no_throw(self):
+        """AC-5: saving an IPC whose BOM components have no stock anywhere
+        must succeed -- the "not stocked here" case is a B-2 warning
+        (rendered client-side by the form's dashboard headline), never a
+        validate-time throw. The retained validator (B-3) only ever throws
+        for a component that is itself an actively-configured sellable item
+        of a *different* department -- a raw material with zero stock and no
+        IPC row of its own (the overwhelming majority case) must never block
+        save.
+        """
+        values = {
+            "Branch": "Branch Co",
+            ("BOM", "BOM-MTO-003"): ("MTO Item Unstocked", "Branch Co"),
+            ("URY Production Department", "Dept-001"): ("Test Branch", "Branch Co"),
+        }
+
+        real_get_value = frappe.db.get_value
+
+        def fake_get_value(doctype, *args, **kwargs):
+            name = kwargs.get("filters", args[0] if args else None)
+            fieldname = kwargs.get("fieldname", args[1] if len(args) > 1 else "name")
+            cache = kwargs.get("cache", args[6] if len(args) > 6 else False)
+
+            if fieldname == "name" and cache and isinstance(name, str):
+                return name
+
+            # Component has no IPC row of its own (ordinary raw material) --
+            # the retained validator no-ops for it regardless of stock.
+            if isinstance(name, dict) and doctype == "URY Item Production Configuration":
+                return None
+
+            if isinstance(name, Hashable):
+                key = (doctype, name) if isinstance(name, str) else name
+                if isinstance(key, tuple) and key in values:
+                    return values[key]
+            if doctype in values:
+                return values[doctype]
+            return real_get_value(doctype, *args, **kwargs)
+
+        with self._patch_link_checks():
+            with patch("frappe.db.get_value", side_effect=fake_get_value):
+                with patch("frappe.get_all") as mock_get_all:
+                    def get_all_side_effect(doctype, *args, **kwargs):
+                        if doctype == "BOM Explosion Item":
+                            return [frappe._dict(item_code="Never Stocked Component")]
+                        return []
+
+                    mock_get_all.side_effect = get_all_side_effect
+
+                    doc = self._make_doc(
+                        item="MTO Item Unstocked",
+                        bom="BOM-MTO-003",
+                        department="Dept-001",
+                        production_policy="MADE_TO_ORDER",
+                    )
+
+                    # Must not raise even though "Never Stocked Component"
+                    # has zero stock anywhere -- that is a B-2 warning, not a
+                    # validate-time gate.
+                    doc.insert(ignore_permissions=True)
                     self.assertIn("Dept-002", str(context.exception))

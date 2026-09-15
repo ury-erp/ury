@@ -74,11 +74,29 @@ class URYItemProductionConfiguration(Document):
             frappe.throw(_("{0} {1} does not belong to Company {2}").format(label, link_name, branch_company))
 
     def validate_no_cross_department_bom_components(self):
-        """Enforce that BOM components are not shared across different production departments.
+        """Throw only for the one case this check genuinely detects: a BOM
+        component that is *itself* an actively-configured sellable item of a
+        *different* department (a real modelling error -- e.g. two selling
+        items, each with their own IPC, where one's recipe uses the other as
+        a raw material across departments).
 
-        A raw material (BOM component item) must never be configured for a different
-        department than the top-level item's IPC. This validation applies only to
-        MADE_TO_ORDER configurations that have a department assigned.
+        This is deliberately narrow. Item 4 / G-13 (sa-pos-followups-and-ux,
+        `ITEM_4_CROSS_DEPARTMENT.md` §5.3) retired this validator's original,
+        broader intent -- catching "this raw material isn't stocked in my own
+        department's warehouse" -- because that condition is legitimate at
+        save time (stock may be zero before the first transfer) and must
+        never block saving the configuration. That detection now lives as a
+        non-blocking warning: `ury_production_context.check_bom_components_stocked`,
+        rendered by the IPC form's dashboard headline alert (see
+        `ury_item_production_configuration.js`), never a validate-time throw.
+
+        Ordinary raw materials (the overwhelming majority of BOM components)
+        have no IPC row at all, so this loop no-ops for them, by design --
+        cross-department *raw-material* sourcing is already structurally
+        impossible (see `ury_reservation_service.create_reservation`'s single
+        `warehouse` parameter, used for every component); this check exists
+        only to catch the narrower, still-real mistake of one *sellable*
+        item's recipe drawing on another sellable item across departments.
         """
         # Only validate MADE_TO_ORDER configurations with a department
         if not self.department:

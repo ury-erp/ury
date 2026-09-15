@@ -136,6 +136,8 @@ export const PosProfilePage: React.FC = () => {
     try {
       let defaultCurrency = '';
       let defaultCostCenter = '';
+      let writeOffAccount = '';
+      let writeOffCostCenter = '';
       if (addForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -165,6 +167,31 @@ export const PosProfilePage: React.FC = () => {
             console.error("Failed to fetch cost center list", e);
           }
         }
+
+        // ERPNext's core POS Profile doctype marks write_off_account and
+        // write_off_cost_center as mandatory. Resolve the same fallback
+        // cascade already proven in the setup wizard (Company default ->
+        // Write Off type Account -> Expense account) via a shared
+        // whitelisted server helper, so this Dashboard flow doesn't hit
+        // ERPNext's raw mandatory-field error the way it used to.
+        try {
+          const defaults = await call<any>('ury.ury.api.pos_profile_defaults.resolve_write_off_defaults', {
+            company: addForm.company,
+          });
+          const resolved = defaults.message || defaults;
+          writeOffAccount = resolved?.write_off_account || '';
+          writeOffCostCenter = resolved?.write_off_cost_center || '';
+        } catch (e) {
+          console.error('Failed to resolve write-off defaults', e);
+        }
+
+        if (!writeOffAccount) {
+          showToast.error(
+            'This company has no default Write Off Account configured. Please set one on the Company before creating a POS Profile.'
+          );
+          setSaving(false);
+          return;
+        }
       }
 
       // ERPNext's standard POS Profile validation requires every payment mode
@@ -190,6 +217,8 @@ export const PosProfilePage: React.FC = () => {
           selling_price_list: addForm.selling_price_list || 'Standard Selling',
           currency: defaultCurrency || undefined,
           cost_center: defaultCostCenter || undefined,
+          write_off_account: writeOffAccount || undefined,
+          write_off_cost_center: writeOffCostCenter || undefined,
           print_format: addForm.print_format || undefined,
           custom_kot_naming_series: addForm.custom_kot_naming_series || undefined,
           applicable_for_users: addForm.applicable_for_users.filter(u => u.user).map(u => ({ user: u.user, default: u.default })),

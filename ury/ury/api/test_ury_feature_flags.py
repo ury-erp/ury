@@ -317,6 +317,87 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
         mock_log_error.assert_not_called()
         self.assertEqual(calls["retry"], 1)
 
+    # -- Item 3: `retry` parameter ---------------------------------------
+
+    def _run_with_unposted_intent_and_retry_flag(self, retry, closing_reconciliation_enabled=True):
+        """Like `_run_with_unposted_intent`, but drives the new `retry`
+        parameter directly and reports whether `process_posting_intent` was
+        called at all -- the thing that must never happen when retry=False,
+        since that is what makes T5's `validate`-time call side-effect-free
+        (Item 3)."""
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+
+        unposted = {
+            "name": "INTENT-1",
+            "status": "PENDING",
+            "accepted_revision": "rev-2",
+            "accepted_qty": 3,
+        }
+
+        def get_all(doctype, **kwargs):
+            if doctype == "URY KOT":
+                return [frappe._dict({"name": "KOT-001"})]
+            if doctype == "URY KOT Item Execution":
+                return [
+                    frappe._dict(
+                        {
+                            "name": "EXEC-1",
+                            "kot_item": "KOTITEM-1",
+                            "state": "READY",
+                            "idempotency_key": "rev-2",
+                            "branch": "Main Branch",
+                            "company": "Acme Co",
+                        }
+                    )
+                ]
+            if doctype == "URY Fulfilment Posting Intent":
+                return [frappe._dict(unposted)]
+            raise AssertionError(doctype)
+
+        doc = frappe._dict({"name": "POS-INV-001", "branch": "Main Branch", "company": "Acme Co"})
+        with patch(
+            "ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+        ), patch(
+            "ury.ury.api.ury_feature_flags.frappe.db.get_value",
+            return_value=frappe._dict({"item": "BURGER", "quantity": 3}),
+        ), patch(
+            "ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+        ), patch(
+            "ury.ury.api.ury_fulfilment_posting_service.process_posting_intent"
+        ) as mock_process, patch(
+            "ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+            return_value=frappe._dict(
+                {"closing_reconciliation_enabled": closing_reconciliation_enabled}
+            ),
+        ), patch("ury.ury.api.ury_feature_flags.frappe.log_error"):
+            with self.assertRaises(frappe.ValidationError):
+                _verify_fulfilment_posted_for_invoice(doc, strict=True, retry=retry)
+            return mock_process
+
+    def test_retry_false_never_calls_process_posting_intent(self):
+        """T5's mode (`strict=True, retry=False`): zero document writes.
+        A genuinely non-POSTED intent still blocks (strict=True), but the
+        retry's write is never attempted."""
+        mock_process = self._run_with_unposted_intent_and_retry_flag(retry=False)
+        mock_process.assert_not_called()
+
+    def test_retry_true_default_still_calls_process_posting_intent(self):
+        """Regression: the till-time caller's default behaviour
+        (retry=True) is unchanged -- the synchronous retry still fires."""
+        mock_process = self._run_with_unposted_intent_and_retry_flag(retry=True)
+        mock_process.assert_called_once_with("INTENT-1")
+
+    def test_default_retry_is_true(self):
+        """The default must stay True so the till-time caller at
+        `maybe_wire_fulfilment_on_submit` -> `_verify_fulfilment_posted_for_invoice(doc)`
+        (called with no `retry` kwarg) is completely unaffected by this
+        parameter's addition."""
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+        import inspect
+
+        sig = inspect.signature(_verify_fulfilment_posted_for_invoice)
+        self.assertTrue(sig.parameters["retry"].default is True)
+
     def test_non_made_to_order_item_requires_no_intent(self):
         """Pre-produced and direct-retail items post nothing at READY, so
         demanding an intent for them would block every submit."""

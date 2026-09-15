@@ -166,11 +166,14 @@ class TestGetItemAvailabilityMadeToOrder(FrappeTestCase):
         self.assertFalse(result["sellable"])
         self.assertEqual(result["available_qty"], 0)
 
+    @patch(f"{MODULE}._component_never_stocked")
     @patch(f"{MODULE}._resolve_plan_remaining")
     @patch(f"{MODULE}.project_component_allocatable")
     @patch(f"{MODULE}.compile_bom_vector")
     @patch(f"{MODULE}._resolve_production_config")
-    def test_blocking_component(self, mock_config, mock_compile, mock_alloc, mock_plan):
+    def test_blocking_component(
+        self, mock_config, mock_compile, mock_alloc, mock_plan, mock_never_stocked
+    ):
         mock_config.return_value = _config(production_policy="MADE_TO_ORDER")
         mock_compile.return_value = {
             "item_code": "ITEM-BURGER",
@@ -186,6 +189,7 @@ class TestGetItemAvailabilityMadeToOrder(FrappeTestCase):
             "PATTY": {"allocatable_qty": 0},
         }
         mock_plan.return_value = {"plan_qty": 30, "plan_remaining": 30}
+        mock_never_stocked.return_value = False
 
         result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
 
@@ -194,13 +198,47 @@ class TestGetItemAvailabilityMadeToOrder(FrappeTestCase):
         self.assertEqual(result["available_qty"], 0)
         self.assertEqual(result["blocking_component"], "PATTY")
         self.assertEqual(result["max_producible"], 0)
+        self.assertFalse(result["blocking_component_never_stocked"])
 
+    @patch(f"{MODULE}._component_never_stocked")
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_blocking_component_never_stocked_flag_reflects_classification(
+        self, mock_config, mock_compile, mock_alloc, mock_plan, mock_never_stocked
+    ):
+        """Item 4 / G-13 (§5.1 availability-path parity): the response
+        carries `blocking_component_never_stocked` alongside `blocking_component`
+        so a misconfigured (never-stocked) item can be badged distinctly from
+        a merely sold-out one, reusing the exact same classification the
+        order-time error uses.
+        """
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER")
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [
+                {"component_item": "PATTY", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+            ],
+        }
+        mock_alloc.return_value = {"PATTY": {"allocatable_qty": 0}}
+        mock_plan.return_value = {"plan_qty": 30, "plan_remaining": 30}
+        mock_never_stocked.return_value = True
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "BLOCKING_COMPONENT")
+        self.assertEqual(result["blocking_component"], "PATTY")
+        self.assertTrue(result["blocking_component_never_stocked"])
+        mock_never_stocked.assert_called_once()
+
+    @patch(f"{MODULE}._component_never_stocked")
     @patch(f"{MODULE}._resolve_plan_remaining")
     @patch(f"{MODULE}.project_component_allocatable")
     @patch(f"{MODULE}.compile_bom_vector")
     @patch(f"{MODULE}._resolve_production_config")
     def test_mto_available_capped_by_recipe_capacity(
-        self, mock_config, mock_compile, mock_alloc, mock_plan
+        self, mock_config, mock_compile, mock_alloc, mock_plan, mock_never_stocked
     ):
         mock_config.return_value = _config(production_policy="MADE_TO_ORDER")
         mock_compile.return_value = {
@@ -215,6 +253,7 @@ class TestGetItemAvailabilityMadeToOrder(FrappeTestCase):
             "PATTY": {"allocatable_qty": 10},
         }
         mock_plan.return_value = {"plan_qty": 30, "plan_remaining": 30}
+        mock_never_stocked.return_value = False
 
         result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
 
@@ -222,6 +261,7 @@ class TestGetItemAvailabilityMadeToOrder(FrappeTestCase):
         self.assertTrue(result["sellable"])
         self.assertEqual(result["available_qty"], 10)  # min(plan_remaining=30, recipe_capacity=10)
         self.assertEqual(result["blocking_component"], "PATTY")
+        self.assertFalse(result["blocking_component_never_stocked"])
 
 
 class TestGetItemAvailabilityFailClosed(FrappeTestCase):
@@ -537,6 +577,144 @@ class TestControlledBySalesPlanPolarity(FrappeTestCase):
         self.assertEqual(result["reason_code"], "AVAILABLE")
         self.assertTrue(result["sellable"])
         self.assertEqual(result["available_qty"], 50)
+
+
+class TestNoPlanEnforcementMode(FrappeTestCase):
+    """Item #8: `no_plan_enforcement_mode` (Hard/Soft) governs the
+    NO_ACTIVE_PLAN branch when `controlled_by_sales_plan=1` and no plan row
+    exists. Hard must keep today's fail-closed behaviour unchanged (see
+    TestControlledBySalesPlanPolarity, unaffected by this change since
+    `_config()` omits the new field and the code defaults missing/None to
+    Hard). Soft must fall through to stock/capacity-only availability,
+    distinguishably flagged via `plan_status`."""
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_hard_still_fails_closed_pre_produced(self, mock_config, mock_fg, mock_plan):
+        mock_config.return_value = _config(no_plan_enforcement_mode="Hard")
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertNotIn("plan_status", result)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_soft_allows_stock_based_pre_produced(self, mock_config, mock_fg, mock_plan):
+        mock_config.return_value = _config(no_plan_enforcement_mode="Soft")
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+        self.assertEqual(result["plan_status"], "no_plan_soft_allowed")
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_soft_still_blocks_when_out_of_stock_pre_produced(self, mock_config, mock_fg, mock_plan):
+        # Soft only removes the plan requirement -- it must not force
+        # sellable when stock itself is unavailable.
+        mock_config.return_value = _config(no_plan_enforcement_mode="Soft")
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 60, "bin_projected_qty": 0}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "FG_OUT_OF_STOCK")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["plan_status"], "no_plan_soft_allowed")
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_hard_still_fails_closed_made_to_order(self, mock_config, mock_compile, mock_alloc, mock_plan):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", no_plan_enforcement_mode="Hard"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+        self.assertNotIn("plan_status", result)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_soft_allows_capacity_based_made_to_order(self, mock_config, mock_compile, mock_alloc, mock_plan):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", no_plan_enforcement_mode="Soft"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 50)
+        self.assertEqual(result["plan_status"], "no_plan_soft_allowed")
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_no_plan_soft_still_blocks_blocking_component_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", no_plan_enforcement_mode="Soft"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 0}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "BLOCKING_COMPONENT")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["plan_status"], "no_plan_soft_allowed")
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_missing_no_plan_enforcement_mode_defaults_to_hard(self, mock_config, mock_fg, mock_plan):
+        # A config row without the new field (pre-migration data, or the
+        # base _config() fixture used throughout this file) must default to
+        # Hard, preserving every existing NO_ACTIVE_PLAN regression test.
+        mock_config.return_value = _config()
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
 
 
 class TestAvailabilityModeOverride(FrappeTestCase):

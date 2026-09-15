@@ -192,12 +192,58 @@
           >
             Reason
           </label>
-          <input
-            type="text"
+          <select
             id="cancelReason"
             class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
             v-model="this.invoiceData.cancelReason"
+          >
+            <option value="" disabled>Select a reason</option>
+            <option
+              v-for="reasonOption in invoiceData.cancelReasons"
+              :key="reasonOption"
+              :value="reasonOption"
+            >
+              {{ reasonOption }}
+            </option>
+          </select>
+          <label
+            for="cancelReasonNotes"
+            class="mt-6 block text-left text-gray-900 dark:text-white"
+          >
+            Additional details (optional)
+          </label>
+          <textarea
+            id="cancelReasonNotes"
+            class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+            v-model="this.invoiceData.cancelReasonNotes"
           />
+          <template v-if="invoiceData.cancelDispositionRequired">
+            <label
+              for="cancelDisposition"
+              class="mt-6 block text-left text-gray-900 dark:text-white"
+            >
+              What happened to the food?
+            </label>
+            <select
+              id="cancelDisposition"
+              class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+              v-model="this.invoiceData.cancelDisposition"
+              @change="invoiceData.fetchCancellationEstimate()"
+            >
+              <option value="" disabled>Select disposition</option>
+              <option
+                v-for="option in invoiceData.cancelDispositions"
+                :key="option"
+                :value="option"
+              >
+                {{ option }}
+              </option>
+            </select>
+            <p v-if="invoiceData.cancelDisposition" class="mt-2 text-sm text-gray-600">
+              Estimated write-off value:
+              {{ invoiceData.cancelEstimate ? invoiceData.cancelEstimate.estimated_total : '--' }}
+            </p>
+          </template>
         </div>
         <div class="flex justify-end">
           <button
@@ -383,10 +429,14 @@ export default {
   },
   methods: {
     handleConfirmCancellation() {
-      console.log(this.invoiceData.cancelReason);
-      console.log(!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '');
-      if (!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '') {
-        this.notification.createNotification('Please enter a reason for cancellation');
+      // Reason is now a required Select over the shared vocabulary, replacing
+      // the old non-empty free-text check (item 10, AC-3).
+      if (!this.invoiceData.cancelReason) {
+        this.notification.createNotification('Please select a reason for cancellation');
+        return;
+      }
+      if (this.invoiceData.cancelDispositionRequired && !this.invoiceData.cancelDisposition) {
+        this.notification.createNotification('Please select what happened to the food before confirming cancellation');
         return;
       }
       this.invoiceData.cancelInvoice();

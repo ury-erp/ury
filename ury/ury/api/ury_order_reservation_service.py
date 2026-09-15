@@ -34,6 +34,11 @@ RESERVATION_DOCTYPE = "URY Stock Reservation"
 # mode only changes behaviour for an item whose plan exists but is exhausted.
 PLAN_EXHAUSTED_REASON = "PLAN_EXHAUSTED"
 
+# Reason code for the "no Sales Plan row at all" case -- branched separately
+# on URY Item Production Configuration.no_plan_enforcement_mode (Hard/Soft),
+# since there is no Sales Plan row to read an enforcement_mode from.
+NO_ACTIVE_PLAN_REASON = "NO_ACTIVE_PLAN"
+
 # Branch-scoped roles notified in Alert enforcement mode, mirroring the
 # manager-role handling used elsewhere for branch alerts (see
 # `ury_kot_item_execution_service.py`, `test_ury_fulfilment_posting_service.py`).
@@ -201,7 +206,28 @@ def _notify_plan_exceeded(item_code, branch, company, department):
 			create_system_notification(message, user.name, subject)
 
 
-def _check_line_availability(item_code, branch, company, context):
+def _log_soft_plan_override(tag, item_code, branch, department, qty):
+	"""Persist a structured, reviewable record of a Soft-mode plan override.
+
+	Minimal reviewable trail per item #8's acceptance criteria: a
+	`frappe.log_error`-style structured log tagged with `tag`
+	(`no_active_plan_soft_override` / `plan_exhausted_soft_override`),
+	carrying item/branch/department/qty/user/timestamp. No new doctype --
+	deliberately minimal per the design doc's own "at minimum" framing.
+	"""
+	payload = {
+		"tag": tag,
+		"item_code": item_code,
+		"branch": branch,
+		"department": department,
+		"qty": qty,
+		"user": frappe.session.user,
+		"timestamp": frappe.utils.now(),
+	}
+	frappe.log_error(message=json.dumps(payload, default=str), title=tag)
+
+
+def _check_line_availability(item_code, branch, company, context, qty=None):
 	"""Return an availability-rejection dict for `item_code`, or None if sellable.
 
 	Pure read-only check -- callers use this to pre-flight a whole batch of
@@ -215,8 +241,17 @@ def _check_line_availability(item_code, branch, company, context):
 	`frappe.throw`); Soft and Alert both let the line through (over-plan
 	status is then simply computable from `committed_qty + fulfilled_qty > qty`
 	on the plan-item row -- no separate flag is written), with Alert
-	additionally firing a branch-scoped notification. Every other rejection
-	reason (NO_ACTIVE_PLAN, CONFIGURATION_ERROR, etc.) is unaffected.
+	additionally firing a branch-scoped notification and Soft persisting a
+	structured override log (see `_log_soft_plan_override`).
+
+	A `NO_ACTIVE_PLAN` rejection is branched the same way, but on
+	`URY Item Production Configuration.no_plan_enforcement_mode` (Hard/Soft --
+	there is no Sales Plan row to read an `enforcement_mode` from in this
+	case): Hard keeps today's behaviour; Soft lets the line through (the
+	underlying stock/capacity-only availability was already computed by
+	`ury_availability.py` and flagged `plan_status=no_plan_soft_allowed`) and
+	persists a structured override log. Every other rejection reason
+	(CONFIGURATION_ERROR, etc.) is unaffected.
 	"""
 	availability = get_item_availability(
 		item_code=item_code,
@@ -224,25 +259,62 @@ def _check_line_availability(item_code, branch, company, context):
 		company=company,
 		department=context.get("department"),
 	)
+	department = context.get("department")
 	if availability.get("sellable"):
+		if availability.get("plan_status") == "no_plan_soft_allowed":
+			# ury_availability.py already resolved this as a Soft no-plan
+			# override and computed stock/capacity-only availability; still
+			# persist the reviewable log entry for it here.
+			_log_soft_plan_override("no_active_plan_soft_override", item_code, branch, department, qty)
 		return None
 
 	reason_code = availability.get("reason_code")
 	if reason_code == PLAN_EXHAUSTED_REASON:
-		department = context.get("department")
 		mode = resolve_plan_enforcement_mode(item_code, branch, company, department=department)
 		if mode == "Soft":
+			_log_soft_plan_override("plan_exhausted_soft_override", item_code, branch, department, qty)
 			return None
 		if mode == "Alert":
 			_notify_plan_exceeded(item_code, branch, company, department)
 			return None
 		# mode == "Hard" (or unresolved -- defaults to Hard): fall through to
 		# the rejection below, matching today's behaviour exactly.
+	elif reason_code == NO_ACTIVE_PLAN_REASON:
+		no_plan_enforcement_mode = context.get("no_plan_enforcement_mode") or "Hard"
+		if no_plan_enforcement_mode == "Soft":
+			_log_soft_plan_override("no_active_plan_soft_override", item_code, branch, department, qty)
+			return None
+		# "Hard" (or unresolved -- defaults to Hard): fall through to the
+		# rejection below, matching today's behaviour exactly.
 
 	return {
 		"item_code": item_code,
 		"reason_code": reason_code,
 	}
+
+
+def _rejection_message(item_code, branch, reason_code):
+	"""Reason-code-aware rejection copy, naming the concrete doctype/field a
+	manager needs to open to change the behaviour (item #8 design doc §4).
+	"""
+	if reason_code == NO_ACTIVE_PLAN_REASON:
+		return _(
+			"{0} cannot be sold yet -- no Sales Plan has been created or approved "
+			"for {1} today. Ask a manager to create/approve today's Sales Plan and "
+			"add this item to it, or set this item's 'No-Plan Enforcement Mode' to "
+			"'Soft' in its URY Item Production Configuration to allow stock-based "
+			"sales before the plan is ready."
+		).format(item_code, branch)
+	if reason_code == PLAN_EXHAUSTED_REASON:
+		return _(
+			"{0} is outside its committed Sales Plan quantity for {1} today and "
+			"cannot be sold. Increase the item's planned quantity on today's "
+			"URY Sales Plan, or change the plan's Enforcement Mode to Soft/Alert "
+			"to allow over-plan sales."
+		).format(item_code, branch)
+	return _("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
+		item_code, reason_code
+	)
 
 
 def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, actor):
@@ -277,12 +349,10 @@ def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, ac
 	# NO_ACTIVE_PLAN/PLAN_EXHAUSTED gating -- which this reconciliation
 	# path previously skipped entirely -- into order acceptance itself.
 	if requested_qty > previous_qty:
-		rejection = _check_line_availability(item_code, branch, company, context)
+		rejection = _check_line_availability(item_code, branch, company, context, qty=requested_qty)
 		if rejection:
 			frappe.throw(
-				_("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
-					item_code, rejection.get("reason_code")
-				),
+				_rejection_message(item_code, branch, rejection.get("reason_code")),
 				frappe.ValidationError,
 			)
 
@@ -427,15 +497,13 @@ def reconcile_order_reservations(order_ref, previous_items, accepted_items, bran
 			# Let _reconcile_line raise the proper "context required" error
 			# below, in original line order, rather than duplicating it here.
 			continue
-		rejection = _check_line_availability(item_code, branch, company, context)
+		rejection = _check_line_availability(item_code, branch, company, context, qty=accepted_qty)
 		if rejection:
 			rejections.append(rejection)
 
 	if rejections:
 		if len(rejections) == 1:
-			message = _("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
-				rejections[0]["item_code"], rejections[0]["reason_code"]
-			)
+			message = _rejection_message(rejections[0]["item_code"], branch, rejections[0]["reason_code"])
 		else:
 			detail = ", ".join(f"{r['item_code']} ({r['reason_code']})" for r in rejections)
 			message = _("The following items are not available for order: {0}. Please refresh the menu.").format(

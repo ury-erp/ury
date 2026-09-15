@@ -12,7 +12,8 @@ from ury.ury.api.ury_kot_item_execution_service import (
 	QUEUED,
 	READY,
 	SERVED,
-	_attach_ready_posting_intent,
+	_attach_production_posting_intent,
+	_resolve_production_posting_trigger_state,
 	get_kot_execution_state,
 	mark_item_ready,
 	seed_kot_item_executions,
@@ -195,8 +196,10 @@ class TestKotItemExecution(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
 			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
 		), patch(f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})), patch(
-			f"{MODULE}._attach_ready_posting_intent", side_effect=lambda result, actor: result
+			f"{MODULE}._attach_production_posting_intent", side_effect=lambda result, actor: result
 		) as mock_ready_posting, patch(
+			f"{MODULE}._resolve_production_posting_trigger_state", return_value=READY
+		), patch(
 			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
 		), patch(
 			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
@@ -237,7 +240,7 @@ class TestKotItemExecution(FrappeTestCase):
 class TestAttachReadyPostingIntent(FrappeTestCase):
 	"""sa-architecture-closure (Gap A): `mark_item_ready` must never let both
 	native POS deduction and fulfilment posting become authoritative for the
-	same item. `_attach_ready_posting_intent` is the sole call site that
+	same item. `_attach_production_posting_intent` is the sole call site that
 	creates a fulfilment Stock Entry off a READY transition, so it must skip
 	posting -- quietly, not by failing the READY transition -- whenever
 	`pos_stock_authority_v2` is off (today's universal default, under which
@@ -252,7 +255,7 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		) as mock_policy, patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
 			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
 		) as mock_create:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 
 		mock_policy.assert_called_once_with(branch="Branch A", company="Company A")
 		mock_get_doc.assert_not_called()
@@ -272,7 +275,7 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
 			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
 		) as mock_create:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 
 		mock_get_doc.assert_not_called()
 		mock_create.assert_not_called()
@@ -292,7 +295,7 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
 			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
 		) as mock_create:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 
 		mock_get_doc.assert_not_called()
 		mock_create.assert_not_called()
@@ -310,7 +313,7 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		) as mock_create, patch(
 			"ury.ury.api.ury_fulfilment_posting_service.enqueue_posting_intent"
 		) as mock_enqueue:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 
 		mock_policy.assert_called_once_with(branch="Branch A", company="Company A")
 		mock_create.assert_called_once_with(fake_doc, actor="chef@example.com")
@@ -335,7 +338,7 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		) as mock_create, patch(
 			"ury.ury.api.ury_fulfilment_posting_service.enqueue_posting_intent"
 		) as mock_enqueue:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 
 		mock_create.assert_called_once_with(fake_doc, actor="chef@example.com")
 		mock_enqueue.assert_not_called()
@@ -347,6 +350,126 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		with patch(
 			"ury.ury.api.ury_stock_policy.get_branch_stock_policy"
 		) as mock_policy:
-			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+			returned = _attach_production_posting_intent(dict(result), actor="chef@example.com")
 		mock_policy.assert_not_called()
 		self.assertEqual(returned, result)
+
+
+class TestResolveProductionPostingTriggerState(FrappeTestCase):
+	"""sa-pos-followups-and-ux Item 6: `production_posting_trigger_state` on
+	`URY Item Production Configuration` chooses which KOT item execution
+	state triggers production posting for that item, falling back to READY
+	(today's universal, pre-Item-6 behavior) whenever it cannot be resolved.
+	"""
+
+	def test_falls_back_to_ready_without_kot_item_or_branch(self):
+		self.assertEqual(_resolve_production_posting_trigger_state(None, "Branch A"), READY)
+		self.assertEqual(_resolve_production_posting_trigger_state("KOTITEM-1", None), READY)
+
+	def test_falls_back_to_ready_when_item_code_cannot_be_resolved(self):
+		# The lookup deliberately tries field "item" first, falling back to
+		# the legacy "item_code" field name if that resolves to nothing --
+		# see `_resolve_production_posting_trigger_state`'s two chained
+		# `frappe.db.get_value` calls. With both mocked to return None here,
+		# neither field name resolves an item_code, so the function must
+		# fall back to READY, having tried both field names in order.
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None) as mock_get_value:
+			state = _resolve_production_posting_trigger_state("KOTITEM-1", "Branch A")
+		self.assertEqual(state, READY)
+		mock_get_value.assert_any_call("URY KOT Items", "KOTITEM-1", "item")
+		mock_get_value.assert_any_call("URY KOT Items", "KOTITEM-1", "item_code")
+		self.assertEqual(mock_get_value.call_count, 2)
+
+	def test_falls_back_to_ready_when_no_configuration_row_or_field_unset(self):
+		def _get_value(doctype, filters_or_field, field=None):
+			if doctype == "URY KOT Items":
+				return "ITEM-1"
+			return None
+
+		with patch(f"{MODULE}.frappe.db.get_value", side_effect=_get_value):
+			state = _resolve_production_posting_trigger_state("KOTITEM-1", "Branch A")
+		self.assertEqual(state, READY)
+
+	def test_resolves_configured_queued_trigger(self):
+		def _get_value(doctype, filters_or_field, field=None):
+			if doctype == "URY KOT Items":
+				return "ITEM-1"
+			if doctype == "URY Item Production Configuration":
+				self.assertEqual(filters_or_field, {"item": "ITEM-1", "branch": "Branch A", "active": 1})
+				self.assertEqual(field, "production_posting_trigger_state")
+				return QUEUED
+			raise AssertionError(doctype)
+
+		with patch(f"{MODULE}.frappe.db.get_value", side_effect=_get_value):
+			state = _resolve_production_posting_trigger_state("KOTITEM-1", "Branch A")
+		self.assertEqual(state, QUEUED)
+
+
+class TestConfigurableProductionPostingTrigger(FrappeTestCase):
+	"""End-to-end (mocked) coverage of Item 6's dispatch rule: exactly one of
+	`seed_kot_item_executions` / `mark_item_ready` / `serve_item_execution`
+	calls `_attach_production_posting_intent`, whichever matches this item's
+	resolved trigger.
+	"""
+
+	def _run(self, trigger_state):
+		harness = _ExecutionHarness()
+		calls = []
+
+		def _fake_attach(result, actor):
+			calls.append((result.get("kot_item"), result.get("state")))
+			return {**result, "posting_intent": "INTENT-1", "posting_intent_status": "PENDING"}
+
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
+		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})), patch(
+			f"{MODULE}._attach_production_posting_intent", side_effect=_fake_attach
+		) as mock_attach, patch(
+			f"{MODULE}._resolve_production_posting_trigger_state", return_value=trigger_state
+		), patch(
+			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
+		), patch(
+			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as session:
+			session.user = "chef@example.com"
+			seed_kot_item_executions("URY KOT-1")
+			start_item_execution("KOTITEM-1", idempotency_key="start-1")
+			mark_item_ready("KOTITEM-1", idempotency_key="ready-1")
+			serve_item_execution("KOTITEM-1", idempotency_key="serve-1")
+		return mock_attach, calls
+
+	def test_queued_trigger_posts_at_kot_submission_before_any_other_transition(self):
+		"""Acceptance criterion 6: a QUEUED-trigger item posts its production
+		entry at `seed_kot_item_executions` (KOT submission time), before any
+		IN_PREPARATION/READY/SERVED transition. Both seeded items are QUEUED at
+		seed time -- KOTITEM-1's attach call happens there, before its own
+		subsequent start/ready/serve calls run.
+		"""
+		mock_attach, calls = self._run(QUEUED)
+		kotitem_1_calls = [call for call in calls if call[0] == "KOTITEM-1"]
+		self.assertEqual(kotitem_1_calls, [("KOTITEM-1", QUEUED)])
+
+	def test_ready_trigger_is_unchanged_default(self):
+		mock_attach, calls = self._run(READY)
+		kotitem_1_calls = [call for call in calls if call[0] == "KOTITEM-1"]
+		self.assertEqual(kotitem_1_calls, [("KOTITEM-1", READY)])
+
+	def test_served_trigger_defers_posting_to_serve(self):
+		mock_attach, calls = self._run(SERVED)
+		kotitem_1_calls = [call for call in calls if call[0] == "KOTITEM-1"]
+		self.assertEqual(kotitem_1_calls, [("KOTITEM-1", SERVED)])
+
+	def test_attach_called_exactly_once_across_full_lifecycle_with_queued_trigger(self):
+		"""Acceptance criterion 3: a QUEUED-triggered item that later also
+		passes through READY and SERVED must not be posted twice -- only the
+		function matching the resolved trigger (QUEUED here) ever calls the
+		attach step for that item, regardless of how many further states the
+		item visits.
+		"""
+		_, calls = self._run(QUEUED)
+		kotitem_1_calls = [call for call in calls if call[0] == "KOTITEM-1"]
+		self.assertEqual(len(kotitem_1_calls), 1)

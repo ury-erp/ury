@@ -30,7 +30,15 @@ from ury.ury.report_api.utils import user_has_branch_access
 
 ISSUE_AUTH_DOCTYPE = "URY Issue Authorization"
 SALES_PLAN_DOCTYPE = "URY Sales Plan"
+WASTAGE_DOCTYPE = "URY Issue Wastage"
 APPROVED_STATES = {"Approved", "Locked for Production"}
+
+# `URY Issue Wastage.source_type` discriminator values. Only rows sourced from
+# an Issue Authorization may ever decrement issue entitlement; rows written by
+# the POS KOT-cancellation write-off route are an accounting record about a
+# cancelled sale and have nothing to do with a Sales Plan's material budget.
+SOURCE_ISSUE_AUTHORIZATION = "Issue Authorization"
+SOURCE_KOT_CANCELLATION = "KOT Cancellation"
 
 
 @frappe.whitelist()
@@ -196,8 +204,81 @@ def prior_quantities(plan, department, branch, company, component_item):
     # live if present so this module needs no change once they land; treat
     # their absence today as zero, never as a cached/stale value.
     returned_qty = _sum_live_if_exists("URY Issue Return", dict(filters), "returned_qty")
-    wasted_qty = _sum_live_if_exists("URY Issue Wastage", dict(filters), "wasted_qty")
+    wasted_qty = sum_issue_sourced_wastage(dict(filters), "wasted_qty")
     return {"authorized_qty": authorized_qty, "returned_qty": returned_qty, "wasted_qty": wasted_qty}
+
+
+def wastage_tracks_source_type():
+    """True when `URY Issue Wastage` actually has the `source_type` column.
+
+    The column is added by the KOT-cancellation write-off work; a bench that
+    has the doctype but has not migrated yet will not have it. Probing instead
+    of assuming keeps `frappe.get_all(fields=[... "source_type"])` from raising
+    a bare SQL error on an un-migrated site.
+    """
+    try:
+        return bool(frappe.db.has_column(WASTAGE_DOCTYPE, "source_type"))
+    except Exception:
+        return False
+
+
+def sum_issue_sourced_wastage(filters, fieldname="wasted_qty", exclude_name=None):
+    """Sum `URY Issue Wastage.<fieldname>` over ISSUE-AUTHORIZATION-sourced rows only.
+
+    CRITICAL INVARIANT (highest-risk regression in the wastage generalisation):
+    `URY Issue Wastage` is shared by two unrelated jobs since the KOT
+    cancellation write-off route landed:
+
+      1. `source_type = "Issue Authorization"` -- a department issue against a
+         Sales Plan. These rows DO decrement issue entitlement and must keep
+         counting here exactly as they always have.
+      2. `source_type = "KOT Cancellation"` -- a write-off of food already
+         cooked for a cancelled POS order. These rows carry no `plan`, no
+         `issue_authorization` and often no `department`. They must NEVER
+         decrement issue entitlement: doing so would silently shrink a
+         department's material budget every time a customer cancelled a dish.
+
+    The discrimination is deliberately done in PYTHON rather than as a SQL
+    filter, and that is not an oversight:
+
+      * A SQL `source_type = "Issue Authorization"` condition would DROP every
+        pre-existing row on a bench where the new column was added but the
+        backfill patch has not run yet (the column is NULL there, and
+        `NULL = 'Issue Authorization'` is NULL, i.e. false). That would make
+        real, approved wastage stop decrementing entitlement -- the exact
+        regression this guard exists to prevent, in the opposite direction.
+      * A SQL `source_type != "KOT Cancellation"` condition is equally
+        NULL-unsafe unless Frappe happens to wrap it in `ifnull(...)`, which
+        varies by Frappe version and query backend.
+
+    Treating a missing/blank `source_type` as "Issue Authorization" (the
+    doctype default, and what every legacy row semantically is) is correct
+    under BOTH a migrated and an un-migrated schema, with no dependency on
+    SQL NULL semantics or on `ury.patches.v3_21` having run.
+
+    `ury.patches.v3_21.backfill_issue_wastage_source_type` still backfills the
+    column so Desk list views and reports see a populated discriminator; this
+    function does not depend on it.
+    """
+    if not frappe.db.exists("DocType", WASTAGE_DOCTYPE):
+        return 0
+
+    fields = ["name", fieldname]
+    track_source = wastage_tracks_source_type()
+    if track_source:
+        fields.append("source_type")
+
+    rows = frappe.get_all(WASTAGE_DOCTYPE, filters=filters, fields=fields) or []
+    total = 0
+    for row in rows:
+        name = row.get("name")
+        if exclude_name and name == exclude_name:
+            continue
+        source_type = (row.get("source_type") if track_source else None) or SOURCE_ISSUE_AUTHORIZATION
+        if source_type == SOURCE_KOT_CANCELLATION:
+            continue
+        total += row.get(fieldname) or 0
+    return total
 
 
 def _sum_live(doctype, filters, fieldname):

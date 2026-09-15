@@ -427,7 +427,55 @@ def get_custom_fields():
 				"label": "User",
 				"insert_after": "branch",
 				"reqd": 1
-			}
+			},
+			# Wastage write-off posting configuration. These are read by
+			# ury.ury.api.ury_wastage.resolve_posting_accounts() when a
+			# URY Issue Wastage row is approved with a posting disposition.
+			# They are deliberately EXPLICIT named fields rather than the
+			# `Account.name LIKE '%Wastage%'` heuristic v2/grillax used: that
+			# silently picks whichever account happens to be named similarly,
+			# which is how unreviewed entries end up in a real ledger. An
+			# unset field fails the approval closed with a named message
+			# instead of guessing.
+			{
+				"fieldname": "ury_wastage_accounting_section",
+				"fieldtype": "Section Break",
+				"label": "Wastage Accounting",
+				"insert_after": "user",
+				"collapsible": 1,
+			},
+			{
+				"fieldname": "wastage_expense_account",
+				"fieldtype": "Link",
+				"options": "Account",
+				"label": "Wastage Expense Account",
+				"insert_after": "ury_wastage_accounting_section",
+				"description": "Debited when a wastage write-off with disposition 'Wastage' is approved.",
+			},
+			{
+				"fieldname": "damage_expense_account",
+				"fieldtype": "Link",
+				"options": "Account",
+				"label": "Damage Expense Account",
+				"insert_after": "wastage_expense_account",
+				"description": "Debited when a wastage write-off with disposition 'Damaged' is approved.",
+			},
+			{
+				"fieldname": "staff_meal_expense_account",
+				"fieldtype": "Link",
+				"options": "Account",
+				"label": "Staff Meal Expense Account",
+				"insert_after": "damage_expense_account",
+				"description": "Debited when a wastage write-off with disposition 'Staff Meal' is approved.",
+			},
+			{
+				"fieldname": "wastage_cost_center",
+				"fieldtype": "Link",
+				"options": "Cost Center",
+				"label": "Wastage Cost Center",
+				"insert_after": "staff_meal_expense_account",
+				"description": "Cost center for every wastage/damage/staff-meal write-off posted for this branch.",
+			},
 		],
 
 		"Customer": [

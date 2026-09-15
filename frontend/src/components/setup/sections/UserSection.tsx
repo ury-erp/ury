@@ -1,10 +1,145 @@
 import React from 'react';
 import { useConfigure, generateRandomPassword } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
-import { Plus, Trash2, Eye, EyeOff } from 'lucide-react';
-import { SearchableSelect } from '../../common/SearchableSelect';
+import { Plus, Trash2, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { call } from '@ury/core';
 
-function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
+const FALLBACK_ROLE_OPTIONS = [
+  { value: 'URY Cashier', label: 'URY Cashier' },
+  { value: 'URY Captain', label: 'URY Captain' },
+  { value: 'URY Manager', label: 'URY Manager' },
+  { value: 'URY Admin', label: 'URY Admin' },
+];
+
+// Roles that only a System Manager caller (or the one-time bootstrap
+// window) may hand out. Mirrors `_SELF_SERVICE_SETUP_ROLES` gate in
+// ury/ury/api/minimal/business_setup.py -- kept here only as a UX
+// fallback so the option can be hidden before the server round-trip
+// resolves; the backend re-validates and is the actual source of truth.
+const ELEVATED_ROLES = new Set(['URY Admin', 'System Manager']);
+
+interface RoleOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Resolves the role option list for the setup-wizard "Add User" role
+ * field, and whether the current caller may assign elevated roles
+ * (URY Admin). Pulls from the `Role` doctype (role_name like "URY %")
+ * via the whitelisted `get_setup_role_options` API so a future new URY
+ * role never requires a frontend code change; falls back to a static
+ * list (still including URY Admin) if that call fails for any reason.
+ */
+function useRoleOptions() {
+  const [options, setOptions] = React.useState<RoleOption[]>(FALLBACK_ROLE_OPTIONS);
+  const [isSystemManager, setIsSystemManager] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res: any = await call.get(
+          'ury.ury.api.minimal.business_setup.get_setup_role_options'
+        );
+        const payload = res?.message ?? res;
+        if (cancelled || !payload) return;
+
+        if (Array.isArray(payload.roles) && payload.roles.length) {
+          setOptions(payload.roles.map((r: any) => ({ value: r.value, label: r.label })));
+        }
+        setIsSystemManager(!!payload.is_system_manager);
+      } catch (error) {
+        console.error('Error loading setup role options, using fallback list:', error);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { options, isSystemManager };
+}
+
+/**
+ * Minimal multi-select checklist control. `SearchableSelect` (shared
+ * component used elsewhere in setup/dashboard) is single-value only, so
+ * roles use this small local dropdown instead of changing that shared
+ * component's contract for unrelated consumers.
+ */
+function RoleMultiSelect({
+  id,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  value: string[];
+  options: RoleOption[];
+  onChange: (roles: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleRole = (role: string) => {
+    if (value.includes(role)) {
+      // Always keep at least one role selected.
+      if (value.length === 1) return;
+      onChange(value.filter((r) => r !== role));
+    } else {
+      onChange([...value, role]);
+    }
+  };
+
+  const summary = value.length ? value.join(', ') : 'Select role(s)';
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        id={id}
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        className="w-full text-sm bg-card border border-input rounded-md px-3 py-2 flex items-center justify-between gap-2 text-left"
+      >
+        <span className="truncate">{summary}</span>
+        <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full min-w-[180px] bg-card border border-input rounded-md shadow-md py-1">
+          {options.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={value.includes(opt.value)}
+                onChange={() => toggleRole(opt.value)}
+                className="accent-primary"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserRow({ user, usersLength, updateUser, deleteUser, roleOptions }: any) {
   const [showPassword, setShowPassword] = React.useState(false);
 
   return (
@@ -66,17 +201,13 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
 
         <div>
           <label htmlFor={`user-role-${user.id}`} className="sr-only">
-            Role
+            Roles
           </label>
-          <SearchableSelect
+          <RoleMultiSelect
             id={`user-role-${user.id}`}
-            value={user.role}
-            options={[
-              { value: 'URY Cashier', label: 'URY Cashier' },
-              { value: 'URY Captain', label: 'URY Captain' },
-              { value: 'URY Manager', label: 'URY Manager' },
-            ]}
-            onChange={(_, val) => updateUser(user.id, { role: val })}
+            value={user.roles}
+            options={roleOptions}
+            onChange={(roles) => updateUser(user.id, { roles })}
           />
         </div>
       </div>
@@ -99,13 +230,23 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
 
 export function UserSection() {
   const { users, addUser, updateUser, deleteUser } = useConfigure();
+  const { options: fetchedOptions, isSystemManager } = useRoleOptions();
+
+  // Gate the elevated (URY Admin / System Manager) options to only appear
+  // when the current setup caller is a System Manager (or the one-time
+  // bootstrap window) -- mirrors the backend gate in create_setup_user(),
+  // so operators don't select an option only to have it rejected server-side.
+  const roleOptions = React.useMemo(
+    () => fetchedOptions.filter((opt) => isSystemManager || !ELEVATED_ROLES.has(opt.value)),
+    [fetchedOptions, isSystemManager]
+  );
 
   const handleAdd = () => {
     addUser({
       name: '',
       email: '',
       passwordPlaceholder: generateRandomPassword(),
-      role: 'URY Cashier',
+      roles: ['URY Cashier'],
     });
   };
 
@@ -117,7 +258,7 @@ export function UserSection() {
           <div className="flex-1">User Name</div>
           <div className="flex-1">Email Address</div>
           <div className="flex-1">Password</div>
-          <div className="flex-1">Role</div>
+          <div className="flex-1">Role(s)</div>
           {users.length > 1 && <div className="w-8"></div>}
         </div>
 
@@ -128,6 +269,7 @@ export function UserSection() {
             usersLength={users.length}
             updateUser={updateUser}
             deleteUser={deleteUser}
+            roleOptions={roleOptions}
           />
         ))}
       </div>

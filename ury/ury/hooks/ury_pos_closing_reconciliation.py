@@ -94,6 +94,93 @@ _RESOLVABLE_STATUSES = (frozenset({RESERVED}), frozenset({FULFILLED}))
 _MAX_REPORTED = 10
 
 
+def drain_session_postings(doc, method=None):
+	"""`POS Closing Entry.before_validate` doc_event entry point (Item 3).
+
+	Runs BEFORE `validate_closing_reconciliation` below, and is the only
+	place in this session's closing flow that is allowed to write documents.
+	It walks every POS Invoice in this closing entry's session once and, for
+	any produced made-to-order line whose posting intent is not yet POSTED,
+	attempts the same synchronous `process_posting_intent` retry that used to
+	live inside `validate` (see `ury_feature_flags._verify_item_execution_intent`)
+	-- a "drain the queue for this shift" pass, moved to a lifecycle phase
+	where a write is an unsurprising, one-time thing to do, rather than
+	inside `validate`, which core calls more than once per user action
+	(draft save, then submit) and which this app's own contract for T5
+	(`validate_closing_reconciliation`) needs to be write-free.
+
+	Gated on `closing_reconciliation_enabled` exactly like T5: gate off means
+	a complete no-op, nothing here is queried, matching the till-time
+	behaviour untouched.
+
+	Never throws. This is an opportunistic self-heal, not the enforcement
+	point -- `validate_closing_reconciliation`'s own `strict=True,
+	retry=False` call is what actually decides whether the shift may close.
+	Any exception encountered while draining one invoice is swallowed so
+	that a problem with one invoice's intent cannot stop the drain pass for
+	the rest of the session, or turn an opportunistic best-effort step into a
+	surprise validation failure at the wrong lifecycle phase.
+	"""
+	policy = _resolve_policy(doc)
+	if not policy or not policy.closing_reconciliation_enabled:
+		# Gate off. Do not query anything at all -- same contract as
+		# `validate_closing_reconciliation`.
+		return
+
+	try:
+		invoice_names = _session_invoice_names(doc)
+	except Exception:
+		# `_session_invoice_names` itself only reads/self-populates and is
+		# not expected to raise, but this is a best-effort pass: if it does,
+		# let `validate_closing_reconciliation` (which calls the same
+		# function again) be the one place that surfaces it.
+		frappe.logger(LOGGER).exception(
+			"Drain pass could not resolve session invoices for closing entry %s",
+			doc.get("name"),
+		)
+		return
+
+	for invoice_name in invoice_names:
+		_drain_invoice(invoice_name)
+
+
+def _drain_invoice(invoice_name):
+	"""Attempt one drain pass over a single invoice's produced lines.
+
+	Reuses `ury_feature_flags._verify_fulfilment_posted_for_invoice` with
+	`strict=False, retry=True` verbatim -- same reuse-not-reimplementation
+	rationale as `_verify_invoice_production` below: the KOT/execution-row
+	matching rules are safety-critical and must not have a second copy.
+	`strict=False` is deliberate here even though this branch has
+	`closing_reconciliation_enabled` on (so the advisory-downgrade path
+	inside that function would apply for a genuinely-still-stuck intent):
+	this pass is not the enforcement point and must never throw, it only
+	wants the retry's side effect of attempting to post.
+	"""
+	from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+
+	row = frappe.db.get_value(
+		"POS Invoice", invoice_name, ["name", "branch", "company"], as_dict=True
+	)
+	if not row:
+		return
+
+	# Same message-log hygiene as `_verify_invoice_production`: a throw
+	# inside the reused function pushes a cashier-worded message onto
+	# `frappe.message_log` before we catch and discard it. Snapshot and
+	# truncate so nothing from this best-effort pass leaks to the user.
+	log_depth = len(getattr(frappe.local, "message_log", []) or [])
+	try:
+		_verify_fulfilment_posted_for_invoice(frappe._dict(row), strict=False, retry=True)
+	except Exception:
+		# Best-effort only. Whatever is still wrong after this attempt is
+		# for `validate_closing_reconciliation`'s strict=True, retry=False
+		# pass to report, not this one.
+		pass
+	finally:
+		_truncate_message_log(log_depth)
+
+
 def validate_closing_reconciliation(doc, method=None):
 	"""`POS Closing Entry.validate` doc_event entry point.
 
@@ -163,9 +250,17 @@ def _reconcile_session(doc):
 	"""Run both checks over every POS Invoice in the session.
 
 	Returns a list of human-readable problem strings (empty == clean).
+
+	Raises when `pos_transactions` is empty but there are submitted,
+	unconsolidated POS Invoices in this session that should have populated
+	it (see `_session_invoice_names` / `_confirm_genuinely_empty`) --
+	deliberately, so the caller's existing system-error path
+	(`validate_closing_reconciliation`'s `except Exception` block) is what
+	surfaces it, rather than this function silently returning a clean pass.
 	"""
 	invoice_names = _session_invoice_names(doc)
 	if not invoice_names:
+		_confirm_genuinely_empty(doc)
 		# An empty shift -- no transactions, nothing to reconcile. A trivial
 		# pass, not an error: a cashier who opened and closed without selling
 		# anything must be able to close.
@@ -184,12 +279,27 @@ def _session_invoice_names(doc):
 	"""The POS Invoices in this closing entry's session, deduplicated.
 
 	Read from `pos_transactions`, the same table
-	`ury_pos_closing_entry.populate_pos_transactions` rebuilds. Hook ordering
-	in `hooks.py` puts `ury_pos_closing_entry.validate` (which runs
-	`populate_pos_transactions`) before this handler, so by the time we read
-	it the table is populated even for the custom frontend's path, which
-	never sends it.
+	`ury_pos_closing_entry.populate_pos_transactions` rebuilds.
+
+	Self-populating, not just self-reading: `populate_pos_transactions` is
+	called here directly rather than relied upon via `hooks.py` ordering.
+	Under today's (correct) `hooks.py` order this is a no-op -- that
+	function's own `if doc.get("pos_transactions"): return` guard
+	(`ury_pos_closing_entry.py:44`) makes it return immediately, since
+	`ury_pos_closing_entry.validate` already ran first and filled the table.
+	Under a hypothetical future reordering of the `validate` doc_events list
+	for "POS Closing Entry" (see the comment in `hooks.py`), this becomes
+	the thing that actually populates it, so this check's correctness no
+	longer depends on hook list position. It is `frappe.get_all`-only and
+	writes no documents, so calling it a second time (or a first time, when
+	the true first call hasn't run yet) has no ledger or audit consequence.
+	Caller-supplied `pos_transactions` is therefore never overwritten either
+	way -- see the guard's own contract.
 	"""
+	from ury.ury.hooks.ury_pos_closing_entry import populate_pos_transactions
+
+	populate_pos_transactions(doc, None)
+
 	rows = doc.get("pos_transactions") or []
 	names = []
 	for row in rows:
@@ -197,6 +307,68 @@ def _session_invoice_names(doc):
 		if name and name not in names:
 			names.append(name)
 	return names
+
+
+def _get(row, field):
+	"""Dict-or-attr field access, matching `_session_invoice_names`'s own
+	`row.get(...) if hasattr(row, "get") else getattr(...)` pattern -- rows
+	here may be `frappe._dict` (real `frappe.get_all` calls) or plain dicts
+	(as used throughout this module's tests)."""
+	return row.get(field) if hasattr(row, "get") else getattr(row, field, None)
+
+
+def _confirm_genuinely_empty(doc):
+	"""Close the fail-open window that remains even after self-population.
+
+	An empty `pos_transactions` is ambiguous on its own: it is either a
+	genuinely empty shift (nothing sold) or a sign that something upstream
+	failed to populate the table the way it should have. Distinguish the two
+	with one cheap confirming query, using the exact same filter
+	`ury_pos_closing_entry.populate_pos_transactions` uses
+	(`ury_pos_closing_entry.py:49-58`) for submitted, unconsolidated POS
+	Invoices in this session's `(pos_profile, user, period)`.
+
+	If that query finds rows while `pos_transactions` is still empty, this
+	is a structural failure, not an empty shift -- raise so the caller's
+	system-error path handles it, rather than let `_reconcile_session`
+	return a clean pass for a session that plainly has unreconciled
+	invoices.
+	"""
+	if not doc.pos_profile or not doc.period_start_date or not doc.period_end_date:
+		# Same preconditions `populate_pos_transactions` requires; without
+		# them there is nothing to confirm against, so treat as genuinely
+		# empty -- consistent with that function's own early return.
+		return
+
+	# Same filter and same "filter consolidated in Python" approach as
+	# `populate_pos_transactions` (`ury_pos_closing_entry.py:49-65`) -- match
+	# it exactly rather than a `consolidated_invoice in ("", NULL)` SQL
+	# filter, which core's own falsy-vs-NULL storage of that field makes
+	# less reliable than a plain truthiness check.
+	invoices = frappe.get_all(
+		"POS Invoice",
+		filters={
+			"docstatus": 1,
+			"pos_profile": doc.pos_profile,
+			"cashier": doc.user,
+			"posting_date": ["between", [doc.period_start_date, doc.period_end_date]],
+		},
+		fields=["name", "consolidated_invoice"],
+	)
+	unconsolidated = [invoice for invoice in invoices if not _get(invoice, "consolidated_invoice")]
+	if unconsolidated:
+		raise Exception(
+			"POS Closing Entry {0}: pos_transactions is empty but submitted, "
+			"unconsolidated POS Invoices exist for pos_profile={1}, user={2}, "
+			"period=({3}, {4}). Refusing to treat this as a clean empty "
+			"shift.".format(
+				doc.get("name") or "(unsaved)",
+				doc.pos_profile,
+				doc.user,
+				doc.period_start_date,
+				doc.period_end_date,
+			)
+		)
 
 
 def _verify_invoice_production(invoice_name):
@@ -223,9 +395,14 @@ def _verify_invoice_production(invoice_name):
 	should see every blocked invoice in the shift in one pass, not fix one
 	and rediscover the next on the next attempt.
 
-	The synchronous retry inside is a bonus here rather than a hazard: at
-	end-of-shift a merely-lagging worker is exactly the case that should
-	self-heal instead of blocking a manager.
+	Item 3: called with `retry=False`. The synchronous-retry write that used
+	to happen here at `validate` time now happens once, earlier, in
+	`drain_session_postings` (`POS Closing Entry.before_validate`, below) --
+	so this call performs zero document writes and only re-reads intents
+	that pass, `validate` is provably side-effect-free, which matters
+	because it can run more than once per user action (draft save, then
+	submit) and must not be the thing that decides whether a Stock Entry
+	gets submitted.
 
 	Returns a problem string, or None when the invoice is clean.
 	"""
@@ -258,7 +435,7 @@ def _verify_invoice_production(invoice_name):
 		# strict=False here would let a not-yet-POSTED intent pass both the
 		# till (advisory, because this gate exists) AND this closing check
 		# (advisory again, for the same reason) -- silently defeating both.
-		_verify_fulfilment_posted_for_invoice(frappe._dict(row), strict=True)
+		_verify_fulfilment_posted_for_invoice(frappe._dict(row), strict=True, retry=False)
 	except frappe.ValidationError as exc:
 		_truncate_message_log(log_depth)
 		return _("POS Invoice {0}: {1}").format(invoice_name, str(exc))

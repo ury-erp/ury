@@ -15,3 +15,5 @@ ury.patches.v3_17.backfill_bom_yield_qty_and_revision
 ury.patches.v3_18.add_batch_sourcing_mode_fields
 ury.patches.v3_19.add_pos_closing_entry_branch_field
 ury.patches.v3_20.migrate_stock_authority_flag_to_branch_policy
+ury.patches.v3_21.add_branch_wastage_accounts
+ury.patches.v3_21.backfill_issue_wastage_source_type

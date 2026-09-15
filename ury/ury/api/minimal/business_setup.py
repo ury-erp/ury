@@ -126,18 +126,71 @@ def _is_bootstrap_setup():
 
 
 @frappe.whitelist()
-def create_setup_user(email, name, password=None, role="URY Cashier"):
+def get_setup_role_options():
+    """Small whitelisted API backing the setup-wizard "Add User" role
+    multi-select, so the frontend never needs a hardcoded role list (and
+    a future new `URY %` role never requires a frontend code change).
+
+    Returns every `URY %` role plus whether the current caller is allowed
+    to assign System-Manager-gated roles (URY Admin), so the UI can hide/
+    disable that option for non-System-Manager callers -- mirroring the
+    server-side gate in create_setup_user().
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"))
+
+    caller = frappe.session.user
+    is_system_manager = caller == "Administrator" or "System Manager" in frappe.get_roles(caller)
+
+    roles = frappe.get_all(
+        "Role",
+        filters={"role_name": ["like", "URY %"], "disabled": 0},
+        fields=["name as value", "role_name as label"],
+        order_by="role_name asc",
+    )
+
+    return {
+        "status": "success",
+        "roles": roles,
+        # Strictly the real System-Manager check -- deliberately NOT widened
+        # by `_is_bootstrap_setup()`. create_setup_user() restricts a
+        # bootstrap caller to `_SELF_SERVICE_SETUP_ROLES` exactly like any
+        # other non-System-Manager caller, so reporting True during bootstrap
+        # would offer the wizard an elevated role the server then rejects.
+        "is_system_manager": bool(is_system_manager),
+        "self_service_roles": sorted(_SELF_SERVICE_SETUP_ROLES),
+    }
+
+
+@frappe.whitelist()
+def create_setup_user(email, name, password=None, role="URY Cashier", roles=None):
     caller = frappe.session.user
     is_system_manager = caller == "Administrator" or "System Manager" in frappe.get_roles(caller)
 
     if not is_system_manager and not _is_bootstrap_setup():
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-    if not is_system_manager and role not in _SELF_SERVICE_SETUP_ROLES:
+    # `role` (single string) is kept for backward compatibility; `roles`
+    # (list) is the current shape. Coerce whichever was given into a list.
+    if roles is None:
+        roles = [role]
+    elif isinstance(roles, str):
+        roles = frappe.parse_json(roles)
+    roles = [r for r in roles if r]
+    if not roles:
+        roles = ["URY Cashier"]
+
+    if not is_system_manager:
         # A caller who isn't already a System Manager (including the
         # one-time bootstrap window, where nobody is authenticated yet)
-        # cannot mint a user with an elevated/arbitrary role.
-        frappe.throw(_("Not permitted to assign role {0}").format(role), frappe.PermissionError)
+        # cannot mint a user with an elevated/arbitrary role. Reject the
+        # whole call (fail closed) if ANY requested role is out of bounds.
+        disallowed = [r for r in roles if r not in _SELF_SERVICE_SETUP_ROLES]
+        if disallowed:
+            frappe.throw(
+                _("Not permitted to assign role {0}").format(disallowed[0]),
+                frappe.PermissionError,
+            )
 
     if frappe.db.exists("User", email):
         return {"status": "exists", "email": email}
@@ -149,7 +202,7 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
         "enabled": 1,
         "send_welcome_email": 0,
         "user_type": "System User",
-        "roles": [{"role": role}]
+        "roles": [{"role": r} for r in roles]
     })
     # Permission check above already gates who may reach this point and
     # which role they may assign; ignore_permissions is only needed because
@@ -421,7 +474,7 @@ def _run_configure_data(data, results, user):
             email=u.get("email"),
             name=u.get("name", "Cashier"),
             password=u.get("passwordPlaceholder"),
-            role=u.get("role", "URY Cashier")
+            roles=u.get("roles", [u.get("role", "URY Cashier")])
         )
         results["users"].append(res)
         

@@ -6,6 +6,7 @@ from ury.ury.api.ury_production_validation import normalize_production_policy
 
 
 DOCTYPE = "URY Item Production Configuration"
+BIN_DOCTYPE = "Bin"
 
 
 def resolve_production_context(item, branch, company=None, department=None):
@@ -22,7 +23,7 @@ def resolve_production_context(item, branch, company=None, department=None):
 		fields=[
 			"name", "item", "branch", "department", "production_unit",
 			"production_policy", "bom", "direct_retail_warehouse",
-			"controlled_by_sales_plan", "allow_over_plan_sale", "availability_mode",
+			"controlled_by_sales_plan", "no_plan_enforcement_mode", "allow_over_plan_sale", "availability_mode",
 		],
 		filters=filters,
 		limit=2,
@@ -72,3 +73,70 @@ def resolve_production_context(item, branch, company=None, department=None):
 	if company and row.company and company != row.company:
 		return None
 	return row
+
+
+@frappe.whitelist()
+def check_bom_components_stocked(item=None, branch=None, company=None, department=None, bom=None):
+	"""Read-only diagnostic for the IPC form (Item 4 / G-13, §5.2 B-2).
+
+	For the item's resolved MADE_TO_ORDER production context, explode `bom`
+	(or the context's own `bom` when not supplied -- the form may be showing
+	an unsaved `bom` value the DB row doesn't have yet) and report, for each
+	leaf component, whether it has a `Bin` row in the resolved warehouse and
+	that Bin's `actual_qty`. This never throws on zero/missing stock -- stock
+	may legitimately be zero before the first transfer -- it only informs the
+	client-side warning banner.
+
+	Returns ``{"warehouse": ..., "components": [{"item_code", "warehouse",
+	"has_bin", "actual_qty"}, ...]}``, or ``{"warehouse": None, "components":
+	[]}`` if the context/BOM cannot be resolved (e.g. new/incomplete doc).
+	"""
+	from ury.ury.api.ury_bom_compiler import compile_bom_vector
+
+	if not item or not branch:
+		return {"warehouse": None, "components": []}
+
+	context = resolve_production_context(item, branch, company=company, department=department)
+	if not context or context.production_policy != "MADE_TO_ORDER":
+		return {"warehouse": None, "components": []}
+
+	warehouse = context.get("warehouse")
+	if not warehouse:
+		return {"warehouse": None, "components": []}
+
+	# `compile_bom_vector` resolves the item's own active/default BOM for
+	# (item, company) -- it has no per-call BOM override -- so an explicit
+	# `bom` argument here only gates whether we attempt the explosion at all
+	# (an unsaved IPC with no bom picked yet has nothing to explode).
+	if not (bom or context.get("bom")):
+		return {"warehouse": warehouse, "components": []}
+
+	try:
+		vector = compile_bom_vector(item, 1, context.company)
+	except frappe.ValidationError:
+		return {"warehouse": warehouse, "components": []}
+
+	component_items = sorted({row["component_item"] for row in vector["components"]})
+	if not component_items:
+		return {"warehouse": warehouse, "components": []}
+
+	bins = {
+		row.item_code: row.actual_qty
+		for row in frappe.get_all(
+			BIN_DOCTYPE,
+			filters={"item_code": ["in", component_items], "warehouse": warehouse},
+			fields=["item_code", "actual_qty"],
+		)
+	}
+
+	components = [
+		{
+			"item_code": component_item,
+			"warehouse": warehouse,
+			"has_bin": component_item in bins and (bins[component_item] or 0) > 0,
+			"actual_qty": bins.get(component_item, 0) or 0,
+		}
+		for component_item in component_items
+	]
+
+	return {"warehouse": warehouse, "components": components}

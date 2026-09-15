@@ -112,6 +112,13 @@ from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 # not because this module calls any of its mutating entry points.
 import ury.ury.api.ury_reservation_service  # noqa: F401
 
+# Item 4 (G-13, sa-pos-followups-and-ux): reuse the exact NEVER_STOCKED vs
+# DEPLETED classification `ury_reservation_service` uses at order-acceptance
+# time, so a misconfigured item's availability badge (never-stocked) agrees
+# with what the order-time error will say -- see `_raise_shortfall_error`
+# there for the definition.
+from ury.ury.api.ury_reservation_service import _component_never_stocked
+
 
 PRODUCTION_CONFIG_DOCTYPE = "URY Item Production Configuration"
 SALES_PLAN_DOCTYPE = "URY Sales Plan"
@@ -183,6 +190,7 @@ def _resolve_production_config(item_code, branch, company, department=None):
 			"warehouse": row.get("warehouse"),
 			"direct_retail_warehouse": row.get("direct_retail_warehouse"),
 			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
+			"no_plan_enforcement_mode": row.get("no_plan_enforcement_mode"),
 			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
 			"availability_mode": row.get("availability_mode"),
 			"production_unit_disabled": row.get("production_unit_disabled", 0),
@@ -265,6 +273,7 @@ def _base_response(item_code, company, branch, department, production_policy):
 		"fg_available": None,
 		"max_producible": None,
 		"blocking_component": None,
+		"blocking_component_never_stocked": None,
 		"reason_code": "CONFIGURATION_ERROR",
 		"as_of": now_datetime(),
 	}
@@ -418,7 +427,26 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
-		# Plan gate is enabled; fail closed without an active plan
+		no_plan_enforcement_mode = config.get("no_plan_enforcement_mode", "Hard") if config else "Hard"
+		if no_plan_enforcement_mode == "Soft":
+			# Soft no-plan override: fall through to the same stock-only
+			# computation used for controlled_by_sales_plan=0, but keep the
+			# outcome distinguishable via plan_status (not the same as
+			# "gating disabled entirely").
+			effective_available = fg_available
+			response["available_qty"] = max(effective_available, 0)
+			response["plan_status"] = "no_plan_soft_allowed"
+			if fg_available <= 0 and never_produced:
+				response["reason_code"] = "NOT_PRODUCED"
+				response["sellable"] = False
+			elif fg_available <= 0:
+				response["reason_code"] = "FG_OUT_OF_STOCK"
+				response["sellable"] = False
+			else:
+				response["reason_code"] = "AVAILABLE"
+				response["sellable"] = effective_available > 0
+			return
+		# Plan gate is enabled and enforcement is Hard; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -507,6 +535,9 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 			response["reason_code"] = "BLOCKING_COMPONENT"
 			response["sellable"] = False
 			response["blocking_component"] = blocking_component
+			response["blocking_component_never_stocked"] = _component_never_stocked(
+				blocking_component, warehouse
+			)
 		else:
 			response["reason_code"] = "AVAILABLE"
 			response["sellable"] = True
@@ -514,7 +545,26 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
-		# Plan gate is enabled; fail closed without an active plan
+		no_plan_enforcement_mode = config.get("no_plan_enforcement_mode", "Hard") if config else "Hard"
+		if no_plan_enforcement_mode == "Soft":
+			# Soft no-plan override: fall through to the same capacity-only
+			# computation used for controlled_by_sales_plan=0, but keep the
+			# outcome distinguishable via plan_status (not the same as
+			# "gating disabled entirely").
+			response["available_qty"] = max(recipe_capacity, 0)
+			response["plan_status"] = "no_plan_soft_allowed"
+			if recipe_capacity <= 0:
+				response["reason_code"] = "BLOCKING_COMPONENT"
+				response["sellable"] = False
+				response["blocking_component"] = blocking_component
+				response["blocking_component_never_stocked"] = _component_never_stocked(
+					blocking_component, warehouse
+				)
+			else:
+				response["reason_code"] = "AVAILABLE"
+				response["sellable"] = True
+			return
+		# Plan gate is enabled and enforcement is Hard; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -528,6 +578,9 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	if recipe_capacity < plan["plan_remaining"]:
 		response["blocking_component"] = blocking_component
+		response["blocking_component_never_stocked"] = _component_never_stocked(
+			blocking_component, warehouse
+		)
 
 	if recipe_capacity <= 0:
 		response["reason_code"] = "BLOCKING_COMPONENT"
