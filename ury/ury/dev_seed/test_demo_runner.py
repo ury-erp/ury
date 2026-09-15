@@ -12,6 +12,45 @@ from ury.ury.dev_seed.demo_runner import seed_all
 
 
 class TestDemoRunner(FrappeTestCase):
+    def setUp(self):
+        """seed_all() -> _resolve_branch() requires at least one real Branch
+        record to already exist on the site -- a fresh site (e.g. via
+        setup_complete(), which creates a default Company but never a
+        Branch, a separate optional doctype) has none, so seed_all() throws
+        "No Branch found on this site" before this test's own assertions
+        ever run. Seed the minimum needed directly rather than relying on
+        the site already having one."""
+        company = frappe.db.get_value("Company", {}, "name")
+        if not company:
+            self.skipTest("No Company found on this site -- cannot set up this test's Branch fixture.")
+        branch_name = frappe.db.get_value("Branch", {"company": company}, "name")
+        if not branch_name:
+            branch_doc = frappe.get_doc({
+                "doctype": "Branch",
+                "branch": "Demo Branch",
+                "company": company,
+            })
+            # ury's custom "user" child table on Branch is marked mandatory.
+            # A real row (not just ignore_mandatory on this one insert) is
+            # needed because demo_runner's own operations.seed() later
+            # re-fetches and re-saves this Branch doc (to add aggregator
+            # settings), which re-validates mandatory fields for real --
+            # Administrator always exists, so it's a safe assignee here.
+            branch_doc.append("user", {"user": "Administrator"})
+            branch_doc.insert(ignore_permissions=True)
+            frappe.db.commit()
+        else:
+            # A Branch created by an earlier (e.g. pre-fix) test run may
+            # already exist without a "user" row -- this test's data
+            # persists across runs (seed_all() commits real records, it
+            # isn't wrapped in the usual per-test rollback), so check for
+            # this every time rather than only on first creation.
+            branch_doc = frappe.get_doc("Branch", branch_name)
+            if not branch_doc.get("user"):
+                branch_doc.append("user", {"user": "Administrator"})
+                branch_doc.save(ignore_permissions=True)
+                frappe.db.commit()
+
     def test_seed_all_completes_and_creates_key_records(self):
         """seed_all() should run every module without raising and leave the
         site with the demo records the front-end dashboards/reports expect."""
