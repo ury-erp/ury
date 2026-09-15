@@ -47,6 +47,9 @@ def dismiss_insight(name):
 	"""Mark a URY Insight as dismissed by the current user."""
 	require_manager()
 
+	if not frappe.db.exists("URY Insight", name):
+		frappe.throw(frappe._("URY Insight {0} not found").format(name), frappe.DoesNotExistError)
+
 	frappe.db.set_value(
 		"URY Insight",
 		name,
