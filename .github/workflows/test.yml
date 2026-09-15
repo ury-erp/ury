@@ -301,6 +301,24 @@ jobs:
           frappe.db.commit()
           if not frappe.db.exists("Warehouse Type", "Transit"):
               frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
+          # Sharding (see the backend job's matrix comment) extended this
+          # gate from 17 hand-picked modules to 91, several of which pull
+          # in frappe/erpnext's OWN standard test-fixture convention of a
+          # Company literally named "_Test Company" (not this script's own
+          # "Test Company", created above for setup_complete()'s explicit
+          # args) via the same recursive test-record dependency chain that
+          # needed the Warehouse Type fallback above. Seed it too.
+          try:
+              if not frappe.db.exists("Company", "_Test Company"):
+                  frappe.get_doc({
+                      "doctype": "Company",
+                      "company_name": "_Test Company",
+                      "abbr": "_TC",
+                      "default_currency": "INR",
+                      "country": "India",
+                  }).insert(ignore_permissions=True, ignore_mandatory=True)
+          except Exception as e:
+              print("_Test Company creation failed (see workflow comment):", e)
           frappe.db.commit()
           exit()
           y
