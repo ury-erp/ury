@@ -24,11 +24,18 @@ IDEMPOTENT: guarded by `frappe.db.exists` per branch (branch is `unique`
 per T1's schema, via `autoname: field:branch`), so re-running never creates
 duplicates and never errors.
 
-SAFE ON FRESH INSTALL: guarded by `frappe.db.table_exists` /
-`frappe.db.has_column` on the OLD doctype/field, same pattern as
-v3_0's `backfill_invoice_employee_attribution` and v3_18's
-`add_batch_sourcing_mode_fields` -- never assumes the retired doctype is
-present.
+SAFE ON FRESH INSTALL: guarded by `frappe.db.exists("DocType", ...)` /
+a `DocField` existence check on the OLD doctype/field -- **not**
+`frappe.db.table_exists`, which is the wrong check for a Single. A Single
+doctype's values live in the shared `tabSingles` table (rows keyed by
+`(doctype, field)`), never in a physical `tab<DocType>` table of its own,
+so `table_exists("URY Feature Flags")` returns `False` unconditionally
+regardless of whether the doctype exists or the flag was ever set -- an
+earlier version of this patch used exactly that check and was silently a
+complete no-op on every site, discovered via live-bench verification
+(see tracks/sa-pos-stock-phase2/LIVE_VERIFICATION.md). The correct
+existence check for a Single is on the DocType/DocField metadata, not the
+storage table.
 
 Must run after `URY Branch Stock Policy` itself exists. T1 reports the
 doctype is installable directly via `bench migrate`'s doctype sync (no
@@ -55,12 +62,26 @@ def execute():
 		# somehow hasn't.
 		return
 
-	if not frappe.db.table_exists(OLD_FLAG_DOCTYPE):
+	if not frappe.db.exists("DocType", OLD_FLAG_DOCTYPE):
+		# The retired doctype has been removed entirely (or never existed on
+		# a fresh install) -- nothing to migrate.
 		return
-	if not frappe.db.has_column(OLD_FLAG_DOCTYPE, OLD_FLAG_FIELD):
+	if not frappe.db.exists("DocField", {"parent": OLD_FLAG_DOCTYPE, "fieldname": OLD_FLAG_FIELD}):
+		# The doctype survived but the specific field was dropped from it --
+		# same as above, nothing to read.
 		return
 
-	old_flag_value = frappe.db.get_single_value(OLD_FLAG_DOCTYPE, OLD_FLAG_FIELD)
+	try:
+		old_flag_value = frappe.db.get_single_value(OLD_FLAG_DOCTYPE, OLD_FLAG_FIELD)
+	except Exception:
+		# Belt-and-braces: any unexpected error reading a Single's stored
+		# value (e.g. a malformed tabSingles row) fails closed to "nothing to
+		# migrate" rather than aborting the whole migrate run.
+		frappe.log_error(
+			frappe.get_traceback(),
+			"migrate_stock_authority_flag_to_branch_policy: could not read old flag value",
+		)
+		return
 	if not old_flag_value:
 		return
 
