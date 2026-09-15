@@ -27,6 +27,7 @@ from ury.ury_pos.api import (
 )
 from ury.ury.api.ury_kot_validation import get_kot_errors
 from ury.ury.doctype.sub_pos_closing.sub_pos_closing import get_pos_invoices
+from ury.ury.tests.factories import make_branch
 
 TEST_COMPANY = "_Test Company"
 TEST_MODE_OF_PAYMENT = "Cash"
@@ -114,14 +115,7 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
             branch.append("user", {"user": self.cashier.name})
             branch.save(ignore_permissions=True)
         else:
-            branch = frappe.get_doc(
-                {
-                    "doctype": "Branch",
-                    "branch": TEST_BRANCH,
-                    "user": [{"user": self.cashier.name}],
-                }
-            )
-            branch.insert(ignore_permissions=True)
+            branch = make_branch(branch=TEST_BRANCH, user=[{"user": self.cashier.name}])
         return branch
 
     def _make_restaurant(self):
