@@ -493,3 +493,111 @@ class TestPlanExhaustedEnforcementMode(unittest.TestCase):
 		notified_users = {call.args[1] for call in create_notification.call_args_list}
 		self.assertEqual(notified_users, {"pm@example.com", "mgr@example.com"})
 		self.assertEqual(create_notification.call_count, 2)
+
+
+class TestNoActivePlanEnforcementMode(unittest.TestCase):
+	"""Item #8: `_check_line_availability()`'s Hard/Soft branching on
+	NO_ACTIVE_PLAN, consulting `URY Item Production Configuration.
+	no_plan_enforcement_mode` (via the already-loaded production `context`)
+	instead of a Sales Plan's `enforcement_mode` (there is no plan row in
+	this case)."""
+
+	def _availability(self, reason_code, **extra):
+		result = {"sellable": False, "reason_code": reason_code}
+		result.update(extra)
+		return result
+
+	def test_hard_mode_returns_rejection(self):
+		context = {"department": "Hot Line", "no_plan_enforcement_mode": "Hard"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("NO_ACTIVE_PLAN")
+		), patch.object(service, "_log_soft_plan_override") as log_override:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context, qty=3)
+
+		self.assertEqual(result, {"item_code": "ITEM-1", "reason_code": "NO_ACTIVE_PLAN"})
+		log_override.assert_not_called()
+
+	def test_missing_no_plan_enforcement_mode_defaults_to_hard(self):
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("NO_ACTIVE_PLAN")
+		), patch.object(service, "_log_soft_plan_override") as log_override:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context, qty=3)
+
+		self.assertEqual(result, {"item_code": "ITEM-1", "reason_code": "NO_ACTIVE_PLAN"})
+		log_override.assert_not_called()
+
+	def test_soft_mode_allows_through_and_logs_when_still_flagged_not_sellable(self):
+		# Defensive branch: if availability somehow still reports
+		# NO_ACTIVE_PLAN/not-sellable despite Soft mode, Soft still lets the
+		# line through and logs the override (mirrors PLAN_EXHAUSTED's Soft
+		# handling).
+		context = {"department": "Hot Line", "no_plan_enforcement_mode": "Soft"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("NO_ACTIVE_PLAN")
+		), patch.object(service, "_log_soft_plan_override") as log_override:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context, qty=3)
+
+		self.assertIsNone(result)
+		log_override.assert_called_once_with("no_active_plan_soft_override", "ITEM-1", "BR-1", "Hot Line", 3)
+
+	def test_soft_mode_allowed_via_availability_plan_status_marker_is_logged(self):
+		# The real production path: ury_availability.py itself already
+		# resolved NO_ACTIVE_PLAN + Soft into a sellable, stock/capacity-based
+		# result flagged with plan_status="no_plan_soft_allowed" -- the
+		# reservation service must still persist a reviewable log for it.
+		context = {"department": "Hot Line", "no_plan_enforcement_mode": "Soft"}
+		with patch.object(
+			service,
+			"get_item_availability",
+			return_value={"sellable": True, "reason_code": "AVAILABLE", "plan_status": "no_plan_soft_allowed"},
+		), patch.object(service, "_log_soft_plan_override") as log_override:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context, qty=5)
+
+		self.assertIsNone(result)
+		log_override.assert_called_once_with("no_active_plan_soft_override", "ITEM-1", "BR-1", "Hot Line", 5)
+
+	def test_sellable_without_plan_status_marker_does_not_log(self):
+		# Ordinary sellable results (no plan-related override at all) must
+		# not trigger a soft-override log.
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
+		), patch.object(service, "_log_soft_plan_override") as log_override:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context, qty=5)
+
+		self.assertIsNone(result)
+		log_override.assert_not_called()
+
+
+class TestRejectionMessageIsReasonCodeAware(unittest.TestCase):
+	"""§4/§5 acceptance: the frappe.throw message names the concrete
+	doctype/field a manager needs to open, and differs by reason code."""
+
+	def test_no_active_plan_message_names_config_field(self):
+		message = service._rejection_message("ITEM-1", "BR-1", "NO_ACTIVE_PLAN")
+		self.assertIn("Sales Plan", message)
+		self.assertIn("No-Plan Enforcement Mode", message)
+		self.assertIn("URY Item Production Configuration", message)
+
+	def test_plan_exhausted_message_names_sales_plan(self):
+		message = service._rejection_message("ITEM-1", "BR-1", "PLAN_EXHAUSTED")
+		self.assertIn("URY Sales Plan", message)
+		self.assertIn("Enforcement Mode", message)
+
+	def test_unknown_reason_falls_back_to_generic_message(self):
+		message = service._rejection_message("ITEM-1", "BR-1", "CONFIGURATION_ERROR")
+		self.assertIn("CONFIGURATION_ERROR", message)
+		self.assertIn("refresh the menu", message)
+
+	def test_reconcile_line_uses_reason_code_aware_message(self):
+		context = service.frappe._dict({"name": "UIPC-1", "department": "Hot Line", "warehouse": "WH-1"})
+		with patch.object(service, "resolve_production_context", return_value=context), patch.object(
+			service, "_check_line_availability", return_value={"item_code": "ITEM-1", "reason_code": "NO_ACTIVE_PLAN"}
+		):
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				service._reconcile_line(
+					"INV-1", "key-1", {"item_code": "ITEM-1", "qty": 2}, 0, "BR-1", "COMP-1", "user@example.com"
+				)
+
+		self.assertIn("No-Plan Enforcement Mode", str(ctx.exception))

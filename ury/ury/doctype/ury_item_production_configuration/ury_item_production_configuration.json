@@ -17,6 +17,7 @@
   "production_posting_trigger_state",
   "bom",
   "controlled_by_sales_plan",
+  "no_plan_enforcement_mode",
   "allow_over_plan_sale",
   "availability_mode",
   "direct_retail_warehouse",
@@ -98,6 +99,16 @@
    "fieldname": "controlled_by_sales_plan",
    "fieldtype": "Check",
    "label": "Controlled by Sales Plan"
+  },
+  {
+   "default": "Hard",
+   "depends_on": "eval:doc.controlled_by_sales_plan",
+   "description": "Only applies when Controlled by Sales Plan is checked and no active Sales Plan row covers this item for today's branch/department. Hard: block the sale until a plan is created/approved. Soft: allow the sale on stock/capacity alone and flag it for review.",
+   "fieldname": "no_plan_enforcement_mode",
+   "fieldtype": "Select",
+   "label": "No-Plan Enforcement Mode",
+   "options": "Hard\nSoft",
+   "reqd": 1
   },
   {
    "default": "0",

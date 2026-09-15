@@ -23,7 +23,7 @@ def resolve_production_context(item, branch, company=None, department=None):
 		fields=[
 			"name", "item", "branch", "department", "production_unit",
 			"production_policy", "bom", "direct_retail_warehouse",
-			"controlled_by_sales_plan", "allow_over_plan_sale", "availability_mode",
+			"controlled_by_sales_plan", "no_plan_enforcement_mode", "allow_over_plan_sale", "availability_mode",
 		],
 		filters=filters,
 		limit=2,
