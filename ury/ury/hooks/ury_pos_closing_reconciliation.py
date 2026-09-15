@@ -163,9 +163,17 @@ def _reconcile_session(doc):
 	"""Run both checks over every POS Invoice in the session.
 
 	Returns a list of human-readable problem strings (empty == clean).
+
+	Raises when `pos_transactions` is empty but there are submitted,
+	unconsolidated POS Invoices in this session that should have populated
+	it (see `_session_invoice_names` / `_confirm_genuinely_empty`) --
+	deliberately, so the caller's existing system-error path
+	(`validate_closing_reconciliation`'s `except Exception` block) is what
+	surfaces it, rather than this function silently returning a clean pass.
 	"""
 	invoice_names = _session_invoice_names(doc)
 	if not invoice_names:
+		_confirm_genuinely_empty(doc)
 		# An empty shift -- no transactions, nothing to reconcile. A trivial
 		# pass, not an error: a cashier who opened and closed without selling
 		# anything must be able to close.
@@ -184,12 +192,27 @@ def _session_invoice_names(doc):
 	"""The POS Invoices in this closing entry's session, deduplicated.
 
 	Read from `pos_transactions`, the same table
-	`ury_pos_closing_entry.populate_pos_transactions` rebuilds. Hook ordering
-	in `hooks.py` puts `ury_pos_closing_entry.validate` (which runs
-	`populate_pos_transactions`) before this handler, so by the time we read
-	it the table is populated even for the custom frontend's path, which
-	never sends it.
+	`ury_pos_closing_entry.populate_pos_transactions` rebuilds.
+
+	Self-populating, not just self-reading: `populate_pos_transactions` is
+	called here directly rather than relied upon via `hooks.py` ordering.
+	Under today's (correct) `hooks.py` order this is a no-op -- that
+	function's own `if doc.get("pos_transactions"): return` guard
+	(`ury_pos_closing_entry.py:44`) makes it return immediately, since
+	`ury_pos_closing_entry.validate` already ran first and filled the table.
+	Under a hypothetical future reordering of the `validate` doc_events list
+	for "POS Closing Entry" (see the comment in `hooks.py`), this becomes
+	the thing that actually populates it, so this check's correctness no
+	longer depends on hook list position. It is `frappe.get_all`-only and
+	writes no documents, so calling it a second time (or a first time, when
+	the true first call hasn't run yet) has no ledger or audit consequence.
+	Caller-supplied `pos_transactions` is therefore never overwritten either
+	way -- see the guard's own contract.
 	"""
+	from ury.ury.hooks.ury_pos_closing_entry import populate_pos_transactions
+
+	populate_pos_transactions(doc, None)
+
 	rows = doc.get("pos_transactions") or []
 	names = []
 	for row in rows:
@@ -197,6 +220,68 @@ def _session_invoice_names(doc):
 		if name and name not in names:
 			names.append(name)
 	return names
+
+
+def _get(row, field):
+	"""Dict-or-attr field access, matching `_session_invoice_names`'s own
+	`row.get(...) if hasattr(row, "get") else getattr(...)` pattern -- rows
+	here may be `frappe._dict` (real `frappe.get_all` calls) or plain dicts
+	(as used throughout this module's tests)."""
+	return row.get(field) if hasattr(row, "get") else getattr(row, field, None)
+
+
+def _confirm_genuinely_empty(doc):
+	"""Close the fail-open window that remains even after self-population.
+
+	An empty `pos_transactions` is ambiguous on its own: it is either a
+	genuinely empty shift (nothing sold) or a sign that something upstream
+	failed to populate the table the way it should have. Distinguish the two
+	with one cheap confirming query, using the exact same filter
+	`ury_pos_closing_entry.populate_pos_transactions` uses
+	(`ury_pos_closing_entry.py:49-58`) for submitted, unconsolidated POS
+	Invoices in this session's `(pos_profile, user, period)`.
+
+	If that query finds rows while `pos_transactions` is still empty, this
+	is a structural failure, not an empty shift -- raise so the caller's
+	system-error path handles it, rather than let `_reconcile_session`
+	return a clean pass for a session that plainly has unreconciled
+	invoices.
+	"""
+	if not doc.pos_profile or not doc.period_start_date or not doc.period_end_date:
+		# Same preconditions `populate_pos_transactions` requires; without
+		# them there is nothing to confirm against, so treat as genuinely
+		# empty -- consistent with that function's own early return.
+		return
+
+	# Same filter and same "filter consolidated in Python" approach as
+	# `populate_pos_transactions` (`ury_pos_closing_entry.py:49-65`) -- match
+	# it exactly rather than a `consolidated_invoice in ("", NULL)` SQL
+	# filter, which core's own falsy-vs-NULL storage of that field makes
+	# less reliable than a plain truthiness check.
+	invoices = frappe.get_all(
+		"POS Invoice",
+		filters={
+			"docstatus": 1,
+			"pos_profile": doc.pos_profile,
+			"cashier": doc.user,
+			"posting_date": ["between", [doc.period_start_date, doc.period_end_date]],
+		},
+		fields=["name", "consolidated_invoice"],
+	)
+	unconsolidated = [invoice for invoice in invoices if not _get(invoice, "consolidated_invoice")]
+	if unconsolidated:
+		raise Exception(
+			"POS Closing Entry {0}: pos_transactions is empty but submitted, "
+			"unconsolidated POS Invoices exist for pos_profile={1}, user={2}, "
+			"period=({3}, {4}). Refusing to treat this as a clean empty "
+			"shift.".format(
+				doc.get("name") or "(unsaved)",
+				doc.pos_profile,
+				doc.user,
+				doc.period_start_date,
+				doc.period_end_date,
+			)
+		)
 
 
 def _verify_invoice_production(invoice_name):

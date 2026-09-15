@@ -18,6 +18,20 @@ Pinned here:
   5. Empty `pos_transactions` (a shift with no sales) -> trivial pass.
   6. An unexpected exception inside the reconciliation -> blocked with a
      manager-readable message, never a raw traceback.
+
+PR #386 review follow-up, Item 2 (hook-ordering self-sufficiency):
+
+  7. `_session_invoice_names` self-calls `populate_pos_transactions`, so an
+     empty `pos_transactions` with submitted unconsolidated POS Invoices
+     still in the period is caught rather than silently passed -- even
+     when simulating T5 running BEFORE `ury_pos_closing_entry.validate`
+     (i.e. hook order reversed).
+  8. A genuinely empty shift (no matching POS Invoices at all) still
+     passes, per the existing `_reconcile_session` contract.
+  9. Caller-supplied `pos_transactions` is never overwritten by the extra
+     `populate_pos_transactions` call.
+  10. The literal order of `hooks.py`'s "POS Closing Entry" `validate` list
+      is asserted directly, so a future reorder shows up as a red test.
 """
 
 from unittest.mock import patch
@@ -295,3 +309,113 @@ class TestClosingReconciliation(FrappeTestCase):
 		with patch(f"{MODULE}._reconcile_session") as reconcile:
 			validate_closing_reconciliation(doc)
 		self.assertEqual(reconcile.call_count, 0)
+
+	# -- 7-10. Item 2 follow-up: hook-ordering self-sufficiency ----------
+
+	def test_empty_transactions_with_unconsolidated_invoices_is_not_a_silent_pass(self):
+		"""Simulates T5 running BEFORE `ury_pos_closing_entry.validate` (a
+		hypothetical hook reorder): `pos_transactions` is empty even though
+		submitted, unconsolidated POS Invoices exist for this session. The
+		self-population call is left to run for real (not mocked) -- it
+		finds the same invoices via its own query and would normally
+		repopulate `pos_transactions` -- but here we mock its own
+		`frappe.get_all` to look like no invoices were found either, so the
+		fail-open window is exercised: the confirming query in
+		`_confirm_genuinely_empty` (mocked to return a row) must catch it
+		and route into the system-error throw."""
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_all",
+			return_value=[{"name": "POSINV-99", "consolidated_invoice": None}],
+		), patch(
+			f"{MODULE}.frappe.log_error"
+		) as log_error:
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				validate_closing_reconciliation(doc)
+
+		message = str(ctx.exception)
+		self.assertIn("system error", message.lower())
+		self.assertEqual(log_error.call_count, 1)
+		# Never a silent pass: pos_transactions is still empty and yet we
+		# raised, rather than `_reconcile_session` returning [].
+		self.assertEqual(doc.pos_transactions, [])
+
+	def test_genuinely_empty_shift_still_passes(self):
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		):
+			validate_closing_reconciliation(doc)  # must not raise
+
+	def test_caller_supplied_pos_transactions_not_overwritten(self):
+		doc = _closing(["POSINV-1"])
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_ON,
+		), patch(
+			f"{MODULE}._verify_invoice_production", return_value=None
+		) as verify, patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all"
+		) as entry_get_all:
+			validate_closing_reconciliation(doc)  # must not raise
+
+		# populate_pos_transactions's own `:44` guard means it returns before
+		# ever issuing its query, because pos_transactions is non-empty --
+		# the caller-supplied row is never overwritten.
+		entry_get_all.assert_not_called()
+		self.assertEqual(len(doc.pos_transactions), 1)
+		self.assertEqual(doc.pos_transactions[0].pos_invoice, "POSINV-1")
+		self.assertEqual(verify.call_count, 1)
+
+	def test_hook_order_entry_populate_precedes_reconciliation(self):
+		"""Documents the current order as defence-in-depth (not a
+		correctness requirement, per the extended `hooks.py` comment): a
+		future reorder is now caught by fix (a)+(b) above, but this test
+		still pins the order so a reorder is visible as a diff, not just a
+		latent risk."""
+		validate_hooks = frappe.get_hooks("doc_events").get("POS Closing Entry", {}).get(
+			"validate", []
+		)
+		entry_index = validate_hooks.index("ury.ury.hooks.ury_pos_closing_entry.validate")
+		reconciliation_index = validate_hooks.index(
+			"ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation"
+		)
+		self.assertLess(entry_index, reconciliation_index)
+
+	def test_gate_off_skips_self_population_too(self):
+		"""Acceptance criterion 5: the gate-off no-op must precede ANY new
+		work, including the self-population call added for this fix."""
+		doc = _closing([])
+		doc.user = "cashier@example.com"
+		doc.period_start_date = "2024-01-01 00:00:00"
+		doc.period_end_date = "2024-01-01 23:59:59"
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+			return_value=POLICY_OFF,
+		), patch(
+			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all"
+		) as entry_get_all, patch(
+			f"{MODULE}.frappe.get_all"
+		) as recon_get_all:
+			validate_closing_reconciliation(doc)
+
+		entry_get_all.assert_not_called()
+		recon_get_all.assert_not_called()

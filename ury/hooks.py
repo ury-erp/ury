@@ -242,9 +242,17 @@ doc_events = {
             "ury.ury.utils.stock_count_gate.validate_pos_closing_entry",
             # T5 / I-10: session-scoped closing reconciliation. Runs AFTER
             # `ury_pos_closing_entry.validate`, which is what populates
-            # `pos_transactions` for the custom frontend's path -- this
-            # handler reads that table, so the order matters. No-op unless
-            # the branch has `closing_reconciliation_enabled` (tier gate 3).
+            # `pos_transactions` for the custom frontend's path. Keeping it
+            # after that entry here is defence-in-depth, not a correctness
+            # requirement: `ury_pos_closing_reconciliation._session_invoice_names`
+            # self-calls `populate_pos_transactions` before reading the
+            # table (safe because of that function's own
+            # `if doc.get("pos_transactions"): return` guard), and
+            # additionally confirms via a direct query that an empty table
+            # really is an empty shift rather than a silently-skipped
+            # session, so this handler's correctness no longer depends on
+            # this list's order. No-op unless the branch has
+            # `closing_reconciliation_enabled` (tier gate 3).
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
         ],
         },
