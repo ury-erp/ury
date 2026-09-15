@@ -96,6 +96,13 @@ class TestQueuedMapping(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_kot_with_no_execution_row_is_implicitly_queued(self):
 		"""A KOT with no `URY KOT Execution` row yet is treated as QUEUED --
 		this is the documented mapping for 'KOT submitted maps to QUEUED',
@@ -135,6 +142,13 @@ class TestStartRecordsActorOnce(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_start_records_actor_and_timestamp(self):
 		get_doc_side_effect, created = _new_doc_recorder()
 
@@ -167,6 +181,13 @@ class TestDoubleStartSameKey(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_double_start_with_same_idempotency_key_returns_original(self):
 		"""A second call with the SAME idempotency_key must return the
@@ -213,6 +234,13 @@ class TestDoubleCompleteNoDuplicate(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_double_serve_with_same_key_does_not_duplicate(self):
 		prior_row = frappe._dict(
@@ -286,6 +314,13 @@ class TestCompleteWithoutStart(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_mark_ready_without_start_fails_closed(self):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
 			f"{MODULE}.frappe.get_all", return_value=[]
@@ -353,6 +388,13 @@ class TestReverseTransitionGuard(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_start_on_already_ready_kot_fails_closed_and_preserves_state(self):
 		"""There is no public function whose target_state is QUEUED, so a
 		literal READY/SERVED -> QUEUED call cannot be expressed through this
@@ -401,6 +443,13 @@ class TestConcurrency(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_concurrent_start_by_two_chefs_not_executed(self):
 		"""Two chefs call start_execution on the same KOT 'simultaneously';
