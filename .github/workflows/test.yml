@@ -189,7 +189,13 @@ jobs:
               ury.ury.hooks.test_ury_bom
               ury.ury.hooks.test_ury_item
               ury.ury.report_api.test_commission
+              ury.ury.report_api.test_customers
               ury.ury.report_api.test_day_close
+              ury.ury.report_api.test_employees
+              ury.ury.report_api.test_financial
+              ury.ury.report_api.test_items
+              ury.ury.report_api.test_operations
+              ury.ury.report_api.test_sales
               ury.ury.services.test_bom_cost_resolver
               ury.ury.services.test_production_unit_department_migration
               ury.ury.services.test_yield_check_reminders
