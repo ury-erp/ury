@@ -258,10 +258,6 @@
     --white: 0 0% 100%;
     --black: 0 0% 0%;
     --chat-accent: 251 65% 54%;
-    --order-panel-width: 24rem;
-    --badge-min-width: 1.5rem;
-    --dialog-max-width: 90rem;
-    --dialog-max-height: 90vh;
   }
 
   * {
