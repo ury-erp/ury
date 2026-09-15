@@ -9,6 +9,14 @@ export interface POSInvoiceItem {
   image: string;
   qty: number;
   comment: string;
+  /**
+   * Stable per-line identity persisted on the invoice row (custom field
+   * `POS Invoice Item-reservation_line_key`). Echoed back unchanged in the
+   * next `sync_order` payload so the server diffs previous-vs-current lines
+   * by identity instead of by child-row name (which is regenerated on every
+   * save) — see `ury_order.py::_previous_line_snapshot`.
+   */
+  reservation_line_key?: string | null;
   rate: number;
   amount: number;
   discount_percentage: number;
@@ -74,6 +82,13 @@ export interface SyncOrderRequest {
     rate: number;
     qty: number;
     comment?: string;
+    /**
+     * Stable line identity (the cart's `uniqueId`). The server accepts it
+     * under any of `ury_order_reservation_service.LINE_REF_FIELDS`; we send
+     * the canonical name. Omitting it makes the server fall back to
+     * context/occurrence matching, which cannot survive a comment edit.
+     */
+    reservation_line_key?: string;
   }>;
   no_of_pax: number;
   mode_of_payment?: string;

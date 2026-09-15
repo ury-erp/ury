@@ -51,6 +51,18 @@ export interface OrderItem extends MenuItem {
   selectedAddons?: { id: string; name: string; price: number }[];
   uniqueId?: string;
   comment?: string;
+  /**
+   * Stable server-side line identity for this cart line.
+   *
+   * For a line loaded from an existing order this is the value persisted on
+   * the invoice row (`POS Invoice Item-reservation_line_key`); for a line
+   * added in this session it is the locally generated `uniqueId`, which the
+   * server then persists. Either way the SAME string is sent back on every
+   * subsequent `sync_order`, which is what lets the backend see a quantity
+   * change as a delta on an existing line rather than as a remove + add
+   * (B02b). Never derive it from the invoice child row's `name`.
+   */
+  reservationLineKey?: string;
 }
 
 export interface PaymentMode {
@@ -425,7 +437,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         
         set({ activeOrders: newOrders });
       } else {
-        const newOrders = [...get().activeOrders, { ...item, uniqueId }];
+        const newOrders = [
+          ...get().activeOrders,
+          // A brand-new cart line owns its identity from creation: the
+          // server persists this key on the invoice row and we echo it back
+          // on every later sync (see OrderItem.reservationLineKey).
+          { ...item, uniqueId, reservationLineKey: item.reservationLineKey || uniqueId },
+        ];
         set({ activeOrders: newOrders });
       }
     } catch (error) {
@@ -644,9 +662,16 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             tax_rate: 0,
             comment: item.comment || '',
           };
+          const uniqueId = generateUniqueId(orderItem as OrderItem);
           return {
             ...orderItem,
-            uniqueId: generateUniqueId(orderItem as OrderItem)
+            uniqueId,
+            // Prefer the key the server already persisted for this row, so
+            // the identity survives the round trip byte-for-byte. Only a
+            // legacy row saved before the key was persisted falls back to
+            // the locally regenerated uniqueId (the server then adopts it —
+            // see ury_order.py::_backfill_previous_line_keys).
+            reservationLineKey: item.reservation_line_key || uniqueId,
           } as OrderItem;
         });
 

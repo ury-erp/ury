@@ -1419,3 +1419,232 @@ class TestReconciledActiveRows(FrappeTestCase):
 		)
 		self.assertEqual(names, ["R1", "R2", "R4"])
 		self.assertEqual(total, 10)
+
+
+class TestSharedGroupPartialFulfilment(FrappeTestCase):
+    """B03b: one reservation group legitimately shared by several fulfillers.
+
+    A straight quantity bump on ONE POS line (Coffee 1 -> 2) does not create a
+    second reservation group: `ury_order_reservation_service._reconcile_line`
+    releases the line's group and creates ONE replacement sized for the new
+    TOTAL under the same `reservation_line_key`, and the delta KOT raised for
+    the +1 inherits that same line key. So the original KOT item and the delta
+    KOT item both resolve -- correctly, per B03's line scoping -- to that one
+    group, which covers both of them together.
+
+    Before this, fulfilling was all-or-nothing, so whichever KOT item was
+    served FIRST flipped the whole group to Fulfilled for its own posting
+    alone, and the sibling served minutes later found nothing Reserved for its
+    line (`RESERVATION_NOT_FOUND`). The accounting below is cumulative: each
+    contributor's share is recorded, and only the contribution that completes
+    the reserved total performs the terminal transition.
+    """
+
+    GROUP = "GRP-SHARED"
+
+    def setUp(self):
+        patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00").start()
+        self.addCleanup(patch.stopall)
+
+    def _store(self, reserved_top_level_qty=2, status=RESERVED, rows=2):
+        """Two component rows of one group, as `create_reservation` writes them.
+
+        `reserved_top_level_qty` is the key `create_reservation` now freezes
+        into every row's create-time `frozen_context`; `None` models a legacy
+        group created before it existed (and with no `sales_plan_commit`
+        fallback either), which must keep whole-group behaviour.
+        """
+        context = {"item_code": "COFFEE", "warehouse": "WH-1"}
+        if reserved_top_level_qty is not None:
+            context["reserved_top_level_qty"] = reserved_top_level_qty
+        return {
+            "RES-{0}".format(i): frappe._dict(
+                {
+                    "name": "RES-{0}".format(i),
+                    "status": status,
+                    "reservation_group": self.GROUP,
+                    "audit_log": json.dumps([{"event": "create", "frozen_context": context}]),
+                }
+            )
+            for i in range(1, rows + 1)
+        }
+
+    def _call(self, store, contributor=None, contributed_qty=None):
+        """Drive the real `fulfil_reservation_if_pending` against `store`.
+
+        `store` is a live dict of row name -> row: every `doc.save()` writes
+        the row's new `audit_log`/`status` straight back into it, so a second
+        call in the same test reads what the first one actually persisted --
+        which is the whole point, since the ledger lives in `audit_log`.
+        """
+        def get_doc_dispatch(_doctype, name, *a, **k):
+            row = store[name]
+            doc = frappe._dict(dict(row))
+
+            def _save(*_a, **_k):
+                row["audit_log"] = doc.audit_log
+                row["status"] = doc.status
+
+            doc.save = MagicMock(side_effect=_save)
+            return doc
+
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                row = store.get(values["name"])
+                return [frappe._dict({"reservation_group": row.reservation_group})] if row else []
+            if values and "group" in values:
+                return [frappe._dict(dict(r)) for r in store.values()]
+            return []
+
+        with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+            f"{MODULE}.apply_commit_delta"
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "chef@example.com"
+            return fulfil_reservation_if_pending(
+                "RES-1", contributor=contributor, contributed_qty=contributed_qty
+            )
+
+    def _statuses(self, store):
+        return {row.status for row in store.values()}
+
+    def test_original_then_delta_each_fulfil_their_own_share(self):
+        """The exact reported repro, original KOT served first."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+        # Still Reserved: the delta KOT has not been served yet and must still
+        # find this group. This is the failure B03b fixes -- before it, the
+        # group was already Fulfilled here.
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_delta_then_original_each_fulfil_their_own_share(self):
+        """Reverse order: the delta KOT is served first. Serving order must not
+        matter -- neither KOT item is privileged over the other."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "partial")
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_replayed_contributor_is_counted_once_and_does_not_close_the_group(self):
+        """A posting intent is retried on failure, so the same contributor can
+        call twice. Counting it twice would close a half-consumed group early
+        and strand the sibling KOT item."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "already")
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_contribution_after_the_group_closed_is_a_no_op(self):
+        store = self._store(reserved_top_level_qty=2)
+        self._call(store, contributor="A", contributed_qty=1)
+        self._call(store, contributor="B", contributed_qty=1)
+
+        self.assertEqual(self._call(store, contributor="C", contributed_qty=1), "already")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_single_kot_covering_the_whole_group_closes_in_one_shot(self):
+        """The ordinary case -- one line, one KOT, no quantity bump. Cumulative
+        tracking must be invisible here: the single share equals the reserved
+        total, so the group reaches its terminal status on the first call
+        exactly as before."""
+        store = self._store(reserved_top_level_qty=1)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ONLY", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_legacy_group_with_no_frozen_reserved_qty_closes_in_one_shot(self):
+        """A group created before `reserved_top_level_qty` was frozen has no
+        divisible total, so it must keep today's whole-group behaviour rather
+        than being left Reserved forever by an un-completable ledger."""
+        store = self._store(reserved_top_level_qty=None)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_the_sales_plan_close_out_still_fulfils_the_whole_group(self):
+        """`fulfil_reservations_on_consolidation` passes no contributor. It is
+        the backstop that sweeps a group whose contributors never added up (a
+        KOT item cancelled after production, G-08/G-09), so it must still close
+        a partially-fulfilled group in one shot."""
+        store = self._store(reserved_top_level_qty=2)
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+
+        self.assertEqual(self._call(store), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_the_ledger_survives_on_every_row_not_just_one(self):
+        """The ledger is appended to every row of the group, so no single row
+        is load-bearing, and reading it back de-duplicates by contributor
+        rather than summing the same entry N times."""
+        from ury.ury.api.ury_reservation_service import group_partial_fulfilments
+
+        store = self._store(reserved_top_level_qty=3, rows=2)
+        self._call(store, contributor="A", contributed_qty=1)
+
+        for row in store.values():
+            self.assertIn("partial_fulfil", row.audit_log)
+        self.assertEqual(group_partial_fulfilments(list(store.values())), {"A": 1.0})
+
+    def test_fractional_shares_still_reach_the_terminal_status(self):
+        """Shares are float quotients, so three thirds can sum a few ulps short
+        of the total. QTY_TOLERANCE must absorb that or the group would never
+        close."""
+        store = self._store(reserved_top_level_qty=1)
+        third = 1.0 / 3.0
+
+        self.assertEqual(self._call(store, contributor="A", contributed_qty=third), "partial")
+        self.assertEqual(self._call(store, contributor="B", contributed_qty=third), "partial")
+        self.assertEqual(self._call(store, contributor="C", contributed_qty=third), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_cancelling_a_partially_fulfilled_group_still_completes(self):
+        """G-08/G-09 interaction: a group can now be Reserved yet already partly
+        consumed. Cancellation must not crash over that -- a cancellation must
+        always be able to complete -- and the discrepancy must be logged rather
+        than silently swallowed. The disposition of the already-produced food
+        remains an open business decision.
+        """
+        store = self._store(reserved_top_level_qty=2)
+        self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1)
+
+        def get_doc_dispatch(_doctype, name, *a, **k):
+            row = store[name]
+            doc = frappe._dict(dict(row))
+            doc.save = MagicMock(side_effect=lambda *_a, **_k: row.update({"status": doc.status}))
+            return doc
+
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                return [frappe._dict({"reservation_group": self.GROUP})]
+            if values and "group" in values:
+                return [frappe._dict(dict(r)) for r in store.values()]
+            return []
+
+        with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+            f"{MODULE}.apply_commit_delta"
+        ), patch(
+            f"{MODULE}.frappe.logger"
+        ) as logger, patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "captain@example.com"
+            cancel_reservation("RES-1", reason="customer left")
+
+        self.assertEqual(self._statuses(store), {CANCELLED})
+        self.assertTrue(logger.return_value.warning.called)

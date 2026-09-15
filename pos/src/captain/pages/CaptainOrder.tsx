@@ -226,6 +226,9 @@ export default function CaptainOrder() {
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
           comment: item.comment || undefined,
+          // Same stable line identity the Cashier OrderPanel sends — see
+          // OrderItem.reservationLineKey (B02b).
+          reservation_line_key: item.reservationLineKey || item.uniqueId,
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,

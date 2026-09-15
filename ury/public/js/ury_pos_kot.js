@@ -2,9 +2,6 @@ let old_items = [];
 let new_items = [];
 let finalarray = [];
 frappe.ui.form.on("POS Invoice", {
-  refresh: function (frm) {
-    cur_frm.check = true;
-  },
   after_save: function (frm) {
     let invoice_comment = cur_frm.order_comments;
 
@@ -36,6 +33,7 @@ frappe.ui.form.on("POS Invoice", {
       callback: function (r) {
         cur_frm.order_comments = "";
 
+        cur_frm.old_items = new_items;
         old_items = new_items;
 
         new_items = [];
