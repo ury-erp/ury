@@ -194,6 +194,10 @@ CANCELLED = "Cancelled"
 
 ACTIVE_STATUSES = (RESERVED,)
 
+# Audit-log event name for one contributor's partial consumption of a shared
+# reservation group. See `fulfil_reservation_if_pending`.
+PARTIAL_FULFIL_EVENT = "partial_fulfil"
+
 
 def _best_effort_department(item_code, branch):
 	"""Best-effort department lookup for the H1 fan-out event payload only.
@@ -677,7 +681,7 @@ def _require_create_permission():
 		frappe.throw(_("Not permitted to create reservations"), frappe.PermissionError)
 
 
-def append_audit(doc, actor, event, reason=None, frozen_context=None):
+def append_audit(doc, actor, event, reason=None, frozen_context=None, extra=None):
 	import json
 
 	existing = doc.get("audit_log")
@@ -695,6 +699,8 @@ def append_audit(doc, actor, event, reason=None, frozen_context=None):
 		entry["reason"] = reason
 	if frozen_context:
 		entry["frozen_context"] = frozen_context
+	if extra:
+		entry.update(extra)
 	entries.append(entry)
 	doc.audit_log = json.dumps(entries, sort_keys=True, default=str)
 
@@ -838,6 +844,21 @@ def create_reservation(
 		)
 		commit_result = None
 	frozen_context = dict(frozen_context or {})
+	# The TOP-LEVEL item quantity this group reserves, frozen explicitly and
+	# under its own purpose-named key.
+	#
+	# A group's component rows carry per-component quantities (a MADE_TO_ORDER
+	# item's row `qty` is `per_unit_rate * commit_qty`), so the top-level
+	# quantity cannot be recovered from them. It is needed by every consumer
+	# that has to divide one group between several fulfilling parties -- see
+	# `fulfil_reservation_if_pending`'s partial accounting and
+	# `ury_fulfilment_posting_service._freeze_payload`'s per-KOT component
+	# scaling. `sales_plan_commit["qty"]` happens to hold the same number today
+	# (it is the same `flt(qty)`), and `group_reserved_top_level_qty` still
+	# reads it as a fallback for groups created before this key existed -- but
+	# that is a Sales Plan accounting detail which must be free to change, so
+	# it is not the contract.
+	frozen_context["reserved_top_level_qty"] = commit_qty
 	frozen_context["sales_plan_commit"] = {
 		"applied": bool(commit_result),
 		"item_code": item_code,
@@ -981,6 +1002,117 @@ def _group_sales_plan_commit(rows):
 	return None
 
 
+def _group_frozen_context(rows):
+	"""The order-time `frozen_context` recorded on this group, or {}.
+
+	`create_reservation` writes one "create" entry per row, all carrying the
+	SAME frozen_context (it is built once, before any row is inserted), so the
+	first usable one is authoritative for the whole group. Entries are scanned
+	forward because only the create entry ever carries a frozen_context --
+	release/cancel/fulfil/partial_fulfil entries do not.
+	"""
+	import json
+
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries or []:
+			frozen_context = entry.get("frozen_context")
+			if frozen_context:
+				return frozen_context
+	return {}
+
+
+def group_reserved_top_level_qty(rows):
+	"""The TOP-LEVEL item quantity this reservation group covers, or None.
+
+	`rows` may be the locked snapshot from `_resolve_group_rows` or any row set
+	fetched with an `audit_log` field (e.g. `ury_fulfilment_posting_service`'s
+	`frappe.get_all`), so this is deliberately shape-tolerant.
+
+	Returns None -- meaning "unknown, treat the group as indivisible" -- for
+	any group whose order-time context predates `reserved_top_level_qty` and
+	carries no `sales_plan_commit` either. Every caller must fall back to
+	whole-group behaviour on None rather than guessing a quantity, which is
+	what keeps this change a strict no-op for legacy groups.
+	"""
+	context = _group_frozen_context(rows)
+	qty = context.get("reserved_top_level_qty")
+	if qty is None:
+		qty = (context.get("sales_plan_commit") or {}).get("qty")
+	if qty is None:
+		return None
+	qty = flt(qty)
+	return qty if qty > 0 else None
+
+
+def group_partial_fulfilments(rows):
+	"""`{contributor: qty}` already recorded against this group.
+
+	Keyed by contributor, so re-reading the same entry off every row of the
+	group collapses to one value rather than N -- the entry is appended to
+	every row (see `_record_partial_fulfilment`) precisely so no single row is
+	load-bearing for the ledger.
+	"""
+	import json
+
+	ledger = {}
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries or []:
+			if entry.get("event") != PARTIAL_FULFIL_EVENT:
+				continue
+			contributor = entry.get("contributor")
+			if not contributor:
+				continue
+			ledger[contributor] = flt(entry.get("contributed_qty"))
+	return ledger
+
+
+def _record_partial_fulfilment(rows, contributor, contributed_qty):
+	"""Append one contributor's partial-fulfilment entry to every row of the group.
+
+	Status is deliberately NOT touched: the group stays `Reserved` -- and
+	therefore still subtracts capacity, and is still visible to
+	`_reservation_rows` for the sibling KOT items that have yet to be served --
+	until the cumulative contributions reach the reserved total, at which point
+	`fulfil_reservation_if_pending` performs the real
+	`Reserved -> Fulfilled` transition.
+
+	Runs under the `SELECT ... FOR UPDATE` `_resolve_group_rows` already took
+	on every row, so the read-modify-write of the ledger is serialized against
+	a concurrent contributor for the same group.
+	"""
+	actor = frappe.session.user
+	for row in rows:
+		doc = frappe.get_doc(RESERVATION_DOCTYPE, row.name)
+		# Same reason as `_transition_group`: `frappe.get_doc` is a plain read,
+		# so overwrite audit_log with the value the locking SELECT fetched
+		# before appending, or a concurrently committed entry can be dropped.
+		doc.audit_log = row.get("audit_log")
+		append_audit(
+			doc,
+			actor,
+			event=PARTIAL_FULFIL_EVENT,
+			extra={"contributor": contributor, "contributed_qty": flt(contributed_qty)},
+		)
+		doc.save(ignore_permissions=False)
+		# Keep the locked snapshot current for anything that reads `rows`
+		# after this call within the same transition.
+		row["audit_log"] = doc.audit_log
+
+
 def _transition_group(reservation_name, from_status, to_status, reason, event):
 	rows = _resolve_group_rows(reservation_name)
 	not_eligible = [row for row in rows if row.status != from_status]
@@ -1007,6 +1139,39 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 	sales_plan_commit = None
 	if from_status == RESERVED:
 		sales_plan_commit = _group_sales_plan_commit(rows)
+
+	# OPEN BUSINESS DECISION (extends G-08/G-09): a group can now be `Reserved`
+	# yet ALREADY PARTLY CONSUMED -- one of several KOT items sharing it has
+	# been produced and has posted its Stock Entry, while its siblings have not
+	# (see `fulfil_reservation_if_pending`). Releasing / cancelling / expiring
+	# such a group hands its FULL reserved quantity back as available capacity,
+	# including the portion whose raw materials are genuinely already gone.
+	#
+	# This is the same class of question G-08/G-09 leaves open for a wholly
+	# Fulfilled group cancelled after production ("what is the consumption
+	# charged to -- waste, staff meal, a re-plate?"), and it is NOT decided
+	# here: partial consumption makes the existing gap finer-grained, it does
+	# not create a new one, and inventing a disposition policy inside a status
+	# transition would be guessing. What IS guaranteed is that it cannot happen
+	# silently -- the transition proceeds (a cancellation must always be able
+	# to complete, per `release_order_reservations`) and is logged with the
+	# exact quantity involved so the discrepancy is attributable.
+	if from_status == RESERVED and to_status != FULFILLED:
+		partial = group_partial_fulfilments(rows)
+		if partial:
+			frappe.logger("ury_reservation_service").warning(
+				"Reservation group %s is being transitioned %s -> %s while %s of its "
+				"reserved quantity has already been consumed by %s completed "
+				"fulfilment(s) (%s). That consumed portion's capacity is being "
+				"handed back; disposition of the already-produced food is an open "
+				"decision (see G-08/G-09).",
+				rows[0].reservation_group,
+				from_status,
+				to_status,
+				sum(partial.values()),
+				len(partial),
+				", ".join(sorted(partial)),
+			)
 
 	actor = frappe.session.user
 	for row in rows:
@@ -1110,8 +1275,14 @@ def fulfil_reservation(reservation_name):
 	return _transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
 
 
-def fulfil_reservation_if_pending(reservation_name):
+def fulfil_reservation_if_pending(reservation_name, contributor=None, contributed_qty=None):
 	"""Idempotent, non-raising variant of `fulfil_reservation`.
+
+	Optionally PARTIAL (B03b). Pass `contributor` (a stable, unique identity for
+	the fulfilling unit of work -- `ury_fulfilment_posting_service` passes the
+	posting intent's `idempotency_key`) together with `contributed_qty` (in
+	TOP-LEVEL item units) to fulfil only that contributor's share of a group
+	that several parties legitimately share. See the section below.
 
 	`fulfil_reservation` delegates to `_transition_group`, which deliberately
 	refuses a partial transition (frappe.throw) when any row of the group is
@@ -1130,7 +1301,11 @@ def fulfil_reservation_if_pending(reservation_name):
 	`Fulfilled`. Returns one of:
 
 	  "fulfilled"      -- this call performed the transition
-	  "already"        -- every row was already FULFILLED; nothing to do
+	  "partial"        -- this contributor's share was recorded, but the group
+	                      is not yet fully consumed and stays RESERVED
+	  "already"        -- nothing to do: every row was already FULFILLED, or
+	                      this contributor's share was already recorded (a
+	                      replay)
 	  "not_eligible"   -- the group is in some other/mixed state (e.g. partly
 	                      Released by a cancellation, or mid-transition);
 	                      logged and skipped rather than raised, because
@@ -1141,6 +1316,57 @@ def fulfil_reservation_if_pending(reservation_name):
 	The group rows are read through `_resolve_group_rows`, which takes a
 	`SELECT ... FOR UPDATE` lock, so the status observed here cannot be a
 	stale snapshot of a concurrent worker's already-committed fulfilment.
+
+	Partial fulfilment (B03b) -- why a group can have more than one fulfiller
+	--------------------------------------------------------------------------
+	A straight quantity bump on ONE POS line (Coffee 1 -> 2) does not create a
+	second reservation group. `ury_order_reservation_service._reconcile_line`
+	releases the line's existing group and creates ONE replacement sized for
+	the new TOTAL, under the same `reservation_line_key`. The delta KOT raised
+	for the +1 inherits that same line key, so the original KOT item and the
+	delta KOT item both resolve -- correctly, per B03's line scoping -- to that
+	one group, which covers both of them together.
+
+	Fulfilling a group is purely the `Reserved -> Fulfilled` status transition
+	below; the stock movement itself is posted separately, per KOT item, by
+	`ury_fulfilment_posting_service`. So before this, whichever KOT item was
+	served FIRST flipped the whole group to `Fulfilled` for its own posting
+	alone. The sibling KOT item, served minutes later, then found nothing
+	`Reserved` for its line and failed with `RESERVATION_NOT_FOUND` -- the same
+	user-visible symptom B03 fixed for two separate lines, reached by a second
+	mechanism. (Worse, had it not failed, both postings consumed components
+	sized for the group's FULL quantity: `_freeze_payload` now scales those to
+	the KOT item's own share for exactly this reason.)
+
+	The accounting here is therefore cumulative rather than all-or-nothing:
+
+	  - Each contributor's share is appended to every row's `audit_log` as a
+	    `partial_fulfil` entry keyed by `contributor`. Nothing else changes;
+	    the group stays `Reserved`, keeps subtracting capacity, and stays
+	    visible to the siblings that have yet to be served.
+	  - The group transitions to `Fulfilled` -- once, terminally, with the
+	    single Sales Plan committed -> fulfilled counter move `_transition_group`
+	    performs -- only when the cumulative recorded quantity reaches the
+	    group's reserved total.
+	  - Replays are free: a contributor already present in the ledger is
+	    counted once and returns "already", so a retried posting intent can
+	    never double-count.
+	  - A group whose reserved total is unknown (`group_reserved_top_level_qty`
+	    returns None -- a legacy group predating the frozen key), or a caller
+	    that passes no contributor/quantity (the consolidated Sales Invoice
+	    close-out), takes the whole-group path unchanged. The single-KOT case
+	    also closes in one shot, because its single share already equals the
+	    reserved total.
+
+	If the contributors' quantities never add up to the reserved total -- e.g.
+	one of the sharing KOT items is cancelled after production started (G-08/
+	G-09) -- the group simply stays `Reserved` and is swept to `Fulfilled` by
+	the consolidated Sales Invoice close-out at POS closing
+	(`ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`,
+	which calls this function with no contributor). That is a safe under-fulfil:
+	capacity stays reserved until the sale actually posts, rather than being
+	handed back or double-counted. It is deliberately NOT resolved by guessing
+	a disposition here; see the open-decision note in `_transition_group`.
 	"""
 	try:
 		rows = _resolve_group_rows(reservation_name)
@@ -1161,6 +1387,27 @@ def fulfil_reservation_if_pending(reservation_name):
 			RESERVED,
 		)
 		return "not_eligible"
+
+	contributed_qty = flt(contributed_qty)
+	reserved_total = group_reserved_top_level_qty(rows) if contributor else None
+	if contributor and contributed_qty > 0 and reserved_total is not None:
+		ledger = group_partial_fulfilments(rows)
+		if contributor in ledger:
+			# Replay of an already-recorded contribution. Counting it again
+			# would close the group early and under-consume the siblings.
+			return "already"
+		_record_partial_fulfilment(rows, contributor, contributed_qty)
+		ledger[contributor] = contributed_qty
+		# Tolerance, not a bare `>=`: shares are quotients of float quantities
+		# (`accepted_qty / reserved_total` per KOT item) and their sum carries
+		# binary-float drift, so an exactly-complete group can land a few ulps
+		# short and would otherwise never reach its terminal status. Same
+		# reasoning, and the same constant, as the capacity check in
+		# `create_reservation`.
+		if sum(ledger.values()) < reserved_total - QTY_TOLERANCE:
+			return "partial"
+		# Cumulative contributions have reached the reserved total: close the
+		# group out for real, below.
 
 	_transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
 	return "fulfilled"
