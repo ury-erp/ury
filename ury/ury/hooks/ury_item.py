@@ -35,10 +35,11 @@ def validate_yield_tracking(doc, method):
 	its weakest entry point, and Item itself (editable directly via desk, API,
 	or the Yield Standards page) is one of them.
 	"""
-	if doc.get("custom_yield_tracked") and not doc.get("custom_yield_percent"):
-		frappe.throw(
-			_(
-				"Item {0} is marked Yield Tracked but has no Yield Percent set. "
-				"Set a standard yield percent before enabling yield tracking."
-			).format(doc.name or doc.item_code)
-		)
+	if doc.get("custom_yield_tracked"):
+		yield_percent = doc.get("custom_yield_percent")
+		if not yield_percent or yield_percent <= 0 or yield_percent > 100:
+			frappe.throw(
+				_(
+					"Item {0}: Yield Percent must be greater than 0 and at most 100 when Yield Tracked is enabled."
+				).format(doc.name or doc.item_code)
+			)

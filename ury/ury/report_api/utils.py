@@ -18,6 +18,42 @@ def require_manager():
 		)
 
 
+def user_has_branch_access(user, branch):
+	"""True if `user` is assigned to `branch` via Branch's `user` child table
+	(rows of URY User, each linking a User in its own `user` field), or if
+	`user` is Administrator or holds the System Manager role — matching the
+	admin-bypass convention used by require_manager() so admins are never
+	locked out.
+
+	Shared by the staff-facing WRITE endpoints that accept a caller-supplied
+	branch (record_yield_check in ury_yield_variance, and
+	create_issue_authorization in ury_issue_authorization) to confirm the
+	calling user is actually assigned to that specific branch, not merely
+	that some branch/company value was supplied. Not used by the
+	manager-gated reporting endpoints (get_yield_variance,
+	get_yield_check_compliance), which intentionally rely on
+	require_manager() instead — managers may report across branches they
+	oversee even without a Branch.user row.
+	"""
+	if not user or not branch:
+		return False
+	if user == "Administrator":
+		return True
+	if "System Manager" in frappe.get_roles(user):
+		return True
+	return bool(
+		frappe.db.exists(
+			"URY User",
+			{
+				"parenttype": "Branch",
+				"parent": branch,
+				"parentfield": "user",
+				"user": user,
+			},
+		)
+	)
+
+
 def get_business_day_condition(date_expr="curdate()", prefix="b"):
 	"""Return a SQL fragment implementing URY's extended-business-day boundary
 	logic, shared by every report that needs "today"/a single business day,

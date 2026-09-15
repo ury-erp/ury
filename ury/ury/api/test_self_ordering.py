@@ -392,6 +392,92 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
     @patch(f"{MOD}.reconcile_order_reservations")
+    def test_add_customer_items_kot_failure_raises_instead_of_swallowing(
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
+    ):
+        """Same class of bug as sa-post-373-review-fixes Blocker 2 in
+        sync_order(): add_customer_items() saved the invoice, then called
+        kot_execute() inside a bare try/except that only logged the
+        exception via frappe.log_error() and returned normally. That let a
+        QR self-order be fully accepted (invoice saved, customer sees a
+        confirmation) while the kitchen silently never received one or more
+        items. kot_execute() failures must now propagate out of
+        add_customer_items() instead of being swallowed."""
+        mock_db_exists.return_value = True
+        session = self._session_doc(invoice="POS-INV-100")
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enabled = 1
+        profile.allow_add_to_running_table = 1
+        profile.branch = "Branch A"
+        profile.pos_profile = "POS Profile A"
+        profile.default_customer = "Walk-in Customer"
+
+        pos_profile_doc = MagicMock()
+        pos_profile_doc.payments = [MagicMock(mode_of_payment="Cash")]
+
+        def get_doc_side_effect(doctype, name=None, **kwargs):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "POS Profile":
+                return pos_profile_doc
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_resolve_menu.return_value = {"items": [{"item": "Sandwich"}]}
+
+        existing_row = MagicMock(item_code="Biryani", item_name="Biryani", qty=2)
+        invoice = MagicMock()
+        invoice.customer = "Walk-in Customer"
+        invoice.items = [existing_row]
+        invoice.invoice_created = 1
+        invoice.invoice_printed = 0
+        invoice.restaurant_table = "Table 7"
+        invoice.branch = "Branch A"
+        invoice.selling_price_list = "Standard Selling"
+        invoice.grand_total = 300
+        invoice.name = "POS-INV-100"
+
+        def append_side_effect(fieldname, row_dict):
+            if fieldname == "items":
+                invoice.items.append(MagicMock(item_code=row_dict["item_code"], item_name=row_dict["item_name"], qty=row_dict["qty"]))
+        invoice.append.side_effect = append_side_effect
+
+        mock_resolve_invoice.return_value = (invoice, "POS-INV-100")
+
+        priced_sandwich = {"item_code": "Sandwich", "item_name": "Sandwich", "qty": 1, "comment": "",
+                            "rate": 120, "price_list_rate": 120, "base_price_list_rate": 120, "cost_center": "CC"}
+        mock_price_items.return_value = [priced_sandwich]
+        mock_db_get_value.return_value = "Menu A"
+
+        # kot_execute() blows up -- e.g. KOT routing/printer failure.
+        mock_kot.side_effect = Exception("kitchen printer offline")
+
+        with patch(f"{MOD}.frappe.log_error") as mock_log_error:
+            with self.assertRaises(frappe.ValidationError):
+                add_customer_items("session-token", [{"item": "Sandwich", "qty": 1}])
+
+        # Still logged for diagnostics -- re-raising must not drop the log.
+        mock_log_error.assert_called_once()
+        # The invoice was saved before the KOT call -- the fix relies on the
+        # exception propagating out of the whitelisted endpoint so Frappe
+        # rolls back the whole request, not on add_customer_items() itself
+        # undoing the save.
+        invoice.save.assert_called_once_with(ignore_permissions=True)
+
+    @patch(f"{MOD}.kot_execute")
+    @patch(f"{MOD}.price_items_for_invoice")
+    @patch(f"{MOD}._resolve_or_create_pos_invoice")
+    @patch(f"{MOD}.resolve_restaurant_menu")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.db.set_value")
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
     def test_add_customer_items_calls_reservation_gate_for_available_item(
         self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,

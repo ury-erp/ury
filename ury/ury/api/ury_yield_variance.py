@@ -17,7 +17,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 
-from ury.ury.report_api.utils import require_manager
+from ury.ury.report_api.utils import require_manager, user_has_branch_access
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
@@ -59,6 +59,11 @@ def record_yield_check(item, branch, company, input_qty, output_qty, stock_uom,
 	if not frappe.has_permission(YIELD_CHECK_DOCTYPE, "create"):
 		frappe.throw(_("Not permitted to create Yield Check"), frappe.PermissionError)
 	_require_scope(company)
+	if not user_has_branch_access(frappe.session.user, branch):
+		frappe.throw(
+			_("You are not assigned to branch {0}").format(branch),
+			frappe.PermissionError,
+		)
 
 	doc = frappe.get_doc({
 		"doctype": YIELD_CHECK_DOCTYPE,
@@ -154,6 +159,17 @@ def get_yield_check_compliance(company, branch=None):
 	completed checks over the last 30 days. Returns compliance percentage and
 	attached vs standalone check count for data-quality signaling.
 
+	IMPORTANT — compliance_basis: "authorization". For the "Every Issue"
+	cadence, `required_count` counts URY Issue Authorization records with
+	status = "Authorized"; it does NOT know whether that authorization was
+	ever physically issued, was later cancelled, or was only partially used.
+	This is authorization-based compliance (did every Authorized record get a
+	check), not production-based compliance (did every actual physical issue
+	get a check). A real production-based fix needs a new field on URY Issue
+	Authorization recording confirmed physical issuance, which is out of
+	scope here — until that lands, treat these numbers as an upper bound on
+	true non-compliance, not an exact measure.
+
 	Args:
 		company: Company name (required, scoped)
 		branch: Branch name (optional filter; if None, aggregates all branches)
@@ -168,6 +184,7 @@ def get_yield_check_compliance(company, branch=None):
 				"completed_count": <int>,
 				"compliance_percent": <float>,
 				"attached_count": <int>,  # checks with issue_authorization set
+				"compliance_basis": "authorization",  # see docstring above
 			},
 			...
 		]
@@ -264,6 +281,7 @@ def get_yield_check_compliance(company, branch=None):
 			"completed_count": completed_count,
 			"compliance_percent": round(compliance_percent, 2),
 			"attached_count": attached_count,
+			"compliance_basis": "authorization",
 		})
 
 	return compliance_data
@@ -322,3 +340,5 @@ def _require_scope(company):
 	"""Fail closed if company scope is missing, matching the established pattern."""
 	if not company:
 		frappe.throw(_("Company is required"), frappe.ValidationError)
+
+
