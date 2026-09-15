@@ -26,6 +26,8 @@ from frappe.tests.utils import FrappeTestCase
 
 from ury.patches.v3_20.migrate_stock_authority_flag_to_branch_policy import (
     NEW_POLICY_DOCTYPE,
+    OLD_FLAG_DOCTYPE,
+    OLD_FLAG_FIELD,
     execute,
 )
 
@@ -33,26 +35,30 @@ MODULE = "ury.patches.v3_20.migrate_stock_authority_flag_to_branch_policy.frappe
 
 
 class TestMigrateStockAuthorityFlagToBranchPolicy(FrappeTestCase):
-    def _mock_frappe(self, mock_frappe, table_exists=True, has_old_flag_table=True,
-                      has_old_flag_column=True, old_flag_value=1, branches=None,
+    def _mock_frappe(self, mock_frappe, new_doctype_table_exists=True, old_doctype_exists=True,
+                      old_field_exists=True, old_flag_value=1, branches=None,
                       existing_policy_branches=None):
         branches = branches if branches is not None else ["Branch A", "Branch B"]
         existing_policy_branches = existing_policy_branches or set()
 
         def table_exists_side_effect(doctype):
+            # Only the NEW doctype is ever checked via table_exists -- the
+            # OLD doctype is a Single and is checked via DocType/DocField
+            # existence instead (see exists_side_effect below).
             if doctype == NEW_POLICY_DOCTYPE:
-                return table_exists
-            if doctype == "URY Feature Flags":
-                return has_old_flag_table
+                return new_doctype_table_exists
             return False
 
-        def exists_side_effect(doctype, filters):
+        def exists_side_effect(doctype, filters=None):
+            if doctype == "DocType" and filters == OLD_FLAG_DOCTYPE:
+                return old_doctype_exists
+            if doctype == "DocField" and filters == {"parent": OLD_FLAG_DOCTYPE, "fieldname": OLD_FLAG_FIELD}:
+                return old_field_exists
             if doctype == NEW_POLICY_DOCTYPE:
                 return filters.get("branch") in existing_policy_branches
             return False
 
         mock_frappe.db.table_exists.side_effect = table_exists_side_effect
-        mock_frappe.db.has_column.return_value = has_old_flag_column
         mock_frappe.db.get_single_value.return_value = old_flag_value
         mock_frappe.db.exists.side_effect = exists_side_effect
         mock_frappe.get_all.return_value = list(branches)
@@ -111,7 +117,7 @@ class TestMigrateStockAuthorityFlagToBranchPolicy(FrappeTestCase):
 
     @patch(MODULE)
     def test_fresh_install_no_old_doctype_is_noop(self, mock_frappe):
-        created = self._mock_frappe(mock_frappe, has_old_flag_table=False)
+        created = self._mock_frappe(mock_frappe, old_doctype_exists=False)
 
         execute()
 
@@ -119,9 +125,9 @@ class TestMigrateStockAuthorityFlagToBranchPolicy(FrappeTestCase):
         mock_frappe.db.get_single_value.assert_not_called()
 
     @patch(MODULE)
-    def test_old_table_present_but_column_missing_is_noop(self, mock_frappe):
-        created = self._mock_frappe(mock_frappe, has_old_flag_table=True,
-                                     has_old_flag_column=False)
+    def test_old_doctype_present_but_field_missing_is_noop(self, mock_frappe):
+        created = self._mock_frappe(mock_frappe, old_doctype_exists=True,
+                                     old_field_exists=False)
 
         execute()
 
@@ -130,9 +136,21 @@ class TestMigrateStockAuthorityFlagToBranchPolicy(FrappeTestCase):
 
     @patch(MODULE)
     def test_new_doctype_table_missing_is_noop(self, mock_frappe):
-        created = self._mock_frappe(mock_frappe, table_exists=False)
+        created = self._mock_frappe(mock_frappe, new_doctype_table_exists=False)
 
         execute()
 
         self.assertEqual(created, [])
         mock_frappe.db.get_single_value.assert_not_called()
+
+    @patch(MODULE)
+    def test_get_single_value_error_fails_closed(self, mock_frappe):
+        created = self._mock_frappe(mock_frappe)
+        mock_frappe.db.get_single_value.side_effect = Exception("boom")
+        mock_frappe.get_traceback.return_value = "traceback"
+
+        execute()
+
+        self.assertEqual(created, [])
+        mock_frappe.log_error.assert_called_once()
+        mock_frappe.get_all.assert_not_called()
