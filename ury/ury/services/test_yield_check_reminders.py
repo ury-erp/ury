@@ -108,28 +108,44 @@ class TestEvaluateEveryIssue(unittest.TestCase):
 class TestEvaluateInterval(unittest.TestCase):
 	"""Test Interval cadence mode."""
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	@patch(f"{MOD}.frappe.db.get_value")
 	def test_due_immediately_when_never_checked(self, mock_get_value, mock_getdate):
 		"""Item is due immediately if never checked."""
 		today = date(2026, 1, 15)
-		mock_getdate.return_value = today
-		mock_get_value.return_value = None  # No last check
+		item_creation = date(2026, 1, 10)  # 5 days before "today"
+		# _evaluate_interval() calls getdate() (no args, for "today") AND
+		# getdate(item_creation) (to normalize the Item's creation value) --
+		# a single return_value would answer both calls with the same fixed
+		# date regardless of the argument, silently making days_overdue
+		# always 0. Real frappe.utils.getdate(None) with no argument returns
+		# today's date; with an argument it normalizes that value.
+		mock_getdate.side_effect = lambda *a: today if not a else a[0]
+		# Real code makes two frappe.db.get_value calls here: the "URY Yield
+		# Check" lookup (None -- no prior check) and the "Item" creation
+		# lookup (mocked here) -- a single blanket return_value would answer
+		# both with None, and (today - None) would crash.
+		mock_get_value.side_effect = [None, item_creation]
 
 		item = _item(cadence="Interval", interval_days=7)
 		reason, extra = _evaluate_interval(item, "Test Branch")
 
 		self.assertIsNotNone(reason)
 		self.assertIn("No yield check recorded", reason)
-		self.assertEqual(extra, {})
+		# The current implementation always returns days_overdue (days since
+		# the item's own creation) for the never-checked case, not an empty
+		# dict -- see the docstring in _evaluate_interval's "never checked"
+		# branch: it deliberately surfaces this to highlight items that have
+		# never been checked in the Overdue report.
+		self.assertEqual(extra, {"days_overdue": 5})
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	@patch(f"{MOD}.frappe.db.get_value")
 	def test_not_due_when_within_interval(self, mock_get_value, mock_getdate):
 		"""Item is not due if last check is within the interval."""
 		today = date(2026, 1, 15)
 		last_check = date(2026, 1, 12)  # 3 days ago, interval=7
-		mock_getdate.return_value = today
+		mock_getdate.side_effect = lambda *a: today if not a else a[0]
 		mock_get_value.return_value = last_check
 
 		item = _item(cadence="Interval", interval_days=7)
@@ -138,13 +154,13 @@ class TestEvaluateInterval(unittest.TestCase):
 		self.assertIsNone(reason)
 		self.assertIsNone(extra)
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	@patch(f"{MOD}.frappe.db.get_value")
 	def test_due_when_overdue_by_interval(self, mock_get_value, mock_getdate):
 		"""Item is due when last check is older than interval."""
 		today = date(2026, 1, 15)
 		last_check = date(2026, 1, 5)  # 10 days ago, interval=7
-		mock_getdate.return_value = today
+		mock_getdate.side_effect = lambda *a: today if not a else a[0]
 		mock_get_value.return_value = last_check
 
 		item = _item(cadence="Interval", interval_days=7)
@@ -154,13 +170,13 @@ class TestEvaluateInterval(unittest.TestCase):
 		self.assertIn("10 days since last check", reason)
 		self.assertEqual(extra["days_overdue"], 3)  # 10 - 7
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	@patch(f"{MOD}.frappe.db.get_value")
 	def test_days_overdue_calculation_correct(self, mock_get_value, mock_getdate):
 		"""days_overdue is correctly calculated as days_since - interval."""
 		today = date(2026, 1, 20)
 		last_check = date(2026, 1, 1)  # 19 days ago, interval=5
-		mock_getdate.return_value = today
+		mock_getdate.side_effect = lambda *a: today if not a else a[0]
 		mock_get_value.return_value = last_check
 
 		item = _item(cadence="Interval", interval_days=5)
@@ -168,7 +184,7 @@ class TestEvaluateInterval(unittest.TestCase):
 
 		self.assertEqual(extra["days_overdue"], 14)  # 19 - 5
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	@patch(f"{MOD}.frappe.db.get_value")
 	def test_not_due_when_interval_is_zero_or_negative(self, mock_get_value, mock_getdate):
 		"""Item is not due if interval_days is <= 0."""
@@ -185,7 +201,7 @@ class TestEvaluateInterval(unittest.TestCase):
 class TestEvaluateSampled(unittest.TestCase):
 	"""Test Sampled cadence mode (deterministic hash-based sampling)."""
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	def test_sampled_deterministic_same_date_branch_item_same_result(
 		self, mock_getdate
 	):
@@ -201,7 +217,7 @@ class TestEvaluateSampled(unittest.TestCase):
 		self.assertEqual(reason1, reason2)
 		self.assertEqual(extra1, extra2)
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	def test_sampled_different_dates_may_differ(self, mock_getdate):
 		"""Sampled evaluation may differ for different dates (but is still deterministic)."""
 		# First call: date A
@@ -216,7 +232,7 @@ class TestEvaluateSampled(unittest.TestCase):
 		# Results may differ, but each is deterministic when called again with same date
 		# (can't directly verify without controlling the hash, but we verify determinism)
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	def test_sampled_result_is_boolean(self, mock_getdate):
 		"""Sampled evaluation returns either (reason, {}) or (None, None), not a complex object."""
 		today = date(2026, 1, 15)
@@ -232,7 +248,7 @@ class TestEvaluateSampled(unittest.TestCase):
 		else:
 			self.assertIsNone(extra)
 
-	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}.getdate")
 	def test_sampled_different_items_different_results(self, mock_getdate):
 		"""Different items may have different sampling outcomes on same day."""
 		today = date(2026, 1, 15)
@@ -378,15 +394,29 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 
 class TestBOMHookYieldBackCalculation(unittest.TestCase):
-	"""Test BOM Item yield back-calculation hook."""
+	"""Test BOM Item yield back-calculation hook.
 
-	@patch("ury.ury.hooks.ury_bom.frappe.get_doc")
-	def test_qty_calculated_from_yield_qty_and_percent(self, mock_get_doc):
+	This class mirrors ury/ury/hooks/test_ury_bom.py's own
+	TestApplyYieldBackCalculation (see that file's fix, Session 4, for the
+	full explanation) -- both suffered the exact same drift: the hardening
+	pass (PR #375) switched the per-item tracking lookup from
+	frappe.get_doc("Item", ...).custom_yield_tracked to the cheaper
+	frappe.get_cached_value("Item", item_code, "custom_yield_tracked"), so
+	patching frappe.get_doc here no longer intercepts anything -- the real,
+	unmocked get_cached_value ran instead. Two of these four tests also
+	asserted a pre-hardening "skip silently" behavior for a missing
+	custom_yield_qty / zero custom_yield_percent that the current code
+	deliberately replaced with frappe.throw() (same source, same comment) --
+	updated to expect the raise, matching test_ury_bom.py's already-fixed
+	versions of the same two cases.
+	"""
+
+	@patch("ury.ury.hooks.ury_bom.frappe.get_cached_value")
+	def test_qty_calculated_from_yield_qty_and_percent(self, mock_get_cached_value):
 		"""BOM Item qty is calculated as: qty = custom_yield_qty / (custom_yield_percent / 100)."""
 		from ury.ury.hooks.ury_bom import apply_yield_back_calculation
 
-		item_mock = MagicMock()
-		item_mock.custom_yield_tracked = 1
+		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
 
 		bom_doc = MagicMock()
 		row = MagicMock()
@@ -395,21 +425,18 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 		row.item_code = "TEST-ITEM"
 		bom_doc.items = [row]
 
-		mock_get_doc.return_value = item_mock
-
 		apply_yield_back_calculation(bom_doc, None)
 
 		# qty should be 1.0 / (85.0 / 100) = 1.0 / 0.85 = 1.176...
 		expected_qty = 1.0 / 0.85
 		self.assertAlmostEqual(row.qty, expected_qty, places=5)
 
-	@patch("ury.ury.hooks.ury_bom.frappe.get_doc")
-	def test_qty_not_overwritten_when_yield_tracking_disabled(self, mock_get_doc):
+	@patch("ury.ury.hooks.ury_bom.frappe.get_cached_value")
+	def test_qty_not_overwritten_when_yield_tracking_disabled(self, mock_get_cached_value):
 		"""BOM Item qty is not recalculated if Item.custom_yield_tracked is False."""
 		from ury.ury.hooks.ury_bom import apply_yield_back_calculation
 
-		item_mock = MagicMock()
-		item_mock.custom_yield_tracked = 0  # Disabled
+		mock_get_cached_value.return_value = 0  # custom_yield_tracked = 0 (disabled)
 
 		bom_doc = MagicMock()
 		row = MagicMock()
@@ -419,37 +446,42 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 		row.qty = 10.0  # Original value
 		bom_doc.items = [row]
 
-		mock_get_doc.return_value = item_mock
-
 		apply_yield_back_calculation(bom_doc, None)
 
 		# qty should remain unchanged (10.0, not recalculated)
 		self.assertEqual(row.qty, 10.0)
 
-	@patch("ury.ury.hooks.ury_bom.frappe.get_doc")
-	def test_skips_rows_without_yield_qty(self, mock_get_doc):
-		"""Rows without custom_yield_qty set are skipped."""
+	@patch("ury.ury.hooks.ury_bom.frappe.throw")
+	@patch("ury.ury.hooks.ury_bom.frappe.get_cached_value")
+	def test_throws_when_missing_yield_qty(self, mock_get_cached_value, mock_throw):
+		"""A yield-tracked row without custom_yield_qty throws (I6 hardening --
+		this is no longer a silent skip, see the class docstring above)."""
 		from ury.ury.hooks.ury_bom import apply_yield_back_calculation
+
+		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
+		mock_throw.side_effect = frappe.ValidationError
 
 		bom_doc = MagicMock()
 		row = MagicMock()
-		row.custom_yield_qty = None  # Not set
+		row.custom_yield_qty = None  # Missing!
 		row.custom_yield_percent = 85.0
 		row.item_code = "TEST-ITEM"
 		bom_doc.items = [row]
 
-		apply_yield_back_calculation(bom_doc, None)
+		with self.assertRaises(frappe.ValidationError):
+			apply_yield_back_calculation(bom_doc, None)
 
-		# frappe.get_doc should not be called since row was skipped
-		mock_get_doc.assert_not_called()
+		mock_throw.assert_called_once()
 
-	@patch("ury.ury.hooks.ury_bom.frappe.get_doc")
-	def test_skips_rows_with_zero_yield_percent(self, mock_get_doc):
-		"""Rows with custom_yield_percent=0 are skipped (guard against division by zero)."""
+	@patch("ury.ury.hooks.ury_bom.frappe.throw")
+	@patch("ury.ury.hooks.ury_bom.frappe.get_cached_value")
+	def test_throws_when_zero_yield_percent(self, mock_get_cached_value, mock_throw):
+		"""A yield-tracked row with custom_yield_percent=0 throws (guard
+		against division by zero -- I6 hardening, no longer a silent skip)."""
 		from ury.ury.hooks.ury_bom import apply_yield_back_calculation
 
-		item_mock = MagicMock()
-		item_mock.custom_yield_tracked = 1
+		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
+		mock_throw.side_effect = frappe.ValidationError
 
 		bom_doc = MagicMock()
 		row = MagicMock()
@@ -459,12 +491,10 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 		row.qty = 5.0  # Original value
 		bom_doc.items = [row]
 
-		mock_get_doc.return_value = item_mock
+		with self.assertRaises(frappe.ValidationError):
+			apply_yield_back_calculation(bom_doc, None)
 
-		apply_yield_back_calculation(bom_doc, None)
-
-		# qty should remain unchanged (5.0, not recalculated)
-		self.assertEqual(row.qty, 5.0)
+		mock_throw.assert_called_once()
 
 
 if __name__ == "__main__":
