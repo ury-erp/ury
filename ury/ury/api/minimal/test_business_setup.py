@@ -1,9 +1,9 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import frappe
 
-from ury.ury.api.minimal.business_setup import submit_configure_data
+from ury.ury.api.minimal.business_setup import create_setup_user, submit_configure_data
 
 
 class TestSubmitConfigureDataGuard(unittest.TestCase):
@@ -143,6 +143,112 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
 
         self.assertEqual(result, {"status": "success", "results": {"branch": "Main"}})
         mock_rollback.assert_not_called()
+
+
+class TestCreateSetupUserRoles(unittest.TestCase):
+    """Item 11: create_setup_user() must accept multiple roles (`roles:
+    list[str]`), keep the single `role` string accepted for backward
+    compatibility, and preserve the pre-existing privilege-escalation
+    guard: a non-System-Manager caller (including the one-time bootstrap
+    window) must never be able to obtain URY Admin/System Manager,
+    whether requested alone or alongside other, allowed roles.
+
+    Mock-based, matching the existing convention in this file -- this
+    worktree has no runnable Frappe site/bench to insert real User docs
+    against.
+    """
+
+    def _patch_session(self, user):
+        return patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": user}))
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.db.exists", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
+    def test_backward_compat_single_role_string_still_works(
+        self, mock_get_doc, _mock_exists, _mock_bootstrap, _mock_get_roles
+    ):
+        mock_user = MagicMock()
+        mock_get_doc.return_value = mock_user
+
+        with self._patch_session("manager@example.com"):
+            result = create_setup_user(email="a@example.com", name="A", role="URY Cashier")
+
+        self.assertEqual(result["status"], "created")
+        called_with = mock_get_doc.call_args[0][0]
+        self.assertEqual(called_with["roles"], [{"role": "URY Cashier"}])
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=["System Manager"])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.db.exists", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
+    def test_system_manager_can_grant_multiple_roles_including_admin(
+        self, mock_get_doc, _mock_exists, _mock_bootstrap, _mock_get_roles
+    ):
+        mock_get_doc.return_value = MagicMock()
+
+        with self._patch_session("sysmgr@example.com"):
+            result = create_setup_user(
+                email="a@example.com",
+                name="A",
+                roles=["URY Manager", "URY Cashier", "URY Admin"],
+            )
+
+        self.assertEqual(result["status"], "created")
+        called_with = mock_get_doc.call_args[0][0]
+        self.assertEqual(
+            called_with["roles"],
+            [{"role": "URY Manager"}, {"role": "URY Cashier"}, {"role": "URY Admin"}],
+        )
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    def test_non_system_manager_cannot_obtain_admin_via_multi_role_list(
+        self, _mock_bootstrap, _mock_get_roles
+    ):
+        with self._patch_session("cashier@example.com"):
+            with self.assertRaises(frappe.exceptions.PermissionError):
+                create_setup_user(
+                    email="a@example.com",
+                    name="A",
+                    roles=["URY Cashier", "URY Admin"],
+                )
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    def test_non_system_manager_cannot_obtain_admin_via_single_role(
+        self, _mock_bootstrap, _mock_get_roles
+    ):
+        with self._patch_session("cashier@example.com"):
+            with self.assertRaises(frappe.exceptions.PermissionError):
+                create_setup_user(email="a@example.com", name="A", role="URY Admin")
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    def test_non_system_manager_cannot_obtain_system_manager_role(
+        self, _mock_bootstrap, _mock_get_roles
+    ):
+        with self._patch_session("cashier@example.com"):
+            with self.assertRaises(frappe.exceptions.PermissionError):
+                create_setup_user(email="a@example.com", name="A", roles=["System Manager"])
+
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.db.exists", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
+    def test_non_system_manager_can_grant_allowed_roles_combination(
+        self, mock_get_doc, _mock_exists, _mock_bootstrap, _mock_get_roles
+    ):
+        mock_get_doc.return_value = MagicMock()
+
+        with self._patch_session("cashier@example.com"):
+            result = create_setup_user(
+                email="a@example.com",
+                name="A",
+                roles=["URY Cashier", "URY Captain", "URY Manager"],
+            )
+
+        self.assertEqual(result["status"], "created")
 
 
 if __name__ == "__main__":
