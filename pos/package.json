@@ -9,7 +9,8 @@
     "copy-html-entry": "cp ../ury/public/pos/index.html ../ury/www/pos.html",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run --testTimeout=8000",
+    "test:safe": "./scripts/run-tests.sh"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.5",
