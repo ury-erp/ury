@@ -54,16 +54,23 @@ jobs:
       # themselves) is written up in full in EXECUTION_LOG.md
       # (sa-comprehensive-test-strategy track, "Session 2" for the original
       # exclusions and "Session 4"/"Session 5" for each fix) -- all 6 are
-      # now fixed and verified passing locally, but test_demo_runner was
-      # pulled back out after re-enablement: it passed once in CI (on the
-      # merge commit that brought in upstream v3-stg) but failed on a CI
-      # re-run of that exact same commit with "No submitted POS Invoices
-      # were seeded for the demo branch" -- a real CI-only flake in
-      # historical_sales.seed's today-dated-invoice creation, not
-      # reproduced against any local bench (dirty or freshly provisioned).
+      # now fixed. test_demo_runner is RE-ENABLED again (Session 6, final):
+      # its CI-only flake ("No submitted POS Invoices were seeded") is
+      # solved. Root cause: historical_sales.seed resolved the seeding
+      # Company from the Branch record, but a multi-company CI test site
+      # (frappe/erpnext's own _Test Company plus whatever sibling test
+      # modules create) can independently resolve the POS Profile to a
+      # DIFFERENT Company than the Branch -- both are single-row lookups
+      # with no pinned ORDER BY, so the two can (and did) disagree. Every
+      # downstream invoice insert against the wrong company's
+      # cost-centre/accounts was silently rejected, seeding zero invoices.
+      # A single-company local bench never exhibits this, which is why it
+      # was never reproduced despite failing twice in real CI. Fixed by
+      # re-resolving the seeding company from the POS Profile itself
+      # whenever it disagrees with the Branch-derived one.
       # The other 5 (test_ury_yield_check, test_ury_reservation_service,
       # test_ury_yield_variance, test_ury_item_production_configuration,
-      # test_yield_check_reminders) are included in the 96 modules below.
+      # test_yield_check_reminders) are included in the 97 modules below.
       #
       # test_ury_bom is now RE-ENABLED (Session 6): the Python-3.11-only CI
       # failure above turned out to share a root cause with an upstream bug
@@ -175,6 +182,7 @@ jobs:
               ury.ury.api.test_ury_yield_variance
               ury.ury.api.test_ury_workstation_mapping
               ury.ury.controllers.test_setup_redirect
+              ury.ury.dev_seed.test_demo_runner
               ury.ury.doctype.alert_settings.test_alert_settings
               ury.ury.doctype.bulk_production.test_bulk_production
               ury.ury.doctype.menu_for_room.test_menu_for_room
