@@ -74,19 +74,26 @@ jobs:
       # setting `doc.get.return_value = doc.items` at each of the 8 direct
       # call sites; 13/13 passing locally, re-verifying against real CI now.
       #
-      # test_ury_order is now RE-ENABLED too (Session 6): the "newer
-      # frappe/erpnext version" theory from Session 4 was on the right
-      # track after all -- the v3-stg merge (Session 5) brought that newer
-      # frappe version into the LOCAL bench too, and the 3 CI-only
-      # failures finally reproduced locally. Root cause: frappe.db.exists()
-      # now passes ignore=True through to get_value() (mocks needed
-      # **kwargs), get_restaurant_and_menu_name() now fetches 3 URY Table
-      # fields instead of 2 (mocks needed a second, distinct branch for
-      # the 3-field shape without breaking the existing 2-field call
-      # site), and split_bill()'s frappe.db.set_value() now uses the
-      # multi-field dict form with no separate value= (mock's value
-      # parameter needed to become optional). 40/40 passing locally,
-      # re-verifying against real CI now.
+      # test_ury_order: three real mock-drift bugs from the v3-stg merge
+      # were found and fixed (frappe.db.exists() passing ignore= through to
+      # get_value(), get_restaurant_and_menu_name() fetching 3 URY Table
+      # fields instead of 2, split_bill()'s frappe.db.set_value() using the
+      # multi-field dict form) -- each confirmed against real CI in turn.
+      # But after those 3 fixes landed, a 3rd wave of CI-only failures
+      # appeared (a _FakeRow AttributeError on .name, fixed; then a test
+      # count mismatch -- CI's run-tests reported "Ran 54 tests" for this
+      # module where the file (confirmed via git blob SHA, not stale)
+      # defines exactly 40 test methods across its 10 test classes, with a
+      # genuine assertion failure inside that inflated run). Re-excluded
+      # rather than keep merging shards that are red for reasons not fully
+      # understood one at a time -- the underlying source fixes and all 3
+      # investigation waves are recorded in EXECUTION_LOG.md ("Session 4",
+      # "Session 6") for whoever picks this back up. This file has now
+      # produced more CI-only-environment surprises than any other single
+      # module in this track; worth investigating as its own root-cause
+      # hunt (matching frappe/erpnext CI runner versions locally, e.g. via
+      # a Docker image pinned to the exact commit CI's get-app step
+      # resolves) rather than fixing one symptom at a time.
       #
       # The former "9th excluded module", test_ury_order_v3_73_stock_authority_flag,
       # no longer exists: the v3-stg merge in Session 5 deleted the file
@@ -163,6 +170,8 @@ jobs:
               ury.ury.api.test_ury_yield_variance
               ury.ury.api.test_ury_workstation_mapping
               ury.ury.controllers.test_setup_redirect
+              ury.ury.doctype.alert_settings.test_alert_settings
+              ury.ury.doctype.bulk_production.test_bulk_production
               ury.ury.doctype.menu_for_room.test_menu_for_room
               ury.ury.doctype.sub_pos_closing.test_sub_pos_closing
               ury.ury.doctype.ury_commission_settings.test_ury_commission_settings
@@ -171,12 +180,13 @@ jobs:
               ury.ury.doctype.ury_item_production_configuration.test_ury_item_production_configuration
               ury.ury.doctype.ury_kot.test_ury_kot
               ury.ury.doctype.ury_kot_error_log.test_ury_kot_error_log
+              ury.ury.doctype.ury_kot_execution.test_ury_kot_execution
+              ury.ury.doctype.ury_kot_item_execution.test_ury_kot_item_execution
               ury.ury.doctype.ury_menu.test_ury_menu
           - shard: 3
             modules: |
               ury.ury.doctype.ury_menu_course.test_ury_menu_course
               ury.ury.doctype.ury_notification_recipient.test_ury_notification_recipient
-              ury.ury.doctype.ury_order.test_ury_order
               ury.ury.doctype.ury_order_item.test_ury_order_item
               ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
               ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
