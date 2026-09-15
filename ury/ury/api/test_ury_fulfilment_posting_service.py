@@ -589,7 +589,9 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(result["status"], POSTED)
 		stock_entry.insert.assert_called_once_with(ignore_permissions=False)
 		stock_entry.submit.assert_called_once()
-		fulfil.assert_called_once_with("GROUP-1")
+		# B03b: the guard is now told WHOSE share is being fulfilled, so a group
+		# shared by several KOT items only closes once all of them have posted.
+		fulfil.assert_called_once_with("GROUP-1", contributor="KEY-1", contributed_qty=1)
 		self.assertEqual(intent.erpnext_stock_entry, "STE-1")
 		self.assertEqual(intent.fulfilment_record, "FUL-1")
 		self.assertEqual(intent.status, POSTED)
@@ -646,7 +648,9 @@ class TestProcessPostingIntent(FrappeTestCase):
 		# Routed through the shared idempotent guard, never through
 		# `fulfil_reservation` (which would frappe.throw on a group that is
 		# no longer Reserved and fail the replay).
-		fulfil.assert_called_once_with("GROUP-1")
+		# B03b: the guard is now told WHOSE share is being fulfilled, so a group
+		# shared by several KOT items only closes once all of them have posted.
+		fulfil.assert_called_once_with("GROUP-1", contributor="KEY-1", contributed_qty=1)
 
 	def test_ready_or_served_is_required(self):
 		execution = _execution_doc()
@@ -924,3 +928,184 @@ class TestReservationLineScoping(FrappeTestCase):
 		with self.assertRaises(FulfilmentPostingError) as ctx:
 			self._serve("KOTITEM-A", self.LINE_A)
 		self.assertEqual(ctx.exception.reason_code, "RESERVATION_NOT_FOUND")
+
+
+def _shared_group_rows(group, reservation_line_key, reserved_top_level_qty, component_qtys):
+	"""One reservation group sized for `reserved_top_level_qty` top-level units.
+
+	`component_qtys` are the row quantities as `create_reservation` wrote them,
+	i.e. already scaled to the group's FULL top-level quantity -- which is
+	exactly what made the un-scaled freeze over-consume when two KOT items
+	shared the group.
+	"""
+	context = {
+		"item_code": "PLATE-1",
+		"branch": "Branch A",
+		"company": "Company A",
+		"warehouse": "Kitchen WH",
+		"production_policy": "MADE_TO_ORDER",
+		"production_unit": "PU-FROZEN",
+		"department": "Kitchen",
+		"production_configuration": "CFG-1",
+		"reservation_line_key": reservation_line_key,
+	}
+	if reserved_top_level_qty is not None:
+		context["reserved_top_level_qty"] = reserved_top_level_qty
+	return [
+		frappe._dict(
+			{
+				"name": "{0}-RES-{1}".format(group, index),
+				"reservation_group": group,
+				"policy": "DIRECT_RETAIL",
+				"warehouse": "MUTATED WH",
+				"top_level_item": "PLATE-1",
+				"component_item": "MUTATED-COMP",
+				"qty": 999,
+				"audit_log": json.dumps(
+					[
+						{
+							"event": "create",
+							"component_item": "COMP-{0}".format(index),
+							"qty": qty,
+							"frozen_context": context,
+						}
+					],
+					sort_keys=True,
+				),
+			}
+		)
+		for index, qty in enumerate(component_qtys, start=1)
+	]
+
+
+class TestSharedReservationGroupComponentScaling(FrappeTestCase):
+	"""B03b: two KOT items sharing ONE reservation group must each freeze only
+	their own share of its components.
+
+	B03 bound each KOT item to its own line's reservation group. But a straight
+	quantity bump on ONE line (Coffee 1 -> 2) does not produce two groups:
+	`ury_order_reservation_service._reconcile_line` releases the line's group
+	and creates ONE replacement sized for the new TOTAL under the same
+	`reservation_line_key`, and the delta KOT raised for the +1 inherits that
+	same line key. So B03's scoping correctly binds BOTH KOT items to that one
+	group -- whose component rows are sized for qty 2.
+
+	Freezing those rows verbatim made each of the two postings consume raw
+	materials for the full 2 while receiving a finished good for its own 1:
+	components deducted twice over. Each posting must instead freeze
+	`accepted_qty / reserved_total` of them.
+	"""
+
+	LINE = "ref:PLATE-1:LINE-A"
+
+	def setUp(self):
+		patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00").start()
+		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
+		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
+		patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=True).start()
+		self.addCleanup(patch.stopall)
+
+	def _serve(self, kot_item_name, kot_qty, rows):
+		created = []
+
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc(
+					{"item": "PLATE-1", "quantity": kot_qty, "reservation_line_key": self.LINE}
+				)
+			if isinstance(arg, dict):
+				doc = _doc(arg)
+				doc.name = "INTENT-{0}".format(kot_item_name)
+				created.append(doc)
+				return doc
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		def get_all(doctype, *args, **kwargs):
+			if doctype == "URY Stock Reservation":
+				return rows
+			if doctype == "URY Fulfilment Posting Intent":
+				return []
+			raise AssertionError(doctype)
+
+		execution = _execution_doc()
+		execution.kot_item = kot_item_name
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			create_or_get_posting_intent_for_ready(execution, actor="chef@example.com")
+		return json.loads(created[0]["frozen_payload_json"])
+
+	def test_each_of_two_kots_sharing_a_group_consumes_only_its_own_half(self):
+		rows = _shared_group_rows("GROUP-A", self.LINE, reserved_top_level_qty=2, component_qtys=[4, 2])
+
+		original = self._serve("KOTITEM-ORIGINAL", 1, rows)
+		delta = self._serve("KOTITEM-DELTA", 1, rows)
+
+		for payload in (original, delta):
+			self.assertEqual(payload["reservation_group"], "GROUP-A")
+			self.assertEqual(payload["reservation_group_qty"], 2)
+			self.assertEqual(payload["reservation_line_share"], 0.5)
+			# Half of the group's rows, which were sized for the full qty 2.
+			self.assertEqual([c["qty"] for c in payload["components"]], [2, 1])
+			# The finished good was always per-KOT-item and is unchanged.
+			self.assertEqual(payload["accepted_qty"], 1)
+
+		# Together the two postings consume exactly what the group reserved.
+		self.assertEqual(
+			[a["qty"] + b["qty"] for a, b in zip(original["components"], delta["components"])],
+			[4, 2],
+		)
+
+	def test_an_uneven_bump_scales_each_kot_to_its_own_quantity(self):
+		"""Coffee 1 -> 3: the delta KOT is for 2, the original for 1, against
+		one group reserving 3."""
+		rows = _shared_group_rows("GROUP-A", self.LINE, reserved_top_level_qty=3, component_qtys=[6])
+
+		original = self._serve("KOTITEM-ORIGINAL", 1, rows)
+		delta = self._serve("KOTITEM-DELTA", 2, rows)
+
+		self.assertEqual(original["components"][0]["qty"], 2)
+		self.assertEqual(delta["components"][0]["qty"], 4)
+
+	def test_a_single_kot_covering_the_whole_group_is_unscaled(self):
+		"""The ordinary no-bump case. The share is exactly 1.0, and `x * 1.0 ==
+		x` for floats, so the frozen component quantities are bit-identical to
+		what this froze before B03b."""
+		rows = _shared_group_rows("GROUP-A", self.LINE, reserved_top_level_qty=2, component_qtys=[4, 2])
+
+		payload = self._serve("KOTITEM-ONLY", 2, rows)
+
+		self.assertEqual(payload["reservation_line_share"], 1.0)
+		self.assertEqual([c["qty"] for c in payload["components"]], [4, 2])
+
+	def test_a_legacy_group_with_no_frozen_reserved_qty_is_unscaled(self):
+		"""Reservations created before `reserved_top_level_qty` was frozen carry
+		no divisible total, so the freeze must fall back to today's exact
+		whole-group behaviour rather than inventing a ratio."""
+		rows = _shared_group_rows("GROUP-A", self.LINE, reserved_top_level_qty=None, component_qtys=[4, 2])
+
+		payload = self._serve("KOTITEM-ONLY", 1, rows)
+
+		self.assertIsNone(payload["reservation_group_qty"])
+		self.assertEqual(payload["reservation_line_share"], 1.0)
+		self.assertEqual([c["qty"] for c in payload["components"]], [4, 2])
+
+	def test_a_kot_item_claiming_more_than_its_group_reserved_fails_closed(self):
+		"""Posting it would consume beyond the reservation; silently scaling it
+		down would under-produce against the ticket. Neither is a defensible
+		guess, so the intent must fail observably instead."""
+		rows = _shared_group_rows("GROUP-A", self.LINE, reserved_top_level_qty=1, component_qtys=[2])
+
+		with self.assertRaises(FulfilmentPostingError) as ctx:
+			self._serve("KOTITEM-ONLY", 2, rows)
+		self.assertEqual(ctx.exception.reason_code, "KOT_QTY_EXCEEDS_RESERVATION")
