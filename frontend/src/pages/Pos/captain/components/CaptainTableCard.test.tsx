@@ -138,7 +138,11 @@ describe("CaptainTableCard", () => {
   });
 
   it("shows elapsed time for occupied table", () => {
-    const pastTime = new Date(Date.now() - 60000).toISOString();
+    // latest_invoice_time is a Frappe Time field -- a bare "HH:MM:SS" string
+    // with no date component (see the minutesElapsed() comment in
+    // CaptainTableCard.tsx) -- not a full ISO datetime.
+    const pastDate = new Date(Date.now() - 60000);
+    const pastTime = pastDate.toTimeString().slice(0, 8);
     render(
       <CaptainTableCard
         table={{

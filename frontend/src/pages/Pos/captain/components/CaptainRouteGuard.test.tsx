@@ -3,9 +3,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import CaptainRouteGuard from "./CaptainRouteGuard";
 
 const mockUseCaptainContext = vi.fn();
+const mockUsePOSStore = vi.fn();
 
 vi.mock("../hooks/useCaptainContext", () => ({
   useCaptainContext: () => mockUseCaptainContext(),
+}));
+
+vi.mock("../../store/pos-store", () => ({
+  usePOSStore: () => mockUsePOSStore(),
+}));
+
+vi.mock("../../../../lib/pos/checklist-api", () => ({
+  getChecklist: vi.fn().mockResolvedValue({ logStatus: "Complete" }),
+}));
+
+vi.mock("../../i18n", () => ({
+  initI18n: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../components/ChecklistGateDialog", () => ({
+  default: () => <div data-testid="checklist-gate-dialog" />,
 }));
 
 vi.mock("./ServiceRequestPanel", () => ({
@@ -22,6 +39,11 @@ describe("CaptainRouteGuard", () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    mockUsePOSStore.mockReturnValue({
+      posProfile: { name: "POS-1" },
+      profileLoading: false,
+      fetchPosProfile: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
   it("renders loading state while context is loading", () => {
