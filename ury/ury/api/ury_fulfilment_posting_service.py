@@ -21,6 +21,18 @@ Invoice's ``update_stock = 1``. Nothing here suppresses or replaces it.
 - Reservation fulfilment happens only after the Stock Entry has submitted.
 - Replays recover from an already-submitted Stock Entry instead of creating
   another one.
+
+Returns / credit notes (G-05, decided): a return never reverses a production
+Stock Entry created here or by the batch path. Only the native sale-side
+ledger is affected -- `pos_invoice_merge_log.py` sets `update_stock=1` on the
+consolidated credit note, so ERPNext genuinely credits the finished good back
+into the warehouse on its own. A returned dish does not un-cook itself: the
+raw materials this service's Manufacture Stock Entry consumed are genuinely
+gone, and that Stock Entry is left submitted and untouched. See
+`ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation` for
+the corresponding reservation-side statement of this policy, and
+tracks/sa-pos-stock-phase2/ARCHITECTURE_POS_STOCK_AUTHORITY.md (G-05) /
+PLAN.md (T7) for the full decision record.
 """
 
 from __future__ import annotations
