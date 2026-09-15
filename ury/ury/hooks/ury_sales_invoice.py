@@ -230,11 +230,33 @@ def fulfil_reservations_on_consolidation(doc, method=None):
     sale in every configuration, with or without the feature flag.
 
     Not a credit note: a consolidated credit note (`is_return=1`) returns
-    finished goods to the warehouse. Reversing the production side of a
-    return is an explicit, still-undecided disposition question (see the
-    Phase 3 / I-9 follow-up in
-    tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md), so
-    this handler deliberately does nothing for returns rather than guessing.
+    finished goods to the warehouse -- `pos_invoice_merge_log.py` sets
+    `update_stock=1` on it, exactly as it does on a normal consolidated sale,
+    so native ERPNext genuinely credits the FG back into the warehouse via
+    that Stock Entry. This handler deliberately does nothing else for
+    returns:
+
+      - **Production-side Stock Entries are never reversed.** Whatever raw
+        materials a made-to-order or pre-produced item's Manufacture Stock
+        Entry consumed to create that finished good are genuinely gone --
+        a returned cooked dish does not un-cook itself. This is a
+        deliberate policy decision (see G-05 /
+        tracks/sa-pos-stock-phase2/ARCHITECTURE_POS_STOCK_AUTHORITY.md and
+        PLAN.md's T7 section), not an oversight: only the native sale-side
+        ledger (finished good back into the warehouse) is affected by a
+        return, ever. If a future policy wants waste/scrap routing or a
+        production reversal on return, it needs its own explicit doctype
+        and flow -- it must not be bolted onto this handler implicitly.
+      - **Reservation groups are not touched.** By the time a sale reaches
+        this consolidated, `update_stock=1` invoice, its `URY Stock
+        Reservation` group has already been moved out of `Reserved` (either
+        by the fulfilment posting service at production time, or by this
+        same handler's non-return branch at an earlier closing). A group in
+        a terminal state (`Fulfilled`) is not in `ACTIVE_STATUSES` and is
+        therefore already excluded from `get_available_capacity()` -- a
+        later return of that same sale has nothing left to release or
+        re-fulfil on the reservation side. There is intentionally no
+        return-triggered reservation transition here.
 
     Never raises: a submitted, ledger-posting Sales Invoice must not be
     rolled back because a reservation row is in an unexpected state. Failures
