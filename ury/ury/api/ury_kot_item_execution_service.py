@@ -141,7 +141,48 @@ def _result_dict(row, idempotent=False):
 	}
 
 
-def _attach_ready_posting_intent(result, actor):
+def _resolve_production_posting_trigger_state(kot_item, branch):
+	"""Resolve which KOT item execution state should trigger production posting.
+
+	Looks up the active `URY Item Production Configuration` row for this KOT
+	item's item/branch and reads `production_posting_trigger_state`. Falls
+	back to READY (today's universal, pre-Item-6 behavior) when there is no
+	row, the row has no branch, or the field is unset/blank -- so upgrading
+	this code never silently changes behavior for any item/branch that
+	hasn't explicitly opted into a different trigger.
+	"""
+	if not kot_item or not branch:
+		return READY
+
+	item_code = frappe.db.get_value(KOT_ITEMS_DOCTYPE, kot_item, "item") or frappe.db.get_value(
+		KOT_ITEMS_DOCTYPE, kot_item, "item_code"
+	)
+	if not item_code:
+		return READY
+
+	trigger_state = frappe.db.get_value(
+		"URY Item Production Configuration",
+		{"item": item_code, "branch": branch, "active": 1},
+		"production_posting_trigger_state",
+	)
+	return trigger_state or READY
+
+
+def _attach_production_posting_intent(result, actor):
+	"""Attach (create-or-fetch) the production posting intent for one item.
+
+	Called from exactly one of `seed_kot_item_executions` (QUEUED trigger),
+	`mark_item_ready` (READY trigger, the default), or `serve_item_execution`
+	(SERVED trigger) -- whichever matches this item's resolved
+	`production_posting_trigger_state` (see
+	`_resolve_production_posting_trigger_state`, which falls back to READY
+	when no per-item configuration exists). Each caller only invokes this
+	once, at its own matching trigger state, so this function runs exactly
+	once per KOT item's lifecycle; the underlying posting intent's
+	idempotency key (frozen from branch/kot/kot_item/accepted_revision, not
+	from the triggering state) is also state-independent and provides
+	defense-in-depth against a double call.
+	"""
 	if result.get("idempotent_replay"):
 		return result
 
@@ -156,14 +197,15 @@ def _attach_ready_posting_intent(result, actor):
 	#                 anything: native's deduction is never opted out of.
 	#   Production -- owned by the fulfilment posting service, and only when
 	#                 POS Stock Authority V2 is enabled. Posted in real time
-	#                 at READY, as a `Manufacture` Stock Entry that consumes
-	#                 raw components and receives the finished good into the
-	#                 same department warehouse the sale later deducts from,
-	#                 so the two net out.
+	#                 at this item's resolved trigger state (QUEUED, READY,
+	#                 or SERVED), as a `Manufacture` Stock Entry that
+	#                 consumes raw components and receives the finished good
+	#                 into the same department warehouse the sale later
+	#                 deducts from, so the two net out.
 	#
 	# With the flag off there is simply no production ledger: the item is
 	# deducted once, by native, at closing. A quiet no-op (not a thrown
-	# error) because READY is a routine kitchen-workflow transition that must
+	# error) because this is a routine kitchen-workflow transition that must
 	# keep working in the default configuration.
 	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
@@ -307,7 +349,21 @@ def seed_kot_item_executions(kot, actor=None):
 			# A concurrent submit won the unique kot_item insert.
 			frappe.db.rollback(save_point="ury_seed_kot_item_execution")
 			continue
-		created.append(doc.as_dict())
+		item_result = doc.as_dict()
+		trigger_state = _resolve_production_posting_trigger_state(kot_item, branch)
+		if trigger_state == QUEUED:
+			# QUEUED is not a valid durable state without its corresponding
+			# posting intent when it is the configured trigger -- roll back
+			# the whole seed of this item (including the insert above) rather
+			# than leave a QUEUED row with no posting intent attached,
+			# mirroring how `mark_item_ready` treats READY when READY is the
+			# trigger.
+			try:
+				item_result = _attach_production_posting_intent(item_result, actor)
+			except Exception:
+				frappe.db.rollback(save_point="ury_seed_kot_item_execution")
+				raise
+		created.append(item_result)
 	_sync_kot_execution(kot)
 	return created
 
@@ -396,13 +452,24 @@ def start_item_execution(kot_item, idempotency_key):
 def mark_item_ready(kot_item, idempotency_key):
 	actor = frappe.session.user
 	# READY is not a valid durable state without a corresponding posting
-	# intent. Keep both writes inside one savepoint so missing reservations,
-	# migration drift, or enqueue failures cannot leave the item READY alone.
+	# intent when READY is this item's resolved trigger. Keep both writes
+	# inside one savepoint so missing reservations, migration drift, or
+	# enqueue failures cannot leave the item READY alone.
 	savepoint = "ury_ready_posting_intent"
 	frappe.db.savepoint(savepoint)
 	try:
 		result = _transition(kot_item, READY, idempotency_key, "ready_by", "ready_at", "mark_ready")
-		return _attach_ready_posting_intent(result, actor)
+		trigger_state = _resolve_production_posting_trigger_state(kot_item, result.get("branch"))
+		if trigger_state != READY:
+			# A different trigger (QUEUED/SERVED) is configured for this
+			# item -- posting either already happened at QUEUED or is
+			# deferred to SERVED. Calling the attach step here too would
+			# rely solely on the posting intent's own idempotency to avoid
+			# a duplicate; skipping it here keeps "exactly once" a
+			# structural property of which function calls the attach step,
+			# not just a property of its idempotency key.
+			return result
+		return _attach_production_posting_intent(result, actor)
 	except Exception:
 		frappe.db.rollback(save_point=savepoint)
 		raise
@@ -410,7 +477,18 @@ def mark_item_ready(kot_item, idempotency_key):
 
 @frappe.whitelist()
 def serve_item_execution(kot_item, idempotency_key):
-	return _transition(kot_item, SERVED, idempotency_key, "served_by", "served_at", "serve")
+	actor = frappe.session.user
+	savepoint = "ury_served_posting_intent"
+	frappe.db.savepoint(savepoint)
+	try:
+		result = _transition(kot_item, SERVED, idempotency_key, "served_by", "served_at", "serve")
+		trigger_state = _resolve_production_posting_trigger_state(kot_item, result.get("branch"))
+		if trigger_state != SERVED:
+			return result
+		return _attach_production_posting_intent(result, actor)
+	except Exception:
+		frappe.db.rollback(save_point=savepoint)
+		raise
 
 
 def get_kot_execution_state(kot):

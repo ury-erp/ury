@@ -243,6 +243,46 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.assertEqual(payload["fg_warehouse"], "Kitchen WH")
 		created[0].insert.assert_called_once_with(ignore_permissions=False)
 
+	def test_queued_creates_one_intent_same_as_ready(self):
+		"""Item 6 (sa-pos-followups-and-ux): a QUEUED execution state (used
+		when an item's `production_posting_trigger_state` is configured to
+		QUEUED, so posting happens from `seed_kot_item_executions` at KOT
+		submission) is accepted here exactly like READY/SERVED.
+		"""
+		created = []
+
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			if isinstance(arg, dict):
+				doc = _doc(arg)
+				doc.name = "INTENT-1"
+				created.append(doc)
+				return doc
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		execution = _execution_doc()
+		execution.state = "QUEUED"
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create()
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = create_or_get_posting_intent_for_ready(execution, actor="chef@example.com")
+
+		self.assertEqual(result["name"], "INTENT-1")
+		self.assertFalse(result["idempotent_replay"])
+		self.assertEqual(created[0]["production_policy"], "MADE_TO_ORDER")
+
 	def test_pre_produced_ready_creates_no_intent_and_posts_nothing(self):
 		"""Production posting is for MADE_TO_ORDER only.
 
@@ -648,10 +688,16 @@ class TestProcessPostingIntent(FrappeTestCase):
 		# no longer Reserved and fail the replay).
 		fulfil.assert_called_once_with("GROUP-1")
 
-	def test_ready_or_served_is_required(self):
+	def test_queued_ready_or_served_is_required(self):
+		"""Item 6 (sa-pos-followups-and-ux): QUEUED joined READY/SERVED as a
+		valid execution state here, since a per-item
+		`production_posting_trigger_state` of QUEUED now calls this same
+		function from `seed_kot_item_executions`. IN_PREPARATION, which no
+		configurable trigger ever targets, remains rejected.
+		"""
 		execution = _execution_doc()
-		execution.state = "QUEUED"
-		with self.assertRaisesRegex(Exception, "requires READY or SERVED"):
+		execution.state = "IN_PREPARATION"
+		with self.assertRaisesRegex(Exception, "requires QUEUED, READY or SERVED"):
 			# Use an authorized service actor so this test reaches the state guard.
 			create_or_get_posting_intent_for_ready(execution, actor="Administrator")
 

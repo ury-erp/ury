@@ -7,11 +7,13 @@ PRODUCTION ledger. The sale ledger is owned by native ERPNext, always, and
 is posted once per session at POS Closing Entry via the consolidated Sales
 Invoice's ``update_stock = 1``. Nothing here suppresses or replaces it.
 
-- READY creates one durable ``URY Fulfilment Posting Intent`` per KOT item,
-  for MADE_TO_ORDER items only. PRE_PRODUCED items had their Manufacture
-  entry posted ahead of time by the batch path; DIRECT_RETAIL items are not
-  produced at all. Both post nothing here and are deducted once, by the
-  sale, at closing.
+- The item's resolved production-posting trigger state (QUEUED at KOT
+  submission, READY -- the default, or SERVED; see `URY Item Production
+  Configuration.production_posting_trigger_state`) creates one durable
+  ``URY Fulfilment Posting Intent`` per KOT item, for MADE_TO_ORDER items
+  only. PRE_PRODUCED items had their Manufacture entry posted ahead of time
+  by the batch path; DIRECT_RETAIL items are not produced at all. Both post
+  nothing here and are deducted once, by the sale, at closing.
 - The worker claims intents with a row lock and short lease.
 - ERPNext stock movement is a submitted ``Manufacture`` Stock Entry, and only
   ever that: it consumes raw-material BOM components and receives the
@@ -46,7 +48,7 @@ from frappe import _
 from frappe.utils import add_to_date, flt, now, now_datetime
 
 from ury.ury.api.ury_reservation_service import RESERVED, fulfil_reservation_if_pending
-from ury.ury.api.ury_kot_execution_service import READY, SERVED
+from ury.ury.api.ury_kot_execution_service import QUEUED, READY, SERVED
 from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled, ITEM_EXECUTION_DOCTYPE
 
@@ -73,7 +75,14 @@ PRE_PRODUCED = "PRE_PRODUCED"
 MADE_TO_ORDER = "MADE_TO_ORDER"
 MTO_LEGACY = "MTO"
 DIRECT_RETAIL = "DIRECT_RETAIL"
-READY_STATES = (READY, SERVED)
+# READY and SERVED remain the universal defaults. QUEUED is included so a
+# per-item `production_posting_trigger_state` configured to QUEUED (see
+# `URY Item Production Configuration` / sa-pos-followups-and-ux Item 6) can
+# post at KOT-submission time instead of waiting for READY/SERVED -- the
+# caller (`ury_kot_item_execution_service._attach_production_posting_intent`)
+# still decides *whether* to call this function at all for a given state; this
+# tuple only says which states this function itself will accept payloads for.
+READY_STATES = (QUEUED, READY, SERVED)
 POSTING_ROLES = {"System Manager", "Stock Manager", "Production Manager", "Chef", "URY Captain"}
 
 
@@ -295,7 +304,7 @@ def _freeze_payload(execution_doc, actor):
 	if execution_state not in READY_STATES:
 		raise FulfilmentPostingError(
 			"EXECUTION_NOT_READY",
-			_("KOT {0} execution state is {1}; posting requires READY or SERVED").format(
+			_("KOT {0} execution state is {1}; posting requires QUEUED, READY or SERVED").format(
 				execution_doc.kot, execution_state or "UNKNOWN"
 			),
 		)
@@ -392,7 +401,13 @@ def _intent_result(intent, idempotent=False):
 
 
 def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
-	"""Create/fetch the durable posting intent for one READY item execution."""
+	"""Create/fetch the durable posting intent for one item execution.
+
+	Despite the name (kept for compatibility), this is no longer READY-only:
+	it is called for whichever of QUEUED/READY/SERVED is the resolved
+	per-item production-posting trigger state -- see
+	`ury_kot_item_execution_service._attach_production_posting_intent`.
+	"""
 	if not _has_doctype(INTENT_DOCTYPE):
 		raise FulfilmentPostingError("POSTING_INTENT_DOCTYPE_MISSING", _("{0} is not available").format(INTENT_DOCTYPE))
 
@@ -403,11 +418,13 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 
 	# sa-architecture-closure: this service must never post stock for an item
 	# native POS Invoice deduction (`update_stock=1`) is also posting for.
-	# The actual production entry point (`mark_item_ready` ->
-	# `_attach_ready_posting_intent` in ury_kot_item_execution_service.py)
-	# already checks `pos_stock_authority_v2` before ever calling this
-	# function, and skips calling it entirely while the flag is OFF (today's
-	# universal default) so native POS remains the sole authority. This is a
+	# The actual production entry point (whichever of `seed_kot_item_executions`
+	# / `mark_item_ready` / `serve_item_execution` matches the item's resolved
+	# `production_posting_trigger_state`, via `_attach_production_posting_intent`
+	# in ury_kot_item_execution_service.py) already checks
+	# `pos_stock_authority_v2` before ever calling this function, and skips
+	# calling it entirely while the flag is OFF (today's universal default) so
+	# native POS remains the sole authority. This is a
 	# second, defense-in-depth check for any other/future direct caller of
 	# this function: it must never silently create a Stock Entry while the
 	# flag is off, on top of whatever native POS already posts. Checked

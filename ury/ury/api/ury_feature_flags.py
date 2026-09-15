@@ -25,15 +25,19 @@ document's submit writes the SLEs -- once per session, out of each line's
 warehouse.
 
 What this flag actually gates is a SECOND, orthogonal ledger: the
-production-side raws-to-finished-good movement, posted in real time at KOT
-READY as a `Manufacture` Stock Entry by the fulfilment posting service, for
-made-to-order items only. That movement receives the finished good into the
-same department warehouse the sale later deducts from, so the two net out
-rather than competing. Turning the flag on adds the production ledger; it
-subtracts nothing from the sale ledger.
+production-side raws-to-finished-good movement, posted in real time at the
+item's resolved production-posting trigger state (QUEUED, READY -- the
+default, or SERVED; see `URY Item Production Configuration.
+production_posting_trigger_state`) as a `Manufacture` Stock Entry by the
+fulfilment posting service, for made-to-order items only. That movement
+receives the finished good into the same department warehouse the sale
+later deducts from, so the two net out rather than competing. Turning the
+flag on adds the production ledger; it subtracts nothing from the sale
+ledger.
 
-Concretely, the flag's only effects are (a) whether READY creates a posting
-intent (`ury_kot_item_execution_service._attach_ready_posting_intent`) and
+Concretely, the flag's only effects are (a) whether the item's trigger
+state creates a posting intent
+(`ury_kot_item_execution_service._attach_production_posting_intent`) and
 (b) whether the POS Invoice submit gate below runs. The replacement path
 remains feature-flagged and operationally gated until its runtime accounting
 and deployment evidence is accepted.

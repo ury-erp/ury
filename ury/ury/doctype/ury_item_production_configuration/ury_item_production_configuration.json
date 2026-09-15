@@ -14,6 +14,7 @@
   "production_unit",
   "production_policy",
   "sourcing_mode",
+  "production_posting_trigger_state",
   "bom",
   "controlled_by_sales_plan",
   "allow_over_plan_sale",
@@ -74,6 +75,15 @@
    "fieldtype": "Select",
    "label": "Sourcing Mode",
    "options": "IN_HOUSE\nEXTERNAL_RECEIPT"
+  },
+  {
+   "default": "READY",
+   "depends_on": "eval:doc.production_policy==\"MADE_TO_ORDER\"",
+   "description": "Only meaningful when Production Policy is MADE_TO_ORDER. Chooses which KOT item execution state triggers production posting (creation of the Manufacture Stock Entry / posting intent) for this item: QUEUED (at KOT submission, before preparation begins), READY (default, current behavior -- when the item is marked ready), or SERVED (deferred until the item is served to the guest). A missing row or unset value falls back to READY. Independent of and still gated by URY Branch Stock Policy.realtime_production_posting_enabled.",
+   "fieldname": "production_posting_trigger_state",
+   "fieldtype": "Select",
+   "label": "Production Posting Trigger State",
+   "options": "READY\nSERVED\nQUEUED"
   },
   {
    "fieldname": "bom",
