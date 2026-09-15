@@ -15,6 +15,146 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
+    strategy:
+      fail-fast: false
+      # The full ~100-file test suite (bench run-tests --app ury, no
+      # --module filter) has been repeatedly killed by an external
+      # "runner has received a shutdown signal" cancellation at close to
+      # the same ~10-minute mark regardless of this job's timeout-minutes
+      # setting -- strongly suggesting an infra-level constraint outside
+      # this workflow's control, not a bug in the tests themselves
+      # (verified: the full suite runs cleanly to completion in well
+      # under a minute against a local warm site). Per-module invocations
+      # (one bench run-tests --app ury --module <x> per file, same as
+      # this job always did for its original hand-picked 17) sidestep
+      # that entirely -- each module gets its own fresh test-record
+      # transaction instead of accumulating state across the whole app's
+      # doctype list, which is also why running the suite this way never
+      # reproduces the ~60 pre-existing failures a single combined
+      # --app-wide run surfaces (see EXECUTION_LOG.md, sa-comprehensive-
+      # test-strategy track) -- those are a real, separate, already-
+      # tracked finding, not something sharding needs to solve.
+      #
+      # Still, ~100 modules serially in one job (~3.5s/module on a
+      # GitHub-hosted runner, measured from this job's own prior 17-module
+      # runs) would push this step alone to ~6 minutes, on top of the
+      # ~4 minutes "Setup Frappe" already takes -- too close to the
+      # external ~10-minute boundary for comfort. Sharded across 4
+      # parallel jobs (~25 modules each, ~90s per shard's test step)
+      # keeps every job's wall-clock time close to what this job already
+      # took for its original 17 modules, while now gating the entire
+      # suite instead of a hand-picked subset.
+      matrix:
+        include:
+          - shard: 0
+            modules: |
+              ury.setup.test_setup_wizard
+              ury.ury.ai_tools.test_agent_seeding
+              ury.ury.ai_tools.test_ury_tools
+              ury.ury.api.minimal.test_business_setup
+              ury.ury.api.minimal.test_setup_organization
+              ury.ury.api.test_button_permission
+              ury.ury.api.test_dashboard
+              ury.ury.api.test_payment_terminal
+              ury.ury.api.test_pos_extend
+              ury.ury.api.test_seed_v3_demo
+              ury.ury.api.test_self_ordering
+              ury.ury.api.test_service_requests
+              ury.ury.api.test_ury_ai_settings
+              ury.ury.api.test_ury_availability
+              ury.ury.api.test_ury_batch_manufacture_service
+              ury.ury.api.test_ury_batch_work_order_adapter
+              ury.ury.api.test_ury_bom_compiler
+              ury.ury.api.test_ury_bom_staleness
+              ury.ury.api.test_ury_branch_operational_state
+              ury.ury.api.test_ury_chat
+              ury.ury.api.test_ury_comparable_weekday_history
+              ury.ury.api.test_ury_cost_variance_attribution
+              ury.ury.api.test_ury_dashboard
+              ury.ury.api.test_ury_department_profitability
+              ury.ury.api.test_ury_desk_link
+          - shard: 1
+            modules: |
+              ury.ury.api.test_ury_fast_moving
+              ury.ury.api.test_ury_feature_flags
+              ury.ury.api.test_ury_fulfilment_posting_service
+              ury.ury.api.test_ury_insight
+              ury.ury.api.test_ury_insight_rules
+              ury.ury.api.test_ury_inventory_projection
+              ury.ury.api.test_ury_issue_authorization
+              ury.ury.api.test_ury_job_card_controls
+              ury.ury.api.test_ury_kot_cancellation_service
+              ury.ury.api.test_ury_kot_chef_filter
+              ury.ury.api.test_ury_kot_display
+              ury.ury.api.test_ury_kot_execution_service
+              ury.ury.api.test_ury_kot_generate
+              ury.ury.api.test_ury_kot_item_execution_service
+              ury.ury.api.test_ury_kot_notification
+              ury.ury.api.test_ury_kot_order_number
+              ury.ury.api.test_ury_kot_reprint
+              ury.ury.api.test_ury_kot_routing
+              ury.ury.api.test_ury_kot_validation
+              ury.ury.api.test_ury_menu_course_validation
+              ury.ury.api.test_ury_mto_fulfilment_service
+              ury.ury.api.test_ury_order_reservation_service
+              ury.ury.api.test_ury_preproduced_fulfilment_service
+              ury.ury.api.test_ury_print
+              ury.ury.api.test_ury_production_context
+          - shard: 2
+            modules: |
+              ury.ury.api.test_ury_production_plan_adapter
+              ury.ury.api.test_ury_production_validation
+              ury.ury.api.test_ury_requirements_stock
+              ury.ury.api.test_ury_reservation_service
+              ury.ury.api.test_ury_sales_plan
+              ury.ury.api.test_ury_sales_plan_commit
+              ury.ury.api.test_ury_service_line
+              ury.ury.api.test_ury_stock_service
+              ury.ury.api.test_ury_waiter_print
+              ury.ury.api.test_ury_wastage
+              ury.ury.api.test_ury_workstation_mapping
+              ury.ury.api.test_ury_yield_variance
+              ury.ury.controllers.test_setup_redirect
+              ury.ury.dev_seed.test_demo_runner
+              ury.ury.doctype.menu_for_room.test_menu_for_room
+              ury.ury.doctype.sub_pos_closing.test_sub_pos_closing
+              ury.ury.doctype.ury_commission_settings.test_ury_commission_settings
+              ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l
+              ury.ury.doctype.ury_insight.test_ury_insight
+              ury.ury.doctype.ury_item_production_configuration.test_ury_item_production_configuration
+              ury.ury.doctype.ury_kot.test_ury_kot
+              ury.ury.doctype.ury_kot_error_log.test_ury_kot_error_log
+              ury.ury.doctype.ury_menu.test_ury_menu
+              ury.ury.doctype.ury_menu_course.test_ury_menu_course
+              ury.ury.doctype.ury_notification_recipient.test_ury_notification_recipient
+          - shard: 3
+            modules: |
+              ury.ury.doctype.ury_order.test_ury_order
+              ury.ury.doctype.ury_order.test_ury_order_v3_73_stock_authority_flag
+              ury.ury.doctype.ury_order_item.test_ury_order_item
+              ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
+              ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
+              ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
+              ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
+              ury.ury.doctype.ury_production_department.test_ury_production_department
+              ury.ury.doctype.ury_production_unit.test_ury_production_unit
+              ury.ury.doctype.ury_report_settings.test_ury_report_settings
+              ury.ury.doctype.ury_restaurant.test_ury_restaurant
+              ury.ury.doctype.ury_room.test_ury_room
+              ury.ury.doctype.ury_self_ordering_profile.test_ury_self_ordering_profile
+              ury.ury.doctype.ury_service_request.test_ury_service_request
+              ury.ury.doctype.ury_table.test_ury_table
+              ury.ury.doctype.ury_yield_check.test_ury_yield_check
+              ury.ury.hooks.test_ury_bom
+              ury.ury.hooks.test_ury_item
+              ury.ury.report_api.test_commission
+              ury.ury.report_api.test_day_close
+              ury.ury.services.test_bom_cost_resolver
+              ury.ury.services.test_production_unit_department_migration
+              ury.ury.services.test_yield_check_reminders
+              ury.ury_pos.test_api
+              ury.ury_pos.test_e2e_p0_p1_flow
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -156,38 +296,12 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           cd frappe_env
-          # `bench run-tests --app ury` (the whole ~1000-test legacy suite,
-          # most of which had never been run in any automated setting before
-          # this workflow existed) has been repeatedly killed by an external
-          # "runner has received a shutdown signal" cancellation at close to
-          # the same ~10-minute mark regardless of this job's timeout-minutes
-          # setting or how much MariaDB/output tuning was applied -- strongly
-          # suggesting an infra-level constraint outside this workflow's
-          # control, not a bug in the tests themselves (verified: the full
-          # suite runs cleanly to completion, 1009 tests, in well under a
-          # minute against a local warm site). Rather than keep fighting an
-          # external limit, scope this PR's CI gate to what it actually
-          # added: the 17 backend modules below, each already individually
-          # verified against a real bench. Running the full legacy suite in
-          # CI (likely via sharding across multiple jobs) is a reasonable
-          # follow-up, not something this PR should block on.
-          bench --site test_site run-tests --app ury --module ury.ury.api.minimal.test_setup_organization
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_button_permission
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_dashboard
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_pos_extend
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_seed_v3_demo
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_service_requests
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_chat
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_desk_link
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_fast_moving
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_insight
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_insight_rules
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_kot_generate
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_kot_order_number
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_kot_validation
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_menu_course_validation
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_print
-          bench --site test_site run-tests --app ury --module ury.ury.api.test_ury_requirements_stock
+          while IFS= read -r module; do
+            [ -z "$module" ] && continue
+            bench --site test_site run-tests --app ury --module "$module"
+          done <<'MODULES'
+          ${{ matrix.modules }}
+          MODULES
 
   frontend-lint-test:
     runs-on: ubuntu-latest
