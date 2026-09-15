@@ -109,5 +109,8 @@ export const remainingHeadroom = (
   currentCartQty: number,
 ): number | undefined => {
   if (!availability) return undefined;
+  // `available_qty == null` means "unconstrained" (e.g. an "Always
+  // Available" override) -- do not gate on it, same as unknown/unfetched.
+  if (availability.available_qty == null) return undefined;
   return availability.available_qty - currentCartQty;
 };

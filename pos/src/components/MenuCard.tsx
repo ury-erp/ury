@@ -54,7 +54,10 @@ const MenuCard: FC<MenuCardProps> = ({
     };
   }, [item, branch, company]);
 
-  const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0);
+  // `available_qty == null` means "unconstrained" (e.g. an "Always
+  // Available" override) -- never treat it as zero/out-of-stock.
+  const isUnavailable =
+    !!availability && (!availability.sellable || (availability.available_qty != null && availability.available_qty <= 0));
   const isDisabled = disabled || isUnavailable;
   const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null;
 
@@ -62,12 +65,16 @@ const MenuCard: FC<MenuCardProps> = ({
   const getAvailabilityTag = (): { variant: 'tagDestructive' | 'tagWarning' | 'tagSuccess'; text: string; showDot: boolean } | null => {
     if (!availability) return null;
 
-    if (!availability.sellable || availability.available_qty <= 0) {
+    if (!availability.sellable || (availability.available_qty != null && availability.available_qty <= 0)) {
       return { variant: 'tagDestructive', text: unavailableMessage || 'Unavailable', showDot: false };
     }
 
-    if (availability.available_qty < 5) {
+    if (availability.available_qty != null && availability.available_qty < 5) {
       return { variant: 'tagWarning', text: `${availability.available_qty} left`, showDot: false };
+    }
+
+    if (availability.available_qty == null) {
+      return { variant: 'tagSuccess', text: 'Available', showDot: true };
     }
 
     return { variant: 'tagSuccess', text: `${availability.available_qty} left`, showDot: true };
