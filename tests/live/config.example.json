@@ -1,0 +1,43 @@
+{
+  "_comment": "Copy to config.json (gitignored) and fill in real values for a specific bench.",
+  "bench_url": "http://sa-testcov-verify.localhost:8000",
+  "api_key": "REPLACE_ME",
+  "api_secret": "REPLACE_ME",
+  "cookies": null,
+  "branch": "Main Branch",
+  "endpoints": {
+    "create": "ury.pos.api.order.create_order",
+    "add_item": "ury.pos.api.order.add_item",
+    "submit": "ury.pos.api.order.submit_order",
+    "pay": "ury.pos.api.order.pay_order",
+    "close": "ury.pos.api.order.close_order"
+  },
+  "item_pool": [
+    { "item_code": "TEST-ITEM-001", "qty": 1 },
+    { "item_code": "TEST-ITEM-002", "qty": 2 },
+    { "item_code": "TEST-ITEM-003", "qty": 1 }
+  ],
+  "db": {
+    "driver": "pymysql",
+    "host": "mariadb",
+    "port": 3306,
+    "user": "root",
+    "password": "REPLACE_ME",
+    "database": "REPLACE_ME_site_db_name"
+  },
+  "no_oversell": {
+    "bin_table": "tabBin",
+    "allow_negative_stock_items": []
+  },
+  "reservation_atomicity": {
+    "reservation_table": "tabStock Reservation Entry",
+    "order_field": "voucher_no",
+    "order_table": "tabSales Order"
+  },
+  "audit_log_completeness": {
+    "order_table": "tabSales Order",
+    "version_table": "tabVersion",
+    "tracked_docstatuses": [1, 2],
+    "since_clause": "1=1"
+  }
+}
