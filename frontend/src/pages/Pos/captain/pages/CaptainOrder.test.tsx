@@ -134,6 +134,8 @@ const mockPOSStore = {
   selectedCustomer: { name: "CUST-001" },
   clearTableOrder: vi.fn(),
   isOrderInteractionDisabled: () => false,
+  selectedOrderType: "Dine In",
+  setSelectedOrderType: vi.fn(),
 };
 
 describe("CaptainOrder", () => {
