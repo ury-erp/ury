@@ -301,6 +301,14 @@ jobs:
           # apps/ury -- get-app with a local path symlinks it in rather than
           # re-cloning from GitHub, so uncommitted/PR-branch code is what's tested.
           bench get-app ury "$GITHUB_WORKSPACE" --skip-assets
+          # ury/ury/tests/factories.py (Phase 8, sa-comprehensive-test-strategy)
+          # uses Faker for fixture data -- it is a dev-only dependency,
+          # declared under [tool.bench.dev-dependencies] in frappe's own
+          # pyproject.toml, not a pip extras group ("pip install -e
+          # apps/frappe[test]" -- referenced in some of this repo's own
+          # older docs/comments -- is a no-op for it, confirmed directly).
+          # `bench setup requirements --dev` is the real installer.
+          bench setup requirements --dev
           bench new-site test_site --admin-password=admin --mariadb-root-password=root
           bench --site test_site install-app erpnext
           bench --site test_site install-app payments
