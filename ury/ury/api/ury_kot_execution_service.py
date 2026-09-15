@@ -324,6 +324,7 @@ def _transition(kot, target_state, idempotency_key, actor_field, timestamp_field
 		return _result_dict(prior, idempotent=True)
 
 	branch, company, production_unit = _kot_scope(kot)
+	_require_kot_branch_scope(branch, actor)
 
 	# Step 4: lock any existing row for this KOT before reading its state,
 	# so two concurrent callers serialize on this SELECT ... FOR UPDATE.
