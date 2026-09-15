@@ -79,32 +79,50 @@ jobs:
       # reproduced against any local bench (dirty or freshly provisioned).
       # The other 5 (test_ury_yield_check, test_ury_reservation_service,
       # test_ury_yield_variance, test_ury_item_production_configuration,
-      # test_yield_check_reminders) are included in the 96 modules below.
+      # test_yield_check_reminders) are included in the 114 modules below.
       #
-      # test_ury_bom and test_ury_order both have their underlying source
-      # bugs fixed and verified passing against fresh local sites (13/13
-      # and 37/37 respectively), but NEITHER is re-enabled here: each
-      # produced further failures unique to this workflow's actual Python
-      # 3.11 CI runner that a local re-check (including, for test_ury_bom,
-      # a standalone Python 3.11 repro of the exact failing logic) could
-      # not reproduce. For test_ury_order specifically, the leading theory
-      # for the mismatch (CI fetching a newer frappe/erpnext version-15
-      # commit than the local bench) was directly ruled out -- `git
-      # ls-remote` against both upstream branches returned the exact same
-      # commit hashes the local bench has. Left excluded rather than merge
-      # a shard that's red for a reason not yet understood; both source
-      # fixes and this investigation are recorded in EXECUTION_LOG.md
-      # ("Session 4") for whoever picks this back up -- likely one shared
-      # root cause across both, not two coincidences.
+      # Shard matrix re-synced with .github/workflows/test.yml (the v15 CI
+      # workflow). This file had drifted to 96 modules while test.yml had
+      # grown to 116 unique modules -- a 20-module hole that silently left
+      # business-critical doctypes (bulk_production, alert_settings,
+      # ury_kot_execution, stock_correction, staff_discount_policy, the
+      # whole report_api cluster, ury_order, ury_bom) untested on v16.
       #
-      # A 9th module, test_ury_order_v3_73_stock_authority_flag, is also
-      # excluded: it imports and passes locally against a real bench
-      # (verified) but fails with ModuleNotFoundError specifically inside
-      # this workflow's fresh bench get-app/install-app environment, for
-      # a reason not yet root-caused (not a missing/misspelled file --
-      # confirmed present and correctly tracked in git). Left out rather
-      # than block the other 91 on an unresolved CI-environment-specific
-      # mystery; a real follow-up, not silently dropped.
+      # The 20 missing modules were not copied over blind: each was run
+      # individually against a real v16 bench (frappe v16.33.1, erpnext
+      # v16.34.2, payments + hrms installed) before being added. 18 of 20
+      # passed and are now included. The remaining 2 are deliberately still
+      # excluded, with the reason recorded here rather than silently dropped:
+      #
+      #   - ury.ury.api.test_ury_kot_display_serve_and_list -- errors on v16
+      #     with AttributeError('__class__') raised from
+      #     frappe/utils/local.py:28 inside unittest.mock's _is_async_obj
+      #     check. The test patches an attribute on `frappe.local`, whose
+      #     v16 Local.__getattribute__ raises AttributeError for the dunder
+      #     lookups mock performs on the patch target. A real v16 (and
+      #     Python 3.14) incompatibility in the test's patching strategy,
+      #     not in the shard mapping -- needs the test rewritten to patch
+      #     the consuming module's reference instead of frappe.local.
+      #   - ury.ury.dev_seed.test_demo_runner -- fails on v16 for the
+      #     already-tracked dev_seed.seed_all bugs (URY Sales Plan rejected
+      #     by its own workflow on the Draft -> Approved transition, and
+      #     "POS Opening Entry is outdated" on every seeded POS Invoice),
+      #     the same seeding bugs documented in EXECUTION_LOG.md. It is
+      #     also already excluded above as a CI-only flake on v15.
+      #
+      # test.yml additionally lists ury_payment_terminal and
+      # ury_payment_terminal_transaction twice in its shard 3; the
+      # duplicates are not reproduced here.
+      #
+      # Modules are re-split into 4 contiguous, evenly sized shards
+      # (29/29/28/28) in the same order test.yml uses, rather than carrying
+      # over test.yml's own lopsided 23/24/36/35 split.
+      #
+      # test_ury_order_v3_73_stock_authority_flag remains excluded (it is
+      # absent from test.yml too): it imports and passes locally against a
+      # real bench but fails with ModuleNotFoundError specifically inside
+      # this workflow's fresh bench get-app/install-app environment, for a
+      # reason not yet root-caused.
       matrix:
         include:
           - shard: 0
@@ -132,14 +150,14 @@ jobs:
               ury.ury.api.test_ury_comparable_weekday_history
               ury.ury.api.test_ury_cost_variance_attribution
               ury.ury.api.test_ury_dashboard
-          - shard: 1
-            modules: |
               ury.ury.api.test_ury_department_profitability
               ury.ury.api.test_ury_desk_link
               ury.ury.api.test_ury_fast_moving
               ury.ury.api.test_ury_feature_flags
               ury.ury.api.test_ury_fulfilment_posting_service
               ury.ury.api.test_ury_insight
+          - shard: 1
+            modules: |
               ury.ury.api.test_ury_insight_rules
               ury.ury.api.test_ury_inventory_projection
               ury.ury.api.test_ury_issue_authorization
@@ -157,10 +175,9 @@ jobs:
               ury.ury.api.test_ury_kot_validation
               ury.ury.api.test_ury_menu_course_validation
               ury.ury.api.test_ury_mto_fulfilment_service
-          - shard: 2
-            modules: |
               ury.ury.api.test_ury_order_reservation_service
               ury.ury.api.test_ury_reservation_service
+              ury.ury.api.test_ury_reservation_service_expiry
               ury.ury.api.test_ury_preproduced_fulfilment_service
               ury.ury.api.test_ury_print
               ury.ury.api.test_ury_production_context
@@ -170,30 +187,41 @@ jobs:
               ury.ury.api.test_ury_sales_plan
               ury.ury.api.test_ury_sales_plan_commit
               ury.ury.api.test_ury_service_line
+          - shard: 2
+            modules: |
               ury.ury.api.test_ury_stock_service
               ury.ury.api.test_ury_waiter_print
               ury.ury.api.test_ury_wastage
               ury.ury.api.test_ury_yield_variance
               ury.ury.api.test_ury_workstation_mapping
               ury.ury.controllers.test_setup_redirect
+              ury.ury.doctype.alert_settings.test_alert_settings
+              ury.ury.doctype.staff_discount_policy.test_staff_discount_policy
+              ury.ury.doctype.stock_correction.test_stock_correction
+              ury.ury.doctype.bulk_production.test_bulk_production
               ury.ury.doctype.menu_for_room.test_menu_for_room
               ury.ury.doctype.sub_pos_closing.test_sub_pos_closing
+              ury.ury.doctype.sub_pos_closing.test_sub_pos_closing_lookups
               ury.ury.doctype.ury_commission_settings.test_ury_commission_settings
               ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l
+              ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l_get_profit_loss_details
               ury.ury.doctype.ury_insight.test_ury_insight
               ury.ury.doctype.ury_item_production_configuration.test_ury_item_production_configuration
               ury.ury.doctype.ury_kot.test_ury_kot
               ury.ury.doctype.ury_kot_error_log.test_ury_kot_error_log
+              ury.ury.doctype.ury_kot_execution.test_ury_kot_execution
+              ury.ury.doctype.ury_kot_item_execution.test_ury_kot_item_execution
               ury.ury.doctype.ury_menu.test_ury_menu
-          - shard: 3
-            modules: |
               ury.ury.doctype.ury_menu_course.test_ury_menu_course
               ury.ury.doctype.ury_notification_recipient.test_ury_notification_recipient
+              ury.ury.doctype.ury_order.test_ury_order
               ury.ury.doctype.ury_order_item.test_ury_order_item
               ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
-              ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
+          - shard: 3
+            modules: |
               ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
               ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
+              ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
               ury.ury.doctype.ury_production_department.test_ury_production_department
               ury.ury.doctype.ury_production_unit.test_ury_production_unit
               ury.ury.doctype.ury_report_settings.test_ury_report_settings
@@ -203,9 +231,17 @@ jobs:
               ury.ury.doctype.ury_service_request.test_ury_service_request
               ury.ury.doctype.ury_table.test_ury_table
               ury.ury.doctype.ury_yield_check.test_ury_yield_check
+              ury.ury.hooks.test_ury_bom
               ury.ury.hooks.test_ury_item
               ury.ury.report_api.test_commission
+              ury.ury.report_api.test_customers
               ury.ury.report_api.test_day_close
+              ury.ury.report_api.test_employees
+              ury.ury.report_api.test_financial
+              ury.ury.report_api.test_items
+              ury.ury.report_api.test_operations
+              ury.ury.report_api.test_sales
+              ury.ury.report_api.test_sales_data_logic
               ury.ury.services.test_bom_cost_resolver
               ury.ury.services.test_production_unit_department_migration
               ury.ury.services.test_yield_check_reminders
