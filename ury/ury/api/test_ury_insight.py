@@ -15,7 +15,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_insight import get_active_insights, dismiss_insight
-from ury.ury.tests.factories import make_user
+from ury.ury.tests.factories import make_branch, make_user
 
 
 MODULE = "ury.ury.api.ury_insight"
@@ -28,14 +28,14 @@ def _ensure_test_branch(branch_name="Test Branch"):
 	test site has no records for (only created via the setup wizard, which
 	CI's fixture bootstrap does not run for every doctype -- see
 	ury/install.py's before_tests for the general version of this gap).
-	Seed the record(s) these tests need directly."""
-	if not frappe.db.exists("Branch", branch_name):
-		branch_doc = frappe.get_doc({"doctype": "Branch", "branch": branch_name})
-		# ury's custom "user" child table on Branch is marked mandatory, but
-		# these tests only need the Branch record to exist for URY Insight's
-		# link validation -- no branch-user assignment is relevant here.
-		branch_doc.flags.ignore_mandatory = True
-		branch_doc.insert(ignore_permissions=True)
+
+	Phase 8 (sa-comprehensive-test-strategy) proof-of-concept: delegates to
+	the shared ury.ury.tests.factories.make_branch factory (idempotent --
+	checks frappe.db.exists first) instead of reimplementing the same
+	insert-if-missing logic this file used to carry inline (one of 8
+	hand-rolled "doctype": "Branch" call sites across the repo before that
+	factory existed)."""
+	make_branch(branch=branch_name)
 
 
 class TestGetActiveInsightsHappyPath(FrappeTestCase):
