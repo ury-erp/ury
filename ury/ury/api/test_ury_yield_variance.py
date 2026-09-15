@@ -52,11 +52,12 @@ def _yield_check_record(
 class TestRecordYieldCheckPermissionGating(FrappeTestCase):
 	"""Test record_yield_check permission and scope gating."""
 
-	@patch(f"{MOD}.require_manager")
-	@patch(f"{MOD}._require_scope")
-	def test_require_manager_called(self, mock_scope, mock_manager):
-		"""record_yield_check calls require_manager()."""
-		mock_manager.side_effect = frappe.PermissionError
+	@patch(f"{MOD}.frappe.has_permission")
+	def test_has_permission_gate_enforced(self, mock_has_permission):
+		"""record_yield_check requires doctype create permission (I7: relaxed
+		from manager-only to any authenticated user with create permission --
+		this replaced the old require_manager() gate for this endpoint)."""
+		mock_has_permission.return_value = False
 
 		with self.assertRaises(frappe.PermissionError):
 			record_yield_check(
@@ -69,12 +70,13 @@ class TestRecordYieldCheckPermissionGating(FrappeTestCase):
 				check_type="Routine",
 			)
 
-		mock_manager.assert_called_once()
+		mock_has_permission.assert_called_once_with("URY Yield Check", "create")
 
-	@patch(f"{MOD}.require_manager")
+	@patch(f"{MOD}.frappe.has_permission")
 	@patch(f"{MOD}._require_scope")
-	def test_require_scope_called_with_company(self, mock_scope, mock_manager):
+	def test_require_scope_called_with_company(self, mock_scope, mock_has_permission):
 		"""record_yield_check calls _require_scope(company)."""
+		mock_has_permission.return_value = True
 		mock_scope.side_effect = frappe.ValidationError
 
 		with self.assertRaises(frappe.ValidationError):
@@ -94,11 +96,14 @@ class TestRecordYieldCheckPermissionGating(FrappeTestCase):
 	@patch(f"{MOD}.frappe.session")
 	@patch(f"{MOD}.frappe.utils.now")
 	@patch(f"{MOD}._require_scope")
-	@patch(f"{MOD}.require_manager")
+	@patch(f"{MOD}.user_has_branch_access")
+	@patch(f"{MOD}.frappe.has_permission")
 	def test_record_yield_check_creates_and_inserts_document(
-		self, mock_manager, mock_scope, mock_now, mock_session, mock_get_doc
+		self, mock_has_permission, mock_access, mock_scope, mock_now, mock_session, mock_get_doc
 	):
 		"""record_yield_check creates URY Yield Check and inserts it."""
+		mock_has_permission.return_value = True
+		mock_access.return_value = True
 		mock_session.user = "test_user"
 		mock_now.return_value = "2026-01-01 10:00:00"
 		mock_doc = MagicMock()
@@ -141,11 +146,14 @@ class TestRecordYieldCheckPermissionGating(FrappeTestCase):
 	@patch(f"{MOD}.frappe.session")
 	@patch(f"{MOD}.frappe.utils.now")
 	@patch(f"{MOD}._require_scope")
-	@patch(f"{MOD}.require_manager")
+	@patch(f"{MOD}.user_has_branch_access")
+	@patch(f"{MOD}.frappe.has_permission")
 	def test_record_yield_check_with_optional_fields(
-		self, mock_manager, mock_scope, mock_now, mock_session, mock_get_doc
+		self, mock_has_permission, mock_access, mock_scope, mock_now, mock_session, mock_get_doc
 	):
 		"""record_yield_check includes optional fields when provided."""
+		mock_has_permission.return_value = True
+		mock_access.return_value = True
 		mock_session.user = "test_user"
 		mock_now.return_value = "2026-01-01 10:00:00"
 		mock_doc = MagicMock()
@@ -174,11 +182,14 @@ class TestRecordYieldCheckPermissionGating(FrappeTestCase):
 	@patch(f"{MOD}.frappe.session")
 	@patch(f"{MOD}.frappe.utils.now")
 	@patch(f"{MOD}._require_scope")
-	@patch(f"{MOD}.require_manager")
+	@patch(f"{MOD}.user_has_branch_access")
+	@patch(f"{MOD}.frappe.has_permission")
 	def test_record_yield_check_returns_key_fields(
-		self, mock_manager, mock_scope, mock_now, mock_session, mock_get_doc
+		self, mock_has_permission, mock_access, mock_scope, mock_now, mock_session, mock_get_doc
 	):
 		"""record_yield_check return dict includes required key fields."""
+		mock_has_permission.return_value = True
+		mock_access.return_value = True
 		mock_session.user = "test_user"
 		mock_now.return_value = "2026-01-01 10:00:00"
 		mock_doc = MagicMock()
@@ -418,11 +429,16 @@ class TestUserHasBranchAccess(FrappeTestCase):
 		result = user_has_branch_access("test_user", "Test Branch")
 
 		self.assertTrue(result)
+		# The real query also filters by parentfield="user" (to scope to
+		# Branch's own user child table specifically, not any other doctype
+		# reusing "URY User" as a child table with a different fieldname) --
+		# this test's expected filter dict predates that and was missing it.
 		mock_exists.assert_called_once_with(
 			"URY User",
 			{
 				"parenttype": "Branch",
 				"parent": "Test Branch",
+				"parentfield": "user",
 				"user": "test_user",
 			},
 		)
@@ -467,13 +483,19 @@ class TestUserHasBranchAccess(FrappeTestCase):
 class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
 	"""Test B1: record_yield_check enforces user-branch access."""
 
+	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.frappe.has_permission")
 	@patch(f"{MOD}._require_scope")
 	@patch(f"{MOD}.user_has_branch_access")
-	def test_calls_user_has_branch_access(self, mock_access, mock_scope, mock_perm):
+	def test_calls_user_has_branch_access(self, mock_access, mock_scope, mock_perm, mock_get_doc):
 		"""record_yield_check checks user's branch access."""
 		mock_perm.return_value = True
 		mock_access.return_value = True
+		# Once permission/scope/branch-access all pass, record_yield_check
+		# goes on to frappe.get_doc({...}).insert() for real -- unmocked,
+		# that's a genuine document insert against nonexistent Item/Branch/
+		# Company records, which is not what this test is about.
+		mock_get_doc.return_value = MagicMock()
 
 		record_yield_check(
 			item="TEST-ITEM",
@@ -489,15 +511,17 @@ class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
 		call_args = mock_access.call_args[0]
 		self.assertIn("Test Branch", call_args)
 
+	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.frappe.has_permission")
 	@patch(f"{MOD}._require_scope")
 	@patch(f"{MOD}.user_has_branch_access")
 	@patch(f"{MOD}.frappe.session")
-	def test_user_has_branch_access_receives_session_user(self, mock_session, mock_access, mock_scope, mock_perm):
+	def test_user_has_branch_access_receives_session_user(self, mock_session, mock_access, mock_scope, mock_perm, mock_get_doc):
 		"""record_yield_check passes frappe.session.user to branch access check."""
 		mock_session.user = "test_user"
 		mock_perm.return_value = True
 		mock_access.return_value = True
+		mock_get_doc.return_value = MagicMock()
 
 		record_yield_check(
 			item="TEST-ITEM",
