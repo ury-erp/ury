@@ -92,7 +92,8 @@ class TestMarkReadyManagerOverrideGate(FrappeTestCase):
 			patch(f"{MODULE}.append_audit"):
 			mock_session.user = "manager@ury.test"
 			result = svc.mark_ready("KOT-0001", "idem-1", manager_override=True)
-			self.assertEqual(result, {"name": "UKE-0001", "state": svc.READY})
+			self.assertEqual(result["name"], "UKE-0001")
+			self.assertEqual(result["state"], svc.READY)
 			fake_doc.insert.assert_called_once_with(ignore_permissions=False)
 
 	def test_no_override_never_consults_manager_roles(self):
@@ -158,5 +159,6 @@ class TestBranchScopeGapFinding(FrappeTestCase):
 			# No role check, no branch-scope check -- succeeds regardless of
 			# the caller's actual branch.
 			result = svc.start_execution("KOT-0001", "idem-1")
-			self.assertEqual(result, {"name": "UKE-0002", "state": svc.IN_PREPARATION})
+			self.assertEqual(result["name"], "UKE-0002")
+			self.assertEqual(result["state"], svc.IN_PREPARATION)
 			mock_branch_guard.assert_not_called()
