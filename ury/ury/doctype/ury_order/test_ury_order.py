@@ -1768,6 +1768,16 @@ class _FakeRow:
     def __init__(self, **fields):
         self.__dict__.update(fields)
 
+    def __getattr__(self, name):
+        # A real (unsaved) Frappe child-table row returns None for a field
+        # that was never set (e.g. .name before insert()), rather than
+        # raising AttributeError -- split_bill() relies on this for rows it
+        # constructs itself via _FakeInvoice.append() without a "name" key.
+        # __getattr__ (not __getattribute__) only fires for names Python
+        # couldn't already find in __dict__/the class, so explicitly-set
+        # fields are unaffected.
+        return None
+
     def get(self, key, default=None):
         return getattr(self, key, default)
 
