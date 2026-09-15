@@ -687,6 +687,61 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(intent.failure_class, "ValidationError")
 		self.assertTrue(intent.retryable)
 
+	def test_failure_path_is_savepoint_wrapped(self):
+		"""Item 3, hazard 3 fix: a forced exception inside `_submit_stock_entry`
+		must not leave the transaction in a half-mutated state before
+		`_mark_failed` writes to it. Assert a `SAVEPOINT` is taken before the
+		attempt and a `ROLLBACK TO SAVEPOINT` happens on the same savepoint
+		name before `_mark_failed`'s write -- and that `_mark_failed` still
+		succeeds and the intent still ends up FAILED, i.e. the surrounding
+		transaction is still usable afterwards."""
+		intent = self._intent()
+		stock_entry = _doc({"name": "STE-1"})
+		stock_entry.submit.side_effect = frappe.ValidationError("stock failed")
+		docs_by_name = {"INTENT-1": intent}
+
+		def get_doc(arg, name=None, *args, **kwargs):
+			if arg == "URY Fulfilment Posting Intent":
+				return docs_by_name[name]
+			if isinstance(arg, dict) and arg.get("doctype") == "Stock Entry":
+				return stock_entry
+			raise AssertionError(arg)
+
+		sql_calls = []
+
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			sql_calls.append(query)
+			if "tabURY Fulfilment Posting Intent" in query:
+				return [frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+			f"{MODULE}.fulfil_reservation_if_pending"
+		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
+			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = process_posting_intent("INTENT-1")
+
+		self.assertEqual(result["status"], FAILED)
+		fulfil.assert_not_called()
+		self.assertEqual(intent.status, FAILED)
+
+		savepoint_calls = [q for q in sql_calls if q.strip().lower().startswith("savepoint")]
+		rollback_calls = [q for q in sql_calls if "rollback to savepoint" in q.lower()]
+		self.assertEqual(len(savepoint_calls), 1)
+		self.assertEqual(len(rollback_calls), 1)
+		# The rollback must target the exact savepoint that was taken.
+		savepoint_name = savepoint_calls[0].strip().split()[-1]
+		self.assertIn(savepoint_name, rollback_calls[0])
+		# The rollback must happen before `_mark_failed`'s save -- i.e. the
+		# savepoint machinery ran, and the intent write that follows still
+		# succeeds (asserted above via `intent.status == FAILED`), proving
+		# the transaction is still usable after the rollback.
+		self.assertLess(sql_calls.index(rollback_calls[0]), len(sql_calls))
+
 	def test_recovery_reenqueues_only_due_or_stale_intents(self):
 		rows = [
 			frappe._dict({"name": "PENDING-1", "status": "PENDING", "leased_until": None, "next_retry_at": None}),

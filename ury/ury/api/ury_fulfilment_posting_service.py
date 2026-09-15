@@ -789,10 +789,22 @@ def _mark_failed(intent_name, error):
 
 
 def process_posting_intent(intent_name):
-	"""Claim and post one fulfilment intent. Safe to replay."""
+	"""Claim and post one fulfilment intent. Safe to replay.
+
+	Hazard 3 fix (Item 3): the whole body below is wrapped in a savepoint so
+	that a failure partway through -- e.g. an exception inside
+	`_submit_stock_entry` after the Stock Entry insert but before it fully
+	settles -- rolls back to a clean point before `_mark_failed` writes the
+	intent's failure state. Without this, `_mark_failed`'s `doc.save()` would
+	run in a transaction left in whatever half-mutated state the failure left
+	it in. This applies equally to the background worker and to the
+	synchronous retry called from inside `POS Closing Entry` validation.
+	"""
 	intent = _claim_intent(intent_name)
 	if not intent:
 		return _intent_result(frappe.get_doc(INTENT_DOCTYPE, intent_name), idempotent=True)
+	savepoint = "ury_fulfilment_posting_{0}".format(frappe.generate_hash(length=10))
+	frappe.db.savepoint(savepoint)
 	try:
 		payload = _payload(intent)
 		stock_entry = _submit_stock_entry(intent, payload)
@@ -842,6 +854,7 @@ def process_posting_intent(intent_name):
 			intent.save(ignore_permissions=False)
 		return _intent_result(intent.as_dict(), idempotent=False)
 	except Exception as exc:
+		frappe.db.rollback(save_point=savepoint)
 		return _mark_failed(intent.name, exc)
 
 

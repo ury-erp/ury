@@ -159,7 +159,7 @@ def maybe_wire_fulfilment_on_submit(doc, method=None):
 	_verify_fulfilment_posted_for_invoice(doc)
 
 
-def _verify_fulfilment_posted_for_invoice(doc, strict=False):
+def _verify_fulfilment_posted_for_invoice(doc, strict=False, retry: bool = True):
 	"""Assert every produced made-to-order line on this invoice has a POSTED
 	intent that matches what is actually being invoiced.
 
@@ -182,6 +182,17 @@ def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 	`strict=False` would make the till-time advisory and the closing-time
 	enforcement the same permissive check, silently defeating both --
 	exactly the composition bug this parameter exists to prevent.
+
+	`retry`: when True (the default -- unchanged behaviour for the till-time
+	caller above), a non-POSTED intent gets one synchronous
+	`process_posting_intent` call before being re-checked, as before. When
+	False, that call is skipped entirely and the intent is only re-read --
+	this function performs zero document writes in that mode. T5
+	(`ury_pos_closing_reconciliation`) now passes `retry=False`: the
+	drain-the-queue pass that used to happen implicitly inside this retry now
+	runs once, earlier, from `POS Closing Entry.before_validate`
+	(`ury_pos_closing_reconciliation.drain_session_postings`), so that
+	`validate` itself is provably side-effect-free (Item 3).
 	"""
 	from ury.ury.api.ury_fulfilment_posting_service import process_posting_intent
 
@@ -201,10 +212,14 @@ def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 				# unproduced item is a kitchen-workflow question, not a stock
 				# one, and must not block payment.
 				continue
-			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent, strict=strict)
+			_verify_item_execution_intent(
+				row, kot.name, doc, process_posting_intent, strict=strict, retry=retry
+			)
 
 
-def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent, strict=False):
+def _verify_item_execution_intent(
+	row, kot_name, doc, process_posting_intent, strict=False, retry: bool = True
+):
 	item_code, invoiced_qty = _kot_item_scope(row.get("kot_item"))
 	if not item_code:
 		return
@@ -224,15 +239,20 @@ def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent, st
 		)
 
 	if intent.get("status") != POSTED:
-		# One synchronous retry: the posting normally happens in a background
-		# worker moments after READY, so the common case here is simply that
-		# the worker has not drained yet rather than a real failure.
-		try:
-			process_posting_intent(intent.get("name"))
-		except Exception:
-			frappe.logger("ury_feature_flags").exception(
-				"Synchronous retry of posting intent %s failed", intent.get("name")
-			)
+		if retry:
+			# One synchronous retry: the posting normally happens in a
+			# background worker moments after READY, so the common case here
+			# is simply that the worker has not drained yet rather than a
+			# real failure.
+			try:
+				process_posting_intent(intent.get("name"))
+			except Exception:
+				frappe.logger("ury_feature_flags").exception(
+					"Synchronous retry of posting intent %s failed", intent.get("name")
+				)
+		# retry=False (T5's mode): no write happens above -- re-read only, to
+		# pick up whatever the `before_validate` drain pass (or a background
+		# worker) already did for this intent.
 		intent = _latest_intent(row.get("kot_item"))
 		if not intent or intent.get("status") != POSTED:
 			if not strict and _closing_reconciliation_will_catch_this(row, doc):
