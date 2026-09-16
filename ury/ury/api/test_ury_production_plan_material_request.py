@@ -136,7 +136,11 @@ class GenerateMaterialRequestsTests(unittest.TestCase):
             result["skipped_sufficient_stock"],
             [{"department": "Kitchen", "item_code": "RAW-1"}],
         )
-        self.assertEqual(result["department_stock_used"], {})
+        # Stock actually consumed is recorded even when it's more than
+        # enough to fully cover the requirement (min(required, current) =
+        # min(20, 25) = 20) -- consistent with the partial-shortage case
+        # above, which records the same field for the qty actually drawn.
+        self.assertEqual(result["department_stock_used"], {("Kitchen", "RAW-1"): 20.0})
 
     def test_sufficient_store_stock_only_produces_transfer(self):
         plan = make_plan(

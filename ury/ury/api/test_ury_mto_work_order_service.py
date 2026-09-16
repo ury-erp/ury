@@ -31,9 +31,13 @@ def _kot_item_row(name, item, quantity=2, work_order=None):
 
 
 def _make_kot_doc(branch="Branch A", rows=None):
-    kot = frappe._dict({"name": "KOT-1", "branch": branch})
-    kot.get = lambda key, default=None: rows if key == "kot_items" else kot.__dict__.get(key, default)
-    return kot
+    # frappe._dict is a dict subclass whose __setattr__ writes into the dict
+    # itself, so a plain instance-attribute override of `.get` (as this
+    # helper used to attempt) is silently shadowed by the real, inherited
+    # `dict.get` at attribute-lookup time -- `kot.get("kot_items")` would
+    # always miss and return `None`/default. Put `kot_items` directly in the
+    # dict instead so the real `dict.get` finds it.
+    return frappe._dict({"name": "KOT-1", "branch": branch, "kot_items": rows or []})
 
 
 def _context(policy="MADE_TO_ORDER", company="Company A", warehouse="WH - C", bom=None):
