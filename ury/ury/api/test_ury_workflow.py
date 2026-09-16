@@ -111,7 +111,12 @@ class TestURYWorkflowGeneric(FrappeTestCase):
         self._ensure_item("MTPL")
         self._ensure_item_production_configuration("MTPL", self.branch, self.company)
         self._create_user(TEST_MANAGER, roles=["URY Manager"])
-        self._create_user(TEST_NON_MANAGER, roles=[])
+        # "URY Admin" (read-only on URY Sales Plan, per its doctype
+        # permissions) -- not a roleless user, which couldn't even read the
+        # document and would get PermissionError before get_workflow_status
+        # reaches its "no actions available" logic at all. URY Admin is the
+        # real-world shape of "can see this plan but can't act on it".
+        self._create_user(TEST_NON_MANAGER, roles=["URY Admin"])
         frappe.db.delete(
             "URY Sales Plan",
             {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
