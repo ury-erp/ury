@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, Minus } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
@@ -26,9 +26,12 @@ import {
   isMergedBill,
   resolvePrintFormat,
   mapSplitGroupInvoiceToPOSInvoice,
+  getPOSInvoiceItemCodes,
   type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
+import { reduceOrderItemQty, isOrderTypeNotAllowedError } from '../lib/order-api';
+import { parseFrappeError } from '../lib/pos-opening-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
 
@@ -92,6 +95,7 @@ export default function Orders() {
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
   const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+  const [reducingItemKey, setReducingItemKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (selectedOrder?.name) {
@@ -255,6 +259,42 @@ export default function Orders() {
       showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  // Reduces a saved/printed order's line item by 1 (or removes it at qty 1)
+  // via `reduce_order_item_qty` — a partial cancel-KOT is generated
+  // server-side for the delta. Only permitted for the invoice's Order Type
+  // when the POS Profile's allow-list includes it; that rejection is
+  // surfaced as a specific message rather than a generic failure toast.
+  async function handleReduceItemQty(item: (typeof selectedOrderItems)[number]) {
+    if (!selectedOrder) return;
+    setReducingItemKey(item.name);
+    try {
+      const itemCodeMap = await getPOSInvoiceItemCodes(selectedOrder.name);
+      const itemCode = itemCodeMap[item.name];
+      if (!itemCode) {
+        showToast.error('Unable to resolve this item for quantity reduction.');
+        return;
+      }
+      const newQty = item.qty - 1;
+      const result = await reduceOrderItemQty(selectedOrder.name, itemCode, newQty);
+      const kotNames = result.cancel_kot_names?.length ? result.cancel_kot_names.join(', ') : null;
+      showToast.success(
+        newQty === 0
+          ? `${item.item_name} removed from the order. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+          : `${item.item_name} reduced to qty ${newQty}. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+      );
+      await selectOrder(selectedOrder);
+    } catch (err) {
+      const parsedMessage = parseFrappeError(err) || (err instanceof Error ? err.message : null);
+      if (isOrderTypeNotAllowedError(parsedMessage)) {
+        showToast.error(`Quantity reduction isn't allowed for ${selectedOrder.order_type} orders.`);
+      } else {
+        showToast.error(parsedMessage || 'Failed to reduce item quantity.');
+      }
+    } finally {
+      setReducingItemKey(null);
     }
   }
 
@@ -672,6 +712,12 @@ export default function Orders() {
                     const discountPercentage = item.rate < item.price_list_rate
                       ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
                       : null;
+                    const canReduceQty =
+                      String(selectedOrder.invoice_printed) === '1' &&
+                      isOrderEditable(selectedOrder.status) &&
+                      !isMergedBill(selectedOrder) &&
+                      item.qty > 0;
+                    const isReducingThisItem = reducingItemKey === item.name;
 
                     return (
                       <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
@@ -684,7 +730,24 @@ export default function Orders() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {canReduceQty && (
+                              <button
+                                type="button"
+                                onClick={() => handleReduceItemQty(item)}
+                                disabled={isReducingThisItem}
+                                aria-label={`Reduce quantity of ${item.item_name}`}
+                                className="flex items-center justify-center w-5 h-5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isReducingThisItem ? (
+                                  <Spinner className="w-3 h-3" hideMessage message="" />
+                                ) : (
+                                  <Minus className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                            <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-gray-900">

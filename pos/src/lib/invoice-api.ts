@@ -108,6 +108,29 @@ export async function getPOSInvoices({
   }
 }
 
+/**
+ * Resolve `item_code` for each POS Invoice Item row of a saved invoice,
+ * keyed by row name (the same `name` returned by `getPOSInvoiceItems`).
+ *
+ * `ury.ury_pos.api.getPosInvoiceItems` deliberately omits `item_code` (it
+ * only needs display fields), so the qty-reduction flow — which must pass
+ * `item_code` to `reduce_order_item_qty` — resolves it separately via the
+ * same `frappe.client.get` full-invoice fetch already used by
+ * `Orders.tsx`'s `handleEditOrder`, rather than widening the shared
+ * list-items API's response shape.
+ */
+export async function getPOSInvoiceItemCodes(invoiceId: string): Promise<Record<string, string>> {
+  const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${encodeURIComponent(invoiceId)}`);
+  if (!res.ok) throw new Error('Failed to fetch invoice items');
+  const data = await res.json();
+  const items: Array<{ name: string; item_code: string }> = data?.message?.items || [];
+  const map: Record<string, string> = {};
+  for (const item of items) {
+    map[item.name] = item.item_code;
+  }
+  return map;
+}
+
 export async function getPOSInvoiceItems(invoiceId: string) {
   try {
     const response = await call.get<GetPOSInvoiceItemsResponse>(
