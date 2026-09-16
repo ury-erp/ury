@@ -153,6 +153,44 @@ class TestFetchLastPurchaseRate(FrappeTestCase):
 		self.assertEqual(result, 12.5)
 
 
+class TestCreateStockEntryExemptsManufactureEnforcement(FrappeTestCase):
+	"""create_stock_entry() must mark the Stock Entry it builds as exempt from
+	ury_manufacture_enforcement.validate_manufacture_requires_work_order --
+	this doctype hand-builds a work_order-less Manufacture Stock Entry by
+	design (see that module's docstring), so it sets
+	flags.ignore_manufacture_enforcement=True before insert(). Mocked per this
+	file's stated scope decision (no real Stock Entry DB round trip here);
+	the real write path stays deferred to the IntegrationTestCase follow-up.
+	"""
+
+	def test_flag_is_set_before_insert(self):
+		doc = _new_doc([])
+		doc.creation = "2026-01-01 00:00:00.000000"
+		doc.posting_date = "2026-01-01"
+		doc.branch = "Main"
+		doc.company = "URY"
+		doc.warehouse = "WH-1"
+
+		mock_stock_entry = MagicMock()
+		mock_stock_entry.items = []
+		insert_order = []
+		mock_stock_entry.insert.side_effect = lambda: insert_order.append(
+			mock_stock_entry.flags.ignore_manufacture_enforcement
+		)
+
+		with patch(f"{MODULE}.frappe.new_doc", return_value=mock_stock_entry):
+			with patch(f"{MODULE}.frappe.db.get_value", side_effect=lambda *a, **k: 1):
+				with patch(f"{MODULE}.frappe.get_all", return_value=[]):
+					with patch(f"{MODULE}.get_incoming_rate", return_value=1):
+						with patch(f"{MODULE}.get_bom_cost", return_value=1):
+							doc.create_stock_entry("BOM-001", 5, 5)
+
+		# The flag must be True by the time insert() is called, not set
+		# (or left unset) only afterwards.
+		self.assertEqual(insert_order, [True])
+		mock_stock_entry.submit.assert_called_once()
+
+
 class TestEnqueueSaveStockentry(FrappeTestCase):
 	"""Queue-vs-inline dispatch logic in enqueue_save_stockentry()/
 	cancel_stock_entry_queue() -- pure branching on row count, no real Stock

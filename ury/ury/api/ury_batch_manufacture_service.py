@@ -15,21 +15,24 @@ Configuration` row.
 Two branches, selected by the config row's `sourcing_mode`:
 
 - IN_HOUSE (`start_batch`): resolves the item's active BOM (reusing
-  `ury_batch_work_order_adapter._resolve_active_bom`) and posts a real
-  `Manufacture` Stock Entry -- raw-material components as `s_warehouse`
-  rows sourced from the production unit/department warehouse, the finished
-  item as a `t_warehouse` row (with `is_finished_item: 1`, since this is a
-  hand-built entry with no linked `work_order`/`bom_no` for ERPNext to
-  infer that from) landing in the config's `direct_retail_warehouse` --
-  the same warehouse `ury_production_context.resolve_production_context`
-  and `ury_availability._fill_pre_produced` already treat as the
-  PRE_PRODUCED finished-goods location. This deliberately mirrors
-  `ury_fulfilment_posting_service._submit_stock_entry`/`_stock_entry_items`'s
-  existing MADE_TO_ORDER pattern: same hand-built-entry approach (see that
-  module's module docstring for why a real ERPNext Work Order is not used),
-  same `is_finished_item` workaround, same stock-entry-construction shape.
-  This is a deliberate consistency choice, not an oversight: the repo
-  should have one pattern for "post a Manufacture Stock Entry", not two.
+  `ury_batch_work_order_adapter._resolve_active_bom`), creates and submits a
+  real ERPNext `Work Order` for that BOM/item/qty, then generates the
+  `Manufacture` Stock Entry through ERPNext's own
+  `erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry` --
+  raw-material components as `s_warehouse` rows sourced from the production
+  unit/department warehouse, the finished item as a `t_warehouse` row
+  landing in the config's `direct_retail_warehouse` -- the same warehouse
+  `ury_production_context.resolve_production_context` and
+  `ury_availability._fill_pre_produced` already treat as the PRE_PRODUCED
+  finished-goods location. As of Track-Item N3, this is no longer a
+  hand-built entry: the generated Stock Entry always carries a `work_order`
+  link, and `ury_manufacture_enforcement.validate_manufacture_requires_work_order`
+  (a `Stock Entry.validate` hook) rejects any *other* Manufacture Stock
+  Entry for a PRE_PRODUCED/IN_HOUSE item that lacks one. This deliberately
+  diverges from `ury_fulfilment_posting_service._submit_stock_entry`/
+  `_stock_entry_items`'s MADE_TO_ORDER pattern (still a hand-built entry --
+  see that module's docstring for why -- and explicitly out of scope for
+  this migration/enforcement).
 - EXTERNAL_RECEIPT (`receive_batch`): no BOM, no component consumption. A
   plain `Material Receipt` Stock Entry receives the finished item directly
   into the config's `external_receiving_warehouse`.
@@ -64,8 +67,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry as _wo_make_stock_entry
+
 from ury.ury.api.ury_batch_work_order_adapter import _resolve_active_bom
-from ury.ury.api.ury_bom_compiler import compile_bom_vector
 from ury.ury.api.ury_fulfilment_posting_service import _service_mutation
 
 
@@ -169,32 +173,74 @@ def _find_existing_stock_entry(idempotency_key):
 	return rows[0].get("name") if rows else None
 
 
-def _in_house_stock_entry_items(item_code, qty, company, source_warehouse, target_warehouse):
-	vector = compile_bom_vector(item_code, qty, company)
-	items = []
-	for component in vector["components"]:
-		if not component.get("component_item") or flt(component.get("qty")) <= 0:
-			raise BatchManufactureError("INVALID_BOM_COMPONENT", _("BOM component row is incomplete"))
-		items.append(
-			{
-				"item_code": component["component_item"],
-				"qty": flt(component["qty"]),
-				"s_warehouse": source_warehouse,
-			}
-		)
-	items.append(
+def _create_and_submit_work_order(*, item_code, bom_no, qty, company, source_warehouse, target_warehouse):
+	"""Create and submit a real ERPNext Work Order for the resolved BOM/item/
+	qty, so `start_batch`'s Manufacture Stock Entry can be generated through
+	ERPNext's own `work_order.make_stock_entry` instead of a hand-built dict.
+
+	`skip_transfer=1` matches the previous hand-built-entry behaviour: raw
+	material consumption and finished-item receipt happen in a single
+	Manufacture Stock Entry (no separate Material Transfer for Manufacture
+	step), same as `_in_house_stock_entry_items` used to build directly.
+	"""
+	wo = frappe.get_doc(
 		{
-			"item_code": item_code,
+			"doctype": "Work Order",
+			"production_item": item_code,
+			"bom_no": bom_no,
 			"qty": flt(qty),
-			"t_warehouse": target_warehouse,
-			# Same workaround as ury_fulfilment_posting_service._stock_entry_items:
-			# this is a hand-built entry with no linked work_order/bom_no, so
-			# ERPNext's mark_finished_and_scrap_items() cannot auto-infer
-			# is_finished_item and the submit is rejected without it.
-			"is_finished_item": 1,
+			"company": company,
+			"wip_warehouse": source_warehouse,
+			"fg_warehouse": target_warehouse,
+			"skip_transfer": 1,
 		}
 	)
-	return items, vector["bom"]
+	with _service_mutation():
+		wo.insert(ignore_permissions=False)
+		wo.submit()
+	return wo
+
+
+def _work_order_stock_entry_doc(*, work_order_name, qty, source_warehouse, target_warehouse):
+	"""Build the (unsaved) Manufacture Stock Entry for `work_order_name` via
+	ERPNext's own `work_order.make_stock_entry`, then pin its item rows onto
+	the same source/target warehouses `start_batch` has always used (the
+	production unit/department warehouse in, `direct_retail_warehouse` out) --
+	`make_stock_entry` defaults to the Work Order's own `wip_warehouse`/
+	`fg_warehouse`, which we already set to the same values, but rows are
+	repointed explicitly here in case ERPNext ever changes that default.
+
+	`work_order.make_stock_entry` ends with `return stock_entry.as_dict()` --
+	a plain `frappe._dict`, not a bound Document -- so it must be wrapped with
+	`frappe.get_doc()` before any `.items` iteration, attribute assignment, or
+	`.insert()`/`.submit()` call treats it as one."""
+	stock_entry_dict = _wo_make_stock_entry(work_order_name, purpose="Manufacture", qty=flt(qty))
+	doc = frappe.get_doc(stock_entry_dict)
+	for item_row in doc.items:
+		if item_row.get("is_finished_item"):
+			item_row.t_warehouse = target_warehouse
+			item_row.s_warehouse = None
+		else:
+			item_row.s_warehouse = source_warehouse
+			item_row.t_warehouse = None
+	return doc
+
+
+def _submit_work_order_stock_entry(*, doc, config_name, idempotency_key, extra_remarks=None):
+	existing = _find_existing_stock_entry(idempotency_key)
+	if existing:
+		return existing, True
+
+	remarks = "URY Batch Manufacture: {0}".format(config_name)
+	if extra_remarks:
+		remarks = "{0} ({1})".format(remarks, extra_remarks)
+	doc.remarks = remarks
+	doc.custom_ury_batch_request = idempotency_key
+
+	with _service_mutation():
+		doc.insert(ignore_permissions=False)
+		doc.submit()
+	return doc.name, False
 
 
 def _submit_stock_entry(*, company, stock_entry_type, items, config_name, idempotency_key, extra_remarks=None):
@@ -257,7 +303,8 @@ def _load_and_validate_config(config_name, expected_sourcing_mode, actor):
 
 @frappe.whitelist()
 def start_batch(production_configuration, qty, idempotency_key=None, actor=None):
-	"""IN_HOUSE path: post a real BOM-based Manufacture Stock Entry.
+	"""IN_HOUSE path: post a real BOM-based Manufacture Stock Entry, backed by
+	a real, submitted ERPNext Work Order.
 
 	Raw-material components are issued from the production unit/department
 	warehouse; the finished pre-produced item is received into the config's
@@ -265,6 +312,18 @@ def start_batch(production_configuration, qty, idempotency_key=None, actor=None)
 	stock from). Fails closed if `sourcing_mode` is not IN_HOUSE, if the
 	configuration is inactive, or if no active BOM/source warehouse can be
 	resolved.
+
+	A Work Order is created and submitted for the resolved BOM/item/qty, and
+	the Manufacture Stock Entry is generated through ERPNext's own
+	`work_order.make_stock_entry` (never hand-built), so the resulting entry
+	always carries a `work_order` link -- see
+	`ury_manufacture_enforcement.validate_manufacture_requires_work_order`,
+	which now rejects any Manufacture Stock Entry for a PRE_PRODUCED/IN_HOUSE
+	item that is *not* linked to a Work Order.
+
+	On an idempotent replay (same `idempotency_key` as an already-submitted
+	Stock Entry), no new Work Order is created -- the existing Stock Entry
+	name is returned directly, same as before this migration.
 	"""
 	qty = flt(qty)
 	if qty <= 0:
@@ -280,17 +339,41 @@ def start_batch(production_configuration, qty, idempotency_key=None, actor=None)
 	# Reuses the same active-BOM resolution contract as
 	# ury_batch_work_order_adapter._resolve_active_bom / ury_bom_compiler --
 	# fails closed (frappe.throw) if no active BOM exists for this item/company.
-	_resolve_active_bom(item_code, company)
+	bom_no = _resolve_active_bom(item_code, company)
 
-	items, bom_no = _in_house_stock_entry_items(item_code, qty, company, source_warehouse, target_warehouse)
+	existing = _find_existing_stock_entry(idempotency_key)
+	if existing:
+		return {
+			"stock_entry": existing,
+			"idempotent_replay": True,
+			"item_code": item_code,
+			"qty": qty,
+			"bom": bom_no,
+			"source_warehouse": source_warehouse,
+			"target_warehouse": target_warehouse,
+		}
 
-	stock_entry, idempotent = _submit_stock_entry(
+	work_order = _create_and_submit_work_order(
+		item_code=item_code,
+		bom_no=bom_no,
+		qty=qty,
 		company=company,
-		stock_entry_type="Manufacture",
-		items=items,
+		source_warehouse=source_warehouse,
+		target_warehouse=target_warehouse,
+	)
+
+	stock_entry_doc = _work_order_stock_entry_doc(
+		work_order_name=work_order.name,
+		qty=qty,
+		source_warehouse=source_warehouse,
+		target_warehouse=target_warehouse,
+	)
+
+	stock_entry, idempotent = _submit_work_order_stock_entry(
+		doc=stock_entry_doc,
 		config_name=production_configuration,
 		idempotency_key=idempotency_key,
-		extra_remarks="BOM {0}".format(bom_no),
+		extra_remarks="BOM {0}, Work Order {1}".format(bom_no, work_order.name),
 	)
 	return {
 		"stock_entry": stock_entry,
@@ -298,6 +381,7 @@ def start_batch(production_configuration, qty, idempotency_key=None, actor=None)
 		"item_code": item_code,
 		"qty": qty,
 		"bom": bom_no,
+		"work_order": work_order.name,
 		"source_warehouse": source_warehouse,
 		"target_warehouse": target_warehouse,
 	}

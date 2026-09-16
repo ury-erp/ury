@@ -6,7 +6,6 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_batch_manufacture_service import (
 	BatchManufactureError,
 	_authorize_batch_action,
-	_in_house_stock_entry_items,
 	_load_and_validate_config,
 	_submit_stock_entry,
 	receive_batch,
@@ -24,6 +23,41 @@ def _doc(data):
 	doc.submit = MagicMock()
 	doc.name = data.get("name", "SE-1")
 	return doc
+
+
+def _wo_doc(name="WO-1"):
+	doc = frappe._dict({"name": name})
+	doc.insert = MagicMock()
+	doc.submit = MagicMock()
+	return doc
+
+
+class _Row:
+	"""Mimics a Frappe child-table row: dict-like item row with attribute
+	access, matching what `work_order.make_stock_entry` returns."""
+
+	def __init__(self, **data):
+		self.__dict__.update(data)
+
+	def get(self, key, default=None):
+		return getattr(self, key, default)
+
+
+class _GeneratedStockEntryDoc:
+	"""Stand-in for what `frappe.get_doc(stock_entry.as_dict())` returns: a
+	real, bound (unsaved) Document whose `.items` is the child-table list of
+	attribute-accessible rows -- as opposed to the plain dict
+	`work_order.make_stock_entry` (`return stock_entry.as_dict()`) actually
+	returns, whose `.items` would resolve to `dict.items` (the builtin bound
+	method), not a child table."""
+
+	def __init__(self, data):
+		self.items = [_Row(**row) for row in data.get("items", [])]
+		self.remarks = None
+		self.custom_ury_batch_request = None
+		self.name = "SE-1"
+		self.insert = MagicMock()
+		self.submit = MagicMock()
 
 
 def _config_row(**overrides):
@@ -114,56 +148,19 @@ class TestLoadAndValidateConfig(FrappeTestCase):
 		self.assertEqual(ctx.exception.reason_code, "CONFIGURATION_NOT_FOUND")
 
 
-class TestInHouseStockEntryItems(FrappeTestCase):
-	"""Regression for the same class of bug TestStockEntryType in
-	test_ury_fulfilment_posting_service.py guards against: a hand-built
-	Manufacture Stock Entry must include a t_warehouse finished-item row
-	with is_finished_item=1, or ERPNext rejects the submit."""
-
-	def test_components_and_finished_item_rows(self):
-		vector = {
-			"bom": "BOM-BIRYANI-001",
-			"components": [
-				{"component_item": "RICE", "qty": 4, "stock_uom": "Kg", "qty_per_unit": 2},
-				{"component_item": "CHICKEN", "qty": 2, "stock_uom": "Kg", "qty_per_unit": 1},
-			],
-		}
-		with patch(f"{MODULE}.compile_bom_vector", return_value=vector):
-			items, bom_no = _in_house_stock_entry_items("BIRYANI-1", 2, "Company A", "Kitchen WH", "FG WH")
-
-		self.assertEqual(bom_no, "BOM-BIRYANI-001")
-		component_rows = [row for row in items if row["item_code"] != "BIRYANI-1"]
-		self.assertEqual(len(component_rows), 2)
-		for row in component_rows:
-			self.assertEqual(row["s_warehouse"], "Kitchen WH")
-			self.assertNotIn("t_warehouse", row)
-
-		finished_rows = [row for row in items if row["item_code"] == "BIRYANI-1"]
-		self.assertEqual(len(finished_rows), 1)
-		self.assertEqual(finished_rows[0]["t_warehouse"], "FG WH")
-		self.assertEqual(finished_rows[0]["qty"], 2)
-		self.assertEqual(finished_rows[0]["is_finished_item"], 1)
-
-	def test_rejects_incomplete_component_row(self):
-		vector = {
-			"bom": "BOM-1",
-			"components": [{"component_item": "", "qty": 1, "stock_uom": "Kg", "qty_per_unit": 1}],
-		}
-		with patch(f"{MODULE}.compile_bom_vector", return_value=vector):
-			with self.assertRaises(BatchManufactureError) as ctx:
-				_in_house_stock_entry_items("BIRYANI-1", 1, "Company A", "Kitchen WH", "FG WH")
-		self.assertEqual(ctx.exception.reason_code, "INVALID_BOM_COMPONENT")
-
-
 class TestSubmitStockEntryIdempotency(FrappeTestCase):
+	"""`_submit_stock_entry` (the plain, non-Work-Order path) is still used
+	by `receive_batch` (Material Receipt, no BOM, unaffected by this
+	migration)."""
+
 	def test_replays_existing_stock_entry_for_same_idempotency_key(self):
 		with patch(f"{MODULE}._find_existing_stock_entry", return_value="SE-EXISTING"), patch(
 			f"{MODULE}.frappe.get_doc"
 		) as get_doc:
 			stock_entry, idempotent = _submit_stock_entry(
 				company="Company A",
-				stock_entry_type="Manufacture",
-				items=[{"item_code": "BIRYANI-1", "qty": 1, "t_warehouse": "FG WH", "is_finished_item": 1}],
+				stock_entry_type="Material Receipt",
+				items=[{"item_code": "BIRYANI-1", "qty": 1, "t_warehouse": "External WH"}],
 				config_name="UIPC-1",
 				idempotency_key="KEY-1",
 			)
@@ -199,6 +196,10 @@ class TestSubmitStockEntryIdempotency(FrappeTestCase):
 
 
 class TestStartBatch(FrappeTestCase):
+	"""IN_HOUSE path: a real Work Order is created+submitted, and the
+	Manufacture Stock Entry is generated via `work_order.make_stock_entry`
+	(never hand-built) -- Track-Item N3."""
+
 	def setUp(self):
 		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
 		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
@@ -209,17 +210,9 @@ class TestStartBatch(FrappeTestCase):
 			start_batch("UIPC-1", 0, actor="chef@example.com")
 		self.assertEqual(ctx.exception.reason_code, "INVALID_QTY")
 
-	def test_start_batch_posts_manufacture_entry_into_direct_retail_warehouse(self):
+	def test_start_batch_creates_submitted_work_order_and_linked_stock_entry(self):
 		row = _config_row()
-		vector = {
-			"bom": "BOM-BIRYANI-001",
-			"components": [{"component_item": "RICE", "qty": 4, "stock_uom": "Kg", "qty_per_unit": 2}],
-		}
 		captured = {}
-
-		def get_doc(arg):
-			captured["doc"] = arg
-			return _doc(arg)
 
 		def get_value(doctype, *args, **kwargs):
 			if doctype == "Branch":
@@ -228,24 +221,98 @@ class TestStartBatch(FrappeTestCase):
 				return "Kitchen WH"
 			raise AssertionError((doctype, args, kwargs))
 
+		# What `work_order.make_stock_entry` really returns: a plain dict
+		# (`stock_entry.as_dict()`), whose `items` is a list of plain dicts,
+		# never a bound Document.
+		generated_se_dict = {
+			"doctype": "Stock Entry",
+			"purpose": "Manufacture",
+			"items": [
+				{"item_code": "RICE", "qty": 4, "is_finished_item": 0, "s_warehouse": "Some WH", "t_warehouse": None},
+				{"item_code": "BIRYANI-1", "qty": 2, "is_finished_item": 1, "s_warehouse": None, "t_warehouse": "Some WH"},
+			],
+		}
+
+		def get_doc(arg):
+			if isinstance(arg, dict) and arg.get("doctype") == "Work Order":
+				captured["work_order_payload"] = arg
+				return _wo_doc("WO-1")
+			# The corrected code path wraps `make_stock_entry`'s raw dict with
+			# `frappe.get_doc(...)` before treating it as a Document.
+			captured["doc"] = arg
+			se_doc = _GeneratedStockEntryDoc(arg)
+			captured["se_doc"] = se_doc
+			return se_doc
+
 		with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql_lock(row)), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=get_value
 		), patch(f"{MODULE}._resolve_active_bom", return_value="BOM-BIRYANI-001"), patch(
-			f"{MODULE}.compile_bom_vector", return_value=vector
-		), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(
+			f"{MODULE}._wo_make_stock_entry", return_value=generated_se_dict
+		) as mock_make_se, patch(
 			f"{MODULE}._service_mutation"
 		) as mock_mutation:
 			mock_mutation.return_value.__enter__ = MagicMock()
 			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
 			result = start_batch("UIPC-1", 2, idempotency_key="KEY-1", actor="chef@example.com")
 
-		self.assertEqual(captured["doc"]["stock_entry_type"], "Manufacture")
-		finished_rows = [row for row in captured["doc"]["items"] if row["item_code"] == "BIRYANI-1"]
-		self.assertEqual(finished_rows[0]["t_warehouse"], "FG WH")
-		self.assertEqual(finished_rows[0]["is_finished_item"], 1)
+		# A real Work Order was created for the resolved BOM/item/qty and submitted.
+		wo_payload = captured["work_order_payload"]
+		self.assertEqual(wo_payload["production_item"], "BIRYANI-1")
+		self.assertEqual(wo_payload["bom_no"], "BOM-BIRYANI-001")
+		self.assertEqual(wo_payload["qty"], 2)
+		self.assertEqual(wo_payload["wip_warehouse"], "Kitchen WH")
+		self.assertEqual(wo_payload["fg_warehouse"], "FG WH")
+
+		# The Stock Entry was generated via work_order.make_stock_entry (which
+		# returns a raw dict), then wrapped via frappe.get_doc into a real
+		# Document -- it's THAT object, not the raw dict, whose rows get
+		# repointed and which gets inserted/submitted.
+		mock_make_se.assert_called_once_with("WO-1", purpose="Manufacture", qty=2)
+		se_doc = captured["se_doc"]
+		component_row, finished_row = se_doc.items
+		self.assertEqual(component_row.s_warehouse, "Kitchen WH")
+		self.assertIsNone(component_row.t_warehouse)
+		self.assertEqual(finished_row.t_warehouse, "FG WH")
+		self.assertIsNone(finished_row.s_warehouse)
+		se_doc.insert.assert_called_once()
+		se_doc.submit.assert_called_once()
+
+		self.assertEqual(result["work_order"], "WO-1")
 		self.assertEqual(result["source_warehouse"], "Kitchen WH")
 		self.assertEqual(result["target_warehouse"], "FG WH")
 		self.assertFalse(result["idempotent_replay"])
+		self.assertEqual(result["stock_entry"], "SE-1")
+
+	def test_start_batch_idempotent_replay_skips_work_order_creation(self):
+		row = _config_row()
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "Branch":
+				return "Company A"
+			if doctype == "URY Production Unit":
+				return "Kitchen WH"
+			raise AssertionError((doctype, args, kwargs))
+
+		def _sql_with_existing(query, values=None, as_dict=False, **kwargs):
+			if "tabURY Item Production Configuration" in query:
+				return [row]
+			if "tabStock Entry" in query:
+				return [{"name": "SE-EXISTING"}]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql_with_existing), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=get_value
+		), patch(f"{MODULE}._resolve_active_bom", return_value="BOM-BIRYANI-001"), patch(
+			f"{MODULE}.frappe.get_doc"
+		) as get_doc, patch(f"{MODULE}._wo_make_stock_entry") as mock_make_se:
+			result = start_batch("UIPC-1", 2, idempotency_key="KEY-1", actor="chef@example.com")
+
+		get_doc.assert_not_called()
+		mock_make_se.assert_not_called()
+		self.assertEqual(result["stock_entry"], "SE-EXISTING")
+		self.assertTrue(result["idempotent_replay"])
 
 	def test_start_batch_rejects_external_receipt_configuration(self):
 		row = _config_row(sourcing_mode="EXTERNAL_RECEIPT")

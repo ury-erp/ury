@@ -198,6 +198,19 @@ class BulkProduction(Document):
 				},
 			)
 
+			# Bulk Production is a pre-existing, shipped flow that hand-builds a
+			# "Manufacture" Stock Entry with no `work_order` (it predates and is
+			# independent of the Work-Order-based production path that
+			# ury_manufacture_enforcement.validate_manufacture_requires_work_order
+			# now requires for PRE_PRODUCED/IN_HOUSE finished items). Set an
+			# in-memory-only flag so that hook exempts this entry instead of
+			# throwing. This is intentionally NOT persisted (no new Stock Entry
+			# field/fixture): it is simpler and avoids a schema change, at the
+			# cost of not being queryable/auditable from the Stock Entry record
+			# itself after the fact -- Bulk Production's own `production_items`
+			# child table (which links back to this Stock Entry) remains the
+			# audit trail for "which Stock Entries came from Bulk Production".
+			stock_entry.flags.ignore_manufacture_enforcement = True
 			stock_entry.insert()
 			for item in stock_entry.items:
 				if item.basic_rate == 0.0:
