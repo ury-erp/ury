@@ -32,21 +32,21 @@
    },
    {
     "state": "Approved",
-    "doc_status": "0",
+    "doc_status": "1",
     "allow_edit": "URY Manager",
     "update_field": "status",
     "update_value": "Approved"
    },
    {
     "state": "Locked for Production",
-    "doc_status": "0",
+    "doc_status": "1",
     "allow_edit": "URY Manager",
     "update_field": "status",
     "update_value": "Locked for Production"
    },
    {
     "state": "Superseded/Cancelled",
-    "doc_status": "0",
+    "doc_status": "2",
     "allow_edit": "URY Manager",
     "update_field": "status",
     "update_value": "Superseded/Cancelled"
