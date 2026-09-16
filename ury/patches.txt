@@ -16,3 +16,4 @@ ury.patches.v3_18.add_batch_sourcing_mode_fields
 ury.patches.v3_19.add_pos_closing_entry_branch_field
 ury.patches.v3_20.migrate_stock_authority_flag_to_branch_policy
 ury.patches.v3_21.backfill_kot_item_execution_revision_key
+ury.patches.v3_22.backfill_sales_plan_docstatus

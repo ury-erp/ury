@@ -8,7 +8,12 @@ for any submittable/workflow-driven doctype.
 
 import frappe
 from frappe import _
-from frappe.model.workflow import apply_workflow, get_transitions, get_workflow_name
+from frappe.model.workflow import (
+    apply_workflow,
+    get_transitions,
+    get_workflow_name,
+    is_transition_condition_satisfied,
+)
 
 
 @frappe.whitelist(methods=["GET"])
@@ -70,8 +75,20 @@ def apply_workflow_action(doctype, name, action):
 
     allowed_transitions = get_transitions(doc, workflow=workflow, raise_exception=False)
     if not any(t.action == action for t in allowed_transitions):
-        action_exists = any(t.state == current_state and t.action == action for t in workflow.transitions)
-        if action_exists:
+        matching = [t for t in workflow.transitions if t.state == current_state and t.action == action]
+        if matching:
+            # get_transitions() filters on BOTH role membership and each
+            # transition's `condition` expression. So the action existing in
+            # the unfiltered definition while being absent from the filtered
+            # list does not necessarily mean the user lacks the role -- the
+            # condition may simply not hold for this doc. Re-check the
+            # condition first and report that case as a plain invalid
+            # transition rather than as a permission failure.
+            if not any(is_transition_condition_satisfied(t, doc) for t in matching):
+                frappe.throw(
+                    _("Invalid workflow action {0} from state {1}").format(action, current_state),
+                    frappe.ValidationError,
+                )
             frappe.throw(_("Not permitted to take this workflow action"), frappe.PermissionError)
         frappe.throw(_("Invalid workflow action {0} from state {1}").format(action, current_state), frappe.ValidationError)
 

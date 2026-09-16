@@ -1,3 +1,4 @@
+import json
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -145,3 +146,83 @@ class TestURYWorkflowGeneric(FrappeTestCase):
                 apply_workflow_action("URY Sales Plan", self.plan_name, "Propose")
         finally:
             frappe.set_user("Administrator")
+
+    def test_apply_workflow_action_walks_every_state_to_cancelled(self):
+        """The generic endpoint must be able to drive EVERY edge declared on
+        the workflow -- including the two that start from an already-submitted
+        doc, which Frappe routes to `update_after_submit` (Approved -> Locked
+        for Production, docstatus 1 -> 1) and to `cancel` (-> Superseded/
+        Cancelled, docstatus 1 -> 2). Neither of those runs the doctype's
+        validate(), and the first additionally rejects any field changed
+        without `allow_on_submit` -- `status` itself included.
+        """
+        walk = [
+            ("Propose", "Proposed", 0),
+            ("Submit for Approval", "Submitted for Approval", 0),
+            ("Approve", "Approved", 1),
+            ("Lock for Production", "Locked for Production", 1),
+            ("Supersede/Cancel", "Superseded/Cancelled", 2),
+        ]
+
+        frappe.set_user(TEST_MANAGER)
+        try:
+            previous_state = "Draft"
+            for hop, (action, next_state, docstatus) in enumerate(walk, start=1):
+                result = apply_workflow_action("URY Sales Plan", self.plan_name, action)
+                self.assertEqual(result["status"], next_state)
+                self.assertEqual(
+                    frappe.db.get_value("URY Sales Plan", self.plan_name, "docstatus"),
+                    docstatus,
+                    f"docstatus wrong after action {action}",
+                )
+
+                raw = frappe.db.get_value("URY Sales Plan", self.plan_name, "audit_log")
+                audit = json.loads(raw) if raw else []
+                self.assertEqual(
+                    len(audit), hop, f"audit_log did not grow on action {action}: {audit}"
+                )
+                self.assertEqual(audit[-1]["from_state"], previous_state)
+                self.assertEqual(audit[-1]["to_state"], next_state)
+                previous_state = next_state
+        finally:
+            frappe.set_user("Administrator")
+
+    def test_apply_workflow_action_reports_unknown_action_as_validation_error(self):
+        frappe.set_user(TEST_MANAGER)
+        try:
+            with self.assertRaises(frappe.ValidationError):
+                apply_workflow_action("URY Sales Plan", self.plan_name, "No Such Action")
+        finally:
+            frappe.set_user("Administrator")
+
+    def test_unsatisfied_condition_is_a_validation_error_not_a_permission_error(self):
+        """A transition the user HAS the role for but whose `condition`
+        doesn't hold must not be reported as a permission failure.
+
+        `get_transitions()` filters on role membership AND condition, so the
+        endpoint's "edge exists in the unfiltered definition" fallback cannot
+        conclude "not permitted" on its own. The shipped fixture declares no
+        conditions, so one is injected in-memory here.
+        """
+        from frappe.model.workflow import get_workflow_name
+
+        workflow = frappe.get_doc("Workflow", get_workflow_name("URY Sales Plan"))
+        for transition in workflow.transitions:
+            if transition.action == "Propose":
+                transition.condition = "doc.status == 'Nope'"
+        workflow.save(ignore_permissions=True)
+        frappe.clear_cache(doctype="URY Sales Plan")
+
+        frappe.set_user(TEST_MANAGER)
+        try:
+            with self.assertRaises(frappe.ValidationError) as ctx:
+                apply_workflow_action("URY Sales Plan", self.plan_name, "Propose")
+            self.assertNotIsInstance(ctx.exception, frappe.PermissionError)
+        finally:
+            frappe.set_user("Administrator")
+            workflow.reload()
+            for transition in workflow.transitions:
+                if transition.action == "Propose":
+                    transition.condition = None
+            workflow.save(ignore_permissions=True)
+            frappe.clear_cache(doctype="URY Sales Plan")

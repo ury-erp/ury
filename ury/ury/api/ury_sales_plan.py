@@ -5,7 +5,12 @@ import json
 
 import frappe
 from frappe import _
-from frappe.model.workflow import get_transitions, get_workflow_name, apply_workflow
+from frappe.model.workflow import (
+    apply_workflow,
+    get_transitions,
+    get_workflow_name,
+    is_transition_condition_satisfied,
+)
 
 from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_production_validation import validate_item_production_configuration
@@ -45,12 +50,51 @@ def transition_sales_plan(doc, target_state, actor=None):
         # PermissionError instead of a generic ValidationError so callers can
         # distinguish "no such transition" from "not allowed to do this".
         all_transitions = frappe.get_doc("Workflow", workflow_name).transitions
-        edge_exists = any(t.state == current and t.next_state == target_state for t in all_transitions)
-        if edge_exists:
+        matching = [t for t in all_transitions if t.state == current and t.next_state == target_state]
+        if matching:
+            # get_transitions() filters on BOTH role membership and the
+            # transition's `condition` expression, so "edge exists in the
+            # unfiltered definition but not in the filtered list" is not by
+            # itself a permission problem. Re-evaluate the condition before
+            # blaming the user's roles -- an unsatisfied condition means the
+            # transition is simply not legal for this doc right now, which
+            # is a ValidationError, not a PermissionError.
+            if not any(is_transition_condition_satisfied(t, doc) for t in matching):
+                frappe.throw(
+                    _("Invalid Sales Plan transition from {0} to {1}").format(current, target_state),
+                    frappe.ValidationError,
+                )
             frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
         frappe.throw(_("Invalid Sales Plan transition from {0} to {1}").format(current, target_state), frappe.ValidationError)
 
     return apply_workflow(doc, transition.action)
+
+
+#: The path a plan walks from its initial Workflow state up to "Approved".
+#: Mirrors the transitions declared in ``ury/fixtures/workflow.json``.
+APPROVAL_PATH = ("Proposed", "Submitted for Approval", "Approved")
+
+
+def advance_plan_to_approved(doc):
+    """Walk a freshly-inserted Draft plan up to "Approved" via the Workflow.
+
+    Exists so dev_seed scripts stop assigning ``doc.status = "Approved"``
+    directly. A direct assignment bypasses Frappe's Workflow engine *and*
+    its docstatus machinery entirely, producing a row whose ``status`` says
+    "Approved" while its ``docstatus`` column is still 0 -- the exact
+    status/docstatus mismatch that
+    ``ury.patches.v3_22.backfill_sales_plan_docstatus`` has to repair for
+    historical data. Routing through ``apply_workflow()`` instead means the
+    Approved row is submitted (docstatus 1) by construction, and
+    ``freeze_approval_snapshot``/``append_audit`` run exactly as they do for
+    a plan a human approved.
+
+    The doc must already be inserted and sitting in the Workflow's initial
+    state. Returns the (reloaded) doc.
+    """
+    for target_state in APPROVAL_PATH:
+        doc = transition_sales_plan(doc, target_state)
+    return doc
 
 
 def _validate_plan_scope(doc):
@@ -266,12 +310,25 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
     existing_name = existing_rows[0] if existing_rows else None
 
     if existing_name:
-        existing_status = frappe.db.get_value("URY Sales Plan", existing_name, "status")
-        if existing_status not in ("Draft", "Proposed"):
+        existing_status, existing_docstatus = frappe.db.get_value(
+            "URY Sales Plan", existing_name, ["status", "docstatus"]
+        )
+        # Gate on the REAL `docstatus` column rather than on a hard-coded
+        # allow-list of status names. `URY Sales Plan` is submittable, so
+        # docstatus 0 is exactly "Frappe will still let this be re-saved
+        # through the ordinary `_action == "save"` path"; anything else is
+        # a submitted (1) or cancelled (2) doc, where `doc.save()` would
+        # instead route to `update_after_submit` (or refuse outright) and
+        # blow up with an opaque internal `UpdateAfterSubmitError`.
+        # Deriving the gate from the column keeps this correct if the
+        # workflow's status -> doc_status mapping in
+        # ury/fixtures/workflow.json ever changes.
+        if existing_docstatus != 0:
             frappe.throw(
                 _(
-                    "Sales Plan {0} for this branch, company and date is already {1} and can no longer be saved as a draft"
-                ).format(existing_name, existing_status),
+                    "Sales Plan {0} for this branch, company and date is already {1} "
+                    "(docstatus {2}) and can no longer be saved as a draft"
+                ).format(existing_name, existing_status, existing_docstatus),
                 frappe.ValidationError,
             )
         doc = frappe.get_doc("URY Sales Plan", existing_name)
