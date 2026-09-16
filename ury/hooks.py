@@ -433,6 +433,7 @@ fixtures = [
                     "POS Invoice-custom_merged_tables",
                     "Production Plan Item-custom_ury_department",
                     "URY KOT Items-custom_ury_work_order",
+                    "URY Sales Plan-custom_ury_production_plan",
                     "POS Invoice-custom_restaurant_room",
                     "POS Invoice-column_break_gd1mq",
                     "POS Invoice-arrived_time",
