@@ -51,7 +51,7 @@
    "fieldtype": "Link",
    "label": "Department Manager",
    "options": "User",
-   "description": "Scopes report/analytics access at the department level (who can view department-level reports). This is distinct from 'Lead Chef' on URY Production Unit, which scopes KOT (kitchen order ticket) visibility at the individual production-unit level. These are two intentionally separate fields, not duplicates, so don't try to merge them."
+   "description": "Informational: the person responsible for this department. Not currently enforced as an access or report-scoping control by any code. Distinct from 'Lead Chef' on URY Production Unit, which does actively scope KOT visibility to the unit's chef."
   },
   {
    "fieldname": "department_warehouse",

@@ -105,7 +105,7 @@
    "reqd": 1
   },
   {
-   "description": "Scopes KOT (kitchen order ticket) visibility at the individual production-unit level (which chef sees which unit's tickets), as distinct from \"Department Manager\" on URY Production Department which scopes report/analytics access at the department level — these are two intentionally separate fields by design, not duplicates, so don't merge them.",
+   "description": "Actively scopes KOT (kitchen order ticket) visibility to this unit's chef. Distinct from 'Department Manager' on URY Production Department, which is informational only and not currently enforced by any access logic.",
    "fieldname": "lead_chef",
    "fieldtype": "Link",
    "label": "Lead Chef",
