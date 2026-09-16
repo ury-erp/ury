@@ -15,6 +15,9 @@ from ury.ury.api.ury_sales_plan import (
 	validate_no_overlapping_plan_scope,
 	validate_plan_items,
 )
+from ury.ury.api.ury_sales_plan_auto_production_plan import (
+	maybe_create_production_plan_on_approval,
+)
 
 
 class URYSalesPlan(Document):
@@ -58,6 +61,16 @@ class URYSalesPlan(Document):
 				validate_plan_items(self)
 				validate_no_overlapping_plan_scope(self)
 				freeze_approval_snapshot(self)
+				# Track-Item N7: never let a bug here block the plan's own
+				# approval save -- belt and suspenders on top of the
+				# module-level try/except inside the function itself.
+				try:
+					maybe_create_production_plan_on_approval(self)
+				except Exception:
+					frappe.log_error(
+						title="URY Sales Plan auto Production Plan call failed",
+						message=frappe.get_traceback(),
+					)
 			self._record_transition(prev_status)
 
 	# ------------------------------------------------------------------

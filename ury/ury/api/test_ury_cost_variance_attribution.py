@@ -12,13 +12,13 @@ import unittest
 from unittest.mock import patch
 
 import frappe
+from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_cost_variance_attribution import (
     compute_posted_cost,
     compute_theoretical_cost,
     compute_variance,
 )
-
 
 MOD = "ury.ury.api.ury_cost_variance_attribution"
 BOM_MOD = "ury.ury.api.ury_bom_compiler"
@@ -230,6 +230,51 @@ class TestComputeVariance(unittest.TestCase):
 
         mock_get_doc.assert_not_called()
         self.assertNotIn("snapshot", result)
+
+
+class TestComputeVarianceRealPermissionBoundary(FrappeTestCase):
+    """Real, un-mocked negative-permission coverage for compute_variance.
+
+    None of this file's other tests mock or otherwise exercise
+    `require_manager()` (it is called for real, but only ever under the
+    default Administrator test-runner session, which passes trivially) --
+    confirmed by reading `ury.ury.report_api.utils.require_manager`
+    directly: it raises `frappe.PermissionError` for any user other than
+    Administrator or one holding "URY Manager"/"System Manager". This test
+    is the first in the file to actually flip the session user and assert
+    the rejection.
+    """
+
+    NEGATIVE_USER = "test_cost_variance_negative@example.com"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not frappe.db.exists("User", cls.NEGATIVE_USER):
+            frappe.get_doc(
+                {
+                    "doctype": "User",
+                    "email": cls.NEGATIVE_USER,
+                    "first_name": "Cost Variance Negative",
+                    "send_welcome_email": 0,
+                    "roles": [],
+                }
+            ).insert(ignore_permissions=True)
+
+    def setUp(self):
+        frappe.set_user("Administrator")
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+
+    def test_roleless_user_is_rejected_before_any_cost_computation_runs(self):
+        frappe.set_user(self.NEGATIVE_USER)
+        with self.assertRaises(frappe.PermissionError):
+            compute_variance(
+                item_code="_Test Item Not Reached",
+                qty=1,
+                company="_Test Company Not Reached",
+            )
 
 
 if __name__ == "__main__":

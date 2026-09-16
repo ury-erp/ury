@@ -2,6 +2,9 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch
 
+import frappe
+from frappe.tests.utils import FrappeTestCase
+
 from ury.ury.api.ury_branch_operational_state import resolve_branch_operational_state
 
 
@@ -84,3 +87,99 @@ class TestBranchOperationalState(unittest.TestCase):
 		result = resolve_branch_operational_state(at=datetime(2026, 9, 7, 1, 0))
 		self.assertFalse(result["is_open"])
 		self.assertEqual(result["active_services"], [])
+
+
+class TestBranchOperationalStateRealPermissionBoundary(FrappeTestCase):
+	"""Real (non-mocked) coverage of the branch-scope PermissionError guard in
+	`resolve_branch_operational_state()` -- the existing test class above patches
+	`frappe` entirely, which means the actual `getBranch()`/role-check control flow
+	(the security-relevant part of this module) has never been exercised end to end
+	against a real session/DB, only the pure date/time windowing logic has.
+
+	Uses `frappe.set_user()` with real fixtures (Branch + URY User child-row
+	assignment, per `getBranch()`'s own SQL join in `ury/ury_pos/api.py`) so these
+	tests fail if the guard is ever accidentally unwired -- the same class of gap
+	already found and fixed this session in `ury_kot_execution_service.py`.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from ury.ury.tests.factories import make_branch
+
+		cls.branch_a = make_branch(branch="P4R3 Branch A")
+		cls.branch_b = make_branch(branch="P4R3 Branch B")
+
+		cls.user_a = cls._make_branch_user("p4r3-branch-a-user@ury.test", cls.branch_a.name)
+		cls.user_no_branch = cls._make_branch_user("p4r3-no-branch-user@ury.test", None)
+
+		# getBranch() (ury/ury_pos/api.py) unconditionally requires a
+		# 'URY User' branch-assignment row for ANY caller, including a
+		# System Manager -- there is no role-based bypass of that lookup
+		# itself, only of the cross-branch REQUEST check further down in
+		# resolve_branch_operational_state(). So the System Manager test
+		# user must also be assigned to a (home) branch, distinct from the
+		# one it will cross into.
+		cls.sys_manager = cls._make_branch_user("p4r3-sysmgr@ury.test", cls.branch_a.name)
+		frappe.get_doc("User", cls.sys_manager).add_roles("System Manager")
+
+	@staticmethod
+	def _make_branch_user(email, branch_name):
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		user = frappe.get_doc({
+			"doctype": "User",
+			"email": email,
+			"first_name": "P4R3Branch",
+			"send_welcome_email": 0,
+			"enabled": 1,
+		}).insert(ignore_permissions=True)
+		if branch_name:
+			# Mirrors `getBranch()`'s join: a `URY User` child row on the
+			# `Branch.user` table field whose `user` column is this user's name.
+			branch = frappe.get_doc("Branch", branch_name)
+			branch.append("user", {"user": email})
+			branch.save(ignore_permissions=True)
+		return email
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_no_branch_assignment_fails_closed(self):
+		# getBranch() itself (ury/ury_pos/api.py) throws its own generic
+		# frappe.throw() -- which defaults to ValidationError, not
+		# PermissionError -- before resolve_branch_operational_state()'s own
+		# branch-scope PermissionError check is ever reached. Confirmed by
+		# running this test against a real bench: asserting PermissionError
+		# here fails with an uncaught ValidationError. This is still a
+		# fail-closed outcome (no operational-state data is ever returned to
+		# an unassigned user), just via a different, real exception type --
+		# documented here rather than assumed.
+		frappe.set_user(self.user_no_branch)
+		with self.assertRaises(frappe.ValidationError):
+			resolve_branch_operational_state()
+
+	def test_cross_branch_request_rejected_for_non_privileged_user(self):
+		frappe.set_user(self.user_a)
+		with self.assertRaises(frappe.PermissionError):
+			resolve_branch_operational_state(branch=self.branch_b.name)
+
+	def test_own_branch_request_does_not_raise_permission_error(self):
+		frappe.set_user(self.user_a)
+		# No operating schedule fixture exists for this branch, so the module
+		# fails open to a "NOT_CONFIGURED" snapshot rather than raising --
+		# the assertion here is specifically that no PermissionError is
+		# raised for a user requesting their OWN branch.
+		result = resolve_branch_operational_state(branch=self.branch_a.name)
+		self.assertEqual(result["branch"], self.branch_a.name)
+		self.assertEqual(result["primary_phase"], "NOT_CONFIGURED")
+
+	def test_implicit_own_branch_default_does_not_raise(self):
+		frappe.set_user(self.user_a)
+		result = resolve_branch_operational_state()
+		self.assertEqual(result["branch"], self.branch_a.name)
+
+	def test_system_manager_may_cross_tenant_boundary(self):
+		frappe.set_user(self.sys_manager)
+		result = resolve_branch_operational_state(branch=self.branch_b.name)
+		self.assertEqual(result["branch"], self.branch_b.name)

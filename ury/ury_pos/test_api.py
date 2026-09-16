@@ -287,6 +287,7 @@ class TestURYPosAPI(FrappeTestCase):
 import frappe
 import unittest
 from ury.ury_pos.api import create_customer
+from ury.ury.tests.factories import make_user
 
 class TestUryPosApi(unittest.TestCase):
     def setUp(self):
@@ -305,14 +306,11 @@ class TestUryPosApi(unittest.TestCase):
 
         # Create a test user with Customer creation rights
         if not frappe.db.exists("User", "test_authorized_user@example.com"):
-            user = frappe.get_doc({
-                "doctype": "User",
-                "email": "test_authorized_user@example.com",
-                "first_name": "Test Authorized",
-                "send_welcome_email": 0
-            })
-            user.insert(ignore_permissions=True)
-            user.add_roles("System Manager")
+            make_user(
+                email="test_authorized_user@example.com",
+                roles=["System Manager"],
+                first_name="Test Authorized",
+            )
 
     def tearDown(self):
         frappe.set_user("Administrator")

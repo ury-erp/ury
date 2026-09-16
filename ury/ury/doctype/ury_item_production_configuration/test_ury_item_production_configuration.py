@@ -465,9 +465,24 @@ class TestURYItemProductionConfiguration(FrappeTestCase):
                 item = name.get("item")
                 branch = name.get("branch")
                 active = name.get("active")
-                # Component A is in Dept-001, but we're checking from Dept-002
-                if item == "Component A" and branch == "Branch Co" and active == 1:
+                # Component A is in Dept-001, but we're checking from Dept-002.
+                # self.branch defaults to "Test Branch" (see _make_doc) -- this
+                # test never overrides it, and "Branch Co" is this suite's
+                # stand-in for the *company* value (see the "Branch": "Branch Co"
+                # doctype-level fallback below), not a branch name, so the
+                # filter's branch here is "Test Branch", not "Branch Co".
+                if item == "Component A" and branch == "Test Branch" and active == 1:
                     return ("Dept-001",)
+
+            # _resolve_active_bom() looks up "BOM" by a filters dict
+            # ({"item": ..., "is_active": 1, "docstatus": 1, ...}), not by
+            # the literal BOM name -- the values dict's ("BOM", "BOM-MTO-002")
+            # key (used elsewhere in this file) only matches a plain string
+            # lookup, so this filter-dict shape needs its own handler or
+            # _resolve_active_bom silently returns None and the validation
+            # this test targets never runs.
+            if isinstance(name, dict) and doctype == "BOM" and name.get("item") == "MTO Item Cross":
+                return "BOM-MTO-002"
 
             if isinstance(name, Hashable):
                 key = (doctype, name) if isinstance(name, str) else name

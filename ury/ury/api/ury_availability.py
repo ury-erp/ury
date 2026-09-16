@@ -350,18 +350,20 @@ def get_item_availability(item_code, branch, company, department=None):
 		response["reason_code"] = "CONFIGURATION_ERROR"
 		return response
 
-	# TODO(availability_mode semantics): The `availability_mode` field has three
-	# documented options ("Plan Available" (default/safe), "Stock Available",
-	# "Always Available") but its full intended semantics are not documented in
-	# the codebase. "Always Available" is implemented as an override of
-	# *commercial* not-sellable reasons only (stock/plan-derived: out of stock,
-	# no/exhausted plan, blocking recipe component) — it must NEVER override a
-	# structural/config error (missing BOM, missing/disabled department or
-	# production unit, generic configuration error), since those indicate the
-	# item is not actually safe to sell/produce at all, regardless of plan or
-	# stock. "Stock Available" is not yet implemented. This TODO should be
-	# resolved once availability_mode's intended semantics are fully documented
-	# in a follow-up task (likely V3-13/V3-15 or a later task).
+	# `availability_mode` has two options: "Plan Available" (default/safe, no
+	# override) and "Always Available". "Always Available" overrides
+	# *commercial* not-sellable reasons only (stock/plan-derived: out of
+	# stock, no/exhausted plan, blocking recipe component) — it must NEVER
+	# override a structural/config error (missing BOM, missing/disabled
+	# department or production unit, generic configuration error), since
+	# those indicate the item is not actually safe to sell/produce at all,
+	# regardless of plan or stock.
+	#
+	# There is no "Stock Available" mode: selling on stock/recipe-capacity
+	# alone while ignoring the Sales Plan is already covered by turning off
+	# `controlled_by_sales_plan` (see `_fill_pre_produced`/`_fill_made_to_order`
+	# below). A separate "Stock Available" availability_mode was considered
+	# and dropped as functionally identical to that flag.
 	_STRUCTURAL_ERROR_CODES = {
 		"MISSING_BOM",
 		"CONFIGURATION_ERROR",
