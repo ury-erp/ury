@@ -26,11 +26,14 @@ import {
   isMergedBill,
   resolvePrintFormat,
   mapSplitGroupInvoiceToPOSInvoice,
-  getPOSInvoiceItemCodes,
   type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
-import { reduceOrderItemQty, isOrderTypeNotAllowedError } from '../lib/order-api';
+import {
+  reduceOrderItemQty,
+  isOrderTypeNotAllowedError,
+  isLastItemCannotBeRemovedError,
+} from '../lib/order-api';
 import { parseFrappeError } from '../lib/pos-opening-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
@@ -271,14 +274,12 @@ export default function Orders() {
     if (!selectedOrder) return;
     setReducingItemKey(item.name);
     try {
-      const itemCodeMap = await getPOSInvoiceItemCodes(selectedOrder.name);
-      const itemCode = itemCodeMap[item.name];
-      if (!itemCode) {
-        showToast.error('Unable to resolve this item for quantity reduction.');
-        return;
-      }
+      // `item.name` is the real POS Invoice Item child-table row name (see
+      // `getPOSInvoiceItems`/`POSInvoiceItem` in invoice-api.ts) — the
+      // authoritative selector `reduce_order_item_qty` matches on, not a
+      // locally-derived key.
       const newQty = item.qty - 1;
-      const result = await reduceOrderItemQty(selectedOrder.name, itemCode, newQty);
+      const result = await reduceOrderItemQty(selectedOrder.name, item.name, newQty);
       const kotNames = result.cancel_kot_names?.length ? result.cancel_kot_names.join(', ') : null;
       showToast.success(
         newQty === 0
@@ -290,6 +291,8 @@ export default function Orders() {
       const parsedMessage = parseFrappeError(err) || (err instanceof Error ? err.message : null);
       if (isOrderTypeNotAllowedError(parsedMessage)) {
         showToast.error(`Quantity reduction isn't allowed for ${selectedOrder.order_type} orders.`);
+      } else if (isLastItemCannotBeRemovedError(parsedMessage)) {
+        showToast.error('This is the last item on the order. Cancel the whole order instead.');
       } else {
         showToast.error(parsedMessage || 'Failed to reduce item quantity.');
       }

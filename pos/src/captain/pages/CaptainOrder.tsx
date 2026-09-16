@@ -13,6 +13,7 @@ import {
   tableTransfer,
   reduceOrderItemQty,
   isOrderTypeNotAllowedError,
+  isLastItemCannotBeRemovedError,
 } from '../../lib/order-api';
 import { parseFrappeError } from '../../lib/pos-opening-api';
 import { printOrder } from '../../lib/print';
@@ -306,10 +307,20 @@ export default function CaptainOrder() {
   // surfaced distinctly rather than as a generic failure toast.
   const handleReduceConfirmedNow = async (line: OrderDeltaLine) => {
     if (isInteractionDisabled || !invoiceId) return;
+    if (!line.invoiceItemName) {
+      showToast.error('Unable to resolve this item for quantity reduction.');
+      return;
+    }
     setReducingLineId(line.uniqueId);
     try {
-      const newQty = line.confirmedQty - 1;
-      const result = await reduceOrderItemQty(invoiceId, line.id, newQty);
+      // `reduce_order_item_qty` treats `new_qty` as an ABSOLUTE target against
+      // the server/DB qty for this row, so the baseline must come from
+      // `line.baseQty` (the server-confirmed quantity) — NOT `line.confirmedQty`,
+      // which is `min(baseQty, curQty)` and reflects the locally-staged working
+      // cart. Using `confirmedQty` here would send the wrong absolute qty
+      // whenever the working cart has already diverged from the server value.
+      const newQty = line.baseQty - 1;
+      const result = await reduceOrderItemQty(invoiceId, line.invoiceItemName, newQty);
       const kotNames = result.cancel_kot_names?.length ? result.cancel_kot_names.join(', ') : null;
       showToast.success(
         newQty <= 0
@@ -321,6 +332,8 @@ export default function CaptainOrder() {
       const parsedMessage = parseFrappeError(error) || (error instanceof Error ? error.message : null);
       if (isOrderTypeNotAllowedError(parsedMessage)) {
         showToast.error(`Quantity reduction isn't allowed for ${orderType} orders.`);
+      } else if (isLastItemCannotBeRemovedError(parsedMessage)) {
+        showToast.error('This is the last item on the order. Cancel the whole order instead.');
       } else {
         showToast.error(parsedMessage || 'Failed to reduce item quantity.');
       }
