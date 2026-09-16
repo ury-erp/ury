@@ -54,6 +54,9 @@ frappe.ui.form.on("Production Plan", {
 									row.bom_no = item.bom_no;
 									row.planned_qty = item.planned_qty;
 									row.stock_uom = item.stock_uom;
+									row.planned_start_date = item.planned_start_date;
+									row.warehouse = item.warehouse;
+									row.custom_ury_department = item.custom_ury_department;
 								});
 								frm.refresh_field("po_items");
 								frappe.show_alert({
