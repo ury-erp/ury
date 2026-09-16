@@ -187,6 +187,35 @@
                     >
                       {{ kotitem.comments }}
                     </p>
+                    <!-- Cancellation disposition: return-to-stock vs waste -->
+                    <div
+                      v-if="kotitem.disposition_required && !kotitem.disposition"
+                      class="ml-2 mt-1 flex gap-2"
+                      @click.stop
+                    >
+                      <span class="text-sm font-medium" style="color: var(--t2)">Disposition:</span>
+                      <button
+                        @click="resolveDisposition(kot, kotitem, 'return_to_stock')"
+                        class="px-2 py-1 rounded text-xs font-semibold"
+                        style="background: var(--gr); color: #fff"
+                      >
+                        Return to Stock
+                      </button>
+                      <button
+                        @click="resolveDisposition(kot, kotitem, 'waste')"
+                        class="px-2 py-1 rounded text-xs font-semibold"
+                        style="background: var(--rd); color: #fff"
+                      >
+                        Mark as Wasted
+                      </button>
+                    </div>
+                    <div
+                      v-else-if="kotitem.disposition"
+                      class="ml-2 mt-1 text-sm font-medium"
+                      style="color: var(--t2)"
+                    >
+                      ( Disposition: {{ kotitem.disposition === 'return_to_stock' ? 'Returned to Stock' : 'Wasted' }} )
+                    </div>
                     <hr class="my-1 mt-2" style="border-color: var(--hair)" />
                   </div>
                 </div>
@@ -465,9 +494,35 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          // Race condition: the KOT was cancelled between load and this
+          // click. The backend rejects the serve; remove the now-stale
+          // card instead of leaving an orphaned "Serve"-able order.
+          alert(error?.message || "This KOT has been cancelled and cannot be served.");
+          kot.showDiv = true;
+          this.removeAllItemsFromLocalStorage(kot);
+          this.masonryLoading();
+        });
     },
 
+    resolveDisposition(kot, kotitem, disposition) {
+      this.call
+        .post("ury.api.ury_kot_cancellation_service.resolve_cancellation_disposition", {
+          kot: kot.name,
+          item_row_name: kotitem.name,
+          disposition: disposition,
+          qty: kotitem.cancelled_qty,
+        })
+        .then((result) => {
+          kotitem.disposition = disposition;
+          this.masonryLoading();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert(error?.message || "Failed to resolve item disposition.");
+        });
+    },
     async orderDelayNotify(kot) {
       const now = new Date();
       this.currentTime = now.toLocaleTimeString();
