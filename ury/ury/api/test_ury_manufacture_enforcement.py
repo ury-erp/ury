@@ -9,8 +9,8 @@ from ury.ury.api.ury_manufacture_enforcement import validate_manufacture_require
 MODULE = "ury.ury.api.ury_manufacture_enforcement"
 
 
-def _stock_entry(*, purpose="Manufacture", work_order=None, items=None):
-	return frappe._dict(
+def _stock_entry(*, purpose="Manufacture", work_order=None, items=None, flags=None):
+	doc = frappe._dict(
 		{
 			"purpose": purpose,
 			"stock_entry_type": purpose,
@@ -18,6 +18,8 @@ def _stock_entry(*, purpose="Manufacture", work_order=None, items=None):
 			"items": items or [],
 		}
 	)
+	doc.flags = frappe._dict(flags or {})
+	return doc
 
 
 class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
@@ -82,6 +84,20 @@ class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
 	def test_ignores_non_finished_item_rows(self):
 		doc = _stock_entry(items=[{"item_code": "RICE", "qty": 4, "is_finished_item": 0}])
 		with patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+			validate_manufacture_requires_work_order(doc)  # does not raise
+		mock_exists.assert_not_called()
+
+	def test_allows_bulk_production_originated_entry_without_work_order(self):
+		# Bulk Production (ury/ury/doctype/bulk_production/bulk_production.py's
+		# create_stock_entry()) hand-builds a PRE_PRODUCED/IN_HOUSE-eligible
+		# Manufacture Stock Entry with no work_order, but sets
+		# flags.ignore_manufacture_enforcement=True before insert(). That flag
+		# must exempt it here even though the item is PRE_PRODUCED/IN_HOUSE.
+		doc = _stock_entry(
+			items=[{"item_code": "BIRYANI-1", "qty": 2, "is_finished_item": 1}],
+			flags={"ignore_manufacture_enforcement": True},
+		)
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True) as mock_exists:
 			validate_manufacture_requires_work_order(doc)  # does not raise
 		mock_exists.assert_not_called()
 
