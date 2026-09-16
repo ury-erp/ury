@@ -59,6 +59,7 @@ INVALID_QTY = "INVALID_QTY"
 ORDER_TYPE_NOT_ALLOWED = "ORDER_TYPE_NOT_ALLOWED"
 KOT_NAMING_SERIES_MISSING = "KOT_NAMING_SERIES_MISSING"
 NOT_PERMITTED = "NOT_PERMITTED"
+LAST_ITEM_CANNOT_BE_REMOVED = "LAST_ITEM_CANNOT_BE_REMOVED"
 
 
 class QtyReductionError(frappe.ValidationError):
@@ -77,7 +78,7 @@ def _allowed_order_types(pos_profile_doc):
 
 
 @frappe.whitelist()
-def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=None):
+def reduce_order_item_qty(invoice_id, item_row_name, new_qty, item_code=None, reason=None):
 	"""Reduce (or fully remove, `new_qty=0`) one item's qty on a printed POS
 	Invoice, for an Order Type the POS Profile has explicitly allowed, and
 	generate the matching partial cancel-KOT for the delta.
@@ -85,23 +86,41 @@ def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=Non
 	Works identically for a cashier (Register) or captain (order UI) caller
 	-- there is no separate backend path per caller type.
 
+	The item to modify is selected by `item_row_name` -- the actual POS
+	Invoice Item child-table row `name` -- NOT by `item_code`. Matching by
+	item_code alone was ambiguous whenever the same item appeared as more
+	than one row (e.g. added in two separate rounds, or with different
+	comments): it matched the FIRST row with that item_code and, for
+	`new_qty=0`, removed EVERY row sharing that item_code rather than just
+	the one row the caller meant. `item_code`, if given, is only used as a
+	secondary sanity check against the resolved row.
+
 	Steps (see module docstring for the full rationale of each):
 	  1. Load the POS Invoice and resolve its Order Type.
 	  2. Check that Order Type against the POS Profile's configurable
 	     allow-list; raise `ORDER_TYPE_NOT_ALLOWED` (specific, not the
 	     generic post-print block) if not allowed.
-	  3. Validate `new_qty` is a real reduction: `0 <= new_qty < current_qty`.
-	  4. Set `frappe.flags.ury_qty_reduction` around the save so
+	  3. Resolve the exact item row by `item_row_name`.
+	  4. Validate `new_qty` is a real, integer reduction:
+	     `0 <= new_qty < current_qty`.
+	  5. Reject a `new_qty=0` that would leave the invoice with zero items --
+	     the whole invoice must be cancelled instead.
+	  6. Set `frappe.flags.ury_qty_reduction` around the save so
 	     `validate_invoice`'s guard does not fire for this legitimate write.
-	  5. Update the invoice item's qty (0 = full removal of that item row).
-	  6. Reuse `process_items_for_cancel_kot` (which itself reuses
+	  7. Update the invoice item's qty (0 = full removal of that item row).
+	  8. Reuse `process_items_for_cancel_kot` (which itself reuses
 	     `create_cancel_kot_doc`) to create a partial cancel-KOT for exactly
 	     the reduced delta.
+
+	The permission check and the `actor` recorded on the result are always
+	`frappe.session.user` -- never a caller-supplied value. An `actor`
+	argument accepted from the client would be forgeable and must never be
+	used as the authority for a permission decision or an audit trail.
 
 	Returns a dict with the created cancel-KOT name(s) and the updated
 	invoice state.
 	"""
-	actor = actor or frappe.session.user
+	actor = frappe.session.user
 
 	if not invoice_id or not frappe.db.exists("POS Invoice", invoice_id):
 		raise QtyReductionError(INVOICE_NOT_FOUND, _("POS Invoice {0} not found").format(invoice_id))
@@ -132,14 +151,24 @@ def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=Non
 
 	item_row = None
 	for row in pos_invoice.items:
-		if row.item_code == item_code:
+		if row.name == item_row_name:
 			item_row = row
 			break
 	if item_row is None:
 		raise QtyReductionError(
-			ITEM_NOT_FOUND, _("Item {0} not found on invoice {1}").format(item_code, invoice_id)
+			ITEM_NOT_FOUND,
+			_("Item row {0} not found on invoice {1}").format(item_row_name, invoice_id),
 		)
 
+	if item_code and item_row.item_code != item_code:
+		raise QtyReductionError(
+			ITEM_NOT_FOUND,
+			_(
+				"Item row {0} on invoice {1} is item {2}, not the expected {3}"
+			).format(item_row_name, invoice_id, item_row.item_code, item_code),
+		)
+
+	item_code = item_row.item_code
 	current_qty = item_row.qty
 
 	try:
@@ -156,6 +185,23 @@ def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=Non
 		)
 
 	delta = new_qty - current_qty  # negative
+
+	if not float(new_qty).is_integer() or not float(delta).is_integer():
+		raise QtyReductionError(
+			INVALID_QTY,
+			_(
+				"new_qty ({0}) must be a whole number: fractional quantity reductions are not supported"
+			).format(new_qty),
+		)
+
+	if new_qty == 0 and len(pos_invoice.items) <= 1:
+		raise QtyReductionError(
+			LAST_ITEM_CANNOT_BE_REMOVED,
+			_(
+				"Item {0} is the only item on invoice {1}. Cancel the whole invoice instead of "
+				"removing its last item."
+			).format(item_code, invoice_id),
+		)
 
 	pos_profile_id = pos_invoice.pos_profile
 	kot_naming_series = pos_profile.custom_kot_naming_series
@@ -189,7 +235,7 @@ def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=Non
 	frappe.flags.ury_qty_reduction = True
 	try:
 		if new_qty == 0:
-			pos_invoice.items = [row for row in pos_invoice.items if row.item_code != item_code]
+			pos_invoice.items = [row for row in pos_invoice.items if row.name != item_row_name]
 		else:
 			item_row.qty = new_qty
 		pos_invoice.save(ignore_permissions=False)
@@ -217,6 +263,7 @@ def reduce_order_item_qty(invoice_id, item_code, new_qty, actor=None, reason=Non
 
 	return {
 		"invoice": invoice_id,
+		"item_row_name": item_row_name,
 		"item_code": item_code,
 		"previous_qty": current_qty,
 		"new_qty": new_qty,

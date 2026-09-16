@@ -23,6 +23,7 @@ from ury.ury.api.ury_pos_invoice_qty_reduction import (
 	ORDER_TYPE_NOT_ALLOWED,
 	KOT_NAMING_SERIES_MISSING,
 	NOT_PERMITTED,
+	LAST_ITEM_CANNOT_BE_REMOVED,
 )
 
 
@@ -42,6 +43,7 @@ def _pos_invoice_doc(
 	if items is None:
 		items = [
 			{
+				"name": "ROW-001",
 				"item_code": "ITEM-001",
 				"qty": 2,
 				"item_name": "Biryani",
@@ -113,7 +115,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		"""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In,Take Away")
 		get_kot_side_effect, created_kots = _kot_doc_recorder()
@@ -131,7 +133,10 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all") as mock_get_all, \
 		     patch(f"{MODULE}.frappe.db.get_value") as mock_get_value, \
-		     patch(f"{MODULE}.frappe.get_roles", return_value=["URY Cashier"]):
+		     patch(f"{MODULE}.frappe.get_roles", return_value=["URY Cashier"]), \
+		     patch(f"{MODULE}.frappe.session") as mock_session:
+
+			mock_session.user = "cashier@example.com"
 
 			# Mock existence checks
 			mock_exists.side_effect = lambda doctype, name=None: True if doctype == "POS Invoice" else False
@@ -146,9 +151,8 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 			result = reduce_order_item_qty(
 				invoice_id="INV-001",
-				item_code="ITEM-001",
+				item_row_name="ROW-001",
 				new_qty=1,
-				actor="cashier@example.com",
 				reason="Guest requested reduction",
 			)
 
@@ -162,8 +166,17 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		self.assertEqual(cancel_kot["type"], "Partially cancelled")
 		self.assertEqual(cancel_kot["invoice"], "INV-001")
 
+		# Verify the cancel-KOT's kot_items row records the correct cancelled_qty
+		# (the delta, not the full original qty) -- this is the exact assertion
+		# whose absence let the fractional-qty `abs(int(...))` truncation bug in
+		# ury_kot_generate.create_cancel_kot_doc go undetected.
+		self.assertEqual(len(cancel_kot["kot_items"]), 1)
+		self.assertEqual(cancel_kot["kot_items"][0]["cancelled_qty"], 1)
+		self.assertEqual(cancel_kot["kot_items"][0]["item"], "ITEM-001")
+
 		# Verify return shape
 		self.assertEqual(result["invoice"], "INV-001")
+		self.assertEqual(result["item_row_name"], "ROW-001")
 		self.assertEqual(result["item_code"], "ITEM-001")
 		self.assertEqual(result["previous_qty"], 2)
 		self.assertEqual(result["new_qty"], 1)
@@ -177,8 +190,8 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		invoice = _pos_invoice_doc(
 			order_type="Take Away",
 			items=[
-				{"item_code": "ITEM-001", "qty": 3, "item_name": "Biryani"},
-				{"item_code": "ITEM-002", "qty": 1, "item_name": "Naan"},
+				{"name": "ROW-001", "item_code": "ITEM-001", "qty": 3, "item_name": "Biryani"},
+				{"name": "ROW-002", "item_code": "ITEM-002", "qty": 1, "item_name": "Naan"},
 			],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In,Take Away")
@@ -199,12 +212,14 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 			result = reduce_order_item_qty(
 				invoice_id="INV-001",
-				item_code="ITEM-001",
+				item_row_name="ROW-001",
 				new_qty=0,
-				actor="cashier@example.com",
 			)
 
-		# Verify item was fully removed from invoice items
+		# Verify only the targeted row was removed from invoice items -- the OTHER
+		# row (ROW-002) must survive even though, before the item_row_name fix,
+		# matching by item_code alone would have removed every row sharing that
+		# item_code.
 		self.assertEqual(len(invoice.items), 1)
 		self.assertEqual(invoice.items[0].item_code, "ITEM-002")
 
@@ -213,6 +228,47 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		self.assertEqual(result["new_qty"], 0)
 		self.assertEqual(result["delta"], -3)
 
+		self.assertEqual(len(created_kots), 1)
+		self.assertEqual(created_kots[0]["kot_items"][0]["cancelled_qty"], 3)
+
+	def test_reduce_qty_by_row_name_does_not_remove_other_row_with_same_item_code(self):
+		"""Two rows share the same item_code; reducing one by its row name must
+		leave the other row (and its qty) completely untouched.
+		"""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[
+				{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"},
+				{"name": "ROW-002", "item_code": "ITEM-001", "qty": 5, "item_name": "Biryani"},
+			],
+		)
+		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
+		get_kot_side_effect, created_kots = _kot_doc_recorder()
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			if args and args[0] == "POS Profile":
+				return pos_profile
+			return get_kot_side_effect(*args, **kwargs)
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
+		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
+		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
+
+			result = reduce_order_item_qty(
+				invoice_id="INV-001",
+				item_row_name="ROW-001",
+				new_qty=0,
+			)
+
+		remaining_names = [row.name for row in invoice.items]
+		self.assertEqual(remaining_names, ["ROW-002"])
+		self.assertEqual(invoice.items[0].qty, 5)
+		self.assertEqual(result["delta"], -2)
+
 	def test_reduce_qty_bypass_bypasses_validate_invoice_guard(self):
 		"""Qty reduction with frappe.flags.ury_qty_reduction set should bypass
 		validate_invoice's post-print guard (no throw).
@@ -220,7 +276,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
 			invoice_printed=1,
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 		get_kot_side_effect, _ = _kot_doc_recorder()
@@ -247,7 +303,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 			reduce_order_item_qty(
 				invoice_id="INV-001",
-				item_code="ITEM-001",
+				item_row_name="ROW-001",
 				new_qty=1,
 			)
 
@@ -264,7 +320,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 		"""Order type "Phone In" not in allow-list should raise ORDER_TYPE_NOT_ALLOWED."""
 		invoice = _pos_invoice_doc(
 			order_type="Phone In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In,Take Away")
 
@@ -282,7 +338,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
@@ -294,7 +350,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 		"""Empty custom_qty_reduction_allowed_order_types should reject ANY order type."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="")  # Empty = no order types allowed
 
@@ -312,7 +368,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
@@ -322,7 +378,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 		"""Invoice with order_type=None should fail when list is non-empty."""
 		invoice = _pos_invoice_doc(
 			order_type=None,  # Not set
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In,Take Away")
 
@@ -340,7 +396,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
@@ -348,13 +404,13 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 
 
 class TestInvalidQtyValidation(FrappeTestCase):
-	"""Test qty validation: must satisfy 0 <= new_qty < current_qty."""
+	"""Test qty validation: must satisfy 0 <= new_qty < current_qty, and integral."""
 
 	def test_negative_qty_raises_invalid_qty(self):
 		"""new_qty < 0 should raise INVALID_QTY."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 
@@ -372,7 +428,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=-1,
 				)
 
@@ -382,7 +438,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 		"""new_qty == current_qty is not a reduction (must be < current_qty)."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 
@@ -400,7 +456,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=2,
 				)
 
@@ -410,7 +466,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 		"""new_qty > current_qty is an increase, not a reduction."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 
@@ -428,7 +484,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=5,
 				)
 
@@ -438,7 +494,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 		"""Non-numeric new_qty (e.g. 'two') should raise INVALID_QTY."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 
@@ -456,11 +512,46 @@ class TestInvalidQtyValidation(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty="two",
 				)
 
 		self.assertEqual(ctx.exception.reason_code, INVALID_QTY)
+
+	def test_fractional_qty_raises_invalid_qty(self):
+		"""A fractional new_qty (e.g. 1.5) must be rejected: reduce_order_item_qty
+		only supports whole-number reductions, matching the cancel-KOT row's
+		integer `cancelled_qty` (ury_kot_generate.create_cancel_kot_doc uses
+		`abs(int(...))`, which silently truncates a fractional delta instead of
+		rejecting it -- this validation must happen before that point).
+		"""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 3, "item_name": "Biryani"}],
+		)
+		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			if args and args[0] == "POS Profile":
+				return pos_profile
+			raise AssertionError(f"Unexpected get_doc call for {args}")
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
+
+			with self.assertRaises(QtyReductionError) as ctx:
+				reduce_order_item_qty(
+					invoice_id="INV-001",
+					item_row_name="ROW-001",
+					new_qty=1.5,
+				)
+
+		self.assertEqual(ctx.exception.reason_code, INVALID_QTY)
+		# Verify invoice was NOT modified
+		self.assertEqual(invoice.items[0].qty, 3)
 
 
 class TestInvoiceAndItemNotFoundErrors(FrappeTestCase):
@@ -472,17 +563,17 @@ class TestInvoiceAndItemNotFoundErrors(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-NONEXISTENT",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
 		self.assertEqual(ctx.exception.reason_code, INVOICE_NOT_FOUND)
 
 	def test_item_not_found_raises_item_not_found_error(self):
-		"""Invoice without the requested item should raise ITEM_NOT_FOUND."""
+		"""Invoice without the requested item row should raise ITEM_NOT_FOUND."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 
@@ -500,7 +591,39 @@ class TestInvoiceAndItemNotFoundErrors(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-NONEXISTENT",
+					item_row_name="ROW-NONEXISTENT",
+					new_qty=1,
+				)
+
+		self.assertEqual(ctx.exception.reason_code, ITEM_NOT_FOUND)
+
+	def test_item_code_mismatch_raises_item_not_found_error(self):
+		"""An `item_code` that doesn't match the resolved row's item_code should
+		raise ITEM_NOT_FOUND (the row is the authority; item_code is only a
+		secondary sanity check).
+		"""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+		)
+		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			if args and args[0] == "POS Profile":
+				return pos_profile
+			raise AssertionError(f"Unexpected get_doc call for {args}")
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
+
+			with self.assertRaises(QtyReductionError) as ctx:
+				reduce_order_item_qty(
+					invoice_id="INV-001",
+					item_row_name="ROW-001",
+					item_code="ITEM-999",
 					new_qty=1,
 				)
 
@@ -511,10 +634,10 @@ class TestPermissionChecks(FrappeTestCase):
 	"""Test permission validation."""
 
 	def test_no_write_permission_raises_not_permitted_error(self):
-		"""Actor without write permission should raise NOT_PERMITTED."""
+		"""Caller without write permission should raise NOT_PERMITTED."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 
 		def get_doc_dispatch(*args, **kwargs):
@@ -529,11 +652,44 @@ class TestPermissionChecks(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
 		self.assertEqual(ctx.exception.reason_code, NOT_PERMITTED)
+
+	def test_has_permission_is_checked_against_session_user_not_client_supplied_value(self):
+		"""`frappe.has_permission` must be called with `frappe.session.user` --
+		never a value the client could supply -- since a caller-supplied
+		"actor" would otherwise let anyone forge write access to invoices they
+		don't actually have permission on.
+		"""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+		)
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			raise AssertionError(f"Unexpected get_doc call for {args}")
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=False) as mock_has_permission, \
+		     patch(f"{MODULE}.frappe.session") as mock_session:
+
+			mock_session.user = "real-session-user@example.com"
+
+			with self.assertRaises(QtyReductionError):
+				reduce_order_item_qty(
+					invoice_id="INV-001",
+					item_row_name="ROW-001",
+					new_qty=1,
+				)
+
+		_, call_kwargs = mock_has_permission.call_args
+		self.assertEqual(call_kwargs.get("user"), "real-session-user@example.com")
 
 
 class TestKOTNamingSeriesValidation(FrappeTestCase):
@@ -543,7 +699,7 @@ class TestKOTNamingSeriesValidation(FrappeTestCase):
 		"""POS Profile without custom_kot_naming_series should raise KOT_NAMING_SERIES_MISSING."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(kot_naming_series="")  # Empty = not configured
 
@@ -561,11 +717,83 @@ class TestKOTNamingSeriesValidation(FrappeTestCase):
 			with self.assertRaises(QtyReductionError) as ctx:
 				reduce_order_item_qty(
 					invoice_id="INV-001",
-					item_code="ITEM-001",
+					item_row_name="ROW-001",
 					new_qty=1,
 				)
 
 		self.assertEqual(ctx.exception.reason_code, KOT_NAMING_SERIES_MISSING)
+
+
+class TestLastItemCannotBeRemoved(FrappeTestCase):
+	"""Test that removing the sole remaining item on an invoice is rejected."""
+
+	def test_removing_only_item_raises_last_item_cannot_be_removed(self):
+		"""new_qty=0 on an invoice with exactly one item row should raise
+		LAST_ITEM_CANNOT_BE_REMOVED instead of leaving a zero-item invoice.
+		"""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+		)
+		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			if args and args[0] == "POS Profile":
+				return pos_profile
+			raise AssertionError(f"Unexpected get_doc call for {args}")
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
+
+			with self.assertRaises(QtyReductionError) as ctx:
+				reduce_order_item_qty(
+					invoice_id="INV-001",
+					item_row_name="ROW-001",
+					new_qty=0,
+				)
+
+		self.assertEqual(ctx.exception.reason_code, LAST_ITEM_CANNOT_BE_REMOVED)
+		# Verify invoice was NOT modified/saved
+		self.assertEqual(len(invoice.items), 1)
+		invoice.save.assert_not_called()
+
+	def test_removing_one_of_several_items_is_allowed(self):
+		"""new_qty=0 is still allowed when other item rows remain on the invoice."""
+		invoice = _pos_invoice_doc(
+			order_type="Dine In",
+			items=[
+				{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"},
+				{"name": "ROW-002", "item_code": "ITEM-002", "qty": 1, "item_name": "Naan"},
+			],
+		)
+		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
+		get_kot_side_effect, created_kots = _kot_doc_recorder()
+
+		def get_doc_dispatch(*args, **kwargs):
+			if args and args[0] == "POS Invoice":
+				return invoice
+			if args and args[0] == "POS Profile":
+				return pos_profile
+			return get_kot_side_effect(*args, **kwargs)
+
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
+		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
+		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
+		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
+
+			result = reduce_order_item_qty(
+				invoice_id="INV-001",
+				item_row_name="ROW-001",
+				new_qty=0,
+			)
+
+		self.assertEqual(result["new_qty"], 0)
+		self.assertEqual(len(invoice.items), 1)
+		self.assertEqual(invoice.items[0].item_code, "ITEM-002")
 
 
 class TestValidateInvoiceGuardRegression(FrappeTestCase):
@@ -620,14 +848,16 @@ class TestValidateInvoiceGuardRegression(FrappeTestCase):
 				validate_invoice(pos_invoice, None)
 
 
-class TestActorDefaulting(FrappeTestCase):
-	"""Test that actor defaults to frappe.session.user if not provided."""
+class TestActorAuthority(FrappeTestCase):
+	"""Test that the actor recorded/authorized is always frappe.session.user,
+	never a client-supplied value -- the actor-as-authority permission bug.
+	"""
 
-	def test_actor_defaults_to_session_user(self):
-		"""If actor is not provided, it should default to frappe.session.user."""
+	def test_actor_is_always_session_user(self):
+		"""The returned `actor` must be frappe.session.user."""
 		invoice = _pos_invoice_doc(
 			order_type="Dine In",
-			items=[{"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
+			items=[{"name": "ROW-001", "item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"}],
 		)
 		pos_profile = _pos_profile_doc(allowed_order_types="Dine In")
 		get_kot_side_effect, _ = _kot_doc_recorder()
@@ -650,9 +880,18 @@ class TestActorDefaulting(FrappeTestCase):
 
 			result = reduce_order_item_qty(
 				invoice_id="INV-001",
-				item_code="ITEM-001",
+				item_row_name="ROW-001",
 				new_qty=1,
-				# actor NOT provided
 			)
 
 		self.assertEqual(result["actor"], "default_user@example.com")
+
+	def test_reduce_order_item_qty_has_no_client_supplied_actor_parameter(self):
+		"""There must be no `actor` parameter a caller could use to forge
+		permission/authority -- it should not appear in the function signature
+		at all.
+		"""
+		import inspect
+
+		params = inspect.signature(reduce_order_item_qty).parameters
+		self.assertNotIn("actor", params)
