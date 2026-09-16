@@ -483,6 +483,7 @@ fixtures = [
                     "POS Profile-role_restricted_for_table_order",
                     "POS Profile-view_all_status",
                     "POS Profile-remove_items",
+                    "POS Profile-custom_qty_reduction_allowed_order_types",
                     "POS Profile-restaurant_prefix",
                     "POS Profile-show_image",
                     "POS Profile-custom_daily_pos_close",
