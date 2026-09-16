@@ -208,8 +208,14 @@ def _work_order_stock_entry_doc(*, work_order_name, qty, source_warehouse, targe
 	production unit/department warehouse in, `direct_retail_warehouse` out) --
 	`make_stock_entry` defaults to the Work Order's own `wip_warehouse`/
 	`fg_warehouse`, which we already set to the same values, but rows are
-	repointed explicitly here in case ERPNext ever changes that default."""
-	doc = _wo_make_stock_entry(work_order_name, purpose="Manufacture", qty=flt(qty))
+	repointed explicitly here in case ERPNext ever changes that default.
+
+	`work_order.make_stock_entry` ends with `return stock_entry.as_dict()` --
+	a plain `frappe._dict`, not a bound Document -- so it must be wrapped with
+	`frappe.get_doc()` before any `.items` iteration, attribute assignment, or
+	`.insert()`/`.submit()` call treats it as one."""
+	stock_entry_dict = _wo_make_stock_entry(work_order_name, purpose="Manufacture", qty=flt(qty))
+	doc = frappe.get_doc(stock_entry_dict)
 	for item_row in doc.items:
 		if item_row.get("is_finished_item"):
 			item_row.t_warehouse = target_warehouse

@@ -43,13 +43,16 @@ class _Row:
 		return getattr(self, key, default)
 
 
-class _GeneratedStockEntry:
-	"""Stand-in for the unsaved Stock Entry `work_order.make_stock_entry`
-	returns: a plain object (not a dict) so `.items` is the child-table
-	attribute, not `dict.items`."""
+class _GeneratedStockEntryDoc:
+	"""Stand-in for what `frappe.get_doc(stock_entry.as_dict())` returns: a
+	real, bound (unsaved) Document whose `.items` is the child-table list of
+	attribute-accessible rows -- as opposed to the plain dict
+	`work_order.make_stock_entry` (`return stock_entry.as_dict()`) actually
+	returns, whose `.items` would resolve to `dict.items` (the builtin bound
+	method), not a child table."""
 
-	def __init__(self, items):
-		self.items = items
+	def __init__(self, data):
+		self.items = [_Row(**row) for row in data.get("items", [])]
 		self.remarks = None
 		self.custom_ury_batch_request = None
 		self.name = "SE-1"
@@ -211,13 +214,6 @@ class TestStartBatch(FrappeTestCase):
 		row = _config_row()
 		captured = {}
 
-		def get_doc(arg):
-			if isinstance(arg, dict) and arg.get("doctype") == "Work Order":
-				captured["work_order_payload"] = arg
-				return _wo_doc("WO-1")
-			captured["doc"] = arg
-			return _doc(arg)
-
 		def get_value(doctype, *args, **kwargs):
 			if doctype == "Branch":
 				return "Company A"
@@ -225,16 +221,35 @@ class TestStartBatch(FrappeTestCase):
 				return "Kitchen WH"
 			raise AssertionError((doctype, args, kwargs))
 
-		component_row = _Row(item_code="RICE", qty=4, is_finished_item=0, s_warehouse="Some WH", t_warehouse=None)
-		finished_row = _Row(item_code="BIRYANI-1", qty=2, is_finished_item=1, s_warehouse=None, t_warehouse="Some WH")
-		generated_se = _GeneratedStockEntry([component_row, finished_row])
+		# What `work_order.make_stock_entry` really returns: a plain dict
+		# (`stock_entry.as_dict()`), whose `items` is a list of plain dicts,
+		# never a bound Document.
+		generated_se_dict = {
+			"doctype": "Stock Entry",
+			"purpose": "Manufacture",
+			"items": [
+				{"item_code": "RICE", "qty": 4, "is_finished_item": 0, "s_warehouse": "Some WH", "t_warehouse": None},
+				{"item_code": "BIRYANI-1", "qty": 2, "is_finished_item": 1, "s_warehouse": None, "t_warehouse": "Some WH"},
+			],
+		}
+
+		def get_doc(arg):
+			if isinstance(arg, dict) and arg.get("doctype") == "Work Order":
+				captured["work_order_payload"] = arg
+				return _wo_doc("WO-1")
+			# The corrected code path wraps `make_stock_entry`'s raw dict with
+			# `frappe.get_doc(...)` before treating it as a Document.
+			captured["doc"] = arg
+			se_doc = _GeneratedStockEntryDoc(arg)
+			captured["se_doc"] = se_doc
+			return se_doc
 
 		with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql_lock(row)), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=get_value
 		), patch(f"{MODULE}._resolve_active_bom", return_value="BOM-BIRYANI-001"), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(
-			f"{MODULE}._wo_make_stock_entry", return_value=generated_se
+			f"{MODULE}._wo_make_stock_entry", return_value=generated_se_dict
 		) as mock_make_se, patch(
 			f"{MODULE}._service_mutation"
 		) as mock_mutation:
@@ -250,13 +265,19 @@ class TestStartBatch(FrappeTestCase):
 		self.assertEqual(wo_payload["wip_warehouse"], "Kitchen WH")
 		self.assertEqual(wo_payload["fg_warehouse"], "FG WH")
 
-		# The Stock Entry was generated via work_order.make_stock_entry, not
-		# hand-built, and carries the resolved warehouses.
+		# The Stock Entry was generated via work_order.make_stock_entry (which
+		# returns a raw dict), then wrapped via frappe.get_doc into a real
+		# Document -- it's THAT object, not the raw dict, whose rows get
+		# repointed and which gets inserted/submitted.
 		mock_make_se.assert_called_once_with("WO-1", purpose="Manufacture", qty=2)
+		se_doc = captured["se_doc"]
+		component_row, finished_row = se_doc.items
 		self.assertEqual(component_row.s_warehouse, "Kitchen WH")
 		self.assertIsNone(component_row.t_warehouse)
 		self.assertEqual(finished_row.t_warehouse, "FG WH")
 		self.assertIsNone(finished_row.s_warehouse)
+		se_doc.insert.assert_called_once()
+		se_doc.submit.assert_called_once()
 
 		self.assertEqual(result["work_order"], "WO-1")
 		self.assertEqual(result["source_warehouse"], "Kitchen WH")
