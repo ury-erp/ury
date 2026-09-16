@@ -54,6 +54,9 @@ frappe.ui.form.on("Production Plan", {
 									row.bom_no = item.bom_no;
 									row.planned_qty = item.planned_qty;
 									row.stock_uom = item.stock_uom;
+									row.planned_start_date = item.planned_start_date;
+									row.warehouse = item.warehouse;
+									row.custom_ury_department = item.custom_ury_department;
 								});
 								frm.refresh_field("po_items");
 								frappe.show_alert({
@@ -72,5 +75,41 @@ frappe.ui.form.on("Production Plan", {
 			},
 			__("Get Items From")
 		);
+
+		if (!frm.doc.__islocal) {
+			// N5/N6: only meaningful once the plan exists and has po_items
+			// with resolvable BOMs (i.e. saved/submitted, not a fresh draft
+			// still being filled in via "Get Items From > Sales Plan" above).
+			frm.add_custom_button(
+				__("Generate Material Requests"),
+				() => {
+					frappe.call({
+						method:
+							"ury.ury.api.ury_production_plan_material_request.generate_material_requests_for_production_plan",
+						args: { production_plan: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Generating Material Requests..."),
+						callback: (r) => {
+							const data = r.message;
+							if (!data) {
+								return;
+							}
+							const purchaseCount = (data.purchase_material_requests || []).length;
+							const transferCount = (data.transfer_material_requests || []).length;
+							const skippedCount = (data.skipped_sufficient_stock || []).length;
+							frappe.msgprint({
+								title: __("Material Requests Generated"),
+								indicator: "green",
+								message: __(
+									"Created {0} Purchase Material Request(s) and {1} Transfer Material Request(s). {2} item(s) skipped (sufficient department stock).",
+									[purchaseCount, transferCount, skippedCount]
+								),
+							});
+						},
+					});
+				},
+				__("Create")
+			);
+		}
 	},
 });
