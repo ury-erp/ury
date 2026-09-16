@@ -23,7 +23,7 @@ interface ItemProductionConfigRecord {
 }
 
 const PRODUCTION_POLICY_OPTIONS = ['PRE_PRODUCED', 'MADE_TO_ORDER', 'DIRECT_RETAIL'];
-const AVAILABILITY_MODE_OPTIONS = ['Always Available', 'Stock Available', 'Plan Available'];
+const AVAILABILITY_MODE_OPTIONS = ['Always Available', 'Plan Available'];
 
 const emptyForm = {
   active: true,
