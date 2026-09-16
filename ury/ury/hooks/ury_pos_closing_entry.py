@@ -4,8 +4,64 @@ def before_save(doc, method):
     sub_pos_close_check(doc, method)
 
 def validate(doc, method):
+    populate_pos_transactions(doc, method)
     calculate_closing_amount(doc, method)
     validate_cashier(doc, method)
+
+
+def populate_pos_transactions(doc, method=None):
+    """Fill `doc.pos_transactions` with this session's submitted,
+    unconsolidated POS Invoices, if it isn't already populated.
+
+    Guard (referenced by `ury_pos_closing_reconciliation.py`'s
+    `_session_invoice_names`, which self-calls this function so its own
+    correctness never depends on `hooks.py` doc_event ordering): if
+    `pos_transactions` already has rows -- e.g. hand-picked by a cashier in
+    the desk form, or already populated by an earlier call in the same
+    request -- this is a no-op. Never overwrites caller-supplied rows.
+
+    Mirrors core ERPNext's own `pos_closing_entry.get_pos_invoices`
+    filtering intent (submitted, not yet consolidated, within the session
+    window) but scoped by this app's `cashier` field rather than core's
+    `owner`, since a POS Invoice's `cashier` (set at billing time, and
+    distinct from whichever user's session created/owns the document) is
+    the correct session-attribution field here -- `sub_pos_close_check`/
+    `validate_cashier` above already treat `cashier` as that source of
+    truth for this same doctype.
+
+    `consolidated_invoice` is filtered in Python (`not` truthy check), not
+    SQL, matching how `ury_pos_closing_reconciliation._confirm_genuinely_
+    empty` reads this same field -- core's storage of it as `""`/NULL
+    inconsistently makes a plain SQL falsy filter less reliable.
+    """
+    if doc.get("pos_transactions"):
+        return
+    if not doc.get("pos_profile") or not doc.get("period_start_date") or not doc.get("period_end_date"):
+        return
+
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={
+            "docstatus": 1,
+            "pos_profile": doc.pos_profile,
+            "cashier": doc.user,
+            "posting_date": ["between", [doc.period_start_date, doc.period_end_date]],
+        },
+        fields=["name", "posting_date", "grand_total", "customer", "consolidated_invoice"],
+        order_by="posting_date asc",
+    )
+    unconsolidated = [inv for inv in invoices if not inv.get("consolidated_invoice")]
+
+    for inv in unconsolidated:
+        doc.append(
+            "pos_transactions",
+            {
+                "pos_invoice": inv.name,
+                "posting_date": inv.posting_date,
+                "grand_total": inv.grand_total,
+                "customer": inv.customer,
+            },
+        )
 
 
 def sub_pos_close_check(doc,method):

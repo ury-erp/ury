@@ -845,6 +845,47 @@ def getPosProfile():
 
 
 @frappe.whitelist()
+def getPosProfileFull(pos_profile):
+    """Return the subset of POS Profile fields the POS frontend needs beyond
+    getPosProfile()'s limited set (role-permission child tables, company/branch
+    identity fields, etc). Cashier/Captain roles don't have doctype-level read
+    permission on POS Profile, so the frontend can't fetch these via the raw
+    `/api/resource/POS Profile/<name>` REST read - this whitelisted method
+    reads server-side instead, scoped to the caller's own branch.
+    """
+    branch_name = getBranch()
+    profile = frappe.get_doc("POS Profile", pos_profile)
+    if profile.branch != branch_name:
+        frappe.throw(frappe._("Not permitted to view this POS Profile"), frappe.PermissionError)
+
+    return {
+        "name": profile.name,
+        "owner": profile.owner,
+        "creation": profile.creation,
+        "modified": profile.modified,
+        "modified_by": profile.modified_by,
+        "docstatus": profile.docstatus,
+        "idx": profile.idx,
+        "company": profile.company,
+        "customer": profile.customer,
+        "country": profile.country,
+        "disabled": profile.disabled,
+        "warehouse": profile.warehouse,
+        "campaign": profile.campaign,
+        "company_address": profile.company_address,
+        "restaurant": profile.restaurant,
+        "branch": profile.branch,
+        "currency": profile.currency,
+        "paid_limit": profile.paid_limit,
+        "role_allowed_for_billing": [row.as_dict() for row in profile.role_allowed_for_billing],
+        "role_restricted_for_table_order": [row.as_dict() for row in profile.role_restricted_for_table_order],
+        "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
+        "view_all_status": profile.get("view_all_status"),
+        "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
+    }
+
+
+@frappe.whitelist()
 def getPosInvoiceItems(invoice):
     itemDetails = []
     taxDetails = []

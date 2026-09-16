@@ -38,6 +38,7 @@ governing contract above -- not a code change.
 """
 
 import frappe
+from frappe import _
 
 FLAG_DOCTYPE = "URY Feature Flags"
 FLAG_FIELD = "pos_stock_authority_v2"
@@ -125,8 +126,12 @@ def _wire_fulfilment_for_invoice(doc):
 		kot_doc = frappe.get_doc("URY KOT", kot.name)
 		for item_row in kot_doc.get("kot_items") or []:
 			item_code = item_row.get("item")
-			qty = item_row.get("quantity")
-			if not item_code:
+			# URY KOT Items.quantity is a Data (string) field, not Float --
+			# a doc reloaded fresh from DB (as kot_doc is here) yields a
+			# string, which breaks numeric comparisons inside
+			# fulfil_mto_order/fulfil_preproduced_order downstream.
+			qty = frappe.utils.flt(item_row.get("quantity"))
+			if not item_code or not qty:
 				continue
 
 			production_policy = frappe.db.get_value(
@@ -177,4 +182,128 @@ def _wire_fulfilment_for_invoice(doc):
 					qty=qty,
 					reservation_ref=reservation[0].name,
 					actor=frappe.session.user,
+				)
+
+
+def _verify_fulfilment_posted_for_invoice(invoice_doc, strict=False):
+	"""Verify every produced MADE_TO_ORDER line on `invoice_doc` has a
+	matching `URY Fulfilment Record`. Raises `frappe.ValidationError` (via
+	`frappe.throw`) on a real problem; returns `None` when clean.
+
+	Two callers, two severities, same check:
+
+	  - `strict=False` (till-time advisory -- not currently wired to any
+	    live call site, reserved for a future submit-time advisory use):
+	    would surface a problem without blocking a cashier's payment.
+	  - `strict=True` (`ury_pos_closing_reconciliation._verify_invoice_
+	    production`, the closing-time enforcement point): a missing
+	    fulfilment record gets exactly one synchronous retry (a lagging
+	    background worker is exactly the case that should self-heal at
+	    end-of-shift instead of blocking a manager); if that retry also
+	    fails, this raises.
+
+	Scope note: only MADE_TO_ORDER lines are checked here, matching
+	`ury_pos_closing_reconciliation.py`'s own module docstring ("every
+	produced MADE_TO_ORDER item"). PRE_PRODUCED/DIRECT_RETAIL items are not
+	covered by this function -- their stock posture is ERPNext's native Bin/
+	Stock Ledger, reconciled by ordinary stock-count tooling, not by this
+	fulfilment-record check.
+
+	A KOT item is "produced" (and therefore in scope at all) only once its
+	`URY KOT Execution.state` has reached READY or SERVED -- an item still
+	queued/cooking has nothing to verify yet, matching `_wire_fulfilment_
+	for_invoice`'s own READY_STATES gate above.
+
+	This intentionally re-queries `URY Fulfilment Record` / `URY Stock
+	Reservation` directly rather than importing `ury_mto_fulfilment_
+	service`'s private `_find_prior_fulfilment` -- that helper is correct
+	but underscore-private to its own module's internal dedup step; this
+	function needs only a read, not that module's full fulfil-or-dedupe
+	state machine.
+	"""
+	from ury.ury.api.ury_mto_fulfilment_service import (
+		READY_STATES as MTO_READY_STATES,
+		MADE_TO_ORDER as MTO_FULFILMENT_TYPE,
+		fulfil_mto_order,
+	)
+
+	kots = frappe.get_all("URY KOT", filters={"invoice": invoice_doc.get("name")}, fields=["name"])
+	for kot in kots:
+		execution_rows = frappe.get_all(
+			"URY KOT Execution", filters={"kot": kot.name}, fields=["state"], limit=1
+		)
+		if not execution_rows or execution_rows[0].state not in MTO_READY_STATES:
+			continue
+
+		kot_doc = frappe.get_doc("URY KOT", kot.name)
+		for item_row in kot_doc.get("kot_items") or []:
+			item_code = item_row.get("item")
+			# URY KOT Items.quantity is a Data (string) field, not Float --
+			# a doc reloaded fresh from DB (as kot_doc is here) yields a
+			# string, which breaks the numeric comparisons inside
+			# fulfil_mto_order/compile_bom_vector. flt() coerces safely.
+			qty = frappe.utils.flt(item_row.get("quantity"))
+			if not item_code or not qty:
+				continue
+
+			production_policy = frappe.db.get_value(
+				"URY Item Production Configuration", {"item": item_code}, "production_policy"
+			)
+			if production_policy != "MADE_TO_ORDER":
+				continue
+
+			existing = frappe.get_all(
+				"URY Fulfilment Record",
+				filters={"kot": kot.name, "item_code": item_code, "fulfilment_type": MTO_FULFILMENT_TYPE},
+				fields=["name", "qty"],
+				order_by="creation desc",
+				limit=1,
+			)
+			if existing:
+				if existing[0].qty != qty:
+					frappe.throw(
+						_(
+							"Production posting for item {0} on KOT {1} is for qty {2}, "
+							"but the invoice line is qty {3}."
+						).format(item_code, kot.name, existing[0].qty, qty)
+					)
+				continue
+
+			if not strict:
+				# Advisory mode: a missing record is worth knowing about but
+				# must never block a cashier's payment.
+				continue
+
+			reservation = frappe.get_all(
+				"URY Stock Reservation",
+				filters={
+					"order_ref": invoice_doc.get("name"),
+					"top_level_item": item_code,
+					"status": "Reserved",
+				},
+				fields=["reservation_group", "name"],
+				limit=1,
+			)
+			if not reservation:
+				frappe.throw(
+					_(
+						"Production posting is missing for item {0} on KOT {1}, and no "
+						"active reservation exists to retry it against."
+					).format(item_code, kot.name)
+				)
+
+			try:
+				fulfil_mto_order(
+					kot=kot.name,
+					item_code=item_code,
+					qty=qty,
+					reservation_group_ref=reservation[0].reservation_group or reservation[0].name,
+					actor=frappe.session.user,
+					batch_key=f"{kot.name}:{item_code}",
+				)
+			except Exception as exc:
+				frappe.throw(
+					_("Production posting is missing for item {0} on KOT {1}: {2}").format(
+						item_code, kot.name, str(exc)
+					)
 				)

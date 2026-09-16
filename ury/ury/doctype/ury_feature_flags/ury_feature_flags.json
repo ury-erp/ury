@@ -6,7 +6,10 @@
  "engine": "InnoDB",
  "field_order": [
   "pos_stock_authority_v2",
-  "pos_stock_authority_v2_help"
+  "pos_stock_authority_v2_help",
+  "pos_reservation_enforcement_enabled",
+  "pos_closing_reconciliation_enabled",
+  "pos_stock_policy_help"
  ],
  "fields": [
   {
@@ -22,6 +25,26 @@
    "fieldtype": "HTML",
    "label": "Warning",
    "options": "<div class=\"text-muted\">This flag routes real POS invoices away from ERPNext's native stock posting into the new (not yet fully integration-tested) fulfilment services. Leave OFF unless you have explicitly been told to enable it as part of a signed-off rollout. See V3-70-fulfilment-accounting-transition-checklist.md.</div>"
+  },
+  {
+   "default": "0",
+   "description": "Gate 2 of 3 (ARCHITECTURE_POS_STOCK_AUTHORITY.md 3.4): when on, order-time capacity is expected to be backed by real URY Stock Reservation rows (see ury_kot_reservation_bridge.py) for this deployment's branches. Reservation creation/release itself always runs regardless of this flag (it never touches Bin/GL); this flag is read by ury_stock_policy.get_branch_stock_policy for callers that need to know whether reservation coverage is considered authoritative yet. Defaults off; same human-sign-off expectation as pos_stock_authority_v2.",
+   "fieldname": "pos_reservation_enforcement_enabled",
+   "fieldtype": "Check",
+   "label": "POS Reservation Enforcement Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Gate 3 of 3 (ARCHITECTURE_POS_STOCK_AUTHORITY.md 3.4): turns on ury_pos_closing_reconciliation.validate_closing_reconciliation for a branch -- blocking POS Closing Entry submission until every produced MADE_TO_ORDER line has a POSTED fulfilment posting intent and every reservation group is in a settleable state. MUST stay off until pos_stock_authority_v2's evidence bar is met AND ury_feature_flags._verify_fulfilment_posted_for_invoice (the G-07 posting-verification function this check calls) exists and is itself signed off -- that function is not yet implemented in this codebase. Turning this on before then will make every closing entry fail with an ImportError, not a real reconciliation result.",
+   "fieldname": "pos_closing_reconciliation_enabled",
+   "fieldtype": "Check",
+   "label": "POS Closing Reconciliation Enabled"
+  },
+  {
+   "fieldname": "pos_stock_policy_help",
+   "fieldtype": "HTML",
+   "label": "Warning",
+   "options": "<div class=\"text-muted\">These two flags are read via ury.ury.api.ury_stock_policy.get_branch_stock_policy. Both default OFF (Tier 1). Do not enable pos_closing_reconciliation_enabled until pos_stock_authority_v2's rollout is signed off and the G-07 posting-verification function it depends on has been implemented -- see ury_pos_closing_reconciliation.py's module docstring.</div>"
   }
  ],
  "index_web_pages_for_search": 1,

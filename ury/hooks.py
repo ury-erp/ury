@@ -211,7 +211,10 @@ doc_events = {
         },
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
-        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"
+        "validate": [
+            "ury.ury.hooks.ury_pos_closing_entry.validate",
+            "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
+        ]
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
@@ -226,6 +229,13 @@ scheduler_events = {
     "cron":{
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
+		],
+		# Releases order-time URY Stock Reservation rows left "Reserved" past
+		# RESERVATION_TTL_MINUTES (abandoned carts / KOTs that never made it
+		# to an invoice) so their capacity isn't held forever. Additive,
+		# reservation-ledger-only -- see ury_kot_reservation_bridge.py.
+		"*/5 * * * *":[
+			"ury.ury.api.ury_kot_reservation_bridge.expire_stale_reservations_job"
 		]
 	},
 	"daily": [

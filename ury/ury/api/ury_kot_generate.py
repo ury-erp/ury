@@ -2,6 +2,10 @@ import json
 
 import frappe
 from ury.ury_pos.api import getBranch
+from ury.ury.api.ury_kot_reservation_bridge import (
+    reserve_for_order_items,
+    release_for_cancelled_items,
+)
 
 
 # Load JSON data or return as is if it's already a Python dictionary
@@ -64,7 +68,7 @@ def create_kot_doc(
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
+
     else:
         menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
 
@@ -121,6 +125,14 @@ def process_items_for_kot(
 ):
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
+
+    # Reserve at the full-order-item level, not per-KOT -- see
+    # reserve_for_order_items's docstring for why: an item whose Item
+    # Group isn't mapped to any Production Unit (a pre-made/direct-retail
+    # item that needs no kitchen step) never reaches create_kot_doc below,
+    # so it must reserve here or never reserve at all.
+    reserve_for_order_items(invoice_id, pos_profile.branch, kot_items)
+
     productions = frappe.db.get_all(
         "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
     )
@@ -205,6 +217,13 @@ def process_items_for_cancel_kot(
 
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
+
+    # Release at the full-cancelled-item level, not per-cancel-KOT -- same
+    # reason as process_items_for_kot's reserve call: a cancelled item
+    # whose Item Group isn't mapped to any Production Unit never reaches
+    # create_cancel_kot_doc below.
+    release_for_cancelled_items(invoice_id, kot_items)
+
     productions = frappe.db.get_all(
         "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
     )
