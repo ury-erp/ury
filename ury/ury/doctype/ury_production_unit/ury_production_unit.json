@@ -14,7 +14,6 @@
   "pos_profile",
   "branch",
   "warehouse",
-  "unit_type",
   "lead_chef",
   "assigned_employees",
   "workstation",
@@ -106,11 +105,7 @@
    "reqd": 1
   },
   {
-   "fieldname": "unit_type",
-   "fieldtype": "Data",
-   "label": "Unit Type"
-  },
-  {
+   "description": "Scopes KOT (kitchen order ticket) visibility at the individual production-unit level (which chef sees which unit's tickets), as distinct from \"Department Manager\" on URY Production Department which scopes report/analytics access at the department level — these are two intentionally separate fields by design, not duplicates, so don't merge them.",
    "fieldname": "lead_chef",
    "fieldtype": "Link",
    "label": "Lead Chef",
