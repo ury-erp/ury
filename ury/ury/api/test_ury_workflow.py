@@ -51,6 +51,40 @@ class TestURYWorkflowGeneric(FrappeTestCase):
                 }
             ).insert(ignore_permissions=True)
 
+    def _ensure_warehouse(self, warehouse_name, company):
+        if frappe.db.exists("Warehouse", {"warehouse_name": warehouse_name, "company": company}):
+            return frappe.db.get_value(
+                "Warehouse", {"warehouse_name": warehouse_name, "company": company}, "name"
+            )
+        doc = frappe.get_doc(
+            {
+                "doctype": "Warehouse",
+                "warehouse_name": warehouse_name,
+                "company": company,
+            }
+        ).insert(ignore_permissions=True)
+        return doc.name
+
+    def _ensure_item_production_configuration(self, item_code, branch, company):
+        # validate_plan_items() (invoked on the Approved transition) requires
+        # an active production configuration for every plan item -- see the
+        # identical helper in test_ury_sales_plan.py for the full rationale.
+        if frappe.db.exists(
+            "URY Item Production Configuration", {"item": item_code, "branch": branch, "active": 1}
+        ):
+            return
+        warehouse = self._ensure_warehouse(f"{item_code} Retail Store", company)
+        frappe.get_doc(
+            {
+                "doctype": "URY Item Production Configuration",
+                "active": 1,
+                "item": item_code,
+                "branch": branch,
+                "production_policy": "DIRECT_RETAIL",
+                "direct_retail_warehouse": warehouse,
+            }
+        ).insert(ignore_permissions=True)
+
     def _create_user(self, email, roles):
         if frappe.db.exists("User", email):
             frappe.delete_doc("User", email, force=True, ignore_permissions=True)
@@ -75,6 +109,7 @@ class TestURYWorkflowGeneric(FrappeTestCase):
         self._ensure_company(self.company, "UWGT")
         self._ensure_branch(self.branch, self.company)
         self._ensure_item("MTPL")
+        self._ensure_item_production_configuration("MTPL", self.branch, self.company)
         self._create_user(TEST_MANAGER, roles=["URY Manager"])
         self._create_user(TEST_NON_MANAGER, roles=[])
         frappe.db.delete(
