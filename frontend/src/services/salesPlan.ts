@@ -150,16 +150,12 @@ export interface SaveSalesPlanDraftParams {
   company?: string;
   service_period?: string;
   items: SaveSalesPlanDraftItem[];
+  enforcement_mode?: string;
 }
 
 export interface SaveSalesPlanDraftResponse {
   name: string;
   status: string;
-}
-
-export interface TransitionSalesPlanParams {
-  name: string;
-  target_state: string;
 }
 
 export interface GetPlanStatusParams {
@@ -170,6 +166,7 @@ export interface GetPlanStatusParams {
 export interface GetPlanStatusResponse {
   name: string | null;
   status: string | null;
+  enforcement_mode: string | null;
 }
 
 export const salesPlanService = {
@@ -195,17 +192,7 @@ export const salesPlanService = {
         company: params.company,
         service_period: params.service_period,
         items: params.items,
-      },
-    );
-    return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
-  },
-
-  async transitionPlan(params: TransitionSalesPlanParams): Promise<SaveSalesPlanDraftResponse> {
-    const res = await call.post<SaveSalesPlanDraftResponse>(
-      'ury.ury.api.ury_sales_plan.transition_plan',
-      {
-        name: params.name,
-        target_state: params.target_state,
+        enforcement_mode: params.enforcement_mode,
       },
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;

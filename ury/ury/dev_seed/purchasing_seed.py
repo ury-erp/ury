@@ -70,6 +70,8 @@ Usage (from a bench console / ``bench execute``)::
 import frappe
 from frappe.utils import add_days, nowdate
 
+from ury.ury.api.ury_sales_plan import advance_plan_to_approved
+
 
 # ---------------------------------------------------------------------------
 # Tunables
@@ -575,18 +577,33 @@ def _ensure_approved_sales_plan(branch_name, company_name, plan_date, item_depar
 
 	try:
 		if existing:
-			doc = frappe.get_doc("URY Sales Plan", existing)
-		else:
-			doc = frappe.get_doc(
-				{
-					"doctype": "URY Sales Plan",
-					"status": "Draft",
-					"branch": branch_name,
-					"company": company_name,
-					"plan_date": plan_date,
-					"service_period": SALES_PLAN_SERVICE_PERIOD,
-				}
+			# This plan is ALREADY Approved/Locked for Production -- i.e. its
+			# docstatus is 1 -- and only its snapshot is missing. It must not
+			# be re-saved through doc.save(): that routes to Frappe's
+			# `update_after_submit` path, which rejects any change to a field
+			# without `allow_on_submit` (approval_snapshot has none), and it
+			# must not be walked through the workflow again either, since it
+			# is already past "Approved". Write the two snapshot columns
+			# directly instead -- the only thing missing here is bookkeeping.
+			frappe.db.set_value(
+				"URY Sales Plan",
+				existing,
+				{"approval_snapshot": encoded, "approval_snapshot_hash": snapshot_hash},
+				update_modified=False,
 			)
+			print(f"  ~ Backfilled approval_snapshot on URY Sales Plan: {existing}")
+			return existing, False
+
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Sales Plan",
+				"status": "Draft",
+				"branch": branch_name,
+				"company": company_name,
+				"plan_date": plan_date,
+				"service_period": SALES_PLAN_SERVICE_PERIOD,
+			}
+		)
 		doc.set("items", [])
 		for item in items_payload:
 			doc.append(
@@ -600,13 +617,21 @@ def _ensure_approved_sales_plan(branch_name, company_name, plan_date, item_depar
 					"production_policy": item["production_policy"],
 				},
 			)
-		doc.status = "Approved"
+		# Freeze the deterministic snapshot up front, then reach "Approved"
+		# by walking the REAL workflow instead of assigning `doc.status`
+		# directly. A direct assignment bypasses both Frappe's workflow
+		# engine and its docstatus machinery, producing a row that reads
+		# "Approved" while its `docstatus` column is still 0 -- exactly the
+		# mismatch ury.patches.v3_22.backfill_sales_plan_docstatus has to
+		# repair for historical data. apply_workflow() performs a real
+		# submit() on the Submitted for Approval -> Approved hop, so the
+		# seeded plan lands at docstatus 1 like a human-approved one.
+		# (freeze_approval_snapshot() short-circuits when approval_snapshot
+		# is already set, so the value computed above is what persists.)
 		doc.approval_snapshot = encoded
 		doc.approval_snapshot_hash = snapshot_hash
-		if existing:
-			doc.save(ignore_permissions=True)
-		else:
-			doc.insert(ignore_permissions=True)
+		doc.insert(ignore_permissions=True)
+		doc = advance_plan_to_approved(doc)
 		print(f"Approved URY Sales Plan with snapshot: {doc.name} ({plan_date}, {len(items_payload)} items)")
 		return doc.name, True
 	except Exception as e:
