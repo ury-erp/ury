@@ -189,7 +189,7 @@
                     </p>
                     <!-- Cancellation disposition: return-to-stock vs waste -->
                     <div
-                      v-if="kotitem.disposition_required && !kotitem.disposition"
+                      v-if="Number(kotitem.cancelled_qty) > 0 && (!kotitem.disposition || kotitem.disposition === 'Pending')"
                       class="ml-2 mt-1 flex gap-2"
                       @click.stop
                     >
@@ -210,11 +210,11 @@
                       </button>
                     </div>
                     <div
-                      v-else-if="kotitem.disposition"
+                      v-else-if="kotitem.disposition && kotitem.disposition !== 'Pending'"
                       class="ml-2 mt-1 text-sm font-medium"
                       style="color: var(--t2)"
                     >
-                      ( Disposition: {{ kotitem.disposition === 'return_to_stock' ? 'Returned to Stock' : 'Wasted' }} )
+                      ( Disposition: {{ kotitem.disposition }} )
                     </div>
                     <hr class="my-1 mt-2" style="border-color: var(--hair)" />
                   </div>
@@ -515,7 +515,7 @@ export default {
           qty: kotitem.cancelled_qty,
         })
         .then((result) => {
-          kotitem.disposition = disposition;
+          kotitem.disposition = disposition === "return_to_stock" ? "Returned to Stock" : "Wasted";
           this.masonryLoading();
         })
         .catch((error) => {
