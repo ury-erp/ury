@@ -97,11 +97,11 @@
   },
   {
    "default": "Plan Available",
-   "description": "Controls availability override behavior. 'Plan Available' (default/safe): normal plan+stock based availability checking, no override. 'Always Available' makes the item sellable regardless of plan/stock constraints (but never overrides structural/config errors such as a missing BOM). 'Stock Available' semantics are reserved for future clarification (not yet implemented).",
+   "description": "Controls availability override behavior; distinct from 'Controlled by Sales Plan' below, which decides whether a Sales Plan gates this item at all. 'Plan Available' (default/safe): normal plan+stock (PRE_PRODUCED) or plan+recipe-capacity (MADE_TO_ORDER) based availability checking, no override. 'Always Available' makes the item sellable regardless of plan/stock/capacity constraints (but never overrides structural/config errors such as a missing BOM). There is no separate 'Stock Available' mode: to sell purely on stock/capacity while ignoring the Sales Plan, turn off 'Controlled by Sales Plan' instead -- a dedicated 'Stock Available' mode was considered and dropped because it would be functionally identical to that existing flag and only added a second, confusing way to configure the same outcome.",
    "fieldname": "availability_mode",
    "fieldtype": "Select",
    "label": "Availability Mode",
-   "options": "Plan Available\nStock Available\nAlways Available"
+   "options": "Plan Available\nAlways Available"
   },
   {
    "fieldname": "direct_retail_warehouse",

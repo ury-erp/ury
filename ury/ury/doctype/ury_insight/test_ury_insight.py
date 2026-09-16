@@ -5,6 +5,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_insight import get_active_insights
+from ury.ury.tests.factories import make_user
 
 TEST_NON_MANAGER = "_test_ury_insight_non_manager@example.com"
 TEST_MANAGER = "_test_ury_insight_manager@example.com"
@@ -44,20 +45,7 @@ class TestURYInsightPermissions(FrappeTestCase):
                 frappe.delete_doc("User", user, force=True, ignore_permissions=True)
 
     def _create_user(self, email, roles):
-        if frappe.db.exists("User", email):
-            frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-        user = frappe.get_doc(
-            {
-                "doctype": "User",
-                "email": email,
-                "first_name": email.split("@")[0],
-                "send_welcome_email": 0,
-                "enabled": 1,
-            }
-        ).insert(ignore_permissions=True)
-        for role in roles:
-            user.add_roles(role)
-        return user
+        return make_user(email=email, roles=roles, first_name=email.split("@")[0], enabled=1)
 
     # ------------------------------------------------------------ non-manager
 

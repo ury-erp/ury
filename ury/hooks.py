@@ -258,6 +258,9 @@ doc_events = {
     "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
     "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
     "BOM": {"before_validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
+    "Stock Entry": {
+        "validate": "ury.ury.api.ury_manufacture_enforcement.validate_manufacture_requires_work_order",
+    },
 }
 
 # Scheduled Tasks
@@ -306,7 +309,7 @@ commands = [
 # Testing
 # -------
 
-# before_tests = "ury.install.before_tests"
+before_tests = "ury.install.before_tests"
 
 # Overriding Methods
 # ------------------------------
@@ -428,6 +431,9 @@ fixtures = [
                     "POS Invoice-print",
                     "POS Invoice-restaurant_table",
                     "POS Invoice-custom_merged_tables",
+                    "Production Plan Item-custom_ury_department",
+                    "URY KOT Items-custom_ury_work_order",
+                    "URY Sales Plan-custom_ury_production_plan",
                     "POS Invoice-custom_restaurant_room",
                     "POS Invoice-column_break_gd1mq",
                     "POS Invoice-arrived_time",

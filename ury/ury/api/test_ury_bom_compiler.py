@@ -30,16 +30,35 @@ def _row(item_code, qty_consumed_per_unit, stock_uom="Nos"):
     )
 
 
+def _explosion_only_get_all(explosion_rows):
+    """get_all side_effect: `explosion_rows` for BOM Explosion Item, [] otherwise.
+
+    Models a pure "grouping"/no-sub-assembly BOM: the pre-produced-stop-point
+    tree scan (which queries `BOM Item` for `is_sub_assembly_item=1` rows)
+    finds nothing, so the fast `BOM Explosion Item` path is used, matching
+    pre-existing single-level-BOM behavior.
+    """
+
+    def side_effect(doctype, filters=None, fields=None, **kwargs):
+        if doctype == "BOM Explosion Item":
+            return explosion_rows
+        return []
+
+    return side_effect
+
+
 class TestCompileBomVectorSingleLevel(unittest.TestCase):
     @patch(f"{MOD}.frappe.get_all")
     @patch(f"{MOD}.frappe.db.get_value")
     def test_single_level_bom_compiles_correctly(self, mock_get_value, mock_get_all):
         mock_get_value.return_value = "BOM-BURGER-001"
-        mock_get_all.return_value = [
-            _row("Bun", 1),
-            _row("Patty", 1),
-            _row("Cheese Slice", 2),
-        ]
+        mock_get_all.side_effect = _explosion_only_get_all(
+            [
+                _row("Bun", 1),
+                _row("Patty", 1),
+                _row("Cheese Slice", 2),
+            ]
+        )
 
         result = compile_bom_vector("Burger", 10, "URY Co")
 
@@ -55,7 +74,7 @@ class TestCompileBomVectorSingleLevel(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.get_value")
     def test_determinism_same_input_twice_identical_output(self, mock_get_value, mock_get_all):
         mock_get_value.return_value = "BOM-BURGER-001"
-        mock_get_all.return_value = [_row("Bun", 1), _row("Patty", 1)]
+        mock_get_all.side_effect = _explosion_only_get_all([_row("Bun", 1), _row("Patty", 1)])
 
         first = compile_bom_vector("Burger", 5, "URY Co")
         second = compile_bom_vector("Burger", 5, "URY Co")
@@ -64,13 +83,18 @@ class TestCompileBomVectorSingleLevel(unittest.TestCase):
 
 
 class TestCompileBomVectorNested(unittest.TestCase):
+    @patch(f"{MOD}.frappe.db.exists")
     @patch(f"{MOD}.frappe.get_all")
     @patch(f"{MOD}.frappe.db.get_value")
     def test_nested_bom_falls_back_to_manual_recursion_and_flattens_subassembly(
-        self, mock_get_value, mock_get_all
+        self, mock_get_value, mock_get_all, mock_exists
     ):
         # No BOM Explosion Item rows populated -> falls back to manual BOM Item
-        # recursion, exploding the sub-assembly (Patty Mix) down to raw items.
+        # recursion. Patty Mix is a pure "grouping" sub-assembly (no
+        # PRE_PRODUCED production configuration of its own), so it must still
+        # be flattened down to its raw ingredients.
+        mock_exists.return_value = False
+
         def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
             if doctype == "BOM Explosion Item":
                 return []
@@ -134,6 +158,83 @@ class TestCompileBomVectorNested(unittest.TestCase):
         self.assertEqual(by_item["Bun"]["qty"], 4)
         self.assertEqual(by_item["Beef"]["qty"], 4 * 0.2)
         self.assertEqual(by_item["Spice Mix"]["qty"], 4 * 0.01)
+
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_preproduced_subassembly_is_a_stop_point_not_exploded(
+        self, mock_get_value, mock_get_all, mock_exists
+    ):
+        # Masala Dosa -> Masala (sub-assembly, PRE_PRODUCED, independently
+        # stocked) -> [Rice, Spices] (Masala's own ingredients). Masala must
+        # appear as a component of Masala Dosa's vector; its own ingredients
+        # must NOT appear, since Masala's own stock is checked independently
+        # at ury_availability.py's PRE_PRODUCED level, not re-derived here.
+        mock_exists.side_effect = lambda doctype, filters: filters.get("item") == "Masala"
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Explosion Item":
+                # Even if ERPNext has pre-flattened this BOM (fully exploding
+                # through Masala down to Rice/Spices), the compiler must not
+                # use this fast path once a PRE_PRODUCED stop point exists
+                # anywhere in the tree -- so return rows that would be WRONG
+                # if used, to prove the fast path was actually skipped.
+                if filters.get("parent") in ("BOM-MASALADOSA-001", "BOM-MASALA-001"):
+                    return [_row("Rice", 0.5), _row("Spices", 0.05)]
+                return []
+            if doctype == "BOM Item":
+                parent = filters["parent"]
+                if parent == "BOM-MASALADOSA-001":
+                    return [
+                        frappe._dict(
+                            item_code="Masala",
+                            stock_qty=1,
+                            stock_uom="Kg",
+                            is_sub_assembly_item=1,
+                            bom_no="BOM-MASALA-001",
+                        ),
+                        frappe._dict(
+                            item_code="Dosa Batter",
+                            stock_qty=1,
+                            stock_uom="Kg",
+                            is_sub_assembly_item=0,
+                            bom_no=None,
+                        ),
+                    ]
+                if parent == "BOM-MASALA-001":
+                    return [
+                        frappe._dict(
+                            item_code="Rice", stock_qty=0.5, stock_uom="Kg",
+                            is_sub_assembly_item=0, bom_no=None,
+                        ),
+                        frappe._dict(
+                            item_code="Spices", stock_qty=0.05, stock_uom="Kg",
+                            is_sub_assembly_item=0, bom_no=None,
+                        ),
+                    ]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and field == "quantity":
+                return 1
+            if doctype == "BOM" and isinstance(filters, dict) and filters.get("item") == "Masala Dosa":
+                return "BOM-MASALADOSA-001"
+            if doctype == "BOM":
+                return 1
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = compile_bom_vector("Masala Dosa", 3, "URY Co")
+
+        self.assertEqual(result["source"], "manual_recursion")
+        by_item = {c["component_item"]: c for c in result["components"]}
+        self.assertIn("Masala", by_item)
+        self.assertEqual(by_item["Masala"]["qty"], 3)  # stop point: Masala itself, qty per its BOM line
+        self.assertEqual(by_item["Dosa Batter"]["qty"], 3)
+        self.assertNotIn("Rice", by_item)  # Masala's own ingredients must not leak through
+        self.assertNotIn("Spices", by_item)
 
 
 class TestSharedComponentIndex(unittest.TestCase):
@@ -411,7 +512,7 @@ class TestBuildDemandVector(unittest.TestCase):
             f"{MOD}.frappe.db.get_value"
         ) as mock_get_value:
             mock_get_value.return_value = "BOM-BURGER-001"
-            mock_get_all.return_value = [_row("Bun", 1)]
+            mock_get_all.side_effect = _explosion_only_get_all([_row("Bun", 1)])
 
             snapshot = {
                 "company": "URY Co",

@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_kot_notification import create_system_notification
+from ury.ury.api.ury_kot_notification import create_system_notification, order_delay_notification
 
 TEST_USER = "Administrator"
 TEST_SUBJECT = "_Test Order # 00001 Delayed"
@@ -47,3 +47,47 @@ class TestCreateSystemNotification(FrappeTestCase):
             )
         finally:
             frappe.db.delete("Notification Log", {"subject": other_subject})
+
+
+class TestOrderDelayNotificationPermissionBoundary(FrappeTestCase):
+    """order_delay_notification gates on
+    frappe.has_permission("URY KOT", "write", doc=kot_doc) and raises
+    frappe.PermissionError (not a generic ValidationError) when the calling
+    user lacks write access to the target KOT -- confirmed by reading the
+    guard in ury_kot_notification.py directly before writing this test.
+
+    Uses a real KOT fixture (no doctype-level mocking of frappe) and a real
+    roleless user via frappe.set_user(), matching the round-3 pattern for
+    this track (see EXECUTION_LOG.md Phase 4 round 3).
+    """
+
+    NEGATIVE_USER = "test_kot_notif_negative@example.com"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not frappe.db.exists("User", cls.NEGATIVE_USER):
+            frappe.get_doc(
+                {
+                    "doctype": "User",
+                    "email": cls.NEGATIVE_USER,
+                    "first_name": "Kot Notif Negative",
+                    "send_welcome_email": 0,
+                    "roles": [],
+                }
+            ).insert(ignore_permissions=True)
+
+    def setUp(self):
+        frappe.set_user("Administrator")
+        self.kot_name = frappe.db.get_value("URY KOT", {}, "name")
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+
+    def test_roleless_user_cannot_send_notification_for_kot_they_cannot_write(self):
+        if not self.kot_name:
+            self.skipTest("No URY KOT fixture available on this bench to test against")
+
+        frappe.set_user(self.NEGATIVE_USER)
+        with self.assertRaises(frappe.PermissionError):
+            order_delay_notification(self.kot_name)

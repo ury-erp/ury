@@ -357,3 +357,37 @@ class TestGetRunningLow(FrappeTestCase):
         first_item = result[0]
         self.assertEqual(first_item["item_code"], "ITEM3")
         self.assertEqual(first_item["remaining"], 100)
+
+
+class TestServiceLineRealPermissionBoundary(FrappeTestCase):
+	"""Real (non-mocked) coverage of `require_manager()` for this module.
+
+	Every test class above in this file patches `require_manager` out
+	entirely, so the actual permission gate guarding `get_service_line()`
+	and `get_running_low()` has never been exercised against a real
+	session/role table -- only the business logic behind it has. This uses
+	`frappe.set_user()` with a real, role-less user and asserts the actual
+	`frappe.PermissionError`.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from ury.ury.tests.factories import make_user
+
+		cls.no_role_user = make_user(
+			email="p4r3-serviceline-norole@ury.test", roles=[]
+		).name
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_get_service_line_rejects_user_without_manager_role(self):
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_service_line()
+
+	def test_get_running_low_rejects_user_without_manager_role(self):
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_running_low()

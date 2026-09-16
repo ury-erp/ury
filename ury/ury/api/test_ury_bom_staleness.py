@@ -386,5 +386,45 @@ class TestGetStaleDraftBoms(FrappeTestCase):
 		self.assertIn("diff", entry)
 
 
+class TestGetStaleDraftBomsRealPermissionBoundary(FrappeTestCase):
+	"""Real, un-mocked negative-permission coverage for get_stale_draft_boms.
+
+	Every other test class in this file patches `require_manager` out
+	entirely (`@patch(f"{MOD}.require_manager")`), so the gate itself has
+	never actually run in this file's test suite -- confirmed by reading
+	`ury.ury.report_api.utils.require_manager` directly: it raises
+	`frappe.PermissionError` for any user other than Administrator or one
+	holding "URY Manager"/"System Manager", checked via
+	`frappe.get_roles()`/`frappe.session.user`.
+	"""
+
+	NEGATIVE_USER = "test_bom_staleness_negative@example.com"
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		if not frappe.db.exists("User", cls.NEGATIVE_USER):
+			frappe.get_doc(
+				{
+					"doctype": "User",
+					"email": cls.NEGATIVE_USER,
+					"first_name": "Bom Staleness Negative",
+					"send_welcome_email": 0,
+					"roles": [],
+				}
+			).insert(ignore_permissions=True)
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_roleless_user_is_rejected_before_any_bom_query_runs(self):
+		frappe.set_user(self.NEGATIVE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			get_stale_draft_boms(company="_Test Company Not Reached")
+
+
 if __name__ == "__main__":
 	unittest.main()

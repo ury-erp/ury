@@ -1,5 +1,16 @@
 import frappe
-from frappe.desk.page.setup_wizard.setup_wizard import load_languages, load_country, setup_complete
+from frappe.desk.page.setup_wizard.setup_wizard import load_languages, setup_complete
+
+try:
+    # Frappe v15 and earlier exposed GeoIP-based country detection here.
+    from frappe.desk.page.setup_wizard.setup_wizard import load_country
+except ImportError:  # pragma: no cover - depends on installed Frappe version
+    # Frappe v16 removed load_country() (and the whole GeoIP helper it used,
+    # frappe.sessions.get_geo_ip_country) from the setup wizard. There is no
+    # replacement API, so detection is simply unavailable: return None and let
+    # get_setup_defaults() fall back to System Settings / the default country.
+    def load_country():
+        return None
 from frappe.geo.country_info import get_country_info, get_all
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 import pytz
