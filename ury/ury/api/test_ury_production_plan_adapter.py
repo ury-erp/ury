@@ -24,6 +24,17 @@ from ury.ury.api.ury_production_plan_adapter import (
 )
 
 
+def _warehouse_for_department(dt, department, fieldname):
+    """Stand-in for frappe.db.get_value("URY Production Department", dept,
+    "department_warehouse") used by tests below, keyed off department name.
+    """
+    mapping = {
+        "Kitchen": "Kitchen Warehouse - U",
+        "Bakery": "Bakery Warehouse - U",
+    }
+    return mapping.get(department)
+
+
 class FakeDoc(dict):
     """Dict-like stand-in for a Frappe document; only .get(...) is used."""
 
@@ -43,7 +54,7 @@ def make_snapshot(items=None, **overrides):
                 "stock_uom": "Nos",
                 "department": "Kitchen",
                 "production_unit": "Unit A",
-                "production_policy": "Make",
+                "production_policy": "PRE_PRODUCED",
                 "bom": "BOM-ITEM-A-001",
                 "bom_revision": 1,
             },
@@ -53,7 +64,7 @@ def make_snapshot(items=None, **overrides):
                 "stock_uom": "Nos",
                 "department": "Bakery",
                 "production_unit": "Unit B",
-                "production_policy": "Make",
+                "production_policy": "PRE_PRODUCED",
                 "bom": "BOM-ITEM-B-001",
                 "bom_revision": 2,
             },
@@ -77,6 +88,19 @@ def make_approved_doc(snapshot=None, status="Approved", name="SP-0001"):
 
 
 class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
+    def setUp(self):
+        # _snapshot_item_to_production_plan_item resolves the item's
+        # Finished Goods Warehouse via frappe.db.get_value("URY Production
+        # Department", department, "department_warehouse"); no live site is
+        # available here, so it is mocked for every test in this class,
+        # following the same FakeDoc-only-.get() style used for the rest of
+        # this file.
+        patcher = mock.patch(
+            "frappe.db.get_value", side_effect=_warehouse_for_department
+        )
+        self.mock_get_value = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_rejects_plan_with_no_status(self):
         doc = FakeDoc(name="SP-DRAFT", status="Draft", approval_snapshot=None)
         with self.assertRaises(UnapprovedSalesPlanError):
@@ -151,8 +175,13 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         doc = make_approved_doc()
         result = adapt_sales_plan_to_production_plan(doc)
         self.assertIn("get_items_from", result["_unmapped_fields"]["production_plan"])
-        self.assertIn(
+        # "warehouse" (Finished Goods Warehouse) is populated as of
+        # Track-Item N2 and must no longer be listed as unmapped.
+        self.assertNotIn(
             "warehouse", result["_unmapped_fields"]["production_plan_item"]
+        )
+        self.assertIn(
+            "planned_end_date", result["_unmapped_fields"]["production_plan_item"]
         )
         # None of the unmapped fields should have been silently populated
         # with a guessed value on the parent dict.
@@ -186,6 +215,95 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         )
         result = adapt_sales_plan_to_production_plan(doc)
         self.assertEqual(len(result["po_items"]), 2)
+
+    def test_direct_retail_items_excluded(self):
+        snapshot = make_snapshot(
+            items=[
+                {
+                    "item_code": "PP-1",
+                    "qty": 4,
+                    "stock_uom": "Nos",
+                    "department": "Kitchen",
+                    "production_policy": "PRE_PRODUCED",
+                    "bom": "BOM-PP-1",
+                },
+                {
+                    "item_code": "DR-1",
+                    "qty": 6,
+                    "stock_uom": "Nos",
+                    "department": "Bakery",
+                    "production_policy": "DIRECT_RETAIL",
+                    "bom": "BOM-DR-1",
+                },
+            ]
+        )
+        doc = make_approved_doc(snapshot=snapshot)
+        result = adapt_sales_plan_to_production_plan(doc)
+        item_codes = [row["item_code"] for row in result["po_items"]]
+        self.assertEqual(item_codes, ["PP-1"])
+        self.assertEqual(result["total_planned_qty"], 4)
+
+    def test_made_to_order_items_excluded(self):
+        # Made-to-order items are excluded per Track-Item N2's scope: the
+        # snapshot shape does not currently identify a MADE_TO_ORDER row's
+        # pre-produced inner-BOM sub-items, so plain MADE_TO_ORDER rows are
+        # dropped rather than guessed at.
+        snapshot = make_snapshot(
+            items=[
+                {
+                    "item_code": "MTO-1",
+                    "qty": 2,
+                    "stock_uom": "Nos",
+                    "department": "Kitchen",
+                    "production_policy": "MADE_TO_ORDER",
+                    "bom": "BOM-MTO-1",
+                },
+            ]
+        )
+        doc = make_approved_doc(snapshot=snapshot)
+        result = adapt_sales_plan_to_production_plan(doc)
+        self.assertEqual(result["po_items"], [])
+
+    def test_pre_produced_items_get_warehouse_department_and_start_date(self):
+        doc = make_approved_doc()
+        result = adapt_sales_plan_to_production_plan(doc)
+        po_items = result["po_items"]
+
+        row_a = po_items[0]
+        self.assertEqual(row_a["custom_ury_department"], "Kitchen")
+        self.assertEqual(row_a["warehouse"], "Kitchen Warehouse - U")
+        self.assertEqual(row_a["planned_start_date"], "2026-08-01")
+        # Backwards-compat key is still populated alongside the real field.
+        self.assertEqual(row_a["_ury_department"], "Kitchen")
+
+        row_b = po_items[1]
+        self.assertEqual(row_b["custom_ury_department"], "Bakery")
+        self.assertEqual(row_b["warehouse"], "Bakery Warehouse - U")
+        self.assertEqual(row_b["planned_start_date"], "2026-08-01")
+
+        self.mock_get_value.assert_any_call(
+            "URY Production Department", "Kitchen", "department_warehouse"
+        )
+        self.mock_get_value.assert_any_call(
+            "URY Production Department", "Bakery", "department_warehouse"
+        )
+
+    def test_warehouse_is_none_when_department_unresolved(self):
+        snapshot = make_snapshot(
+            items=[
+                {
+                    "item_code": "PP-2",
+                    "qty": 1,
+                    "stock_uom": "Nos",
+                    "department": "Unknown Dept",
+                    "production_policy": "PRE_PRODUCED",
+                    "bom": "BOM-PP-2",
+                },
+            ]
+        )
+        doc = make_approved_doc(snapshot=snapshot)
+        result = adapt_sales_plan_to_production_plan(doc)
+        self.assertIsNone(result["po_items"][0]["warehouse"])
 
 
 if __name__ == "__main__":

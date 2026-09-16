@@ -14,8 +14,11 @@ depth). It is intentionally:
   ``ury.ury.api.ury_sales_plan.freeze_approval_snapshot``) and never mutates
   anything.
 - Pure / side-effect-free: the same input snapshot always produces the same
-  output mapping. No ``frappe.get_doc``, no ``.insert()``/``.save()``/
-  ``.submit()``, no database writes of any kind.
+  output mapping. No ``.insert()``/``.save()``/``.submit()``, no database
+  writes of any kind. As of Track-Item N2, ``_snapshot_item_to_production_plan_item``
+  performs one read-only ``frappe.db.get_value`` lookup (department ->
+  Finished Goods Warehouse) -- still no writes, no ``frappe.get_doc`` inside
+  ``adapt_sales_plan_to_production_plan`` itself.
 - Advisory / dry-run only: callers get back a plain ``dict`` shaped like the
   ERPNext ``Production Plan`` doctype's fields (verified against the local
   checkout at
@@ -48,12 +51,19 @@ below and are surfaced in the output under the ``"_unmapped_fields"`` key
 rather than being guessed at.
 
 URY's ``department`` grouping has no equivalent field on the stock ERPNext
-``Production Plan`` or ``Production Plan Item`` doctypes (no custom field was
-found in this checkout). Rather than invent one, department fidelity is
-preserved out-of-band in the output under ``"_ury_department_index"``, which
-maps each department name to the list of ``po_items`` indices belonging to
-it. This keeps the ``po_items`` list itself a faithful, unmodified subset of
-real ERPNext ``Production Plan Item`` fields.
+``Production Plan Item`` doctype, so a custom field
+(``custom_ury_department``, a Link to ``URY Production Department``) is
+added via ``ury/fixtures/custom_field.json`` (Track-Item N2) and populated
+directly on each ``po_items`` row. Department fidelity is additionally kept
+out-of-band in the output under ``"_ury_department_index"`` (mapping each
+department name to the list of ``po_items`` indices belonging to it) for
+backwards compatibility with any existing caller of that key.
+
+Scope filter (Track-Item N2): ``po_items`` only ever contains PRE_PRODUCED
+items (and, in principle, MADE_TO_ORDER items' pre-produced inner-BOM
+sub-items -- not currently identifiable from the snapshot shape; see the
+NOTE above ``INCLUDED_PRODUCTION_POLICIES`` in this module).
+DIRECT_RETAIL items, and other MADE_TO_ORDER items, are excluded.
 """
 
 import json
@@ -67,6 +77,29 @@ from frappe import _
 #: module has no behavioural coupling to the sales-plan state machine beyond
 #: reading the resulting doc fields.
 APPROVED_STATES = {"Approved", "Locked for Production"}
+
+#: Mirrors ury.ury.api.ury_availability.POLICY_* constants. Kept as local
+#: literals (not imported) for the same reason APPROVED_STATES is: no
+#: behavioural coupling to another module beyond the string values.
+POLICY_PRE_PRODUCED = "PRE_PRODUCED"
+POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
+POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+
+#: Track-Item N2 filter: a Production Plan only ever covers items this
+#: adapter/site actually produces ahead of demand. PRE_PRODUCED items are
+#: always in scope. MADE_TO_ORDER items are excluded UNLESS the snapshot row
+#: represents one of their pre-produced inner/sub-BOM components -- but the
+#: ``snapshot_item`` shape frozen by ``ury_sales_plan.snapshot_item`` today
+#: (item_code, qty, stock_uom, department, production_unit,
+#: production_policy, bom, bom_revision) carries no field identifying a row
+#: as a sub-component of a parent MADE_TO_ORDER item (no
+#: ``parent_item``/``is_sub_component``/equivalent). NOTE: made-to-order
+#: pre-produced inner-BOM expansion is therefore out of scope here -- it
+#: depends on the snapshot/BOM compiler carrying that data, which is a
+#: separate gap tracked in tracks/sa-item-production-config-gaps/PLAN.md.
+#: This adapter must not attempt to fix the BOM compiler; it only filters on
+#: the ``production_policy`` values the snapshot already provides.
+INCLUDED_PRODUCTION_POLICIES = (POLICY_PRE_PRODUCED,)
 
 #: Production Plan (parent) fields this adapter cannot populate from a Sales
 #: Plan snapshot alone -- see module docstring.
@@ -99,7 +132,6 @@ UNMAPPED_PRODUCTION_PLAN_FIELDS = (
 #: populate from a Sales Plan snapshot line alone.
 UNMAPPED_PRODUCTION_PLAN_ITEM_FIELDS = (
     "include_exploded_items",
-    "warehouse",  # target Finished Goods Warehouse: an operational choice
     "pending_qty",
     "ordered_qty",
     "produced_qty",
@@ -137,8 +169,11 @@ def adapt_sales_plan_to_production_plan(sales_plan_doc):
     """
     snapshot = _require_frozen_snapshot(sales_plan_doc)
 
-    items = snapshot.get("items") or []
-    po_items = [_snapshot_item_to_production_plan_item(row) for row in items]
+    all_items = snapshot.get("items") or []
+    items = _filter_items_in_scope(all_items)
+    po_items = [
+        _snapshot_item_to_production_plan_item(row, snapshot) for row in items
+    ]
     department_index = _build_department_index(items)
 
     production_plan = {
@@ -182,20 +217,59 @@ def _require_frozen_snapshot(sales_plan_doc):
     return raw_snapshot
 
 
-def _snapshot_item_to_production_plan_item(row):
+def _filter_items_in_scope(items):
+    """Keep only snapshot rows this Production Plan should cover.
+
+    See ``INCLUDED_PRODUCTION_POLICIES`` for the full rationale: PRE_PRODUCED
+    rows are included; DIRECT_RETAIL rows are excluded entirely (never
+    produced ahead of demand); MADE_TO_ORDER rows are excluded except for
+    their pre-produced inner-BOM sub-items, which the current snapshot shape
+    cannot identify (out of scope, see the NOTE above
+    ``INCLUDED_PRODUCTION_POLICIES``).
+    """
+    return [
+        row
+        for row in items
+        if row.get("production_policy") in INCLUDED_PRODUCTION_POLICIES
+    ]
+
+
+def _snapshot_item_to_production_plan_item(row, snapshot):
     """Map one frozen snapshot line (see ury_sales_plan.snapshot_item) to a
     Production Plan Item-shaped dict, using only real, confirmed field names.
+
+    Note: unlike the rest of this module, this helper is allowed one
+    ``frappe.db.get_value`` read (to resolve the department's Finished Goods
+    Warehouse) -- ``get_items_from_sales_plan`` already isn't 100% pure
+    (it calls ``frappe.get_doc``), and ``adapt_sales_plan_to_production_plan``
+    itself still performs no writes.
     """
+    department = row.get("department")
+    warehouse = None
+    if department:
+        warehouse = frappe.db.get_value(
+            "URY Production Department", department, "department_warehouse"
+        )
     return {
         "item_code": row.get("item_code"),
         "bom_no": row.get("bom"),
         "planned_qty": row.get("qty"),
         "stock_uom": row.get("stock_uom"),
-        "planned_start_date": None,  # not present in the Sales Plan snapshot
+        # No per-item date exists in the Sales Plan snapshot today, so the
+        # plan's own plan_date is used as the best available start date.
+        "planned_start_date": snapshot.get("plan_date"),
         "description": None,
+        # Finished Goods Warehouse, resolved via the item's department --
+        # mirrors ury_production_context.py's department_warehouse fallback.
+        "warehouse": warehouse,
+        # Real Production Plan Item custom field (see
+        # ury/fixtures/custom_field.json) so department is stored directly on
+        # the item rather than only in the out-of-band index below.
+        "custom_ury_department": department,
         # URY-specific context preserved verbatim, namespaced so it is never
-        # mistaken for a stock ERPNext field.
-        "_ury_department": row.get("department"),
+        # mistaken for a stock ERPNext field. _ury_department is kept for
+        # backwards compat with any other caller of this module.
+        "_ury_department": department,
         "_ury_production_unit": row.get("production_unit"),
         "_ury_production_policy": row.get("production_policy"),
         "_ury_bom_revision": row.get("bom_revision"),
@@ -229,13 +303,13 @@ def get_items_from_sales_plan(sales_plan):
     the in-memory, unsaved Production Plan form.
 
     Returns a dict with ``company``, ``posting_date`` and a flat ``items``
-    list of ``{item_code, bom_no, planned_qty, stock_uom}`` -- real
-    ``Production Plan Item`` fieldnames only, department/production-unit/
-    policy context from the sales plan is dropped here since the stock
-    ``Production Plan Item`` doctype has no field to hold it (see
-    ``_ury_department_index`` in the full adapter output for that detail,
-    exposed separately if a caller wants it via
-    ``adapt_sales_plan_to_production_plan`` directly).
+    list of ``{item_code, bom_no, planned_qty, stock_uom, planned_start_date,
+    warehouse, custom_ury_department}`` -- real ``Production Plan Item``
+    fieldnames (``custom_ury_department`` is the custom field added via
+    ``ury/fixtures/custom_field.json``, see module docstring). Only
+    PRE_PRODUCED items (and, where identifiable, MADE_TO_ORDER pre-produced
+    inner-BOM sub-items -- see ``INCLUDED_PRODUCTION_POLICIES``) are
+    returned; DIRECT_RETAIL items are excluded entirely.
     """
     sales_plan_doc = frappe.get_doc("URY Sales Plan", sales_plan)
     adapted = adapt_sales_plan_to_production_plan(sales_plan_doc)
@@ -246,6 +320,9 @@ def get_items_from_sales_plan(sales_plan):
             "bom_no": row.get("bom_no"),
             "planned_qty": row.get("planned_qty"),
             "stock_uom": row.get("stock_uom"),
+            "planned_start_date": row.get("planned_start_date"),
+            "warehouse": row.get("warehouse"),
+            "custom_ury_department": row.get("custom_ury_department"),
         }
         for row in adapted.get("po_items") or []
         if row.get("item_code")
