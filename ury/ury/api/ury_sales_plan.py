@@ -6,6 +6,7 @@ import json
 import frappe
 from frappe import _
 
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_production_validation import validate_item_production_configuration
 
 
@@ -46,6 +47,25 @@ def _validate_plan_scope(doc):
     branch_company = frappe.db.get_value("Branch", branch, "company")
     if not branch_company or branch_company != company:
         frappe.throw(_("Sales Plan branch and company do not match"), frappe.ValidationError)
+
+
+def populate_item_production_context(doc):
+    """For each row in doc.items, resolve department/production_unit/production_policy/bom
+    from URY Item Production Configuration via resolve_production_context(), and set them on
+    the row when a match is found. Never raises if no config exists for a row -- just leaves
+    that row's fields as-is (frontend-provided values, if any, are preserved)."""
+    for row in doc.get("items") or []:
+        context = resolve_production_context(row.get("item_code"), doc.get("branch"), doc.get("company"))
+        if not context:
+            continue
+        if context.get("department"):
+            row.department = context.get("department")
+        if context.get("production_unit"):
+            row.production_unit = context.get("production_unit")
+        if context.get("bom"):
+            row.bom = context.get("bom")
+        if context.get("production_policy"):
+            row.production_policy = context.get("production_policy")
 
 
 def validate_plan_items(doc):
@@ -196,7 +216,7 @@ SALES_PLAN_ITEM_FIELDS = (
 
 
 @frappe.whitelist(methods=["POST"])
-def save_draft(plan_date, branch, company=None, service_period=None, items=None):
+def save_draft(plan_date, branch, company=None, service_period=None, items=None, enforcement_mode=None):
     """Create or update the Draft Sales Plan for a (branch, company, plan_date) scope."""
     if not plan_date or not branch:
         frappe.throw(_("plan_date and branch are required"), frappe.ValidationError)
@@ -254,6 +274,9 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None)
 
     _validate_plan_scope(doc)
 
+    if enforcement_mode:
+        doc.enforcement_mode = enforcement_mode
+
     doc.service_period = service_period
     doc.set("items", [])
     for row in item_rows:
@@ -307,10 +330,14 @@ def get_plan_status(branch, plan_date):
     rows = frappe.get_all(
         "URY Sales Plan",
         filters={"branch": branch, "plan_date": plan_date},
-        fields=["name", "status"],
+        fields=["name", "status", "enforcement_mode"],
         order_by="modified desc",
         limit=1,
     )
     if not rows:
-        return {"name": None, "status": None}
-    return {"name": rows[0]["name"], "status": rows[0]["status"]}
+        return {"name": None, "status": None, "enforcement_mode": None}
+    return {
+        "name": rows[0]["name"],
+        "status": rows[0]["status"],
+        "enforcement_mode": rows[0]["enforcement_mode"],
+    }

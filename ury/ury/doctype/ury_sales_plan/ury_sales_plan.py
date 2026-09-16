@@ -11,6 +11,7 @@ from ury.ury.api.ury_sales_plan import (
 	append_audit,
 	flag_stale_bom_revisions,
 	freeze_approval_snapshot,
+	populate_item_production_context,
 	validate_no_overlapping_plan_scope,
 	validate_plan_items,
 )
@@ -33,6 +34,14 @@ class URYSalesPlan(Document):
 	def validate(self):
 		old = self.get_doc_before_save()
 		prev_status = old.status if old else None
+
+		# Resolve item production context (department/production_unit/
+		# production_policy/bom) server-side from URY Item Production
+		# Configuration before anything else touches `bom` -- in particular
+		# before flag_stale_bom_revisions() below, so BOM staleness checks
+		# see the freshly-populated bom rather than a stale/missing value
+		# supplied by the frontend.
+		populate_item_production_context(self)
 
 		# Surface (never block on) rows whose requirement was computed from
 		# a BOM yield standard that has since changed -- but only while the
