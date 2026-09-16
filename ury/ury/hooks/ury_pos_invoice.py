@@ -332,6 +332,8 @@ def validate_invoice(doc, method):
         doc.waiter = doc.modified_by
     if getattr(frappe.flags, "ury_bill_split", False):
         return
+    if getattr(frappe.flags, "ury_qty_reduction", False):
+        return
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
     if doc.invoice_printed == 1 and remove_items == 0:
