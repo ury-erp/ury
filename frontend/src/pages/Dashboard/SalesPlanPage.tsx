@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Badge, Button, Card, DataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -371,6 +371,7 @@ export const SalesPlanPage: React.FC = () => {
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  const [enforcementMode, setEnforcementMode] = useState<'Hard' | 'Soft' | 'Alert'>('Hard');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -441,6 +442,7 @@ export const SalesPlanPage: React.FC = () => {
             if (!cancelled) {
               setPlanName(status.name);
               setPlanStatus((status.status as PlanStatus) || null);
+              setEnforcementMode((status.enforcement_mode as 'Hard' | 'Soft' | 'Alert') || 'Hard');
             }
           } catch (statusErr) {
             // A missing/unsaved plan is expected and non-fatal (the stepper
@@ -531,6 +533,7 @@ export const SalesPlanPage: React.FC = () => {
         branch: historyScope.branch,
         company: historyScope.company,
         items: items.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
+        enforcement_mode: enforcementMode,
       });
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
@@ -590,6 +593,17 @@ export const SalesPlanPage: React.FC = () => {
                 className="pl-9"
               />
             </label>
+            <Select
+              aria-label="Enforcement Mode"
+              title="Hard: block order placement once plan_remaining hits 0. Soft: allow the order, over-plan status is computable from committed_qty + fulfilled_qty > qty. Alert: allow the order and notify branch-scoped Production Manager/URY Manager recipients when the plan is exceeded."
+              value={enforcementMode}
+              onChange={(event) => setEnforcementMode(event.target.value as 'Hard' | 'Soft' | 'Alert')}
+              disabled={loading || saving}
+            >
+              <option value="Hard">Hard</option>
+              <option value="Soft">Soft</option>
+              <option value="Alert">Alert</option>
+            </Select>
             <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
               <Save className="h-4 w-4" />
               <span>{saving ? 'Saving...' : 'Save Draft'}</span>
