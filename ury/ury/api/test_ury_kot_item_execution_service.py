@@ -7,11 +7,13 @@ from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_kot_item_execution_service import (
 	IN_PREPARATION,
+	INVALID_EXECUTION_TRANSITION,
 	ITEM_EXECUTION_DOCTYPE,
 	KOT_EXECUTION_DOCTYPE,
 	QUEUED,
 	READY,
 	SERVED,
+	ItemExecutionError,
 	_attach_ready_posting_intent,
 	bump_item_execution_revision,
 	get_kot_execution_state,
@@ -163,6 +165,39 @@ class _ExecutionHarness:
 		doc.insert = MagicMock(side_effect=_insert)
 		doc.save = MagicMock(side_effect=_save)
 		return doc
+
+
+class TestServeItemExecutionBlocksCancelledKot(FrappeTestCase):
+	def _serve_with_kot_type(self, kot_type):
+		with patch(f"{MODULE}._kot_for_item", return_value="URY KOT-1"), patch(
+			f"{MODULE}.frappe.db.get_value", return_value=kot_type
+		), patch(f"{MODULE}._transition") as mock_transition:
+			serve_item_execution("KOTITEM-1", "serve-1")
+		return mock_transition
+
+	def test_rejects_cancelled_kot(self):
+		with patch(f"{MODULE}._kot_for_item", return_value="URY KOT-1"), patch(
+			f"{MODULE}.frappe.db.get_value", return_value="Cancelled"
+		), patch(f"{MODULE}._transition") as mock_transition:
+			with self.assertRaises(ItemExecutionError) as ctx:
+				serve_item_execution("KOTITEM-1", "serve-1")
+			self.assertEqual(ctx.exception.reason_code, INVALID_EXECUTION_TRANSITION)
+			mock_transition.assert_not_called()
+
+	def test_rejects_partially_cancelled_kot(self):
+		with patch(f"{MODULE}._kot_for_item", return_value="URY KOT-1"), patch(
+			f"{MODULE}.frappe.db.get_value", return_value="Partially cancelled"
+		), patch(f"{MODULE}._transition") as mock_transition:
+			with self.assertRaises(ItemExecutionError) as ctx:
+				serve_item_execution("KOTITEM-1", "serve-1")
+			self.assertEqual(ctx.exception.reason_code, INVALID_EXECUTION_TRANSITION)
+			mock_transition.assert_not_called()
+
+	def test_allows_non_cancelled_kot(self):
+		mock_transition = self._serve_with_kot_type("New Order")
+		mock_transition.assert_called_once_with(
+			"KOTITEM-1", SERVED, "serve-1", "served_by", "served_at", "serve"
+		)
 
 
 class TestKotItemExecution(FrappeTestCase):

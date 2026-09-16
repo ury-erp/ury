@@ -475,6 +475,14 @@ def mark_item_ready(kot_item, idempotency_key):
 
 @frappe.whitelist()
 def serve_item_execution(kot_item, idempotency_key):
+	kot = _kot_for_item(kot_item)
+	if kot:
+		kot_type = frappe.db.get_value(KOT_DOCTYPE, kot, "type")
+		if kot_type in ("Cancelled", "Partially cancelled"):
+			raise ItemExecutionError(
+				INVALID_EXECUTION_TRANSITION,
+				_("KOT has been cancelled and cannot be served"),
+			)
 	return _transition(kot_item, SERVED, idempotency_key, "served_by", "served_at", "serve")
 
 
