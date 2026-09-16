@@ -14,9 +14,7 @@
   "branch",
   "department_manager",
   "department_warehouse",
-  "cost_center",
-  "issue_control_policy",
-  "wastage_policy"
+  "cost_center"
  ],
  "fields": [
   {
@@ -52,7 +50,8 @@
    "fieldname": "department_manager",
    "fieldtype": "Link",
    "label": "Department Manager",
-   "options": "User"
+   "options": "User",
+   "description": "Scopes report/analytics access at the department level (who can view department-level reports). This is distinct from 'Lead Chef' on URY Production Unit, which scopes KOT (kitchen order ticket) visibility at the individual production-unit level. These are two intentionally separate fields, not duplicates, so don't try to merge them."
   },
   {
    "fieldname": "department_warehouse",
@@ -67,19 +66,6 @@
    "label": "Cost Center",
    "options": "Cost Center",
    "reqd": 1
-  },
-  {
-   "default": "Plan Controlled",
-   "fieldname": "issue_control_policy",
-   "fieldtype": "Select",
-   "label": "Issue Control Policy",
-   "options": "Plan Controlled\nPlan Controlled with Override\nOpen Issue",
-   "reqd": 1
-  },
-  {
-   "fieldname": "wastage_policy",
-   "fieldtype": "Data",
-   "label": "Wastage Policy"
   }
  ],
  "index_web_pages_for_search": 1,
