@@ -11,7 +11,9 @@ Three entry points:
 - `compile_bom_vector(item_code, qty, company)`: explode one top-level item's
   active BOM into a flat per-component quantity vector for a planned qty,
   recursing through nested sub-assemblies until only non-sub-assembly
-  ("raw"/stock) components remain.
+  ("raw"/stock) components remain, or until a sub-assembly is itself
+  independently stocked (see "Pre-produced sub-assemblies" below), in which
+  case that sub-assembly is a leaf and is not exploded further.
 - `compile_shared_component_index(item_codes, company)`: for a set of
   top-level items, build the reverse dependency index component_item ->
   [{top_level_item, qty_per_unit}], so shortage-propagation logic (V3-42/
@@ -33,10 +35,40 @@ on every BOM save/submit and it already resolves nested sub-assemblies
 without this module re-implementing that traversal (and its phantom-item /
 process-loss rules) by hand. Only when a BOM has no `BOM Explosion Item` rows
 (e.g. an environment where the table has not been populated, or a BOM saved
-without submission in a way that skipped explosion) does this module fall
-back to manual recursive traversal of `BOM Item`, exploding any line flagged
+without submission in a way that skipped explosion), or when the BOM tree
+contains a pre-produced stop point (see below), does this module fall back
+to manual recursive traversal of `BOM Item`, exploding any line flagged
 `is_sub_assembly_item` by looking up that sub-assembly's own default/active
-BOM and recursing, until only non-sub-assembly stock lines remain.
+BOM and recursing, until only non-sub-assembly stock lines (or pre-produced
+stop points) remain.
+
+## Pre-produced sub-assemblies (stop-and-check, not explode)
+
+`BOM Explosion Item` always flattens every sub-assembly down to raw/leaf
+components -- it has no notion of a sub-assembly that is itself produced
+ahead of time and held in its own stock (e.g. a Masala made in batches and
+kept on hand, used inside a made-to-order Masala Dosa BOM). Exploding such a
+sub-assembly into its own raw ingredients on every order would check and
+consume the wrong inventory: the Masala's own stock should be checked
+directly, not re-derived from its ingredients each time.
+
+A `BOM Item` line with `is_sub_assembly_item=1` is therefore a stop point,
+not a pass-through, whenever its `item_code` has its own active `URY Item
+Production Configuration` row with `production_policy="PRE_PRODUCED"` --
+this is the same production-policy value `ury_availability.py` already uses
+to mean "produced ahead of time and tracked as finished-good stock", so a
+sub-assembly's own configuration is the single source of truth for whether
+it is independently stocked. At a stop point, the sub-assembly's item_code
+becomes a component row of its parent's vector (its own qty consumed, not
+its ingredients' quantities); it is not recursed into. A sub-assembly line
+with no such configuration (a pure "grouping" sub-assembly, e.g. a plating
+or combo BOM with no independent stock of its own) is unaffected and
+continues to explode fully to its leaf components, matching prior behavior.
+
+Because `BOM Explosion Item` cannot express this stop point, whenever a
+BOM's tree contains at least one such pre-produced sub-assembly, this module
+skips the `BOM Explosion Item` fast path for that BOM entirely and always
+uses manual recursion, so the stop point is actually honored.
 
 ## control_mode sourcing
 
@@ -297,20 +329,77 @@ def _resolve_active_bom(item_code, company):
 	return bom_name
 
 
-def _explode_bom_components(bom_name, qty):
-	"""Return ({component_item: {"qty", "stock_uom"}}, source_label)."""
-	explosion_rows = frappe.get_all(
-		BOM_EXPLOSION_ITEM_DOCTYPE,
-		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
-		fields=["item_code", "qty_consumed_per_unit", "stock_uom"],
+PRODUCTION_CONFIG_DOCTYPE = "URY Item Production Configuration"
+POLICY_PRE_PRODUCED = "PRE_PRODUCED"
+
+
+def _is_independently_stocked_subassembly(item_code):
+	"""True if `item_code` is itself pre-produced/independently stocked.
+
+	A sub-assembly line whose item has its own active `URY Item Production
+	Configuration` marked `PRE_PRODUCED` (in any branch/department -- this
+	module has no branch context) is stocked and checked at its own level
+	elsewhere (see `_fill_pre_produced` in `ury_availability.py`); exploding
+	it further into its own raw ingredients would double-count/misattribute
+	demand that a pre-produced item already absorbs by being produced and
+	held in stock ahead of time (e.g. Masala inside a Masala Dosa BOM). Such
+	a line is therefore a stop point for BOM explosion, not a pass-through.
+	"""
+	return bool(
+		frappe.db.exists(
+			PRODUCTION_CONFIG_DOCTYPE,
+			{"item": item_code, "active": 1, "production_policy": POLICY_PRE_PRODUCED},
+		)
 	)
 
-	if explosion_rows:
-		components = {}
-		for row in explosion_rows:
-			entry = components.setdefault(row.item_code, {"qty": 0.0, "stock_uom": row.stock_uom})
-			entry["qty"] += (row.qty_consumed_per_unit or 0) * qty
-		return components, "bom_explosion_item"
+
+def _bom_tree_has_independently_stocked_subassembly(bom_name, visited=None):
+	"""True if any sub-assembly line anywhere in `bom_name`'s tree is a stop point.
+
+	Used to decide whether the fast `BOM Explosion Item` path (which ERPNext
+	pre-flattens all the way to raw components, with no notion of a
+	pre-produced stop point) is safe to use, or whether explosion must fall
+	back to manual recursion so `_explode_bom_recursive` can actually stop at
+	such a sub-assembly instead of exploding through it.
+	"""
+	visited = visited or set()
+	if bom_name in visited:
+		return False
+	visited = visited | {bom_name}
+
+	lines = frappe.get_all(
+		BOM_ITEM_DOCTYPE,
+		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2), "is_sub_assembly_item": 1},
+		fields=["item_code", "bom_no", "is_sub_assembly_item"],
+	)
+
+	for line in lines:
+		if not line.is_sub_assembly_item:
+			continue
+		if _is_independently_stocked_subassembly(line.item_code):
+			return True
+		sub_bom = line.bom_no or _resolve_active_bom(line.item_code, None)
+		if _bom_tree_has_independently_stocked_subassembly(sub_bom, visited):
+			return True
+
+	return False
+
+
+def _explode_bom_components(bom_name, qty):
+	"""Return ({component_item: {"qty", "stock_uom"}}, source_label)."""
+	if not _bom_tree_has_independently_stocked_subassembly(bom_name):
+		explosion_rows = frappe.get_all(
+			BOM_EXPLOSION_ITEM_DOCTYPE,
+			filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
+			fields=["item_code", "qty_consumed_per_unit", "stock_uom"],
+		)
+
+		if explosion_rows:
+			components = {}
+			for row in explosion_rows:
+				entry = components.setdefault(row.item_code, {"qty": 0.0, "stock_uom": row.stock_uom})
+				entry["qty"] += (row.qty_consumed_per_unit or 0) * qty
+			return components, "bom_explosion_item"
 
 	components = {}
 	_explode_bom_recursive(bom_name, qty, components, visited=set())
@@ -335,7 +424,7 @@ def _explode_bom_recursive(bom_name, parent_qty, components, visited):
 	for line in lines:
 		line_qty = ((line.stock_qty or 0) / bom_quantity) * parent_qty
 
-		if line.is_sub_assembly_item:
+		if line.is_sub_assembly_item and not _is_independently_stocked_subassembly(line.item_code):
 			sub_bom = line.bom_no or _resolve_active_bom(line.item_code, None)
 			_explode_bom_recursive(sub_bom, line_qty, components, visited)
 			continue
