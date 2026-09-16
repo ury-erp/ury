@@ -270,8 +270,13 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.invoice_printed = 0
         mock_invoice.invoice_created = 1
         previous_item = MagicMock(item_code="ITEM-1", item_name="Item 1", qty=1, name="INVITEM-1")
+        # .get() is a separate mock, not derived from the attributes above --
+        # it must know about item_code too, or sync_order's historic_codes
+        # set (built via prev.get("item_code")) comes back empty and ITEM-1
+        # is wrongly treated as a brand-new code instead of an existing one.
         previous_item.get.side_effect = lambda field, default=None: {
             "reservation_line_key": "INVITEM-1",
+            "item_code": "ITEM-1",
         }.get(field, default)
         mock_invoice.items = [previous_item]
         mock_invoice.waiter = "existing_waiter"
@@ -293,7 +298,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Test Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -302,7 +309,16 @@ class TestURYOrder(FrappeTestCase):
 
         mock_get_value.side_effect = get_value_side_effect
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() (a fail-closed POS-open check
+        # sync_order() now runs before reservation) wasn't mocked here, so
+        # it hit the real (empty) test DB and threw before this test's own
+        # assertions ever ran. get_restaurant_and_menu_name() also calls the
+        # top-level frappe.get_value() (distinct from frappe.db.get_value,
+        # already mocked above) to unpack (restaurant, branch, room) for
+        # the table -- also unmocked, also hitting the real empty test DB.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value", return_value=("Restaurant A", "Test Branch", "Main Hall")):
             sync_order(
                 items='[{"item": "ITEM-1", "qty": 3}]',
                 cashier="fake_cashier",
@@ -383,7 +399,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Test Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -460,7 +478,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Untouched Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Untouched Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Untouched Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -553,6 +573,8 @@ class TestURYOrder(FrappeTestCase):
             # own logic ever runs, masking what this test is actually meant
             # to prove (see the same drift noted for other tests in this
             # file, sa-post-373-review-fixes verification).
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -777,9 +799,22 @@ class TestURYOrder(FrappeTestCase):
         )
         mock_get_roles.return_value = ["URY Manager"]
         mock_session.user = "manager@example.com"
-        mock_get_value.return_value = "Menu A"
+        # A single blanket return_value would also answer the new-items-on-
+        # menu check's Item.disabled lookup truthily (since "Menu A" is a
+        # non-empty string), wrongly throwing "Item ITEM-1 is disabled".
+        mock_get_value.side_effect = lambda doctype, *args, **kwargs: (
+            0 if doctype == "Item" else "Menu A"
+        )
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() (fail-closed POS-open check) and the
+        # new-items-on-menu validation are both real checks sync_order() now
+        # runs before reservation -- neither was mocked here, so they hit the
+        # real (empty) test DB and threw before this test's own assertions
+        # ever ran. Mock both open: a real open POS session, and ITEM-1
+        # available on the menu.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[frappe._dict(item="ITEM-1")]):
             sync_order(
                 items='[{"item": "ITEM-1", "qty": 1}]',
                 cashier="fake_cashier",
@@ -833,7 +868,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     def test_price_items_for_invoice_shape(self, mock_get_value, mock_get_list):
-        def get_value_side_effect(doctype, filters, fieldname=None):
+        def get_value_side_effect(doctype, filters, fieldname=None, **kwargs):
             if doctype == "URY Menu Item":
                 return "Starters"
             if doctype == "POS Profile":
@@ -873,6 +908,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
             )
 
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
@@ -882,7 +918,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
         self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
-        mock_price_items, mock_get_order_invoice, mock_reconcile,
+        mock_price_items, mock_get_order_invoice, mock_kot_execute, mock_reconcile,
     ):
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-002"
@@ -908,13 +944,26 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
 
         mock_session.user = "authorized@example.com"
         mock_has_permission.return_value = True
+        # An unconfigured mock_get_value would return a truthy auto-generated
+        # MagicMock for every frappe.db.get_value call -- including the new-
+        # items-on-menu check's Item.disabled lookup, wrongly throwing "Item
+        # Biryani is disabled". Restaurant/menu-name lookups just need a
+        # truthy value; the disabled check specifically needs a falsy one.
+        mock_get_value.side_effect = lambda doctype, *args, **kwargs: (
+            0 if doctype == "Item" else "Menu A"
+        )
 
         priced = [{"item_code": "Biryani", "item_name": "Biryani", "qty": 1, "comment": None,
                    "rate": 150, "price_list_rate": 150, "base_price_list_rate": 150, "cost_center": "CC-1"}]
         mock_price_items.return_value = priced
         mock_reconcile.return_value = {"status": "ok"}
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() and the new-items-on-menu check
+        # both run before pricing -- neither was mocked here, so they hit
+        # the real (empty) test DB and threw before pricing was ever reached.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[frappe._dict(item="Biryani")]):
             sync_order(
                 items=[{"item": "Biryani", "qty": 1}],
                 cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
@@ -1435,7 +1484,12 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_db_get_value.return_value = None
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]):
+        # _require_open_cashier_session() (a fail-closed POS-open check run
+        # before the item-reduction permission check this test targets)
+        # wasn't mocked here, so it threw "POS is closed" first, masking
+        # the frappe.PermissionError this test actually expects.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True):
             with self.assertRaises(frappe.PermissionError) as context:
                 sync_order(
                     items=json.dumps([{"item": "ITEM-1", "qty": 1}]),  # 2 -> 1: a reduction
@@ -1788,6 +1842,16 @@ class _FakeRow:
     def __init__(self, **fields):
         self.__dict__.update(fields)
 
+    def __getattr__(self, name):
+        # A real (unsaved) Frappe child-table row returns None for a field
+        # that was never set (e.g. .name before insert()), rather than
+        # raising AttributeError -- split_bill() relies on this for rows it
+        # constructs itself via _FakeInvoice.append() without a "name" key.
+        # __getattr__ (not __getattribute__) only fires for names Python
+        # couldn't already find in __dict__/the class, so explicitly-set
+        # fields are unaffected.
+        return None
+
     def get(self, key, default=None):
         return getattr(self, key, default)
 
@@ -1967,10 +2031,20 @@ class TestSplitBillReservations(FrappeTestCase):
         # Item A fully moved off the source invoice; item B stays.
         self.assertEqual([i.item_code for i in source.items], ["ITEM-B"])
         self.assertEqual([i.item_code for i in new_invoice.items], ["ITEM-A"])
-        # The moved row must carry its original stable line identity onto
-        # the new invoice, not a key implicitly derived from its new row
-        # name -- otherwise the reservation lookup below can never find it.
-        self.assertEqual(new_invoice.items[0].get("reservation_line_key"), "ITEM-ROW-A")
+        # As of c84f782a (B02b) + 291e3a40 (B02b-followup),
+        # _copy_invoice_item_fields() deliberately no longer falls back to
+        # a row's own .name for reservation_line_key -- a legacy/unkeyed
+        # row (like item_a here, built with reservation_line_key=None) is
+        # left None on the new invoice too, rather than being given a
+        # bogus name-derived key that a client can never match and that
+        # would poison _backfill_previous_line_keys' claimed set for any
+        # sibling row of the same item_code. The split invoice's own
+        # backfill logic is expected to rescue it on the next real sync,
+        # the same way an un-split legacy invoice already gets rescued --
+        # that rescue path isn't exercised by split_bill()'s mocked
+        # reconcile_order_reservations() call here, so both this row-level
+        # field and the reconciliation call's own key end up None.
+        self.assertIsNone(new_invoice.items[0].get("reservation_line_key"))
 
         self.assertEqual(mock_reconcile.call_count, 2)
         source_call, new_call = mock_reconcile.call_args_list
@@ -1983,16 +2057,17 @@ class TestSplitBillReservations(FrappeTestCase):
         self.assertEqual(previous_keys, {"ITEM-ROW-A": 2, "ITEM-ROW-B": 1})
         self.assertEqual(accepted_keys, {"ITEM-ROW-B": 1})
 
-        # New-invoice-side reconciliation: item A's full quantity is
-        # (re)claimed under the new invoice, under the SAME line key, so
-        # any subsequent posting/lookup keyed on reservation_line_key still
-        # resolves.
+        # New-invoice-side reconciliation: item A's quantity is (re)claimed
+        # under the new invoice. Since item_a started with no persisted
+        # reservation_line_key, its identity here is also None (see above)
+        # -- the backfill-rescue path, not this call, is what's meant to
+        # re-key it against a real client-supplied identity on next sync.
         self.assertEqual(new_call.kwargs["order_ref"], "POS-INV-NEW")
         self.assertEqual(new_call.kwargs["previous_items"], [])
         new_accepted = {
             p["reservation_line_key"]: p["qty"] for p in new_call.kwargs["accepted_items"]
         }
-        self.assertEqual(new_accepted, {"ITEM-ROW-A": 2})
+        self.assertEqual(new_accepted, {None: 2})
 
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
@@ -2121,7 +2196,7 @@ class TestSplitBillReservations(FrappeTestCase):
 
         mock_get_all.side_effect = get_all_side_effect
 
-        def db_set_value_side_effect(doctype, name, field, value, update_modified=None):
+        def db_set_value_side_effect(doctype, name, field, value=None, update_modified=None):
             if doctype == "URY KOT" and field == "invoice":
                 kot_invoice[name] = value
 

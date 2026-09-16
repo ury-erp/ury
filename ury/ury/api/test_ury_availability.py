@@ -17,10 +17,10 @@ and its branch-isolation guarantee.
 
 from unittest.mock import patch
 
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_availability import _resolve_plan_remaining, get_item_availability
-
 
 MODULE = "ury.ury.api.ury_availability"
 
@@ -640,3 +640,68 @@ class TestResolvePlanRemainingReflectsCounters(FrappeTestCase):
         result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
 
         self.assertIsNone(result)
+
+
+class TestGetItemAvailabilityBranchScopePermissionBoundary(FrappeTestCase):
+    """Real, un-mocked negative-permission coverage for
+    ury_availability.get_item_availability's branch-scope guard
+    (_verify_branch_scope), which the file's own module docstring admits
+    has never been run against a live bench/DB.
+
+    _verify_branch_scope() (read directly in source before writing this
+    test) raises frappe.PermissionError when the calling user is not
+    Administrator/System Manager/URY Admin and has no `URY User` row
+    assigning them to the requested branch. That check runs immediately
+    after the item_code presence check, before any config/DB lookups
+    this suite's other tests mock out -- so a roleless user with no
+    branch assignment must be rejected before reaching those mocked
+    helpers at all.
+    """
+
+    NEGATIVE_USER = "test_availability_negative@example.com"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not frappe.db.exists("User", cls.NEGATIVE_USER):
+            frappe.get_doc(
+                {
+                    "doctype": "User",
+                    "email": cls.NEGATIVE_USER,
+                    "first_name": "Availability Negative",
+                    "send_welcome_email": 0,
+                    "roles": [],
+                }
+            ).insert(ignore_permissions=True)
+
+        cls.branch = frappe.db.get_value("Branch", {}, ["name", "company"], as_dict=True)
+
+    def setUp(self):
+        frappe.set_user("Administrator")
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+
+    def test_roleless_user_with_no_branch_assignment_is_rejected(self):
+        if not self.branch:
+            self.skipTest("No Branch fixture available on this bench to test against")
+
+        # Confirm the negative user really has no URY User row on this branch.
+        self.assertFalse(
+            frappe.db.exists(
+                "URY User",
+                {
+                    "parenttype": "Branch",
+                    "parent": self.branch.name,
+                    "user": self.NEGATIVE_USER,
+                },
+            )
+        )
+
+        frappe.set_user(self.NEGATIVE_USER)
+        with self.assertRaises(frappe.PermissionError):
+            get_item_availability(
+                item_code="_Test Item Not Reached",
+                branch=self.branch.name,
+                company=self.branch.company,
+            )
