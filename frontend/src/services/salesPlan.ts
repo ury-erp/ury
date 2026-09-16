@@ -150,6 +150,7 @@ export interface SaveSalesPlanDraftParams {
   company?: string;
   service_period?: string;
   items: SaveSalesPlanDraftItem[];
+  enforcement_mode?: string;
 }
 
 export interface SaveSalesPlanDraftResponse {
@@ -170,6 +171,7 @@ export interface GetPlanStatusParams {
 export interface GetPlanStatusResponse {
   name: string | null;
   status: string | null;
+  enforcement_mode: string | null;
 }
 
 export const salesPlanService = {
@@ -195,6 +197,7 @@ export const salesPlanService = {
         company: params.company,
         service_period: params.service_period,
         items: params.items,
+        enforcement_mode: params.enforcement_mode,
       },
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
