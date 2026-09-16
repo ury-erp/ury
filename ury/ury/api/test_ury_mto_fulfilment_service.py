@@ -520,3 +520,86 @@ class TestNoRealStockMutationAPI(FrappeTestCase):
 					source,
 					f"{module.__name__} must never reference {needle!r}",
 				)
+
+
+class TestFulfilMtoOrderRealPermissionBoundary(FrappeTestCase):
+	"""Real (non-mocked, `frappe.set_user()`-based) negative-permission coverage
+	for `fulfil_mto_order()`'s `_require_create_permission()` gate.
+
+	Every other test in this file mocks `frappe.has_permission` itself (per
+	the module docstring's own admission these were "not executed... no
+	live bench/site/DB available"), so the real doctype-role permission
+	check on `URY Fulfilment Record` has never been exercised against an
+	actual role-permission table. Note this module raises
+	`MtoFulfilmentError` (a `frappe.ValidationError` subclass carrying a
+	`reason_code`), not a bare `frappe.PermissionError` -- asserting on the
+	actual raised type/reason_code here, not on an assumed generic one.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from ury.ury.tests.factories import make_user
+
+		# "Stock Manager" has read/report on URY Fulfilment Record per the
+		# doctype's fixture permissions, but explicitly NOT "create".
+		cls.read_only_user = make_user(
+			email="p4r3-mtofulfil-readonly@ury.test", roles=["Stock Manager"]
+		).name
+		cls.no_role_user = make_user(
+			email="p4r3-mtofulfil-norole@ury.test", roles=[]
+		).name
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def _assert_not_permitted(self):
+		# `_require_kot()` and `_find_prior_fulfilment()` run BEFORE
+		# `_require_create_permission()` in the real fail-closed ordering
+		# (confirmed by reading `fulfil_mto_order()`'s source directly, and
+		# by this test initially failing with KOT_NOT_FOUND against a real
+		# bench when it used a nonexistent KOT) -- so a nonexistent KOT
+		# never reaches the permission check at all. Bypassing only
+		# `_require_kot` (not `_require_create_permission`/`has_permission`
+		# itself) isolates the real, un-mocked permission check under test
+		# without needing a full URY KOT/POS Invoice fixture chain.
+		with patch(f"{MODULE}._require_kot"), patch(
+			f"{MODULE}._find_prior_fulfilment", return_value=None
+		):
+			with self.assertRaises(MtoFulfilmentError) as ctx:
+				fulfil_mto_order(
+					kot="P4R3-NONEXISTENT-KOT",
+					item_code="P4R3-NONEXISTENT-ITEM",
+					qty=1,
+					reservation_group_ref="P4R3-GROUP-1",
+					batch_key="P4R3-BATCH-1",
+				)
+			self.assertEqual(ctx.exception.reason_code, "NOT_PERMITTED")
+
+	def test_read_only_role_cannot_fulfil_mto_order(self):
+		frappe.set_user(self.read_only_user)
+		self._assert_not_permitted()
+
+	def test_no_role_user_cannot_fulfil_mto_order(self):
+		frappe.set_user(self.no_role_user)
+		self._assert_not_permitted()
+
+	def test_nonexistent_kot_reports_kot_not_found_even_for_unprivileged_user(self):
+		"""Documents the REAL fail-closed ordering found by this test class:
+		the KOT-existence check runs before the create-permission check, so
+		an unprivileged caller probing a nonexistent KOT sees KOT_NOT_FOUND,
+		not NOT_PERMITTED. This is a minor KOT-existence oracle (an
+		unprivileged, authenticated user can distinguish a real KOT name
+		from a fake one before any permission check), not a privilege
+		escalation -- no fulfilment record is created or read either way --
+		flagged here as an explicit, intentional-per-module-docstring
+		behaviour rather than silently masked by mocking it away."""
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(MtoFulfilmentError) as ctx:
+			fulfil_mto_order(
+				kot="P4R3-NONEXISTENT-KOT",
+				item_code="P4R3-NONEXISTENT-ITEM",
+				qty=1,
+				reservation_group_ref="P4R3-GROUP-1",
+			)
+		self.assertEqual(ctx.exception.reason_code, "KOT_NOT_FOUND")

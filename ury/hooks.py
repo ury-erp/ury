@@ -306,7 +306,7 @@ commands = [
 # Testing
 # -------
 
-# before_tests = "ury.install.before_tests"
+before_tests = "ury.install.before_tests"
 
 # Overriding Methods
 # ------------------------------
