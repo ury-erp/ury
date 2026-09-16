@@ -154,6 +154,23 @@ def create_kot_doc(
         )
     kot_doc.insert()
     kot_doc.submit()
+
+    # N4: additive, non-blocking Work Order creation for MADE_TO_ORDER
+    # items on this KOT. Never allowed to block/fail KOT creation itself --
+    # `create_work_orders_for_kot` already isolates and swallows per-item
+    # failures internally, but this call is wrapped defensively as well so a
+    # completely unexpected error in that module can never propagate into
+    # the live KOT-creation path.
+    try:
+        from ury.ury.api.ury_mto_work_order_service import create_work_orders_for_kot
+
+        create_work_orders_for_kot(kot_doc.name)
+    except Exception:
+        frappe.log_error(
+            title="ury_kot_generate.create_kot_doc: MTO Work Order creation failed",
+            message=frappe.get_traceback(),
+        )
+
     return kot_doc.name
 
 # Function to get all production item groups for a given branch
