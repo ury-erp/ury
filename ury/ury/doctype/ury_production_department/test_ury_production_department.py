@@ -44,7 +44,6 @@ class TestURYProductionDepartment(FrappeTestCase):
 		dept.branch = branch
 		dept.department_warehouse = warehouse
 		dept.cost_center = cost_center
-		dept.issue_control_policy = "Plan Controlled"
 		return dept
 
 	def test_company_ownership_validation_warehouse_on_insert(self):
