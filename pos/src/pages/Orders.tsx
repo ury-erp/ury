@@ -711,7 +711,10 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
-                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => {
+                  {/* qty === 0 rows are a fully-reduced item kept server-side
+                      (zeroed, not deleted -- see ury_pos_invoice_qty_reduction's
+                      full-removal note) and must stay hidden here. */}
+                  {selectedOrderItems.filter((item) => !item.is_disposable && item.qty > 0).map((item, index) => {
                     const discountPercentage = item.rate < item.price_list_rate
                       ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
                       : null;
