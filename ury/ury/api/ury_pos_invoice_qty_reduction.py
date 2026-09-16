@@ -45,6 +45,7 @@ this module.
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 from ury.ury.api.ury_kot_generate import (
 	create_order_items,
@@ -194,7 +195,10 @@ def reduce_order_item_qty(invoice_id, item_row_name, new_qty, item_code=None, re
 			).format(new_qty),
 		)
 
-	if new_qty == 0 and len(pos_invoice.items) <= 1:
+	other_rows_with_qty = sum(
+		1 for row in pos_invoice.items if row.name != item_row_name and flt(row.qty) > 0
+	)
+	if new_qty == 0 and other_rows_with_qty == 0:
 		raise QtyReductionError(
 			LAST_ITEM_CANNOT_BE_REMOVED,
 			_(
@@ -234,10 +238,18 @@ def reduce_order_item_qty(invoice_id, item_row_name, new_qty, item_code=None, re
 	# validate_invoice's post-print guard for exactly this legitimate write.
 	frappe.flags.ury_qty_reduction = True
 	try:
-		if new_qty == 0:
-			pos_invoice.items = [row for row in pos_invoice.items if row.name != item_row_name]
-		else:
-			item_row.qty = new_qty
+		# A full removal (new_qty == 0) sets the row's qty to 0 rather than
+		# deleting it from the child table. Physically removing a row changes
+		# the child table's row COUNT after submit, which ERPNext's own
+		# accounts_controller.check_if_child_table_updated() cannot handle --
+		# it diffs before/after child rows by parallel index and raises a raw
+		# IndexError once the arrays are different lengths (observed live on
+		# a real restored dataset, not merely theoretical). Frontends must
+		# treat a qty == 0 row as removed/hidden -- it stays present in
+		# `items` for ERPNext's own post-submit bookkeeping, but contributes
+		# nothing to totals or KDS/cancel-KOT display beyond the cancel-KOT
+		# already generated for its full original qty.
+		item_row.qty = new_qty
 		pos_invoice.save(ignore_permissions=False)
 	finally:
 		frappe.flags.ury_qty_reduction = False
