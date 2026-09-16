@@ -184,3 +184,72 @@ export async function cancelOrder(
     reason,
   });
 }
+
+export interface ReduceOrderItemQtyResponse {
+  invoice: string;
+  item_row_name: string;
+  item_code: string;
+  previous_qty: number;
+  new_qty: number;
+  delta: number;
+  order_type: string;
+  cancel_kot_names: string[];
+  actor: string;
+}
+
+/**
+ * Reduces (or fully removes, `newQty = 0`) one item's qty on an already
+ * saved/printed POS Invoice via `ury.ury.api.ury_pos_invoice_qty_reduction
+ * .reduce_order_item_qty` — generic across cashier (Register) and captain
+ * callers by design (see that module's docstring). Only permitted when the
+ * invoice's `order_type` is in the POS Profile's
+ * `custom_qty_reduction_allowed_order_types` allow-list; the server raises
+ * a distinct `ORDER_TYPE_NOT_ALLOWED` error (message text only — no
+ * structured reason code in the response) otherwise, which callers should
+ * detect from the message and surface as a clear per-order-type rejection
+ * rather than a generic failure toast.
+ *
+ * `itemRowName` must be the actual POS Invoice Item child-table row `name`
+ * (NOT `item_code`) — the server matches and removes exactly that row.
+ * Matching by item_code alone was ambiguous whenever an item appeared on
+ * more than one row.
+ */
+export async function reduceOrderItemQty(
+  invoiceId: string,
+  itemRowName: string,
+  newQty: number,
+  reason?: string
+): Promise<ReduceOrderItemQtyResponse> {
+  const res = await call.post<{ message: ReduceOrderItemQtyResponse }>(
+    'ury.ury.api.ury_pos_invoice_qty_reduction.reduce_order_item_qty',
+    {
+      invoice_id: invoiceId,
+      item_row_name: itemRowName,
+      new_qty: newQty,
+      reason,
+    }
+  );
+  return res.message;
+}
+
+/**
+ * True when a caught error from `reduceOrderItemQty` is the server's
+ * `ORDER_TYPE_NOT_ALLOWED` rejection (detected from the message text — the
+ * backend does not expose a structured reason code in the response body).
+ */
+export function isOrderTypeNotAllowedError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /not permitted for order type/i.test(message);
+}
+
+/**
+ * True when a caught error from `reduceOrderItemQty` is the server's
+ * `LAST_ITEM_CANNOT_BE_REMOVED` rejection (detected from the message text —
+ * the backend does not expose a structured reason code in the response
+ * body). Callers should surface this distinctly, telling the user to cancel
+ * the whole invoice instead of removing its last item.
+ */
+export function isLastItemCannotBeRemovedError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /only item on invoice/i.test(message);
+}

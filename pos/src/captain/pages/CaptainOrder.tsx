@@ -11,7 +11,11 @@ import {
   syncOrder,
   SyncOrderRequest,
   tableTransfer,
+  reduceOrderItemQty,
+  isOrderTypeNotAllowedError,
+  isLastItemCannotBeRemovedError,
 } from '../../lib/order-api';
+import { parseFrappeError } from '../../lib/pos-opening-api';
 import { printOrder } from '../../lib/print';
 import { resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
@@ -76,6 +80,7 @@ export default function CaptainOrder() {
     isOrderInteractionDisabled,
     selectedOrderType,
     setSelectedOrderType,
+    loadTableOrder,
   } = usePOSStore();
 
   // Every captain table order used to be assumed Dine In, but takeaway
@@ -112,6 +117,7 @@ export default function CaptainOrder() {
   const [transferDestinations, setTransferDestinations] = useState<Table[]>([]);
   const [isTransferDestinationsLoading, setIsTransferDestinationsLoading] = useState(false);
   const [isTransferCaptainOpen, setIsTransferCaptainOpen] = useState(false);
+  const [reducingLineId, setReducingLineId] = useState<string | null>(null);
 
   // Default to the Order view for a table that already has a baseline
   // order, Menu for a fresh table — matches PLAN §5 ("free table: menu
@@ -289,6 +295,53 @@ export default function CaptainOrder() {
   // (kept in sync with `context.order.name` by `useTableOrderContext`) is
   // the source of truth, matching what `handleSend`'s `last_invoice` uses.
   const invoiceId = orderId ?? context?.order?.name ?? null;
+  const orderType = context?.order?.order_type ?? DINE_IN;
+
+  // Reduces a line that is already saved/printed on the server (an
+  // "Already Ordered" line) by 1 — separate from `handleConfirmedReduce`
+  // above, which only stages a local change to be re-synced on Send/Update.
+  // This calls `reduce_order_item_qty` immediately so the reduction (and
+  // its partial cancel-KOT) persists right away, matching the same backend
+  // path the Cashier Register view uses for a saved order. Only permitted
+  // when Order Type is allowed on the POS Profile; that rejection is
+  // surfaced distinctly rather than as a generic failure toast.
+  const handleReduceConfirmedNow = async (line: OrderDeltaLine) => {
+    if (isInteractionDisabled || !invoiceId) return;
+    if (!line.invoiceItemName) {
+      showToast.error('Unable to resolve this item for quantity reduction.');
+      return;
+    }
+    setReducingLineId(line.uniqueId);
+    try {
+      // `reduce_order_item_qty` treats `new_qty` as an ABSOLUTE target against
+      // the server/DB qty for this row, so the baseline must come from
+      // `line.baseQty` (the server-confirmed quantity) — NOT `line.confirmedQty`,
+      // which is `min(baseQty, curQty)` and reflects the locally-staged working
+      // cart. Using `confirmedQty` here would send the wrong absolute qty
+      // whenever the working cart has already diverged from the server value.
+      const newQty = line.baseQty - 1;
+      const result = await reduceOrderItemQty(invoiceId, line.invoiceItemName, newQty);
+      const kotNames = result.cancel_kot_names?.length ? result.cancel_kot_names.join(', ') : null;
+      showToast.success(
+        newQty <= 0
+          ? `${line.name} removed. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+          : `${line.name} reduced to qty ${newQty}. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+      );
+      if (table) await loadTableOrder(table);
+    } catch (error) {
+      const parsedMessage = parseFrappeError(error) || (error instanceof Error ? error.message : null);
+      if (isOrderTypeNotAllowedError(parsedMessage)) {
+        showToast.error(`Quantity reduction isn't allowed for ${orderType} orders.`);
+      } else if (isLastItemCannotBeRemovedError(parsedMessage)) {
+        showToast.error('This is the last item on the order. Cancel the whole order instead.');
+      } else {
+        showToast.error(parsedMessage || 'Failed to reduce item quantity.');
+      }
+    } finally {
+      setReducingLineId(null);
+    }
+  };
+
   const canReprintKot = permissions?.reprint_kot ?? false;
   const canTransferTable = permissions?.transfer_table ?? false;
   const canTransferCaptain = permissions?.transfer_captain ?? false;
@@ -450,15 +503,28 @@ export default function CaptainOrder() {
               </h2>
               <div className="space-y-2">
                 {alreadyOrderedLines.map((line) => (
-                  <CaptainOrderLine
-                    key={`confirmed-${line.uniqueId}`}
-                    line={line}
-                    variant="confirmed"
-                    disabled={isInteractionDisabled}
-                    onDecrement={canModify && canReduce ? () => handleConfirmedReduce(line) : undefined}
-                    onRemove={canModify && canRemove ? () => handleConfirmedRemove(line) : undefined}
-                    onEditNote={canModify ? () => handleEditConfirmedNote(line) : undefined}
-                  />
+                  <div key={`confirmed-${line.uniqueId}`}>
+                    <CaptainOrderLine
+                      line={line}
+                      variant="confirmed"
+                      disabled={isInteractionDisabled}
+                      onDecrement={canModify && canReduce ? () => handleConfirmedReduce(line) : undefined}
+                      onRemove={canModify && canRemove ? () => handleConfirmedRemove(line) : undefined}
+                      onEditNote={canModify ? () => handleEditConfirmedNote(line) : undefined}
+                    />
+                    {canModify && canReduce && invoiceId && line.confirmedQty > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleReduceConfirmedNow(line)}
+                        disabled={isInteractionDisabled || reducingLineId === line.uniqueId}
+                        className="ms-3 mt-0.5 mb-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {reducingLineId === line.uniqueId
+                          ? 'Reducing…'
+                          : 'Reduce & notify kitchen'}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </section>
