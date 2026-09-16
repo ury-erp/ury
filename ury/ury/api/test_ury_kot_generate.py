@@ -287,9 +287,26 @@ class TestGetAllProductionItemGroups(FrappeTestCase):
 class TestCreateKotDoc(FrappeTestCase):
     """Tests for create_kot_doc function."""
 
+    # N4 wires an additive, non-blocking call to
+    # ury_mto_work_order_service.create_work_orders_for_kot right after KOT
+    # insert/submit. It's imported inline (inside create_kot_doc) rather than
+    # at module level, so it must be patched on its OWN module, not on
+    # ury_kot_generate -- and it must be patched in every test here, since
+    # frappe.get_doc/db.get_value are mocked module-globally (they patch the
+    # shared `frappe` module object, not a per-test-file copy) with a fixed,
+    # short side_effect list that the real create_work_orders_for_kot would
+    # otherwise also draw from, exhausting it and raising a StopIteration
+    # this test never intended to exercise (caught live on CI: both tests in
+    # this class failed this way before this patch was added).
+    @patch(
+        "ury.ury.api.ury_mto_work_order_service.create_work_orders_for_kot",
+        return_value={"created": [], "skipped": [], "errors": []},
+    )
     @patch(f"{MODULE}.frappe.get_doc")
     @patch(f"{MODULE}.frappe.db.get_value")
-    def test_create_kot_doc_with_table(self, mock_db_get_value, mock_get_doc):
+    def test_create_kot_doc_with_table(
+        self, mock_db_get_value, mock_get_doc, mock_create_work_orders
+    ):
         """Test creating a KOT document with a restaurant table: branch/menu
         is derived from the table's room/restaurant, never from getBranch()
         (removed -- see the comment in create_kot_doc for why session-branch
@@ -333,9 +350,15 @@ class TestCreateKotDoc(FrappeTestCase):
         mock_kot_doc.insert.assert_called_once()
         mock_kot_doc.submit.assert_called_once()
 
+    @patch(
+        "ury.ury.api.ury_mto_work_order_service.create_work_orders_for_kot",
+        return_value={"created": [], "skipped": [], "errors": []},
+    )
     @patch(f"{MODULE}.frappe.get_doc")
     @patch(f"{MODULE}.frappe.db.get_value")
-    def test_create_kot_doc_without_table(self, mock_db_get_value, mock_get_doc):
+    def test_create_kot_doc_without_table(
+        self, mock_db_get_value, mock_get_doc, mock_create_work_orders
+    ):
         """Test creating a KOT document without a restaurant table (takeaway):
         menu is derived from the INVOICE's own branch (pos_invoice.branch),
         not from the acting user's session branch."""
