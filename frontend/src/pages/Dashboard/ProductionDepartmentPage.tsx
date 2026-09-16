@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Badge, Button, DataTable, Input, Page, Panel, Select, Spinner, showToast, type DataTableColumn } from '@ury/ui';
+import { Button, DataTable, Input, Page, Panel, Spinner, showToast, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
