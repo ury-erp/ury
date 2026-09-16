@@ -65,9 +65,11 @@ def _kot_item_row(name, item, quantity=2, work_order=None):
 
 
 def _make_kot_doc(branch="Branch A", rows=None):
-    kot = frappe._dict({"name": "KOT-1", "branch": branch})
-    kot.get = lambda key, default=None: rows if key == "kot_items" else kot.__dict__.get(key, default)
-    return kot
+    # frappe._dict is a dict subclass whose __setattr__ writes into the dict
+    # itself, so overriding `.get` as an instance attribute is silently
+    # shadowed by the real, inherited `dict.get` at lookup time -- put
+    # `kot_items` directly in the dict instead.
+    return frappe._dict({"name": "KOT-1", "branch": branch, "kot_items": rows or []})
 
 
 def _context(policy="MADE_TO_ORDER", company="Company A", warehouse="WH - C", bom=None):
