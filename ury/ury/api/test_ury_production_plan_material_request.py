@@ -170,6 +170,22 @@ class GenerateMaterialRequestsTests(unittest.TestCase):
         self.assertEqual(transfer_doc.fields["items"][0]["qty"], 20.0)
         self.assertEqual(result["skipped_sufficient_stock"], [])
 
+    def test_unset_store_warehouse_raises_clear_error(self):
+        plan = make_plan(
+            [
+                {
+                    "item_code": "FINISHED-A",
+                    "bom_no": "BOM-A",
+                    "planned_qty": 10,
+                    "warehouse": "Kitchen WH - U",
+                    "custom_ury_department": "Kitchen",
+                }
+            ]
+        )
+        with mock.patch.object(mr_module, "compile_bom_vector"):
+            with self.assertRaises(mr_module.frappe.ValidationError):
+                self._run(plan, {}, store_warehouse=None)
+
     def test_min_order_qty_bumps_purchase_quantity(self):
         plan = make_plan(
             [

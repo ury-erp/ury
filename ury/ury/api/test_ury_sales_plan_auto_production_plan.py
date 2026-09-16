@@ -21,6 +21,9 @@ class _FakeSalesPlanDoc(dict):
 		super().__init__(**kwargs)
 		self.name = kwargs.get("name", "SP-0001")
 
+	def set(self, key, value):
+		self[key] = value
+
 
 ADAPTED_PLAN = {
 	"doctype": "Production Plan",
@@ -71,13 +74,12 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		mock_adapt.assert_not_called()
 		mock_get_doc.assert_not_called()
 
-	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.db.set_value")
 	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
 	@patch(
 		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
 	)
 	def test_setting_enabled_creates_and_submits_plan_and_links_back(
-		self, mock_adapt, mock_get_doc, mock_set_value
+		self, mock_adapt, mock_get_doc
 	):
 		frappe.db.set_single_value(DOCTYPE, "enable_auto_production_plan", 1)
 		mock_adapt.return_value = ADAPTED_PLAN
@@ -103,9 +105,7 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 
 		fake_plan.insert.assert_called_once()
 		fake_plan.submit.assert_called_once()
-		mock_set_value.assert_called_once_with(
-			"URY Sales Plan", "SP-0001", "custom_ury_production_plan", "PP-0001"
-		)
+		self.assertEqual(sales_plan_doc.get("custom_ury_production_plan"), "PP-0001")
 
 	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
 	@patch(
