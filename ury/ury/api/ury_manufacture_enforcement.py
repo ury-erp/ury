@@ -13,6 +13,23 @@ Manufacture Stock Entry (hand-built from the desk, a script, an import, or
 any future code path) for a PRE_PRODUCED/IN_HOUSE finished item unless it is
 linked to a submitted Work Order.
 
+`ury/ury/doctype/bulk_production/bulk_production.py`'s `create_stock_entry()`
+is a second, pre-existing, shipped hand-built Manufacture Stock Entry
+producer (no `work_order` either) that the original migration simply missed.
+Unlike the MADE_TO_ORDER `ury_fulfilment_posting_service` case above, Bulk
+Production is not scoped by production_policy/sourcing_mode -- it can target
+PRE_PRODUCED/IN_HOUSE finished items directly (that is its whole purpose: a
+manual bulk manufacture run). Blocking it here would regress a shipped
+feature, and it is not the "hand-built Manufacture Stock Entry bypassing
+Work Order" problem this hook targets (POS/KOT-time fulfilment). It is
+therefore explicitly exempted: `create_stock_entry()` sets a transient,
+in-memory-only `stock_entry.flags.ignore_manufacture_enforcement = True`
+before `insert()`, and this hook honors that flag. The flag is deliberately
+not persisted (no new Stock Entry field/fixture) -- simpler, but it means the
+exemption is not visible/queryable on the Stock Entry record after the fact;
+Bulk Production's own `production_items` child table (which links back to
+the Stock Entry it created) is the audit trail for that instead.
+
 Wired via `hooks.py`'s `doc_events` (not edited by this module -- the
 orchestrator merges the entry centrally):
 
@@ -57,6 +74,9 @@ def validate_manufacture_requires_work_order(doc, method=None):
 
 	No-ops (does nothing) for:
 	- Stock Entries that are not Manufacture-purpose.
+	- Stock Entries created by the pre-existing Bulk Production flow
+	  (`doc.flags.ignore_manufacture_enforcement` set by
+	  `BulkProduction.create_stock_entry()` -- see module docstring).
 	- Finished item rows whose item has no active PRE_PRODUCED/IN_HOUSE
 	  `URY Item Production Configuration` row (including items this app
 	  does not manage at all).
@@ -64,6 +84,9 @@ def validate_manufacture_requires_work_order(doc, method=None):
 	  (`is_finished_item != 1`).
 	"""
 	if doc.get("purpose") != MANUFACTURE_PURPOSE and doc.get("stock_entry_type") != MANUFACTURE_PURPOSE:
+		return
+
+	if doc.flags.get("ignore_manufacture_enforcement"):
 		return
 
 	work_order = (doc.get("work_order") or "").strip() if isinstance(doc.get("work_order"), str) else doc.get("work_order")
