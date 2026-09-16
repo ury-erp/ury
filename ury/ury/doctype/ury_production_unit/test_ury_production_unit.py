@@ -9,7 +9,6 @@ class TestURYProductionUnit(FrappeTestCase):
 
 		for fieldname in (
 			"department",
-			"unit_type",
 			"enabled",
 			"lead_chef",
 			"assigned_employees",
@@ -37,7 +36,6 @@ class TestURYProductionUnit(FrappeTestCase):
 				"production": self._unique_name("V3-12 Production Unit"),
 				"department": department,
 				"enabled": 1,
-				"unit_type": "Test Unit",
 				"lead_chef": employee,
 				"workstation": workstation,
 				"workstation_type": workstation_type,

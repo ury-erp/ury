@@ -195,7 +195,6 @@ def _ensure_departments(branch_name, company_name, warehouse, cost_center):
 				"branch": branch_name,
 				"department_warehouse": warehouse,
 				"cost_center": cost_center,
-				"issue_control_policy": "Plan Controlled",
 			}
 		)
 		doc.insert(ignore_permissions=True)

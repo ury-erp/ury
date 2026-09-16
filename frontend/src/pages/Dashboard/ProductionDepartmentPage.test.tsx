@@ -45,8 +45,6 @@ const mockDepartments = [
     department_manager: "manager@ury.test",
     department_warehouse: "Central Store",
     cost_center: "Production",
-    issue_control_policy: "Plan Controlled",
-    wastage_policy: "Allow",
     enabled: true,
   },
 ];
