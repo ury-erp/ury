@@ -508,7 +508,7 @@ export default {
 
     resolveDisposition(kot, kotitem, disposition) {
       this.call
-        .post("ury.api.ury_kot_cancellation_service.resolve_cancellation_disposition", {
+        .post("ury.ury.api.ury_kot_cancellation_service.resolve_cancellation_disposition", {
           kot: kot.name,
           item_row_name: kotitem.name,
           disposition: disposition,
