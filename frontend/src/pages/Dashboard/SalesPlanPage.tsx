@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Badge, Button, Card, DataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
+import { CalendarDays, History, Save, Search, X } from 'lucide-react';
+import { AttentionFeed, Button, Card, DataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
-import { useAuth } from '../../store/useAuth';
+import { WorkflowStatusStepper } from '../../components/workflow/WorkflowStatusStepper';
 import {
   buildSalesPlanDraft,
   buildSalesPlanDraftKey,
@@ -22,25 +22,6 @@ type PlanStatus =
   | 'Approved'
   | 'Locked for Production'
   | 'Superseded/Cancelled';
-
-const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
-  { key: 'draft', label: 'Draft', matches: ['Draft'] },
-  { key: 'review', label: 'Review', matches: ['Proposed', 'Submitted for Approval'] },
-  { key: 'approval', label: 'Approval', matches: ['Approved'] },
-  { key: 'production', label: 'Ready for Production', matches: ['Locked for Production'] },
-];
-
-// Each entry describes the single next-action button shown for a given
-// status: what it says, which status it transitions to, and whether the
-// action is restricted to manager/approval-capable users. This intentionally
-// surfaces only one obvious next step at a time rather than every possible
-// transition, per product direction.
-const NEXT_ACTION: Partial<Record<PlanStatus, { label: string; targetState: PlanStatus; icon: React.ElementType; managerOnly?: boolean }>> = {
-  Draft: { label: 'Submit for Review', targetState: 'Proposed', icon: Send },
-  Proposed: { label: 'Submit for Approval', targetState: 'Submitted for Approval', icon: Send },
-  'Submitted for Approval': { label: 'Approve', targetState: 'Approved', icon: CheckCircle2, managerOnly: true },
-  Approved: { label: 'Lock for Production', targetState: 'Locked for Production', icon: Lock },
-};
 
 const getToday = () => {
   const now = new Date();
@@ -321,61 +302,20 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) 
   );
 };
 
-interface LifecycleStepperProps {
-  status: PlanStatus | null;
-}
-
-const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
-  const activeIndex = status ? LIFECYCLE_STEPS.findIndex((step) => step.matches.includes(status)) : -1;
-  const isTerminalOther = status === 'Superseded/Cancelled';
-
-  return (
-    <div className="flex items-center gap-2" aria-label="Sales Plan status">
-      {LIFECYCLE_STEPS.map((step, index) => {
-        const isActive = index === activeIndex;
-        const isComplete = activeIndex >= 0 && index < activeIndex;
-        return (
-          <React.Fragment key={step.key}>
-            {index > 0 && (
-              <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
-            )}
-            <Badge
-              size="tag"
-              variant={
-                isActive
-                  ? 'tagAccent'
-                  : isComplete
-                    ? 'tagSuccess'
-                    : 'default'
-              }
-            >
-              {step.label}
-            </Badge>
-          </React.Fragment>
-        );
-      })}
-      {isTerminalOther && (
-        <Badge size="tag" variant="tagDestructive" className="ml-1">
-          Superseded/Cancelled
-        </Badge>
-      )}
-    </div>
-  );
-};
-
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
-  const { isManager } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   const [items, setItems] = useState<SalesPlanItem[]>([]);
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
-  const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  // Only the setter is used: WorkflowStatusStepper owns and renders workflow
+  // status itself, but we still track the latest known status here so it can
+  // be persisted (e.g. after saveDraft) without re-reading it in this page.
+  const [, setPlanStatus] = useState<PlanStatus | null>(null);
+  const [enforcementMode, setEnforcementMode] = useState<'Hard' | 'Soft' | 'Alert'>('Hard');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [transitioning, setTransitioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [transitionError, setTransitionError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
   const [selectedItemDetailCode, setSelectedItemDetailCode] = useState<string | null>(null);
@@ -396,7 +336,6 @@ export const SalesPlanPage: React.FC = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setTransitionError(null);
     setHistoryScope(null);
     setPlanName(null);
     setPlanStatus(null);
@@ -441,6 +380,7 @@ export const SalesPlanPage: React.FC = () => {
             if (!cancelled) {
               setPlanName(status.name);
               setPlanStatus((status.status as PlanStatus) || null);
+              setEnforcementMode((status.enforcement_mode as 'Hard' | 'Soft' | 'Alert') || 'Hard');
             }
           } catch (statusErr) {
             // A missing/unsaved plan is expected and non-fatal (the stepper
@@ -531,6 +471,7 @@ export const SalesPlanPage: React.FC = () => {
         branch: historyScope.branch,
         company: historyScope.company,
         items: items.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
+        enforcement_mode: enforcementMode,
       });
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
@@ -538,34 +479,6 @@ export const SalesPlanPage: React.FC = () => {
       setError('Unable to save this Sales Plan draft.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const currentAction = planStatus ? NEXT_ACTION[planStatus] : undefined;
-  // Draft plans that have never been saved to the backend don't have a name
-  // yet, so there is nothing to transition -- the manager must save first.
-  const canTransition = Boolean(currentAction && planName);
-  const actionBlockedByRole = Boolean(currentAction?.managerOnly && !isManager);
-
-  const runTransition = async () => {
-    if (!planName || !currentAction) return;
-    setTransitionError(null);
-    setTransitioning(true);
-    try {
-      const result = await salesPlanService.transitionPlan({
-        name: planName,
-        target_state: currentAction.targetState,
-      });
-      setPlanStatus((result.status as PlanStatus) || currentAction.targetState);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '';
-      setTransitionError(
-        message && /permitted|permission/i.test(message)
-          ? "You don't have permission to make this change to the Sales Plan."
-          : 'Unable to update this Sales Plan. Please try again.'
-      );
-    } finally {
-      setTransitioning(false);
     }
   };
 
@@ -590,35 +503,38 @@ export const SalesPlanPage: React.FC = () => {
                 className="pl-9"
               />
             </label>
+            <Select
+              aria-label="Enforcement Mode"
+              title="Hard: block order placement once plan_remaining hits 0. Soft: allow the order, over-plan status is computable from committed_qty + fulfilled_qty > qty. Alert: allow the order and notify branch-scoped Production Manager/URY Manager recipients when the plan is exceeded."
+              value={enforcementMode}
+              onChange={(event) => setEnforcementMode(event.target.value as 'Hard' | 'Soft' | 'Alert')}
+              disabled={loading || saving}
+            >
+              <option value="Hard">Hard</option>
+              <option value="Soft">Soft</option>
+              <option value="Alert">Alert</option>
+            </Select>
             <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
               <Save className="h-4 w-4" />
               <span>{saving ? 'Saving...' : 'Save Draft'}</span>
             </Button>
-            {currentAction && (
-              <Button
-                onClick={runTransition}
-                disabled={!canTransition || transitioning || actionBlockedByRole}
-                title={actionBlockedByRole ? 'Only managers can approve a Sales Plan.' : undefined}
-                size="compactLg"
-                className="gap-2"
-              >
-                <currentAction.icon className="h-4 w-4" />
-                <span>{transitioning ? 'Updating...' : currentAction.label}</span>
-              </Button>
-            )}
           </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <LifecycleStepper status={planStatus} />
-          {actionBlockedByRole && (
-            <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
-          )}
+          {/*
+            No client-side "manager only" re-gating here: get_workflow_status
+            already filters `actions` down to what the current logged-in user
+            is permitted to do from the current state, so an unauthorized
+            action (e.g. Approve) simply never appears in the list -- there is
+            nothing left for the UI to disable.
+          */}
+          <WorkflowStatusStepper
+            doctype="URY Sales Plan"
+            name={planName}
+            onTransitioned={(status) => setPlanStatus(status as PlanStatus)}
+          />
         </div>
-
-        {transitionError && (
-          <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
-        )}
       </div>
 
       <Section>

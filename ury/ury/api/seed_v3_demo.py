@@ -37,7 +37,6 @@ def run():
 				"branch": branch,
 				"department_warehouse": warehouse,
 				"cost_center": cost_center,
-				"issue_control_policy": "Plan Controlled",
 			}
 		)
 		doc.insert(ignore_permissions=True)
