@@ -6,6 +6,7 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_sales_plan import (
     _validate_plan_scope,
     freeze_approval_snapshot,
+    populate_item_production_context,
     transition_sales_plan,
     validate_no_overlapping_plan_scope,
     validate_plan_items,
@@ -312,6 +313,137 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
         result = get_plan_status(branch=self.branch, plan_date="2099-01-01")
         self.assertIsNone(result["name"])
         self.assertIsNone(result["status"])
+        self.assertIsNone(result["enforcement_mode"])
+
+    def test_save_draft_persists_enforcement_mode_on_new_plan(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        result = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+            enforcement_mode="Soft",
+        )
+        doc = frappe.get_doc("URY Sales Plan", result["name"])
+        self.assertEqual(doc.enforcement_mode, "Soft")
+
+    def test_get_plan_status_returns_persisted_enforcement_mode(self):
+        from ury.ury.api.ury_sales_plan import get_plan_status, save_draft
+
+        save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+            enforcement_mode="Soft",
+        )
+        result = get_plan_status(branch=self.branch, plan_date=self.plan_date)
+        self.assertEqual(result["enforcement_mode"], "Soft")
+
+    def test_save_draft_without_enforcement_mode_keeps_existing_value(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        first = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+            enforcement_mode="Soft",
+        )
+        save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 9}],
+        )
+        doc = frappe.get_doc("URY Sales Plan", first["name"])
+        self.assertEqual(doc.enforcement_mode, "Soft")
+
+
+class TestPopulateItemProductionContext(FrappeTestCase):
+    def _doc(self, **values):
+        doc = frappe._dict(
+            {
+                "branch": "Branch A",
+                "company": "Company A",
+                "items": [frappe._dict({"item_code": "MTPL", "department": None, "production_unit": None, "production_policy": None, "bom": None})],
+            }
+        )
+        doc.update(values)
+        return doc
+
+    def test_populates_fields_when_config_resolves(self):
+        doc = self._doc()
+        resolved = frappe._dict(
+            {
+                "department": "Hot Kitchen",
+                "production_unit": "Main Kitchen",
+                "production_policy": "MADE_TO_ORDER",
+                "bom": "BOM-1",
+            }
+        )
+        with patch(
+            "ury.ury.api.ury_sales_plan.resolve_production_context", return_value=resolved
+        ) as resolve:
+            populate_item_production_context(doc)
+
+        resolve.assert_called_once_with("MTPL", "Branch A", "Company A")
+        row = doc["items"][0]
+        self.assertEqual(row.department, "Hot Kitchen")
+        self.assertEqual(row.production_unit, "Main Kitchen")
+        self.assertEqual(row.production_policy, "MADE_TO_ORDER")
+        self.assertEqual(row.bom, "BOM-1")
+
+    def test_leaves_row_alone_when_no_config_resolves(self):
+        doc = self._doc(
+            items=[
+                frappe._dict(
+                    {
+                        "item_code": "MTPL",
+                        "department": "Frontend Dept",
+                        "production_unit": None,
+                        "production_policy": None,
+                        "bom": None,
+                    }
+                )
+            ]
+        )
+        with patch(
+            "ury.ury.api.ury_sales_plan.resolve_production_context", return_value=None
+        ):
+            populate_item_production_context(doc)  # must not raise
+
+        row = doc["items"][0]
+        self.assertEqual(row.department, "Frontend Dept")
+        self.assertIsNone(row.production_unit)
+        self.assertIsNone(row.bom)
+
+    def test_does_not_blank_out_field_when_resolved_value_is_falsy(self):
+        doc = self._doc(
+            items=[
+                frappe._dict(
+                    {
+                        "item_code": "MTPL",
+                        "department": "Frontend Dept",
+                        "production_unit": "Frontend Unit",
+                        "production_policy": None,
+                        "bom": None,
+                    }
+                )
+            ]
+        )
+        resolved = frappe._dict(
+            {"department": None, "production_unit": "", "production_policy": None, "bom": None}
+        )
+        with patch(
+            "ury.ury.api.ury_sales_plan.resolve_production_context", return_value=resolved
+        ):
+            populate_item_production_context(doc)
+
+        row = doc["items"][0]
+        self.assertEqual(row.department, "Frontend Dept")
+        self.assertEqual(row.production_unit, "Frontend Unit")
 
 
 class TestFlagStaleBomRevisions(FrappeTestCase):
