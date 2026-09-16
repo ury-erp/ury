@@ -14,6 +14,9 @@ def serve_kot(name, time=None):
     if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
         frappe.throw(_("Not permitted to serve this KOT"), frappe.PermissionError)
 
+    if kot_doc.type in ("Cancelled", "Partially cancelled"):
+        frappe.throw(_("KOT has been cancelled and cannot be served"), frappe.ValidationError)
+
     current_time = get_datetime()
     creation_time = kot_doc.creation
 
@@ -104,6 +107,32 @@ def build_dashboard_summary(kot_list):
 
     return list(summary.values())
 
+def _get_cancel_confirmed_original_kots(branch):
+    """Names of KOTs that a verified cancel-KOT references via `original_kot`.
+
+    `original_kot` is a comma-separated string of KOT names stamped onto the
+    cancel-KOT record at creation time (see `ury_kot_generate.py`), not a
+    link field, so it has to be matched with LIKE and split in Python rather
+    than joined in the query.
+    """
+    cancel_rows = frappe.get_all(
+        "URY KOT",
+        fields=["original_kot"],
+        filters={
+            "branch": branch,
+            "type": ["in", ["Cancelled", "Partially cancelled"]],
+            "verified": 1,
+            "docstatus": 1,
+        },
+    )
+    original_names = set()
+    for row in cancel_rows:
+        if not row.get("original_kot"):
+            continue
+        original_names.update(name.strip() for name in row.get("original_kot").split(",") if name.strip())
+    return original_names
+
+
 @frappe.whitelist()
 def kot_list():
     today = frappe.utils.now()
@@ -140,11 +169,15 @@ def kot_list():
         },
         order_by="creation desc",
     )
+    cancelled_original_kots = _get_cancel_confirmed_original_kots(branch)
     production_filters = {}
     KOT = []
     for kot in kotList:
+        if kot.name in cancelled_original_kots:
+            continue
+
         kotdoc = frappe.get_doc("URY KOT", kot.name)
-        
+
         if kotdoc.production:
             if kotdoc.production not in production_filters:
                 prod_doc = frappe.get_doc("URY Production Unit", kotdoc.production)
@@ -152,7 +185,7 @@ def kot_list():
                     production_filters[kotdoc.production] = [row.order_type for row in prod_doc.get("order_type", [])]
                 else:
                     production_filters[kotdoc.production] = None
-            
+
             allowed_order_types = production_filters[kotdoc.production]
             if allowed_order_types is not None:
                 invoice_order_type = frappe.db.get_value("POS Invoice", kotdoc.invoice, "order_type")

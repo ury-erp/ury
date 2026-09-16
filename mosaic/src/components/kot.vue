@@ -445,6 +445,14 @@ export default {
         }
       } catch (error) {
         console.error("Failed to serve KOT via execution service", error);
+        // Race condition: the KOT was cancelled (or partially cancelled)
+        // between load and this click. The execution service rejects the
+        // serve; surface it and remove the now-stale card instead of
+        // leaving an orphaned "Serve"-able order on screen.
+        alert(error?.message || "This KOT has been cancelled and cannot be served.");
+        kot.showDiv = true;
+        this.removeAllItemsFromLocalStorage(kot);
+        this.masonryLoading();
         return;
       }
 
