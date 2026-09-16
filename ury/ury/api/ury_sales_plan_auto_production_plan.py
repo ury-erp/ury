@@ -76,12 +76,11 @@ def _maybe_create_production_plan_on_approval(sales_plan_doc):
 	new_plan.insert()
 	new_plan.submit()
 
-	frappe.db.set_value(
-		"URY Sales Plan",
-		sales_plan_doc.name,
-		SALES_PLAN_LINK_FIELD,
-		new_plan.name,
-	)
+	# Use .set() (not frappe.db.set_value) because this runs inside
+	# validate(), which is followed by this same save's own db_update() --
+	# a direct DB write here would be silently overwritten by db_update()
+	# writing back the in-memory (still-None) value for this field.
+	sales_plan_doc.set(SALES_PLAN_LINK_FIELD, new_plan.name)
 
 
 def _build_production_plan_doc_dict(sales_plan_doc):

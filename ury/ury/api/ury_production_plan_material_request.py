@@ -75,6 +75,13 @@ def generate_material_requests_for_production_plan(production_plan):
     po_items = plan_doc.get("po_items") or []
 
     store_warehouse = get_store_warehouse()
+    if not store_warehouse:
+        frappe.throw(
+            _(
+                "URY Production Settings: Store Warehouse is not configured. "
+                "Configure it before generating Material Requests."
+            )
+        )
 
     # department_need[(department, raw_material)] -> net qty department still needs
     department_need = {}
