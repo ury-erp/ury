@@ -906,6 +906,29 @@ def sync_order(
     # - 'ury_pos': Already formatted list, hence using else
     if isinstance(items, str):
         items = json.loads(items)
+
+    # Server-side validation: Restrict cashier from editing/removing existing table order items
+    restrict_role = any(
+        role.role in user_role for role in posprofile.role_restricted_for_table_order
+    )
+    if restrict_role and not posprofile.remove_items and invoice.restaurant_table and past_item:
+        from frappe.utils import flt
+        incoming_qty_map = {}
+        for d in items:
+            code = d.get("item") or d.get("item_code")
+            incoming_qty_map[code] = incoming_qty_map.get(code, 0) + flt(d.get("qty") or 0)
+
+        for prev in past_item:
+            code = prev.get("item_code")
+            prev_qty = flt(prev.get("qty") or 0)
+            inc_qty = incoming_qty_map.get(code, 0)
+            if inc_qty < prev_qty:
+                frappe.throw(
+                    _("Cashier is not allowed to edit or remove existing table order items ({0}). You may only add new items or increase quantities.").format(
+                        prev.get("item_name") or code
+                    )
+                )
+
     invoice.items = []
     
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
