@@ -19,3 +19,4 @@ ury.patches.v3_21.backfill_kot_item_execution_revision_key
 ury.patches.v3_22.backfill_sales_plan_docstatus
 ury.patches.v3_23.ensure_erpnext_address_contact_custom_fields
 ury.patches.v3_24.backfill_branch_company
+ury.patches.v3_25.add_stock_reservation_availability_index
