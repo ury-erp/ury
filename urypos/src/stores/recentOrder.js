@@ -325,6 +325,10 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
               if (!itemIndexExists) {
                 item.qty = previousItem.qty;
                 item.comment = previousItem.comment;
+                if (pastOrder.restaurant_table) {
+                  item.is_table_order_item = true;
+                  item.original_qty = previousItem.qty;
+                }
                 cart.push(item);
               }
             }
@@ -336,13 +340,18 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
               
               if (!existsInMenu && !existsInCart) {
                 // Item no longer in menu but was in previous order - add it to cart
-                cart.push({
+                const orphanedItem = {
                   item: previousItem.item_code,
                   item_name: previousItem.item_name,
                   rate: previousItem.rate,
                   qty: previousItem.qty,
                   comment: previousItem.comment
-                });
+                };
+                if (pastOrder.restaurant_table) {
+                  orphanedItem.is_table_order_item = true;
+                  orphanedItem.original_qty = previousItem.qty;
+                }
+                cart.push(orphanedItem);
               }
             });
           }

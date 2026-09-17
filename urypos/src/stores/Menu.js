@@ -332,6 +332,23 @@ export const useMenuStore = defineStore("menu", {
       const item = this.item;
 
       if (
+        item &&
+        item.is_table_order_item &&
+        this.auth.restrictTableOrder &&
+        this.auth.removeTableOrderItem === 0 &&
+        Number(this.quantity) < Number(item.original_qty || 0)
+      ) {
+        this.alert.createAlert(
+          "Message",
+          "Quantity cannot be less than original quantity (" +
+            item.original_qty +
+            ")",
+          "OK"
+        );
+        return;
+      }
+
+      if (
         this.quantity !== null &&
         this.quantity !== undefined &&
         this.quantity !== "" &&
@@ -389,7 +406,53 @@ export const useMenuStore = defineStore("menu", {
         this.cart.push({ item: item.item, qty: 1 });
       }
     },
+    canRemoveItem(item) {
+      if (
+        item &&
+        item.is_table_order_item &&
+        this.auth.restrictTableOrder &&
+        this.auth.removeTableOrderItem === 0
+      ) {
+        return false;
+      }
+      if (
+        this.recentOrders.editPrintedInvoice === 1 &&
+        this.auth.removeTableOrderItem === 0
+      ) {
+        return false;
+      }
+      return true;
+    },
+    canDecrementItem(item) {
+      if (
+        item &&
+        item.is_table_order_item &&
+        this.auth.restrictTableOrder &&
+        this.auth.removeTableOrderItem === 0
+      ) {
+        return (item.qty || 0) > (item.original_qty || 0);
+      }
+      if (
+        this.recentOrders.editPrintedInvoice === 1 &&
+        this.auth.removeTableOrderItem === 0
+      ) {
+        return false;
+      }
+      return true;
+    },
     decrementItemQuantity(item) {
+      if (
+        item &&
+        item.is_table_order_item &&
+        this.auth.restrictTableOrder &&
+        this.auth.removeTableOrderItem === 0 &&
+        item.qty <= (item.original_qty || 0)
+      ) {
+        this.notification.createNotification(
+          "Cannot reduce quantity of existing table order item"
+        );
+        return;
+      }
       const itemIndex = this.cart.findIndex((obj) => obj.item === item.item);
       const itemIndexExists = itemIndex !== -1;
       if (itemIndexExists) {
@@ -405,6 +468,17 @@ export const useMenuStore = defineStore("menu", {
     removeItemFromCart(index) {
       // Get the item that corresponds to the index
       const item = this.cart[index];
+      if (
+        item &&
+        item.is_table_order_item &&
+        this.auth.restrictTableOrder &&
+        this.auth.removeTableOrderItem === 0
+      ) {
+        this.notification.createNotification(
+          "Cannot remove existing table order item"
+        );
+        return;
+      }
       // Set the item's quantity to zero
       item.qty = 0;
       this.cart.splice(index, 1);

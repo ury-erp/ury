@@ -343,6 +343,7 @@ export const useTableStore = defineStore("table", {
     },
     async addToSelectedTables(table) {
       this.selectedTable = table.name;
+      this.recentOrders.restaurantTable = this.selectedTable;
       this.takeAwayTable = 0;
 
       if (table.is_take_away === 1) {
@@ -426,6 +427,8 @@ export const useTableStore = defineStore("table", {
               if (!itemIndexExists) {
                 item.qty = previousItem.qty;
                 item.comment = previousItem.comment;
+                item.is_table_order_item = true;
+                item.original_qty = previousItem.qty;
                 cart.push(item);
               }
             }
@@ -442,7 +445,9 @@ export const useTableStore = defineStore("table", {
                   item_name: previousItem.item_name,
                   rate: previousItem.rate,
                   qty: previousItem.qty,
-                  comment: previousItem.comment
+                  comment: previousItem.comment,
+                  is_table_order_item: true,
+                  original_qty: previousItem.qty,
                 });
               }
             });
