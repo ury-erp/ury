@@ -132,11 +132,16 @@ def transition_sales_plan(doc, target_state, actor=None, reason=None):
 
     _guard_backward_transition(doc, target_state, reason)
     if target_state in BACKWARD_OR_TERMINAL_TARGETS:
-        # Stashed on the in-memory doc so URYSalesPlan._record_transition()
-        # (validate()/before_cancel(), whichever this transition's docstatus
-        # edge actually triggers) can thread it into append_audit() without
-        # this function needing to know which save path will run.
-        doc.cancellation_reason = reason
+        # apply_workflow() below reconstructs its own Document instance and
+        # calls doc.load_from_db() on it before doing anything else --
+        # setting `doc.cancellation_reason` on THIS in-memory object would be
+        # silently discarded the moment that reload happens. Write it
+        # directly to the DB row first so it's already there by the time
+        # apply_workflow()'s fresh load reads it back; URYSalesPlan's
+        # _record_transition() (validate()/before_cancel(), whichever this
+        # transition's docstatus edge actually triggers) then folds it into
+        # append_audit().
+        frappe.db.set_value(doc.doctype, doc.name, "cancellation_reason", reason)
 
     return apply_workflow(doc, transition.action)
 
