@@ -4,4 +4,6 @@ export const SUPPORTED_LANGUAGES: Record<string, string> = {
   en: 'English',
   fr: 'Français',
   ar: 'العربية',
+  ru: 'Русский',
+  kk: 'Қазақша',
 };
