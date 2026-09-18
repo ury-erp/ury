@@ -7,6 +7,7 @@ import frappe
 from frappe.model.document import Document
 
 from ury.ury.api.ury_sales_plan import (
+	_guard_backward_transition,
 	_validate_plan_scope,
 	append_audit,
 	flag_stale_bom_revisions,
@@ -50,6 +51,17 @@ class URYSalesPlan(Document):
 				validate_plan_items(self)
 				validate_no_overlapping_plan_scope(self)
 				freeze_approval_snapshot(self)
+			# Hook-level backstop for _guard_backward_transition(): this
+			# doctype's Workflow is also reachable from Desk's own workflow
+			# Actions button, which flips `status` directly and never calls
+			# transition_sales_plan() (see the module docstring above). The
+			# "Draft" ("Return to Draft") edge is always a docstatus 0 -> 0
+			# save, so it always reaches here regardless of which UI drove
+			# it -- the "Superseded/Cancelled" edge is covered separately in
+			# before_cancel() below, since that one crosses a docstatus
+			# boundary validate() never sees.
+			if self.status == "Draft":
+				_guard_backward_transition(self, self.status, self.get("cancellation_reason"))
 			self._record_transition(prev_status)
 
 	# ------------------------------------------------------------------
@@ -90,6 +102,10 @@ class URYSalesPlan(Document):
 		self._record_transition(self._previous_status())
 
 	def before_cancel(self):
+		# Hook-level backstop for _guard_backward_transition() on the
+		# "Superseded/Cancelled" edge -- see the comment on the "Draft" case
+		# in validate() above for why this needs its own call site.
+		_guard_backward_transition(self, "Superseded/Cancelled", self.get("cancellation_reason"))
 		self._record_transition(self._previous_status())
 
 	def _previous_status(self):
