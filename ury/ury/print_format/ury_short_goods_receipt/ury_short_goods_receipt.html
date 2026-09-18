@@ -1,0 +1,132 @@
+{# Adapted from "Укороченный товарный чек. Фронт.mrt" for ERPNext POS Invoice. #}
+<style>
+  @page { size: A4 landscape; margin: 5mm; }
+
+  .print-format .ury-short-receipt {
+    width: 100%;
+    color: #111;
+    font: 10pt Arial, Helvetica, sans-serif;
+    line-height: 1.35;
+  }
+  .ury-short-receipt * { box-sizing: border-box; }
+  .ury-short-receipt__top {
+    display: table;
+    width: 100%;
+    margin-bottom: 12mm;
+  }
+  .ury-short-receipt__top > div { display: table-cell; vertical-align: top; }
+  .ury-short-receipt__title { width: 66%; text-align: center; font-weight: bold; }
+  .ury-short-receipt__document { text-align: right; font-weight: bold; }
+  .ury-short-receipt__dates { text-align: right; margin-bottom: 10mm; }
+  .ury-short-receipt__parties { display: table; width: 100%; margin-bottom: 9mm; }
+  .ury-short-receipt__party { display: table-cell; width: 50%; padding-right: 7mm; vertical-align: top; }
+  .ury-short-receipt__party:last-child { padding-right: 0; padding-left: 7mm; }
+  .ury-short-receipt__party h2 { margin: 0 0 3mm; font-size: 14pt; }
+  .ury-short-receipt__party p { margin: 0 0 2mm; min-height: 5mm; }
+  .ury-short-receipt__items { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .ury-short-receipt__items th,
+  .ury-short-receipt__items td { padding: 2mm 1.5mm; border: 1px solid #333; vertical-align: top; }
+  .ury-short-receipt__items th { font-weight: normal; text-align: left; }
+  .ury-short-receipt__items .number { width: 4%; }
+  .ury-short-receipt__items .description { width: 38%; }
+  .ury-short-receipt__items .net { width: 15%; }
+  .ury-short-receipt__items .rate { width: 12%; }
+  .ury-short-receipt__items .tax { width: 13%; }
+  .ury-short-receipt__items .gross { width: 18%; }
+  .ury-short-receipt__items .money { text-align: right; white-space: nowrap; }
+  .ury-short-receipt__items thead { display: table-header-group; }
+  .ury-short-receipt__items tr { page-break-inside: avoid; }
+  .ury-short-receipt__total-label { text-align: right; font-weight: bold; }
+  .ury-short-receipt__after { display: table; width: 100%; margin-top: 7mm; }
+  .ury-short-receipt__after > div { display: table-cell; width: 50%; vertical-align: top; }
+  .ury-short-receipt__after > div:last-child { text-align: right; }
+  .ury-short-receipt__after p { margin: 0 0 2mm; }
+  .ury-short-receipt__grand { font-size: 13pt; font-weight: bold; }
+  .ury-short-receipt__words { margin-top: 7mm; }
+  .ury-short-receipt__signatures { display: table; width: 100%; margin-top: 18mm; page-break-inside: avoid; }
+  .ury-short-receipt__signatures > div { display: table-cell; width: 50%; padding-right: 8mm; }
+  .ury-short-receipt__signatures > div:last-child { padding-right: 0; padding-left: 8mm; }
+  .ury-short-receipt__signature-line { border-bottom: 1px solid #111; height: 8mm; }
+  .ury-short-receipt__muted { color: #555; }
+</style>
+
+<div class="ury-short-receipt">
+  <div class="ury-short-receipt__top">
+    <div class="ury-short-receipt__title">Invoice: {{ doc.name }}</div>
+    <div class="ury-short-receipt__document">{{ doc.get("order_type") or "" }}</div>
+  </div>
+
+  <div class="ury-short-receipt__dates">
+    <div>Date of issue: <strong>{{ frappe.utils.formatdate(doc.posting_date) }}</strong></div>
+    {% if doc.get("delivery_date") %}
+    <div>Date of delivery: <strong>{{ frappe.utils.formatdate(doc.delivery_date) }}</strong></div>
+    {% endif %}
+  </div>
+
+  <div class="ury-short-receipt__parties">
+    <div class="ury-short-receipt__party">
+      <h2>Seller</h2>
+      <p><strong>{{ doc.company or "" }}</strong></p>
+      {% if doc.get("company_tax_id") %}<p>{{ doc.company_tax_id }}</p>{% endif %}
+      {% if doc.get("company_address_display") %}<p>{{ doc.company_address_display }}</p>{% endif %}
+    </div>
+    <div class="ury-short-receipt__party">
+      <h2>Purchaser</h2>
+      <p><strong>{{ doc.customer_name or doc.customer or "" }}</strong></p>
+      {% if doc.get("tax_id") %}<p>{{ doc.tax_id }}</p>{% endif %}
+      {% if doc.get("address_display") %}<p>{{ doc.address_display }}</p>{% endif %}
+    </div>
+  </div>
+
+  <table class="ury-short-receipt__items">
+    <thead>
+      <tr>
+        <th class="number">No</th>
+        <th class="description">Name of service</th>
+        <th class="net money">Total net price</th>
+        <th class="rate money">Tax rate</th>
+        <th class="tax money">Tax / charges</th>
+        <th class="gross money">Gross value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in doc.items %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.item_name or item.item_code }}{% if item.qty != 1 %} × {{ item.qty }}{% endif %}</td>
+        <td class="money">{{ item.get_formatted("net_amount") }}</td>
+        <td class="money">—</td>
+        <td class="money">—</td>
+        <td class="money">{% if not doc.total_taxes_and_charges %}{{ item.get_formatted("net_amount") }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td colspan="2" class="ury-short-receipt__total-label">TOTAL:</td>
+        <td class="money">{{ doc.get_formatted("net_total") }}</td>
+        <td></td>
+        <td class="money">{{ doc.get_formatted("total_taxes_and_charges") }}</td>
+        <td class="money"><strong>{{ doc.get_formatted("grand_total") }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="ury-short-receipt__after">
+    <div>
+      {% if doc.get("fiscal_register_number") %}<p>Number fiscal register: <strong>{{ doc.fiscal_register_number }}</strong></p>{% endif %}
+      {% if doc.get("fiscal_cheque_number") %}<p>Number fiscal cheque: <strong>{{ doc.fiscal_cheque_number }}</strong></p>{% endif %}
+    </div>
+    <div>
+      {% for tax in doc.taxes or [] %}
+      <p>{{ tax.description or tax.account_head }}{% if tax.rate %} ({{ tax.rate }}%){% endif %}: {{ tax.get_formatted("tax_amount") }}</p>
+      {% endfor %}
+      <p class="ury-short-receipt__grand">TOTAL: {{ doc.get_formatted("grand_total") }}</p>
+    </div>
+  </div>
+
+  {% if doc.get("in_words") %}<p class="ury-short-receipt__words">In words: <strong>{{ doc.in_words }}</strong></p>{% endif %}
+
+  <div class="ury-short-receipt__signatures">
+    <div><div class="ury-short-receipt__signature-line"></div>Seller (signature)</div>
+    <div><div class="ury-short-receipt__signature-line"></div>Purchaser (signature)</div>
+  </div>
+</div>
