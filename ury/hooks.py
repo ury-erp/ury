@@ -576,4 +576,13 @@ fixtures = [
     {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
     {"doctype": "Workflow", "filters": [["name", "in", ["URY Sales Plan"]]]},
+    # "Return to Draft" is a new Workflow Action introduced for "URY Sales
+    # Plan" alongside its wider Supersede/Cancel reach -- unlike Desk's own
+    # Workflow-editor UI (whose client JS auto-creates a matching
+    # "Workflow Action Master" row the moment a new action name is typed
+    # into the Transitions grid), fixture-importing the Workflow doctype
+    # directly does NOT auto-create it, so the Workflow Transition child
+    # row's `action` Link field fails validation with a LinkValidationError
+    # on any later re-save/re-validate unless this row already exists.
+    {"doctype": "Workflow Action Master", "filters": [["name", "in", ["Return to Draft"]]]},
 ]
