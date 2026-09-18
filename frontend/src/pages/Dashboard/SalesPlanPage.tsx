@@ -387,7 +387,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
                 )}
                 <div
                   role="listitem"
-                  className="flex flex-1 items-center gap-1.5"
+                  className="flex flex-none items-center gap-1.5"
                   title={step.label}
                 >
                   <span
