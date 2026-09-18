@@ -7,6 +7,7 @@ import frappe
 from frappe.model.document import Document
 
 from ury.ury.api.ury_sales_plan import (
+	BACKWARD_OR_TERMINAL_TARGETS,
 	_guard_backward_transition,
 	_validate_plan_scope,
 	append_audit,
@@ -152,20 +153,33 @@ class URYSalesPlan(Document):
 	def _record_transition(self, prev_status):
 		"""Append one audit entry if `status` actually changed.
 
-		`cancellation_reason` is stashed onto the in-memory doc by
+		`cancellation_reason` is written directly to the DB row by
 		`transition_sales_plan()`'s `_guard_backward_transition()` right
-		before it calls `apply_workflow()`, so it survives into whichever of
-		validate() / before_update_after_submit() / before_cancel() actually
-		fires for this particular docstatus edge and gets folded into the
-		audit_log entry here. It is also a real, persisted field (see
-		ury_sales_plan.json), so the reason for the most recent Return to
-		Draft/Supersede-Cancel stays directly visible on the doc, not just
-		buried inside the audit_log JSON blob.
+		before it calls `apply_workflow()` (see that function's docstring for
+		why it can't just be set on the in-memory doc), so it's already
+		there by the time whichever of validate() / before_update_after_submit()
+		/ before_cancel() fires for this particular docstatus edge reads it
+		back here.
+
+		Only fold it into THIS transition's audit entry when the transition
+		actually landing right now is itself a backward/terminal one
+		(`self.status in BACKWARD_OR_TERMINAL_TARGETS`) -- and clear the
+		field on every OTHER transition. Without that: (a) a reason given for
+		one Return to Draft would silently get attached to every later,
+		unrelated transition's audit entry too (the field never resets on
+		its own), and (b) a stale reason left over from a PRIOR Return to
+		Draft would satisfy _guard_backward_transition's "reason required"
+		check on Desk's native Actions button -- which supplies no reason of
+		its own -- letting a second reopen through with no fresh
+		explanation, silently defeating the requirement for exactly the
+		bypass path the hook-level guard exists to close.
 		"""
 		if not prev_status or prev_status == self.status:
 			return
-		reason = self.get("cancellation_reason")
+		reason = self.get("cancellation_reason") if self.status in BACKWARD_OR_TERMINAL_TARGETS else None
 		append_audit(self, prev_status, self.status, frappe.session.user, reason=reason)
+		if self.get("cancellation_reason"):
+			self.db_set("cancellation_reason", None, update_modified=False)
 		# audit_log is a Long Text (JSON) field -- append_audit leaves it
 		# as a Python list in memory, which must be serialized back to a
 		# string before Document.save() persists it.
