@@ -1,5 +1,6 @@
 import { useConfigure, SectionId } from '../../context/ConfigureContext';
 import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check } from 'lucide-react';
+import { t } from '../../i18n';
 
 interface SidebarItem {
   id: SectionId;
@@ -23,9 +24,7 @@ export function ConfigureSidebar() {
     <nav className="w-full">
       <div className="bg-muted border border-border rounded-lg p-4">
         {/* Section Title */}
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-          Configuration
-        </h2>
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">{t('dash.configure_sidebar.configuration')}</h2>
 
         <div className="space-y-1">
           {SIDEBAR_ITEMS.map((item) => {

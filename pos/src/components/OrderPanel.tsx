@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
+import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare, ShoppingBasket, Users, ReceiptText } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency, parseFrappeError, flt } from '@ury/core';
+import { AnimatedNumber } from '@ury/ui';
 import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
@@ -195,19 +196,33 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+    <div className="w-96 bg-[#fffdf8] border-s border-[#eadfce] flex flex-col h-[calc(100vh-4.5rem)] fixed end-0 z-10 shadow-[-10px_0_30px_rgba(74,48,30,0.06)]">
+      <div className="p-5 border-b border-[#eadfce] flex-shrink-0 bg-[#fffaf0]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f05b42] text-white shadow-[0_5px_12px_rgba(240,91,66,0.22)]">
+              <ShoppingBasket className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">{t('order_panel.current_ticket')}</p>
+              <h2 className="text-base font-bold text-[#3f2a20]">{t('order_panel.your_order')}</h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-[#9a7e6b]">
+            <ReceiptText className="w-3.5 h-3.5" /> {activeOrders.length} items
+          </div>
+        </div>
         <OrderTabs disabled={isInteractionDisabled} />
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-[#eadfce] bg-white px-3 py-2">
+          <span className="flex items-center gap-2 text-sm font-semibold text-[#735d4e]"><Users className="w-4 h-4 text-primary" /> {t('cart.pax')}</span>
           <div className="flex items-center gap-2">
             <Button
               onClick={handlePaxDecrement}
               variant="outline"
               size="icon"
-              className="w-8 h-8 rounded-full"
+              className="w-8 h-8 rounded-lg border-[#eadfce]"
               disabled={isInteractionDisabled || noOfPax <= MIN_PAX}
             >
               -
@@ -217,7 +232,7 @@ const OrderPanel = () => {
               onClick={handlePaxIncrement}
               variant="outline"
               size="icon"
-              className="w-8 h-8 rounded-full"
+              className="w-8 h-8 rounded-lg border-[#eadfce]"
               disabled={isInteractionDisabled || noOfPax >= MAX_PAX}
             >
               +
@@ -237,14 +252,14 @@ const OrderPanel = () => {
               <div
                 key={item.uniqueId}
                 className={cn(
-                  "flex flex-col py-4 border-b border-gray-100",
+                  "flex flex-col py-4 border-b border-[#f0e6d8]",
                   isInteractionDisabled && "opacity-50"
                 )}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
+                      <h3 className="font-semibold text-[#3f2a20] text-sm">{item.name}</h3>
                     </div>
                     {item.selectedVariant && (
                       <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
@@ -259,7 +274,7 @@ const OrderPanel = () => {
                         "{item.comment.trim()}"
                       </p>
                     )}
-                    <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
+                    <p className="text-primary font-bold text-sm">{formatCurrency(calculateItemTotal(item))}</p>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -328,7 +343,7 @@ const OrderPanel = () => {
             )}
           </div>
           
-          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          <div className="p-5 border-t border-[#eadfce] flex-shrink-0 bg-[#fffaf0]">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <Button
@@ -336,23 +351,29 @@ const OrderPanel = () => {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-8 w-8 p-0",
-                    orderComment ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+                    "h-8 w-8 p-0 rounded-lg",
+                    orderComment ? "text-primary bg-primary-50" : "text-[#9a7e6b] hover:text-[#3f2a20] hover:bg-white"
                   )}
                   disabled={isInteractionDisabled}
                   title={orderComment ? t('cart.edit_comment') : t('cart.add_comment')}
                 >
                   <MessageSquare className="w-4 h-4" />
                 </Button>
-                <span className="text-lg font-semibold">{t('cart.total')}</span>
+                <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{t('cart.total')}</span>
               </div>
-              <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+              {/* The figure a cashier watches while building an order. The
+                  slide-in on change is the one place motion carries real
+                  information here: it confirms the tap registered. */}
+              <AnimatedNumber
+                value={formatCurrency(total)}
+                className="text-2xl font-bold text-foreground"
+              />
             </div>
             <Button
               onClick={handleSubmit}
               variant="default"
               size="default"
-              className="w-full"
+              className="w-full h-12 rounded-xl text-base font-bold shadow-[0_7px_18px_rgba(240,91,66,0.22)]"
               disabled={isInteractionDisabled}
             >
               {isSubmitting ? (

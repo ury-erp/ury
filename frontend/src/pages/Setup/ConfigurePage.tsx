@@ -20,6 +20,7 @@ import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
+import { t } from '../../i18n';
 
 const SECTION_CONFIGS: Record<
   SectionId,
@@ -306,9 +307,7 @@ function ConfigurePageContent() {
             variant="ghost"
             onClick={handleFinish}
             disabled={finishing}
-          >
-            Finish with defaults
-          </Button>
+          >{t('dash.configure.finish_with_defaults')}</Button>
         </div>
       }
     >
@@ -316,18 +315,14 @@ function ConfigurePageContent() {
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
-              <span className="font-bold block mb-1">
-                Configuration Error:
-              </span>
+              <span className="font-bold block mb-1">{t('setup.config_error')}</span>
               {error}
             </div>
 
             <button
               onClick={() => setError(null)}
               className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
-            >
-              Dismiss
-            </button>
+            >{t('dash.configure.dismiss')}</button>
           </div>
         )}
 

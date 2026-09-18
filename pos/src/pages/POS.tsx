@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { t } from '../i18n';
-import { Star, TrendingUp } from 'lucide-react';
+import { Star, TrendingUp, Zap } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
@@ -64,10 +64,10 @@ export default function POS() {
     <button
       onClick={() => setQuickFilter(filter)}
       className={cn(
-        'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+        'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
         quickFilter === filter
-          ? 'bg-blue-100 text-blue-700'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+          ? 'bg-[#f05b42] text-white shadow-[0_5px_14px_rgba(240,91,66,0.25)]'
+          : 'bg-white text-[#735d4e] border border-[#eadfce] hover:border-[#f0b83e] hover:bg-[#fff8e8]',
         isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
       )}
       disabled={isMenuInteractionDisabled()}
@@ -85,14 +85,12 @@ export default function POS() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('pos_page.failed_load')}</p>
           <p className="text-gray-600">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-          >
-            Retry
-          </button>
+          >{t('pos_opening.retry')}</button>
         </div>
       </div>
     );
@@ -118,11 +116,19 @@ export default function POS() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 overflow-hidden bg-[#f8f4eb]">
       <Sidebar disabled={isMenuInteractionDisabled()} />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
-        <div className="p-4 bg-white border-b border-gray-200">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden pe-96">
+        <div className="px-5 py-4 bg-[#fffdf8] border-b border-[#eadfce]">
           <div className="max-w-screen-xl mx-auto space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{t('pos_page.service_counter')}</p>
+                <h1 className="text-xl font-bold tracking-tight text-[#3f2a20]">{t('pos_page.build_an_order')}</h1>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 rounded-xl bg-[#fff2d7] px-3 py-2 text-xs font-medium text-[#8f6b55]">
+                <Zap className="w-3.5 h-3.5 text-[#d89917]" />{t('pos_page.tap_item_hint')}</div>
+            </div>
             <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
               {/* <SearchBar
                 value={searchQuery}

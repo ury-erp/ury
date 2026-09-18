@@ -363,7 +363,10 @@ const TableView = () => {
 
   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
 
-  const renderTableCard = (table: Table, className?: string) => {
+  /** `index` is the card's position in the room grid; it only staggers the
+      entrance animation, so a missing value just means "animate with the
+      first group". */
+  const renderTableCard = (table: Table, className?: string, index = 0) => {
     const mergeMembers = getMergeGroupMembers(table, tables);
     const mergeGroupLabel =
       mergeMembers.length > 1 ? formatMergedTableLabelFromGroup(mergeMembers) : undefined;
@@ -372,6 +375,7 @@ const TableView = () => {
     return (
     <TableCard
       key={table.name}
+      index={index}
       table={table}
       mergeGroupLabel={mergeGroupLabel}
       className={className}
@@ -446,9 +450,7 @@ const TableView = () => {
 
                 {!loadingRooms && !hasRooms && (
                   <div className="flex items-center gap-2 text-gray-500 text-sm">
-                    <AlertTriangle className="w-4 h-4" />
-                    No rooms found for this branch
-                  </div>
+                    <AlertTriangle className="w-4 h-4" />{t('tables.no_rooms_for_branch')}</div>
                 )}
 
                 {rooms.map((room) => (
@@ -461,7 +463,7 @@ const TableView = () => {
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ml-2 bg-white/60">
+                      <Badge variant="outline" className="ms-2 bg-white/60">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}
@@ -500,9 +502,9 @@ const TableView = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-40">
-              {tableRenderGroups.map((group) =>
+              {tableRenderGroups.map((group, groupIndex) =>
                 group.length === 1 ? (
-                  renderTableCard(group[0])
+                  renderTableCard(group[0], undefined, groupIndex)
                 ) : (
                   <div
                     key={group.map((t) => t.name).join('-')}
@@ -512,7 +514,8 @@ const TableView = () => {
                       <Fragment key={table.name}>
                         {renderTableCard(
                           table,
-                          'min-w-[9.5rem] flex-1 basis-[calc(50%-1.5rem)] sm:basis-[calc(33.333%-1.5rem)] md:min-w-[10rem] md:max-w-[14rem]'
+                          'min-w-[9.5rem] flex-1 basis-[calc(50%-1.5rem)] sm:basis-[calc(33.333%-1.5rem)] md:min-w-[10rem] md:max-w-[14rem]',
+                          groupIndex
                         )}
                         {index < group.length - 1 && (
                           <MergeLinkConnector

@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import MenuCard from './MenuCard';
-import { Spinner } from '@ury/ui';
-import { cn } from '@ury/ui';
+import { EmptyState, Skeleton, cn } from '@ury/ui';
+import { SearchX, UtensilsCrossed, AlertTriangle } from 'lucide-react';
 import { t } from '../i18n';
 
 interface MenuListProps {
@@ -42,35 +42,44 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
 
   const isInteractionDisabled = isMenuInteractionDisabled() || isOrderInteractionDisabled();
 
+  const gridClasses =
+    'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
+
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
-      <div className="max-w-screen-xl mx-auto p-4 pb-40">
+    <div className="flex-1 overflow-auto bg-background">
+      <div className="max-w-screen-xl mx-auto p-5 pb-40">
         {menuLoading ? (
-          <div className="h-96">
-            <Spinner message={t('common.loading_menu_items')} />
+          /* Skeleton cards in the real grid, rather than a centred spinner:
+             the menu keeps its shape so nothing shifts under the cashier's
+             finger when the items land. */
+          <div className={gridClasses} aria-busy="true" aria-label={t('common.loading_menu_items')}>
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} shape="block" className="h-60" />
+            ))}
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-red-600 text-center">
-              <p className="text-lg font-medium">{t('common.error_loading_menu_items')}</p>
-              <p className="text-sm mt-2">{error}</p>
-            </div>
-          </div>
+          <EmptyState
+            className="h-96"
+            icon={<AlertTriangle />}
+            title={t('common.error_loading_menu_items')}
+            description={error}
+          />
         ) : filteredItems.length === 0 ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-gray-500 text-center">
-              <p className="text-lg font-medium">{t('common.no_items_found')}</p>
-              <p className="text-sm mt-2">{t('common.try_adjusting_filters')}</p>
-            </div>
-          </div>
+          <EmptyState
+            className="h-96"
+            icon={searchQuery || selectedCategory ? <SearchX /> : <UtensilsCrossed />}
+            title={t('common.no_items_found')}
+            description={t('common.try_adjusting_filters')}
+          />
         ) : (
           <div className={cn(
-            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3",
+            gridClasses,
             isInteractionDisabled && "opacity-50 pointer-events-none"
           )}>
-            {filteredItems.map((item) => (
+            {filteredItems.map((item, index) => (
               <MenuCard
                 key={item.id}
+                index={index}
                 id={item.id}
                 name={item.name}
                 price={item.price}

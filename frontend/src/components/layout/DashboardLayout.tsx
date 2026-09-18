@@ -8,7 +8,7 @@ import { Sidebar } from './Sidebar';
 export const DashboardLayout: React.FC = () => {
   return (
     <BranchProvider>
-      <div className="h-screen flex flex-col bg-background text-foreground font-inter text-sm overflow-hidden">
+      <div className="h-screen flex flex-col bg-background text-foreground text-sm overflow-hidden">
         <Header />
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar />
