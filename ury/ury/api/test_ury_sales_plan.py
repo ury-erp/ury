@@ -55,6 +55,23 @@ class TestURYSalesPlanContract(FrappeTestCase):
                 validate_plan_items(doc)
         self.assertFalse(doc.get("approval_snapshot"))
 
+    def test_validate_plan_items_skips_untouched_zero_qty_rows(self):
+        """A history-suggested row nobody actually planned (qty still 0) must
+        never gate approval on its own production configuration -- see
+        feedback_history_is_suggestion_not_precondition. Only a row with a
+        real qty is actually part of the plan."""
+        doc = self._doc(
+            items=[
+                {"item_code": "MTPL", "qty": 2, "production_policy": "PRE_PRODUCED", "bom": "BOM-1"},
+                {"item_code": "UNCONFIGURED-ITEM", "qty": 0, "production_policy": "PRE_PRODUCED"},
+            ]
+        )
+        with patch(
+            "ury.ury.api.ury_sales_plan.validate_item_production_configuration"
+        ) as validate:
+            validate_plan_items(doc)
+        validate.assert_called_once_with("MTPL", "Branch A")
+
     def test_snapshot_is_immutable_once_created(self):
         doc = self._doc()
         first = freeze_approval_snapshot(doc)
