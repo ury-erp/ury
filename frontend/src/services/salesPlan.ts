@@ -47,6 +47,30 @@ export interface LoadSalesPlanParams {
 
 const STORAGE_KEY_PREFIX = 'ury_v3_sales_plan_draft';
 
+export const addManualItemToDraft = (
+  items: SalesPlanItem[],
+  searchResult: BranchItemSearchResult,
+): SalesPlanItem[] => {
+  // Check for duplicates by item_code
+  if (items.some((item) => item.item_code === searchResult.item_code)) {
+    return items;
+  }
+
+  const newItem: SalesPlanItem = {
+    item_code: searchResult.item_code,
+    item_name: searchResult.item_name || searchResult.item_code,
+    stock_uom: searchResult.stock_uom || 'Nos',
+    department: searchResult.department || 'Ungrouped',
+    production_unit: searchResult.production_unit || 'Unassigned',
+    average_qty: 0,
+    sample_days: 0,
+    history: [],
+    planned_qty: 0,
+  };
+
+  return [...items, newItem];
+};
+
 export const buildSalesPlanDraftKey = (params: Pick<LoadSalesPlanParams, 'branch' | 'company' | 'plan_date'>) => {
   if (!params.branch || params.branch === 'all' || !params.company || !params.plan_date) {
     return null;
@@ -172,6 +196,21 @@ export interface GetPlanStatusResponse {
   status: string | null;
 }
 
+export interface BranchItemSearchResult {
+  item_code: string;
+  item_name?: string;
+  stock_uom?: string;
+  department?: string;
+  production_unit?: string;
+}
+
+export interface SearchBranchItemsParams {
+  branch: string;
+  company?: string;
+  query?: string;
+  limit?: number;
+}
+
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
     const res = await call.get<ComparableHistoryResponse>(
@@ -225,5 +264,19 @@ export const salesPlanService = {
       { branch: params.branch, plan_date: params.plan_date },
     );
     return ((res as any)?.message ?? res) as GetPlanStatusResponse;
+  },
+
+  async searchBranchItems(params: SearchBranchItemsParams): Promise<BranchItemSearchResult[]> {
+    const res = await call.get<BranchItemSearchResult[]>(
+      'ury.ury.api.ury_dashboard.search_branch_items',
+      {
+        branch: params.branch,
+        company: params.company,
+        query: params.query || '',
+        limit: params.limit || 25,
+      },
+    );
+    const items = ((res as any)?.message ?? res) as BranchItemSearchResult[];
+    return Array.isArray(items) ? items : [];
   },
 };
