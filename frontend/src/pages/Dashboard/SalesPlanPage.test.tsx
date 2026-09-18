@@ -17,6 +17,7 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
       ...actual.salesPlanService,
       getComparableHistory: vi.fn(),
       searchBranchItems: vi.fn(),
+      getPlanStatus: vi.fn(),
     },
   };
 });
@@ -69,6 +70,7 @@ describe('SalesPlanPage', () => {
     window.localStorage.clear();
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(historyResponse);
     vi.mocked(salesPlanService.searchBranchItems).mockResolvedValue([]);
+    vi.mocked(salesPlanService.getPlanStatus).mockRejectedValue(new Error('not found'));
   });
 
   afterEach(() => {
@@ -326,5 +328,54 @@ describe('SalesPlanPage', () => {
     const indianHeader = indianToggle.closest('div');
     expect(indianHeader).toHaveTextContent('2 items');
     expect(indianHeader).toHaveTextContent('1 issue');
+  });
+
+  describe('lifecycle stepper summary', () => {
+    it('shows the next action for a Draft plan', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      expect(await screen.findByText('Currently: Draft · Next: Submit for Review')).toBeInTheDocument();
+    });
+
+    it('marks a manager-only next action with (manager)', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Submitted for Approval' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      expect(await screen.findByText('Currently: Review · Next: Approve (manager)')).toBeInTheDocument();
+    });
+
+    it('shows the locked message with no Next for Locked for Production', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Locked for Production' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      const summary = await screen.findByText('Currently: Ready for Production · This plan is locked for production.');
+      expect(summary).toBeInTheDocument();
+      expect(summary).not.toHaveTextContent('Next:');
+    });
+
+    it('shows the cancelled message for Superseded/Cancelled', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Superseded/Cancelled' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      expect(
+        await screen.findByText('Currently: Superseded/Cancelled · This plan has been superseded or cancelled.')
+      ).toBeInTheDocument();
+    });
+
+    it('shows no summary line when status is null', async () => {
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      expect(screen.queryByText(/^Currently:/)).not.toBeInTheDocument();
+    });
   });
 });

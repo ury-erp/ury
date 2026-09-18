@@ -338,35 +338,68 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
   const activeIndex = status ? LIFECYCLE_STEPS.findIndex((step) => step.matches.includes(status)) : -1;
   const isTerminalOther = status === 'Superseded/Cancelled';
 
+  // Text summary shown under the pill row, kept in sync with the same
+  // NEXT_ACTION map that drives the actual action button elsewhere in this
+  // file, so the copy never drifts from what the button actually does.
+  let summary: string | null = null;
+  if (status) {
+    const currentLabel = isTerminalOther ? status : LIFECYCLE_STEPS[activeIndex]?.label ?? status;
+    const nextAction = NEXT_ACTION[status];
+    let nextPart: string;
+    if (nextAction) {
+      nextPart = ` · Next: ${nextAction.label}${nextAction.managerOnly ? ' (manager)' : ''}`;
+    } else if (status === 'Locked for Production') {
+      nextPart = ' · This plan is locked for production.';
+    } else if (isTerminalOther) {
+      nextPart = ' · This plan has been superseded or cancelled.';
+    } else {
+      nextPart = '';
+    }
+    summary = `Currently: ${currentLabel}${nextPart}`;
+  }
+
   return (
-    <div className="flex items-center gap-2" aria-label="Sales Plan status">
-      {LIFECYCLE_STEPS.map((step, index) => {
-        const isActive = index === activeIndex;
-        const isComplete = activeIndex >= 0 && index < activeIndex;
-        return (
-          <React.Fragment key={step.key}>
-            {index > 0 && (
-              <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
-            )}
-            <Badge
-              size="tag"
-              variant={
-                isActive
-                  ? 'tagAccent'
-                  : isComplete
-                    ? 'tagSuccess'
-                    : 'default'
-              }
-            >
-              {step.label}
+    <div>
+      <div className="flex items-center gap-2" role="list" aria-label="Sales Plan status">
+        {LIFECYCLE_STEPS.map((step, index) => {
+          const isActive = index === activeIndex;
+          const isComplete = activeIndex >= 0 && index < activeIndex;
+          return (
+            <React.Fragment key={step.key}>
+              {index > 0 && (
+                <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
+              )}
+              <div role="listitem">
+                <Badge
+                  size="tag"
+                  aria-current={isActive ? 'step' : undefined}
+                  variant={
+                    isActive
+                      ? 'tagAccent'
+                      : isComplete
+                        ? 'tagSuccess'
+                        : 'default'
+                  }
+                  className={isActive ? 'font-semibold ring-2 ring-primary' : undefined}
+                >
+                  {step.label}
+                </Badge>
+              </div>
+            </React.Fragment>
+          );
+        })}
+        {isTerminalOther && (
+          <div role="listitem">
+            <Badge size="tag" variant="tagDestructive" className="ml-1">
+              Superseded/Cancelled
             </Badge>
-          </React.Fragment>
-        );
-      })}
-      {isTerminalOther && (
-        <Badge size="tag" variant="tagDestructive" className="ml-1">
-          Superseded/Cancelled
-        </Badge>
+          </div>
+        )}
+      </div>
+      {summary && (
+        <p className="mt-1.5 text-xs text-text-tertiary" aria-live="polite">
+          {summary}
+        </p>
       )}
     </div>
   );
