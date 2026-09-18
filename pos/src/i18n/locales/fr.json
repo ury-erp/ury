@@ -33,7 +33,8 @@
     "service_board": "Tableau de service",
     "close_shift": "Clôturer la session",
     "lock_pos": "Verrouiller / Changer d’utilisateur",
-    "switch_to_desk": "Accéder au bureau"
+    "switch_to_desk": "Accéder au bureau",
+    "language": "Langue"
   },
   "menu": {
     "special_items": "Plats spéciaux"
