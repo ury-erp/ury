@@ -19,35 +19,35 @@
    {
     "state": "Proposed",
     "doc_status": "0",
-    "allow_edit": "URY Manager",
+    "allow_edit": "",
     "update_field": "status",
     "update_value": "Proposed"
    },
    {
     "state": "Submitted for Approval",
     "doc_status": "0",
-    "allow_edit": "URY Manager",
+    "allow_edit": "",
     "update_field": "status",
     "update_value": "Submitted for Approval"
    },
    {
     "state": "Approved",
     "doc_status": "1",
-    "allow_edit": "URY Manager",
+    "allow_edit": "",
     "update_field": "status",
     "update_value": "Approved"
    },
    {
     "state": "Locked for Production",
     "doc_status": "1",
-    "allow_edit": "URY Manager",
+    "allow_edit": "",
     "update_field": "status",
     "update_value": "Locked for Production"
    },
    {
     "state": "Superseded/Cancelled",
     "doc_status": "2",
-    "allow_edit": "URY Manager",
+    "allow_edit": "",
     "update_field": "status",
     "update_value": "Superseded/Cancelled"
    }
@@ -82,17 +82,52 @@
     "allow_self_approval": 1
    },
    {
+    "state": "Proposed",
+    "action": "Return to Draft",
+    "next_state": "Draft",
+    "allowed": "URY Sales Plan Controller",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Submitted for Approval",
+    "action": "Return to Draft",
+    "next_state": "Draft",
+    "allowed": "URY Sales Plan Controller",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Draft",
+    "action": "Supersede/Cancel",
+    "next_state": "Superseded/Cancelled",
+    "allowed": "URY Sales Plan Controller",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Proposed",
+    "action": "Supersede/Cancel",
+    "next_state": "Superseded/Cancelled",
+    "allowed": "URY Sales Plan Controller",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Submitted for Approval",
+    "action": "Supersede/Cancel",
+    "next_state": "Superseded/Cancelled",
+    "allowed": "URY Sales Plan Controller",
+    "allow_self_approval": 1
+   },
+   {
     "state": "Approved",
     "action": "Supersede/Cancel",
     "next_state": "Superseded/Cancelled",
-    "allowed": "URY Manager",
+    "allowed": "URY Sales Plan Controller",
     "allow_self_approval": 1
    },
    {
     "state": "Locked for Production",
     "action": "Supersede/Cancel",
     "next_state": "Superseded/Cancelled",
-    "allowed": "URY Manager",
+    "allowed": "URY Sales Plan Controller",
     "allow_self_approval": 1
    }
   ]

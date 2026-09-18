@@ -5,6 +5,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_sales_plan import (
+    _guard_backward_transition,
     _validate_plan_scope,
     freeze_approval_snapshot,
     validate_no_overlapping_plan_scope,
@@ -80,6 +81,61 @@ class TestURYSalesPlanContract(FrappeTestCase):
         # field -- use item access to reach the actual field instead.
         doc["items"][0]["qty"] = 99
         self.assertEqual(freeze_approval_snapshot(doc), first)
+
+
+class TestGuardBackwardTransition(FrappeTestCase):
+    """_guard_backward_transition() blocks Return to Draft ("Draft") and
+    Supersede/Cancel ("Superseded/Cancelled") once real production has
+    happened, and requires a reason either way -- the actual regression
+    coverage for the live incident this guard exists to prevent: a plan
+    stuck on a validation error had no safe way back, and any way back
+    needed to both require an explanation and refuse to fire once the plan
+    had already driven real kitchen output."""
+
+    def _doc(self, **items_kwargs):
+        items = items_kwargs.pop("items", [{"item_code": "MTPL", "fulfilled_qty": 0, "committed_qty": 0}])
+        return frappe._dict({"name": "SP-TEST", "items": items})
+
+    def test_forward_targets_are_untouched(self):
+        # Only "Draft" and "Superseded/Cancelled" are guarded at all -- a
+        # forward transition (e.g. into "Approved") must never require a
+        # reason or be blocked by this function.
+        _guard_backward_transition(self._doc(), "Approved", reason=None)
+
+    def test_reason_required_to_return_to_draft(self):
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(self._doc(), "Draft", reason="")
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(self._doc(), "Draft", reason="   ")
+        _guard_backward_transition(self._doc(), "Draft", reason="wrong branch selected")
+
+    def test_reason_required_to_cancel(self):
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(self._doc(), "Superseded/Cancelled", reason=None)
+        _guard_backward_transition(self._doc(), "Superseded/Cancelled", reason="branch closed for the day")
+
+    def test_fulfilled_qty_blocks_return_to_draft_even_with_a_reason(self):
+        doc = self._doc(items=[{"item_code": "MTPL", "fulfilled_qty": 5, "committed_qty": 0}])
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(doc, "Draft", reason="need to fix a typo")
+
+    def test_fulfilled_qty_blocks_cancel_even_with_a_reason(self):
+        doc = self._doc(items=[{"item_code": "MTPL", "fulfilled_qty": 5, "committed_qty": 0}])
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(doc, "Superseded/Cancelled", reason="branch closed early")
+
+    def test_committed_but_unfulfilled_qty_blocks_return_to_draft_only(self):
+        doc = self._doc(items=[{"item_code": "MTPL", "fulfilled_qty": 0, "committed_qty": 3}])
+        with self.assertRaises(frappe.ValidationError):
+            _guard_backward_transition(doc, "Draft", reason="need to edit")
+        # Cancel stays allowed: an unfulfilled reservation is still
+        # recoverable, unlike production that already happened.
+        _guard_backward_transition(doc, "Superseded/Cancelled", reason="branch closed for the day")
+
+    def test_zero_committed_and_fulfilled_qty_allows_both(self):
+        doc = self._doc(items=[{"item_code": "MTPL", "fulfilled_qty": 0, "committed_qty": 0}])
+        _guard_backward_transition(doc, "Draft", reason="fixing a data entry mistake")
+        _guard_backward_transition(doc, "Superseded/Cancelled", reason="branch closed for the day")
 
 
 class TestValidateNoOverlappingPlanScope(FrappeTestCase):
@@ -505,6 +561,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 TEST_SALES_PLAN_MANAGER = "_test_sales_plan_workflow_manager@example.com"
 TEST_SALES_PLAN_NON_MANAGER = "_test_sales_plan_workflow_non_manager@example.com"
+TEST_SALES_PLAN_CONTROLLER = "_test_sales_plan_workflow_controller@example.com"
 
 
 class TestSalesPlanWorkflowTransitions(FrappeTestCase):
@@ -621,6 +678,9 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 		self._ensure_item_production_configuration("MTPL", self.branch, self.company)
 		self._create_user(TEST_SALES_PLAN_MANAGER, roles=["URY Manager"])
 		self._create_user(TEST_SALES_PLAN_NON_MANAGER, roles=[])
+		self._create_user(
+			TEST_SALES_PLAN_CONTROLLER, roles=["URY Manager", "URY Sales Plan Controller"]
+		)
 		frappe.db.delete(
 			"URY Sales Plan",
 			{"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
@@ -632,7 +692,7 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 			"URY Sales Plan",
 			{"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
 		)
-		for user in (TEST_SALES_PLAN_MANAGER, TEST_SALES_PLAN_NON_MANAGER):
+		for user in (TEST_SALES_PLAN_MANAGER, TEST_SALES_PLAN_NON_MANAGER, TEST_SALES_PLAN_CONTROLLER):
 			if frappe.db.exists("User", user):
 				frappe.delete_doc("User", user, force=True, ignore_permissions=True)
 
@@ -694,12 +754,20 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 			transition_plan(name=name, target_state="Proposed")
 			transition_plan(name=name, target_state="Submitted for Approval")
 			transition_plan(name=name, target_state="Approved")
-			result = transition_plan(name=name, target_state="Superseded/Cancelled")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			result = transition_plan(name=name, target_state="Superseded/Cancelled", reason="branch closed for the day")
 		finally:
 			frappe.set_user("Administrator")
 
 		self.assertEqual(result["status"], "Superseded/Cancelled")
 		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
+		self.assertEqual(
+			frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"), "branch closed for the day"
+		)
 
 	def test_cancel_from_locked_for_production_results_in_real_docstatus_2(self):
 		from ury.ury.api.ury_sales_plan import transition_plan
@@ -711,15 +779,115 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 			transition_plan(name=name, target_state="Proposed")
 			transition_plan(name=name, target_state="Submitted for Approval")
 			transition_plan(name=name, target_state="Approved")
-			result = transition_plan(name=name, target_state="Locked for Production")
+			transition_plan(name=name, target_state="Locked for Production")
 			self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 1)
+		finally:
+			frappe.set_user("Administrator")
 
-			result = transition_plan(name=name, target_state="Superseded/Cancelled")
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			result = transition_plan(name=name, target_state="Superseded/Cancelled", reason="menu changed")
 		finally:
 			frappe.set_user("Administrator")
 
 		self.assertEqual(result["status"], "Superseded/Cancelled")
 		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
+
+	def test_manager_without_controller_role_cannot_cancel_or_return_to_draft(self):
+		"""URY Manager alone (no URY Sales Plan Controller role) can drive the
+		whole forward path but must not be able to reopen or kill a plan --
+		Return to Draft/Supersede-Cancel are gated to a narrower role,
+		precisely because plain "can approve plans" and "can undo an
+		approval decision" are not the same permission."""
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+			with self.assertRaises(frappe.PermissionError):
+				transition_plan(name=name, target_state="Draft", reason="need to fix something")
+
+			transition_plan(name=name, target_state="Submitted for Approval")
+			transition_plan(name=name, target_state="Approved")
+			with self.assertRaises(frappe.PermissionError):
+				transition_plan(name=name, target_state="Superseded/Cancelled", reason="branch closed")
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_controller_can_return_proposed_plan_to_draft_with_a_reason(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			result = transition_plan(name=name, target_state="Draft", reason="wrong branch selected")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["status"], "Draft")
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 0)
+		self.assertEqual(
+			frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"), "wrong branch selected"
+		)
+
+	def test_return_to_draft_without_a_reason_is_rejected(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				transition_plan(name=name, target_state="Draft")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "status"), "Proposed")
+
+	def test_cancel_blocked_once_fulfilled_qty_recorded_even_for_controller(self):
+		"""No override, ever: once real production is recorded against a row,
+		neither the manager nor the sales-plan-controller role can reopen or
+		kill the plan -- see _guard_backward_transition()."""
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+			transition_plan(name=name, target_state="Submitted for Approval")
+			transition_plan(name=name, target_state="Approved")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.db.set_value(
+			"URY Sales Plan Item", {"parent": name, "item_code": "MTPL"}, "fulfilled_qty", 3
+		)
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				transition_plan(name=name, target_state="Superseded/Cancelled", reason="branch closed")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "status"), "Approved")
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 1)
 
 	def test_audit_log_records_transitions_across_docstatus_boundaries(self):
 		"""Regression test for the gap before_update_after_submit()/before_cancel()
@@ -735,7 +903,12 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 			transition_plan(name=name, target_state="Submitted for Approval")
 			transition_plan(name=name, target_state="Approved")
 			transition_plan(name=name, target_state="Locked for Production")
-			transition_plan(name=name, target_state="Superseded/Cancelled")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			transition_plan(name=name, target_state="Superseded/Cancelled", reason="branch closed for the day")
 		finally:
 			frappe.set_user("Administrator")
 
