@@ -182,11 +182,23 @@ export interface UseEditableTableOptions<T> {
   visibleRows: T[];
   /** Stable persisted-identity accessor for a row (NOT assumed to be item_code/department). */
   rowKey: (row: T) => string;
+  /**
+   * Fired when ArrowUp/ArrowDown would move focus past this instance's first/last
+   * row (i.e. the nav would go out of `visibleRows` bounds). Lets a consumer react
+   * — e.g. expand a truncated view and retry focus — without inspecting the DOM.
+   */
+  onBoundaryReached?: (direction: "up" | "down") => void;
 }
 
 export interface UseEditableTableResult<T> {
-  /** Ref callback for a numeric input: blocks page-scroll-driven value changes while focused. */
-  wheelGuardRef: (el: HTMLInputElement | null) => void;
+  /**
+   * Ref-callback factory for a numeric input, keyed by row key: prevents the
+   * "scroll silently changes a focused number input's value" browser behavior
+   * by blurring the input on wheel while it is focused (rather than calling
+   * `preventDefault()`, which would also block page scroll). Call as
+   * `wheelGuardRef(key)(el)` from the input's `ref`.
+   */
+  wheelGuardRef: (key: string) => (el: HTMLInputElement | null) => void;
   /**
    * Keyboard handler for a cell in the designated editable column. Wire to
    * `onKeyDown` on the input. `ArrowUp`/`ArrowDown` move focus within
@@ -208,8 +220,13 @@ export interface UseEditableTableResult<T> {
  * `visibleRows` passed to *this* hook call, so multiple mounted tables (one
  * per department, say) never cross-navigate into each other.
  */
-export function useEditableTable<T>({ visibleRows, rowKey }: UseEditableTableOptions<T>): UseEditableTableResult<T> {
+export function useEditableTable<T>({
+  visibleRows,
+  rowKey,
+  onBoundaryReached,
+}: UseEditableTableOptions<T>): UseEditableTableResult<T> {
   const cellRefs = React.useRef(new Map<string, HTMLInputElement>());
+  const wheelGuardCleanups = React.useRef(new Map<string, () => void>());
 
   const registerCellRef = React.useCallback(
     (key: string) => (el: HTMLInputElement | null) => {
@@ -219,22 +236,29 @@ export function useEditableTable<T>({ visibleRows, rowKey }: UseEditableTableOpt
     []
   );
 
-  const wheelGuardRef = React.useCallback((el: HTMLInputElement | null) => {
-    const existing = (el as any)?.__wheelGuardCleanup as (() => void) | undefined;
-    if (!el) return;
-    if (existing) return;
-    const onWheel = (e: WheelEvent) => {
-      // Only block the page-scroll-changes-value behavior while this input is
-      // focused; a non-passive native listener is required because React's
-      // synthetic onWheel is passive by default and preventDefault() there
-      // silently no-ops.
-      if (document.activeElement === el) {
-        e.preventDefault();
+  const wheelGuardRef = React.useCallback(
+    (key: string) => (el: HTMLInputElement | null) => {
+      // Tear down any previously attached listener for this slot first —
+      // this runs both on unmount (el === null) and on element reassignment.
+      const prevCleanup = wheelGuardCleanups.current.get(key);
+      if (prevCleanup) {
+        prevCleanup();
+        wheelGuardCleanups.current.delete(key);
       }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    (el as any).__wheelGuardCleanup = () => el.removeEventListener("wheel", onWheel);
-  }, []);
+      if (!el) return;
+      const onWheel = () => {
+        // Root cause: browsers change a focused <input type=number>'s value
+        // on wheel scroll. Removing focus (rather than preventDefault-ing the
+        // wheel event) stops that value change without blocking page scroll.
+        if (document.activeElement === el) {
+          el.blur();
+        }
+      };
+      el.addEventListener("wheel", onWheel, { passive: true });
+      wheelGuardCleanups.current.set(key, () => el.removeEventListener("wheel", onWheel));
+    },
+    []
+  );
 
   const handleCellKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>, row: T, onCommit?: (row: T) => void) => {
@@ -244,8 +268,12 @@ export function useEditableTable<T>({ visibleRows, rowKey }: UseEditableTableOpt
 
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();
+        const direction = event.key === "ArrowUp" ? "up" : "down";
         const nextIndex = event.key === "ArrowUp" ? index - 1 : index + 1;
-        if (nextIndex < 0 || nextIndex >= visibleRows.length) return; // stop at this instance's own edge
+        if (nextIndex < 0 || nextIndex >= visibleRows.length) {
+          onBoundaryReached?.(direction); // stop at this instance's own edge
+          return;
+        }
         const nextKey = rowKey(visibleRows[nextIndex]);
         cellRefs.current.get(nextKey)?.focus();
         return;
@@ -261,7 +289,7 @@ export function useEditableTable<T>({ visibleRows, rowKey }: UseEditableTableOpt
         }
       }
     },
-    [visibleRows, rowKey]
+    [visibleRows, rowKey, onBoundaryReached]
   );
 
   return { wheelGuardRef, handleCellKeyDown, registerCellRef };
