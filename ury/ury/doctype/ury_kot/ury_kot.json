@@ -24,6 +24,8 @@
   "production_time",
   "column_break_9rksu",
   "start_time_serv",
+  "served_by",
+  "prepared_by",
   "section_break_ubzfc",
   "kot_items",
   "section_break_zpwun",
@@ -253,12 +255,26 @@
    "fieldtype": "Data",
    "label": "Total Production Time",
    "read_only": 1
+  },
+  {
+   "fieldname": "prepared_by",
+   "fieldtype": "Link",
+   "label": "Prepared By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "served_by",
+   "fieldtype": "Link",
+   "label": "Served By",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-02 19:28:17.139894",
+ "modified": "2026-09-18 13:45:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT",
