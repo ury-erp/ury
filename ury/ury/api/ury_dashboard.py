@@ -201,44 +201,66 @@ def search_branch_items(branch, company=None, query="", limit=25):
 
 	_validate_comparable_history_access(branch, company)
 
-	# Cap limit server-side to prevent abuse.
-	limit = min(int(limit) if limit else 25, 100)
+	# Cap limit server-side to prevent abuse; fall back to the default on
+	# non-numeric input and clamp negatives so a bad value can't slip through.
+	try:
+		limit = max(1, min(int(limit or 25), 100))
+	except (TypeError, ValueError):
+		limit = 25
 	query = (query or "").strip()
 
+	# Scope the item set to this branch via URY Item Production Configuration
+	# *before* touching the Item master, so the ignore_permissions=True query
+	# below can never leak the site-wide catalog (other companies/branches,
+	# raw materials, packaging, etc.) to a caller who only has branch-scoped
+	# access. Items with no config yet for this branch are simply not
+	# searchable here (they still appear once configured).
+	production_config_map = {}
+	for cfg in frappe.db.get_all(
+		"URY Item Production Configuration",
+		filters={"branch": branch},
+		fields=["item", "department", "production_unit"],
+	):
+		item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
+		if item_key:
+			production_config_map[item_key] = cfg
+
+	branch_item_codes = list(production_config_map.keys())
+
+	if not branch_item_codes:
+		return []
+
 	# Query items with ignore_permissions=True (see class docstring).
-	# Filter: disabled = 0 and optionally query-match.
-	filters = {"disabled": 0}
+	# Filter: disabled = 0, item_code restricted to this branch's configured
+	# items, and optionally query-match via or_filters (dict filter keys must
+	# be real fieldnames — "|item_code|item_name" is not valid Frappe filter
+	# syntax and 500s; or_filters is the correct OR mechanism, matching the
+	# pattern used in ury/ury_pos/api.py and ury_order.py).
+	filters = {"disabled": 0, "item_code": ["in", branch_item_codes]}
+	or_filters = None
 	if query:
-		filters = {
-			"disabled": 0,
-			"|item_code|item_name": ["like", f"%{query}%"],
+		or_filters = {
+			"item_code": ["like", f"%{query}%"],
+			"item_name": ["like", f"%{query}%"],
 		}
 
-	items = frappe.db.get_all(
-		"Item",
+	get_all_kwargs = dict(
 		filters=filters,
 		fields=["item_code", "item_name", "stock_uom"],
 		order_by="item_name asc",
 		limit_page_length=limit,
 		ignore_permissions=True,
 	)
+	if or_filters:
+		get_all_kwargs["or_filters"] = or_filters
+
+	items = frappe.db.get_all("Item", **get_all_kwargs)
 
 	if not items:
 		return []
 
-	# Fetch production config for this branch, keyed by item_code.
-	item_codes = [item["item_code"] for item in items]
-	production_config_map = {}
-	if item_codes:
-		for cfg in frappe.db.get_all(
-			"URY Item Production Configuration",
-			filters={"item": ["in", item_codes], "branch": branch},
-			fields=["item", "department", "production_unit"],
-		):
-			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
-			production_config_map[item_key] = cfg
-
-	# Reshape results to include production config.
+	# Reshape results to include production config (already fetched above,
+	# scoped to this branch).
 	result = []
 	for item in items:
 		item_code = item["item_code"]
