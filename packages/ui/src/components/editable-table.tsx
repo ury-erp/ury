@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Download, Upload } from "lucide-react";
 import { DataTable, type DataTableColumn, type DataTableRowTone } from "./data-table";
 import { Input } from "./input";
 import { Button } from "./button";
@@ -98,6 +99,13 @@ export interface EditableDataTableProps<T> {
    * focus instead of inspecting DOM indices.
    */
   onBoundaryReached?: (direction: "up" | "down") => void;
+  /**
+   * Optional content (e.g. a per-table filter input) rendered on the left of
+   * the same toolbar row as the bulk-set/CSV actions, so a caller's filter
+   * and this table's actions share one row instead of stacking in two.
+   * Ignored when neither `bulkSet` nor `csv` is supplied (no toolbar row).
+   */
+  toolbarLeft?: React.ReactNode;
 }
 
 const defaultConfirm = (rowCount: number) =>
@@ -118,6 +126,7 @@ export function EditableDataTable<T>({
   bulkSet,
   csv,
   onBoundaryReached,
+  toolbarLeft,
 }: EditableDataTableProps<T>) {
   const { wheelGuardRef, handleCellKeyDown, registerCellRef } = useEditableTable({
     visibleRows: rows,
@@ -199,37 +208,74 @@ export function EditableDataTable<T>({
 
   return (
     <div className="flex flex-col gap-2">
-      {(bulkSet || csv) && (
-        <div className="flex items-center gap-2">
-          {bulkSet && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleBulkSet}>
-              {bulkSet.label}
-            </Button>
-          )}
-          {csv && (
-            <>
-              <Button type="button" variant="ghost" size="sm" onClick={handleExport}>
-                Export CSV
-              </Button>
-              {csv.onImport && (
+      {(toolbarLeft || bulkSet || csv) && (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">{toolbarLeft}</div>
+          {(bulkSet || csv) && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              {/* Export/Import are a related CSV round-trip pair: grouped
+                  tightly together, quiet/low-weight so they don't compete
+                  visually with the primary editable-qty column. */}
+              {csv && (
                 <>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    Import CSV
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="compactSm"
+                    onClick={handleExport}
+                    title="Export this table to CSV"
+                    className="gap-1 text-text-tertiary hover:text-foreground"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export
                   </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv,text/csv"
-                    hidden
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleImportFile(file);
-                      e.target.value = "";
-                    }}
-                  />
+                  {csv.onImport && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="compactSm"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Import CSV into this table"
+                        className="gap-1 text-text-tertiary hover:text-foreground"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        hidden
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handleImportFile(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </>
+                  )}
                 </>
               )}
-            </>
+              {/* A distinct, destructive, higher-consequence action -- kept
+                  visually separate from the CSV pair by a thin divider and
+                  the shared `text-destructive` token, not an invented color. */}
+              {bulkSet && (
+                <>
+                  {csv && <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="compactSm"
+                    onClick={handleBulkSet}
+                    title={`Set every item in this table's plan to ${bulkSet.value}`}
+                    className="text-destructive hover:bg-destructive-tint hover:text-destructive"
+                  >
+                    {bulkSet.label}
+                  </Button>
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

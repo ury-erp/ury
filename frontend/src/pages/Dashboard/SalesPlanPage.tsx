@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, ChevronUp, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -929,7 +929,7 @@ export const SalesPlanPage: React.FC = () => {
               />
             </div>
             {addItemOpen && (
-              <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
                 {addItemLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Spinner className="h-4 w-4 text-primary" />
@@ -983,7 +983,11 @@ export const SalesPlanPage: React.FC = () => {
       ) : (
         <Section>
           {Object.keys(groupedItems).length > 1 && (
-            <div className="sticky top-0 z-20 mb-3 flex flex-wrap gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+              <span className="flex shrink-0 items-center gap-1 pr-1 text-xs font-medium text-text-tertiary">
+                <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+                Jump to:
+              </span>
               {Object.keys(groupedItems).map((department) => (
                 <button
                   key={department}
@@ -1118,17 +1122,6 @@ export const SalesPlanPage: React.FC = () => {
                     departmentContainerRefs.current[department] = el;
                   }}
                 >
-                  <div className="border-b border-border bg-card px-5 py-2">
-                    <Input
-                      aria-label={`Filter items in ${department}`}
-                      placeholder={`Filter ${department} items`}
-                      value={departmentFilters[department] || ''}
-                      onChange={(event) =>
-                        setDepartmentFilters((current) => ({ ...current, [department]: event.target.value }))
-                      }
-                      className="h-8 max-w-xs text-sm"
-                    />
-                  </div>
                   <div className="px-5 py-3">
                     {csvImportWarning && (
                       <p className="mb-2 rounded-md border border-warning-tint-border bg-warning-tint px-3 py-2 text-sm text-warning" role="alert">
@@ -1136,6 +1129,17 @@ export const SalesPlanPage: React.FC = () => {
                       </p>
                     )}
                     <EditableDataTable
+                      toolbarLeft={
+                        <Input
+                          aria-label={`Filter items in ${department}`}
+                          placeholder={`Filter ${department} items`}
+                          value={departmentFilters[department] || ''}
+                          onChange={(event) =>
+                            setDepartmentFilters((current) => ({ ...current, [department]: event.target.value }))
+                          }
+                          className="h-8 max-w-xs text-sm"
+                        />
+                      }
                       columns={departmentColumns}
                       rows={shownDepartmentItems}
                       // `dataRows` is the full filtered (but not truncated) set for
