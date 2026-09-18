@@ -603,6 +603,15 @@ def _ensure_approved_sales_plan(branch_name, company_name, plan_date, item_depar
 		doc.status = "Approved"
 		doc.approval_snapshot = encoded
 		doc.approval_snapshot_hash = snapshot_hash
+		# URY Sales Plan is now submittable, and its Workflow maps "Approved"
+		# to doc_status 1 (see ury/fixtures/workflow.json). Setting only
+		# `status` here (bypassing the real Workflow engine, which this seed
+		# script deliberately does to write a pre-baked snapshot in one shot)
+		# would otherwise leave a status/docstatus mismatch -- exactly the
+		# kind of row ury.patches.v3_22.backfill_sales_plan_docstatus exists
+		# to repair. Set docstatus explicitly so a freshly-seeded row is
+		# consistent from the start.
+		doc.docstatus = 1
 		if existing:
 			doc.save(ignore_permissions=True)
 		else:
