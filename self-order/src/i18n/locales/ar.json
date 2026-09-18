@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "language_code": "ar",
+    "direction": "rtl",
+    "register": "fusha_grammar_iraqi_terminology",
+    "glossary": "docs/i18n/arabic-glossary.md",
+    "human_verified": false,
+    "last_updated": "2026-09-17"
+  },
+  "assign": {
+    "enter_pin": "أدخل رمز الموظف",
+    "enter_table": "أدخل اسم الطاولة أو رمزها",
+    "pin_entry": "إدخال الرمز",
+    "submit": "تخصيص الطاولة",
+    "submitting": "جارٍ التخصيص...",
+    "title": "تخصيص هذا الجهاز"
+  },
+  "common": {
+    "starting_up": "جارٍ بدء التشغيل...",
+    "total": "الإجمالي",
+    "back": "رجوع",
+    "continue": "متابعة"
+  },
+  "device": {
+    "not_provisioned": "هذا الجهاز غير مُهيأ. يرجى مراجعة الموظفين.",
+    "start_failed": "تعذّر تشغيل هذا الجهاز. يرجى مراجعة الموظفين."
+  },
+  "idle": {
+    "confirm": "نعم، ما زلت هنا",
+    "title": "هل ما زلت هنا؟"
+  },
+  "menu": {
+    "categories": "فئات قائمة الطعام",
+    "all_items": "جميع الأصناف"
+  },
+  "order": {
+    "bill_requested": "تم طلب الفاتورة — أُبلغ الموظفون",
+    "cart": "سلة الطلب",
+    "confirm_restart": "هل تريد بدء طلب جديد؟ سيتم إفراغ سلة الطلب الحالية.",
+    "confirm_start_over": "هل تريد البدء من جديد؟ سيتم إفراغ سلة الطلب الحالية.",
+    "for_pickup": "طلب للاستلام",
+    "in_cart": "في السلة: {{qty}}",
+    "pay_online": "الدفع إلكترونياً",
+    "place": "إرسال الطلب",
+    "placing": "جارٍ إرسال الطلب...",
+    "placing_short": "جارٍ الإرسال...",
+    "request_bill": "طلب الفاتورة",
+    "so_far": "طلبك حتى الآن",
+    "starting_payment": "جارٍ بدء الدفع...",
+    "table": "طاولة {{table}}",
+    "title": "الطلب",
+    "start_over": "البدء من جديد",
+    "new_order": "طلب جديد",
+    "empty_hint": "اضغط على صنف من القائمة لإضافته إلى سلة طلبك.",
+    "item_count": {
+      "zero": "لا توجد أصناف",
+      "one": "صنف واحد",
+      "two": "صنفان",
+      "few": "{{count}} أصناف",
+      "many": "{{count}} صنفاً",
+      "other": "{{count}} صنف"
+    },
+    "remove_one": "إزالة واحدة من {{item}}",
+    "add_one": "إضافة واحدة أخرى من {{item}}"
+  },
+  "language": {
+    "label": "اللغة"
+  }
+}

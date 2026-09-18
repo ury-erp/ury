@@ -1,16 +1,21 @@
 import { createI18n, setIntlLocale, setCompactSuffixes } from '@ury/core';
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from './config';
-import { loadLocale } from './loader';
 
-/**
- * POS i18n, built on the engine shared with the dashboard and self-order apps
- * (packages/core/src/i18n/engine.ts).
- *
- * This deliberately delegates rather than keeping a private copy: the POS used
- * to own a duplicate implementation, and the duplicate is exactly why the
- * currency formatter never learned the active locale — money kept rendering
- * with Indian digit grouping under an Arabic UI.
- */
+const cache: Record<string, Record<string, unknown>> = {};
+
+/** Locale bundles are dynamic imports so only the active language ships. */
+async function loadLocale(lang: string): Promise<Record<string, unknown>> {
+  if (cache[lang]) return cache[lang];
+  try {
+    const mod = await import(`./locales/${lang}.json`);
+    cache[lang] = mod.default;
+    return cache[lang];
+  } catch {
+    if (lang !== DEFAULT_LANGUAGE) return loadLocale(DEFAULT_LANGUAGE);
+    return {};
+  }
+}
+
 const i18n = createI18n({
   loadLocale,
   defaultLanguage: DEFAULT_LANGUAGE,
@@ -28,15 +33,15 @@ export const applyDocumentLocale = i18n.applyDocumentLocale;
 /**
  * Boot i18n and point the shared formatters at the active locale.
  *
- * `@ury/core`'s format helpers sit below this layer and cannot import the
- * app's i18n, so they are told the locale here. Without this call every
- * amount, quantity and time in the POS formats against the 'en-IN' default
- * regardless of the language on screen.
+ * The formatters live in @ury/core below this layer, so they are told the
+ * locale here rather than importing it — otherwise currency on the dashboard
+ * would keep rendering with Indian grouping while the text is Arabic.
  */
-export async function initI18n(lang?: string): Promise<void> {
-  await i18n.init(lang);
+export async function initI18n(): Promise<void> {
+  await i18n.init();
   setIntlLocale(i18n.getIntlLocale());
   if (getActiveLanguage() === 'ar') {
     setCompactSuffixes({ thousand: ' ألف', million: ' مليون', billion: ' مليار' });
   }
+  applyDocumentLocale();
 }

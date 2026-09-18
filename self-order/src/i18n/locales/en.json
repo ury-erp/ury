@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "language_code": "en",
+    "direction": "ltr"
+  },
+  "assign": {
+    "enter_pin": "Enter staff PIN",
+    "enter_table": "Enter table name or code",
+    "pin_entry": "PIN entry",
+    "submit": "Assign Table",
+    "submitting": "Assigning…",
+    "title": "Assign This Tablet"
+  },
+  "common": {
+    "starting_up": "Starting up…",
+    "total": "Total",
+    "back": "Back",
+    "continue": "Continue"
+  },
+  "device": {
+    "not_provisioned": "This tablet is not provisioned. Please contact staff.",
+    "start_failed": "This device could not be started. Please contact staff."
+  },
+  "idle": {
+    "confirm": "I'm still here",
+    "title": "Still there?"
+  },
+  "menu": {
+    "categories": "Menu categories",
+    "all_items": "All Items"
+  },
+  "order": {
+    "bill_requested": "Bill requested — staff notified",
+    "cart": "Cart",
+    "confirm_restart": "Start a new order? Current cart will be cleared.",
+    "confirm_start_over": "Start over? Your current cart will be cleared.",
+    "for_pickup": "Order for Pickup",
+    "in_cart": "In cart: {{qty}}",
+    "pay_online": "Pay Online",
+    "place": "Place Order",
+    "placing": "Placing order…",
+    "placing_short": "Placing…",
+    "request_bill": "Request Bill",
+    "so_far": "Your order so far",
+    "starting_payment": "Starting payment…",
+    "table": "Table {{table}}",
+    "title": "Order",
+    "start_over": "Start Over",
+    "new_order": "New Order",
+    "empty_hint": "Tap a menu item to add it to your cart.",
+    "item_count": {
+      "zero": "No items",
+      "one": "1 item",
+      "two": "2 items",
+      "few": "{{count}} items",
+      "many": "{{count}} items",
+      "other": "{{count}} items"
+    },
+    "remove_one": "Remove one {{item}}",
+    "add_one": "Add one more {{item}}"
+  },
+  "language": {
+    "label": "Language"
+  }
+}
