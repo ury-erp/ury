@@ -10,6 +10,7 @@
     "copy-html-entry": "cp ../ury/public/urypos/index.html ../ury/www/urypos.html"
   },
   "dependencies": {
+    "@ury/core": "file:../packages/core",
     "socket.io-client": "^4.5.1",
     "vue": "^3.3.4",
     "vue-router": "^4",
