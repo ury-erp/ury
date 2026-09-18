@@ -5,37 +5,64 @@ import json
 
 import frappe
 from frappe import _
+from frappe.model.workflow import (
+    apply_workflow,
+    get_transitions,
+    get_workflow_name,
+    is_transition_condition_satisfied,
+)
 
 from ury.ury.api.ury_production_validation import validate_item_production_configuration
 
 
-TRANSITIONS = {
-    "Draft": {"Proposed"},
-    "Proposed": {"Submitted for Approval"},
-    "Submitted for Approval": {"Approved"},
-    "Approved": {"Locked for Production", "Superseded/Cancelled"},
-    "Locked for Production": {"Superseded/Cancelled"},
-}
-
-
 def transition_sales_plan(doc, target_state, actor=None):
-    """Validate the legality of a state transition and apply it.
+    """Apply a state transition via Frappe's real Workflow engine.
+
+    Finds the workflow transition whose current state matches ``doc.status``
+    and whose ``next_state`` equals ``target_state``, then calls
+    ``apply_workflow()`` for that transition's action. ``apply_workflow()``
+    both enforces the role gating declared in the "URY Sales Plan" Workflow
+    fixture (raising ``frappe.PermissionError``/``WorkflowPermissionError``
+    if the current user's role doesn't allow the transition) and performs the
+    actual save -- including a real ``doc.submit()``/``doc.cancel()`` when the
+    transition crosses a ``doc_status`` boundary (see
+    ``ury/fixtures/workflow.json``: Approved/Locked for Production are
+    doc_status 1, Superseded/Cancelled is doc_status 2). This replaces the
+    hand-rolled ``TRANSITIONS`` edge dict that used to live here -- it was a
+    second, independently-maintained copy of the same graph Frappe's own
+    ``validate_workflow()`` already re-checks on every save.
 
     The guardrails that used to run here directly (scope check, item
     validation, approval-snapshot freeze, audit append) now run
     unconditionally inside ``URYSalesPlan.validate()`` on every ``doc.save()``
-    -- including Desk/Workflow-driven transitions, which never called this
-    function at all. Keeping them here too would double-append audit_log
-    entries, so this function only checks whether the requested edge is a
-    legal one and then saves.
+    -- including Desk/Workflow-driven transitions -- so this function does
+    not duplicate them.
     """
     current = doc.get("status") or "Draft"
-    if target_state not in TRANSITIONS.get(current, set()):
+    workflow_name = get_workflow_name(doc.doctype)
+    if not workflow_name:
         frappe.throw(_("Invalid Sales Plan transition from {0} to {1}").format(current, target_state), frappe.ValidationError)
-    if not frappe.has_permission("URY Sales Plan", "write", doc=doc):
-        frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
-    doc.status = target_state
-    return doc
+
+    transitions = get_transitions(doc, raise_exception=False)
+    transition = next((t for t in transitions if t.state == current and t.next_state == target_state), None)
+    if not transition:
+        # Either there is no such edge in the workflow at all, or the current
+        # user's role does not permit it (get_transitions() already filters
+        # by frappe.get_roles()) -- in the latter case surface a
+        # PermissionError instead of a generic ValidationError so callers can
+        # distinguish "no such transition" from "not allowed to do this".
+        all_transitions = frappe.get_doc("Workflow", workflow_name).transitions
+        matching = [t for t in all_transitions if t.state == current and t.next_state == target_state]
+        if matching:
+            if not any(is_transition_condition_satisfied(t, doc) for t in matching):
+                frappe.throw(
+                    _("Invalid Sales Plan transition from {0} to {1}").format(current, target_state),
+                    frappe.ValidationError,
+                )
+            frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
+        frappe.throw(_("Invalid Sales Plan transition from {0} to {1}").format(current, target_state), frappe.ValidationError)
+
+    return apply_workflow(doc, transition.action)
 
 
 def _validate_plan_scope(doc):
@@ -276,15 +303,18 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None)
 
 @frappe.whitelist(methods=["POST"])
 def transition_plan(name, target_state):
-    """Apply an audited state transition to an existing Sales Plan and persist it."""
+    """Apply an audited state transition to an existing Sales Plan and persist it.
+
+    ``transition_sales_plan()`` now calls ``apply_workflow()`` itself, which
+    already performs the save (a real ``submit()``/``cancel()`` where the
+    transition crosses a doc_status boundary) -- an extra ``doc.save()`` here
+    would be redundant and, worse, would fail outright once the doc has been
+    submitted (docstatus 1), since a plain save on a submitted doc requires
+    going through ``before_update_after_submit`` semantics rather than a
+    normal save.
+    """
     doc = frappe.get_doc("URY Sales Plan", name)
-    transition_sales_plan(doc, target_state, actor=frappe.session.user)
-    # The scope check / item validation / snapshot freeze / audit append that
-    # used to happen inside transition_sales_plan() now run automatically in
-    # URYSalesPlan.validate() on every save (including Desk/Workflow-driven
-    # transitions, which never call transition_sales_plan() at all) -- so
-    # doc.save() alone is sufficient here.
-    doc.save()
+    doc = transition_sales_plan(doc, target_state, actor=frappe.session.user)
     return {"name": doc.name, "status": doc.status}
 
 

@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import frappe
@@ -6,7 +7,6 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_sales_plan import (
     _validate_plan_scope,
     freeze_approval_snapshot,
-    transition_sales_plan,
     validate_no_overlapping_plan_scope,
     validate_plan_items,
     flag_stale_bom_revisions,
@@ -14,35 +14,23 @@ from ury.ury.api.ury_sales_plan import (
 
 
 class TestURYSalesPlanContract(FrappeTestCase):
-    """transition_sales_plan() only checks transition legality + permission now.
+    """Scope checking, item validation, snapshot freezing, and audit logging
+    run inside URYSalesPlan.validate() (ury/ury/doctype/ury_sales_plan/
+    ury_sales_plan.py) on every status-changing save, including a real
+    Workflow-engine-driven transition. Those guardrails are exercised here as
+    direct unit tests of the still-standalone helper functions.
 
-    Scope checking, item validation, snapshot freezing, and audit logging moved
-    to URYSalesPlan.validate() (ury/ury/doctype/ury_sales_plan/ury_sales_plan.py)
-    so they fire on every status-changing save, including a Desk/Workflow-driven
-    transition that never calls transition_sales_plan() at all. Those guardrails
-    are exercised here as direct unit tests of the still-standalone helper
-    functions instead of through transition_sales_plan().
+    transition_sales_plan() itself is no longer testable against a bare
+    frappe._dict: it now routes through frappe.model.workflow.get_transitions()
+    / apply_workflow(), which require a real, persisted "URY Sales Plan" doc
+    and an active Workflow. See TestSalesPlanWorkflowTransitions below for
+    those end-to-end tests.
     """
 
     def _doc(self, **values):
         doc = frappe._dict({"status": "Submitted for Approval", "branch": "Branch A", "company": "Company A", "plan_date": "2026-09-12", "items": [{"item_code": "MTPL", "qty": 2, "production_policy": "PRE_PRODUCED", "bom": "BOM-1"}], "insight_snapshot": {"source": "history"}})
         doc.update(values)
         return doc
-
-    def test_transition_updates_status_when_permitted(self):
-        doc = self._doc()
-        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True):
-            transition_sales_plan(doc, "Approved", actor="approver@example.com")
-        self.assertEqual(doc.status, "Approved")
-
-    def test_invalid_transition_fails_closed(self):
-        with self.assertRaises(frappe.ValidationError):
-            transition_sales_plan(self._doc(status="Draft"), "Approved")
-
-    def test_approval_requires_permission(self):
-        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=False):
-            with self.assertRaises(frappe.PermissionError):
-                transition_sales_plan(self._doc(), "Approved")
 
     def test_validate_plan_scope_fails_closed_on_mismatch(self):
         with patch("ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Other Company"):
@@ -496,3 +484,245 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		# Row is marked stale but no exception
 		self.assertEqual(doc["items"][0].bom_revision_stale, 1)
+
+
+TEST_SALES_PLAN_MANAGER = "_test_sales_plan_workflow_manager@example.com"
+TEST_SALES_PLAN_NON_MANAGER = "_test_sales_plan_workflow_non_manager@example.com"
+
+
+class TestSalesPlanWorkflowTransitions(FrappeTestCase):
+	"""End-to-end regression coverage for routing transition_plan() through
+	Frappe's real Workflow engine (see ury/fixtures/workflow.json and
+	ury.ury.api.ury_sales_plan.transition_sales_plan()).
+
+	This is the actual regression test for the bug this fixes: before this
+	change, transition_sales_plan() only checked generic
+	frappe.has_permission(doctype, "write") -- so ANY user with write access
+	to URY Sales Plan (not just "URY Manager") could transition a plan,
+	bypassing the role gating declared on the Workflow fixture entirely. It
+	also regresses the confusing native Cancel+Amend affordance a real,
+	unrelated user hit live on this branch: docstatus must stay 0 until the
+	plan is genuinely Approved, then flip to 1 (never 2) until it is actually
+	Superseded/Cancelled.
+	"""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_branch(self, branch_name, company):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code):
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": item_code,
+					"item_name": item_code,
+					"item_group": "All Item Groups",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_warehouse(self, warehouse_name, company):
+		if frappe.db.exists("Warehouse", {"warehouse_name": warehouse_name, "company": company}):
+			return frappe.db.get_value(
+				"Warehouse", {"warehouse_name": warehouse_name, "company": company}, "name"
+			)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Warehouse",
+				"warehouse_name": warehouse_name,
+				"company": company,
+			}
+		).insert(ignore_permissions=True)
+		return doc.name
+
+	def _ensure_item_production_configuration(self, item_code, branch, company):
+		# validate_plan_items() (invoked on the Approved transition) requires
+		# an active production configuration for every plan item, via
+		# ury.ury.api.ury_production_validation.validate_item_production_configuration.
+		# A DIRECT_RETAIL policy is the cheapest config shape to satisfy here
+		# (no Department/Production Unit/BOM required, just a warehouse).
+		if frappe.db.exists(
+			"URY Item Production Configuration", {"item": item_code, "branch": branch, "active": 1}
+		):
+			return
+		warehouse = self._ensure_warehouse(f"{item_code} Retail Store", company)
+		frappe.get_doc(
+			{
+				"doctype": "URY Item Production Configuration",
+				"active": 1,
+				"item": item_code,
+				"branch": branch,
+				"production_policy": "DIRECT_RETAIL",
+				"direct_retail_warehouse": warehouse,
+			}
+		).insert(ignore_permissions=True)
+
+	def _create_user(self, email, roles):
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": email.split("@")[0],
+				"send_welcome_email": 0,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
+		for role in roles:
+			user.add_roles(role)
+		return user
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.company = "Sales Plan Workflow Test Co"
+		self.branch = "Sales Plan Workflow Test Branch"
+		self.plan_date = "2026-09-25"
+		self._ensure_company(self.company, "SPWF")
+		self._ensure_branch(self.branch, self.company)
+		self._ensure_item("MTPL")
+		self._ensure_item_production_configuration("MTPL", self.branch, self.company)
+		self._create_user(TEST_SALES_PLAN_MANAGER, roles=["URY Manager"])
+		self._create_user(TEST_SALES_PLAN_NON_MANAGER, roles=[])
+		frappe.db.delete(
+			"URY Sales Plan",
+			{"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+		)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.delete(
+			"URY Sales Plan",
+			{"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+		)
+		for user in (TEST_SALES_PLAN_MANAGER, TEST_SALES_PLAN_NON_MANAGER):
+			if frappe.db.exists("User", user):
+				frappe.delete_doc("User", user, force=True, ignore_permissions=True)
+
+	def _create_draft(self):
+		from ury.ury.api.ury_sales_plan import save_draft
+
+		created = save_draft(
+			plan_date=self.plan_date,
+			branch=self.branch,
+			company=self.company,
+			items=[{"item_code": "MTPL", "qty": 5}],
+		)
+		return created["name"]
+
+	def test_manager_can_walk_draft_to_approved_and_docstatus_flips_only_then(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			result = transition_plan(name=name, target_state="Proposed")
+			self.assertEqual(result["status"], "Proposed")
+			self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 0)
+
+			result = transition_plan(name=name, target_state="Submitted for Approval")
+			self.assertEqual(result["status"], "Submitted for Approval")
+			self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 0)
+
+			result = transition_plan(name=name, target_state="Approved")
+			self.assertEqual(result["status"], "Approved")
+			self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 1)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_non_manager_cannot_transition_plan(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_NON_MANAGER)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				transition_plan(name=name, target_state="Proposed")
+		finally:
+			frappe.set_user("Administrator")
+
+		# Nothing changed: still Draft, still docstatus 0.
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "status"), "Draft")
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 0)
+
+	def test_cancel_from_approved_results_in_real_docstatus_2(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+			transition_plan(name=name, target_state="Submitted for Approval")
+			transition_plan(name=name, target_state="Approved")
+			result = transition_plan(name=name, target_state="Superseded/Cancelled")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["status"], "Superseded/Cancelled")
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
+
+	def test_cancel_from_locked_for_production_results_in_real_docstatus_2(self):
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+			transition_plan(name=name, target_state="Submitted for Approval")
+			transition_plan(name=name, target_state="Approved")
+			result = transition_plan(name=name, target_state="Locked for Production")
+			self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 1)
+
+			result = transition_plan(name=name, target_state="Superseded/Cancelled")
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(result["status"], "Superseded/Cancelled")
+		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
+
+	def test_audit_log_records_transitions_across_docstatus_boundaries(self):
+		"""Regression test for the gap before_update_after_submit()/before_cancel()
+		close: validate() never fires once docstatus is 1, so without those two
+		hooks the audit trail would silently stop at "Approved"."""
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+			transition_plan(name=name, target_state="Submitted for Approval")
+			transition_plan(name=name, target_state="Approved")
+			transition_plan(name=name, target_state="Locked for Production")
+			transition_plan(name=name, target_state="Superseded/Cancelled")
+		finally:
+			frappe.set_user("Administrator")
+
+		audit_log = json.loads(frappe.db.get_value("URY Sales Plan", name, "audit_log") or "[]")
+		recorded_transitions = [(entry["from_state"], entry["to_state"]) for entry in audit_log]
+		self.assertIn(("Approved", "Locked for Production"), recorded_transitions)
+		self.assertIn(("Locked for Production", "Superseded/Cancelled"), recorded_transitions)

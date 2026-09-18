@@ -22,7 +22,8 @@
   "approval_snapshot_hash",
   "insight_snapshot",
   "section_break_audit",
-  "audit_log"
+  "audit_log",
+  "amended_from"
  ],
  "fields": [
   {
@@ -33,7 +34,8 @@
    "label": "Status",
    "options": "Draft\nProposed\nSubmitted for Approval\nApproved\nLocked for Production\nSuperseded/Cancelled",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "allow_on_submit": 1
   },
   {
    "default": "Hard",
@@ -120,6 +122,16 @@
    "fieldname": "audit_log",
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "URY Sales Plan",
+   "no_copy": 1,
+   "print_hide": 1,
    "read_only": 1
   }
  ],
@@ -133,6 +145,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -142,9 +155,11 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
+   "cancel": 1,
    "create": 1,
    "email": 1,
    "export": 1,
@@ -153,6 +168,7 @@
    "report": 1,
    "role": "URY Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
@@ -163,5 +179,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "is_submittable": 1
 }
