@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Badge, Button, Card, DataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
+import { CalendarDays, ChevronDown, ChevronUp, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
+import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import {
+  addManualItemToDraft,
+  BranchItemSearchResult,
   buildSalesPlanDraft,
   buildSalesPlanDraftKey,
   ComparableHistoryItem,
@@ -53,6 +55,8 @@ const formatQty = (value: number) => {
 };
 
 const getVariance = (item: SalesPlanItem) => item.planned_qty - item.average_qty;
+
+const cssSafeId = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '-');
 
 interface HistoryModalProps {
   item: ComparableHistoryItem | null;
@@ -382,6 +386,20 @@ export const SalesPlanPage: React.FC = () => {
   const [highlightedItemCode, setHighlightedItemCode] = useState<string | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
+  // Catalog search to add an item to the plan regardless of comparable history.
+  const [addItemQuery, setAddItemQuery] = useState('');
+  const [addItemResults, setAddItemResults] = useState<BranchItemSearchResult[]>([]);
+  const [addItemLoading, setAddItemLoading] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
+
+  // "Needs Attention" collapse-by-default state.
+  const [attentionExpanded, setAttentionExpanded] = useState(false);
+
+  // Per-department inline filter + collapse state, keyed by department name.
+  const [departmentFilters, setDepartmentFilters] = useState<Record<string, string>>({});
+  const [collapsedDepartments, setCollapsedDepartments] = useState<Record<string, boolean>>({});
+  const departmentToggleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   const draftKey = useMemo(() => {
     if (!historyScope) return null;
 
@@ -496,8 +514,72 @@ export const SalesPlanPage: React.FC = () => {
   // has no history to base the suggested quantity on -- both come straight
   // off the comparable-history response, nothing fabricated here.
   const blockedItems = useMemo(() => {
-    return items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
+    const blocked = items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
+    // Blocking-severity items (missing production unit) surface before
+    // warning-severity ones (no comparable history) so the most actionable
+    // gaps show up first in the collapsed 3-item preview.
+    return [...blocked].sort((a, b) => {
+      const aBlocking = a.production_unit === 'Unassigned' ? 0 : 1;
+      const bBlocking = b.production_unit === 'Unassigned' ? 0 : 1;
+      return aBlocking - bBlocking;
+    });
   }, [items]);
+
+  const visibleBlockedItems = attentionExpanded ? blockedItems : blockedItems.slice(0, 3);
+
+  // Debounced catalog search -- searches ANY item for this branch, regardless
+  // of whether it has comparable history, so zero-history items can be added.
+  useEffect(() => {
+    if (!addItemOpen || !historyScope?.branch) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setAddItemLoading(true);
+      try {
+        const results = await salesPlanService.searchBranchItems({
+          branch: historyScope.branch!,
+          company: historyScope.company,
+          query: addItemQuery,
+        });
+        if (!cancelled) setAddItemResults(results);
+      } catch (err) {
+        if (!cancelled) setAddItemResults([]);
+      } finally {
+        if (!cancelled) setAddItemLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [addItemQuery, addItemOpen, historyScope?.branch, historyScope?.company]);
+
+  const handleAddManualItem = (result: BranchItemSearchResult) => {
+    setItems((currentItems) => addManualItemToDraft(currentItems, result));
+    setAddItemOpen(false);
+    setAddItemQuery('');
+    setAddItemResults([]);
+  };
+
+  const toggleDepartmentCollapsed = (department: string) => {
+    setCollapsedDepartments((current) => {
+      const next = { ...current, [department]: !current[department] };
+      // If the group is about to collapse while a cell inside it holds
+      // focus, move focus to the department's own toggle button rather than
+      // leaving it stranded on a now-hidden element.
+      if (next[department]) {
+        const toggleEl = departmentToggleRefs.current[department];
+        if (toggleEl && toggleEl.contains(document.activeElement) === false) {
+          const active = document.activeElement;
+          const container = document.getElementById(`department-panel-${cssSafeId(department)}`);
+          if (container && active && container.contains(active)) {
+            toggleEl.focus();
+          }
+        }
+      }
+      return next;
+    });
+  };
 
   const focusItemRow = (itemCode: string) => {
     setHighlightedItemCode(itemCode);
@@ -638,7 +720,7 @@ export const SalesPlanPage: React.FC = () => {
         <Section>
           <AttentionFeed
           title="Needs Attention"
-          items={blockedItems.map((item) => {
+          items={visibleBlockedItems.map((item) => {
             const missingProductionUnit = item.production_unit === 'Unassigned';
             return {
               severity: missingProductionUnit ? 'blocking' : 'warning',
@@ -655,18 +737,99 @@ export const SalesPlanPage: React.FC = () => {
             };
           })}
           />
+          {blockedItems.length > 3 && (
+            <div className="mt-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAttentionExpanded((current) => !current)}
+                className="gap-1"
+              >
+                {attentionExpanded ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    <span>{`Show all (${blockedItems.length})`}</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </Section>
       )}
 
       <Section>
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-        <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search item, department, or production unit"
-          className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
-        />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+            <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search item, department, or production unit"
+              className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
+            />
+          </div>
+
+          {/* Catalog search: adds a NEW item to the plan (regardless of comparable
+              history), distinct from the filter box above which only narrows the
+              already-loaded list. */}
+          <div className="relative rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+            <label htmlFor="add-item-search" className="mb-1 block text-xs font-medium text-text-tertiary">
+              Add item to plan
+            </label>
+            <div className="flex items-center gap-3">
+              <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
+              <input
+                id="add-item-search"
+                value={addItemQuery}
+                onChange={(event) => {
+                  setAddItemQuery(event.target.value);
+                  setAddItemOpen(true);
+                }}
+                onFocus={() => setAddItemOpen(true)}
+                placeholder="Search the item catalog by name or code"
+                className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
+              />
+            </div>
+            {addItemOpen && (
+              <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                {addItemLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Spinner className="h-4 w-4 text-primary" />
+                  </div>
+                ) : addItemResults.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-text-tertiary">No matching items found.</p>
+                ) : (
+                  <ul>
+                    {addItemResults.map((result) => (
+                      <li key={result.item_code}>
+                        <button
+                          type="button"
+                          onClick={() => handleAddManualItem(result)}
+                          className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-primary-tint"
+                        >
+                          <span className="font-medium text-foreground">{result.item_name || result.item_code}</span>
+                          <span className="text-xs text-text-tertiary">
+                            {result.item_code}
+                            {result.department ? ` · ${result.department}` : ''}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="border-t border-border px-4 py-1 text-right">
+                  <Button variant="ghost" size="sm" onClick={() => setAddItemOpen(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </Section>
 
@@ -687,81 +850,142 @@ export const SalesPlanPage: React.FC = () => {
       ) : (
         <Section>
           <div className="space-y-5">
-          {Object.entries(groupedItems).map(([department, departmentItems]) => (
-            <div key={department} className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-              <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
-                <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">{department}</h2>
-                <span className="text-xs font-medium text-text-tertiary">
-                  {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
-                </span>
+          {Object.entries(groupedItems).map(([department, departmentItems]) => {
+            const safeId = cssSafeId(department);
+            // Collapsed groups default to open (absence of an entry means expanded).
+            const isCollapsed = Boolean(collapsedDepartments[department]);
+            const deptFilter = (departmentFilters[department] || '').trim().toLowerCase();
+            const visibleDepartmentItems = deptFilter
+              ? departmentItems.filter((item) => {
+                  return [item.item_code, item.item_name, item.production_unit]
+                    .filter(Boolean)
+                    .some((value) => String(value).toLowerCase().includes(deptFilter));
+                })
+              : departmentItems;
+
+            const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
+              {
+                key: 'item_code',
+                header: 'Item',
+                render: (row) => (
+                  <div>
+                    <p className="font-semibold text-foreground">{row.item_name || row.item_code}</p>
+                    <p className="mt-0.5 text-xs text-text-tertiary">{row.item_code}</p>
+                  </div>
+                ),
+              },
+              {
+                key: 'average_qty',
+                header: 'History Insight',
+                render: (row) => (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHistoryItem(row)}
+                    className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-primary-tint"
+                  >
+                    <History className="h-4 w-4" />
+                    <span>
+                      Last {row.sample_days} comparable days avg {formatQty(row.average_qty)} {row.stock_uom}
+                    </span>
+                  </button>
+                ),
+              },
+              {
+                key: 'production_unit',
+                header: 'Production Unit',
+                render: (row) => <span className="text-muted-foreground">{row.production_unit || 'Unassigned'}</span>,
+              },
+              {
+                key: 'variance',
+                header: 'Variance',
+                align: 'right',
+                render: (row) => {
+                  const variance = getVariance(row);
+                  return (
+                    <span className={`font-semibold ${variance < 0 ? 'text-warning' : 'text-success'}`}>
+                      {variance > 0 ? '+' : ''}{formatQty(variance)}
+                    </span>
+                  );
+                },
+              },
+            ];
+
+            return (
+              <div key={department} className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+                <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
+                  <button
+                    type="button"
+                    ref={(el) => {
+                      departmentToggleRefs.current[department] = el;
+                    }}
+                    onClick={() => toggleDepartmentCollapsed(department)}
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`department-panel-${safeId}`}
+                    className="flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground"
+                  >
+                    {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                    <span>{department}</span>
+                  </button>
+                  <span className="text-xs font-medium text-text-tertiary">
+                    {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
+                  </span>
+                </div>
+                <div id={`department-panel-${safeId}`} hidden={isCollapsed}>
+                  <div className="border-b border-border bg-card px-5 py-2">
+                    <Input
+                      aria-label={`Filter items in ${department}`}
+                      placeholder={`Filter ${department} items`}
+                      value={departmentFilters[department] || ''}
+                      onChange={(event) =>
+                        setDepartmentFilters((current) => ({ ...current, [department]: event.target.value }))
+                      }
+                      className="h-8 max-w-xs text-sm"
+                    />
+                  </div>
+                  <div className="px-5 py-3">
+                    <EditableDataTable
+                      columns={departmentColumns}
+                      rows={visibleDepartmentItems}
+                      // item_code is the practical key here since items are not yet
+                      // persisted Sales Plan Item child rows (no child-table `name`
+                      // exists pre-save) -- see task spec for why this is acceptable.
+                      rowKey={(row) => row.item_code}
+                      editableColumn={{
+                        key: 'planned_qty',
+                        header: 'Plan',
+                        align: 'right',
+                        min: 0,
+                        step: 0.01,
+                        getValue: (row) => row.planned_qty,
+                        onChange: (row, value) => updatePlannedQty(row.item_code, value),
+                      }}
+                      csvContextColumns={[
+                        { header: 'Item Code', get: (row) => row.item_code },
+                        { header: 'Item Name', get: (row) => row.item_name || '' },
+                      ]}
+                      emptyMessage="No items for this department."
+                      bulkSet={{
+                        label: 'Set all to 0',
+                        value: 0,
+                        onApply: (rows, value) => {
+                          rows.forEach((row) => updatePlannedQty(row.item_code, value));
+                        },
+                      }}
+                      csv={{
+                        filename: `${safeId}-sales-plan.csv`,
+                        onImport: (result) => {
+                          result.updated.forEach(({ rowKey, values }) => {
+                            const qty = Number(values.planned_qty);
+                            if (Number.isFinite(qty)) updatePlannedQty(rowKey, qty);
+                          });
+                        },
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
-              {(() => {
-                const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
-                  {
-                    key: 'item_code',
-                    header: 'Item',
-                    render: (row) => (
-                      <div>
-                        <p className="font-semibold text-foreground">{row.item_name || row.item_code}</p>
-                        <p className="mt-0.5 text-xs text-text-tertiary">{row.item_code}</p>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'average_qty',
-                    header: 'History Insight',
-                    render: (row) => (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedHistoryItem(row)}
-                        className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-primary-tint"
-                      >
-                        <History className="h-4 w-4" />
-                        <span>
-                          Last {row.sample_days} comparable days avg {formatQty(row.average_qty)} {row.stock_uom}
-                        </span>
-                      </button>
-                    ),
-                  },
-                  {
-                    key: 'production_unit',
-                    header: 'Production Unit',
-                    render: (row) => <span className="text-muted-foreground">{row.production_unit || 'Unassigned'}</span>,
-                  },
-                  {
-                    key: 'planned_qty',
-                    header: 'Plan',
-                    align: 'right',
-                    render: (row) => (
-                      <Input
-                        aria-label={`Plan quantity for ${row.item_name || row.item_code}`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={row.planned_qty}
-                        onChange={(event) => updatePlannedQty(row.item_code, Number(event.target.value))}
-                        className="ml-auto w-28 text-right"
-                      />
-                    ),
-                  },
-                  {
-                    key: 'variance',
-                    header: 'Variance',
-                    align: 'right',
-                    render: (row) => {
-                      const variance = getVariance(row);
-                      return (
-                        <span className={`font-semibold ${variance < 0 ? 'text-warning' : 'text-success'}`}>
-                          {variance > 0 ? '+' : ''}{formatQty(variance)}
-                        </span>
-                      );
-                    },
-                  },
-                ];
-                return <DataTable columns={departmentColumns} rows={departmentItems} emptyMessage="No items for this department." />;
-              })()}
-            </div>
-          ))}
+            );
+          })}
           </div>
         </Section>
       )}
