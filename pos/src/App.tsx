@@ -15,6 +15,7 @@ import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
+import { useRootStore } from './store/root-store';
 import { useEffect, useRef, useState } from 'react';
 import { getActiveLanguage } from './i18n';
 import { ActiveReportProvider } from './components/chat/ActiveReportContext';
@@ -58,12 +59,19 @@ function App() {
   const {
     initializeApp
   } = usePOSStore();
+  const user = useRootStore((state) => state.user);
+  const posProfile = useRootStore((state) => state.posProfile);
   const chatRef = useRef<ChatWidgetHandle>(null);
   const aiEnabled = useAiSettings();
 
   useEffect(() => {
-    initializeApp();
-  }, [initializeApp]);
+    // Stay idle while the browser is still Guest on the optional PIN screen;
+    // waiting for AuthGuard's profile keeps the original init order for
+    // password-authenticated users.
+    if (user && posProfile) {
+      initializeApp();
+    }
+  }, [initializeApp, posProfile, user]);
 
   useEffect(() => {
     const lang = getActiveLanguage();

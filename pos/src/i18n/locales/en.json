@@ -32,6 +32,7 @@
     "shift_overview": "Shift Overview",
     "service_board": "Service Board",
     "close_shift": "Close Shift",
+    "lock_pos": "Lock / Switch User",
     "switch_to_desk": "Switch To Desk"
   },
   "menu": {
@@ -445,5 +446,28 @@
     "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
     "confirm_zero_balance": "Confirm & Open",
     "session_opened_success": "POS session opened"
+  },
+  "pin_login": {
+    "title": "Enter your PIN",
+    "subtitle": "Use your personal POS PIN to start your secure cashier session.",
+    "pin_progress": "{{count}} PIN digits entered",
+    "delete_digit": "Delete last digit",
+    "sign_in": "Sign in",
+    "invalid_pin": "The PIN is incorrect or not enabled. Try again.",
+    "too_many_attempts": "Too many attempts. Wait a minute and try again.",
+    "use_password": "Sign in with email and password",
+    "manager_hint": "A manager can enable or disable personal PIN access for each POS account.",
+    "active_order_lock": "Finish or clear the current order before switching users."
+  },
+  "terminal_enroll": {
+    "title": "Register this terminal",
+    "subtitle": "Enter the terminal ID and the one-time code from your manager to bind this device.",
+    "terminal_id": "Terminal ID",
+    "code": "One-time enrollment code",
+    "enroll": "Register terminal",
+    "enrolling": "Registering…",
+    "failed": "Enrollment failed. Check the terminal ID and code, then ask a manager for a new code.",
+    "too_many_attempts": "Too many attempts. Wait a while and try again.",
+    "manager_hint": "A manager creates the terminal in Desk and generates a short-lived enrollment code."
   }
 }
