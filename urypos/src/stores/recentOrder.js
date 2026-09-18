@@ -290,6 +290,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           this.restaurantTable = pastOrder.restaurant_table;
           this.pastOrderdItem = pastOrder.items;
           this.recentWaiter = pastOrder.waiter;
+          this.table.previousWaiter = pastOrder.waiter;
           this.pastOrderType = pastOrder.order_type;
           this.modifiedTime = pastOrder.modified;
           this.menu.comments= pastOrder.custom_comments;

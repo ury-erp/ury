@@ -333,13 +333,9 @@
           class="waiter mt-3 block w-full rounded-md border bg-gray-50 p-2.5 text-sm text-gray-900 md:w-3/5 lg:w-2/5"
           :class="{ hidden: this.invoiceData.waiter === '' }"
           :value="
-            this.table.previousWaiter !== null &&
-            this.table.previousWaiter !== undefined
-              ? this.table.previousWaiter
-              : this.recentOrders.recentWaiter !== null &&
-                this.recentOrders.recentWaiter !== undefined
-              ? this.recentOrders.recentWaiter
-              : this.invoiceData.waiter
+            this.table.previousWaiter ||
+            this.recentOrders.recentWaiter ||
+            (this.auth.cashier ? '' : this.invoiceData.waiter)
           "
           readonly
         />

@@ -865,7 +865,10 @@ def sync_order(
     invoice.no_of_pax = no_of_pax
     invoice.pos_profile = pos_profile
     invoice.cashier = cashier
-    invoice.waiter = waiter
+    # Preserve original waiter on existing orders (Order Taker / Captain).
+    # Only assign waiter if the document does not already have one.
+    if not invoice.get("waiter"):
+        invoice.waiter = waiter
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room =room
     if not invoice.restaurant_table:

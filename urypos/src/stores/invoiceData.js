@@ -164,15 +164,12 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       selectedTables =
         this.table.selectedTable || this.recentOrders.restaurantTable;
       const cartCopy = JSON.parse(JSON.stringify(cart));
-      let waiter = null
+      let waiter = null;
       if (lastInvoice) {
-        waiter = this.table.previousWaiter !== null &&
-          this.table.previousWaiter !== undefined
-          ? this.table.previousWaiter
-          : this.recentOrders.recentWaiter !== null &&
-            this.recentOrders.recentWaiter !== undefined
-            ? this.recentOrders.recentWaiter
-            : this.waiter;
+        waiter =
+          this.table.previousWaiter ||
+          this.recentOrders.recentWaiter ||
+          (this.auth.cashier ? null : this.waiter);
       } else {
         waiter = this.waiter;
       }
