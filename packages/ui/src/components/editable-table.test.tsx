@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import * as React from "react";
 import { EditableDataTable } from "./editable-table";
-import { sanitizeCsvCell, buildCsv, parseImportCsv } from "./use-editable-table";
+import { sanitizeCsvCell, buildCsv, parseImportCsv, type EditableColumnSpec } from "./use-editable-table";
 
 // Fixture (a): Sales-Plan-item-like shape.
 interface SalesPlanItemFixture {
@@ -106,18 +106,50 @@ describe("EditableDataTable — Sales-Plan-shaped fixture", () => {
     expect((inputs[0] as HTMLInputElement).value).toBe("10");
   });
 
-  it("wheel-guard blocks native wheel events on a focused number input", () => {
+  it("wheel-guard blurs a focused number input on wheel instead of blocking page scroll", () => {
     renderSalesPlanTable(salesPlanRows);
     const input = screen.getAllByRole("spinbutton")[0] as HTMLInputElement;
     input.focus();
+    expect(document.activeElement).toBe(input);
 
     const wheelEvent = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
-    const prevented = !input.dispatchEvent(wheelEvent);
+    const notPrevented = input.dispatchEvent(wheelEvent);
 
-    // A native, non-passive listener calling preventDefault() results in the
-    // event being marked defaultPrevented / dispatchEvent returning false.
-    expect(prevented).toBe(true);
-    expect(wheelEvent.defaultPrevented).toBe(true);
+    // The event itself is never preventDefault()'d — page scroll is not blocked.
+    expect(notPrevented).toBe(true);
+    expect(wheelEvent.defaultPrevented).toBe(false);
+    // Instead, focus is removed from the input, which stops the browser from
+    // redirecting the wheel delta into the number input's value.
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it("wheel-guard does nothing when the input is not focused", () => {
+    renderSalesPlanTable(salesPlanRows);
+    const inputs = screen.getAllByRole("spinbutton") as HTMLInputElement[];
+    const input = inputs[0];
+    inputs[1].focus(); // focus elsewhere
+
+    const wheelEvent = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
+    input.dispatchEvent(wheelEvent);
+
+    expect(document.activeElement).toBe(inputs[1]);
+  });
+
+  it("wheel-guard listener is actually removed on unmount (no leak)", () => {
+    const removeSpy = vi.spyOn(HTMLInputElement.prototype, "removeEventListener");
+    const addSpy = vi.spyOn(HTMLInputElement.prototype, "addEventListener");
+    const { unmount } = renderSalesPlanTable(salesPlanRows);
+
+    const wheelAddCallsBeforeUnmount = addSpy.mock.calls.filter((c) => c[0] === "wheel").length;
+    expect(wheelAddCallsBeforeUnmount).toBeGreaterThan(0);
+
+    unmount();
+
+    const wheelRemoveCallsAfterUnmount = removeSpy.mock.calls.filter((c) => c[0] === "wheel").length;
+    expect(wheelRemoveCallsAfterUnmount).toBe(wheelAddCallsBeforeUnmount);
+
+    removeSpy.mockRestore();
+    addSpy.mockRestore();
   });
 
   it("keyboard nav: ArrowDown/ArrowUp move focus within visible rows, stopping at instance edges", () => {
@@ -217,6 +249,40 @@ describe("EditableDataTable — Sales-Plan-shaped fixture", () => {
     expect(result.unmatched).toEqual([{ rowKey: "GONE", values: { planned_qty: "7" } }]);
   });
 
+  it("CSV import/export is symmetric: a genuine leading-quote value round-trips unchanged", () => {
+    const rows: SalesPlanItemFixture[] = [
+      { item_code: "'hello", item_name: "'hello", department: "Indian", planned_qty: 10 },
+    ];
+    const csv = buildCsv(
+      rows,
+      (r) => r.item_code,
+      [{ header: "Item Name", get: (r) => r.item_name }],
+      [{ header: "Planned Qty", field: "planned_qty", get: (r) => r.planned_qty }]
+    );
+    // No guard prefix applied — "'hello" doesn't start with a guarded prefix.
+    expect(csv).toContain("'hello,'hello,10");
+
+    const result = parseImportCsv<SalesPlanItemFixture>(csv, new Set(["'hello"]), [
+      { header: "Planned Qty", field: "planned_qty", get: (r) => r.planned_qty },
+    ]);
+    // Round-trips back to the exact original value, quote intact.
+    expect(result.updated).toEqual([{ rowKey: "'hello", values: { planned_qty: "10" } }]);
+  });
+
+  it("CSV import/export is symmetric: a real formula value is guarded on export and restored on import", () => {
+    const rows: SalesPlanItemFixture[] = [
+      { item_code: "A1", item_name: "Item", department: "Indian", planned_qty: 0 },
+    ];
+    const editable: EditableColumnSpec<SalesPlanItemFixture>[] = [
+      { header: "Formula", field: "formula", get: () => "=SUM(A1:A2)" },
+    ];
+    const csv = buildCsv(rows, (r) => r.item_code, [], editable);
+    expect(csv).toContain("'=SUM(A1:A2)");
+
+    const result = parseImportCsv<SalesPlanItemFixture>(csv, new Set(["A1"]), editable);
+    expect(result.updated).toEqual([{ rowKey: "A1", values: { formula: "=SUM(A1:A2)" } }]);
+  });
+
   it("CSV export neutralizes a formula-injection payload in an editable cell", () => {
     const malicious: SalesPlanItemFixture[] = [
       { item_code: "A1", item_name: "Chicken Biryani", department: "Indian", planned_qty: 10 },
@@ -228,6 +294,94 @@ describe("EditableDataTable — Sales-Plan-shaped fixture", () => {
       [{ header: "Note", field: "note", get: () => "=cmd|calc!A1" }]
     );
     expect(csv).toContain("'=cmd|calc!A1");
+  });
+});
+
+describe("EditableDataTable — new API surface", () => {
+  it("dataRows: CSV export/bulk-set operate on dataRows, not the rendered rows subset", async () => {
+    const onApply = vi.fn();
+    const confirmSpy = vi.fn().mockReturnValue(true);
+    const rendered = salesPlanRows.slice(0, 1); // only A1 rendered/paginated
+    renderSalesPlanTable(rendered, {
+      dataRows: salesPlanRows, // full filtered set
+      bulkSet: { label: "Set all to 0", value: 0, confirm: confirmSpy, onApply },
+    });
+
+    fireEvent.click(screen.getByText("Set all to 0"));
+    await Promise.resolve();
+
+    expect(confirmSpy).toHaveBeenCalledWith(salesPlanRows.length);
+    expect(onApply).toHaveBeenCalledWith(salesPlanRows, 0);
+  });
+
+  it("dataRows: defaults to rows when omitted (backward compatible)", async () => {
+    const onApply = vi.fn();
+    const confirmSpy = vi.fn().mockReturnValue(true);
+    renderSalesPlanTable(salesPlanRows, {
+      bulkSet: { label: "Set all to 0", value: 0, confirm: confirmSpy, onApply },
+    });
+    fireEvent.click(screen.getByText("Set all to 0"));
+    await Promise.resolve();
+    expect(onApply).toHaveBeenCalledWith(salesPlanRows, 0);
+  });
+
+  it("editableColumnIndex: inserts the editable column at the given position instead of appending", () => {
+    renderSalesPlanTable(salesPlanRows, { editableColumnIndex: 0 });
+    // Header order reflects insertion position: editable header first.
+    const headerRow = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headerRow[0]).toBe("Planned Qty");
+  });
+
+  it("editableColumnIndex: omitted keeps default append-at-end behavior", () => {
+    renderSalesPlanTable(salesPlanRows);
+    const headerRow = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headerRow[headerRow.length - 1]).toBe("Planned Qty");
+  });
+
+  it("getAriaLabel: sets aria-label on the rendered input when provided", () => {
+    renderSalesPlanTable(salesPlanRows, {
+      editableColumn: {
+        key: "planned_qty",
+        header: "Planned Qty",
+        getValue: (r) => r.planned_qty,
+        onChange: vi.fn(),
+        getAriaLabel: (r) => `Planned quantity for ${r.item_name}`,
+      },
+    });
+    expect(screen.getByLabelText("Planned quantity for Chicken Biryani")).toBeInTheDocument();
+  });
+
+  it("getAriaLabel: omitted leaves inputs without an aria-label (current behavior)", () => {
+    renderSalesPlanTable(salesPlanRows);
+    const input = screen.getAllByRole("spinbutton")[0];
+    expect(input).not.toHaveAttribute("aria-label");
+  });
+
+  it("onBoundaryReached: fires with 'down' when ArrowDown is pressed past the last row", () => {
+    const onBoundaryReached = vi.fn();
+    renderSalesPlanTable(salesPlanRows, { onBoundaryReached });
+    const inputs = screen.getAllByRole("spinbutton") as HTMLInputElement[];
+    inputs[2].focus();
+    fireEvent.keyDown(inputs[2], { key: "ArrowDown" });
+    expect(onBoundaryReached).toHaveBeenCalledWith("down");
+  });
+
+  it("onBoundaryReached: fires with 'up' when ArrowUp is pressed past the first row", () => {
+    const onBoundaryReached = vi.fn();
+    renderSalesPlanTable(salesPlanRows, { onBoundaryReached });
+    const inputs = screen.getAllByRole("spinbutton") as HTMLInputElement[];
+    inputs[0].focus();
+    fireEvent.keyDown(inputs[0], { key: "ArrowUp" });
+    expect(onBoundaryReached).toHaveBeenCalledWith("up");
+  });
+
+  it("onBoundaryReached: not fired for in-bounds nav", () => {
+    const onBoundaryReached = vi.fn();
+    renderSalesPlanTable(salesPlanRows, { onBoundaryReached });
+    const inputs = screen.getAllByRole("spinbutton") as HTMLInputElement[];
+    inputs[0].focus();
+    fireEvent.keyDown(inputs[0], { key: "ArrowDown" });
+    expect(onBoundaryReached).not.toHaveBeenCalled();
   });
 });
 

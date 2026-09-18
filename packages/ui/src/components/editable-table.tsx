@@ -55,7 +55,14 @@ export interface EditableDataTableProps<T> {
     onChange: (row: T, value: number) => void;
     min?: number;
     step?: number;
+    /** Optional per-row aria-label for the rendered `<input>`. Omit for no aria-label (current behavior). */
+    getAriaLabel?: (row: T) => string;
   };
+  /**
+   * Position within `columns` where the editable column should be inserted
+   * (0 = first). Omit to keep current behavior — append at the end.
+   */
+  editableColumnIndex?: number;
   /** Context (read-only, human-readable) columns included in CSV export alongside the editable column. */
   csvContextColumns?: CsvColumnSpec<T>[];
   isLoading?: boolean;
@@ -63,8 +70,15 @@ export interface EditableDataTableProps<T> {
   className?: string;
   rowTone?: (row: T) => DataTableRowTone;
   /**
-   * Bulk-set support ("Set all to 0", etc). Operates only on `rows` (the
-   * caller's current visible/filtered subset). Omit to hide the control.
+   * Rows CSV export/import and bulk-set operate on. Defaults to `rows` when
+   * omitted, so this is fully backward-compatible. Use this when `rows` is a
+   * rendered/paginated subset (e.g. "show 10, expand for more") but CSV/bulk-set
+   * should act on the full filtered set instead of just what's on screen.
+   */
+  dataRows?: T[];
+  /**
+   * Bulk-set support ("Set all to 0", etc). Operates on `dataRows` (falling
+   * back to `rows` if `dataRows` is omitted). Omit to hide the control.
    */
   bulkSet?: {
     label: string;
@@ -78,6 +92,12 @@ export interface EditableDataTableProps<T> {
     filename?: string;
     onImport?: (result: CsvImportResult) => void;
   };
+  /**
+   * Fired when ArrowUp/ArrowDown would move focus past this table's first/last
+   * row. Lets a consumer (e.g. a truncated/paginated view) expand and retry
+   * focus instead of inspecting DOM indices.
+   */
+  onBoundaryReached?: (direction: "up" | "down") => void;
 }
 
 const defaultConfirm = (rowCount: number) =>
@@ -88,16 +108,24 @@ export function EditableDataTable<T>({
   rows,
   rowKey,
   editableColumn,
+  editableColumnIndex,
   csvContextColumns = [],
   isLoading,
   emptyMessage,
   className,
   rowTone,
+  dataRows,
   bulkSet,
   csv,
+  onBoundaryReached,
 }: EditableDataTableProps<T>) {
-  const { wheelGuardRef, handleCellKeyDown, registerCellRef } = useEditableTable({ visibleRows: rows, rowKey });
+  const { wheelGuardRef, handleCellKeyDown, registerCellRef } = useEditableTable({
+    visibleRows: rows,
+    rowKey,
+    onBoundaryReached,
+  });
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const effectiveDataRows = dataRows ?? rows;
 
   const editableSpec: EditableColumnSpec<T> = {
     header: editableColumn.header,
@@ -105,47 +133,54 @@ export function EditableDataTable<T>({
     get: (row) => editableColumn.getValue(row),
   };
 
-  const allColumns: DataTableColumn<T>[] = [
-    ...columns,
-    {
-      key: editableColumn.key,
-      header: editableColumn.header,
-      align: editableColumn.align ?? "right",
-      render: (row: T) => {
-        const key = rowKey(row);
-        return (
-          <Input
-            type="number"
-            size="sm"
-            min={editableColumn.min}
-            step={editableColumn.step ?? 1}
-            value={editableColumn.getValue(row)}
-            ref={(el) => {
-              registerCellRef(key)(el);
-              wheelGuardRef(el);
-            }}
-            onChange={(e) => {
-              const value = e.target.value === "" ? 0 : Number(e.target.value);
-              editableColumn.onChange(row, value);
-            }}
-            onKeyDown={(e) => handleCellKeyDown(e, row)}
-          />
-        );
-      },
+  const editableDataTableColumn: DataTableColumn<T> = {
+    key: editableColumn.key,
+    header: editableColumn.header,
+    align: editableColumn.align ?? "right",
+    render: (row: T) => {
+      const key = rowKey(row);
+      return (
+        <Input
+          type="number"
+          size="sm"
+          min={editableColumn.min}
+          step={editableColumn.step ?? 1}
+          value={editableColumn.getValue(row)}
+          aria-label={editableColumn.getAriaLabel?.(row)}
+          ref={(el) => {
+            registerCellRef(key)(el);
+            wheelGuardRef(key)(el);
+          }}
+          onChange={(e) => {
+            const value = e.target.value === "" ? 0 : Number(e.target.value);
+            editableColumn.onChange(row, value);
+          }}
+          onKeyDown={(e) => handleCellKeyDown(e, row)}
+        />
+      );
     },
-  ];
+  };
+
+  const allColumns: DataTableColumn<T>[] =
+    editableColumnIndex === undefined
+      ? [...columns, editableDataTableColumn]
+      : [
+          ...columns.slice(0, editableColumnIndex),
+          editableDataTableColumn,
+          ...columns.slice(editableColumnIndex),
+        ];
 
   const handleBulkSet = async () => {
     if (!bulkSet) return;
     const confirmFn = bulkSet.confirm ?? defaultConfirm;
-    const ok = await confirmFn(rows.length);
+    const ok = await confirmFn(effectiveDataRows.length);
     if (!ok) return;
-    bulkSet.onApply(rows, bulkSet.value);
+    bulkSet.onApply(effectiveDataRows, bulkSet.value);
   };
 
   const handleExport = () => {
     if (typeof document === "undefined") return;
-    const csvText = buildCsv(rows, rowKey, csvContextColumns, [editableSpec]);
+    const csvText = buildCsv(effectiveDataRows, rowKey, csvContextColumns, [editableSpec]);
     const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -157,7 +192,7 @@ export function EditableDataTable<T>({
 
   const handleImportFile = async (file: File) => {
     const text = await file.text();
-    const currentKeys = new Set(rows.map(rowKey));
+    const currentKeys = new Set(effectiveDataRows.map(rowKey));
     const result = parseImportCsv(text, currentKeys, [editableSpec]);
     csv?.onImport?.(result);
   };
