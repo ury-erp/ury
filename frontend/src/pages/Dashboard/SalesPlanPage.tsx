@@ -26,6 +26,48 @@ type PlanStatus =
   | 'Locked for Production'
   | 'Superseded/Cancelled';
 
+/**
+ * Pull the real, actionable reason out of a failed transition_plan() call.
+ *
+ * `call` (@ury/core, backed by frappe-js-sdk) does NOT throw a real `Error`
+ * on an API failure -- it throws the plain object `getFrappeError()` builds,
+ * which spreads the raw Frappe error response (`exc_type`, `exception`,
+ * `_server_messages`, etc.) onto a `message` field that is only ever the
+ * SDK's own generic fallback string ("There was an error."), never the
+ * backend's actual frappe.throw() text. The previous code here checked
+ * `err instanceof Error`, which is always false for this shape -- so it was
+ * unconditionally landing on the hardcoded "Unable to update this Sales
+ * Plan. Please try again." for every failure, permission errors included,
+ * discarding messages like "BOM is required for manufactured Item X" that
+ * are genuinely actionable for whoever hit them. `_server_messages` (a
+ * JSON-encoded array of JSON-encoded {message, title, indicator} objects --
+ * see frappe/frappe/__init__.py's msgprint) is where frappe.throw()'s actual
+ * text lives; other pages in this app (e.g. Pos/lib/aggregator-api.ts)
+ * already parse it the same way.
+ */
+export function describeTransitionError(err: unknown): string {
+  const anyErr = err as { exc_type?: string; _server_messages?: string } | null | undefined;
+
+  if (anyErr?.exc_type === 'frappe.exceptions.PermissionError') {
+    return "You don't have permission to make this change to the Sales Plan.";
+  }
+
+  if (anyErr?._server_messages) {
+    try {
+      const messages = JSON.parse(anyErr._server_messages) as string[];
+      const first = JSON.parse(messages[0]) as { message?: string };
+      if (first?.message) {
+        return first.message;
+      }
+    } catch {
+      // Malformed/unexpected shape -- fall through to the generic message
+      // below rather than surfacing a raw JSON parse error to the user.
+    }
+  }
+
+  return 'Unable to update this Sales Plan. Please try again.';
+}
+
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
   { key: 'draft', label: 'Draft', matches: ['Draft'] },
   { key: 'review', label: 'Review', matches: ['Proposed', 'Submitted for Approval'] },
@@ -828,12 +870,7 @@ export const SalesPlanPage: React.FC = () => {
       });
       setPlanStatus((result.status as PlanStatus) || currentAction.targetState);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '';
-      setTransitionError(
-        message && /permitted|permission/i.test(message)
-          ? "You don't have permission to make this change to the Sales Plan."
-          : 'Unable to update this Sales Plan. Please try again.'
-      );
+      setTransitionError(describeTransitionError(err));
     } finally {
       setTransitioning(false);
     }

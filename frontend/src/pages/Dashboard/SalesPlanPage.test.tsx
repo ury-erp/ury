@@ -398,3 +398,40 @@ describe('SalesPlanPage', () => {
     });
   });
 });
+
+describe('describeTransitionError', () => {
+  it('surfaces the real backend validation message from _server_messages', async () => {
+    const { describeTransitionError } = await import('./SalesPlanPage');
+    const err = {
+      exc_type: 'frappe.exceptions.ValidationError',
+      _server_messages: JSON.stringify([
+        JSON.stringify({ message: 'BOM is required for manufactured Item Caesar Salad', title: 'Message', indicator: 'red' }),
+      ]),
+    };
+    expect(describeTransitionError(err)).toBe('BOM is required for manufactured Item Caesar Salad');
+  });
+
+  it('gives a fixed, friendly message for a permission error rather than the raw exception text', async () => {
+    const { describeTransitionError } = await import('./SalesPlanPage');
+    const err = {
+      exc_type: 'frappe.exceptions.PermissionError',
+      _server_messages: JSON.stringify([JSON.stringify({ message: 'Not permitted to change this Sales Plan' })]),
+    };
+    expect(describeTransitionError(err)).toBe("You don't have permission to make this change to the Sales Plan.");
+  });
+
+  it('falls back to a generic message when there is nothing usable on the error', async () => {
+    const { describeTransitionError } = await import('./SalesPlanPage');
+    expect(describeTransitionError(new Error('Network Error'))).toBe(
+      'Unable to update this Sales Plan. Please try again.'
+    );
+    expect(describeTransitionError({})).toBe('Unable to update this Sales Plan. Please try again.');
+  });
+
+  it('falls back to the generic message instead of throwing on a malformed _server_messages payload', async () => {
+    const { describeTransitionError } = await import('./SalesPlanPage');
+    expect(describeTransitionError({ _server_messages: 'not-json' })).toBe(
+      'Unable to update this Sales Plan. Please try again.'
+    );
+  });
+});
