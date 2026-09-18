@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard } from '@ury/ui';
-import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
+import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { DatePicker } from '../../components/setup/DatePicker';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface TodaySalesData {
   branch: string | null;
@@ -38,7 +40,7 @@ export function TodaysSales() {
       });
       setData(res.message ?? (res as unknown as TodaySalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -60,9 +62,9 @@ export function TodaysSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Today's Sales</h1>
+          <h1 className="text-xl font-semibold">{t('reports.todays_sales.today_s_sales')}</h1>
           <p className="text-sm text-muted-foreground">
-            {data ? `${data.day_of_week}, ${data.query_date}` : 'Live sales snapshot'}
+            {data ? `${data.day_of_week}, ${data.query_date}` : t('reports.todays_sales.subtitle')}
             {activeBranchId === 'all' ? ' · All Branches' : ''}
           </p>
         </div>
@@ -83,39 +85,43 @@ export function TodaysSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton />
       ) : data ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard label="Total Invoices" value={data.total_invoices} icon={<Receipt className="w-4 h-4" />} />
+          <StatCard label={t('reports.todays_sales.total_invoices')} value={data.total_invoices} icon={<Receipt className="w-4 h-4" />} />
           <StatCard
-            label="Item Total"
+            label={t('reports.todays_sales.item_total')}
             value={formatCurrency(data.item_total)}
             icon={<IndianRupee className="w-4 h-4" />}
           />
           <StatCard
-            label="Total Taxes & Charges"
+            label={t('reports.todays_sales.total_taxes_charges')}
             value={formatCurrency(data.total_taxes_and_charges)}
             icon={<Percent className="w-4 h-4" />}
           />
           <StatCard
-            label="Grand Total"
+            label={t('reports.todays_sales.grand_total')}
             value={formatCurrency(data.grand_total)}
             icon={<Sigma className="w-4 h-4" />}
             className="border-primary-200"
           />
           <StatCard
-            label="Round Off"
+            label={t('reports.todays_sales.round_off')}
             value={formatCurrency(data.round_off)}
             icon={<Equal className="w-4 h-4" />}
           />
           <StatCard
-            label="Cash Discounts"
+            label={t('reports.todays_sales.cash_discounts')}
             value={formatCurrency(data.cash_discounts)}
             icon={<BadgePercent className="w-4 h-4" />}
             delta={

@@ -1,0 +1,22 @@
+{
+ "name": "Smart Restro Occupied Tables",
+ "label": "Smart Restro Occupied Tables",
+ "creation": "2026-09-17 12:00:00.000000",
+ "modified": "2026-09-17 12:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "idx": 0,
+ "type": "Document Type",
+ "document_type": "URY Table",
+ "function": "Count",
+ "filters_json": "[[\"URY Table\", \"occupied\", \"=\", 1, false]]",
+ "is_public": 1,
+ "is_standard": 1,
+ "module": "URY",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Daily",
+ "color": "#e03636",
+ "roles": []
+}

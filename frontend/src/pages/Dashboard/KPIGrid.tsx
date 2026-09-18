@@ -1,7 +1,9 @@
 import React from 'react';
 import { formatCurrency } from '@ury/core';
-import { Card, Spinner } from '@ury/ui';
+import { Card, StatCard } from '@ury/ui';
+import { ArrowUpRight } from 'lucide-react';
 import { DashboardSummary } from '../../services/dashboard';
+import { t } from '../../i18n';
 import uryPosLogo from '../../../../pos/public/ury_pos.png';
 import uryMosaicLogo from '../../../../mosaic/src/assets/logos/mosaic.jpg';
 
@@ -13,12 +15,27 @@ interface LinkCardProps {
 
 const LinkCard: React.FC<LinkCardProps> = ({ logoSrc, label, href }) => {
   return (
-    <a href={href} className="block outline-none h-full">
-      <Card className="h-full rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-        <div className="flex h-4 items-center mb-2">
-          <img src={logoSrc} alt="Logo" className="h-full object-contain opacity-70 mix-blend-multiply" />
+    <a
+      href={href}
+      className="group block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <Card variant="interactive" padding="lg" className="h-full">
+        <div className="mb-2 flex h-4 items-center">
+          <img
+            src={logoSrc}
+            alt=""
+            className="h-full object-contain opacity-70 mix-blend-multiply transition-opacity duration-fast group-hover:opacity-100"
+          />
         </div>
-        <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{label}</h3>
+        <h3 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{label}</h3>
+        {/* Affordance that this tile navigates, revealed on hover so the
+            resting grid stays quiet. */}
+        <span
+          aria-hidden="true"
+          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity duration-fast group-hover:opacity-100"
+        >
+          <ArrowUpRight className="h-3.5 w-3.5 rtl-flip" />
+        </span>
       </Card>
     </a>
   );
@@ -35,21 +52,25 @@ interface KPICardProps {
   loading?: boolean;
 }
 
-const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
-  return (
-    <Card className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
-      {loading ? (
-        <div className="mt-2 flex items-center space-x-2">
-          <Spinner className="w-4 h-4 text-primary" />
-          <span className="text-sm text-gray-400">Loading...</span>
-        </div>
-      ) : (
-        <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
-      )}
-    </Card>
-  );
-};
+/**
+ * Thin wrapper over the shared StatCard.
+ *
+ * This used to be a second implementation of the same tile, which is how the
+ * dashboard and the report pages drifted into stating a figure two different
+ * ways. StatCard also animates the value, which matters here because these
+ * numbers refresh while someone is watching the screen.
+ */
+const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => (
+  <StatCard
+    label={title}
+    /* Always numeric/currency ("3 / 10", "1,240", "62%"). `bidi-isolate`
+       stops the bidi algorithm reordering them inside an RTL page — a
+       reversed ratio would show the wrong number. */
+    value={value}
+    isLoading={loading}
+    className="bidi-isolate"
+  />
+);
 
 export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const todaySales = summary?.today_sales ?? 0;
@@ -79,38 +100,39 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
         />
 
         <KPICard
-          title="Today's Sales"
+          title={t('kpi.today_sales')}
           value={formatCurrency(todaySales)}
           loading={loading}
         />
 
         <KPICard
-          title="Orders Today"
+          title={t('kpi.orders_today')}
           value={ordersToday.toString()}
           loading={loading}
         />
 
         <KPICard
-          title="Table Occupancy"
+          title={t('kpi.table_occupancy')}
           value={`${occupancyRate}%`}
           loading={loading}
         />
 
         <KPICard
-          title="Occupied Tables"
+          title={t('kpi.occupied_tables')}
           value={`${occupiedTables} / ${totalTables}`}
+          
           loading={loading}
         />
 
         <KPICard
-          title="Average Order Value"
+          title={t('kpi.avg_order_value')}
           value={formatCurrency(aov)}
           loading={loading}
         />
 
         <KPICard
-          title="Pending Kitchen Orders"
-          value={`${pendingOrders} KOTs`}
+          title={t('kpi.pending_kitchen_orders')}
+          value={t('kpi.kot_count', { count: pendingOrders })}
           loading={loading}
         />
       </div>

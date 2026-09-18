@@ -8,6 +8,7 @@ import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { MenuBulkUpload } from '../../components/common/MenuBulkUpload';
+import { t } from '../../i18n';
 
 interface URYMenuRecord {
   name: string;
@@ -322,7 +323,7 @@ export const MenuPage: React.FC = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      showToast.error('Image size must be under 5MB');
+      showToast.error(t('dash.menu.image_size_must_be_under_5mb'));
       return;
     }
 
@@ -334,7 +335,7 @@ export const MenuPage: React.FC = () => {
         image: fileUrl,
         image_name: file.name,
       }));
-      showToast.success('Image uploaded successfully');
+      showToast.success(t('dash.menu.image_uploaded_successfully'));
     } catch (err: any) {
       console.error('Failed to upload image', err);
       showToast.error(`Failed to upload image: ${err.message || 'Server error'}`);
@@ -383,7 +384,7 @@ export const MenuPage: React.FC = () => {
     // Ensure image is a valid URL and not raw base64 data
     const sanitizedImage = newItem.image ? newItem.image.trim() : '';
     if (sanitizedImage.startsWith('data:') || sanitizedImage.startsWith('blob:')) {
-      showToast.error('Invalid image data. Please upload the image again.');
+      showToast.error(t('dash.menu.invalid_image_data_please_upload_the_image_a'));
       return;
     }
 
@@ -412,7 +413,7 @@ export const MenuPage: React.FC = () => {
         const menuDoc = res.message || res;
         const rowIndex = menuDoc.items.findIndex((row: any) => row.name === editingItem.name);
         if (rowIndex === -1) {
-          showToast.error('Could not find the item to update');
+          showToast.error(t('dash.menu.could_not_find_the_item_to_update'));
           return;
         }
         menuDoc.items[rowIndex].item_name = newItem.item_name;
@@ -492,13 +493,13 @@ export const MenuPage: React.FC = () => {
         creatingItemForRowIndex === null ? fetchMenuItems(selectedMenu) : Promise.resolve(),
       ]);
 
-      showToast.success('Item saved');
+      showToast.success(t('dash.menu.item_saved'));
       if (creatingItemForRowIndex === null) {
         closeDrawer();
       }
     } catch (err) {
       console.error('Failed to save Item', err);
-      showToast.error('Failed to save item');
+      showToast.error(t('dash.menu.failed_to_save_item'));
     } finally {
       setSavingItem(false);
     }
@@ -507,13 +508,13 @@ export const MenuPage: React.FC = () => {
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMenu.menu_name || !newMenu.branch) {
-      showToast.error('Menu Name and Branch are required fields');
+      showToast.error(t('dash.menu.menu_name_and_branch_are_required_fields'));
       return;
     }
 
     const validRows = newMenuRows.filter(r => r.item);
     if (validRows.length === 0) {
-      showToast.error('Please add at least one item to the menu');
+      showToast.error(t('dash.menu.please_add_at_least_one_item_to_the_menu'));
       return;
     }
 
@@ -541,18 +542,18 @@ export const MenuPage: React.FC = () => {
       });
       await fetchMenus();
       setSelectedMenu(createdMenuName);
-      showToast.success('Menu saved');
+      showToast.success(t('dash.menu.menu_saved'));
       closeDrawer();
     } catch (err) {
       console.error('Failed to create URY Menu', err);
-      showToast.error('Failed to save menu');
+      showToast.error(t('dash.menu.failed_to_save_menu'));
     } finally {
       setSavingMenu(false);
     }
   };
 
   const handleBulkUploadParsed = async (parsedRows: { name: string; course: string; price: number }[]) => {
-    showToast.info('Processing uploaded items...');
+    showToast.info(t('dash.menu.processing_uploaded_items'));
     const resolvedRows: MenuItemRow[] = [];
     let updatedAllItems = [...allItems];
     let createdCount = 0;
@@ -640,7 +641,7 @@ export const MenuPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Error processing bulk upload', err);
-      showToast.error('Failed to process some uploaded items');
+      showToast.error(t('dash.menu.failed_to_process_some_uploaded_items'));
     }
   };
 
@@ -658,7 +659,7 @@ export const MenuPage: React.FC = () => {
         },
       });
       await fetchCourses();
-      showToast.success('Course saved');
+      showToast.success(t('dash.menu.course_saved'));
       if (returnToAddItemFromCourse) {
         setNewItem(prev => ({ ...prev, course: createdCourse }));
         setReturnToAddItemFromCourse(false);
@@ -668,7 +669,7 @@ export const MenuPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to create Course', err);
-      showToast.error('Failed to save course');
+      showToast.error(t('dash.menu.failed_to_save_course'));
     } finally {
       setSavingCourse(false);
     }
@@ -709,7 +710,7 @@ export const MenuPage: React.FC = () => {
                 { value: 'all', label: 'All Menu Items' },
                 ...menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))
               ]}
-              placeholder="Select Menu..."
+              placeholder={t('dash.menu.select_menu')}
               onChange={(_, val) => setSelectedMenu(val)}
             />
           </div>
@@ -722,7 +723,7 @@ export const MenuPage: React.FC = () => {
                 { value: 'all', label: 'All Courses' },
                 ...categories.map((c) => ({ value: c, label: c }))
               ]}
-              placeholder="Select Course..."
+              placeholder={t('dash.menu.select_course')}
               onChange={(_, val) => setCategoryFilter(val)}
             />
           </div>
@@ -745,13 +746,13 @@ export const MenuPage: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <div className="relative w-full md:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search items..."
+              placeholder={t('dash.menu.search_items')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-gray-50 border-gray-200 w-full"
+              className="ps-9 bg-gray-50 border-gray-200 w-full"
             />
           </div>
 
@@ -761,7 +762,7 @@ export const MenuPage: React.FC = () => {
             className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Course</span>
+            <span>{t('dash.menu.add_course')}</span>
           </Button>
 
           <Button
@@ -770,7 +771,7 @@ export const MenuPage: React.FC = () => {
             className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Menu</span>
+            <span>{t('dash.menu.add_menu')}</span>
           </Button>
 
           <Button
@@ -779,7 +780,7 @@ export const MenuPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Item</span>
+            <span>{t('dash.menu.add_item')}</span>
           </Button>
         </div>
       </div>
@@ -794,7 +795,7 @@ export const MenuPage: React.FC = () => {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Utensils className="w-8 h-8 text-primary" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No Items Found</h3>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">{t('dash.menu.no_items_found')}</h3>
           <p className="text-gray-500 mb-8 max-w-sm">
             {search || categoryFilter !== 'all'
               ? "We couldn't find any items matching your filters."
@@ -806,7 +807,7 @@ export const MenuPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs px-6"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Menu Item</span>
+            <span>{t('dash.menu.add_menu_item')}</span>
           </Button>
         </Card>
       ) : viewMode === 'grid' ? (
@@ -820,7 +821,7 @@ export const MenuPage: React.FC = () => {
                     alt={item.item_name}
                     className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
-                    title="Click to preview image"
+                    title={t('dash.menu.click_to_preview_image')}
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium select-none">
@@ -841,8 +842,8 @@ export const MenuPage: React.FC = () => {
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); openEditItemDrawer(item); }}
-                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-md transition-colors -mr-1.5 -mb-1.5"
-                    title="Edit Item"
+                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-md transition-colors -me-1.5 -mb-1.5"
+                    title={t('dash.menu.edit_item')}
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -853,15 +854,15 @@ export const MenuPage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600 min-w-[600px]">
+          <table className="w-full text-start text-sm text-gray-600 min-w-[600px]">
             <thead className="bg-gray-50/80 border-b border-gray-100 text-xs uppercase text-gray-500 font-bold tracking-wider">
               <tr>
-                <th className="px-6 py-4">Item Name</th>
-                <th className="px-6 py-4">Course</th>
-                <th className="px-6 py-4">Standard Rate</th>
-                <th className="px-6 py-4 text-center">Special</th>
-                <th className="px-6 py-4 text-center">Disabled</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.menu.item_name')}</th>
+                <th className="px-6 py-4">{t('dash.menu.course')}</th>
+                <th className="px-6 py-4">{t('dash.menu.standard_rate')}</th>
+                <th className="px-6 py-4 text-center">{t('dash.menu.special')}</th>
+                <th className="px-6 py-4 text-center">{t('dash.menu.disabled')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.menu.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -876,7 +877,7 @@ export const MenuPage: React.FC = () => {
                             alt={item.item_name}
                             className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
-                            title="Click to preview image"
+                            title={t('dash.menu.click_to_preview_image')}
                           />
                         ) : (
                           <Utensils className="w-4 h-4 text-gray-400" />
@@ -901,7 +902,7 @@ export const MenuPage: React.FC = () => {
                       {item.disabled ? <Check className="w-4 h-4 text-red-500" /> : <X className="w-4 h-4 text-gray-300" />}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-end">
                     <Button variant="ghost" size="sm" onClick={() => openEditItemDrawer(item)} className="text-gray-500 hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -922,7 +923,7 @@ export const MenuPage: React.FC = () => {
         <form onSubmit={handleSaveItem} className="space-y-5 text-sm">
           {creatingItemForRowIndex === null && (
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.target_menu')}<span className="text-red-500">*</span></label>
               <SearchableSelect
                 id="target_menu"
                 value={newItem.target_menu}
@@ -935,8 +936,7 @@ export const MenuPage: React.FC = () => {
           {/* Item Name & Upload Image Row */}
           <div className="flex items-end gap-3">
             <div className="flex-1">
-              <label className="block font-semibold text-gray-700 mb-1.5">
-                Item Name <span className="text-red-500">*</span>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.item_name')}<span className="text-red-500">*</span>
               </label>
               <Input
                 value={newItem.item_name}
@@ -961,7 +961,7 @@ export const MenuPage: React.FC = () => {
                     type="button"
                     onClick={() => setNewItem(prev => ({ ...prev, image: '', image_name: '' }))}
                     className="p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200/60 transition-colors shrink-0"
-                    title="Remove image"
+                    title={t('dash.menu.remove_image')}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -969,7 +969,7 @@ export const MenuPage: React.FC = () => {
               ) : (
                 <label
                   className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-gray-600 hover:text-primary cursor-pointer transition-colors rounded-md hover:bg-primary/5 focus-within:ring-2 focus-within:ring-primary/20 shrink-0 group ${uploadingImage ? 'pointer-events-none opacity-60' : ''}`}
-                  title="Upload Image"
+                  title={t('dash.menu.upload_image')}
                 >
                   <span>{uploadingImage ? 'Uploading...' : 'Upload Image'}</span>
                   {uploadingImage ? (
@@ -1004,7 +1004,7 @@ export const MenuPage: React.FC = () => {
 
           {/* Course field */}
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Course</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.course')}</label>
             <SearchableSelect
               id="course"
               value={newItem.course}
@@ -1043,9 +1043,9 @@ export const MenuPage: React.FC = () => {
                   checked={newItem.special_dish}
                   onChange={(e) => setNewItem({ ...newItem, special_dish: e.target.checked })}
                 />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
               </div>
-              <span className="text-sm font-medium text-gray-700">Special Dish</span>
+              <span className="text-sm font-medium text-gray-700">{t('dash.menu.special_dish')}</span>
             </label>
             
             <label className="flex items-center gap-3 cursor-pointer">
@@ -1056,14 +1056,14 @@ export const MenuPage: React.FC = () => {
                   checked={newItem.disabled}
                   onChange={(e) => setNewItem({ ...newItem, disabled: e.target.checked })}
                 />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
               </div>
-              <span className="text-sm font-medium text-gray-700">Disabled</span>
+              <span className="text-sm font-medium text-gray-700">{t('dash.menu.disabled')}</span>
             </label>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>{t('dash.menu.cancel')}</Button>
             <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
               {editingItem ? 'Save Changes' : 'Create Item'}
             </Button>
@@ -1075,11 +1075,11 @@ export const MenuPage: React.FC = () => {
       <SideDrawer
         isOpen={drawerMode === 'add-menu'}
         onClose={closeDrawer}
-        title="Add New Menu"
+        title={t('dash.menu.add_new_menu')}
       >
         <form onSubmit={handleSaveMenu} className="space-y-5 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Menu Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.menu_name')}<span className="text-red-500">*</span></label>
             <Input
               value={newMenu.menu_name}
               onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
@@ -1089,31 +1089,28 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Branch <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.branch')}<span className="text-red-500">*</span></label>
             <SearchableSelect
               id="branch"
               value={newMenu.branch}
               onChange={(_, value) => setNewMenu({ ...newMenu, branch: value })}
               options={branchOptions.map(b => ({ value: b.name, label: b.title || b.name }))}
-              placeholder="Select Branch..."
+              placeholder={t('dash.menu.select_branch')}
             />
           </div>
 
           {/* Menu Items Section */}
           <div className="space-y-4 pt-2">
             <div className="flex flex-col">
-              <label className="block font-semibold text-gray-700 text-sm">
-                Menu Items <span className="text-red-500">*</span>
+              <label className="block font-semibold text-gray-700 text-sm">{t('dash.menu.menu_items')}<span className="text-red-500">*</span>
               </label>
-              <span className="text-xs text-gray-500 mt-0.5">
-                Add items and set custom price for this menu
-              </span>
+              <span className="text-xs text-gray-500 mt-0.5">{t('dash.menu.add_items_and_set_custom_price_for_this_menu')}</span>
             </div>
 
             <div className="space-y-3">
               {/* Header Row */}
               <div className="flex gap-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <div className="flex-[3]">Item</div>
+                <div className="flex-[3]">{t('dash.menu.item')}</div>
                 <div className="flex-[1.5]">Price (₹)</div>
                 {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
               </div>
@@ -1131,7 +1128,7 @@ export const MenuPage: React.FC = () => {
                         id={`row-item-${index}`}
                         value={row.item}
                         options={options}
-                        placeholder="Select Item..."
+                        placeholder={t('dash.menu.select_item')}
                         onChange={(_, value) => {
                           if (value === 'CREATE_NEW_ITEM') {
                             setCreatingItemForRowIndex(index);
@@ -1196,7 +1193,7 @@ export const MenuPage: React.FC = () => {
                           setNewMenuRows(newMenuRows.filter((_, idx) => idx !== index));
                         }}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-auto shrink-0"
-                        title="Delete Row"
+                        title={t('dash.menu.delete_row')}
                       >
                         <Trash2 className="w-5 h-5" />
                       </Button>
@@ -1213,7 +1210,7 @@ export const MenuPage: React.FC = () => {
               className="w-full py-2 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Item</span>
+              <span>{t('dash.menu.add_item')}</span>
             </Button>
           </div>
 
@@ -1221,16 +1218,14 @@ export const MenuPage: React.FC = () => {
           <div className="pt-4 border-t border-gray-100">
             <MenuBulkUpload
               onItemsParsed={handleBulkUploadParsed}
-              title="Bulk Upload (Optional)"
-              subtitle="Import items from a CSV file"
+              title={t('dash.menu.bulk_upload_optional')}
+              subtitle={t('dash.menu.import_csv_title')}
             />
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingMenu}>Cancel</Button>
-            <Button type="submit" disabled={savingMenu} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              Create Menu
-            </Button>
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingMenu}>{t('dash.menu.cancel')}</Button>
+            <Button type="submit" disabled={savingMenu} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">{t('dash.menu.create_menu')}</Button>
           </div>
         </form>
       </SideDrawer>
@@ -1239,11 +1234,11 @@ export const MenuPage: React.FC = () => {
       <SideDrawer
         isOpen={drawerMode === 'add-course'}
         onClose={closeDrawer}
-        title="Add New Course"
+        title={t('dash.menu.add_new_course')}
       >
         <form onSubmit={handleSaveCourse} className="space-y-5 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Course Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.course_name')}<span className="text-red-500">*</span></label>
             <Input
               value={newCourseName}
               onChange={(e) => setNewCourseName(e.target.value)}
@@ -1253,12 +1248,12 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Icon</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.menu.icon')}</label>
             <SearchableSelect
               id="course-icon"
               value={newCourseIcon}
               onChange={(_, value) => setNewCourseIcon(value)}
-              placeholder="Select Icon..."
+              placeholder={t('dash.menu.select_icon')}
               options={[
                 { value: '', label: 'None' },
                 { value: 'Utensils', label: 'Utensils' },
@@ -1276,10 +1271,8 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingCourse}>Cancel</Button>
-            <Button type="submit" disabled={savingCourse} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              Create Course
-            </Button>
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingCourse}>{t('dash.menu.cancel')}</Button>
+            <Button type="submit" disabled={savingCourse} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">{t('dash.menu.create_course')}</Button>
           </div>
         </form>
       </SideDrawer>
@@ -1297,8 +1290,8 @@ export const MenuPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setPreviewImageUrl(null)}
-              className="absolute top-3 right-3 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors shadow-md z-10 cursor-pointer"
-              title="Close preview"
+              className="absolute top-3 end-3 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors shadow-md z-10 cursor-pointer"
+              title={t('dash.menu.close_preview')}
             >
               <X className="w-5 h-5" />
             </button>
