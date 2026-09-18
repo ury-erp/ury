@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, ChevronUp, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
@@ -57,6 +58,10 @@ const formatQty = (value: number) => {
 const getVariance = (item: SalesPlanItem) => item.planned_qty - item.average_qty;
 
 const cssSafeId = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '-');
+
+// Row-count threshold beyond which a department's table is truncated to a
+// "Show all" toggle instead of rendering every row up front.
+const ROW_TRUNCATE_LIMIT = 10;
 
 interface HistoryModalProps {
   item: ComparableHistoryItem | null;
@@ -368,9 +373,14 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 };
 
 export const SalesPlanPage: React.FC = () => {
-  const { activeBranchId } = useBranchContext();
+  const { activeBranchId, activeBranch } = useBranchContext();
   const { isManager } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
+  // Tracks the "site today" used for the relative date label. Recomputed on
+  // tab focus/visibility so a tab left open overnight doesn't keep showing a
+  // stale "Today" -- kept in sync with `getToday()`'s own timezone-adjustment
+  // logic since that's the only notion of "today" this codebase has.
+  const [todayString, setTodayString] = useState(getToday);
   const [items, setItems] = useState<SalesPlanItem[]>([]);
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
@@ -399,6 +409,24 @@ export const SalesPlanPage: React.FC = () => {
   const [departmentFilters, setDepartmentFilters] = useState<Record<string, string>>({});
   const [collapsedDepartments, setCollapsedDepartments] = useState<Record<string, boolean>>({});
   const departmentToggleRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Row-count truncation state, independent of the whole-group collapse
+  // above: a department can be expanded (visible) yet still truncated to the
+  // first ROW_TRUNCATE_LIMIT rows.
+  const [truncationExpanded, setTruncationExpanded] = useState<Record<string, boolean>>({});
+  const departmentGroupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const departmentContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pendingFocusIndexRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const refreshToday = () => setTodayString(getToday());
+    window.addEventListener('focus', refreshToday);
+    document.addEventListener('visibilitychange', refreshToday);
+    return () => {
+      window.removeEventListener('focus', refreshToday);
+      document.removeEventListener('visibilitychange', refreshToday);
+    };
+  }, []);
 
   const draftKey = useMemo(() => {
     if (!historyScope) return null;
@@ -623,6 +651,76 @@ export const SalesPlanPage: React.FC = () => {
     }
   };
 
+  const branchName = activeBranch?.name || activeBranchId;
+
+  const dayDiffFromToday = useMemo(() => {
+    try {
+      return differenceInCalendarDays(parseISO(planDate), parseISO(todayString));
+    } catch {
+      return 0;
+    }
+  }, [planDate, todayString]);
+
+  const relativeDateLabel = dayDiffFromToday === 0 ? 'Today' : dayDiffFromToday === 1 ? 'Tomorrow' : dayDiffFromToday === -1 ? 'Yesterday' : null;
+  const absoluteDateLabel = useMemo(() => {
+    try {
+      return format(parseISO(planDate), 'EEE, d MMM yyyy');
+    } catch {
+      return planDate;
+    }
+  }, [planDate]);
+  const dateHeading = relativeDateLabel ? `${relativeDateLabel} · ${absoluteDateLabel}` : absoluteDateLabel;
+  const isPastPlanDate = dayDiffFromToday < 0;
+
+  const blockedItemCodes = useMemo(() => new Set(blockedItems.map((item) => item.item_code)), [blockedItems]);
+
+  const jumpToDepartment = (department: string) => {
+    setCollapsedDepartments((current) => (current[department] ? { ...current, [department]: false } : current));
+    requestAnimationFrame(() => {
+      departmentGroupRefs.current[department]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  // Workaround for EditableDataTable's keyboard nav being scoped to exactly
+  // the `rows` array we pass it: when a department's table is truncated to
+  // ROW_TRUNCATE_LIMIT rows, ArrowDown on the last rendered row would
+  // otherwise be a no-op inside that hook (it stops at "this instance's own
+  // edge"). We intercept the keydown in the capture phase -- before
+  // EditableDataTable's own bubble-phase handler sees it -- expand the
+  // truncation, and refocus the row that should now receive focus, all
+  // without touching the `@ury/ui` package itself.
+  const handleDepartmentKeyDownCapture = (
+    department: string,
+    fullRowCount: number,
+    isTruncated: boolean
+  ) => (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowDown' || !isTruncated) return;
+    const container = departmentContainerRefs.current[department];
+    if (!container) return;
+    const inputs = Array.from(container.querySelectorAll('input[type="number"]'));
+    const activeIndex = inputs.indexOf(document.activeElement as HTMLInputElement);
+    if (activeIndex === -1) return;
+    const isLastRenderedRow = activeIndex === ROW_TRUNCATE_LIMIT - 1;
+    const hasMoreRowsHidden = fullRowCount > ROW_TRUNCATE_LIMIT;
+    if (!isLastRenderedRow || !hasMoreRowsHidden) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    pendingFocusIndexRef.current[department] = activeIndex + 1;
+    setTruncationExpanded((current) => ({ ...current, [department]: true }));
+  };
+
+  useEffect(() => {
+    Object.entries(pendingFocusIndexRef.current).forEach(([department, index]) => {
+      if (!truncationExpanded[department]) return;
+      const container = departmentContainerRefs.current[department];
+      if (!container) return;
+      const inputs = Array.from(container.querySelectorAll('input[type="number"]'));
+      inputs[index]?.focus();
+      delete pendingFocusIndexRef.current[department];
+    });
+  }, [truncationExpanded]);
+
   const currentAction = planStatus ? NEXT_ACTION[planStatus] : undefined;
   // Draft plans that have never been saved to the backend don't have a name
   // yet, so there is nothing to transition -- the manager must save first.
@@ -656,10 +754,15 @@ export const SalesPlanPage: React.FC = () => {
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Sales Plan</h1>
+            <h1 className="text-xl font-semibold text-foreground">
+              Sales Plan — {dateHeading} · {branchName}
+            </h1>
             <p className="mt-1 text-sm text-text-tertiary">
               We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval.
             </p>
+            {isPastPlanDate && (
+              <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
+            )}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="relative block">
@@ -849,6 +952,21 @@ export const SalesPlanPage: React.FC = () => {
         </Section>
       ) : (
         <Section>
+          {Object.keys(groupedItems).length > 1 && (
+            <div className="sticky top-0 z-20 mb-3 flex flex-wrap gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+              {Object.keys(groupedItems).map((department) => (
+                <button
+                  key={department}
+                  type="button"
+                  aria-label={`Jump to ${department}`}
+                  onClick={() => jumpToDepartment(department)}
+                  className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-primary-tint"
+                >
+                  {department}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="space-y-5">
           {Object.entries(groupedItems).map(([department, departmentItems]) => {
             const safeId = cssSafeId(department);
@@ -862,6 +980,13 @@ export const SalesPlanPage: React.FC = () => {
                     .some((value) => String(value).toLowerCase().includes(deptFilter));
                 })
               : departmentItems;
+
+            const isTruncationExpanded = Boolean(truncationExpanded[department]);
+            const isTruncated = !isTruncationExpanded && visibleDepartmentItems.length > ROW_TRUNCATE_LIMIT;
+            const shownDepartmentItems = isTruncated
+              ? visibleDepartmentItems.slice(0, ROW_TRUNCATE_LIMIT)
+              : visibleDepartmentItems;
+            const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
 
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
@@ -911,7 +1036,13 @@ export const SalesPlanPage: React.FC = () => {
             ];
 
             return (
-              <div key={department} className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              <div
+                key={department}
+                ref={(el) => {
+                  departmentGroupRefs.current[department] = el;
+                }}
+                className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+              >
                 <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
                   <button
                     type="button"
@@ -926,11 +1057,28 @@ export const SalesPlanPage: React.FC = () => {
                     {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
                     <span>{department}</span>
                   </button>
-                  <span className="text-xs font-medium text-text-tertiary">
-                    {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-text-tertiary">
+                      {departmentItems.length} item{departmentItems.length === 1 ? '' : 's'}
+                    </span>
+                    {departmentIssueCount > 0 && (
+                      <Badge size="tag" variant="tagWarning">
+                        {departmentIssueCount} issue{departmentIssueCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    <span className="text-xs font-medium text-text-tertiary">
+                      {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
+                    </span>
+                  </div>
                 </div>
-                <div id={`department-panel-${safeId}`} hidden={isCollapsed}>
+                <div
+                  id={`department-panel-${safeId}`}
+                  hidden={isCollapsed}
+                  ref={(el) => {
+                    departmentContainerRefs.current[department] = el;
+                  }}
+                  onKeyDownCapture={handleDepartmentKeyDownCapture(department, visibleDepartmentItems.length, isTruncated)}
+                >
                   <div className="border-b border-border bg-card px-5 py-2">
                     <Input
                       aria-label={`Filter items in ${department}`}
@@ -945,7 +1093,7 @@ export const SalesPlanPage: React.FC = () => {
                   <div className="px-5 py-3">
                     <EditableDataTable
                       columns={departmentColumns}
-                      rows={visibleDepartmentItems}
+                      rows={shownDepartmentItems}
                       // item_code is the practical key here since items are not yet
                       // persisted Sales Plan Item child rows (no child-table `name`
                       // exists pre-save) -- see task spec for why this is acceptable.
@@ -981,6 +1129,19 @@ export const SalesPlanPage: React.FC = () => {
                         },
                       }}
                     />
+                    {visibleDepartmentItems.length > ROW_TRUNCATE_LIMIT && (
+                      <div className="flex justify-center pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setTruncationExpanded((current) => ({ ...current, [department]: !current[department] }))
+                          }
+                        >
+                          {isTruncationExpanded ? 'Show fewer' : `Show all ${visibleDepartmentItems.length} rows`}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

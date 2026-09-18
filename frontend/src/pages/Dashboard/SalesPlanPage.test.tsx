@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { addDays, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
 import { salesPlanService } from '../../services/salesPlan';
 
 vi.mock('../../context/BranchContext', () => ({
-  useBranchContext: () => ({ activeBranchId: 'Kozhikode' }),
+  useBranchContext: () => ({ activeBranchId: 'Kozhikode', activeBranch: { id: 'Kozhikode', name: 'Kozhikode Branch' } }),
 }));
 
 vi.mock('../../services/salesPlan', async (importOriginal) => {
@@ -190,5 +191,140 @@ describe('SalesPlanPage', () => {
 
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  // These three tests deliberately avoid fake timers -- combining
+  // `vi.useFakeTimers()` with RTL's async `findBy*` queries (which poll via
+  // real `setTimeout` internally) causes them to hang/time out. Instead they
+  // derive expected labels from the real current date using the exact same
+  // "site today" computation the page uses (`getToday()`'s timezone-adjusted
+  // local date), so they remain deterministic regardless of when they run.
+  const realToday = () => {
+    const now = new Date();
+    const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000;
+    return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
+  };
+
+  it('shows a relative "Today" label paired with the absolute date and branch name', async () => {
+    render(<SalesPlanPage />);
+
+    await screen.findByText('Chicken Biryani');
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent('Today');
+    expect(heading).toHaveTextContent('Kozhikode Branch');
+    expect(screen.queryByText('This date has already passed.')).not.toBeInTheDocument();
+  });
+
+  it('shows a relative "Tomorrow" label for the next day', async () => {
+    render(<SalesPlanPage />);
+    await screen.findByText('Chicken Biryani');
+
+    const tomorrow = format(addDays(parseISO(realToday()), 1), 'yyyy-MM-dd');
+    const dateInput = screen.getByLabelText('Plan date') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: tomorrow } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tomorrow');
+    });
+  });
+
+  it('shows a weekday+date label (no relative word) and a past-date warning for a date further out', async () => {
+    render(<SalesPlanPage />);
+    await screen.findByText('Chicken Biryani');
+
+    const pastDate = format(addDays(parseISO(realToday()), -10), 'yyyy-MM-dd');
+    const expectedLabel = format(parseISO(pastDate), 'EEE, d MMM yyyy');
+    const dateInput = screen.getByLabelText('Plan date') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: pastDate } });
+
+    await waitFor(() => {
+      const heading = screen.getByRole('heading', { level: 1 });
+      expect(heading).not.toHaveTextContent('Today');
+      expect(heading).not.toHaveTextContent('Tomorrow');
+      expect(heading).not.toHaveTextContent('Yesterday');
+      expect(heading).toHaveTextContent(expectedLabel);
+    });
+    expect(screen.getByText('This date has already passed.')).toBeInTheDocument();
+  });
+
+  it('truncates a department table past 10 rows and toggles show all/fewer', async () => {
+    const manyItems = {
+      ...historyResponse,
+      items: Array.from({ length: 14 }, (_, i) => ({
+        item_code: `ITEM-${100 + i}`,
+        item_name: `Item ${i}`,
+        stock_uom: 'Nos',
+        department: 'Indian',
+        production_unit: 'Hot Kitchen',
+        average_qty: 10,
+        sample_days: 3,
+        history: [],
+      })),
+    };
+    vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(manyItems as any);
+
+    render(<SalesPlanPage />);
+    await screen.findByText('Item 0');
+
+    expect(screen.queryByText('Item 9')).toBeInTheDocument();
+    expect(screen.queryByText('Item 10')).not.toBeInTheDocument();
+
+    const showAll = screen.getByRole('button', { name: 'Show all 14 rows' });
+    await userEvent.click(showAll);
+
+    expect(screen.getByText('Item 13')).toBeInTheDocument();
+    const showFewer = screen.getByRole('button', { name: 'Show fewer' });
+    await userEvent.click(showFewer);
+
+    expect(screen.queryByText('Item 10')).not.toBeInTheDocument();
+  });
+
+  it('expands truncation and moves focus down when ArrowDown is pressed on the last visible row', async () => {
+    const manyItems = {
+      ...historyResponse,
+      items: Array.from({ length: 14 }, (_, i) => ({
+        item_code: `ITEM-${100 + i}`,
+        item_name: `Item ${i}`,
+        stock_uom: 'Nos',
+        department: 'Indian',
+        production_unit: 'Hot Kitchen',
+        average_qty: 10,
+        sample_days: 3,
+        history: [],
+      })),
+    };
+    vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(manyItems as any);
+
+    render(<SalesPlanPage />);
+    await screen.findByText('Item 0');
+    expect(screen.queryByText('Item 10')).not.toBeInTheDocument();
+
+    const lastVisibleInput = getPlanInputForRow('Item 9');
+    lastVisibleInput.focus();
+    await userEvent.keyboard('{ArrowDown}');
+
+    await waitFor(() => {
+      expect(screen.getByText('Item 10')).toBeInTheDocument();
+    });
+    expect(getPlanInputForRow('Item 10')).toHaveFocus();
+  });
+
+  it('shows department row count and an issue-count badge when it has blocked items', async () => {
+    const withBlocked = {
+      ...historyResponse,
+      items: [
+        ...historyResponse.items,
+        { item_code: 'ITEM-900', item_name: 'Blocked Item', stock_uom: 'Nos', department: 'Indian', production_unit: 'Unassigned', average_qty: 5, sample_days: 3, history: [] },
+      ],
+    };
+    vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withBlocked as any);
+
+    render(<SalesPlanPage />);
+    await screen.findByText('Chicken Biryani');
+
+    const indianToggle = screen.getByRole('button', { name: 'Indian' });
+    const indianHeader = indianToggle.closest('div');
+    expect(indianHeader).toHaveTextContent('2 items');
+    expect(indianHeader).toHaveTextContent('1 issue');
   });
 });
