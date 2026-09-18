@@ -393,25 +393,278 @@ def release_tables_after_print(invoice):
     if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
         frappe.throw(_("Not permitted to release tables for this invoice"), frappe.PermissionError)
 
-    tables = _get_table_group(
-        invoice_doc.restaurant_table,
-        invoice_doc.custom_merged_tables,
+    # Delegates rather than repeating the release inline: this copy cleared
+    # `occupied` and `latest_invoice_time` but not `merged_with`, so a table
+    # released through here kept a stale merge partner and the next merge
+    # attempt saw it as still joined.
+    release_merge_cluster_tables(
+        _get_table_group(
+            invoice_doc.restaurant_table,
+            invoice_doc.custom_merged_tables,
+        )
     )
 
-    for table in tables:
 
-        frappe.db.set_value(
-            "URY Table",
-            table,
+# Roles that may close a table without a receipt. Billing roles come from the
+# branch's POS Profile — closing a bill out is billing — and managers are
+# included because the action is theirs to authorise when a cashier cannot.
+TABLE_CLOSE_MANAGER_ROLES = frozenset(
+    {"URY Manager", "URY Admin", "System Manager", "Administrator"}
+)
+
+
+def _may_close_table(pos_invoice):
+    """Whether the session user may release a table without printing.
+
+    This is money-adjacent: closing a table is what takes an open bill out of
+    the "still owes" list, so it is gated rather than offered to everyone with
+    write access to the invoice.
+    """
+    user = frappe.session.user
+    if user == "Administrator":
+        return True
+
+    roles = set(frappe.get_roles())
+    if roles & TABLE_CLOSE_MANAGER_ROLES:
+        return True
+
+    # A cashier on this branch's POS Profile settles bills for a living.
+    if pos_invoice.pos_profile:
+        billing_roles = {
+            row.role
+            for row in frappe.get_all(
+                "Role Permitted",
+                filters={
+                    "parent": pos_invoice.pos_profile,
+                    "parenttype": "POS Profile",
+                    "parentfield": "role_allowed_for_billing",
+                },
+                fields=["role"],
+            )
+        }
+        if roles & billing_roles:
+            return True
+
+    return False
+
+
+@frappe.whitelist(methods=["POST"])
+def close_table(invoice=None, table=None, reason=None):
+    """Free an occupied table without forcing a receipt to be printed.
+
+    The table and the paper used to be the same action: `qz_print_update` and
+    `print_pos_page` released the table as a side effect of setting
+    `invoice_printed`. So a bill settled without a receipt — a regular
+    occurrence — could only be cleared by printing one anyway.
+
+    What this deliberately does *not* do is simply set `occupied = 0`. A table
+    freed while its draft invoice is still open would leave that invoice
+    attached to nothing, in no list a waiter looks at, with its items and its
+    total intact: revenue that has quietly left the floor. So the bill is
+    closed out here in the same breath as the table, and the fact that no
+    receipt was printed is recorded against the invoice.
+
+    An empty table — no invoice, or a draft with no items on it — is a
+    different thing entirely and needs no reason: nothing was sold.
+
+    To void an order rather than close it out, use `cancel_order`, which
+    reverses the invoice instead of settling it.
+
+    @param invoice: POS Invoice to close. Resolved from `table` when omitted.
+    @param table:   URY Table to free; used to find the open invoice.
+    @param reason:  Required whenever there is anything on the bill.
+    """
+    if not invoice and not table:
+        frappe.throw(_("A table or an invoice is required"))
+
+    branch = getBranch()
+
+    if not invoice:
+        # The open, unprinted draft on this table. Ordered newest first so a
+        # table that somehow carries two never picks up the stale one.
+        invoice = frappe.db.get_value(
+            "POS Invoice",
             {
-                "occupied": 0,
-                "latest_invoice_time": None,
+                "restaurant_table": table,
+                "branch": branch,
+                "docstatus": 0,
+                "invoice_printed": 0,
             },
+            "name",
+            order_by="modified desc",
         )
 
-    frappe.db.commit()
+    if not invoice:
+        # Nothing is open against it, so the table is occupied by a flag that
+        # no longer reflects anything. Releasing it is the whole fix.
+        if not table:
+            frappe.throw(_("No open order was found"))
 
-    return True
+        table_branch = frappe.db.get_value("URY Table", table, "branch")
+        if table_branch and table_branch != branch:
+            frappe.throw(
+                _("You are not allowed to close a table from another branch"),
+                frappe.PermissionError,
+            )
+
+        release_merge_cluster_tables(table)
+        return {"status": "Success", "invoice": None, "released": True}
+
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(_("Not permitted to modify this invoice"), frappe.PermissionError)
+
+    if frappe.session.user != "Administrator" and pos_invoice.branch != branch:
+        frappe.throw(
+            _("You are not allowed to close a table from another branch"),
+            frappe.PermissionError,
+        )
+
+    if not _may_close_table(pos_invoice):
+        frappe.throw(
+            _("You are not permitted to close a table without printing the bill"),
+            frappe.PermissionError,
+        )
+
+    if not pos_invoice.restaurant_table:
+        frappe.throw(_("This order is not attached to a table"))
+
+    if pos_invoice.docstatus == 2:
+        frappe.throw(_("This order has been cancelled"))
+
+    has_items = bool(pos_invoice.items)
+
+    # Accountability scales with what is at stake. An empty table costs
+    # nothing to release; a bill with food on it that leaves without a receipt
+    # is something a manager will want to be able to ask about later.
+    reason = (reason or "").strip()
+    if has_items and not reason:
+        frappe.throw(_("A reason is required to close a table with an open bill"))
+
+    if pos_invoice.invoice_printed:
+        # Already billed — only the table is still held, which is the bug this
+        # is here to clear rather than a second close.
+        release_merge_cluster_tables(
+            _get_table_group(
+                pos_invoice.restaurant_table,
+                pos_invoice.custom_merged_tables,
+            )
+        )
+        return {"status": "Success", "invoice": invoice, "released": True}
+
+    values = {
+        # The bill is closed out. `invoice_printed` has always carried that
+        # meaning in this codebase — it is what moves an order out of the
+        # "Unbilled" bucket — even though its name says otherwise.
+        "invoice_printed": 1,
+        "custom_closed_without_print": 1,
+        "custom_close_reason": reason or None,
+        "custom_closed_by": frappe.session.user,
+        "custom_closed_at": frappe.utils.now_datetime(),
+    }
+    frappe.db.set_value("POS Invoice", invoice, values, update_modified=False)
+
+    release_merge_cluster_tables(
+        _get_table_group(
+            pos_invoice.restaurant_table,
+            pos_invoice.custom_merged_tables,
+        )
+    )
+
+    return {
+        "status": "Success",
+        "invoice": invoice,
+        "released": True,
+        "had_items": has_items,
+    }
+
+
+@frappe.whitelist()
+def get_table_close_state(table=None, invoice=None):
+    """Whether a table is still held even though nothing is left to settle.
+
+    Tables are freed as a side effect of settling the last bill standing on
+    them (`_free_tables_if_no_open_invoices`). So an occupied table with no
+    open invoice behind it is a table nobody can seat and no bill will ever
+    release — a split sibling settled out of order, a cancelled last bill, a
+    crash between the submit and the release.
+
+    The order screen cannot tell that state from "a bill is still open
+    somewhere on this cluster" on its own, and the difference decides whether
+    offering to close the table is safe or would strand revenue. So it is
+    answered here, where the cluster and the open-invoice rules already live,
+    rather than reconstructed from the order list in the browser.
+
+    @param table:   URY Table to report on.
+    @param invoice: POS Invoice whose table to report on, when the caller has
+                    an order rather than a table in hand.
+    """
+    merged_tables = None
+    table_branch = None
+
+    if invoice and not table:
+        row = frappe.db.get_value(
+            "POS Invoice",
+            invoice,
+            ["restaurant_table", "custom_merged_tables", "branch"],
+            as_dict=True,
+        )
+        if row:
+            table = row.restaurant_table
+            merged_tables = row.custom_merged_tables
+            table_branch = row.branch
+
+    if not table:
+        # A takeaway or delivery order holds no table, so there is nothing to
+        # release. Not an error — the caller asks about every order it shows.
+        return {
+            "table": None,
+            "tables": [],
+            "occupied": False,
+            "has_open_invoices": False,
+            "can_close": False,
+        }
+
+    if not table_branch:
+        table_branch = frappe.db.get_value("URY Table", table, "branch")
+
+    branch = getBranch()
+    if (
+        frappe.session.user != "Administrator"
+        and table_branch
+        and table_branch != branch
+    ):
+        # Another branch's floor. Report it as nothing to do rather than
+        # throwing: this is a passive lookup behind a screen, not an action.
+        return {
+            "table": table,
+            "tables": [],
+            "occupied": False,
+            "has_open_invoices": False,
+            "can_close": False,
+        }
+
+    tables = _get_table_group(table, merged_tables)
+
+    occupied = bool(
+        frappe.db.get_value(
+            "URY Table",
+            {"name": ("in", tables), "occupied": 1},
+            "name",
+        )
+    )
+    has_open_invoices = bool(_has_open_pos_invoices_for_cluster(tables))
+
+    return {
+        "table": table,
+        "tables": tables,
+        "occupied": occupied,
+        "has_open_invoices": has_open_invoices,
+        # Held with nothing left to settle: the one case where releasing the
+        # table cannot take an open bill off the floor with it.
+        "can_close": occupied and not has_open_invoices,
+    }
 
 
 def _has_open_pos_invoices_for_cluster(tables):
