@@ -29,7 +29,22 @@ export interface ComparableHistoryResponse {
 
 export interface SalesPlanItem extends ComparableHistoryItem {
   planned_qty: number;
+  /**
+   * Stable client-side row identity, distinct from `item_code`: two Sales
+   * Plan Item rows can legitimately share the same item_code, so `item_code`
+   * alone is not a safe React/table key -- this is generated once when the
+   * item is first added to the draft (from history or manual add) and never
+   * recomputed, so edits/bulk-set/CSV always target exactly one row.
+   */
+  _rowKey: string;
 }
+
+const generateRowKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 export interface SalesPlanDraft {
   plan_date: string;
@@ -66,6 +81,7 @@ export const addManualItemToDraft = (
     sample_days: 0,
     history: [],
     planned_qty: 0,
+    _rowKey: generateRowKey(),
   };
 
   return [...items, newItem];
@@ -127,6 +143,7 @@ export const buildSalesPlanDraft = (
       return {
         ...item,
         planned_qty: Number.isFinite(savedQty) ? savedQty : Math.round(item.average_qty),
+        _rowKey: generateRowKey(),
       };
     }),
   };

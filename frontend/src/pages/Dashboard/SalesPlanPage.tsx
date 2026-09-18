@@ -367,7 +367,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
           return (
             <React.Fragment key={step.key}>
               {index > 0 && (
-                <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
+                <div role="presentation" className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
               )}
               <div role="listitem">
                 <Badge
@@ -423,6 +423,7 @@ export const SalesPlanPage: React.FC = () => {
   const [transitioning, setTransitioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [csvImportWarning, setCsvImportWarning] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
   const [selectedItemDetailCode, setSelectedItemDetailCode] = useState<string | null>(null);
@@ -449,7 +450,9 @@ export const SalesPlanPage: React.FC = () => {
   const [truncationExpanded, setTruncationExpanded] = useState<Record<string, boolean>>({});
   const departmentGroupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const departmentContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const pendingFocusIndexRef = useRef<Record<string, number>>({});
+  // aria-label of the input to focus once a department's truncation state
+  // has just expanded in response to onBoundaryReached('down') below.
+  const pendingFocusAriaLabelRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     const refreshToday = () => setTodayString(getToday());
@@ -651,9 +654,9 @@ export const SalesPlanPage: React.FC = () => {
     }, 2000);
   };
 
-  const updatePlannedQty = (itemCode: string, qty: number) => {
+  const updatePlannedQty = (rowKey: string, qty: number) => {
     setItems((currentItems) => currentItems.map((item) => (
-      item.item_code === itemCode ? { ...item, planned_qty: Math.max(0, qty) } : item
+      item._rowKey === rowKey ? { ...item, planned_qty: Math.max(0, qty) } : item
     )));
   };
 
@@ -714,43 +717,30 @@ export const SalesPlanPage: React.FC = () => {
     });
   };
 
-  // Workaround for EditableDataTable's keyboard nav being scoped to exactly
-  // the `rows` array we pass it: when a department's table is truncated to
-  // ROW_TRUNCATE_LIMIT rows, ArrowDown on the last rendered row would
-  // otherwise be a no-op inside that hook (it stops at "this instance's own
-  // edge"). We intercept the keydown in the capture phase -- before
-  // EditableDataTable's own bubble-phase handler sees it -- expand the
-  // truncation, and refocus the row that should now receive focus, all
-  // without touching the `@ury/ui` package itself.
-  const handleDepartmentKeyDownCapture = (
+  // When a department's table is truncated to ROW_TRUNCATE_LIMIT rows,
+  // EditableDataTable's keyboard nav is scoped to exactly the (truncated)
+  // `rows` it was given, so ArrowDown on the last rendered row calls
+  // `onBoundaryReached('down')` instead of moving focus. When that happens
+  // while truncated, expand the department and focus the next row (by its
+  // stable aria-label) once it renders.
+  const handleBoundaryReached = (
     department: string,
-    fullRowCount: number,
-    isTruncated: boolean
-  ) => (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'ArrowDown' || !isTruncated) return;
-    const container = departmentContainerRefs.current[department];
-    if (!container) return;
-    const inputs = Array.from(container.querySelectorAll('input[type="number"]'));
-    const activeIndex = inputs.indexOf(document.activeElement as HTMLInputElement);
-    if (activeIndex === -1) return;
-    const isLastRenderedRow = activeIndex === ROW_TRUNCATE_LIMIT - 1;
-    const hasMoreRowsHidden = fullRowCount > ROW_TRUNCATE_LIMIT;
-    if (!isLastRenderedRow || !hasMoreRowsHidden) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    pendingFocusIndexRef.current[department] = activeIndex + 1;
+    isTruncated: boolean,
+    nextRowAriaLabel: string | undefined
+  ) => (direction: 'up' | 'down') => {
+    if (direction !== 'down' || !isTruncated || !nextRowAriaLabel) return;
+    pendingFocusAriaLabelRef.current[department] = nextRowAriaLabel;
     setTruncationExpanded((current) => ({ ...current, [department]: true }));
   };
 
   useEffect(() => {
-    Object.entries(pendingFocusIndexRef.current).forEach(([department, index]) => {
+    Object.entries(pendingFocusAriaLabelRef.current).forEach(([department, ariaLabel]) => {
       if (!truncationExpanded[department]) return;
       const container = departmentContainerRefs.current[department];
       if (!container) return;
-      const inputs = Array.from(container.querySelectorAll('input[type="number"]'));
-      inputs[index]?.focus();
-      delete pendingFocusIndexRef.current[department];
+      const input = container.querySelector<HTMLInputElement>(`[aria-label="${CSS.escape(ariaLabel)}"]`);
+      input?.focus();
+      delete pendingFocusAriaLabelRef.current[department];
     });
   }, [truncationExpanded]);
 
@@ -1021,6 +1011,16 @@ export const SalesPlanPage: React.FC = () => {
               : visibleDepartmentItems;
             const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
 
+            // Next row (in the full filtered set) after the last currently
+            // rendered row -- used to focus the newly-revealed row when
+            // truncation auto-expands via onBoundaryReached('down').
+            const nextRowAfterTruncation = visibleDepartmentItems[shownDepartmentItems.length];
+            const nextRowAriaLabel = nextRowAfterTruncation
+              ? `Plan quantity for ${nextRowAfterTruncation.item_name || nextRowAfterTruncation.item_code}`
+              : undefined;
+
+            // Column order: Item / History Insight / Production Unit / Plan
+            // (inserted via editableColumnIndex below) / Variance.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
                 key: 'item_code',
@@ -1110,7 +1110,6 @@ export const SalesPlanPage: React.FC = () => {
                   ref={(el) => {
                     departmentContainerRefs.current[department] = el;
                   }}
-                  onKeyDownCapture={handleDepartmentKeyDownCapture(department, visibleDepartmentItems.length, isTruncated)}
                 >
                   <div className="border-b border-border bg-card px-5 py-2">
                     <Input
@@ -1124,13 +1123,24 @@ export const SalesPlanPage: React.FC = () => {
                     />
                   </div>
                   <div className="px-5 py-3">
+                    {csvImportWarning && (
+                      <p className="mb-2 rounded-md border border-warning-tint-border bg-warning-tint px-3 py-2 text-sm text-warning" role="alert">
+                        {csvImportWarning}
+                      </p>
+                    )}
                     <EditableDataTable
                       columns={departmentColumns}
                       rows={shownDepartmentItems}
-                      // item_code is the practical key here since items are not yet
-                      // persisted Sales Plan Item child rows (no child-table `name`
-                      // exists pre-save) -- see task spec for why this is acceptable.
-                      rowKey={(row) => row.item_code}
+                      // `dataRows` is the full filtered (but not truncated) set for
+                      // this department, so CSV export/import and bulk-set operate
+                      // on everything the user has filtered to, not just what is
+                      // currently rendered on screen.
+                      dataRows={visibleDepartmentItems}
+                      // `_rowKey` (not item_code) is the row identity: two Sales
+                      // Plan Item rows can legitimately share the same item_code,
+                      // and item_code alone would let one edit/bulk-set/CSV import
+                      // mutate both rows at once.
+                      rowKey={(row) => row._rowKey}
                       editableColumn={{
                         key: 'planned_qty',
                         header: 'Plan',
@@ -1138,8 +1148,10 @@ export const SalesPlanPage: React.FC = () => {
                         min: 0,
                         step: 0.01,
                         getValue: (row) => row.planned_qty,
-                        onChange: (row, value) => updatePlannedQty(row.item_code, value),
+                        onChange: (row, value) => updatePlannedQty(row._rowKey, value),
+                        getAriaLabel: (row) => `Plan quantity for ${row.item_name || row.item_code}`,
                       }}
+                      editableColumnIndex={3}
                       csvContextColumns={[
                         { header: 'Item Code', get: (row) => row.item_code },
                         { header: 'Item Name', get: (row) => row.item_name || '' },
@@ -1149,7 +1161,7 @@ export const SalesPlanPage: React.FC = () => {
                         label: 'Set all to 0',
                         value: 0,
                         onApply: (rows, value) => {
-                          rows.forEach((row) => updatePlannedQty(row.item_code, value));
+                          rows.forEach((row) => updatePlannedQty(row._rowKey, value));
                         },
                       }}
                       csv={{
@@ -1159,8 +1171,14 @@ export const SalesPlanPage: React.FC = () => {
                             const qty = Number(values.planned_qty);
                             if (Number.isFinite(qty)) updatePlannedQty(rowKey, qty);
                           });
+                          setCsvImportWarning(
+                            result.unmatched.length > 0
+                              ? `${result.unmatched.length} row(s) in the imported file didn't match any item in this plan and were skipped.`
+                              : null
+                          );
                         },
                       }}
+                      onBoundaryReached={handleBoundaryReached(department, isTruncated, nextRowAriaLabel)}
                     />
                     {visibleDepartmentItems.length > ROW_TRUNCATE_LIMIT && (
                       <div className="flex justify-center pt-2">

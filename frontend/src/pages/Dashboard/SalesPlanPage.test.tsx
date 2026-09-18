@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addDays, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
@@ -54,14 +54,11 @@ const historyResponse = {
   ],
 };
 
-// Finds the numeric "Plan" input within the row that contains the given item
-// name text -- EditableDataTable renders one plain, unlabeled number input
-// per row rather than a distinct aria-label per cell.
+// Finds the numeric "Plan" input for a given item by its accessible label
+// (`Plan quantity for <item name>`), restored via EditableDataTable's
+// `getAriaLabel` on `editableColumn`.
 const getPlanInputForRow = (itemName: string): HTMLInputElement => {
-  const matches = screen.getAllByText(itemName);
-  const row = matches.map((el) => el.closest('tr')).find((tr): tr is HTMLTableRowElement => tr !== null);
-  if (!row) throw new Error(`Could not find table row for "${itemName}"`);
-  return within(row).getByRole('spinbutton') as HTMLInputElement;
+  return screen.getByLabelText(`Plan quantity for ${itemName}`) as HTMLInputElement;
 };
 
 describe('SalesPlanPage', () => {
