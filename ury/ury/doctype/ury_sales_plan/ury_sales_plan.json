@@ -23,6 +23,7 @@
   "insight_snapshot",
   "section_break_audit",
   "audit_log",
+  "cancellation_reason",
   "amended_from"
  ],
  "fields": [
@@ -133,6 +134,14 @@
    "no_copy": 1,
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "cancellation_reason",
+   "fieldtype": "Small Text",
+   "label": "Reason (Return to Draft / Cancel)",
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "description": "Required when a plan is Returned to Draft or Supersede/Cancelled -- carries the actor-supplied reason into audit_log."
   }
  ],
  "index_web_pages_for_search": 1,

@@ -134,10 +134,22 @@ class URYSalesPlan(Document):
 			)
 
 	def _record_transition(self, prev_status):
-		"""Append one audit entry if `status` actually changed."""
+		"""Append one audit entry if `status` actually changed.
+
+		`cancellation_reason` is stashed onto the in-memory doc by
+		`transition_sales_plan()`'s `_guard_backward_transition()` right
+		before it calls `apply_workflow()`, so it survives into whichever of
+		validate() / before_update_after_submit() / before_cancel() actually
+		fires for this particular docstatus edge and gets folded into the
+		audit_log entry here. It is also a real, persisted field (see
+		ury_sales_plan.json), so the reason for the most recent Return to
+		Draft/Supersede-Cancel stays directly visible on the doc, not just
+		buried inside the audit_log JSON blob.
+		"""
 		if not prev_status or prev_status == self.status:
 			return
-		append_audit(self, prev_status, self.status, frappe.session.user)
+		reason = self.get("cancellation_reason")
+		append_audit(self, prev_status, self.status, frappe.session.user, reason=reason)
 		# audit_log is a Long Text (JSON) field -- append_audit leaves it
 		# as a Python list in memory, which must be serialized back to a
 		# string before Document.save() persists it.
