@@ -23,7 +23,8 @@
   "approval_snapshot_hash",
   "insight_snapshot",
   "section_break_audit",
-  "audit_log"
+  "audit_log",
+  "amended_from"
  ],
  "fields": [
   {
@@ -123,6 +124,15 @@
    "fieldname": "audit_log",
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "URY Sales Plan",
+   "no_copy": 1,
+   "print_hide": 1,
    "read_only": 1
   }
  ],
