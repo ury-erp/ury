@@ -69,17 +69,12 @@
             type="button"
             class="inline-flex items-center justify-center gap-2 border bg-white px-4 py-3 align-middle text-sm font-medium shadow-sm transition-all focus:outline-none dark:border-gray-700"
             :class="{
-              'text-gray-700':
-                this.recentOrders.editPrintedInvoice === 0 ||
-                this.auth.removeTableOrderItem === 1,
-              'text-gray-300':
-                this.recentOrders.editPrintedInvoice === 1 ||
-                this.auth.removeTableOrderItem === 0,
+              'text-gray-700': this.menu.canDecrementItem(item),
+              'text-gray-300': !this.menu.canDecrementItem(item),
             }"
-            :disabled="this.recentOrders.restaurantTable"
+            :disabled="!this.menu.canDecrementItem(item)"
             @click="
-              (this.recentOrders.editPrintedInvoice === 0 ||
-                this.auth.removeTableOrderItem === 1) &&
+              this.menu.canDecrementItem(item) &&
                 this.menu.decrementItemQuantity(item)
             "
           >

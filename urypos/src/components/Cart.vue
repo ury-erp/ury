@@ -90,10 +90,9 @@
         <button
           class="p-2 text-center"
           type="button"
-          :disabled="this.recentOrders.restaurantTable"            
+          :disabled="!this.menu.canRemoveItem(item)"
           @click="
-            (this.recentOrders.editPrintedInvoice === 0 ||
-              this.auth.removeTableOrderItem === 1) &&
+            this.menu.canRemoveItem(item) &&
               this.menu.removeItemFromCart(index)
           "
         >
@@ -101,7 +100,9 @@
             xmlns="http://www.w3.org/2000/svg"
             width="25"
             height="25"
-            :style="{ fill: this.menu.setColorForBilledInvoice }"
+            :style="{
+              fill: this.menu.canRemoveItem(item) ? 'black' : 'gray',
+            }"
             class="bi bi-trash"
             viewBox="0 0 16 16"
           >
@@ -263,7 +264,13 @@
               this.recentOrders.editPrintedInvoice === 1 &&
               this.auth.removeTableOrderItem === 0
             "
-            :disabled="this.recentOrders.restaurantTable"
+            :min="
+              item.is_table_order_item &&
+              this.auth.restrictTableOrder &&
+              this.auth.removeTableOrderItem === 0
+                ? item.original_qty
+                : 1
+            "
           />
           <label
             for="Comments"
@@ -326,13 +333,9 @@
           class="waiter mt-3 block w-full rounded-md border bg-gray-50 p-2.5 text-sm text-gray-900 md:w-3/5 lg:w-2/5"
           :class="{ hidden: this.invoiceData.waiter === '' }"
           :value="
-            this.table.previousWaiter !== null &&
-            this.table.previousWaiter !== undefined
-              ? this.table.previousWaiter
-              : this.recentOrders.recentWaiter !== null &&
-                this.recentOrders.recentWaiter !== undefined
-              ? this.recentOrders.recentWaiter
-              : this.invoiceData.waiter
+            this.table.previousWaiter ||
+            this.recentOrders.recentWaiter ||
+            (this.auth.cashier ? '' : this.invoiceData.waiter)
           "
           readonly
         />
