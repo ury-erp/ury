@@ -96,27 +96,6 @@
     "allow_self_approval": 1
    },
    {
-    "state": "Draft",
-    "action": "Supersede/Cancel",
-    "next_state": "Superseded/Cancelled",
-    "allowed": "URY Sales Plan Controller",
-    "allow_self_approval": 1
-   },
-   {
-    "state": "Proposed",
-    "action": "Supersede/Cancel",
-    "next_state": "Superseded/Cancelled",
-    "allowed": "URY Sales Plan Controller",
-    "allow_self_approval": 1
-   },
-   {
-    "state": "Submitted for Approval",
-    "action": "Supersede/Cancel",
-    "next_state": "Superseded/Cancelled",
-    "allowed": "URY Sales Plan Controller",
-    "allow_self_approval": 1
-   },
-   {
     "state": "Approved",
     "action": "Supersede/Cancel",
     "next_state": "Superseded/Cancelled",
