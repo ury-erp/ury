@@ -382,7 +382,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
                 {index > 0 && (
                   <div
                     role="presentation"
-                    className={`mx-1 h-0.5 min-w-[16px] max-w-[56px] flex-1 ${index <= activeIndex ? 'bg-primary' : 'bg-border-strong'}`}
+                    className={`mx-1 h-0.5 min-w-[16px] max-w-[56px] flex-1 ${index <= activeIndex ? 'bg-primary' : 'bg-border'}`}
                   />
                 )}
                 <div
