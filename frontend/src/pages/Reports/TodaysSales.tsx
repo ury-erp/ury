@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { KpiStrip, type KpiItemProps, Input, DataTable, type DataTableColumn } from '@ury/ui';
@@ -170,7 +171,7 @@ export function TodaysSales() {
           />
           {data && (
             <span className="text-xs text-muted-foreground">
-              Updated {new Date(data.last_updated_at).toLocaleTimeString()}
+              Updated {new Date(data.last_updated_at).toLocaleTimeString(getManagementLocale())}
             </span>
           )}
         </div>

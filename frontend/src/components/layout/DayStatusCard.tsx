@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@ury/ui';
@@ -33,7 +34,7 @@ const getToday = (): string => {
 };
 
 const formatCardDate = (isoDate: string): string =>
-  new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
+  new Date(`${isoDate}T00:00:00`).toLocaleDateString(getManagementLocale(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

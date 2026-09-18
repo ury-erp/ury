@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useState } from 'react';
 import { Page, Section, Panel, Spinner, Input, Button, Select, DataTable, type DataTableColumn } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
@@ -59,7 +60,7 @@ const useCurrentRoles = () => {
 };
 
 const formatCurrency = (value: number | undefined): string =>
-  value === undefined ? '—' : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  value === undefined ? '—' : value.toLocaleString(getManagementLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const DepartmentProfitabilityPage: React.FC = () => {
   const { activeBranch, selectedBranch } = useBranchContext();

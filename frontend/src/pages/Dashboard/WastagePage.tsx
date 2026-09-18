@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Badge,
@@ -22,7 +23,7 @@ import { getLoggedUser, getUserRoles } from '@ury/core';
 // Mirrors the identical helper in StockReservationPage.tsx / PaymentTerminalPage.tsx.
 const formatDateTime = (value?: string) => {
   if (!value) return '';
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(getManagementLocale());
 };
 import { useBranchContext } from '../../context/BranchContext';
 import { DeskLink } from '../../components/DeskLink';
@@ -49,7 +50,7 @@ const getToday = () => new Date().toISOString().slice(0, 10);
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
 const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  value.toLocaleString(getManagementLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface WastageRoleGateProps {
   children: React.ReactNode;

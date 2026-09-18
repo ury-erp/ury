@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../../i18n/language';
 import {
   AlertTriangle,
   Clock,
@@ -50,7 +51,7 @@ function formatOpenSessionDate(dateString: string): string {
 
     if (diffHours === 0) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ${diffMins}m ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(getManagementLocale(), { month: 'short', day: 'numeric' });
   } catch {
     return dateString;
   }

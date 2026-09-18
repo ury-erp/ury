@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useState } from 'react';
 import {
   Page,
@@ -23,7 +24,7 @@ interface YieldVarianceRow {
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(getManagementLocale());
 };
 
 const formatPercent = (value: number) => {

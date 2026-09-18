@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../../i18n/language';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
 import { Badge, Button, DataTable, type DataTableColumn } from '@ury/ui';
@@ -179,7 +180,7 @@ export default function Orders() {
 
   // Function to format the date and time
   const formatDateTime = (date: string, time: string) => {
-    const formattedDate = new Date(date + ' ' + time).toLocaleString('en-US', {
+    const formattedDate = new Date(date + ' ' + time).toLocaleString(getManagementLocale(), {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',

@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../../i18n/language';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -36,7 +37,7 @@ export default function OpenEntries() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString(getManagementLocale(), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',

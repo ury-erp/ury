@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -42,7 +43,7 @@ const getToday = () => {
 const formatCurrency = (value: number | undefined): string =>
   value === undefined || Number.isNaN(value)
     ? '—'
-    : `₹${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    : `₹${value.toLocaleString(getManagementLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const severityForItem = (severity: string): AttentionItemProps['severity'] => {
   const normalized = severity.toLowerCase();
@@ -239,7 +240,7 @@ export const ServicePage: React.FC = () => {
     if (!shiftMetrics) return [];
     const items = [
       { label: 'Net Sales', value: formatCurrency(shiftMetrics.sales) },
-      { label: 'Covers', value: shiftMetrics.covers.toLocaleString() },
+      { label: 'Covers', value: shiftMetrics.covers.toLocaleString(getManagementLocale()) },
       { label: 'Avg / Cover', value: formatCurrency(shiftMetrics.avg_per_cover) },
     ];
     // avg_ticket_minutes has a real backend field but is a duration, not a

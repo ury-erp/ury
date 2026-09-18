@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
+import { ru, enUS } from 'date-fns/locale';
+import { resolveManagementLanguage } from '../../i18n/language';
 import {
   startOfDay,
   endOfDay,
@@ -509,7 +511,8 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
     }
   };
 
-  const labelText = `${format(value.from, 'MMM d, yyyy')} - ${format(value.to, 'MMM d, yyyy')}`;
+  const locale = resolveManagementLanguage() === 'ru' ? ru : enUS;
+  const labelText = `${format(value.from, 'PP', { locale })} — ${format(value.to, 'PP', { locale })}`;
 
   return (
     <div ref={containerRef} className={`relative inline-block ${className ?? ''}`}>

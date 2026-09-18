@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useState } from 'react';
 import { Page, Section, Panel, Badge, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
 import {
@@ -11,12 +12,12 @@ const PROVIDERS = ['Simulated', 'Ingenico', 'PAX', 'Verifone', 'Other'];
 const formatDateTime = (value?: string) => {
   if (!value) return '';
   const d = new Date(value);
-  return d.toLocaleString();
+  return d.toLocaleString(getManagementLocale());
 };
 
 const formatCurrency = (value?: number) => {
   if (value === undefined) return '';
-  return new Intl.NumberFormat('en-IN', {
+  return new Intl.NumberFormat(getManagementLocale('en-IN'), {
     style: 'currency',
     currency: 'INR',
   }).format(value);
