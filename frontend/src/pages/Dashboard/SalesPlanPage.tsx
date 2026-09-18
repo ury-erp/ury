@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Save, Search, Send, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -358,46 +358,71 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
     summary = `Currently: ${currentLabel}${nextPart}`;
   }
 
+  const manyStepsCount = LIFECYCLE_STEPS.length > 5;
+
   return (
-    <div>
-      <div className="flex items-center gap-2" role="list" aria-label="Sales Plan status">
-        {LIFECYCLE_STEPS.map((step, index) => {
-          const isActive = index === activeIndex;
-          const isComplete = activeIndex >= 0 && index < activeIndex;
-          return (
-            <React.Fragment key={step.key}>
-              {index > 0 && (
-                <div role="presentation" className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
-              )}
-              <div role="listitem">
-                <Badge
-                  size="tag"
-                  aria-current={isActive ? 'step' : undefined}
-                  variant={
-                    isActive
-                      ? 'tagAccent'
-                      : isComplete
-                        ? 'tagSuccess'
-                        : 'default'
-                  }
-                  className={isActive ? 'font-semibold ring-2 ring-primary' : undefined}
-                >
-                  {step.label}
-                </Badge>
-              </div>
-            </React.Fragment>
-          );
-        })}
-        {isTerminalOther && (
-          <div role="listitem">
-            <Badge size="tag" variant="tagDestructive" className="ml-1">
-              Superseded/Cancelled
-            </Badge>
+    <div className="flex flex-1 flex-wrap items-center justify-between gap-y-2 rounded-lg border border-border bg-card px-4 py-3.5">
+      {isTerminalOther ? (
+        <div className="flex items-center gap-2" role="list" aria-label="Sales Plan status">
+          <div role="listitem" className="flex items-center gap-2" title="Superseded/Cancelled">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive text-white">
+              <X className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-[13px] font-semibold text-destructive">Superseded/Cancelled</span>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center" role="list" aria-label="Sales Plan status">
+          {LIFECYCLE_STEPS.map((step, index) => {
+            const isActive = index === activeIndex;
+            const isComplete = activeIndex >= 0 && index < activeIndex;
+            const isUpcoming = !isActive && !isComplete;
+            return (
+              <React.Fragment key={step.key}>
+                {index > 0 && (
+                  <div
+                    role="presentation"
+                    className={`mx-1 h-0.5 min-w-[16px] max-w-[56px] flex-1 ${index <= activeIndex ? 'bg-primary' : 'bg-border-strong'}`}
+                  />
+                )}
+                <div
+                  role="listitem"
+                  className="flex flex-1 items-center gap-1.5"
+                  title={step.label}
+                >
+                  <span
+                    aria-current={isActive ? 'step' : undefined}
+                    className={
+                      isComplete
+                        ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-white'
+                        : isActive
+                          ? 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-card text-primary'
+                          : 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-text-tertiary'
+                    }
+                  >
+                    {isComplete ? <Check className="h-3.5 w-3.5" /> : <span className="text-[11px] font-semibold">{index + 1}</span>}
+                  </span>
+                  <span
+                    className={
+                      manyStepsCount && !isActive
+                        ? `hidden text-[13px] sm:inline ${isComplete ? 'text-text-secondary' : 'text-text-tertiary'}`
+                        : isActive
+                          ? 'text-[13px] font-semibold text-foreground'
+                          : isComplete
+                            ? 'text-[13px] text-text-secondary'
+                            : 'text-[13px] text-text-tertiary'
+                    }
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
       {summary && (
-        <p className="mt-1.5 text-xs text-text-tertiary" aria-live="polite">
+        <p className="text-xs text-text-tertiary" aria-live="polite">
           {summary}
         </p>
       )}
@@ -434,6 +459,9 @@ export const SalesPlanPage: React.FC = () => {
   const [addItemResults, setAddItemResults] = useState<BranchItemSearchResult[]>([]);
   const [addItemLoading, setAddItemLoading] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const addItemPopoverRef = useRef<HTMLDivElement | null>(null);
+  const addItemButtonRef = useRef<HTMLButtonElement | null>(null);
+  const addItemInputRef = useRef<HTMLInputElement | null>(null);
 
   // "Needs Attention" collapse-by-default state.
   const [attentionExpanded, setAttentionExpanded] = useState(false);
@@ -617,12 +645,44 @@ export const SalesPlanPage: React.FC = () => {
     };
   }, [addItemQuery, addItemOpen, historyScope?.branch, historyScope?.company]);
 
+  const closeAddItem = () => {
+    setAddItemOpen(false);
+    addItemButtonRef.current?.focus();
+  };
+
   const handleAddManualItem = (result: BranchItemSearchResult) => {
     setItems((currentItems) => addManualItemToDraft(currentItems, result));
-    setAddItemOpen(false);
     setAddItemQuery('');
     setAddItemResults([]);
+    closeAddItem();
   };
+
+  // Close the "Add item" popover on outside click or Escape -- closing is
+  // implicit via these two triggers plus selecting a result, so there is no
+  // explicit "Close" control inside the popover itself.
+  useEffect(() => {
+    if (!addItemOpen) return;
+
+    const onMouseDown = (event: MouseEvent) => {
+      if (addItemPopoverRef.current && !addItemPopoverRef.current.contains(event.target as Node)) {
+        setAddItemOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeAddItem();
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [addItemOpen]);
+
+  useEffect(() => {
+    if (addItemOpen) addItemInputRef.current?.focus();
+  }, [addItemOpen]);
 
   const toggleDepartmentCollapsed = (department: string) => {
     setCollapsedDepartments((current) => {
@@ -805,6 +865,63 @@ export const SalesPlanPage: React.FC = () => {
                 className="pl-9"
               />
             </label>
+            <div className="relative" ref={addItemPopoverRef}>
+              <Button
+                ref={addItemButtonRef}
+                type="button"
+                variant="secondary"
+                size="compactLg"
+                className="gap-2"
+                onClick={() => setAddItemOpen((current) => !current)}
+                aria-expanded={addItemOpen}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add item</span>
+              </Button>
+              {addItemOpen && (
+                <div className="absolute right-0 top-full z-30 mt-1 w-[380px] rounded-lg border border-border bg-card shadow-lg">
+                  <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                    <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
+                    <input
+                      ref={addItemInputRef}
+                      id="add-item-search"
+                      aria-label="Add item to plan"
+                      value={addItemQuery}
+                      onChange={(event) => setAddItemQuery(event.target.value)}
+                      placeholder="Search the item catalog by name or code"
+                      className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
+                    />
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {addItemLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Spinner className="h-4 w-4 text-primary" />
+                      </div>
+                    ) : addItemResults.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-text-tertiary">No matching items found.</p>
+                    ) : (
+                      <ul>
+                        {addItemResults.map((result) => (
+                          <li key={result.item_code}>
+                            <button
+                              type="button"
+                              onClick={() => handleAddManualItem(result)}
+                              className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-primary-tint"
+                            >
+                              <span className="font-medium text-foreground">{result.item_name || result.item_code}</span>
+                              <span className="text-xs text-text-tertiary">
+                                {result.item_code}
+                                {result.department ? ` · ${result.department}` : ''}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
               <Save className="h-4 w-4" />
               <span>{saving ? 'Saving...' : 'Save Draft'}</span>
@@ -896,74 +1013,16 @@ export const SalesPlanPage: React.FC = () => {
       )}
 
       <Section>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-            <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search item, department, or production unit"
-              className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
-            />
-          </div>
-
-          {/* Catalog search: adds a NEW item to the plan (regardless of comparable
-              history), distinct from the filter box above which only narrows the
-              already-loaded list. */}
-          <div className="relative rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-            <label htmlFor="add-item-search" className="mb-1 block text-xs font-medium text-text-tertiary">
-              Add item to plan
-            </label>
-            <div className="flex items-center gap-3">
-              <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
-              <input
-                id="add-item-search"
-                value={addItemQuery}
-                onChange={(event) => {
-                  setAddItemQuery(event.target.value);
-                  setAddItemOpen(true);
-                }}
-                onFocus={() => setAddItemOpen(true)}
-                placeholder="Search the item catalog by name or code"
-                className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
-              />
-            </div>
-            {addItemOpen && (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-                {addItemLoading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Spinner className="h-4 w-4 text-primary" />
-                  </div>
-                ) : addItemResults.length === 0 ? (
-                  <p className="px-4 py-3 text-sm text-text-tertiary">No matching items found.</p>
-                ) : (
-                  <ul>
-                    {addItemResults.map((result) => (
-                      <li key={result.item_code}>
-                        <button
-                          type="button"
-                          onClick={() => handleAddManualItem(result)}
-                          className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-primary-tint"
-                        >
-                          <span className="font-medium text-foreground">{result.item_name || result.item_code}</span>
-                          <span className="text-xs text-text-tertiary">
-                            {result.item_code}
-                            {result.department ? ` · ${result.department}` : ''}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="border-t border-border px-4 py-1 text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setAddItemOpen(false)}>
-                    Close
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <label className="relative mb-4 block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+          <Input
+            aria-label="Search item, department, or production unit"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search item, department, or production unit"
+            className="w-full border-border-strong pl-9"
+          />
+        </label>
       </Section>
 
       {loading ? (
