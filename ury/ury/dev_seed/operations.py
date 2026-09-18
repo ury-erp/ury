@@ -568,6 +568,62 @@ def _ensure_aggregators(branch_name):
 	return created
 
 
+#: Barfi is MADE_TO_ORDER (see ITEM_GROUP_TO_POLICY: "Desserts" ->
+#: "MADE_TO_ORDER") but catalog.py never seeded any BOM for it -- in fact no
+#: MADE_TO_ORDER item in the whole catalog has one, which is exactly what let
+#: a real Sales Plan test hit "BOM is required for manufactured Item Barfi"
+#: on a plan that had nothing else to do with Barfi's own data. Raw materials
+#: reused from BLCS's own BOM (BOM-BLCS-003) -- these are already generic
+#: pantry items (Garlic/Salt/Oil/Seasoning) reused across unrelated dishes in
+#: this demo data, not literally Barfi-specific ingredients; accuracy of the
+#: recipe itself is not the point of this seed.
+BARFI_ITEM = "Barfi"
+BARFI_RAW_MATERIALS = ["SLTPDR", "SFOIL"]
+BARFI_BOM_NAME_HINT = f"BOM-{BARFI_ITEM}-001"
+
+
+def _ensure_barfi_bom(company_name):
+	"""Idempotently create+submit a minimal BOM for Barfi, and backfill it
+	onto Barfi's URY Item Production Configuration `bom` field wherever that
+	row already exists without one (e.g. a live environment seeded before
+	this function existed)."""
+	existing = frappe.db.get_value(
+		"BOM", {"item": BARFI_ITEM, "docstatus": 1, "is_default": 1}, "name"
+	)
+	if not existing:
+		missing = [i for i in BARFI_RAW_MATERIALS if not frappe.db.exists("Item", i)]
+		if missing or not frappe.db.exists("Item", BARFI_ITEM):
+			print(f"operations.seed: expected Items not found ({[BARFI_ITEM] + missing}) — skipping Barfi BOM.")
+			return None
+		try:
+			doc = frappe.get_doc(
+				{
+					"doctype": "BOM",
+					"item": BARFI_ITEM,
+					"company": company_name,
+					"quantity": 1,
+					"is_active": 1,
+					"is_default": 1,
+					"items": [{"item_code": item_code, "qty": 1} for item_code in BARFI_RAW_MATERIALS],
+				}
+			)
+			doc.insert(ignore_permissions=True)
+			doc.submit()
+			existing = doc.name
+			print(f"Created BOM: {existing}")
+		except Exception as e:
+			print(f"  ! Failed to create BOM for {BARFI_ITEM}: {e}")
+			frappe.db.rollback()
+			return None
+
+	config_name = frappe.db.get_value("URY Item Production Configuration", {"item": BARFI_ITEM}, "name")
+	if config_name and not frappe.db.get_value("URY Item Production Configuration", config_name, "bom"):
+		frappe.db.set_value("URY Item Production Configuration", config_name, "bom", existing)
+		print(f"Backfilled bom={existing} onto Item Production Configuration {config_name}")
+
+	return existing
+
+
 def seed():
 	"""Idempotent entrypoint — safe to call repeatedly, e.g. via
 	``bench execute ury.ury.dev_seed.operations.seed``.
@@ -586,6 +642,7 @@ def seed():
 	item_configs_created += _ensure_item_production_configurations_for_stray_history_items(
 		branch_name, dept_names
 	)
+	barfi_bom = _ensure_barfi_bom(company_name)
 	report_settings = _ensure_report_settings(branch_name)
 	aggregators_created = _ensure_aggregators(branch_name)
 
@@ -598,6 +655,7 @@ def seed():
 		"production_units_created": len(production_units_created),
 		"production_item_groups_updated": production_item_groups_updated,
 		"item_configs_created": len(item_configs_created),
+		"barfi_bom": barfi_bom,
 		"report_settings_created": report_settings,
 		"aggregators_created": aggregators_created,
 	}
