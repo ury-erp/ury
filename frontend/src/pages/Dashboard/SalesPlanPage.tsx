@@ -428,7 +428,6 @@ export const SalesPlanPage: React.FC = () => {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
   const [selectedItemDetailCode, setSelectedItemDetailCode] = useState<string | null>(null);
   const [highlightedItemCode, setHighlightedItemCode] = useState<string | null>(null);
-  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   // Catalog search to add an item to the plan regardless of comparable history.
   const [addItemQuery, setAddItemQuery] = useState('');
@@ -646,11 +645,19 @@ export const SalesPlanPage: React.FC = () => {
   };
 
   const focusItemRow = (itemCode: string) => {
-    setHighlightedItemCode(itemCode);
-    const row = rowRefs.current[itemCode];
-    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Resolve to the row's stable `_rowKey` (not item_code, which two rows can
+    // share) for both the visual highlight and locating the DOM node to
+    // scroll to -- `rowRefs` isn't populated by EditableDataTable, so we
+    // locate the rendered qty input by its aria-label instead.
+    const match = items.find((item) => item.item_code === itemCode);
+    if (!match) return;
+    setHighlightedItemCode(match._rowKey);
+    const input = document.querySelector<HTMLElement>(
+      `[aria-label="Plan quantity for ${(match.item_name || match.item_code).replace(/"/g, '\\"')}"]`
+    );
+    input?.closest('tr')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     window.setTimeout(() => {
-      setHighlightedItemCode((current) => (current === itemCode ? null : current));
+      setHighlightedItemCode((current) => (current === match._rowKey ? null : current));
     }, 2000);
   };
 
@@ -1157,6 +1164,7 @@ export const SalesPlanPage: React.FC = () => {
                         { header: 'Item Name', get: (row) => row.item_name || '' },
                       ]}
                       emptyMessage="No items for this department."
+                      rowTone={(row) => (row._rowKey === highlightedItemCode ? 'selected' : undefined)}
                       bulkSet={{
                         label: 'Set all to 0',
                         value: 0,

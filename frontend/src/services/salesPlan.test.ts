@@ -67,7 +67,7 @@ describe('salesPlan service helpers', () => {
       { item_code: 'ITEM-002', planned_qty: 45.5 },
     ]);
 
-    expect(window.localStorage.getItem(key)).toBe(JSON.stringify({ 'ITEM-001': 70, 'ITEM-002': 45.5 }));
+    expect(window.localStorage.getItem(key as string)).toBe(JSON.stringify({ 'ITEM-001': 70, 'ITEM-002': 45.5 }));
     expect(getSalesPlanDraftQuantities(key!)).toEqual({ 'ITEM-001': 70, 'ITEM-002': 45.5 });
   });
 
@@ -139,6 +139,7 @@ describe('addManualItemToDraft', () => {
 
   it('prevents duplicate items by item_code', () => {
     const existingItem: SalesPlanItem = {
+      _rowKey: 'row-existing',
       item_code: 'ITEM-EXISTING',
       item_name: 'Existing Product',
       stock_uom: 'Nos',
@@ -165,6 +166,7 @@ describe('addManualItemToDraft', () => {
 
   it('appends new item without mutating original array', () => {
     const existingItem: SalesPlanItem = {
+      _rowKey: 'row-001',
       item_code: 'ITEM-001',
       item_name: 'Product 1',
       stock_uom: 'Nos',
