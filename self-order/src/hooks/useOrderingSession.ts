@@ -12,6 +12,8 @@ import {
   type OrderingContext,
   type PaymentRequestResult,
 } from '../lib/api'
+import { parseFrappeError } from '@ury/core'
+import { t } from '../i18n'
 
 // Same keys api.ts uses internally for sessionStorage persistence. api.ts
 // doesn't expose a clear function (only get/store), so resetSession clears
@@ -84,7 +86,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       setMenu(menuResponse.items.filter((item) => !item.disabled))
       await loadOrder(ctx.session)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load the menu. Please rescan the QR code.')
+      setError(parseFrappeError(err, t('errors.menu_failed')))
     } finally {
       setLoading(false)
     }
@@ -164,7 +166,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       setOrder(updated)
       setCart({})
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not place the order. Please try again.')
+      setError(parseFrappeError(err, t('errors.order_failed')))
     } finally {
       setSubmitting(false)
     }
@@ -176,7 +178,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       await requestBill(context.session)
       setBillRequested(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not request the bill. Please ask staff for help.')
+      setError(parseFrappeError(err, t('errors.bill_failed')))
     }
   }
 
@@ -193,7 +195,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     } catch (err) {
       // Includes the graceful "online payment isn't set up yet" case from
       // the backend — surfaced as a normal error message, not a crash.
-      setError(err instanceof Error ? err.message : 'Could not start online payment. Please pay at the counter.')
+      setError(parseFrappeError(err, t('errors.payment_failed')))
     } finally {
       setPayingOnline(false)
     }

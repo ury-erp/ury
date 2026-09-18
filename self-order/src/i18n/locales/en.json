@@ -27,7 +27,11 @@
   },
   "menu": {
     "categories": "Menu categories",
-    "all_items": "All Items"
+    "all_items": "All Items",
+    "search_placeholder": "Search the menu",
+    "no_results": "Nothing matches that",
+    "no_results_hint": "Try another word, or pick a different category.",
+    "special": "Special"
   },
   "order": {
     "bill_requested": "Bill requested — staff notified",
@@ -48,18 +52,28 @@
     "start_over": "Start Over",
     "new_order": "New Order",
     "empty_hint": "Tap a menu item to add it to your cart.",
-    "item_count": {
-      "zero": "No items",
-      "one": "1 item",
-      "two": "2 items",
-      "few": "{{count}} items",
-      "many": "{{count}} items",
-      "other": "{{count}} items"
-    },
     "remove_one": "Remove one {{item}}",
-    "add_one": "Add one more {{item}}"
+    "add_one": "Add one more {{item}}",
+    "loading_menu": "Loading the menu…",
+    "pickup_code": "Pickup code",
+    "payment_pending": "Payment request created for {{amount}} — a staff member will assist you.",
+    "view_cart": "View cart",
+    "hide_cart": "Hide cart",
+    "close_cart": "Close cart",
+    "item_count": {
+      "one": "{{count}} item",
+      "other": "{{count}} items"
+    }
   },
   "language": {
     "label": "Language"
+  },
+  "errors": {
+    "menu_failed": "Could not load the menu. Please rescan the code on your table.",
+    "order_failed": "Could not place the order. Please ask a staff member for help.",
+    "bill_failed": "Could not request the bill. Please ask a staff member for help.",
+    "payment_failed": "Could not start online payment. You can pay at the counter.",
+    "cannot_open_title": "This ordering link did not open",
+    "cannot_open_hint": "Scan the code on your table again, or ask a staff member."
   }
 }

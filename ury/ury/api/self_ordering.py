@@ -597,9 +597,23 @@ def add_customer_items(session, items):
             invoice.order_type = order_type
 
         if not invoice.customer:
-            if not profile.default_customer:
-                frappe.throw(_("Self ordering profile has no default customer configured"), frappe.ValidationError)
-            invoice.customer = profile.default_customer
+            # The POS Profile already names the customer that staff walk-in
+            # orders book against, so an unset `default_customer` is a blank
+            # to fill rather than a reason to refuse. Falling back keeps a
+            # customer who has just filled a cart from hitting a wall over a
+            # field nobody knew to set — the failure landed on the guest, at
+            # the last step, as an unexplained error.
+            fallback = frappe.db.get_value("POS Profile", profile.pos_profile, "customer")
+            invoice.customer = profile.default_customer or fallback
+            if not invoice.customer:
+                frappe.throw(
+                    _(
+                        "Self ordering is not fully configured: set Default "
+                        "Customer on the Self Ordering Profile, or a Customer "
+                        "on its POS Profile."
+                    ),
+                    frappe.ValidationError,
+                )
 
         invoice.pos_profile = profile.pos_profile
         invoice.custom_order_source = session.source
