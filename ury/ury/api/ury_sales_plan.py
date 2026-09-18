@@ -76,11 +76,27 @@ def _validate_plan_scope(doc):
 
 
 def validate_plan_items(doc):
-    """Validate every mapped line before approval can freeze demand."""
+    """Validate every mapped line that is actually part of the plan before
+    approval can freeze demand.
+
+    The comparable-history panel pre-populates every catalog item the branch
+    has ever sold as a row on the plan, most left at their default
+    ``qty: 0`` -- they are suggestions the user never acted on, not lines the
+    user is actually planning. Requiring a complete production configuration
+    (department/BOM/etc.) for those untouched rows would make history-derived
+    suggestions gate approval of the whole plan, exactly what
+    "historical-data-driven suggestions must be additive, never gating"
+    (see PLAN.md's own Context and the workspace's
+    feedback_history_is_suggestion_not_precondition memory) forbids. Only a
+    row with a nonzero qty is actually being planned, so only those need a
+    valid production configuration.
+    """
     for row in doc.get("items") or []:
         item_code = row.get("item_code")
         if not item_code:
             frappe.throw(_("Sales Plan item is required"), frappe.ValidationError)
+        if not row.get("qty"):
+            continue
         validate_item_production_configuration(item_code, doc.get("branch"))
 
 
