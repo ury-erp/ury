@@ -163,6 +163,98 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 
 
 @frappe.whitelist(methods=["GET"])
+def search_branch_items(branch, company=None, query="", limit=25):
+	"""Search for items available in a branch via a whitelisted catalog lookup.
+
+	This endpoint enables adding items to a Sales Plan that have no comparable
+	history (e.g., a newly launched item or a brand-new branch). Unlike the
+	sales-history endpoints that require Item read permission, this method
+	validates access scoped to the branch and performs the catalog lookup
+	internally with ignore_permissions=True, so ordinary POS/restaurant-staff
+	roles can add items without requiring broad Item read access.
+
+	Args:
+		branch: Branch name (required).
+		company: Company name (defaults to the branch's company; client-supplied
+			company is still validated against the branch, matching the
+			fail-closed server-derives-scope pattern).
+		query: Optional search string; if provided, matches item_code or item_name
+			via LIKE (case-insensitive). If empty, returns results ordered by
+			item_name only.
+		limit: Number of results to return (default 25, capped at 100 to prevent
+			abuse).
+
+	Returns:
+		List of dicts with keys: item_code, item_name, stock_uom, department,
+		production_unit (where department and production_unit come from
+		URY Item Production Configuration for the branch, falling back to None
+		when not configured).
+	"""
+	if not branch:
+		frappe.throw("branch is required", frappe.ValidationError)
+
+	if not company:
+		company = frappe.db.get_value("Branch", branch, "company")
+
+	if not company:
+		frappe.throw("Branch company is required", frappe.PermissionError)
+
+	_validate_comparable_history_access(branch, company)
+
+	# Cap limit server-side to prevent abuse.
+	limit = min(int(limit) if limit else 25, 100)
+	query = (query or "").strip()
+
+	# Query items with ignore_permissions=True (see class docstring).
+	# Filter: disabled = 0 and optionally query-match.
+	filters = {"disabled": 0}
+	if query:
+		filters = {
+			"disabled": 0,
+			"|item_code|item_name": ["like", f"%{query}%"],
+		}
+
+	items = frappe.db.get_all(
+		"Item",
+		filters=filters,
+		fields=["item_code", "item_name", "stock_uom"],
+		order_by="item_name asc",
+		limit_page_length=limit,
+		ignore_permissions=True,
+	)
+
+	if not items:
+		return []
+
+	# Fetch production config for this branch, keyed by item_code.
+	item_codes = [item["item_code"] for item in items]
+	production_config_map = {}
+	if item_codes:
+		for cfg in frappe.db.get_all(
+			"URY Item Production Configuration",
+			filters={"item": ["in", item_codes], "branch": branch},
+			fields=["item", "department", "production_unit"],
+		):
+			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
+			production_config_map[item_key] = cfg
+
+	# Reshape results to include production config.
+	result = []
+	for item in items:
+		item_code = item["item_code"]
+		config = production_config_map.get(item_code, {})
+		result.append({
+			"item_code": item_code,
+			"item_name": item.get("item_name", item_code),
+			"stock_uom": item.get("stock_uom") or "Nos",
+			"department": config.get("department"),
+			"production_unit": config.get("production_unit"),
+		})
+
+	return result
+
+
+@frappe.whitelist(methods=["GET"])
 def get_dashboard_stats(branch=None):
 	cache_key = f"ury_dashboard_stats:{branch}"
 	cached = frappe.cache().get_value(cache_key)
