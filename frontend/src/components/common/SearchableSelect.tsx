@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Input } from '@ury/ui';
+import { translate } from '../../i18n/translate';
 
 export interface Option {
   value: string;
@@ -79,6 +80,7 @@ export function SearchableSelect({
     return options.filter(
       (opt) =>
         opt.label.toLowerCase().includes(term) ||
+        translate(opt.label).toLowerCase().includes(term) ||
         opt.value.toLowerCase().includes(term)
     );
   }, [options, searchTerm, isTyping]);

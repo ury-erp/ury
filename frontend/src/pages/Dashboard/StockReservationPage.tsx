@@ -1,3 +1,4 @@
+import { getManagementLocale } from '../../i18n/language';
 import React, { useEffect, useState } from 'react';
 import { Badge, Button, Card, DataTable, Page, Section, Spinner, Textarea, type DataTableColumn } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
@@ -17,7 +18,7 @@ export const STOCK_RESERVATION_ALLOWED_ROLES = [
 const formatDateTime = (value?: string) => {
   if (!value) return '';
   const d = new Date(value);
-  return d.toLocaleString();
+  return d.toLocaleString(getManagementLocale());
 };
 
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));

@@ -9,6 +9,7 @@ import { DatePicker } from './DatePicker';
 import { validateFieldValue } from '@ury/core';
 import { SetupPayload } from '../../services/setup';
 import validationMessages from '../../data/validations.json';
+import { translate } from '../../i18n/translate';
 
 export interface DynamicFormHandle {
   validate(): boolean;
@@ -93,7 +94,7 @@ const { registry } = defineRegistry(formCatalog, {
         <div className={getColSpanClass(field)}>
           <div className="space-y-1.5">
             <label htmlFor={field.id} className="text-sm font-medium text-muted-foreground">
-              {field.label} {field.required && <span className="text-destructive">*</span>}
+              {translate(field.label)} {field.required && <span className="text-destructive">*</span>}
             </label>
 
             {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
@@ -110,7 +111,7 @@ const { registry } = defineRegistry(formCatalog, {
                 id={field.id}
                 value={val || ''}
                 options={props.options || []}
-                placeholder={`Select ${field.label}...`}
+                placeholder={translate('Select {{label}}...', { label: translate(field.label) })}
                 error={!!props.error}
                 onChange={(_fieldId, newVal) => handleChange(newVal)}
                 strict={true}

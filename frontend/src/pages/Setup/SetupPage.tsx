@@ -72,11 +72,17 @@ export default function SetupPage() {
           .map((l: any) => {
             const val = typeof l === 'string' ? l : (l.name || l.value || l.label);
             if (val === 'English') return { value: 'English', label: 'English' };
-            if (val === 'العربية' || val === 'Arabic') return { value: 'Arabic', label: 'عربي' };
-            if (val === 'Français' || val === 'French') return { value: 'French', label: 'français' };
+            if (val === 'Русский' || val === 'Russian') return { value: 'Russian', label: 'Русский' };
             return null;
           })
           .filter(Boolean) as { value: string; label: string }[];
+
+        if (!formattedLangs.some(({ value }) => value === 'English')) {
+          formattedLangs.unshift({ value: 'English', label: 'English' });
+        }
+        if (!formattedLangs.some(({ value }) => value === 'Russian')) {
+          formattedLangs.push({ value: 'Russian', label: 'Русский' });
+        }
 
         const rawCountries = Array.isArray(defaults.countries) ? defaults.countries : [];
         const formattedCountries = rawCountries.map((c: any) =>
@@ -101,7 +107,8 @@ export default function SetupPage() {
           timezones: formattedTimezones
         }));
         
-        const defaultLanguage = (defaults.languages as any)?.default_language || 'English';
+        const requestedLanguage = (defaults.languages as any)?.default_language;
+        const defaultLanguage = requestedLanguage === 'Russian' ? 'Russian' : 'English';
         formRef.current?.setFieldValue('language', defaultLanguage);
 
         const countryToUse = defaults.detected_country || 'India';

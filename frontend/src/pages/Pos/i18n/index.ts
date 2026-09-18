@@ -1,18 +1,19 @@
-import { loadLocale } from './loader';
+import { getLocale } from './loader';
 import { DEFAULT_LANGUAGE } from './config';
 import { resolveLanguage } from './resolve-language';
 
 type TranslationMap = Record<string, unknown>;
 
-let activeLocale: TranslationMap = {};
-let activeLanguage: string = DEFAULT_LANGUAGE;
+let activeLanguage: string = resolveLanguage();
+let activeLocale: TranslationMap = getLocale(activeLanguage);
 
 /**
  * Load and activate a locale. Call this once before rendering the app.
  */
 export async function initI18n(lang?: string): Promise<void> {
-  const resolvedLang = lang ?? resolveLanguage();
-  activeLocale = await loadLocale(resolvedLang);
+  const requestedLang = lang ?? resolveLanguage();
+  const resolvedLang = requestedLang === 'ru' ? 'ru' : DEFAULT_LANGUAGE;
+  activeLocale = getLocale(resolvedLang);
   activeLanguage = resolvedLang;
 }
 
@@ -53,17 +54,13 @@ export function getActiveLanguage(): string {
  *   t('common.greeting', { name: 'Alice' })  → "Hello, Alice"
  */
 export function t(key: string, params?: Record<string, string | number>): string {
-  const parts = key.split('.');
-  let value: unknown = activeLocale;
-
-  for (const part of parts) {
-    if (value && typeof value === 'object') {
-      value = (value as Record<string, unknown>)[part];
-    } else {
-      value = undefined;
-      break;
-    }
-  }
+  const lookup = (locale: TranslationMap): unknown => key.split('.').reduce<unknown>(
+    (value, part) => value && typeof value === 'object'
+      ? (value as Record<string, unknown>)[part]
+      : undefined,
+    locale,
+  );
+  const value = lookup(activeLocale) ?? lookup(getLocale(DEFAULT_LANGUAGE));
 
   if (typeof value !== 'string') {
     // Return the key itself as a fallback so missing translations are visible

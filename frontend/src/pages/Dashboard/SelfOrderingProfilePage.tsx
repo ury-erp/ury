@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { translate } from '../../i18n/translate';
 import {
   Settings,
   Plus,
@@ -278,7 +279,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
   };
 
   const handleDeleteProfile = async (profile: SelfOrderingProfile) => {
-    if (!confirm('Are you sure you want to delete this profile?')) {
+    if (!confirm(translate('Are you sure you want to delete this profile?'))) {
       return;
     }
 
