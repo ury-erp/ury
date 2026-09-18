@@ -1,0 +1,2 @@
+@AGENTS.md
+@docs/AI_ENGINEERING_GUIDE.md

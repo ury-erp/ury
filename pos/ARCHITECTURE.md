@@ -1,4 +1,6 @@
-# POS Frontend — Agent Documentation
+# POS Frontend Architecture
+
+Repository-wide engineering rules are defined in `../docs/AI_ENGINEERING_GUIDE.md`.
 
 ## 1. Overview
 
@@ -26,7 +28,7 @@ This is the **URY POS v2** — a React 19 single-page application that serves as
 | Routing | React Router DOM 6.30.1 |
 | Styling | Tailwind CSS 3.4.17 |
 | Backend API | frappe-js-sdk 1.10.0 (via `@ury/core`) |
-| Shared packages | `@ury/ui` (components, theme, Tailwind preset) + `@ury/core` (frappe client, auth/roles, storage, format, QZ transport) — workspace packages in `../packages/`; see `../packages/core/AGENTS.MD` |
+| Shared packages | `@ury/ui` (components, theme, Tailwind preset) + `@ury/core` (frappe client, auth/roles, storage, format, QZ transport) — workspace packages in `../packages/`; see `../packages/core/ARCHITECTURE.md` |
 | Notifications | react-toastify 11.0.5 |
 | Thermal printing | qz-tray 2.2.5 |
 | Icons | lucide-react |
@@ -46,9 +48,12 @@ pos/
 │   ├── index.css             # Global Tailwind imports
 │   │
 │   ├── pages/
+│   │   ├── Dashboard.tsx     # Shift and service overview
 │   │   ├── POS.tsx           # Main ordering interface (menu + order panel)
 │   │   ├── Orders.tsx        # Order history, cancel, edit, print, pay
+│   │   ├── Settings.tsx      # POS settings
 │   │   └── Table.tsx         # Table layout spatial view
+│   ├── captain/              # Mobile captain routes, components, hooks, API wrappers
 │   │
 │   ├── components/           # All UI components
 │   │   │                     # (primitive components — Button, Input, Dialog… — come from
@@ -82,7 +87,7 @@ pos/
 │   │       └── orders-slice.ts
 │   │
 │   ├── lib/                  # Domain API wrappers (generic utilities live in @ury/core;
-│   │   │                     #  see ../packages/core/AGENTS.MD)
+│   │   │                     #  see ../packages/core/ARCHITECTURE.md)
 │   │   ├── menu-api.ts       # getRestaurantMenu, getAggregatorMenu
 │   │   ├── order-api.ts      # syncOrder, cancelOrder, getTableOrder
 │   │   ├── payment-api.ts    # getPaymentModes
@@ -105,8 +110,9 @@ pos/
 │       ├── loader.ts
 │       ├── resolve-language.ts
 │       └── locales/
+│           ├── ar.json
 │           ├── en.json
-│           └── fr.json
+│           └── ru.json
 │
 ├── public/                   # Static assets (favicon, logos)
 ├── index.html                # HTML entry point
@@ -126,7 +132,7 @@ pos/
 - **Dialog pattern** — modals (PaymentDialog, ProductDialog, CommentDialog) are rendered conditionally with a boolean flag and mounted/unmounted, not hidden via CSS.
 
 **Reusability approach:**
-- `ui/` components are headless: they apply className merging via `cn()` but carry no business logic.
+- `@ury/ui` components are shared primitives: they apply className merging via `cn()` but carry no URY business logic.
 - Business components (e.g., `CustomerSelect`) contain their own local state and API calls when the logic is highly specific to that widget.
 
 ---
@@ -165,7 +171,7 @@ UI renders
 
 ## 6. API Integration
 
-**SDK access** — `call`, `db`, and `auth` come from the shared `@ury/core` package (see `../packages/core/AGENTS.MD`):
+**SDK access** — `call`, `db`, and `auth` come from the shared `@ury/core` package (see `../packages/core/ARCHITECTURE.md`):
 ```typescript
 import { call, db, auth } from '@ury/core';
 // call: RPC-style POST/GET · db: CRUD · auth: login/logout/getLoggedInUser
@@ -200,7 +206,7 @@ Translations live in `src/i18n/locales/*.json`. A lightweight custom engine (no 
 
 - `t(key)` — resolves a dot-notation key against the active locale map.
 - `t(key, params)` — interpolates `{{placeholder}}` tokens.
-- Falls back to the key string itself if a translation is missing (visible but non-breaking).
+- Falls back to English and then to the key string itself if a translation is missing.
 
 ### Initialisation
 
@@ -211,8 +217,8 @@ initI18n().then(() => ReactDOM.createRoot(...).render(...));
 ```
 
 `initI18n()` calls `resolveLanguage()` which checks (in priority order):
-1. `window.frappe.boot.lang` — Frappe/ERPNext system language
-2. `localStorage.getItem('ury_language')` — manual override
+1. `localStorage.getItem('ury_language')` — manual POS override
+2. `window.frappe.boot.lang` — Frappe/ERPNext system language
 3. `'en'` — default fallback
 
 ### File locations
@@ -224,8 +230,9 @@ src/i18n/
 ├── resolve-language.ts — priority-based language resolution
 ├── index.ts            — t(), initI18n(), getActiveLanguage()
 └── locales/
+    ├── ar.json         — Arabic (RTL)
     ├── en.json         — English (source of truth)
-    └── fr.json         — French
+    └── ru.json         — Russian
 ```
 
 ### Key namespaces in locale files
@@ -244,15 +251,11 @@ src/i18n/
 | `errors` | All error messages |
 | `success` | All success/info messages |
 
-### Adding a new language
+### Supported languages
 
-1. Create `src/i18n/locales/<lang-code>.json` copying the structure of `en.json`.
-2. Translate all values (do not change keys).
-3. Add the language to `SUPPORTED_LANGUAGES` in `config.ts`:
-   ```typescript
-   export const SUPPORTED_LANGUAGES = { en: 'English', fr: 'Français', de: 'Deutsch' };
-   ```
-4. The loader will dynamically import the file on demand. No other changes needed.
+The product intentionally supports only English (`en`), Kazakh (`kk`) and Russian (`ru`). Keep
+`SUPPORTED_LANGUAGES`, locale files, document metadata, and visible language
+selectors limited to those two languages unless the product requirement changes.
 
 ---
 
@@ -280,7 +283,7 @@ src/i18n/
 ## 9. Guidelines for AI Agents
 
 ### Safe to modify
-- Adding new `t()` keys: add to `en.json` and `fr.json` simultaneously, then use in component.
+- Adding new `t()` keys: add to `en.json` and `ru.json` simultaneously, then use in component.
 - UI text changes: always go through `t()`, never hardcode.
 - Adding new components: follow the existing pattern — named export, TypeScript props interface, Zustand for data.
 - Adding new API wrappers: add to the appropriate `lib/*-api.ts` file.
@@ -290,12 +293,12 @@ src/i18n/
 1. Define new state in the appropriate store slice.
 2. Add API call in `lib/`.
 3. Create or modify component.
-4. Add translation keys to both `en.json` and `fr.json`.
+4. Add translation keys to both `en.json` and `ru.json`.
 5. No need to modify `main.tsx`, `App.tsx`, or `vite.config.ts` for typical features.
 
 ### What NOT to break
-- **`@ury/core` exports (`call`, `db`, `auth`, …)** — every API file depends on them; do not rename or re-wrap. Shared-package changes affect `frontend/` too (see `../packages/core/AGENTS.MD`).
-- **`main.tsx` `initPrinting({ signKey: privateKey })`** — must run before any QZ print; the signing key stays in `pos/privateKey`, never in `packages/`.
+- **`@ury/core` exports (`call`, `db`, `auth`, …)** — every API file depends on them; do not rename or re-wrap. Shared-package changes affect `frontend/` and `self-order/` too (see `../packages/core/ARCHITECTURE.md`).
+- **`main.tsx` printing initialization** — must run before any QZ print; never commit a private signing key or move one into `packages/`.
 - **`pos-store.ts` `resetOrderState()`** — called after every successful order submit/payment; must reset all transient order fields.
 - **`main.tsx` init sequence** — `initI18n()` must resolve before `ReactDOM.render()`.
 - **`AuthGuard`** — do not bypass or remove; it protects the entire app.

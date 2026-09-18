@@ -33,7 +33,8 @@
     "service_board": "Service Board",
     "close_shift": "Close Shift",
     "lock_pos": "Lock / Switch User",
-    "switch_to_desk": "Switch To Desk"
+    "switch_to_desk": "Switch To Desk",
+    "language": "Language"
   },
   "menu": {
     "special_items": "Special Items"
