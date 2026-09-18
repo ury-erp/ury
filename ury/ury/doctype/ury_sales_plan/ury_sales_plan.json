@@ -141,7 +141,7 @@
    "label": "Reason (Return to Draft / Cancel)",
    "no_copy": 1,
    "allow_on_submit": 1,
-   "description": "Required when a plan is Returned to Draft or Supersede/Cancelled -- carries the actor-supplied reason into audit_log."
+   "description": "Required input when Returning a plan to Draft or Supersede/Cancelling it; carried into that transition audit_log entry and cleared immediately after -- a transient input, not a standing display field. See the note in audit_log for the permanent record."
   }
  ],
  "index_web_pages_for_search": 1,

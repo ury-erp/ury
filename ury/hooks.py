@@ -572,8 +572,20 @@ fixtures = [
             ]
         ],
     },
-    {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
-    {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
+    # A single merged entry, not two separate ones: frappe.utils.fixtures.
+    # export_fixtures() runs every hooks.fixtures entry independently and
+    # writes each straight to app_path/fixtures/<scrub(doctype)>.json --
+    # so two "Role" entries don't merge, the second silently OVERWRITES
+    # whatever the first wrote. Two separate "Role" dicts here (one
+    # "like URY %", one "in [Self Ordering Manager]") would mean any future
+    # `bench export-fixtures` run drops every "URY *" role -- including
+    # this file's own "URY Sales Plan Controller" -- keeping only
+    # "Self Ordering Manager". or_filters is the correct way to combine
+    # both conditions into the one export this doctype actually gets.
+    {
+        "doctype": "Role",
+        "or_filters": [["role_name", "like", "URY %"], ["role_name", "in", ["Self Ordering Manager"]]],
+    },
     "Client Script",
     {"doctype": "Workflow", "filters": [["name", "in", ["URY Sales Plan"]]]},
     # "Return to Draft" is a new Workflow Action introduced for "URY Sales

@@ -765,9 +765,11 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 
 		self.assertEqual(result["status"], "Superseded/Cancelled")
 		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
-		self.assertEqual(
-			frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"), "branch closed for the day"
-		)
+		# cancellation_reason is cleared right after being folded into the
+		# audit_log entry -- see test_reason_does_not_leak_into_later_...
+		self.assertFalse(frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"))
+		audit_log = json.loads(frappe.db.get_value("URY Sales Plan", name, "audit_log") or "[]")
+		self.assertEqual(audit_log[-1]["reason"], "branch closed for the day")
 
 	def test_cancel_from_locked_for_production_results_in_real_docstatus_2(self):
 		from ury.ury.api.ury_sales_plan import transition_plan
@@ -835,9 +837,61 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 
 		self.assertEqual(result["status"], "Draft")
 		self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 0)
-		self.assertEqual(
-			frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"), "wrong branch selected"
+		# cancellation_reason is a transient input, not a standing display
+		# field -- it's cleared immediately after being folded into this
+		# transition's audit_log entry (see test below for exactly why:
+		# leaving it set would both misattribute later, unrelated
+		# transitions' audit entries and let a stale reason silently satisfy
+		# a SECOND Return to Draft with no fresh explanation).
+		self.assertFalse(frappe.db.get_value("URY Sales Plan", name, "cancellation_reason"))
+		audit_log = json.loads(frappe.db.get_value("URY Sales Plan", name, "audit_log") or "[]")
+		self.assertEqual(audit_log[-1]["reason"], "wrong branch selected")
+
+	def test_reason_does_not_leak_into_later_unrelated_transitions_audit_entries(self):
+		"""Regression test for the exact bug an Opus verification pass found:
+		if cancellation_reason were never cleared, every transition AFTER a
+		Return to Draft would wrongly inherit that reason in its own
+		audit_log entry, and a stale reason could silently satisfy the
+		"reason required" check on a later, unrelated backward transition
+		that supplied none of its own (e.g. via Desk's native Actions button,
+		which has no reason field at all)."""
+		from ury.ury.api.ury_sales_plan import transition_plan
+
+		name = self._create_draft()
+
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+		finally:
+			frappe.set_user("Administrator")
+
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			transition_plan(name=name, target_state="Draft", reason="wrong branch selected")
+		finally:
+			frappe.set_user("Administrator")
+
+		# A later, unrelated FORWARD transition must not carry that reason.
+		frappe.set_user(TEST_SALES_PLAN_MANAGER)
+		try:
+			transition_plan(name=name, target_state="Proposed")
+		finally:
+			frappe.set_user("Administrator")
+
+		audit_log = json.loads(frappe.db.get_value("URY Sales Plan", name, "audit_log") or "[]")
+		draft_to_proposed_entry = next(
+			e for e in audit_log if e["from_state"] == "Draft" and e["to_state"] == "Proposed"
 		)
+		self.assertNotIn("reason", draft_to_proposed_entry)
+
+		# A SECOND Return to Draft with no reason must still be rejected --
+		# not silently pass by reusing the reason left over from the first.
+		frappe.set_user(TEST_SALES_PLAN_CONTROLLER)
+		try:
+			with self.assertRaises(frappe.ValidationError):
+				transition_plan(name=name, target_state="Draft")
+		finally:
+			frappe.set_user("Administrator")
 
 	def test_return_to_draft_without_a_reason_is_rejected(self):
 		from ury.ury.api.ury_sales_plan import transition_plan
