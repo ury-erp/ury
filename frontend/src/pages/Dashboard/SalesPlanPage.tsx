@@ -27,25 +27,28 @@ type PlanStatus =
   | 'Superseded/Cancelled';
 
 /**
- * Pull the real, actionable reason out of a failed transition_plan() call.
+ * Pull the real, actionable reason out of a failed Sales Plan API call
+ * (transition_plan(), save_draft(), or any other ury_sales_plan.py
+ * endpoint).
  *
  * `call` (@ury/core, backed by frappe-js-sdk) does NOT throw a real `Error`
  * on an API failure -- it throws the plain object `getFrappeError()` builds,
  * which spreads the raw Frappe error response (`exc_type`, `exception`,
  * `_server_messages`, etc.) onto a `message` field that is only ever the
  * SDK's own generic fallback string ("There was an error."), never the
- * backend's actual frappe.throw() text. The previous code here checked
- * `err instanceof Error`, which is always false for this shape -- so it was
- * unconditionally landing on the hardcoded "Unable to update this Sales
- * Plan. Please try again." for every failure, permission errors included,
- * discarding messages like "BOM is required for manufactured Item X" that
- * are genuinely actionable for whoever hit them. `_server_messages` (a
+ * backend's actual frappe.throw() text. Both call sites that used to catch
+ * these errors checked `err instanceof Error` (or ignored `err` entirely),
+ * which is always false for this shape -- so every failure, validation AND
+ * permission errors alike, landed on the same hardcoded generic string,
+ * discarding messages like "BOM is required for manufactured Item X" or
+ * "Sales Plan X is already Y and can no longer be saved as a draft" that are
+ * genuinely actionable for whoever hit them. `_server_messages` (a
  * JSON-encoded array of JSON-encoded {message, title, indicator} objects --
  * see frappe/frappe/__init__.py's msgprint) is where frappe.throw()'s actual
  * text lives; other pages in this app (e.g. Pos/lib/aggregator-api.ts)
  * already parse it the same way.
  */
-export function describeTransitionError(err: unknown): string {
+export function describeSalesPlanApiError(err: unknown, fallback: string): string {
   const anyErr = err as { exc_type?: string; _server_messages?: string } | null | undefined;
 
   if (anyErr?.exc_type === 'frappe.exceptions.PermissionError') {
@@ -65,7 +68,7 @@ export function describeTransitionError(err: unknown): string {
     }
   }
 
-  return 'Unable to update this Sales Plan. Please try again.';
+  return fallback;
 }
 
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
@@ -790,7 +793,7 @@ export const SalesPlanPage: React.FC = () => {
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
     } catch (err) {
-      setError('Unable to save this Sales Plan draft.');
+      setError(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
     } finally {
       setSaving(false);
     }
@@ -870,7 +873,9 @@ export const SalesPlanPage: React.FC = () => {
       });
       setPlanStatus((result.status as PlanStatus) || currentAction.targetState);
     } catch (err) {
-      setTransitionError(describeTransitionError(err));
+      setTransitionError(
+        describeSalesPlanApiError(err, 'Unable to update this Sales Plan. Please try again.')
+      );
     } finally {
       setTransitioning(false);
     }
