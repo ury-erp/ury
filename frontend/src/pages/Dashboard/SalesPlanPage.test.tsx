@@ -141,6 +141,7 @@ describe('SalesPlanPage', () => {
     render(<SalesPlanPage />);
     await screen.findByText('Chicken Biryani');
 
+    await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
     const addItemInput = screen.getByPlaceholderText('Search the item catalog by name or code');
     await userEvent.type(addItemInput, 'zero');
 
@@ -150,6 +151,27 @@ describe('SalesPlanPage', () => {
     // Zero-history items default planned_qty to 0, so the variance vs. a 0
     // average is 0 -- confirming it rendered as a full plan row, not gated.
     expect(getPlanInputForRow('New Zero History Item')).toHaveValue(0);
+    // Selecting a result auto-closes the popover and returns focus to the toggle.
+    expect(screen.queryByPlaceholderText('Search the item catalog by name or code')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus();
+  });
+
+  it('closes the add-item popover on outside click and on Escape', async () => {
+    render(<SalesPlanPage />);
+    await screen.findByText('Chicken Biryani');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    expect(screen.getByPlaceholderText('Search the item catalog by name or code')).toBeInTheDocument();
+
+    await userEvent.click(document.body);
+    expect(screen.queryByPlaceholderText('Search the item catalog by name or code')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    expect(screen.getByPlaceholderText('Search the item catalog by name or code')).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByPlaceholderText('Search the item catalog by name or code')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus();
   });
 
   it('collapses the attention block to 3 items by default with working expand/collapse', async () => {
