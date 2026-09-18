@@ -23,15 +23,19 @@ class TestSearchBranchItems(FrappeTestCase):
 		"""Test that a valid in-branch user gets results."""
 		self._allow_search_access()
 
-		# Mock frappe.db.get_all for Item query.
+		# First call: production config for the branch (drives the allowed
+		# item-code set). Second call: Item, scoped to that set.
+		config = [
+			{"item": "ITEM-1", "department": None, "production_unit": None},
+			{"item": "ITEM-2", "department": None, "production_unit": None},
+		]
 		items = [
 			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
 			{"item_code": "ITEM-2", "item_name": "Item Two", "stock_uom": "Kg"},
 		]
-		# Mock frappe.db.get_all for production config query (empty for now).
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],  # First call: items; second call: production config
+			side_effect=[config, items],
 		):
 			result = search_branch_items("Branch A", "Company A", "", 25)
 
@@ -56,59 +60,104 @@ class TestSearchBranchItems(FrappeTestCase):
 			with self.assertRaises(frappe.PermissionError):
 				search_branch_items("Branch A", "Company A")
 
-	def test_query_string_filters_correctly(self):
-		"""Test that query string filters items by item_code or item_name."""
+	def test_query_string_uses_or_filters_not_pipe_syntax(self):
+		"""Regression test for bug 1: a non-empty query must be passed via the
+		real `or_filters=` kwarg, never as an invalid "|item_code|item_name"
+		dict filter key (which is not valid Frappe filter syntax and 500s)."""
 		self._allow_search_access()
 
+		config = [{"item": "COFFEE-LATTE", "department": None, "production_unit": None}]
 		items = [
 			{"item_code": "COFFEE-LATTE", "item_name": "Latte", "stock_uom": "Nos"},
 		]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],
-		):
+			side_effect=[config, items],
+		) as get_all:
 			result = search_branch_items("Branch A", "Company A", "LATTE", 25)
 
 		self.assertEqual(len(result), 1)
 		self.assertEqual(result[0]["item_code"], "COFFEE-LATTE")
 
+		item_call_kwargs = get_all.call_args_list[1][1]
+		filters = item_call_kwargs["filters"]
+
+		# No invalid pipe-joined key anywhere in the filters dict.
+		for key in filters:
+			self.assertNotIn("|", key)
+
+		# The OR-match must be expressed via or_filters=, matching the
+		# established pattern in ury_pos/api.py and ury_order.py.
+		or_filters = item_call_kwargs.get("or_filters")
+		self.assertIsNotNone(or_filters)
+		self.assertEqual(or_filters.get("item_code"), ["like", "%LATTE%"])
+		self.assertEqual(or_filters.get("item_name"), ["like", "%LATTE%"])
+
 	def test_disabled_items_are_excluded(self):
 		"""Test that disabled items are excluded from results."""
 		self._allow_search_access()
 
-		# Mock should return empty since disabled items are filtered out.
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[[], []],
+			side_effect=[config, []],
 		) as get_all:
 			result = search_branch_items("Branch A", "Company A", "", 25)
 
 		self.assertEqual(len(result), 0)
-		# Verify that the filters included disabled=0.
-		first_call_filters = get_all.call_args_list[0][1]["filters"]
-		self.assertEqual(first_call_filters.get("disabled"), 0)
+		# Verify that the filters included disabled=0 on the Item query.
+		item_call_filters = get_all.call_args_list[1][1]["filters"]
+		self.assertEqual(item_call_filters.get("disabled"), 0)
 
 	def test_limit_is_capped_at_100(self):
 		"""Test that the limit parameter is capped at 100 to prevent abuse."""
 		self._allow_search_access()
 
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[[], []],
+			side_effect=[config, []],
 		) as get_all:
 			search_branch_items("Branch A", "Company A", "", limit=500)
 
-		# Verify that limit was capped at 100.
-		first_call_limit = get_all.call_args_list[0][1]["limit_page_length"]
-		self.assertEqual(first_call_limit, 100)
+		# Verify that limit was capped at 100 on the Item query.
+		item_call_limit = get_all.call_args_list[1][1]["limit_page_length"]
+		self.assertEqual(item_call_limit, 100)
+
+	def test_limit_non_numeric_falls_back_to_default(self):
+		"""Regression test for bug 3: a non-numeric limit must not raise
+		ValueError; it should fall back to the default of 25."""
+		self._allow_search_access()
+
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
+		with patch(
+			"ury.ury.api.ury_dashboard.frappe.db.get_all",
+			side_effect=[config, []],
+		) as get_all:
+			search_branch_items("Branch A", "Company A", "", limit="not-a-number")
+
+		item_call_limit = get_all.call_args_list[1][1]["limit_page_length"]
+		self.assertEqual(item_call_limit, 25)
+
+	def test_limit_negative_clamped_to_floor(self):
+		"""Regression test for bug 3: a negative limit must be clamped to a
+		floor of 1, not passed through as-is or produce an empty page size."""
+		self._allow_search_access()
+
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
+		with patch(
+			"ury.ury.api.ury_dashboard.frappe.db.get_all",
+			side_effect=[config, []],
+		) as get_all:
+			search_branch_items("Branch A", "Company A", "", limit=-5)
+
+		item_call_limit = get_all.call_args_list[1][1]["limit_page_length"]
+		self.assertEqual(item_call_limit, 1)
 
 	def test_production_config_attached_to_results(self):
 		"""Test that department/production_unit from URY Item Production Configuration are attached."""
 		self._allow_search_access()
 
-		items = [
-			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
-		]
 		config = [
 			{
 				"item": "ITEM-1",
@@ -116,9 +165,12 @@ class TestSearchBranchItems(FrappeTestCase):
 				"production_unit": "Line A",
 			},
 		]
+		items = [
+			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
+		]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, config],
+			side_effect=[config, items],
 		):
 			result = search_branch_items("Branch A", "Company A", "", 25)
 
@@ -130,13 +182,13 @@ class TestSearchBranchItems(FrappeTestCase):
 		"""Test that missing production_unit/department fall back to None."""
 		self._allow_search_access()
 
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
 		items = [
 			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
 		]
-		# No production config for this item.
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],
+			side_effect=[config, items],
 		):
 			result = search_branch_items("Branch A", "Company A", "", 25)
 
@@ -148,6 +200,11 @@ class TestSearchBranchItems(FrappeTestCase):
 		"""Test that results are ordered by item_name."""
 		self._allow_search_access()
 
+		config = [
+			{"item": "ITEM-1", "department": None, "production_unit": None},
+			{"item": "ITEM-2", "department": None, "production_unit": None},
+			{"item": "ITEM-3", "department": None, "production_unit": None},
+		]
 		items = [
 			{"item_code": "ITEM-1", "item_name": "Zebra Item", "stock_uom": "Nos"},
 			{"item_code": "ITEM-2", "item_name": "Apple Item", "stock_uom": "Nos"},
@@ -155,13 +212,13 @@ class TestSearchBranchItems(FrappeTestCase):
 		]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],
+			side_effect=[config, items],
 		) as get_all:
-			result = search_branch_items("Branch A", "Company A", "", 25)
+			search_branch_items("Branch A", "Company A", "", 25)
 
-		# Verify that the query asked for order_by="item_name asc".
-		first_call_order_by = get_all.call_args_list[0][1]["order_by"]
-		self.assertEqual(first_call_order_by, "item_name asc")
+		# Verify that the query asked for order_by="item_name asc" on the Item query.
+		item_call_order_by = get_all.call_args_list[1][1]["order_by"]
+		self.assertEqual(item_call_order_by, "item_name asc")
 
 	def test_missing_branch_fails_closed(self):
 		"""Test that missing branch parameter is rejected."""
@@ -199,49 +256,92 @@ class TestSearchBranchItems(FrappeTestCase):
 		"""Test that an empty query string returns all non-disabled items."""
 		self._allow_search_access()
 
+		config = [
+			{"item": "ITEM-1", "department": None, "production_unit": None},
+			{"item": "ITEM-2", "department": None, "production_unit": None},
+		]
 		items = [
 			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
 			{"item_code": "ITEM-2", "item_name": "Item Two", "stock_uom": "Nos"},
 		]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],
+			side_effect=[config, items],
 		) as get_all:
 			result = search_branch_items("Branch A", "Company A", "", 25)
 
 		self.assertEqual(len(result), 2)
-		# Verify that filters did NOT include the query-based filter.
-		first_call_filters = get_all.call_args_list[0][1]["filters"]
-		self.assertEqual(first_call_filters, {"disabled": 0})
+		# Verify that no or_filters (query-based OR match) were passed, and
+		# that filters did not include a query-based key.
+		item_call_kwargs = get_all.call_args_list[1][1]
+		self.assertNotIn("or_filters", item_call_kwargs)
+		self.assertEqual(item_call_kwargs["filters"].get("disabled"), 0)
 
 	def test_uses_ignore_permissions_for_item_query(self):
 		"""Test that the Item query uses ignore_permissions=True."""
 		self._allow_search_access()
 
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[[], []],
+			side_effect=[config, []],
 		) as get_all:
 			search_branch_items("Branch A", "Company A", "", 25)
 
-		# Verify that the first call (Item query) used ignore_permissions=True.
-		first_call_kwargs = get_all.call_args_list[0][1]
-		self.assertTrue(first_call_kwargs.get("ignore_permissions"))
+		# Verify that the Item query (second call) used ignore_permissions=True.
+		item_call_kwargs = get_all.call_args_list[1][1]
+		self.assertTrue(item_call_kwargs.get("ignore_permissions"))
 
-	def test_production_config_query_validates_branch_scope(self):
-		"""Test that production config query filters by branch."""
+	def test_production_config_query_scoped_to_branch(self):
+		"""Test that the production config query (which now drives the
+		allowed item-code set) filters by branch."""
 		self._allow_search_access()
 
-		items = [
-			{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
+		config = [{"item": "ITEM-1", "department": None, "production_unit": None}]
+		with patch(
+			"ury.ury.api.ury_dashboard.frappe.db.get_all",
+			side_effect=[config, []],
+		) as get_all:
+			search_branch_items("Branch A", "Company A", "", 25)
+
+		# First call is the production config query, scoped to this branch.
+		config_call_filters = get_all.call_args_list[0][1]["filters"]
+		self.assertEqual(config_call_filters, {"branch": "Branch A"})
+
+	def test_no_branch_leakage_when_branch_has_no_configured_items(self):
+		"""Regression test for bug 2: if a branch has no
+		URY Item Production Configuration rows, the endpoint must return an
+		empty list rather than falling through to a site-wide Item query
+		(which would leak the entire catalog, including other
+		companies'/branches' items, raw materials, and packaging)."""
+		self._allow_search_access()
+
+		with patch(
+			"ury.ury.api.ury_dashboard.frappe.db.get_all",
+			side_effect=[[]],
+		) as get_all:
+			result = search_branch_items("Branch A", "Company A", "", 25)
+
+		self.assertEqual(result, [])
+		# Only the production config lookup ran; the Item master was never
+		# queried, so no cross-branch/cross-company item data could leak.
+		self.assertEqual(get_all.call_count, 1)
+
+	def test_item_query_scoped_to_branch_configured_item_codes(self):
+		"""Regression test for bug 2: the Item query must restrict
+		item_code to the set of items configured for this specific branch,
+		not the whole site catalog."""
+		self._allow_search_access()
+
+		config = [
+			{"item": "ITEM-1", "department": None, "production_unit": None},
+			{"item": "ITEM-2", "department": None, "production_unit": None},
 		]
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all",
-			side_effect=[items, []],
+			side_effect=[config, []],
 		) as get_all:
 			search_branch_items("Branch A", "Company A", "", 25)
 
-		# Verify that the second call (production config) filtered by branch.
-		second_call_filters = get_all.call_args_list[1][1]["filters"]
-		self.assertIn("branch", second_call_filters)
-		self.assertEqual(second_call_filters["branch"], "Branch A")
+		item_call_filters = get_all.call_args_list[1][1]["filters"]
+		self.assertEqual(item_call_filters.get("item_code"), ["in", ["ITEM-1", "ITEM-2"]])
