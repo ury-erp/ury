@@ -22,3 +22,7 @@ ury/www/mosaic.html
 build
 
 *.lock
+
+# Local bench bootstrap artifacts
+easy-install.log
+package-lock.json
