@@ -361,7 +361,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
   const manyStepsCount = LIFECYCLE_STEPS.length > 5;
 
   return (
-    <div className="flex flex-1 flex-wrap items-center justify-between gap-y-2 rounded-lg border border-border bg-card px-4 py-3.5">
+    <div className="flex flex-1 flex-wrap items-center justify-between gap-y-2">
       {isTerminalOther ? (
         <div className="flex items-center gap-2" role="list" aria-label="Sales Plan status">
           <div role="listitem" className="flex items-center gap-2" title="Superseded/Cancelled">
