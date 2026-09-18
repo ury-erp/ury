@@ -32,6 +32,7 @@
     "shift_overview": "Aperçu du service",
     "service_board": "Tableau de service",
     "close_shift": "Clôturer la session",
+    "lock_pos": "Verrouiller / Changer d’utilisateur",
     "switch_to_desk": "Accéder au bureau"
   },
   "menu": {
@@ -418,5 +419,28 @@
     "confirm_back": "Retour",
     "checklist_skip": "Ignorer pour l'instant",
     "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
+  },
+  "pin_login": {
+    "title": "Saisissez votre code PIN",
+    "subtitle": "Utilisez votre code PIN personnel pour ouvrir une session de caisse sécurisée.",
+    "pin_progress": "{{count}} chiffres du code PIN saisis",
+    "delete_digit": "Effacer le dernier chiffre",
+    "sign_in": "Se connecter",
+    "invalid_pin": "Le code PIN est incorrect ou désactivé. Réessayez.",
+    "too_many_attempts": "Trop de tentatives. Attendez une minute puis réessayez.",
+    "use_password": "Se connecter avec l’e-mail et le mot de passe",
+    "manager_hint": "Un responsable peut activer ou désactiver l’accès par PIN pour chaque compte PDV.",
+    "active_order_lock": "Terminez ou videz la commande en cours avant de changer d’utilisateur."
+  },
+  "terminal_enroll": {
+    "title": "Enregistrer ce terminal",
+    "subtitle": "Saisissez l’identifiant du terminal et le code à usage unique fourni par votre responsable pour associer cet appareil.",
+    "terminal_id": "Identifiant du terminal",
+    "code": "Code d’enregistrement à usage unique",
+    "enroll": "Enregistrer le terminal",
+    "enrolling": "Enregistrement…",
+    "failed": "Échec de l’enregistrement. Vérifiez l’identifiant et le code, puis demandez un nouveau code à un responsable.",
+    "too_many_attempts": "Trop de tentatives. Patientez un instant puis réessayez.",
+    "manager_hint": "Un responsable crée le terminal dans Desk et génère un code d’enregistrement à durée limitée."
   }
 }
