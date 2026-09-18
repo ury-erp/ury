@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:terminal_id",
+ "creation": "2026-09-12 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "terminal_info_tab",
+  "terminal_name",
+  "terminal_id",
+  "column_break_terminal_info",
+  "branch",
+  "enabled",
+  "auth_status_section",
+  "credential_hash",
+  "enrollment_code_hash",
+  "enrollment_code_expiry",
+  "column_break_auth_status",
+  "last_enrolled_at",
+  "last_seen"
+ ],
+ "fields": [
+  {
+   "fieldname": "terminal_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "Terminal Info"
+  },
+  {
+   "fieldname": "terminal_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Terminal Name",
+   "reqd": 1
+  },
+  {
+   "description": "Stable identifier entered on the device during enrollment.",
+   "fieldname": "terminal_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Terminal ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_terminal_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "PIN login on this terminal is limited to staff assigned to this Branch.",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "auth_status_section",
+   "fieldtype": "Section Break",
+   "label": "Auth & Status"
+  },
+  {
+   "fieldname": "credential_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Credential Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "enrollment_code_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Enrollment Code Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "enrollment_code_expiry",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Enrollment Code Expiry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_auth_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_enrolled_at",
+   "fieldtype": "Datetime",
+   "label": "Last Enrolled At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_seen",
+   "fieldtype": "Datetime",
+   "label": "Last Seen",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY POS Terminal",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
