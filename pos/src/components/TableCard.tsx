@@ -54,24 +54,26 @@ const TableCard = ({
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
 
+  // An available table is opened by a real <button> laid over the card rather
+  // than a div carrying role="button". The div announced itself as a button
+  // and took focus, but had no key handler, so Enter and Space did nothing —
+  // the card was reachable by keyboard and then unusable from it (UX-07).
+  // The button is a sibling of the content, not a wrapper, because the card
+  // already contains buttons and a button cannot nest inside one.
+  const isOpenable = !isOccupied && !isRestricted;
+
   return (
     <div
-      role={isOccupied ? 'group' : 'button'}
-      tabIndex={isOccupied ? -1 : 0}
-      onClick={() => {
-        if (!isOccupied && !isRestricted) {
-          onNavigate();
-        }
-      }}
+      role={isOccupied ? 'group' : undefined}
       style={{ '--i': index } as React.CSSProperties}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-card p-4',
+        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background',
         // Scoped rather than `transition-all`: that animated every property
         // including layout ones, which is what made the grid shimmer as the
         // pointer crossed it.
         'transition-[box-shadow,border-color,transform] duration-fast ease-out',
         'animate-fade-in-up stagger-fast',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
           : isRestricted
@@ -84,7 +86,16 @@ const TableCard = ({
         className
       )}
     >
-      <div className="flex flex-1 flex-col">
+      {isOpenable && (
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label={t('tables.open_table', { table: table.name })}
+          className="absolute inset-0 z-[1] rounded-lg focus:outline-none"
+        />
+      )}
+
+      <div className="pointer-events-none relative z-[2] flex flex-1 flex-col">
         <div className="mb-3 flex items-start justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
@@ -107,6 +118,7 @@ const TableCard = ({
               ) : null}
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
+            <div className="pointer-events-auto">
             <TableActionsMenu
               table={table}
               isOpen={menuOpen}
@@ -117,6 +129,7 @@ const TableCard = ({
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
             />
+            </div>
           </div>
         </div>
 
@@ -160,7 +173,7 @@ const TableCard = ({
 
       <div
         className={cn(
-          'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
+          'relative z-[2] mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
           isOccupied ? 'border-amber-200' : 'border-transparent'
         )}
       >

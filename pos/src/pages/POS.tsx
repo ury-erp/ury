@@ -6,7 +6,7 @@ import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import { usePOSStore, type MenuItem } from '../store/pos-store';
-import { cn } from '@ury/ui';
+import { cn, ErrorState } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import InitialLoader from '../components/InitialLoader';
 
@@ -20,6 +20,7 @@ export default function POS() {
     error,
     isMenuInteractionDisabled,
     isInitializing,
+    initializeApp,
   } = usePOSStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -77,14 +78,14 @@ export default function POS() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">{t('pos_page.failed_load')}</p>
-          <p className="text-gray-600">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-          >{t('pos_opening.retry')}</button>
-        </div>
+        <ErrorState
+          title={t('pos_page.failed_load')}
+          description={error}
+          retryLabel={t('common.retry')}
+          // Re-runs the failed request rather than reloading the app, which
+          // would discard the open order tabs along with the error.
+          onRetry={() => initializeApp()}
+        />
       </div>
     );
   }

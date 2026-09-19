@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, DoorClosed } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@ury/ui';
+import { Badge, Button, Card, CardContent, ErrorState } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
@@ -416,10 +416,12 @@ export default function Orders() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">{t('errors.failed_load_orders')}</p>
-          <p className="text-gray-600">{error}</p>
-        </div>
+        <ErrorState
+          title={t('errors.failed_load_orders')}
+          description={error}
+          retryLabel={t('common.retry')}
+          onRetry={() => fetchOrders()}
+        />
       </div>
     );
   }

@@ -1,11 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Layout, Square } from 'lucide-react';
+import { AlertTriangle, Layout, Loader2, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
-import { Spinner } from '@ury/ui';
+import { Spinner, ErrorState } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
@@ -25,7 +25,7 @@ import MergeLinkConnector from '../components/MergeLinkConnector';
 
 const TableView = () => {
   const navigate = useNavigate();
-  const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const { posProfile, setSelectedTable, setSelectedOrderType, tableSearchQuery } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
   const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
@@ -36,6 +36,7 @@ const TableView = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [refreshingTables, setRefreshingTables] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
 
@@ -130,19 +131,36 @@ const TableView = () => {
     fetchRoomCounts();
   }, [branch, rooms, persistRoomCounts]);
 
+  /**
+   * Loads a room's tables, showing what is cached while confirming it.
+   *
+   * The cache used to be terminal: a hit returned and never checked the
+   * server again, so a table seated from another till stayed green here
+   * until the room was switched away and back. Occupancy is exactly the
+   * thing two devices disagree about (UX-08).
+   *
+   * So a hit now paints immediately and revalidates behind it — the grid
+   * stays usable instead of flashing a spinner, and it corrects itself
+   * within one round trip. A failed revalidation keeps the cached rows on
+   * screen rather than blanking a working grid; only a cold load with
+   * nothing to show falls back to the error state.
+   */
   const loadTables = useCallback(
     async (roomName: string, options?: { useCache?: boolean }) => {
       if (!roomName) return;
       setError(null);
 
       const shouldUseCache = options?.useCache !== false;
-      if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTablesByMergeGroups(tablesCache[roomName]));
+      const cached = shouldUseCache ? tablesCache[roomName] : undefined;
+
+      if (cached) {
+        setTables(sortTablesByMergeGroups(cached));
         setLoadingTables(false);
-        return;
+        setRefreshingTables(true);
+      } else {
+        setLoadingTables(true);
       }
 
-      setLoadingTables(true);
       try {
         const fetchedTables = await getTables(roomName);
         const sortedTables = sortTablesByMergeGroups(fetchedTables);
@@ -150,10 +168,13 @@ const TableView = () => {
         setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
         console.error(e);
-        setError('Failed to load tables');
-        setTables([]);
+        if (!cached) {
+          setError(t('errors.failed_load_tables'));
+          setTables([]);
+        }
       } finally {
         setLoadingTables(false);
+        setRefreshingTables(false);
       }
     },
     [tablesCache]
@@ -354,7 +375,18 @@ const TableView = () => {
     });
   }, [mergeSourceTable, tables]);
 
-  const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
+  const tablesToDisplay = useMemo(() => {
+    const sorted = sortTablesByMergeGroups(tables);
+    const needle = tableSearchQuery.trim().toLowerCase();
+    if (!needle) return sorted;
+    // Name and room both: staff say "table 12" and "the terrace", and the
+    // header box gives no hint that only one of them would work.
+    return sorted.filter(
+      (table) =>
+        table.name.toLowerCase().includes(needle) ||
+        (table.restaurant_room || '').toLowerCase().includes(needle)
+    );
+  }, [tables, tableSearchQuery]);
 
   const unmergeGroupMembers = useMemo(() => {
     if (!unmergeSourceTable) return [];
@@ -488,11 +520,28 @@ const TableView = () => {
 
       <div className="flex-1 overflow-auto bg-gray-50 p-6">
         <div className="max-w-screen-xl mx-auto h-full">
-          {error && !loadingTables ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
-              <AlertTriangle className="w-10 h-10" />
-              <p>{error}</p>
+          {/* Announced but not blocking: the cached grid stays usable while
+              the server confirms it. */}
+          {refreshingTables && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-3 flex items-center justify-center gap-2 text-xs text-gray-500"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              {t('tables.refreshing')}
             </div>
+          )}
+          {error && !loadingTables ? (
+            <ErrorState
+              className="h-full"
+              title={t('errors.failed_load_tables')}
+              description={error}
+              retryLabel={t('common.retry')}
+              // Cache bypassed: the previous attempt failed, so whatever is
+              // cached is either absent or the reason we are here.
+              onRetry={() => loadTables(selectedRoom, { useCache: false })}
+            />
           ) : showGridSkeleton ? (
             <Spinner message={t('common.loading_tables')} />
           ) : tablesToDisplay.length === 0 ? (

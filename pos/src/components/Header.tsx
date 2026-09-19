@@ -31,7 +31,7 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+  const { searchQuery, setSearchQuery, tableSearchQuery, setTableSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -47,6 +47,12 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
+  } else if (location.pathname === '/tables') {
+    // The box was rendered here but bound to nothing, so typing in it looked
+    // like a filter and did nothing at all (UX-05).
+    searchPlaceholder = t('header.search_placeholder_tables');
+    searchValue = tableSearchQuery;
+    searchOnChange = (e) => setTableSearchQuery(e.target.value);
   }
 
   // Debounce order search

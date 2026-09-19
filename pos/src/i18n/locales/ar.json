@@ -37,7 +37,8 @@
     "refresh": "تحديث",
     "remove": "إزالة",
     "preview": "معاينة",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "retry": "أعد المحاولة"
   },
   "header": {
     "search_placeholder_default": "ابحث في الطلبات أو الأصناف أو الزبائن...",
@@ -48,7 +49,8 @@
     "switch_to_dashboard": "الانتقال إلى لوحة المعلومات",
     "clear_cache": "مسح الذاكرة المؤقتة",
     "logout": "تسجيل الخروج",
-    "help": "المساعدة"
+    "help": "المساعدة",
+    "search_placeholder_tables": "ابحث عن طاولة بالرقم أو الغرفة"
   },
   "menu": {
     "special_items": "أصناف مميزة",
@@ -389,7 +391,9 @@
     "zoom_out": "تصغير",
     "printing": "جارٍ الطباعة...",
     "take_away": "طلب خارجي",
-    "no_rooms_for_branch": "لم يتم العثور على قاعات لهذا الفرع"
+    "no_rooms_for_branch": "لم يتم العثور على قاعات لهذا الفرع",
+    "open_table": "فتح الطاولة {{table}}",
+    "refreshing": "جارٍ التحقق من التحديثات…"
   },
   "bill_split": {
     "split_bill": "تقسيم الفاتورة",

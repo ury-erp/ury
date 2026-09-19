@@ -26,7 +26,8 @@
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
     "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
-    "close": "Fermer"
+    "close": "Fermer",
+    "retry": "Réessayer"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -36,7 +37,8 @@
     "switch_to_desk": "Accéder au bureau",
     "switch_to_dashboard": "Accéder au tableau de bord",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "search_placeholder_tables": "Rechercher une table par numéro ou salle"
   },
   "menu": {
     "special_items": "Plats spéciaux",
@@ -336,7 +338,9 @@
     "no_destination_tables": "Aucune table libre disponible dans cet établissement",
     "transfer_not_for_merged": "Le transfert de table n'est pas autorisé pour les tables fusionnées. Séparez d'abord les tables.",
     "order_already_billed": "Cette commande a déjà été facturée",
-    "no_captains_found": "Aucun capitaine trouvé"
+    "no_captains_found": "Aucun capitaine trouvé",
+    "open_table": "Ouvrir la table {{table}}",
+    "refreshing": "Vérification des changements…"
   },
   "bill_split": {
     "split_bill": "Diviser l'addition",

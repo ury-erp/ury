@@ -32,7 +32,8 @@
     "refresh": "Refresh",
     "remove": "Remove",
     "preview": "Preview",
-    "close": "Close"
+    "close": "Close",
+    "retry": "Try again"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -43,7 +44,8 @@
     "switch_to_dashboard": "Switch to Dashboard",
     "clear_cache": "Clear Cache",
     "logout": "Logout",
-    "help": "Help"
+    "help": "Help",
+    "search_placeholder_tables": "Search tables by number or room"
   },
   "menu": {
     "special_items": "Special Items",
@@ -384,7 +386,9 @@
     "zoom_out": "Zoom Out",
     "printing": "Printing...",
     "take_away": "Take away",
-    "no_rooms_for_branch": "No rooms found for this branch"
+    "no_rooms_for_branch": "No rooms found for this branch",
+    "open_table": "Open table {{table}}",
+    "refreshing": "Checking for changes…"
   },
   "bill_split": {
     "split_bill": "Split bill",
