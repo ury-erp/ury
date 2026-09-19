@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { ErrorState } from '@ury/ui';
+import { parseFrappeError } from '@ury/core';
+import { t } from './i18n';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -43,6 +46,8 @@ interface WizardStatus {
 
 function SetupGuard() {
   const [status, setStatus] = useState<WizardStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,16 +60,17 @@ function SetupGuard() {
         const wizardStatus: WizardStatus = res?.message ?? res;
 
         if (!cancelled) {
+          setStatusError(null);
           setStatus(wizardStatus);
         }
-      } catch {
-        // If the status fetch fails, fall back to treating setup as incomplete
-        // rather than flashing a redirect to the dashboard on bad data.
+      } catch (err) {
+        // "Could not check" is not "not set up". Defaulting to incomplete
+        // sent a live, fully configured restaurant into the setup wizard on
+        // a network blip — an answer we never had, presented as fact
+        // (UX-13). Unknown is now its own state, with a retry.
         if (!cancelled) {
-          setStatus({
-            step1_complete: false,
-            step2_complete: false,
-          });
+          setStatus(null);
+          setStatusError(parseFrappeError(err, t('dash.errors.setup_check_failed')));
         }
       }
     })();
@@ -72,14 +78,27 @@ function SetupGuard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  if (statusError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <ErrorState
+          title={t('dash.errors.setup_check_failed')}
+          description={statusError}
+          retryLabel={t('common.retry')}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </div>
+    );
+  }
 
   if (!status) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         </div>
       </div>
     );

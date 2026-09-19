@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { ErrorState } from '@ury/ui';
+import { parseFrappeError } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { t } from '../../i18n';
 import KPIGrid from './KPIGrid';
 import AnalyticsCharts from './AnalyticsCharts';
 import ReportWidgets from './ReportWidgets';
@@ -17,9 +20,11 @@ export const DashboardPage: React.FC = () => {
   const [chartsData, setChartsData] = useState<DashboardChartsData | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [sumRes, chartRes, txRes] = await Promise.all([
         dashboardService.getSummary(activeBranchId),
@@ -30,7 +35,11 @@ export const DashboardPage: React.FC = () => {
       setChartsData(chartRes);
       setRecentTransactions(txRes);
     } catch (err) {
+      // Swallowing this left the KPI tiles to render their `?? 0` fallbacks,
+      // so a failed request was indistinguishable from a day with no sales —
+      // and a manager reading "0" has no reason to doubt it (UX-13).
       console.error('Failed to load dashboard data:', err);
+      setError(parseFrappeError(err, t('dash.errors.failed_load')));
     } finally {
       setLoading(false);
     }
@@ -39,6 +48,21 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [activeBranchId]);
+
+  // Failure replaces the figures rather than colouring them. A dashboard
+  // showing stale or zeroed numbers beside an error banner invites reading
+  // the numbers anyway.
+  if (error && !loading) {
+    return (
+      <ErrorState
+        className="py-24"
+        title={t('dash.errors.failed_load')}
+        description={error}
+        retryLabel={t('common.retry')}
+        onRetry={fetchDashboardData}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

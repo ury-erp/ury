@@ -15,7 +15,9 @@
     "search": "Search",
     "next": "Next",
     "prev": "Prev",
-    "export_csv": "Export CSV"
+    "export_csv": "Export CSV",
+    "retry": "Try again",
+    "close": "Close"
   },
   "fields": {
     "abv": "ABV",
@@ -715,15 +717,23 @@
     "wizard_layout": {
       "let_s_get_your_restaurant_ready": "Let's get your restaurant ready",
       "previous": "Previous"
+    },
+    "errors": {
+      "failed_load": "Could not load the dashboard",
+      "setup_check_failed": "Could not check the setup status"
     }
   },
   "auth": {
     "access_denied": "Access Denied",
     "permission_required": "Permission Required",
     "managers_only": "This section is restricted to Managers.",
-    "need_manager_role": "You need the URY Manager role to access this section."
+    "need_manager_role": "You need the URY Manager role to access this section.",
+    "role_check_failed": "Could not verify your permissions",
+    "role_check_failed_hint": "This is not a permission problem. Check the connection and try again."
   },
   "setup": {
-    "config_error": "Configuration Error:"
+    "config_error": "Configuration Error:",
+    "section_complete": "Complete",
+    "section_incomplete": "Needs attention"
   }
 }

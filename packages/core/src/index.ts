@@ -1,6 +1,6 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
-export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities, isDashboardManager, DASHBOARD_MANAGER_ROLES } from './frappe/roles';
 export type { POSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
 export type { User, PosProfileCombined } from './types';

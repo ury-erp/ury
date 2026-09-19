@@ -20,7 +20,9 @@
     "search": "بحث",
     "next": "التالي",
     "prev": "السابق",
-    "export_csv": "تصدير CSV"
+    "export_csv": "تصدير CSV",
+    "retry": "أعد المحاولة",
+    "close": "إغلاق"
   },
   "fields": {
     "abv": "معدل الفاتورة",
@@ -103,7 +105,7 @@
     "branch": "الفروع",
     "daily_pnl_settings": "إعدادات الأرباح والخسائر اليومية",
     "dashboard": "لوحة المعلومات",
-    "menu": "قائمة الطعام",
+    "menu": "القائمة",
     "pos_profile": "ملف نقطة البيع",
     "production_unit": "وحدة الإنتاج",
     "reports": "التقارير",
@@ -720,15 +722,23 @@
     "wizard_layout": {
       "let_s_get_your_restaurant_ready": "لنجهّز مطعمك",
       "previous": "السابق"
+    },
+    "errors": {
+      "failed_load": "تعذّر تحميل لوحة المعلومات",
+      "setup_check_failed": "تعذّر التحقق من حالة الإعداد"
     }
   },
   "auth": {
     "access_denied": "تم رفض الوصول",
     "permission_required": "مطلوب صلاحية",
     "managers_only": "هذا القسم مخصص للمديرين فقط.",
-    "need_manager_role": "تحتاج صلاحية مدير URY للوصول إلى هذا القسم."
+    "need_manager_role": "تحتاج صلاحية مدير URY للوصول إلى هذا القسم.",
+    "role_check_failed": "تعذّر التحقق من صلاحياتك",
+    "role_check_failed_hint": "هذه ليست مشكلة صلاحيات. تحقّق من الاتصال ثم أعد المحاولة."
   },
   "setup": {
-    "config_error": "خطأ في التهيئة:"
+    "config_error": "خطأ في التهيئة:",
+    "section_complete": "مكتمل",
+    "section_incomplete": "يحتاج إكمالاً"
   }
 }
