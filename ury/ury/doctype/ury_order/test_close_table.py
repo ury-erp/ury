@@ -5,9 +5,21 @@ one way to take an open bill off the floor without a receipt, so what it
 refuses matters more than what it allows.
 """
 
+import datetime
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
+
+# Patching `<module>.frappe.get_doc` patches the frappe module globally, so
+# anything the code under test reaches through frappe gets a MagicMock too.
+# `now_datetime()` does exactly that: it loads System Settings for the
+# timezone, and Frappe then tries to pickle that mock into the Redis document
+# cache. The test therefore passed or failed depending on whether the cache
+# happened to be warm — green in a normal run, red right after a cache clear.
+# Pinning the clock removes the dependency and makes the recorded timestamp
+# deterministic besides.
+FROZEN_NOW = datetime.datetime(2026, 9, 19, 3, 30, 0)
 
 from ury.ury.doctype.ury_order.ury_order import close_table, get_table_close_state
 
@@ -60,6 +72,7 @@ class TestCloseTable(FrappeTestCase):
         mock_set_value.assert_not_called()
         mock_release.assert_not_called()
 
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.utils.now_datetime", return_value=FROZEN_NOW)
     @patch("ury.ury.doctype.ury_order.ury_order.release_merge_cluster_tables")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
     @patch("ury.ury.doctype.ury_order.ury_order._may_close_table", return_value=True)
@@ -69,7 +82,7 @@ class TestCloseTable(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_empty_bill_needs_no_reason(
         self, mock_session, mock_branch, mock_get_doc, mock_perm, mock_may,
-        mock_set_value, mock_release,
+        mock_set_value, mock_release, mock_now,
     ):
         """Nothing was sold, so there is nothing to account for."""
         mock_session.user = "cashier@test.com"
@@ -81,6 +94,7 @@ class TestCloseTable(FrappeTestCase):
         self.assertFalse(result["had_items"])
         mock_release.assert_called_once()
 
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.utils.now_datetime", return_value=FROZEN_NOW)
     @patch("ury.ury.doctype.ury_order.ury_order.release_merge_cluster_tables")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
     @patch("ury.ury.doctype.ury_order.ury_order._may_close_table", return_value=True)
@@ -90,7 +104,7 @@ class TestCloseTable(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_closing_settles_the_bill_and_records_no_receipt(
         self, mock_session, mock_branch, mock_get_doc, mock_perm, mock_may,
-        mock_set_value, mock_release,
+        mock_set_value, mock_release, mock_now,
     ):
         """The table is never freed while its bill stays open.
 
@@ -107,6 +121,7 @@ class TestCloseTable(FrappeTestCase):
         self.assertEqual(values["custom_closed_without_print"], 1)
         self.assertEqual(values["custom_close_reason"], "paid cash, no receipt wanted")
         self.assertEqual(values["custom_closed_by"], "cashier@test.com")
+        self.assertEqual(values["custom_closed_at"], FROZEN_NOW)
         mock_release.assert_called_once()
 
     @patch("ury.ury.doctype.ury_order.ury_order.release_merge_cluster_tables")
