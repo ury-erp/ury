@@ -65,7 +65,23 @@
       :socket="socketRef"
     />
 
-    <div v-if="stationKots.length === 0 && !loadingKots" class="text-center py-20 animate-fade-in">
+    <!-- Load failure. Shown ahead of every empty state so a broken feed is
+         never reported as a clear kitchen. Any tickets already on screen stay
+         where they are; this only replaces the "nothing here" message. -->
+    <div v-if="kotsError && stationKots.length === 0 && !loadingKots" class="text-center py-20 animate-fade-in">
+      <div class="empty-kitchen-icon">!</div>
+      <p class="text-lg font-bold text-[#3f2a20]">{{ $t('kot.load_failed') }}</p>
+      <p class="mt-1 text-sm text-[#9a7e6b]">{{ $t('kot.load_failed_hint') }}</p>
+      <button
+        type="button"
+        class="press mt-4 rounded-xl bg-[#ffca4b] px-5 py-2 font-bold text-[#3f2a20]"
+        @click="retryFetchKot"
+      >
+        {{ $t('kot.retry') }}
+      </button>
+    </div>
+
+    <div v-else-if="stationKots.length === 0 && !loadingKots" class="text-center py-20 animate-fade-in">
       <div class="empty-kitchen-icon">✓</div>
       <p class="text-lg font-bold text-[#3f2a20]">{{ $t('kot.kitchen_clear') }}</p>
       <p class="mt-1 text-sm text-[#9a7e6b]">{{ $t('kot.no_active_orders', { station: production }) }}</p>
@@ -498,6 +514,7 @@ export default {
       statusMessage: "",
       daily_order_number:0,
       loadingKots: true,
+      kotsError: null,
       kotErrorAlert: null,
       showKotErrorAlert: false,
       // Handed to <KitchenMessages> so the whole display shares one socket
@@ -568,6 +585,7 @@ export default {
               this.kot_item_channel = `kot_item_update_${this.branch}_${this.production}`;
               this.menu_channel = `menu_availability_${this.branch}`;
               this.kot = result.message.KOT;
+              this.kotsError = null;
               this.loadingKots = false;
               this.updateQtyColorTable();
               this.updateTimeRemaining();
@@ -575,14 +593,28 @@ export default {
             })
             .catch((error) => {
               console.error(error);
+              // A failed load must never render as an empty board. "Kitchen
+              // clear" and "the feed is down" look identical once the list
+              // is empty, and only one of them means it is safe to stand
+              // still (UX-19).
+              this.kotsError = error;
               this.loadingKots = false;
               reject(error);
             });
         } catch (error) {
+          this.kotsError = error;
           this.loadingKots = false;
           reject(error);
         }
       });
+    },
+
+    /** Re-runs the ticket fetch after a failure, without reloading the app —
+        a kitchen screen that reloads loses its socket and its scroll. */
+    retryFetchKot() {
+      this.loadingKots = true;
+      this.kotsError = null;
+      this.fetchKOT().catch(() => {});
     },
 
     /** Shift counters for the toolbar. Failure is silent: a missing number
@@ -1164,7 +1196,24 @@ export default {
         this.socketRef = socket;
         this.socketConnected = !!(socket && socket.connected);
         if (socket) {
-          socket.on("connect", () => { this.socketConnected = true; });
+          // Reconnecting only flipped the indicator green. Tickets pushed
+          // while the socket was down are never replayed, so the board went
+          // on claiming it was live while missing every order placed during
+          // the gap (UX-22). The indicator now follows an actual resync, not
+          // the transport coming back.
+          socket.on("connect", () => {
+            this.fetchKOT()
+              .then(() => {
+                this.socketConnected = true;
+                this.fetchStats();
+                this.fetchUnavailable();
+              })
+              .catch(() => {
+                // Socket up, data not confirmed — not live yet, and the
+                // error state from fetchKOT says why.
+                this.socketConnected = false;
+              });
+          });
           socket.on("disconnect", () => { this.socketConnected = false; });
         }
         self.fetchKOT().then(() => {

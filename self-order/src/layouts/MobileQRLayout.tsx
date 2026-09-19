@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { formatCurrency } from '@ury/core'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import { t, tPlural } from '../i18n'
 import { LanguageToggle } from '../components/LanguageToggle'
+import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
+import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
 
 interface LayoutProps {
   initialContext?: OrderingContext
 }
-
-const ALL_COURSES = '__all__'
 
 /**
  * The surface a guest reaches by scanning the code on their table.
@@ -42,30 +42,9 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     cartTotal,
   } = useOrderingSession(initialContext)
 
-  const [course, setCourse] = useState<string>(ALL_COURSES)
-  const [query, setQuery] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
-
-  // Courses in menu order rather than alphabetical: a menu is sequenced by
-  // the kitchen (starters before mains), and sorting destroys that intent.
-  const courses = useMemo(() => {
-    const seen = new Map<string, string>()
-    menu.forEach((item) => {
-      if (item.course && !seen.has(item.course)) {
-        seen.set(item.course, item.course_label || item.course)
-      }
-    })
-    return Array.from(seen, ([value, label]) => ({ value, label }))
-  }, [menu])
-
-  const visibleMenu = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return menu.filter((item) => {
-      if (course !== ALL_COURSES && item.course !== course) return false
-      if (!needle) return true
-      return item.item_name.toLowerCase().includes(needle)
-    })
-  }, [menu, course, query])
+  const discovery = useMenuDiscovery(menu)
+  const { visibleMenu } = discovery
 
   function handleStartOver() {
     if (window.confirm(t('order.confirm_start_over'))) {
@@ -75,8 +54,11 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
   }
 
   async function handleSubmit() {
-    await submitCart()
-    setCartOpen(false)
+    // The sheet closed unconditionally, so a rejected order took the cart out
+    // of sight along with the error explaining it (UX-20). It now closes only
+    // on a confirmed success.
+    const placed = await submitCart()
+    if (placed) setCartOpen(false)
   }
 
   if (loading) {
@@ -141,33 +123,8 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
         </div>
 
         <div className="px-4 pb-3">
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('menu.search_placeholder')}
-            aria-label={t('menu.search_placeholder')}
-            className="h-11 w-full rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary"
-          />
+          <MenuDiscoveryBar discovery={discovery} />
         </div>
-
-        {courses.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <CourseChip
-              label={t('menu.all_items')}
-              active={course === ALL_COURSES}
-              onClick={() => setCourse(ALL_COURSES)}
-            />
-            {courses.map((entry) => (
-              <CourseChip
-                key={entry.value}
-                label={entry.label}
-                active={course === entry.value}
-                onClick={() => setCourse(entry.value)}
-              />
-            ))}
-          </div>
-        )}
       </header>
 
       {error && (
@@ -328,31 +285,6 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
         </>
       )}
     </div>
-  )
-}
-
-function CourseChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={[
-        'shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition active:scale-95',
-        active
-          ? 'bg-primary text-primary-foreground'
-          : 'border bg-background text-muted-foreground',
-      ].join(' ')}
-    >
-      {label}
-    </button>
   )
 }
 

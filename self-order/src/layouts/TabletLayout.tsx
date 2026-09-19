@@ -5,6 +5,8 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
+import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
 import { t } from '../i18n'
 import { LanguageToggle } from '../components/LanguageToggle'
 
@@ -44,6 +46,9 @@ function TabletLayout({ initialContext }: LayoutProps) {
   } = useOrderingSession(initialContext)
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
+  // Same search and course filtering as every other ordering surface,
+  // so finding a dish does not depend on which screen the guest is at.
+  const discovery = useMenuDiscovery(menu)
   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
@@ -111,8 +116,12 @@ function TabletLayout({ initialContext }: LayoutProps) {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="w-[68%] overflow-y-auto p-6">
+          <div className="mb-5">
+            <MenuDiscoveryBar discovery={discovery} size="default" />
+          </div>
+
           <MenuGrid
-            menu={menu}
+            menu={discovery.visibleMenu}
             cart={cart}
             capabilities={context?.capabilities}
             onAdd={addToCart}

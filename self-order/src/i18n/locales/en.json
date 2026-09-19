@@ -74,6 +74,7 @@
     "bill_failed": "Could not request the bill. Please ask a staff member for help.",
     "payment_failed": "Could not start online payment. You can pay at the counter.",
     "cannot_open_title": "This ordering link did not open",
-    "cannot_open_hint": "Scan the code on your table again, or ask a staff member."
+    "cannot_open_hint": "Scan the code on your table again, or ask a staff member.",
+    "missing_code": "This link is missing an ordering code. Please rescan the code on your table."
   }
 }

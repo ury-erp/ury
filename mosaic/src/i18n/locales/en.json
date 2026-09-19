@@ -107,7 +107,10 @@
     "table_label": "Table:",
     "takeaway": "Takeaway",
     "time_label": "Time:",
-    "waiter": "Waiter"
+    "waiter": "Waiter",
+    "load_failed": "Orders could not be loaded",
+    "load_failed_hint": "This is a connection problem, not an empty kitchen. Check the network, then try again.",
+    "retry": "Try again"
   },
   "language": {
     "label": "Language"
