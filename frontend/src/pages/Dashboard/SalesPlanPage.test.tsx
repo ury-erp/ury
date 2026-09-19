@@ -378,6 +378,16 @@ describe('SalesPlanPage', () => {
       expect(screen.queryByRole('button', { name: 'Save Draft' })).not.toBeInTheDocument();
     });
 
+    it('hides Add item too once the plan is past Draft, same as Save Draft', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Submitted for Approval' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+      await screen.findByText('Currently: Review · Next: Approve (manager)');
+
+      expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument();
+    });
+
     it('shows Save Draft for a Draft plan', async () => {
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
 
