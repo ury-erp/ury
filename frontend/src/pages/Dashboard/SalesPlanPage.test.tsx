@@ -474,6 +474,32 @@ describe('SalesPlanPage', () => {
       ).toBeInTheDocument();
     });
 
+    it('refuses to dismiss the modal via Escape while a transition is still in flight', async () => {
+      mockAuthState.roles = ['URY Sales Plan Controller'];
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Approved' } as any);
+      let resolveTransition: (value: any) => void = () => {};
+      vi.mocked(salesPlanService.transitionPlan).mockReturnValue(
+        new Promise((resolve) => {
+          resolveTransition = resolve;
+        }) as any
+      );
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Supersede/Cancel' }));
+      await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+      // Request is now in flight ("Updating..."); Escape must not dismiss
+      // the dialog and silently drop the eventual response/error.
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByRole('textbox', { name: /reason/i })).toBeInTheDocument();
+
+      resolveTransition({ name: 'PLAN-1', status: 'Superseded/Cancelled' });
+      await waitFor(() => expect(screen.queryByRole('textbox', { name: /reason/i })).not.toBeInTheDocument());
+    });
+
     it('shows the locked message with no Next for Locked for Production', async () => {
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Locked for Production' } as any);
 

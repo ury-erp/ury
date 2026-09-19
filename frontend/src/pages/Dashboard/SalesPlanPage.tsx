@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -507,7 +507,6 @@ export const SalesPlanPage: React.FC = () => {
   const [backwardActionError, setBackwardActionError] = useState<string | null>(null);
   const [backwardActionTransitioning, setBackwardActionTransitioning] = useState(false);
   const [currentBackwardAction, setCurrentBackwardAction] = useState<{ label: string; targetState: PlanStatus; destructive?: boolean } | null>(null);
-  const backwardActionModalRef = useRef<HTMLDivElement | null>(null);
   const [csvImportWarning, setCsvImportWarning] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
@@ -986,7 +985,14 @@ export const SalesPlanPage: React.FC = () => {
   };
 
   const runBackwardTransition = async () => {
-    if (!planName || !currentBackwardAction) return;
+    if (!planName || !currentBackwardAction) {
+      // planName can clear out from under an open modal if the branch/date
+      // changes while it's open (e.g. via keyboard, bypassing the
+      // outside-click dismissal a mouse interaction would have triggered
+      // first) -- surface that instead of silently doing nothing.
+      setBackwardActionError('This plan is no longer available. Close this dialog and try again.');
+      return;
+    }
     const reasonTrimmed = backwardActionReason.trim();
     if (!reasonTrimmed) {
       setBackwardActionError('Reason is required for this action.');
@@ -1012,26 +1018,10 @@ export const SalesPlanPage: React.FC = () => {
     }
   };
 
-  // Close the backward action modal on outside click or Escape
-  useEffect(() => {
-    if (!backwardActionOpen) return;
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (backwardActionModalRef.current && !backwardActionModalRef.current.contains(event.target as Node)) {
-        closeBackwardActionModal();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeBackwardActionModal();
-    };
-
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [backwardActionOpen]);
+  // Outside-click/Escape dismissal, focus trap, initial focus, focus
+  // restore-on-close, and body scroll lock are all handled by
+  // Dialog/DialogContent (@ury/ui) itself -- see its own onOpenChange guard
+  // below for why dismissal is refused while a request is in flight.
 
   return (
     <Page>
@@ -1444,21 +1434,29 @@ export const SalesPlanPage: React.FC = () => {
         }}
       />
 
-      {backwardActionOpen && currentBackwardAction && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="backward-action-modal-title">
-          <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close confirmation" onClick={closeBackwardActionModal} />
-          <div ref={backwardActionModalRef} className="relative z-[101] w-full max-w-md overflow-hidden rounded-lg bg-card shadow-2xl">
-            <div className="border-b border-border bg-muted px-6 py-4">
-              <h2 id="backward-action-modal-title" className="text-lg font-semibold text-foreground">
-                {currentBackwardAction.label}
-              </h2>
-              <p className="mt-1 text-sm text-text-tertiary">
-                {planName || 'Sales Plan'}
-              </p>
-            </div>
-            <div className="p-6">
-              <div className="mb-4">
-                <label htmlFor="backward-action-reason" className="block text-sm font-medium text-foreground mb-2">
+      <Dialog
+        open={backwardActionOpen && Boolean(currentBackwardAction)}
+        // Refuse to close while a request is in flight -- Escape and the
+        // overlay click both route through here, so without this guard
+        // either one could dismiss the modal mid-request, discarding the
+        // eventual response (including a real backend error) into state
+        // nothing renders anymore. The Cancel/Confirm buttons already
+        // disable themselves the same way; this is the same rule applied to
+        // Dialog's own dismissal paths.
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !backwardActionTransitioning) closeBackwardActionModal();
+        }}
+        closeOnEscape={!backwardActionTransitioning}
+      >
+        <DialogContent onClose={backwardActionTransitioning ? undefined : closeBackwardActionModal}>
+          {currentBackwardAction && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{currentBackwardAction.label}</DialogTitle>
+                <p className="text-sm text-text-tertiary">{planName || 'Sales Plan'}</p>
+              </DialogHeader>
+              <div className="px-6">
+                <label htmlFor="backward-action-reason" className="mb-2 block text-sm font-medium text-foreground">
                   Reason for {currentBackwardAction.label.toLowerCase()}
                 </label>
                 <textarea
@@ -1466,18 +1464,16 @@ export const SalesPlanPage: React.FC = () => {
                   value={backwardActionReason}
                   onChange={(event) => setBackwardActionReason(event.target.value)}
                   placeholder="Please explain why you are performing this action..."
-                  className="w-full h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="h-24 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-foreground placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled={backwardActionTransitioning}
                 />
+                {backwardActionError && (
+                  <div className="mt-4 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
+                    {backwardActionError}
+                  </div>
+                )}
               </div>
-
-              {backwardActionError && (
-                <div className="mb-4 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
-                  {backwardActionError}
-                </div>
-              )}
-
-              <div className="flex gap-2 justify-end">
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="secondary"
@@ -1502,11 +1498,11 @@ export const SalesPlanPage: React.FC = () => {
                       role+name. */}
                   {backwardActionTransitioning ? 'Updating...' : 'Confirm'}
                 </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 };
