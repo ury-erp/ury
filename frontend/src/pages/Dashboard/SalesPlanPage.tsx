@@ -964,10 +964,12 @@ export const SalesPlanPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
-              <Save className="h-4 w-4" />
-              <span>{saving ? 'Saving...' : 'Save Draft'}</span>
-            </Button>
+            {(planStatus === null || planStatus === 'Draft') && (
+              <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Draft'}</span>
+              </Button>
+            )}
             {currentAction && (
               <Button
                 onClick={runTransition}

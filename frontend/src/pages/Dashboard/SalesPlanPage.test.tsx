@@ -368,6 +368,26 @@ describe('SalesPlanPage', () => {
       expect(await screen.findByText('Currently: Review · Next: Approve (manager)')).toBeInTheDocument();
     });
 
+    it('hides Save Draft once the plan is past Draft -- items are editable only in Draft', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Submitted for Approval' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+      await screen.findByText('Currently: Review · Next: Approve (manager)');
+
+      expect(screen.queryByRole('button', { name: 'Save Draft' })).not.toBeInTheDocument();
+    });
+
+    it('shows Save Draft for a Draft plan', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+      await screen.findByText('Currently: Draft · Next: Submit for Review');
+
+      expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    });
+
     it('shows the locked message with no Next for Locked for Production', async () => {
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Locked for Production' } as any);
 
