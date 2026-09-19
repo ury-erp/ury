@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, Save, Search, Send, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, EditableDataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -88,6 +88,15 @@ const NEXT_ACTION: Partial<Record<PlanStatus, { label: string; targetState: Plan
   Proposed: { label: 'Submit for Approval', targetState: 'Submitted for Approval', icon: Send },
   'Submitted for Approval': { label: 'Approve', targetState: 'Approved', icon: CheckCircle2, managerOnly: true },
   Approved: { label: 'Lock for Production', targetState: 'Locked for Production', icon: Lock },
+};
+
+// Backward actions that require a reason (Return to Draft, Supersede/Cancel).
+// These require the URY Sales Plan Controller role and a non-empty reason string.
+const BACKWARD_ACTIONS: Partial<Record<PlanStatus, { label: string; targetState: PlanStatus; icon: React.ElementType; destructive?: boolean }>> = {
+  Proposed: { label: 'Return to Draft', targetState: 'Draft', icon: RotateCcw },
+  'Submitted for Approval': { label: 'Return to Draft', targetState: 'Draft', icon: RotateCcw },
+  Approved: { label: 'Supersede/Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
+  'Locked for Production': { label: 'Supersede/Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
 };
 
 const getToday = () => {
@@ -477,7 +486,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId, activeBranch } = useBranchContext();
-  const { isManager } = useAuth();
+  const { isManager, roles } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   // Tracks the "site today" used for the relative date label. Recomputed on
   // tab focus/visibility so a tab left open overnight doesn't keep showing a
@@ -493,6 +502,12 @@ export const SalesPlanPage: React.FC = () => {
   const [transitioning, setTransitioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [backwardActionOpen, setBackwardActionOpen] = useState(false);
+  const [backwardActionReason, setBackwardActionReason] = useState('');
+  const [backwardActionError, setBackwardActionError] = useState<string | null>(null);
+  const [backwardActionTransitioning, setBackwardActionTransitioning] = useState(false);
+  const [currentBackwardAction, setCurrentBackwardAction] = useState<{ label: string; targetState: PlanStatus; destructive?: boolean } | null>(null);
+  const backwardActionModalRef = useRef<HTMLDivElement | null>(null);
   const [csvImportWarning, setCsvImportWarning] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
@@ -857,9 +872,11 @@ export const SalesPlanPage: React.FC = () => {
   }, [truncationExpanded]);
 
   const currentAction = planStatus ? NEXT_ACTION[planStatus] : undefined;
+  const currentBackwardActionDef = planStatus ? BACKWARD_ACTIONS[planStatus] : undefined;
   // Draft plans that have never been saved to the backend don't have a name
   // yet, so there is nothing to transition -- the manager must save first.
   const canTransition = Boolean(currentAction && planName);
+  const canShowBackwardAction = Boolean(currentBackwardActionDef && planName && roles.includes('URY Sales Plan Controller'));
   const actionBlockedByRole = Boolean(currentAction?.managerOnly && !isManager);
   // Items (and by extension the plan's item list itself) are editable only
   // in Draft -- Save Draft, "Add item", bulk-set, and CSV import all gate on
@@ -954,6 +971,69 @@ export const SalesPlanPage: React.FC = () => {
     }
   };
 
+  const openBackwardActionModal = (action: { label: string; targetState: PlanStatus; destructive?: boolean }) => {
+    setCurrentBackwardAction(action);
+    setBackwardActionOpen(true);
+    setBackwardActionReason('');
+    setBackwardActionError(null);
+  };
+
+  const closeBackwardActionModal = () => {
+    setBackwardActionOpen(false);
+    setBackwardActionReason('');
+    setBackwardActionError(null);
+    setCurrentBackwardAction(null);
+  };
+
+  const runBackwardTransition = async () => {
+    if (!planName || !currentBackwardAction) return;
+    const reasonTrimmed = backwardActionReason.trim();
+    if (!reasonTrimmed) {
+      setBackwardActionError('Reason is required for this action.');
+      return;
+    }
+    setBackwardActionError(null);
+    setBackwardActionTransitioning(true);
+    try {
+      const result = await salesPlanService.transitionPlan({
+        name: planName,
+        target_state: currentBackwardAction.targetState,
+        reason: reasonTrimmed,
+      });
+      setPlanStatus((result.status as PlanStatus) || currentBackwardAction.targetState);
+      closeBackwardActionModal();
+    } catch (err) {
+      const actionName = currentBackwardAction.label.toLowerCase();
+      const fallbackMessage = currentBackwardAction.destructive
+        ? `Unable to cancel this Sales Plan. Please try again.`
+        : `Unable to return this Sales Plan to Draft. Please try again.`;
+      setBackwardActionError(describeSalesPlanApiError(err, fallbackMessage));
+    } finally {
+      setBackwardActionTransitioning(false);
+    }
+  };
+
+  // Close the backward action modal on outside click or Escape
+  useEffect(() => {
+    if (!backwardActionOpen) return;
+
+    const onMouseDown = (event: MouseEvent) => {
+      if (backwardActionModalRef.current && !backwardActionModalRef.current.contains(event.target as Node)) {
+        closeBackwardActionModal();
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeBackwardActionModal();
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [backwardActionOpen]);
+
   return (
     <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
@@ -996,6 +1076,18 @@ export const SalesPlanPage: React.FC = () => {
               >
                 <currentAction.icon className="h-4 w-4" />
                 <span>{transitioning ? 'Updating...' : currentAction.label}</span>
+              </Button>
+            )}
+            {canShowBackwardAction && currentBackwardActionDef && (
+              <Button
+                onClick={() => openBackwardActionModal(currentBackwardActionDef)}
+                disabled={backwardActionTransitioning}
+                variant="secondary"
+                size="compactLg"
+                className={`gap-2 ${currentBackwardActionDef.destructive ? 'text-destructive' : ''}`}
+              >
+                <currentBackwardActionDef.icon className="h-4 w-4" />
+                <span>{currentBackwardActionDef.label}</span>
               </Button>
             )}
           </div>
@@ -1352,6 +1444,64 @@ export const SalesPlanPage: React.FC = () => {
           setSelectedItemDetailCode(null);
         }}
       />
+
+      {backwardActionOpen && currentBackwardAction && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="backward-action-modal-title">
+          <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close confirmation" onClick={closeBackwardActionModal} />
+          <div ref={backwardActionModalRef} className="relative z-[101] w-full max-w-md overflow-hidden rounded-lg bg-card shadow-2xl">
+            <div className="border-b border-border bg-muted px-6 py-4">
+              <h2 id="backward-action-modal-title" className="text-lg font-semibold text-foreground">
+                {currentBackwardAction.label}
+              </h2>
+              <p className="mt-1 text-sm text-text-tertiary">
+                {planName || 'Sales Plan'}
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label htmlFor="backward-action-reason" className="block text-sm font-medium text-foreground mb-2">
+                  Reason for {currentBackwardAction.label.toLowerCase()}
+                </label>
+                <textarea
+                  id="backward-action-reason"
+                  value={backwardActionReason}
+                  onChange={(event) => setBackwardActionReason(event.target.value)}
+                  placeholder="Please explain why you are performing this action..."
+                  className="w-full h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  disabled={backwardActionTransitioning}
+                />
+              </div>
+
+              {backwardActionError && (
+                <div className="mb-4 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
+                  {backwardActionError}
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeBackwardActionModal}
+                  disabled={backwardActionTransitioning}
+                  size="compactLg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={runBackwardTransition}
+                  disabled={backwardActionTransitioning || backwardActionReason.trim().length === 0}
+                  className={currentBackwardAction.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+                  size="compactLg"
+                >
+                  {backwardActionTransitioning ? 'Updating...' : currentBackwardAction.label}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Page>
   );
 };
