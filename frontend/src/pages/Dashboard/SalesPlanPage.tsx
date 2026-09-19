@@ -861,6 +861,79 @@ export const SalesPlanPage: React.FC = () => {
   // yet, so there is nothing to transition -- the manager must save first.
   const canTransition = Boolean(currentAction && planName);
   const actionBlockedByRole = Boolean(currentAction?.managerOnly && !isManager);
+  // Items (and by extension the plan's item list itself) are editable only
+  // in Draft -- Save Draft, "Add item", bulk-set, and CSV import all gate on
+  // this. `planStatus === null` covers a plan that hasn't been saved yet at
+  // all, which is still a fresh Draft in effect.
+  const isEditable = planStatus === null || planStatus === 'Draft';
+
+  // Extracted so it can render in BOTH the sticky department-jump bar (the
+  // normal case) and the "no comparable history items" empty state -- the
+  // zero-history case is exactly what Scope §1 (catalog item-add) exists
+  // for, so the control that unblocks it must not disappear right when it's
+  // needed most.
+  const renderAddItemControl = () => {
+    if (!isEditable) return null;
+    return (
+      <div className="relative" ref={addItemPopoverRef}>
+        <Button
+          ref={addItemButtonRef}
+          type="button"
+          variant="secondary"
+          size="compactSm"
+          className="gap-2"
+          onClick={() => setAddItemOpen((current) => !current)}
+          aria-expanded={addItemOpen}
+        >
+          <Plus className="h-4 w-4" />
+          <span>Add item</span>
+        </Button>
+        {addItemOpen && (
+          <div className="absolute right-0 top-full z-30 mt-1 w-[380px] rounded-lg border border-border bg-card shadow-lg">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+              <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
+              <input
+                ref={addItemInputRef}
+                id="add-item-search"
+                aria-label="Add item to plan"
+                value={addItemQuery}
+                onChange={(event) => setAddItemQuery(event.target.value)}
+                placeholder="Search the item catalog by name or code"
+                className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto">
+              {addItemLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Spinner className="h-4 w-4 text-primary" />
+                </div>
+              ) : addItemResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-text-tertiary">No matching items found.</p>
+              ) : (
+                <ul>
+                  {addItemResults.map((result) => (
+                    <li key={result.item_code}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddManualItem(result)}
+                        className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-primary-tint"
+                      >
+                        <span className="font-medium text-foreground">{result.item_name || result.item_code}</span>
+                        <span className="text-xs text-text-tertiary">
+                          {result.item_code}
+                          {result.department ? ` · ${result.department}` : ''}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const runTransition = async () => {
     if (!planName || !currentAction) return;
@@ -907,64 +980,7 @@ export const SalesPlanPage: React.FC = () => {
                 className="pl-9"
               />
             </label>
-            <div className="relative" ref={addItemPopoverRef}>
-              <Button
-                ref={addItemButtonRef}
-                type="button"
-                variant="secondary"
-                size="compactLg"
-                className="gap-2"
-                onClick={() => setAddItemOpen((current) => !current)}
-                aria-expanded={addItemOpen}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add item</span>
-              </Button>
-              {addItemOpen && (
-                <div className="absolute right-0 top-full z-30 mt-1 w-[380px] rounded-lg border border-border bg-card shadow-lg">
-                  <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                    <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
-                    <input
-                      ref={addItemInputRef}
-                      id="add-item-search"
-                      aria-label="Add item to plan"
-                      value={addItemQuery}
-                      onChange={(event) => setAddItemQuery(event.target.value)}
-                      placeholder="Search the item catalog by name or code"
-                      className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
-                    />
-                  </div>
-                  <div className="max-h-72 overflow-y-auto">
-                    {addItemLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Spinner className="h-4 w-4 text-primary" />
-                      </div>
-                    ) : addItemResults.length === 0 ? (
-                      <p className="px-4 py-3 text-sm text-text-tertiary">No matching items found.</p>
-                    ) : (
-                      <ul>
-                        {addItemResults.map((result) => (
-                          <li key={result.item_code}>
-                            <button
-                              type="button"
-                              onClick={() => handleAddManualItem(result)}
-                              className="flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm hover:bg-primary-tint"
-                            >
-                              <span className="font-medium text-foreground">{result.item_name || result.item_code}</span>
-                              <span className="text-xs text-text-tertiary">
-                                {result.item_code}
-                                {result.department ? ` · ${result.department}` : ''}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            {(planStatus === null || planStatus === 'Draft') && (
+            {isEditable && (
               <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
                 <Save className="h-4 w-4" />
                 <span>{saving ? 'Saving...' : 'Save Draft'}</span>
@@ -1081,27 +1097,38 @@ export const SalesPlanPage: React.FC = () => {
         </Section>
       ) : filteredItems.length === 0 ? (
         <Section>
-          <Card className="p-10 text-center text-sm text-text-tertiary">No comparable history items found for this plan date.</Card>
+          {isEditable && <div className="mb-3 flex justify-end">{renderAddItemControl()}</div>}
+          <Card className="p-10 text-center text-sm text-text-tertiary">
+            No comparable history items found for this plan date. Items with no sales history don't show up as a
+            suggestion, but you can still add any catalog item directly using "Add item" above.
+          </Card>
         </Section>
       ) : (
         <Section>
-          {Object.keys(groupedItems).length > 1 && (
-            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
-              <span className="flex shrink-0 items-center gap-1 pr-1 text-xs font-medium text-text-tertiary">
-                <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
-                Jump to:
-              </span>
-              {Object.keys(groupedItems).map((department) => (
-                <button
-                  key={department}
-                  type="button"
-                  aria-label={`Jump to ${department}`}
-                  onClick={() => jumpToDepartment(department)}
-                  className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-primary-tint"
-                >
-                  {department}
-                </button>
-              ))}
+          {(Object.keys(groupedItems).length > 1 || isEditable) && (
+            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+              <div className="flex flex-wrap items-center gap-2">
+                {Object.keys(groupedItems).length > 1 && (
+                  <>
+                    <span className="flex shrink-0 items-center gap-1 pr-1 text-xs font-medium text-text-tertiary">
+                      <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+                      Jump to:
+                    </span>
+                    {Object.keys(groupedItems).map((department) => (
+                      <button
+                        key={department}
+                        type="button"
+                        aria-label={`Jump to ${department}`}
+                        onClick={() => jumpToDepartment(department)}
+                        className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-primary-tint"
+                      >
+                        {department}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+              {renderAddItemControl()}
             </div>
           )}
           <div className="space-y-5">
