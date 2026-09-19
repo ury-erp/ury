@@ -9,6 +9,16 @@ vi.mock('../../context/BranchContext', () => ({
   useBranchContext: () => ({ activeBranchId: 'Kozhikode', activeBranch: { id: 'Kozhikode', name: 'Kozhikode Branch' } }),
 }));
 
+// useAuth's real implementation calls @ury/core's getLoggedUser()/getUserRoles(),
+// which reject in this jsdom environment (no live Frappe session) and resolve to
+// isManager: false, roles: []. Mocked here (mutable per-test via mockAuthState) so
+// tests can exercise both the manager-only NEXT_ACTION gate and the
+// "URY Sales Plan Controller"-only Return to Draft/Supersede-Cancel gate.
+const mockAuthState: { isManager: boolean; roles: string[] } = { isManager: false, roles: [] };
+vi.mock('../../store/useAuth', () => ({
+  useAuth: () => ({ user: 'test@example.com', roles: mockAuthState.roles, fullName: 'Test User', isLoading: false, error: null, isManager: mockAuthState.isManager }),
+}));
+
 vi.mock('../../services/salesPlan', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/salesPlan')>();
   return {
@@ -18,6 +28,7 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
       getComparableHistory: vi.fn(),
       searchBranchItems: vi.fn(),
       getPlanStatus: vi.fn(),
+      transitionPlan: vi.fn(),
     },
   };
 });
@@ -65,6 +76,8 @@ describe('SalesPlanPage', () => {
   beforeEach(() => {
     cleanup();
     window.localStorage.clear();
+    mockAuthState.isManager = false;
+    mockAuthState.roles = [];
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(historyResponse);
     vi.mocked(salesPlanService.searchBranchItems).mockResolvedValue([]);
     vi.mocked(salesPlanService.getPlanStatus).mockRejectedValue(new Error('not found'));
@@ -396,6 +409,69 @@ describe('SalesPlanPage', () => {
       await screen.findByText('Currently: Draft · Next: Submit for Review');
 
       expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    });
+
+    it('hides Return to Draft/Supersede-Cancel for a user without the URY Sales Plan Controller role', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Submitted for Approval' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+      await screen.findByText('Currently: Review · Next: Approve (manager)');
+
+      expect(screen.queryByRole('button', { name: 'Return to Draft' })).not.toBeInTheDocument();
+    });
+
+    it('lets a URY Sales Plan Controller return a Proposed/Submitted plan to Draft with a reason', async () => {
+      mockAuthState.roles = ['URY Sales Plan Controller'];
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Submitted for Approval' } as any);
+      vi.mocked(salesPlanService.transitionPlan).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+      await screen.findByText('Currently: Review · Next: Approve (manager)');
+
+      const returnButton = screen.getByRole('button', { name: 'Return to Draft' });
+      // Reason is required client-side too: Confirm stays disabled until typed.
+      await userEvent.click(returnButton);
+      const confirmButton = screen.getByRole('button', { name: 'Confirm' });
+      expect(confirmButton).toBeDisabled();
+
+      await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'wrong branch selected');
+      expect(confirmButton).not.toBeDisabled();
+
+      await userEvent.click(confirmButton);
+
+      await waitFor(() => {
+        expect(salesPlanService.transitionPlan).toHaveBeenCalledWith({
+          name: 'PLAN-1',
+          target_state: 'Draft',
+          reason: 'wrong branch selected',
+        });
+      });
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument());
+      await screen.findByText('Currently: Draft · Next: Submit for Review');
+    });
+
+    it('surfaces the real backend error in the Return to Draft modal on failure', async () => {
+      mockAuthState.roles = ['URY Sales Plan Controller'];
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Approved' } as any);
+      vi.mocked(salesPlanService.transitionPlan).mockRejectedValue({
+        exc_type: 'frappe.exceptions.ValidationError',
+        _server_messages: JSON.stringify([
+          JSON.stringify({ message: 'Cannot cancel PLAN-1: production has already been recorded against MTPL.' }),
+        ]),
+      });
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Supersede/Cancel' }));
+      await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+      expect(
+        await screen.findByText('Cannot cancel PLAN-1: production has already been recorded against MTPL.')
+      ).toBeInTheDocument();
     });
 
     it('shows the locked message with no Next for Locked for Production', async () => {
