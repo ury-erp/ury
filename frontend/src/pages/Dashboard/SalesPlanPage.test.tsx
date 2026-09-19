@@ -465,7 +465,7 @@ describe('SalesPlanPage', () => {
       render(<SalesPlanPage />);
       await screen.findByText('Chicken Biryani');
 
-      await userEvent.click(screen.getByRole('button', { name: 'Supersede/Cancel' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
       await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
@@ -487,7 +487,7 @@ describe('SalesPlanPage', () => {
       render(<SalesPlanPage />);
       await screen.findByText('Chicken Biryani');
 
-      await userEvent.click(screen.getByRole('button', { name: 'Supersede/Cancel' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
       await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 

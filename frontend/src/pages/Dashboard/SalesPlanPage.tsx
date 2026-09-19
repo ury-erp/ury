@@ -95,8 +95,12 @@ const NEXT_ACTION: Partial<Record<PlanStatus, { label: string; targetState: Plan
 const BACKWARD_ACTIONS: Partial<Record<PlanStatus, { label: string; targetState: PlanStatus; icon: React.ElementType; destructive?: boolean }>> = {
   Proposed: { label: 'Return to Draft', targetState: 'Draft', icon: RotateCcw },
   'Submitted for Approval': { label: 'Return to Draft', targetState: 'Draft', icon: RotateCcw },
-  Approved: { label: 'Supersede/Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
-  'Locked for Production': { label: 'Supersede/Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
+  // Display label is just "Cancel" -- "Supersede/Cancel" is the backend
+  // Workflow's internal action name (ury/fixtures/workflow.json), not
+  // something a user needs to see; targetState is what actually drives the
+  // API call, independent of this label.
+  Approved: { label: 'Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
+  'Locked for Production': { label: 'Cancel', targetState: 'Superseded/Cancelled', icon: X, destructive: true },
 };
 
 const getToday = () => {
