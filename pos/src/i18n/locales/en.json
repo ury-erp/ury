@@ -492,7 +492,26 @@
     "browse_menu": "Browse menu",
     "menu": "Menu",
     "new_changed": "New / Changed",
-    "reduction_pending": "Reduction Pending"
+    "reduction_pending": "Reduction Pending",
+    "errors": {
+      "no_pos_profile": "POS profile not found.",
+      "not_logged_in": "You are not logged in.",
+      "no_permission": "You do not have permission to modify this order.",
+      "empty_order": "Add at least one item before sending the order.",
+      "no_customer": "Please select a customer before sending the order.",
+      "api_error": "The server rejected the request.",
+      "send_failed": "Failed to send the order.",
+      "no_order_reprint": "No active order to reprint.",
+      "no_order_print": "No active order to print.",
+      "no_order_transfer": "No active order to transfer.",
+      "transfer_unavailable": "Unable to transfer this table."
+    },
+    "success": {
+      "kot_reprinted": "KOT reprinted.",
+      "printed": "Printed successfully.",
+      "table_transferred": "Table transferred.",
+      "captain_transferred": "Captain transferred."
+    }
   },
   "auth": {
     "access_denied": "Access Denied",

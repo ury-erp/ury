@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../../i18n';
@@ -22,6 +22,9 @@ const sizeClasses = {
   full: 'max-w-full',
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export const Drawer: React.FC<DrawerProps> = ({
   isOpen,
   onClose,
@@ -32,19 +35,65 @@ export const Drawer: React.FC<DrawerProps> = ({
   size = 'lg',
   className,
 }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  /**
+   * Escape, a focus trap, and focus restoration.
+   *
+   * Escape was already handled, but focus was not: opening the drawer left
+   * the caret wherever it had been, Tab walked straight out into the page
+   * behind the backdrop, and closing dropped focus onto <body> — so a
+   * keyboard user lost their place entirely (UX-17). A modal surface has to
+   * own focus for as long as it is covering the page.
+   */
   useEffect(() => {
+    if (!isOpen) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+
+    const focusable = () =>
+      Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+
+    // Focus the panel itself rather than its first control: moving straight
+    // into a field skips the heading that says what this drawer is.
+    panelRef.current?.focus();
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const els = focusable();
+      if (els.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = els[0];
+      const last = els[els.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey && (active === first || active === panelRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
+      // Back where they were, so closing a drawer resumes the form rather
+      // than restarting the tab order from the top of the document.
+      previouslyFocusedRef.current?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -66,6 +115,11 @@ export const Drawer: React.FC<DrawerProps> = ({
       {/* Slide-over panel container */}
       <div className="fixed inset-y-0 end-0 flex max-w-full ps-10">
         <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          tabIndex={-1}
           className={cn(
             'w-screen transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
             sizeClasses[size],

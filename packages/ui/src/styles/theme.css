@@ -22,7 +22,12 @@
     --secondary: 44 100% 92%;
     --secondary-foreground: 28 63% 23%;
     --muted: 40 30% 93%;
-    --muted-foreground: 25 12% 45%;
+    /* 42% not 45%: at 45% this pairs with --background at 4.47:1, which
+       is below the 4.5:1 WCAG needs for normal text and must not be
+       rounded up to a pass. 42% measures 5.00:1 on background and
+       5.28:1 on card — a margin, so a future nudge does not silently
+       drop it back under. */
+    --muted-foreground: 25 12% 42%;
     --accent: 45 100% 58%;
     --accent-foreground: 28 63% 20%;
     --accent-50: 48 100% 97%;
@@ -36,7 +41,11 @@
     --accent-800: 32 74% 25%;
     --accent-900: 28 66% 19%;
     --accent-950: 25 58% 13%;
-    --destructive: 0 84.2% 60.2%;
+    /* 48% not 60.2%: the destructive button puts near-white text on this
+       colour, and at 60.2% that pair measures 3.76:1 — the least legible
+       control in the system was the one announcing damage. 48% measures
+       4.86:1 and stays unmistakably red. */
+    --destructive: 0 84.2% 48%;
     --destructive-foreground: 210 40% 98%;
     --border: 35 24% 87%;
     --input: 35 24% 83%;

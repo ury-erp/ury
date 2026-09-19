@@ -423,5 +423,26 @@
     "label": "Langue",
     "change_language": "Changer de langue",
     "switched": "Langue modifiée"
+  },
+  "captain": {
+    "errors": {
+      "no_pos_profile": "Profil de caisse introuvable.",
+      "not_logged_in": "Vous n'êtes pas connecté.",
+      "no_permission": "Vous n'avez pas la permission de modifier cette commande.",
+      "empty_order": "Ajoutez au moins un article avant d'envoyer la commande.",
+      "no_customer": "Sélectionnez un client avant d'envoyer la commande.",
+      "api_error": "Le serveur a rejeté la requête.",
+      "send_failed": "Échec de l'envoi de la commande.",
+      "no_order_reprint": "Aucune commande active à réimprimer.",
+      "no_order_print": "Aucune commande active à imprimer.",
+      "no_order_transfer": "Aucune commande active à transférer.",
+      "transfer_unavailable": "Impossible de transférer cette table."
+    },
+    "success": {
+      "kot_reprinted": "Bon de cuisine réimprimé.",
+      "printed": "Impression réussie.",
+      "table_transferred": "Table transférée.",
+      "captain_transferred": "Capitaine transféré."
+    }
   }
 }

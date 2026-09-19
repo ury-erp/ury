@@ -497,7 +497,26 @@
     "browse_menu": "استعراض قائمة الطعام",
     "menu": "قائمة الطعام",
     "new_changed": "جديد / معدّل",
-    "reduction_pending": "تقليل معلّق"
+    "reduction_pending": "تقليل معلّق",
+    "errors": {
+      "no_pos_profile": "لم يُعثر على ملف الكاشير.",
+      "not_logged_in": "لم تسجّل الدخول.",
+      "no_permission": "ليست لديك صلاحية تعديل هذا الطلب.",
+      "empty_order": "أضف صنفاً واحداً على الأقل قبل إرسال الطلب.",
+      "no_customer": "اختر زبوناً قبل إرسال الطلب.",
+      "api_error": "رفض الخادم الطلب.",
+      "send_failed": "تعذّر إرسال الطلب.",
+      "no_order_reprint": "لا يوجد طلب نشط لإعادة طباعته.",
+      "no_order_print": "لا يوجد طلب نشط للطباعة.",
+      "no_order_transfer": "لا يوجد طلب نشط لنقله.",
+      "transfer_unavailable": "تعذّر نقل هذه الطاولة."
+    },
+    "success": {
+      "kot_reprinted": "أُعيدت طباعة أمر المطبخ.",
+      "printed": "تمت الطباعة بنجاح.",
+      "table_transferred": "تم نقل الطاولة.",
+      "captain_transferred": "تم نقل الكابتن."
+    }
   },
   "auth": {
     "access_denied": "تم رفض الوصول",

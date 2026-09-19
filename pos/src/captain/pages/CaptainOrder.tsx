@@ -173,19 +173,19 @@ export default function CaptainOrder() {
     if (!table) return;
     try {
       if (!posProfile) {
-        showToast.error('POS profile not found.');
+        showToast.error(t('captain.errors.no_pos_profile'));
         return;
       }
       if (!user?.name) {
-        showToast.error('You are not logged in.');
+        showToast.error(t('captain.errors.not_logged_in'));
         return;
       }
       if (!canModify) {
-        showToast.error('You do not have permission to modify this order.');
+        showToast.error(t('captain.errors.no_permission'));
         return;
       }
       if (activeOrders.length === 0) {
-        showToast.error('Add at least one item before sending the order.');
+        showToast.error(t('captain.errors.empty_order'));
         return;
       }
       // sync_order requires `customer` as a hard backend parameter (found via
@@ -193,7 +193,7 @@ export default function CaptainOrder() {
       // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
       // exact validate-before-submit gate rather than only omitting the field.
       if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before sending the order.');
+        showToast.error(t('captain.errors.no_customer'));
         return;
       }
 
@@ -247,14 +247,14 @@ export default function CaptainOrder() {
         try {
           const messages = JSON.parse(serverMessages);
           const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
+          showToast.error(messageObj.message || t('captain.errors.api_error'));
         } catch {
-          showToast.error('API error');
+          showToast.error(t('captain.errors.api_error'));
         }
       } else if (error instanceof Error) {
         showToast.error(error.message);
       } else {
-        showToast.error('Failed to send the order.');
+        showToast.error(t('captain.errors.send_failed'));
       }
     } finally {
       setIsSubmitting(false);
@@ -273,13 +273,13 @@ export default function CaptainOrder() {
 
   const handleReprintKot = async () => {
     if (!invoiceId) {
-      showToast.error('No active order to reprint.');
+      showToast.error(t('captain.errors.no_order_reprint'));
       return;
     }
     setIsReprintingKot(true);
     try {
       await reprintKot(invoiceId);
-      showToast.success('KOT reprinted.');
+      showToast.success(t('captain.success.kot_reprinted'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to reprint KOT.');
     } finally {
@@ -289,11 +289,11 @@ export default function CaptainOrder() {
 
   const handlePrintBill = async () => {
     if (!invoiceId) {
-      showToast.error('No active order to print.');
+      showToast.error(t('captain.errors.no_order_print'));
       return;
     }
     if (!posProfile) {
-      showToast.error('POS profile not found.');
+      showToast.error(t('captain.errors.no_pos_profile'));
       return;
     }
     setIsPrintingBill(true);
@@ -303,7 +303,7 @@ export default function CaptainOrder() {
         posProfile,
         printFormat: resolvePrintFormat(context?.order ?? {}, posProfile.print_format),
       });
-      showToast.success('Printed successfully.');
+      showToast.success(t('captain.success.printed'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print bill.');
     } finally {
@@ -313,12 +313,12 @@ export default function CaptainOrder() {
 
   const handleOpenTransferTable = async () => {
     if (!invoiceId || !table) {
-      showToast.error('No active order to transfer.');
+      showToast.error(t('captain.errors.no_order_transfer'));
       return;
     }
     const branch = posProfile?.branch;
     if (!branch) {
-      showToast.error('Unable to transfer this table.');
+      showToast.error(t('captain.errors.transfer_unavailable'));
       return;
     }
     setTransferDestinations([]);
@@ -339,7 +339,7 @@ export default function CaptainOrder() {
     if (!table || !invoiceId) return;
     await tableTransfer(table, newTable, invoiceId);
     clearTableOrder();
-    showToast.success('Table transferred.');
+    showToast.success(t('captain.success.table_transferred'));
     navigate('/order');
   };
 
@@ -347,7 +347,7 @@ export default function CaptainOrder() {
 
   const handleOpenTransferCaptain = () => {
     if (!invoiceId) {
-      showToast.error('No active order to transfer.');
+      showToast.error(t('captain.errors.no_order_transfer'));
       return;
     }
     setIsTransferCaptainOpen(true);
@@ -357,7 +357,7 @@ export default function CaptainOrder() {
     if (!invoiceId) return;
     await captainTransfer(currentCaptain, newCaptain, invoiceId);
     clearTableOrder();
-    showToast.success('Captain transferred.');
+    showToast.success(t('captain.success.captain_transferred'));
     navigate('/order');
   };
 

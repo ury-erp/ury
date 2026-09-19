@@ -41,6 +41,9 @@ export function SearchableSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  // -1 means "nothing highlighted": the list opens with no pre-selection so
+  // Enter cannot commit an option the user never looked at.
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [portalStyle, setPortalStyle] = useState<{
     top: number;
     left: number;
@@ -157,11 +160,70 @@ export function SearchableSelect({
     }
   };
 
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchTerm, isOpen]);
+
+  /**
+   * Keyboard control for the list.
+   *
+   * The field was mouse-only: no key handler at all, so a form containing one
+   * could not be completed from the keyboard, and nothing announced that the
+   * input controlled a list (UX-17). Arrow keys move the highlight, Enter
+   * commits it, Escape closes without committing, Home/End jump the ends.
+   */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        return;
+      }
+      if (filteredOptions.length === 0) return;
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setActiveIndex((prev) => {
+        const next = prev + step;
+        if (next < 0) return filteredOptions.length - 1;
+        if (next >= filteredOptions.length) return 0;
+        return next;
+      });
+      return;
+    }
+
+    if (e.key === 'Home' || e.key === 'End') {
+      if (!isOpen || filteredOptions.length === 0) return;
+      e.preventDefault();
+      setActiveIndex(e.key === 'Home' ? 0 : filteredOptions.length - 1);
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (isOpen && activeIndex >= 0 && activeIndex < filteredOptions.length) {
+        // Only swallow Enter when it is actually committing a highlighted
+        // option; otherwise the surrounding form keeps its submit behaviour.
+        e.preventDefault();
+        handleSelectOption(filteredOptions[activeIndex]);
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (isOpen) {
+        e.preventDefault();
+        setIsOpen(false);
+        setActiveIndex(-1);
+      }
+    }
+  };
+
   const handleSelectOption = (opt: Option) => {
     onChange(id, opt.value);
     setSearchTerm(opt.label);
     setIsTyping(false);
     setIsOpen(false);
+    setActiveIndex(-1);
     onBlur?.(id);
   };
 
@@ -174,6 +236,8 @@ export function SearchableSelect({
   const dropdownContent = (isOpen && !disabled) ? (
     <div
       ref={dropdownRef}
+      role="listbox"
+      id={`${id}-listbox`}
       style={{
         position: 'fixed',
         top: `${portalStyle.top}px`,
@@ -186,7 +250,7 @@ export function SearchableSelect({
       className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {filteredOptions.length > 0 ? (
-        filteredOptions.map((opt) => {
+        filteredOptions.map((opt, optIndex) => {
           const isActionOption =
             opt.value === 'CREATE_NEW_ITEM' ||
             opt.value === 'CREATE_NEW_COURSE' ||
@@ -201,12 +265,20 @@ export function SearchableSelect({
               (opt.value !== '' && opt.value && value !== '' && value && opt.value.toLowerCase() === value.toLowerCase()) ||
               (opt.label !== '' && opt.label && value !== '' && value && opt.label.toLowerCase() === value.toLowerCase()));
 
+          const isActive = optIndex === activeIndex;
+
           return (
             <div
               key={opt.value}
+              id={`${id}-option-${optIndex}`}
+              role="option"
+              aria-selected={isSelected}
               onClick={() => handleSelectOption(opt)}
+              onMouseEnter={() => setActiveIndex(optIndex)}
               className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
-                isSelected
+                isActive
+                  ? 'bg-blue-100 text-blue-900'
+                  : isSelected
                   ? 'bg-blue-50 text-blue-700 font-normal'
                   : isActionOption
                   ? 'text-blue-600 font-medium hover:bg-blue-50/50 border-t border-gray-100 mt-1 pt-2'
@@ -231,6 +303,14 @@ export function SearchableSelect({
           value={searchTerm}
           onChange={handleInputChange}
           onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-expanded={isOpen && !disabled}
+          aria-controls={`${id}-listbox`}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            isOpen && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined
+          }
           placeholder={placeholder}
           error={error}
           disabled={disabled}

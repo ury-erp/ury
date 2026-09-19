@@ -93,7 +93,7 @@ export default function CaptainTables() {
       setTables(sortTablesByMergeGroups(fetchedTables));
     } catch (err) {
       console.error(err);
-      setTablesError('Failed to load tables');
+      setTablesError(t('errors.failed_load_tables'));
       setTables([]);
     } finally {
       setTablesLoading(false);
