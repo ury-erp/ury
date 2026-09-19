@@ -29,7 +29,22 @@ export interface ComparableHistoryResponse {
 
 export interface SalesPlanItem extends ComparableHistoryItem {
   planned_qty: number;
+  /**
+   * Stable client-side row identity, distinct from `item_code`: two Sales
+   * Plan Item rows can legitimately share the same item_code, so `item_code`
+   * alone is not a safe React/table key -- this is generated once when the
+   * item is first added to the draft (from history or manual add) and never
+   * recomputed, so edits/bulk-set/CSV always target exactly one row.
+   */
+  _rowKey: string;
 }
+
+const generateRowKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 export interface SalesPlanDraft {
   plan_date: string;
@@ -46,6 +61,31 @@ export interface LoadSalesPlanParams {
 }
 
 const STORAGE_KEY_PREFIX = 'ury_v3_sales_plan_draft';
+
+export const addManualItemToDraft = (
+  items: SalesPlanItem[],
+  searchResult: BranchItemSearchResult,
+): SalesPlanItem[] => {
+  // Check for duplicates by item_code
+  if (items.some((item) => item.item_code === searchResult.item_code)) {
+    return items;
+  }
+
+  const newItem: SalesPlanItem = {
+    item_code: searchResult.item_code,
+    item_name: searchResult.item_name || searchResult.item_code,
+    stock_uom: searchResult.stock_uom || 'Nos',
+    department: searchResult.department || 'Ungrouped',
+    production_unit: searchResult.production_unit || 'Unassigned',
+    average_qty: 0,
+    sample_days: 0,
+    history: [],
+    planned_qty: 0,
+    _rowKey: generateRowKey(),
+  };
+
+  return [...items, newItem];
+};
 
 export const buildSalesPlanDraftKey = (params: Pick<LoadSalesPlanParams, 'branch' | 'company' | 'plan_date'>) => {
   if (!params.branch || params.branch === 'all' || !params.company || !params.plan_date) {
@@ -103,6 +143,7 @@ export const buildSalesPlanDraft = (
       return {
         ...item,
         planned_qty: Number.isFinite(savedQty) ? savedQty : Math.round(item.average_qty),
+        _rowKey: generateRowKey(),
       };
     }),
   };
@@ -158,6 +199,12 @@ export interface SaveSalesPlanDraftResponse {
   status: string;
 }
 
+export interface TransitionSalesPlanParams {
+  name: string;
+  target_state: string;
+  reason?: string;
+}
+
 export interface GetPlanStatusParams {
   branch: string;
   plan_date: string;
@@ -167,6 +214,28 @@ export interface GetPlanStatusResponse {
   name: string | null;
   status: string | null;
   enforcement_mode: string | null;
+  /** Name of the most recently Superseded/Cancelled plan for this
+   * branch+date, when that's the reason no active plan was found (a
+   * cancelled plan is a dead end -- see ury_sales_plan.py's
+   * get_plan_status() -- so it's excluded from name/status, but the
+   * frontend still needs to know one existed to explain why a fresh Draft
+   * is starting instead of silently pretending nothing was ever there). */
+  superseded_plan?: string | null;
+}
+
+export interface BranchItemSearchResult {
+  item_code: string;
+  item_name?: string;
+  stock_uom?: string;
+  department?: string;
+  production_unit?: string;
+}
+
+export interface SearchBranchItemsParams {
+  branch: string;
+  company?: string;
+  query?: string;
+  limit?: number;
 }
 
 export const salesPlanService = {
@@ -198,6 +267,21 @@ export const salesPlanService = {
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
   },
 
+  async transitionPlan(params: TransitionSalesPlanParams): Promise<SaveSalesPlanDraftResponse> {
+    const body: any = {
+      name: params.name,
+      target_state: params.target_state,
+    };
+    if (params.reason !== undefined) {
+      body.reason = params.reason;
+    }
+    const res = await call.post<SaveSalesPlanDraftResponse>(
+      'ury.ury.api.ury_sales_plan.transition_plan',
+      body,
+    );
+    return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
   async getPlan(name: string): Promise<Record<string, unknown>> {
     const res = await call.get<Record<string, unknown>>(
       'ury.ury.api.ury_sales_plan.get_plan',
@@ -212,5 +296,19 @@ export const salesPlanService = {
       { branch: params.branch, plan_date: params.plan_date },
     );
     return ((res as any)?.message ?? res) as GetPlanStatusResponse;
+  },
+
+  async searchBranchItems(params: SearchBranchItemsParams): Promise<BranchItemSearchResult[]> {
+    const res = await call.get<BranchItemSearchResult[]>(
+      'ury.ury.api.ury_dashboard.search_branch_items',
+      {
+        branch: params.branch,
+        company: params.company,
+        query: params.query || '',
+        limit: params.limit || 25,
+      },
+    );
+    const items = ((res as any)?.message ?? res) as BranchItemSearchResult[];
+    return Array.isArray(items) ? items : [];
   },
 };
