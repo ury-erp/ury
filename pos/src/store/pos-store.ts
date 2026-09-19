@@ -111,6 +111,10 @@ interface POSState {
   selectedTable: string | null;
   selectedRoom: string | null;
   searchQuery: string;
+  /** Header search text while the tables screen is open. Kept apart from
+      `searchQuery` (menu items) so leaving one screen does not silently
+      filter the other. */
+  tableSearchQuery: string;
   selectedCustomer: Customer | null;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
@@ -164,6 +168,7 @@ interface POSStore extends POSState {
   setSelectedCustomer: (customer: Customer | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
+  setTableSearchQuery: (query: string) => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
   setSelectedItem: (item: MenuItem | null) => void;
   initializeCart: () => Promise<void>;
@@ -299,6 +304,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   categories: [],
   selectedCategory: '',
   searchQuery: '',
+  tableSearchQuery: '',
   quickFilter: "all",
   selectedItem: null,
   cartId: null,
@@ -575,6 +581,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setTableSearchQuery: (query) => set({ tableSearchQuery: query }),
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
@@ -590,8 +597,15 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
   setSelectedOrderType: (type) => {
     const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
-    
-    set({ 
+
+    // Re-picking the type that is already active is not a change, and must
+    // not behave like one. The path below clears `activeOrders`, so tapping
+    // the highlighted service type — which a cashier does by reflex, to
+    // reopen the table dialog or just to confirm where they are — silently
+    // emptied a cart that was already correct (UX-02).
+    if (type === selectedOrderType) return;
+
+    set({
           selectedOrderType: type,
           orderId: null
     });

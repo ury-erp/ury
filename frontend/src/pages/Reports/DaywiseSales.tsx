@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Receipt, IndianRupee, TrendingUp, Trophy } from 'lucide-react';
+import { Receipt, IndianRupee, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { startOfMonth, endOfDay } from 'date-fns';
 import { toApiDate } from '../../lib/reportDate';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface DayRow {
   date: string;
@@ -32,14 +34,14 @@ interface DaywiseSalesData {
   };
 }
 
-const columns: DataTableColumn<DayRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'total_invoices', header: 'Invoices', align: 'right' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
-  { key: 'round_off', header: 'Round Off', render: (r) => formatCurrency(r.round_off), align: 'right' },
-  { key: 'cash_discount', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discount), align: 'right' },
+const getColumns = (): DataTableColumn<DayRow>[] => [
+  { key: 'date', header: t('fields.date') },
+  { key: 'total_invoices', header: t('fields.invoices'), align: 'right' },
+  { key: 'item_total', header: t('fields.item_total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'total_taxes', header: t('fields.taxes'), render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'grand_total', header: t('fields.grand_total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
+  { key: 'round_off', header: t('fields.round_off'), render: (r) => formatCurrency(r.round_off), align: 'right' },
+  { key: 'cash_discount', header: t('fields.cash_discounts'), render: (r) => formatCurrency(r.cash_discount), align: 'right' },
 ];
 
 export function DaywiseSales() {
@@ -64,7 +66,7 @@ export function DaywiseSales() {
       });
       setData(res.message ?? (res as unknown as DaywiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +80,7 @@ export function DaywiseSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Daywise Sales</h1>
+          <h1 className="text-xl font-semibold">{t('reports.daywise_sales.daywise_sales')}</h1>
           <p className="text-sm text-muted-foreground">
             Daily sales trend {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -87,33 +89,37 @@ export function DaywiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton chart />
       ) : data ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Period Total"
+              label={t('reports.daywise_sales.period_total')}
               value={formatCurrency(data.summary.period_total)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
             <StatCard
-              label="Avg Daily Sales"
+              label={t('reports.daywise_sales.avg_daily_sales')}
               value={formatCurrency(data.summary.period_avg_daily)}
               icon={<TrendingUp className="w-4 h-4" />}
             />
             <StatCard
-              label="Total Invoices"
+              label={t('reports.daywise_sales.total_invoices')}
               value={data.summary.total_invoices}
               icon={<Receipt className="w-4 h-4" />}
             />
             <StatCard
-              label="Peak Day"
+              label={t('reports.daywise_sales.peak_day')}
               value={data.summary.peak_day ? `${data.summary.peak_day}` : '—'}
               delta={
                 data.summary.peak_day
@@ -125,14 +131,14 @@ export function DaywiseSales() {
           </div>
 
           <LineChartCard
-            title="Grand Total Trend"
+            title={t('reports.daywise_sales.grand_total_trend')}
             data={data.rows}
             xKey="date"
             yKeys={['grand_total']}
-            labels={{ grand_total: 'Grand Total' }}
+            labels={{ grand_total: t('fields.grand_total') }}
           />
 
-          <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.rows} isLoading={isLoading} />
         </>
       ) : null}
     </div>

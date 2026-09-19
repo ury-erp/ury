@@ -25,6 +25,7 @@ import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
 import CaptainTransferDialog from '../../components/CaptainTransferDialog';
 import { CustomerSelect } from '../../components/CustomerSelect';
+import { t } from '../../i18n';
 
 type Mode = 'menu' | 'order';
 
@@ -172,19 +173,19 @@ export default function CaptainOrder() {
     if (!table) return;
     try {
       if (!posProfile) {
-        showToast.error('POS profile not found.');
+        showToast.error(t('captain.errors.no_pos_profile'));
         return;
       }
       if (!user?.name) {
-        showToast.error('You are not logged in.');
+        showToast.error(t('captain.errors.not_logged_in'));
         return;
       }
       if (!canModify) {
-        showToast.error('You do not have permission to modify this order.');
+        showToast.error(t('captain.errors.no_permission'));
         return;
       }
       if (activeOrders.length === 0) {
-        showToast.error('Add at least one item before sending the order.');
+        showToast.error(t('captain.errors.empty_order'));
         return;
       }
       // sync_order requires `customer` as a hard backend parameter (found via
@@ -192,7 +193,7 @@ export default function CaptainOrder() {
       // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
       // exact validate-before-submit gate rather than only omitting the field.
       if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before sending the order.');
+        showToast.error(t('captain.errors.no_customer'));
         return;
       }
 
@@ -246,14 +247,14 @@ export default function CaptainOrder() {
         try {
           const messages = JSON.parse(serverMessages);
           const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
+          showToast.error(messageObj.message || t('captain.errors.api_error'));
         } catch {
-          showToast.error('API error');
+          showToast.error(t('captain.errors.api_error'));
         }
       } else if (error instanceof Error) {
         showToast.error(error.message);
       } else {
-        showToast.error('Failed to send the order.');
+        showToast.error(t('captain.errors.send_failed'));
       }
     } finally {
       setIsSubmitting(false);
@@ -272,13 +273,13 @@ export default function CaptainOrder() {
 
   const handleReprintKot = async () => {
     if (!invoiceId) {
-      showToast.error('No active order to reprint.');
+      showToast.error(t('captain.errors.no_order_reprint'));
       return;
     }
     setIsReprintingKot(true);
     try {
       await reprintKot(invoiceId);
-      showToast.success('KOT reprinted.');
+      showToast.success(t('captain.success.kot_reprinted'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to reprint KOT.');
     } finally {
@@ -288,11 +289,11 @@ export default function CaptainOrder() {
 
   const handlePrintBill = async () => {
     if (!invoiceId) {
-      showToast.error('No active order to print.');
+      showToast.error(t('captain.errors.no_order_print'));
       return;
     }
     if (!posProfile) {
-      showToast.error('POS profile not found.');
+      showToast.error(t('captain.errors.no_pos_profile'));
       return;
     }
     setIsPrintingBill(true);
@@ -302,7 +303,7 @@ export default function CaptainOrder() {
         posProfile,
         printFormat: resolvePrintFormat(context?.order ?? {}, posProfile.print_format),
       });
-      showToast.success('Printed successfully.');
+      showToast.success(t('captain.success.printed'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print bill.');
     } finally {
@@ -312,12 +313,12 @@ export default function CaptainOrder() {
 
   const handleOpenTransferTable = async () => {
     if (!invoiceId || !table) {
-      showToast.error('No active order to transfer.');
+      showToast.error(t('captain.errors.no_order_transfer'));
       return;
     }
     const branch = posProfile?.branch;
     if (!branch) {
-      showToast.error('Unable to transfer this table.');
+      showToast.error(t('captain.errors.transfer_unavailable'));
       return;
     }
     setTransferDestinations([]);
@@ -338,7 +339,7 @@ export default function CaptainOrder() {
     if (!table || !invoiceId) return;
     await tableTransfer(table, newTable, invoiceId);
     clearTableOrder();
-    showToast.success('Table transferred.');
+    showToast.success(t('captain.success.table_transferred'));
     navigate('/order');
   };
 
@@ -346,7 +347,7 @@ export default function CaptainOrder() {
 
   const handleOpenTransferCaptain = () => {
     if (!invoiceId) {
-      showToast.error('No active order to transfer.');
+      showToast.error(t('captain.errors.no_order_transfer'));
       return;
     }
     setIsTransferCaptainOpen(true);
@@ -356,7 +357,7 @@ export default function CaptainOrder() {
     if (!invoiceId) return;
     await captainTransfer(currentCaptain, newCaptain, invoiceId);
     clearTableOrder();
-    showToast.success('Captain transferred.');
+    showToast.success(t('captain.success.captain_transferred'));
     navigate('/order');
   };
 
@@ -375,14 +376,14 @@ export default function CaptainOrder() {
 
       {!canModify && (
         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">Pax</span>
+          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
           <span className="text-sm text-gray-900">{noOfPax}</span>
         </div>
       )}
 
       {canModify && (
         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">Pax</span>
+          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
           <div className="flex items-center gap-3">
             <Button
               onClick={() => setNoOfPax(Math.max(MIN_PAX, noOfPax - 1))}
@@ -410,20 +411,16 @@ export default function CaptainOrder() {
       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-16">
           <ClipboardList className="w-10 h-10 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">No items yet.</p>
+          <p className="text-gray-500 text-sm">{t('captain.no_items_yet')}</p>
           {canModify && (
-            <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
-              Browse menu
-            </Button>
+            <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">{t('captain.browse_menu')}</Button>
           )}
         </div>
       ) : (
         <>
           {alreadyOrderedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
-                Already Ordered
-              </h2>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">{t('captain.already_ordered')}</h2>
               <div className="space-y-2">
                 {alreadyOrderedLines.map((line) => (
                   <CaptainOrderLine
@@ -442,9 +439,7 @@ export default function CaptainOrder() {
 
           {newOrChangedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 px-1">
-                New / Changed
-              </h2>
+              <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 px-1">{t('captain.new_changed')}</h2>
               <div className="space-y-2">
                 {newOrChangedLines.map((line) => (
                   <CaptainOrderLine
@@ -463,9 +458,7 @@ export default function CaptainOrder() {
 
           {reductionPendingLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 px-1">
-                Reduction Pending
-              </h2>
+              <h2 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 px-1">{t('captain.reduction_pending')}</h2>
               <div className="space-y-2">
                 {reductionPendingLines.map((line) => (
                   <CaptainOrderLine
@@ -496,11 +489,9 @@ export default function CaptainOrder() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center">
-          <p className="text-lg font-semibold text-red-600 mb-2">Unable to load this table</p>
+          <p className="text-lg font-semibold text-red-600 mb-2">{t('captain.table_load_failed')}</p>
           <p className="text-gray-600 text-sm">{contextError}</p>
-          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
-            Back to Tables
-          </Button>
+          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">{t('captain.back_to_tables')}</Button>
         </div>
       </div>
     );
@@ -510,13 +501,11 @@ export default function CaptainOrder() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="text-center max-w-sm">
-          <p className="text-lg font-semibold text-gray-900 mb-2">Not permitted</p>
+          <p className="text-lg font-semibold text-gray-900 mb-2">{t('errors.not_permitted')}</p>
           <p className="text-gray-600 text-sm">
             You don't have access to view this table's order. It may belong to another captain.
           </p>
-          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
-            Back to Tables
-          </Button>
+          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">{t('captain.back_to_tables')}</Button>
         </div>
       </div>
     );
@@ -527,7 +516,7 @@ export default function CaptainOrder() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label="Back to Tables">
+          <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label={t('captain.back_to_tables')}>
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
@@ -546,9 +535,7 @@ export default function CaptainOrder() {
                   mode === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600'
                 )}
               >
-                <UtensilsCrossed className="w-4 h-4" />
-                Menu
-              </button>
+                <UtensilsCrossed className="w-4 h-4" />{t('captain.menu')}</button>
               <button
                 onClick={() => setMode('order')}
                 className={cn(
@@ -618,7 +605,7 @@ export default function CaptainOrder() {
         {canModify && (
           <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg">
             <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-sm font-semibold text-gray-700">Total</span>
+              <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
             </div>
             <Button
@@ -647,7 +634,7 @@ export default function CaptainOrder() {
       {canModify && (
         <div className="sticky bottom-0 lg:hidden bg-white border-t border-gray-200 p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-sm font-semibold text-gray-700">Total</span>
+            <span className="text-sm font-semibold text-gray-700">{t('cart.total')}</span>
             <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
           </div>
           <Button

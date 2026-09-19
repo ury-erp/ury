@@ -3,6 +3,7 @@ import { formatCurrency } from '@ury/core';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { TransactionRecord } from '../../services/dashboard';
+import { t } from '../../i18n';
 
 interface ReportWidgetsProps {
   recentTransactions: TransactionRecord[];
@@ -20,12 +21,8 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
       <Card className="rounded-lg border border-gray-200 bg-white shadow-xs overflow-hidden">
         <CardHeader className="border-b border-gray-100 bg-gray-50/50 p-5">
           <div>
-            <CardTitle className="text-lg font-bold text-gray-900">
-              Live POS Transactions
-            </CardTitle>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Real-time sales and active checkouts
-            </p>
+            <CardTitle className="text-lg font-bold text-gray-900">{t('dash.report_widgets.live_pos_transactions')}</CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">{t('dash.report_widgets.real_time_sales_and_active_checkouts')}</p>
           </div>
         </CardHeader>
 
@@ -36,24 +33,22 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-start text-xs">
                 <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
                   <tr>
-                    <th className="px-5 py-3.5">Invoice ID</th>
-                    <th className="px-5 py-3.5">Customer</th>
-                    <th className="px-5 py-3.5">Table / Location</th>
-                    <th className="px-5 py-3.5">Order Type</th>
+                    <th className="px-5 py-3.5">{t('dash.report_widgets.invoice_id')}</th>
+                    <th className="px-5 py-3.5">{t('dash.report_widgets.customer')}</th>
+                    <th className="px-5 py-3.5">{t('dash.report_widgets.table_location')}</th>
+                    <th className="px-5 py-3.5">{t('dash.report_widgets.order_type')}</th>
                     <th className="px-5 py-3.5">Date &amp; Time</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5 text-right">Grand Total</th>
+                    <th className="px-5 py-3.5">{t('dash.report_widgets.status')}</th>
+                    <th className="px-5 py-3.5 text-end">{t('dash.report_widgets.grand_total')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                   {recentTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                        No transactions recorded yet today.
-                      </td>
+                      <td colSpan={7} className="px-5 py-8 text-center text-gray-400">{t('dash.report_widgets.no_transactions_recorded_yet_today')}</td>
                     </tr>
                   ) : (
                     recentTransactions.map((tx) => (
@@ -75,7 +70,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
                             {tx.status}
                           </Badge>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-bold text-gray-900">
+                        <td className="px-5 py-3.5 text-end font-bold text-gray-900">
                           {formatCurrency(tx.grand_total)}
                         </td>
                       </tr>

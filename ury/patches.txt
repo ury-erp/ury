@@ -6,3 +6,5 @@
 ury.patches.v2_0.default_permissions
 ury.patches.v2_0.fix_waiter_order_slip_print_format
 ury.patches.v2_0.admin_permissions
+ury.patches.v2_0.rename_ury_workspace_to_smart_restro
+ury.patches.v2_0.add_table_close_fields

@@ -8,6 +8,7 @@ import {
   endOfMonth,
   format,
 } from 'date-fns';
+import { t } from '../../i18n';
 
 export interface DateRangeValue {
   from: Date;
@@ -346,9 +347,7 @@ export function DatePicker({
               type="button"
               onClick={handleTodayClick}
               className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
-            >
-              Today
-            </button>
+            >{t('dash.date_picker.today')}</button>
           </div>
         </div>
       )}

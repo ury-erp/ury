@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@ury/ui';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, DoorClosed } from 'lucide-react';
+import { Badge, Button, Card, CardContent, ErrorState } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
@@ -18,7 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, getTableCloseState, closeTable } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -83,6 +83,11 @@ export default function Orders() {
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
   const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+  // Only true when this order's table is still held with every bill on it
+  // settled; the backend owns that rule (see getTableCloseState).
+  const [canCloseTable, setCanCloseTable] = React.useState(false);
+  const [closeTableDialogOpen, setCloseTableDialogOpen] = React.useState(false);
+  const [closingTable, setClosingTable] = React.useState(false);
 
   React.useEffect(() => {
     if (selectedOrder?.name) {
@@ -97,6 +102,56 @@ export default function Orders() {
       setCanCancelInvoice(false);
     }
   }, [selectedOrder?.name]);
+
+  const refreshTableCloseState = React.useCallback(async (order: POSInvoice | null) => {
+    if (!order?.name || !order.restaurant_table) {
+      setCanCloseTable(false);
+      return;
+    }
+    const state = await getTableCloseState({ invoice: order.name });
+    setCanCloseTable(state.can_close);
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!selectedOrder?.name || !selectedOrder.restaurant_table) {
+      setCanCloseTable(false);
+      return;
+    }
+    getTableCloseState({ invoice: selectedOrder.name }).then((state) => {
+      // A slower reply for an order the cashier has already moved off must not
+      // light the button up on whatever is on screen now.
+      if (!cancelled) setCanCloseTable(state.can_close);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrder?.name, selectedOrder?.restaurant_table, selectedOrder?.invoice_printed, selectedOrder?.status]);
+
+  async function handleCloseTable() {
+    if (!selectedOrder) return;
+    setClosingTable(true);
+    try {
+      await closeTable({ invoice: selectedOrder.name });
+      showToast.success(t('success.table_closed'));
+      setCloseTableDialogOpen(false);
+      setCanCloseTable(false);
+      await fetchOrders();
+      const refreshed = useRootStore.getState().orders.find((o) => o.name === selectedOrder.name);
+      if (refreshed) {
+        await selectOrder(refreshed);
+      } else {
+        clearSelectedOrder();
+      }
+    } catch (err) {
+      showToast.error(parseFrappeError(err, t('errors.failed_close_table')));
+      // The refusal is the backend's answer about this table, so re-read the
+      // state rather than leaving a button that has just been told no.
+      await refreshTableCloseState(selectedOrder);
+    } finally {
+      setClosingTable(false);
+    }
+  }
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -361,10 +416,12 @@ export default function Orders() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
-          <p className="text-gray-600">{error}</p>
-        </div>
+        <ErrorState
+          title={t('errors.failed_load_orders')}
+          description={error}
+          retryLabel={t('common.retry')}
+          onRetry={() => fetchOrders()}
+        />
       </div>
     );
   }
@@ -533,7 +590,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('errors.failed_load_order_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (
@@ -558,7 +615,7 @@ export default function Orders() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Edit order"
+                        aria-label={t('order.edit_order')}
                         onClick={handleEditOrder}
                         disabled={editLoading}
                       >
@@ -569,7 +626,7 @@ export default function Orders() {
                         <button
                           type="button"
                           className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          aria-label="Cancel order"
+                          aria-label={t('order.cancel_order')}
                           onClick={() => setCancelDialogOpen(true)}
                         >
                           <X className="w-4 h-4" />
@@ -691,7 +748,7 @@ export default function Orders() {
                         <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
                         <p className="text-xs text-gray-500">Qty: {item.qty}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-end">
                         <p className="text-sm font-semibold text-gray-900">
                           {formatCurrency(item.amount)}
                         </p>
@@ -728,24 +785,33 @@ export default function Orders() {
                   size="icon"
                   className="flex-shrink-0"
                   onClick={handlePrintOrder}
-                  aria-label="Print"
+                  aria-label={t('order.print')}
                   disabled={isPrinting}
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
                 </Button>
-                {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
+                {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders.
+                    Printing is no longer a precondition: a receipt is something the
+                    guest may or may not want, not a step in settling the bill. */}
                 {isOrderEditable(selectedOrder.status) && (
                   <Button
                     className="flex-1"
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
-                      setShowPaymentDialog(true);
-                    }}
+                    onClick={() => setShowPaymentDialog(true)}
                   >
                     {t('order.payment')}
+                  </Button>
+                )}
+                {/* Close Table - the table outlived its bills. Offered only when the
+                    backend confirms nothing is left open on the whole cluster. */}
+                {canCloseTable && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    onClick={() => setCloseTableDialogOpen(true)}
+                    disabled={closingTable}
+                  >
+                    <DoorClosed className="w-4 h-4" />
+                    {t('order.close_table')}
                   </Button>
                 )}
                 {/* Total */}
@@ -764,6 +830,36 @@ export default function Orders() {
           </>
         )}
       </div>
+      {selectedOrder && (
+        <Dialog open={closeTableDialogOpen} onOpenChange={(open) => !closingTable && setCloseTableDialogOpen(open)}>
+          <DialogContent className="bg-white">
+            <DialogHeader>
+              <DialogTitle>{t('order.close_table')}</DialogTitle>
+              <DialogDescription>
+                {t('order.close_table_confirm', {
+                  table: getOrderTableLabel(selectedOrder) ?? selectedOrder.restaurant_table ?? '',
+                })}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCloseTableDialogOpen(false)}
+                disabled={closingTable}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleCloseTable} disabled={closingTable}>
+                {closingTable ? (
+                  <Spinner className="w-4 h-4" hideMessage message={t('common.loading')} />
+                ) : (
+                  t('order.close_table')
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}

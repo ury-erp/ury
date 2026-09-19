@@ -1,29 +1,37 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
+import { clearCachedStorage } from '../lib/storage-keys';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Command,
+  MessageSquare,
   User,
   ChevronDown,
   Monitor,
   LogOut,
   RefreshCw,
   Lock,
+  Search,
+  CircleHelp,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
+import LanguageSwitcher from './LanguageSwitcher';
+import KitchenMessageDialog from './KitchenMessageDialog';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
 import { showToast } from '@ury/ui';
+import smartLogo from '../../../smart_logo.png';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showKitchenMessage, setShowKitchenMessage] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+  const { searchQuery, setSearchQuery, tableSearchQuery, setTableSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -39,6 +47,12 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
+  } else if (location.pathname === '/tables') {
+    // The box was rendered here but bound to nothing, so typing in it looked
+    // like a filter and did nothing at all (UX-05).
+    searchPlaceholder = t('header.search_placeholder_tables');
+    searchValue = tableSearchQuery;
+    searchOnChange = (e) => setTableSearchQuery(e.target.value);
   }
 
   // Debounce order search
@@ -96,11 +110,11 @@ const Header = () => {
   };
 
   const handleClearCache = () => {
-    // Clear all local storage
-    localStorage.clear();
-    // Clear all session storage
-    sessionStorage.clear();
-    // Reload the page
+    // Only the re-fetchable entries. `localStorage.clear()` also took
+    // `posOrderTabsData` — the open tabs and their unsent lines — so the
+    // button a cashier presses when a screen looks stale deleted the order
+    // they were building (UX-04). See lib/storage-keys.ts for the split.
+    clearCachedStorage();
     window.location.reload();
   };
 
@@ -110,32 +124,32 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200">
-      <div className="flex items-center justify-between h-16 px-6">
+    <header className="bg-[#241914] text-white border-b border-[#3d2a22] shadow-[0_5px_18px_rgba(36,25,20,0.16)]">
+      <div className="flex items-center justify-between h-[4.5rem] px-5 gap-5">
         {/* Logo */}
         <div className="flex items-center">
         <Link to="/dashboard" className="flex items-center gap-3">
-            <img
-              src="/assets/ury/pos/ury_pos.png"
-              alt="URY POS" 
-              className="h-10 w-auto"
-            />
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
+              <img src={smartLogo} alt="Smart Restro" className="h-8 w-8 object-contain" />
+            </span>
+            <span className="hidden sm:block text-lg font-bold tracking-tight text-white">Smart <span className="text-[#ffca4b]">Restro</span></span>
           </Link>
         </div>
 
         {/* Search Bar */}
         {location.pathname !== '/dashboard' ? (
-          <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
+          <div className="px-4 py-2.5 flex-1 flex items-center max-w-2xl mx-auto bg-white/10 hover:bg-white/15 border border-white/15 rounded-xl transition-colors">
+            <Search className="w-4 h-4 text-[#ffca4b] me-3 shrink-0" />
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
-              className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="h-fit p-0 w-full bg-transparent border-0 text-white placeholder:text-white/55 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
               value={searchValue}
               onChange={searchOnChange}
             />
             <div className="flex items-center gap-2 text-gray-400">
-              <Command className="w-4 h-4" />
-              <span>K</span>
+              <Command className="w-4 h-4 text-white/50" />
+              <span className="text-white/50">K</span>
             </div>
           </div>
         ) : (
@@ -143,19 +157,32 @@ const Header = () => {
         )}
 
         {/* Right side actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {/* Reachable in one tap mid-service, alongside the other header
+              actions, rather than buried in the user menu. */}
+          <button
+            onClick={() => setShowKitchenMessage(true)}
+            title={t('kitchen_msg.open')}
+            aria-label={t('kitchen_msg.open')}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/65 hover:bg-white/10 hover:text-white transition-colors duration-fast press"
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <button className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-white/65 hover:bg-white/10 hover:text-white transition-colors" title={t('header.help')}>
+            <CircleHelp className="w-4 h-4" />
+          </button>
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-white/80 hover:bg-white/10 hover:text-white"
             >
-              <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+              <div className="w-9 h-9 bg-[#f05b42] rounded-xl flex items-center justify-center shadow-inner">
                 <User className="w-4 h-4 text-white" />
               </div>
               <span className="text-sm font-medium">{user?.full_name || 'User'}</span>
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-4 h-4 text-white/60" />
             </Button>
 
             {/* User dropdown */}
@@ -180,7 +207,7 @@ const Header = () => {
                     onClick={() => window.location.href = '/ury/dashboard'}
                   >
                     <Monitor className="w-4 h-4 me-3" />
-                    Switch to Dashboard
+                    {t('header.switch_to_dashboard')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -206,12 +233,18 @@ const Header = () => {
                     <LogOut className="w-4 h-4 me-3" />
                     {t('header.logout')}
                   </Button>
+                  <LanguageSwitcher />
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <KitchenMessageDialog
+        open={showKitchenMessage}
+        onOpenChange={setShowKitchenMessage}
+      />
     </header>
   );
 };

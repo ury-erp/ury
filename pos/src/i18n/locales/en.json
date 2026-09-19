@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "language_code": "en",
+    "direction": "ltr"
+  },
   "common": {
     "loading": "Loading...",
     "cancel": "Cancel",
@@ -21,7 +25,15 @@
     "cancelling": "Cancelling...",
     "confirm_cancel": "Confirm Cancel",
     "loading_ury_pos": "Loading URY POS...",
-    "please_wait_setup": "Please wait while we set things up"
+    "please_wait_setup": "Please wait while we set things up",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "undo": "Undo",
+    "refresh": "Refresh",
+    "remove": "Remove",
+    "preview": "Preview",
+    "close": "Close",
+    "retry": "Try again"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -29,11 +41,17 @@
     "search_placeholder_menu": "Search Menu",
     "close_shift": "Close Shift",
     "switch_to_desk": "Switch To Desk",
+    "switch_to_dashboard": "Switch to Dashboard",
     "clear_cache": "Clear Cache",
-    "logout": "Logout"
+    "logout": "Logout",
+    "help": "Help",
+    "search_placeholder_tables": "Search tables by number or room"
   },
   "menu": {
-    "special_items": "Special Items"
+    "special_items": "Special Items",
+    "add_item": "Add {{item}}",
+    "customize_item": "Customise {{item}}",
+    "customize": "Customise"
   },
   "pos_sidebar": {
     "categories": "Categories",
@@ -64,7 +82,10 @@
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
     "payment": "Payment",
-    "order_actions": "Order actions"
+    "order_actions": "Order actions",
+    "edit_order": "Edit order",
+    "close_table": "Close Table",
+    "close_table_confirm": "Every bill on table {{table}} has been settled. Close it and make the table available again?"
   },
   "payment": {
     "title": "Payment",
@@ -82,7 +103,9 @@
     "processing": "Processing...",
     "short_by": "Short by {{amount}}",
     "change_due": "Change due: {{amount}}",
-    "success": "Payment successful: {{amount}} received"
+    "success": "Payment successful: {{amount}} received",
+    "processing_title": "Collecting {{amount}}…",
+    "processing_hint": "Do not close this window. The result will appear here."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
@@ -142,7 +165,7 @@
     "error_loading": "Failed to load opening data. Please try again.",
     "error_opening": "Failed to open POS session. Please try again.",
     "opening_balance_help": "Opening Balance is the starting cash/payment amount you're declaring for this shift. It's used to reconcile against sales when you close out.",
-    "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
+    "zero_balance_warning": "You're opening with a zero balance across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
     "confirm_zero_balance": "Confirm & Open",
     "session_opened_success": "POS session opened"
   },
@@ -173,7 +196,11 @@
     "confirm_submit": "Yes, Close POS",
     "confirm_back": "Go Back",
     "checklist_skip": "Skip for now",
-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
+    "col_closing": "Closing",
+    "col_difference": "Difference",
+    "col_expected": "Expected",
+    "col_opening": "Opening"
   },
   "checklist": {
     "title_opening": "Opening Checklist",
@@ -234,7 +261,6 @@
     "print_failed": "Print failed: {{reason}}",
     "invalid_discount": "Please enter a valid discount value",
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
-    "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
     "dine_in_restricted": "Dine In is not available for your role",
     "payment_failed": "Payment could not be completed. Please try again.",
@@ -251,7 +277,11 @@
       "session_elsewhere": "You already have an open session elsewhere.",
       "generic": "Could not open the POS session. {{message}}",
       "load_failed": "Could not check the POS session status. Please try again."
-    }
+    },
+    "not_permitted": "Not permitted",
+    "failed_load_order_details": "Failed to load order details",
+    "failed_load_orders": "Failed to load orders",
+    "failed_close_table": "Failed to close the table"
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",
@@ -259,7 +289,8 @@
     "order_updated": "Order updated successfully",
     "printed": "Printed successfully",
     "payment_successful": "Payment successful",
-    "order_moved_to_draft": "Order moved to Draft after printing."
+    "order_moved_to_draft": "Order moved to Draft after printing.",
+    "table_closed": "Table closed"
   },
   "orders": {
     "no_orders_found": "No orders found",
@@ -349,7 +380,15 @@
     "no_destination_tables": "No vacant tables available in this branch",
     "transfer_not_for_merged": "Table transfer is not allowed for merged tables. Unmerge first.",
     "order_already_billed": "This order has already been billed",
-    "no_captains_found": "No captains found"
+    "no_captains_found": "No captains found",
+    "reset_zoom_pan": "Reset Zoom & Pan",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "printing": "Printing...",
+    "take_away": "Take away",
+    "no_rooms_for_branch": "No rooms found for this branch",
+    "open_table": "Open table {{table}}",
+    "refreshing": "Checking for changes…"
   },
   "bill_split": {
     "split_bill": "Split bill",
@@ -427,5 +466,194 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "language": {
+    "label": "Language",
+    "change_language": "Change language",
+    "switched": "Language changed"
+  },
+  "captain": {
+    "more_actions": "More actions",
+    "no_items_found": "No items found.",
+    "search_menu": "Search menu",
+    "reduce_quantity": "Reduce quantity",
+    "remove_item": "Remove item",
+    "undo_reduction": "Undo reduction",
+    "context_load_failed": "Unable to load Captain context",
+    "billed_locked": "Billed / locked",
+    "no_items_yet": "No items yet.",
+    "table_load_failed": "Unable to load this table",
+    "back_to_tables": "Back to Tables",
+    "no_rooms": "No rooms available for your account.",
+    "no_tables_in_room": "No tables found in this room.",
+    "tables_load_failed": "Unable to load tables",
+    "no_permission_table_orders": "You do not have permission to take table orders.",
+    "already_ordered": "Already Ordered",
+    "browse_menu": "Browse menu",
+    "menu": "Menu",
+    "new_changed": "New / Changed",
+    "reduction_pending": "Reduction Pending",
+    "errors": {
+      "no_pos_profile": "POS profile not found.",
+      "not_logged_in": "You are not logged in.",
+      "no_permission": "You do not have permission to modify this order.",
+      "empty_order": "Add at least one item before sending the order.",
+      "no_customer": "Please select a customer before sending the order.",
+      "api_error": "The server rejected the request.",
+      "send_failed": "Failed to send the order.",
+      "no_order_reprint": "No active order to reprint.",
+      "no_order_print": "No active order to print.",
+      "no_order_transfer": "No active order to transfer.",
+      "transfer_unavailable": "Unable to transfer this table."
+    },
+    "success": {
+      "kot_reprinted": "KOT reprinted.",
+      "printed": "Printed successfully.",
+      "table_transferred": "Table transferred.",
+      "captain_transferred": "Captain transferred."
+    }
+  },
+  "auth": {
+    "access_denied": "Access Denied",
+    "config_error": "Configuration Error",
+    "profile_not_configured": "POS Profile not found or not configured.",
+    "permission_required": "Permission Required",
+    "recheck_permissions": "Recheck Permissions",
+    "no_app_permission": "You do not have permission to access this application."
+  },
+  "order_panel": {
+    "current_ticket": "Current ticket",
+    "your_order": "Your order"
+  },
+  "order_tabs": {
+    "add_new_order": "Add new order",
+    "close_order": "Close order"
+  },
+  "search": {
+    "menu_items_placeholder": "Search menu items..."
+  },
+  "dashboard": {
+    "avg_ticket_time": "Avg Ticket Time",
+    "avg_per_cover": "Avg per Cover",
+    "covers": "Covers",
+    "failed_metrics": "Failed to load metrics",
+    "failed_service_line": "Failed to load service line",
+    "failed_stats": "Failed to load stats",
+    "failed_load": "Failed to load",
+    "fired": "Fired",
+    "floor_load": "Floor Load",
+    "needs_attention": "Needs Attention",
+    "no_data": "No data available",
+    "no_forecast": "No items selling fast enough to forecast yet.",
+    "no_notifications": "No recent notifications.",
+    "no_tables_assigned": "No tables currently assigned.",
+    "no_tables_seated": "No tables currently seated.",
+    "nothing_needs_attention": "Nothing needs attention right now.",
+    "open": "Open",
+    "over_time": "Over time",
+    "recent_notifications": "Recent Notifications",
+    "running_low": "Running Low",
+    "sales": "Sales",
+    "seated": "Seated",
+    "served": "Served",
+    "service_line": "Service Line",
+    "shift_brief": "Shift Brief",
+    "tonight_vs_baseline": "Tonight vs Baseline",
+    "todays_sales": "Today's Sales",
+    "orders_today": "Orders Today",
+    "avg_order_value": "Avg. Order Value",
+    "active_tables": "Active Tables",
+    "holds": "Holds",
+    "stock_needs_review": "(stock data needs review)",
+    "tables_over_time": {
+      "one": "1 table running over time",
+      "two": "2 tables running over time",
+      "few": "{{count}} tables running over time",
+      "many": "{{count}} tables running over time",
+      "other": "{{count}} tables running over time"
+    },
+    "table_count": {
+      "one": "1 table",
+      "two": "2 tables",
+      "few": "{{count}} tables",
+      "many": "{{count}} tables",
+      "other": "{{count}} tables"
+    },
+    "shift_brief_pending": "AI-written shift summaries are not connected yet. This panel will show shift observations once integrated.",
+    "title": "Shift Overview",
+    "subtitle": "Live service status for this branch",
+    "updated_at": "Updated {{time}}",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "vs_baseline": "vs {{value}}",
+    "no_branch": "No branch is set on this POS profile."
+  },
+  "pos_page": {
+    "build_an_order": "Build an order",
+    "failed_load": "Failed to load POS",
+    "service_counter": "Service counter",
+    "tap_item_hint": "Tap an item to add it"
+  },
+  "settings": {
+    "coming_soon": "Settings coming soon."
+  },
+  "screen_size": {
+    "current_width": "Current screen width:",
+    "desktop_only": "Desktop Only",
+    "required": "Required:",
+    "switch_v1": "Switch to Version 1",
+    "use_v1_mobile": "You can use URY POS Version 1 for mobile devices."
+  },
+  "time": {
+    "just_now": "just now",
+    "minutes_ago": {
+      "one": "1 min ago",
+      "two": "2 mins ago",
+      "few": "{{count}} mins ago",
+      "many": "{{count}} mins ago",
+      "other": "{{count}} mins ago"
+    },
+    "hours_ago": {
+      "one": "1 hr ago",
+      "two": "2 hrs ago",
+      "few": "{{count}} hrs ago",
+      "many": "{{count}} hrs ago",
+      "other": "{{count}} hrs ago"
+    },
+    "days_ago": {
+      "one": "1 day ago",
+      "two": "2 days ago",
+      "few": "{{count}} days ago",
+      "many": "{{count}} days ago",
+      "other": "{{count}} days ago"
+    },
+    "minutes_short": "{{count}} min",
+    "approx_minutes": "~{{count}} min",
+    "approx_hours": "~{{hours}} hr",
+    "approx_hours_minutes": "~{{hours}} hr {{minutes}} min"
+  },
+  "kitchen_msg": {
+    "title": "Message to Kitchen",
+    "open": "Send a message to the kitchen",
+    "message": "Message",
+    "placeholder": "e.g. Table 6 — no nuts at all, severe allergy",
+    "station": "Station",
+    "all_stations": "All stations",
+    "priority": "Priority",
+    "priority_normal": "Normal",
+    "priority_high": "High",
+    "priority_urgent": "Urgent",
+    "mandatory": "Require the kitchen to confirm they read it",
+    "mandatory_hint": "The kitchen display is blocked until a cook confirms. Use for allergies, recalls and anything the line cannot miss.",
+    "optional_hint": "Appears on the kitchen display until dismissed or expired. The kitchen keeps working.",
+    "expires": "Clear automatically after",
+    "expires_never": "Do not clear automatically",
+    "minutes": "{{count}} minutes",
+    "send": "Send",
+    "sending": "Sending…",
+    "sent": "Message sent to the kitchen",
+    "failed": "Could not send the message",
+    "empty": "Write a message first",
+    "preview": "How it will appear"
   }
 }

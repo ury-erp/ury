@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/Auth.js";
 import router from './router';
 import { createPinia } from 'pinia'
 import NotificationModal from './components/NotificationModal.vue';
+import { initI18n, i18nPlugin } from './i18n';
 
 
 
@@ -14,6 +15,7 @@ const app = createApp(App);
 
 app.use(router);
 app.use(pinia)
+app.use(i18nPlugin)
 
 
 router.beforeEach((to, from, next) => {
@@ -29,6 +31,11 @@ router.beforeEach((to, from, next) => {
 	}
 });
 
-app.mount("#app");
 app.component('NotificationModal', NotificationModal);
+
+// Resolve the locale (and set <html lang/dir>) before mounting, so an RTL
+// language never renders a frame of LTR layout.
+initI18n().then(() => {
+	app.mount("#app");
+});
 

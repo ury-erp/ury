@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { IndianRupee, Receipt, TrendingUp, Trophy } from 'lucide-react';
+import { IndianRupee, Receipt, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { DatePicker } from '../../components/setup/DatePicker';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface IntervalRow {
   interval_label: string;
@@ -32,12 +34,12 @@ interface TimeWiseSalesData {
   };
 }
 
-const columns: DataTableColumn<IntervalRow>[] = [
-  { key: 'interval_label', header: 'Time Interval' },
-  { key: 'sales', header: 'Sales', render: (r) => formatCurrency(r.sales), align: 'right' },
-  { key: 'bills', header: 'Bills', align: 'right' },
-  { key: 'pct_of_daily_total', header: '% of Day', render: (r) => `${r.pct_of_daily_total}%`, align: 'right' },
-  { key: 'avg_transaction_value', header: 'Avg / Bill', render: (r) => formatCurrency(r.avg_transaction_value), align: 'right' },
+const getColumns = (): DataTableColumn<IntervalRow>[] => [
+  { key: 'interval_label', header: t('fields.time_interval') },
+  { key: 'sales', header: t('fields.sales'), render: (r) => formatCurrency(r.sales), align: 'right' },
+  { key: 'bills', header: t('fields.bills'), align: 'right' },
+  { key: 'pct_of_daily_total', header: t('fields.of_day'), render: (r) => `${r.pct_of_daily_total}%`, align: 'right' },
+  { key: 'avg_transaction_value', header: t('fields.avg_bill'), render: (r) => formatCurrency(r.avg_transaction_value), align: 'right' },
 ];
 
 const BUCKET_OPTIONS = [1, 2, 4];
@@ -62,7 +64,7 @@ export function TimeWiseSales() {
       });
       setData(res.message ?? (res as unknown as TimeWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +78,7 @@ export function TimeWiseSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Time Wise Sales</h1>
+          <h1 className="text-xl font-semibold">{t('reports.time_wise_sales.time_wise_sales')}</h1>
           <p className="text-sm text-muted-foreground">
             Sales by time of day {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -105,29 +107,33 @@ export function TimeWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton chart />
       ) : data ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Sales"
+              label={t('reports.time_wise_sales.total_sales')}
               value={formatCurrency(data.summary.total_sales)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
-            <StatCard label="Total Bills" value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
+            <StatCard label={t('reports.time_wise_sales.total_bills')} value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
             <StatCard
-              label="Avg / Bill"
+              label={t('reports.time_wise_sales.avg_bill')}
               value={formatCurrency(data.summary.avg_sale_per_bill)}
               icon={<TrendingUp className="w-4 h-4" />}
             />
             <StatCard
-              label="Peak Interval"
+              label={t('reports.time_wise_sales.peak_interval')}
               value={data.summary.peak_interval ?? '—'}
               delta={
                 data.summary.peak_interval
@@ -139,14 +145,14 @@ export function TimeWiseSales() {
           </div>
 
           <BarChartCard
-            title="Sales by Time of Day"
+            title={t('reports.time_wise_sales.sales_by_time_of_day')}
             data={data.intervals}
             xKey="interval_label"
             yKeys={['sales']}
-            labels={{ sales: 'Sales' }}
+            labels={{ sales: t('fields.sales') }}
           />
 
-          <DataTable columns={columns} rows={data.intervals} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.intervals} isLoading={isLoading} />
         </>
       ) : null}
     </div>

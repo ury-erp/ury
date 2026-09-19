@@ -1,5 +1,6 @@
 import { useConfigure, SectionId } from '../../context/ConfigureContext';
-import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check } from 'lucide-react';
+import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check, AlertCircle } from 'lucide-react';
+import { t } from '../../i18n';
 
 interface SidebarItem {
   id: SectionId;
@@ -17,20 +18,23 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 ];
 
 export function ConfigureSidebar() {
-  const { activeSection, setActiveSection, completedSections } = useConfigure();
+  const { activeSection, setActiveSection, completedSections, visitedSections, sectionValidity } = useConfigure();
 
   return (
     <nav className="w-full">
       <div className="bg-muted border border-border rounded-lg p-4">
         {/* Section Title */}
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-          Configuration
-        </h2>
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">{t('dash.configure_sidebar.configuration')}</h2>
 
         <div className="space-y-1">
           {SIDEBAR_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
             const isCompleted = completedSections.has(item.id);
+            // Seen, left, and still not usable. Previously this wore the same
+            // green tick as a finished step, so the sidebar reported a setup
+            // that was done when it was not (UX-16).
+            const needsAttention =
+              !isCompleted && visitedSections.has(item.id) && !sectionValidity[item.id];
             const Icon = item.icon;
 
             return (
@@ -53,7 +57,10 @@ export function ConfigureSidebar() {
                     <span className="text-start">{item.label}</span>
                   </div>
                   {isCompleted && !isActive && (
-                    <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0" aria-label={t('setup.section_complete')} />
+                  )}
+                  {needsAttention && !isActive && (
+                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" aria-label={t('setup.section_incomplete')} />
                   )}
                 </button>
               </div>

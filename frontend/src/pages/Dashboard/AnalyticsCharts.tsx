@@ -3,6 +3,7 @@ import { formatCurrency } from '@ury/core';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DashboardChartsData } from '../../services/dashboard';
+import { t } from '../../i18n';
 
 interface AnalyticsChartsProps {
   chartsData: DashboardChartsData | null;
@@ -127,8 +128,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           <CardHeader className="p-0 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-bold text-gray-900">Sales Trend</CardTitle>
-                <p className="text-xs text-gray-500 mt-1">Real-time revenue flow throughout operating hours</p>
+                <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.sales_trend')}</CardTitle>
+                <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.real_time_revenue_flow_throughout_operating_')}</p>
               </div>
               <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 font-medium">
                 Peak: {peakTrend.time} ({formatCurrency(peakTrend.sales)})
@@ -141,9 +142,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : trendData.length === 0 ? (
-              <div className="h-64 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
-                No sales trend data available
-              </div>
+              <div className="h-64 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">{t('dash.analytics_charts.no_sales_trend_data_available')}</div>
             ) : (
               <>
                 <div className="relative h-64 w-full">
@@ -197,10 +196,10 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           <CardHeader className="p-0 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-bold text-gray-900">Peak Sales Distribution</CardTitle>
-                <p className="text-xs text-gray-500 mt-1">Hourly order volume density</p>
+                <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.peak_sales_distribution')}</CardTitle>
+                <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.hourly_order_volume_density')}</p>
               </div>
-              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded">Hourly Peak</span>
+              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded">{t('dash.analytics_charts.hourly_peak')}</span>
             </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
@@ -209,9 +208,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : hourlyDataWithPeak.length === 0 ? (
-              <div className="h-52 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
-                No hourly data available
-              </div>
+              <div className="h-52 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">{t('dash.analytics_charts.no_hourly_data_available')}</div>
             ) : (
               <div className="flex items-end justify-between gap-1 h-52 pt-4">
                 {hourlyDataWithPeak.map((item, idx) => {
@@ -258,8 +255,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         {/* Revenue by Branch Comparative Bar Chart */}
         <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-5">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Revenue by Branch</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Comparative performance across outlets</p>
+            <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.revenue_by_branch')}</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.comparative_performance_across_outlets')}</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 space-y-4">
             {loading ? (
@@ -267,9 +264,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : branchData.length === 0 ? (
-              <div className="py-8 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
-                No branch data available
-              </div>
+              <div className="py-8 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">{t('dash.analytics_charts.no_branch_data_available')}</div>
             ) : (
               branchData.map((branch, i) => {
                 const widthPct = Math.round((branch.revenue / maxBranchRevenue) * 100);
@@ -299,8 +294,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         {/* Payment Method Distribution Donut Chart */}
         <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-3">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Payment Breakdown</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Collection by payment mode</p>
+            <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.payment_breakdown')}</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.collection_by_payment_mode')}</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 flex flex-col items-center">
             {loading ? (
@@ -314,7 +309,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                   </svg>
                 </div>
-                <span>No data</span>
+                <span>{t('dash.analytics_charts.no_data')}</span>
               </div>
             ) : (
               <>
@@ -338,7 +333,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     ))}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-[11px] font-semibold uppercase text-gray-400">Total</span>
+                    <span className="text-[11px] font-semibold uppercase text-gray-400">{t('dash.analytics_charts.total')}</span>
                     <span className="text-sm font-bold text-gray-900">{formatCurrency(totalPayment)}</span>
                   </div>
                 </div>
@@ -363,8 +358,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         {/* Order Type Distribution Donut Chart */}
         <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-4">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Order Type Split</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Dine In vs Takeaway vs Delivery</p>
+            <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.order_type_split')}</CardTitle>
+            <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.dine_in_vs_takeaway_vs_delivery')}</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 flex flex-col items-center">
             {loading ? (
@@ -378,7 +373,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                   </svg>
                 </div>
-                <span>No data</span>
+                <span>{t('dash.analytics_charts.no_data')}</span>
               </div>
             ) : (
               <>
@@ -403,7 +398,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-xl font-bold text-gray-900">{totalOrdersCount}</span>
-                    <span className="text-[10px] uppercase font-semibold text-gray-400">Total Orders</span>
+                    <span className="text-[10px] uppercase font-semibold text-gray-400">{t('dash.analytics_charts.total_orders')}</span>
                   </div>
                 </div>
 
@@ -415,8 +410,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                         <span className="h-3 w-3 rounded-md" style={{ backgroundColor: ot.color }} />
                         <span className="font-semibold text-gray-800">{ot.type}</span>
                       </div>
-                      <div className="text-right">
-                        <span className="font-bold text-gray-900 mr-2">{ot.count} orders</span>
+                      <div className="text-end">
+                        <span className="font-bold text-gray-900 me-2">{ot.count} orders</span>
                         <span className="text-gray-500 font-medium">({ot.percentage}%)</span>
                       </div>
                     </div>
@@ -433,8 +428,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         <CardHeader className="p-0 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-bold text-gray-900">Top Selling Menu Items</CardTitle>
-              <p className="text-xs text-gray-500 mt-1">Highest grossing items ranked by order count & volume</p>
+              <CardTitle className="text-lg font-bold text-gray-900">{t('dash.analytics_charts.top_selling_menu_items')}</CardTitle>
+              <p className="text-xs text-gray-500 mt-1">{t('dash.analytics_charts.highest_grossing_items_ranked_by_order_count')}</p>
             </div>
             <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
               Ranked Top {topItems.length}
@@ -447,9 +442,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
               <Spinner className="w-6 h-6 text-primary" />
             </div>
           ) : topItems.length === 0 ? (
-            <div className="py-12 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
-              No top items data available
-            </div>
+            <div className="py-12 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">{t('dash.analytics_charts.no_top_items_data_available')}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
               {topItems.map((item) => (

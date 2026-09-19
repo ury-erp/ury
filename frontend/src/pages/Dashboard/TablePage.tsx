@@ -8,6 +8,7 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import TableLayoutView from './TableLayoutView';
+import { t } from '../../i18n';
 
 interface UryTableRecord {
   name: string;
@@ -115,7 +116,7 @@ export const TablePage: React.FC = () => {
     if (!newTable.table_name) return;
 
     if (!newTable.restaurant_room || !newTable.restaurant_room.trim()) {
-      showToast.warning('Please select a room for the table');
+      showToast.warning(t('dash.table.please_select_a_room_for_the_table'));
       return;
     }
 
@@ -141,7 +142,7 @@ export const TablePage: React.FC = () => {
           is_take_away: newTable.is_take_away ? 1 : 0,
         };
         if (JSON.stringify(original) === JSON.stringify(current)) {
-          showToast.warning('No changes in document');
+          showToast.warning(t('dash.table.no_changes_in_document'));
           setSaving(false);
           return;
         }
@@ -190,7 +191,7 @@ export const TablePage: React.FC = () => {
           }
         }
         if (!restaurantName) {
-          showToast.error('No URY Restaurant configured for this branch — set one up first');
+          showToast.error(t('dash.table.no_ury_restaurant_configured_for_this_branch'));
           return;
         }
 
@@ -212,7 +213,7 @@ export const TablePage: React.FC = () => {
           },
         });
       }
-      showToast.success('Table saved');
+      showToast.success(t('dash.table.table_saved'));
       fetchTables();
       setIsDrawerOpen(false);
     } catch (err) {
@@ -248,14 +249,14 @@ export const TablePage: React.FC = () => {
             className={`border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 ${viewMode === 'layout' ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
           >
             <LayoutTemplate className="w-4 h-4" />
-            <span>Edit Layout</span>
+            <span>{t('dash.table.edit_layout')}</span>
           </Button>
           <Button
             onClick={openAddDrawer}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Table</span>
+            <span>{t('dash.table.add_table')}</span>
           </Button>
         </div>
       </div>
@@ -269,16 +270,14 @@ export const TablePage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Grid className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Dining Tables Configured</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Add dining tables to configure your restaurant layout.
-          </p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.table.no_dining_tables_configured')}</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">{t('dash.table.add_dining_tables_to_configure_your_restaura')}</p>
           <Button
             onClick={openAddDrawer}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Table</span>
+            <span>{t('dash.table.add_table')}</span>
           </Button>
         </Card>
       ) : viewMode === 'layout' ? (
@@ -297,7 +296,7 @@ export const TablePage: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                    <Square className="w-3 h-3 mr-1" />
+                    <Square className="w-3 h-3 me-1" />
                     {t.table_shape || 'Square'}
                   </Badge>
                   <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
@@ -309,7 +308,7 @@ export const TablePage: React.FC = () => {
               </div>
               <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 font-semibold">
                 <span className="flex items-center">
-                  <Users className="w-3.5 h-3.5 mr-1 text-primary" />
+                  <Users className="w-3.5 h-3.5 me-1 text-primary" />
                   {t.no_of_seats || 4} Seats
                 </span>
                 <span className="text-gray-400">Branch: {t.branch || 'Main'}</span>
@@ -322,15 +321,15 @@ export const TablePage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-start text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">Table Name</th>
-                <th className="px-6 py-4">Room</th>
-                <th className="px-6 py-4">Seats</th>
-                <th className="px-6 py-4">Shape</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.table.table_name')}</th>
+                <th className="px-6 py-4">{t('dash.table.room')}</th>
+                <th className="px-6 py-4">{t('dash.table.seats')}</th>
+                <th className="px-6 py-4">{t('dash.table.shape')}</th>
+                <th className="px-6 py-4">{t('dash.table.status')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -349,7 +348,7 @@ export const TablePage: React.FC = () => {
                       {t.status || 'Available'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-end">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(t)} className="text-gray-500 hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -370,7 +369,7 @@ export const TablePage: React.FC = () => {
         <form onSubmit={handleSaveTable} className="space-y-5">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Name</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.table_name')}</label>
               <Input
                 value={newTable.table_name}
                 onChange={(e) => setNewTable({ ...newTable, table_name: e.target.value })}
@@ -381,7 +380,7 @@ export const TablePage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Seats Capacity</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.seats_capacity')}</label>
                 <Input
                   type="number"
                   value={newTable.no_of_seats}
@@ -390,7 +389,7 @@ export const TablePage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Min. Seating</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.min_seating')}</label>
                 <Input
                   type="number"
                   value={newTable.minimum_seating}
@@ -402,7 +401,7 @@ export const TablePage: React.FC = () => {
 
             {/* Branch — Select from Branch doctype */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Branch</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.branch')}</label>
               <SearchableSelect
                 id="branch"
                 value={newTable.branch}
@@ -416,7 +415,7 @@ export const TablePage: React.FC = () => {
 
             {/* Room — Select from URY Room docs */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Room</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.room')}</label>
               <SearchableSelect
                 id="restaurant_room"
                 value={newTable.restaurant_room}
@@ -429,7 +428,7 @@ export const TablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Shape</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">{t('dash.table.table_shape')}</label>
               <SearchableSelect
                 id="table_shape"
                 value={newTable.table_shape}
@@ -448,16 +447,12 @@ export const TablePage: React.FC = () => {
                 checked={newTable.is_take_away}
                 onCheckedChange={(checked) => setNewTable({ ...newTable, is_take_away: checked })}
               />
-              <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">
-                Is Take Away Table
-              </label>
+              <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">{t('dash.table.is_take_away_table')}</label>
             </div>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>{t('dash.table.cancel')}</Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm" disabled={saving}>
               {editingTable ? 'Save Changes' : 'Save Table'}
             </Button>

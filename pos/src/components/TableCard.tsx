@@ -1,4 +1,4 @@
-import { type MouseEvent } from 'react';
+import React, { type MouseEvent } from 'react';
 import { Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
@@ -30,6 +30,8 @@ interface TableCardProps {
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
   isRestricted?: boolean;
+  /** Position in the room grid; drives only the entrance stagger. */
+  index?: number;
 }
 
 const TableCard = ({
@@ -48,30 +50,52 @@ const TableCard = ({
   onPrint,
   isPrinting,
   isRestricted = false,
+  index = 0,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
 
+  // An available table is opened by a real <button> laid over the card rather
+  // than a div carrying role="button". The div announced itself as a button
+  // and took focus, but had no key handler, so Enter and Space did nothing —
+  // the card was reachable by keyboard and then unusable from it (UX-07).
+  // The button is a sibling of the content, not a wrapper, because the card
+  // already contains buttons and a button cannot nest inside one.
+  const isOpenable = !isOccupied && !isRestricted;
+
   return (
     <div
-      role={isOccupied ? 'group' : 'button'}
-      tabIndex={isOccupied ? -1 : 0}
-      onClick={() => {
-        if (!isOccupied && !isRestricted) {
-          onNavigate();
-        }
-      }}
+      role={isOccupied ? 'group' : undefined}
+      style={{ '--i': index } as React.CSSProperties}
       className={cn(
-        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
+        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-card p-4',
+        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background',
+        // Scoped rather than `transition-all`: that animated every property
+        // including layout ones, which is what made the grid shimmer as the
+        // pointer crossed it.
+        'transition-[box-shadow,border-color,transform] duration-fast ease-out',
+        'animate-fade-in-up stagger-fast',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
           : isRestricted
             ? TABLE_STATE_STYLES.restricted
-            : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
+            : cn(
+                TABLE_STATE_STYLES.available,
+                'cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99]'
+              ),
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
     >
-      <div className="flex flex-1 flex-col">
+      {isOpenable && (
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label={t('tables.open_table', { table: table.name })}
+          className="absolute inset-0 z-[1] rounded-lg focus:outline-none"
+        />
+      )}
+
+      <div className="pointer-events-none relative z-[2] flex flex-1 flex-col">
         <div className="mb-3 flex items-start justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
@@ -82,9 +106,19 @@ const TableCard = ({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
+            <Badge
+              variant={isOccupied ? 'warning' : 'success'}
+              className="gap-1.5 whitespace-nowrap"
+            >
+              {isOccupied ? (
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-current animate-pulse-soft"
+                />
+              ) : null}
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
+            <div className="pointer-events-auto">
             <TableActionsMenu
               table={table}
               isOpen={menuOpen}
@@ -95,6 +129,7 @@ const TableCard = ({
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
             />
+            </div>
           </div>
         </div>
 
@@ -131,16 +166,14 @@ const TableCard = ({
             </div>
           )}
           {table.is_take_away === 1 && (
-            <Badge variant="pending" className="mt-2">
-              Take away
-            </Badge>
+            <Badge variant="pending" className="mt-2">{t('tables.take_away')}</Badge>
           )}
         </div>
       </div>
 
       <div
         className={cn(
-          'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
+          'relative z-[2] mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
           isOccupied ? 'border-amber-200' : 'border-transparent'
         )}
       >
@@ -154,9 +187,7 @@ const TableCard = ({
                 isRestricted ? "opacity-50 cursor-not-allowed hover:bg-white" : ""
               )}
             >
-              <Eye className="h-3 w-3" />
-              Preview
-            </button>
+              <Eye className="h-3 w-3" />{t('common.preview')}</button>
             <button
               onClick={onPrint}
               disabled={isPrinting}
@@ -164,14 +195,10 @@ const TableCard = ({
             >
               {isPrinting ? (
                 <>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Printing...
-                </>
+                  <Loader2 className="h-3 w-3 animate-spin" />{t('tables.printing')}</>
               ) : (
                 <>
-                  <Printer className="h-3 w-3" />
-                  Print
-                </>
+                  <Printer className="h-3 w-3" />{t('order.print')}</>
               )}
             </button>
           </>

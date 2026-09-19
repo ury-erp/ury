@@ -1,0 +1,80 @@
+{
+  "_meta": {
+    "language_code": "en",
+    "direction": "ltr"
+  },
+  "assign": {
+    "enter_pin": "Enter staff PIN",
+    "enter_table": "Enter table name or code",
+    "pin_entry": "PIN entry",
+    "submit": "Assign Table",
+    "submitting": "Assigning…",
+    "title": "Assign This Tablet"
+  },
+  "common": {
+    "starting_up": "Starting up…",
+    "total": "Total",
+    "back": "Back",
+    "continue": "Continue"
+  },
+  "device": {
+    "not_provisioned": "This tablet is not provisioned. Please contact staff.",
+    "start_failed": "This device could not be started. Please contact staff."
+  },
+  "idle": {
+    "confirm": "I'm still here",
+    "title": "Still there?"
+  },
+  "menu": {
+    "categories": "Menu categories",
+    "all_items": "All Items",
+    "search_placeholder": "Search the menu",
+    "no_results": "Nothing matches that",
+    "no_results_hint": "Try another word, or pick a different category.",
+    "special": "Special"
+  },
+  "order": {
+    "bill_requested": "Bill requested — staff notified",
+    "cart": "Cart",
+    "confirm_restart": "Start a new order? Current cart will be cleared.",
+    "confirm_start_over": "Start over? Your current cart will be cleared.",
+    "for_pickup": "Order for Pickup",
+    "in_cart": "In cart: {{qty}}",
+    "pay_online": "Pay Online",
+    "place": "Place Order",
+    "placing": "Placing order…",
+    "placing_short": "Placing…",
+    "request_bill": "Request Bill",
+    "so_far": "Your order so far",
+    "starting_payment": "Starting payment…",
+    "table": "Table {{table}}",
+    "title": "Order",
+    "start_over": "Start Over",
+    "new_order": "New Order",
+    "empty_hint": "Tap a menu item to add it to your cart.",
+    "remove_one": "Remove one {{item}}",
+    "add_one": "Add one more {{item}}",
+    "loading_menu": "Loading the menu…",
+    "pickup_code": "Pickup code",
+    "payment_pending": "Payment request created for {{amount}} — a staff member will assist you.",
+    "view_cart": "View cart",
+    "hide_cart": "Hide cart",
+    "close_cart": "Close cart",
+    "item_count": {
+      "one": "{{count}} item",
+      "other": "{{count}} items"
+    }
+  },
+  "language": {
+    "label": "Language"
+  },
+  "errors": {
+    "menu_failed": "Could not load the menu. Please rescan the code on your table.",
+    "order_failed": "Could not place the order. Please ask a staff member for help.",
+    "bill_failed": "Could not request the bill. Please ask a staff member for help.",
+    "payment_failed": "Could not start online payment. You can pay at the counter.",
+    "cannot_open_title": "This ordering link did not open",
+    "cannot_open_hint": "Scan the code on your table again, or ask a staff member.",
+    "missing_code": "This link is missing an ordering code. Please rescan the code on your table."
+  }
+}

@@ -5,6 +5,10 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
+import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
+import { t } from '../i18n'
+import { LanguageToggle } from '../components/LanguageToggle'
 
 const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
@@ -42,10 +46,13 @@ function TabletLayout({ initialContext }: LayoutProps) {
   } = useOrderingSession(initialContext)
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
+  // Same search and course filtering as every other ordering surface,
+  // so finding a dish does not depend on which screen the guest is at.
+  const discovery = useMenuDiscovery(menu)
   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(t('order.confirm_restart'))) {
       resetSession()
     }
   }
@@ -90,14 +97,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b bg-background/95 px-6 py-4">
         <h1 className="text-xl font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {context?.table ? t('order.table', { table: context.table }) : t('order.for_pickup')}
         </h1>
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
         <button
           onClick={handleReset}
           className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
         >
-          New Order
+          {t('order.new_order')}
         </button>
+        </div>
       </header>
 
       {error && (
@@ -106,8 +116,12 @@ function TabletLayout({ initialContext }: LayoutProps) {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="w-[68%] overflow-y-auto p-6">
+          <div className="mb-5">
+            <MenuDiscoveryBar discovery={discovery} size="default" />
+          </div>
+
           <MenuGrid
-            menu={menu}
+            menu={discovery.visibleMenu}
             cart={cart}
             capabilities={context?.capabilities}
             onAdd={addToCart}
@@ -138,14 +152,14 @@ function TabletLayout({ initialContext }: LayoutProps) {
       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
         <DialogContent onClose={handleStillHere}>
           <DialogHeader>
-            <DialogTitle>Still there?</DialogTitle>
+            <DialogTitle>{t('idle.title')}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={handleStillHere}
               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
             >
-              I'm still here
+              {t('idle.confirm')}
             </button>
           </DialogFooter>
         </DialogContent>

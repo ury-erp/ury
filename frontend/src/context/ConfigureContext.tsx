@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { call } from '@ury/core';
 import { nextId } from '../utils/id';
 import { uniqueShortCode, generateTableNames, isAutoTableName } from '../utils/shortCode';
@@ -85,7 +85,45 @@ export interface ConfigureState {
   users: UserData[];
 }
 
+/**
+ * Whether a section's data is actually usable, as opposed to merely seen.
+ *
+ * `completedSections` was set by `goToNextSection` regardless of content, so
+ * "complete" meant "visited" — a wizard could report every step done while
+ * the branch had no name (UX-16). Completion is now derived from the values,
+ * and visiting is tracked separately by `visitedSections`.
+ *
+ * Deliberately the same floor the backend needs, not a stricter one: rooms,
+ * tables, menu and payments all ship seeded defaults, so their requirement is
+ * "at least one row", which is what POS Profile creation depends on.
+ */
+export function isSectionValid(
+  section: SectionId,
+  state: Pick<ConfigureState, 'branch' | 'rooms' | 'tables' | 'menuItems' | 'paymentMethods' | 'users'>
+): boolean {
+  switch (section) {
+    case 'branch':
+      return state.branch.branchName.trim().length > 0;
+    case 'rooms':
+      return state.rooms.length > 0 && state.rooms.every((room) => room.name.trim().length > 0);
+    case 'tables':
+      return state.tables.length > 0;
+    case 'menu':
+      return state.menuItems.length > 0;
+    case 'payment':
+      return state.paymentMethods.length > 0;
+    case 'users':
+      // Users are genuinely optional — the installing administrator is
+      // already a user. An empty list is a valid choice, not an omission.
+      return true;
+    default:
+      return true;
+  }
+}
+
 export interface ConfigureContextType extends ConfigureState {
+  /** Per-section validity, recomputed from the current values. */
+  sectionValidity: Record<SectionId, boolean>;
   setActiveSection: (section: SectionId) => void;
   markSectionCompleted: (section?: SectionId) => void;
   /** Marks the section complete using its current (possibly untouched, seeded) values and advances — the "Use the defaults" affordance. */
@@ -246,13 +284,32 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
     setVisitedSections((prev) => new Set(prev).add(section));
   }, []);
 
+  const sectionValidity = useMemo(
+    () =>
+      SECTION_ORDER.reduce((acc, section) => {
+        acc[section] = isSectionValid(section, {
+          branch, rooms, tables, menuItems, paymentMethods, users,
+        });
+        return acc;
+      }, {} as Record<SectionId, boolean>),
+    [branch, rooms, tables, menuItems, paymentMethods, users]
+  );
+
   const markSectionCompleted = useCallback(
     (section?: SectionId) => {
       const sec = section || activeSection;
-      setCompletedSections((prev) => new Set(prev).add(sec));
+      // Always a visit; complete only when the data supports it. Marking
+      // completion on advance is what let an empty branch name reach the
+      // final step wearing a tick.
       setVisitedSections((prev) => new Set(prev).add(sec));
+      setCompletedSections((prev) => {
+        const next = new Set(prev);
+        if (sectionValidity[sec]) next.add(sec);
+        else next.delete(sec);
+        return next;
+      });
     },
-    [activeSection]
+    [activeSection, sectionValidity]
   );
 
   const useDefaultsForSection = useCallback(
@@ -480,6 +537,7 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
         activeSection,
         visitedSections,
         completedSections,
+        sectionValidity,
         branch,
         rooms,
         tables,

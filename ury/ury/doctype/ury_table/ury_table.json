@@ -28,7 +28,9 @@
   "occupied",
   "column_break_280tb",
   "latest_invoice_time",
-  "merged_with"
+  "merged_with",
+  "self_ordering_tab",
+  "self_ordering_qr"
  ],
  "fields": [
   {
@@ -146,11 +148,22 @@
    "fieldtype": "Data",
    "label": "Merged With",
    "read_only": 1
+  },
+  {
+   "fieldname": "self_ordering_tab",
+   "fieldtype": "Tab Break",
+   "label": "Self Ordering"
+  },
+  {
+   "fieldname": "self_ordering_qr",
+   "fieldtype": "HTML",
+   "label": "Self Ordering QR",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 19:25:38.913387",
+ "modified": "2026-09-18 23:40:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",

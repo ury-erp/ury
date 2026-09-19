@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Factory, Package } from 'lucide-react';
+import { Factory, Package, AlertCircle } from 'lucide-react';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { subMonths, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
 
 interface WorkOrderRow {
   name: string;
@@ -21,12 +22,12 @@ interface CompletedWorkOrdersData {
   summary: { total_completed: number; total_qty_produced: number };
 }
 
-const columns: DataTableColumn<WorkOrderRow>[] = [
-  { key: 'name', header: 'Work Order' },
-  { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.production_item },
-  { key: 'qty', header: 'Planned Qty', align: 'right' },
-  { key: 'produced_qty', header: 'Produced Qty', align: 'right' },
-  { key: 'actual_end_date', header: 'Completed', render: (r) => r.actual_end_date || r.planned_end_date || '—' },
+const getColumns = (): DataTableColumn<WorkOrderRow>[] => [
+  { key: 'name', header: t('fields.work_order') },
+  { key: 'item_name', header: t('fields.item'), render: (r) => r.item_name || r.production_item },
+  { key: 'qty', header: t('fields.planned_qty'), align: 'right' },
+  { key: 'produced_qty', header: t('fields.produced_qty'), align: 'right' },
+  { key: 'actual_end_date', header: t('fields.completed'), render: (r) => r.actual_end_date || r.planned_end_date || '—' },
 ];
 
 export function CompletedWorkOrders() {
@@ -51,7 +52,7 @@ export function CompletedWorkOrders() {
       );
       setData(res.message ?? (res as unknown as CompletedWorkOrdersData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -65,30 +66,34 @@ export function CompletedWorkOrders() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Completed Work Orders</h1>
-          <p className="text-sm text-muted-foreground">Manufacturing production history</p>
+          <h1 className="text-xl font-semibold">{t('reports.completed_work_orders.completed_work_orders')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.completed_work_orders.subtitle')}</p>
         </div>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatCard label="Completed" value={data.summary.total_completed} icon={<Factory className="w-4 h-4" />} />
-          <StatCard label="Qty Produced" value={data.summary.total_qty_produced} icon={<Package className="w-4 h-4" />} />
+          <StatCard label={t('reports.completed_work_orders.completed')} value={data.summary.total_completed} icon={<Factory className="w-4 h-4" />} />
+          <StatCard label={t('reports.completed_work_orders.qty_produced')} value={data.summary.total_qty_produced} icon={<Package className="w-4 h-4" />} />
         </div>
       )}
 
       <DataTable
-        columns={columns}
+        columns={getColumns()}
         rows={data?.work_orders ?? []}
         isLoading={isLoading}
-        emptyMessage="No completed work orders in this range."
+        emptyMessage={t('reports.completed_work_orders.no_completed_work_orders_in_this_range')}
       />
     </div>
   );

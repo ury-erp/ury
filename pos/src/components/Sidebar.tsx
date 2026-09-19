@@ -1,4 +1,4 @@
-import { Grid3X3 } from 'lucide-react';
+import { Grid3X3, Sparkles } from 'lucide-react';
 import { CategoryIcon } from '../lib/category-icons';
 import { usePOSStore } from '../store/pos-store';
 import { SidebarContainer, SidebarCard, SidebarActiveIndicator, sidebarItemVariants, Button, Badge } from '@ury/ui';
@@ -32,12 +32,15 @@ const Sidebar = ({ disabled }: SidebarProps) => {
   return (
     <SidebarContainer disabled={disabled}>
       {/* Categories List */}
-      <nav className="flex-1 p-6 overflow-y-auto">
-        <SidebarCard>
+      <nav className="flex-1 p-4 overflow-y-auto">
+        <SidebarCard className="bg-transparent border-0 p-1">
           {/* Section Title */}
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
+          <div className="flex items-center gap-2 px-2 mb-4">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="text-[11px] font-bold text-[#8f6b55] uppercase tracking-[0.16em]">
             {t('pos_sidebar.categories')}
-          </h2>
+            </h2>
+          </div>
           
           {/* All Items */}
           <Button
@@ -50,17 +53,17 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             {selectedCategory === '' && <SidebarActiveIndicator />}
             
             <div className="flex items-center gap-3 ms-1">
-              <Grid3X3 className="w-4 h-4 text-gray-500" />
+              <Grid3X3 className="w-4 h-4 text-primary" />
               <span>{t('pos_sidebar.all_items')}</span>
             </div>
             
-            <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
+            <Badge variant="secondary" size="sm" className="text-xs text-[#8f6b55] bg-[#fff0cb] min-w-[24px] text-center">
               {getAllItemsCount()}
             </Badge>
           </Button>
 
           {/* Divider */}
-          <div className="h-px bg-gray-200 my-3 mx-1" />
+          <div className="h-px bg-[#eadfce] my-3 mx-1" />
 
           {/* Category Items */}
           <div className="space-y-1">
@@ -81,11 +84,11 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                     <CategoryIcon
                       name={category.icon}
                       courseName={category.name}
-                      className="w-4 h-4 text-gray-500 flex-shrink-0"
+                      className="w-4 h-4 text-[#8f6b55] flex-shrink-0"
                     />
                     <span className="text-start">{category.label}</span>
                   </div>
-                  <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
+                  <Badge variant="secondary" size="sm" className="text-xs text-[#8f6b55] bg-[#fff0cb] min-w-[24px] text-center">
                     {count}
                   </Badge>
                 </Button>
