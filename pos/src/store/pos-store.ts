@@ -258,17 +258,16 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   initializeApp: async () => {
     try {
       set({ isInitializing: true, error: null });
-      
-      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
-        get().fetchPosProfile(),
+
+      // Menu and categories need the resolved POS Profile, so it loads first.
+      await get().fetchPosProfile();
+
+      const [menuResult, paymentModesResult] = await Promise.allSettled([
         get().fetchMenuItems(),
-        get().fetchCategories(),
         get().fetchPaymentModes()
       ]);
 
-      if (profileResult.status === 'rejected' || 
-          menuResult.status === 'rejected' || 
-          categoriesResult.status === 'rejected' ||
+      if (menuResult.status === 'rejected' ||
           paymentModesResult.status === 'rejected') {
         set({ 
           error: 'Failed to initialize app. Please refresh the page.',
@@ -363,6 +362,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       }));
 
       set({ menuItems });
+      // fetchCategories surfaces its own error; it must not mask the menu itself loading fine.
+      await get().fetchCategories().catch(() => {});
     } catch (error) {
       set({ error: 'Failed to load menu items' });
       console.error('Error loading menu items:', error);
@@ -385,7 +386,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         category: item.course
       }));
 
-      set({ menuItems, menuLoading: false });
+      set({ menuItems, categories: [], menuLoading: false });
     } catch (error) {
       set({ error: 'Failed to load aggregator menu', menuLoading: false });
       console.error('Error loading aggregator menu:', error);
@@ -393,16 +394,24 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchCategories: async () => {
+    const { posProfile, selectedRoom, selectedOrderType } = get();
+    if (!posProfile?.name) return;
+
+    const cacheKey = `menuCategories:${posProfile.name}:${selectedRoom ?? ''}:${selectedOrderType ?? ''}`;
+
     try {
-      const cached = sessionStorage.getItem('menuCategories');
+      const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
+        try {
+          set({ categories: JSON.parse(cached) });
+          return;
+        } catch {
+          sessionStorage.removeItem(cacheKey);
+        }
       }
 
-      const courses = await getMenuCourses();
-      sessionStorage.setItem('menuCategories', JSON.stringify(courses));
+      const courses = await getMenuCourses(posProfile.name, selectedRoom, selectedOrderType);
+      sessionStorage.setItem(cacheKey, JSON.stringify(courses));
       set({ categories: courses });
     } catch (error) {
       set({ error: 'Failed to load menu categories' });
