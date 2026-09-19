@@ -393,10 +393,15 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
                 "branch": self.branch,
                 "company": self.company,
                 "plan_date": self.plan_date,
-                "docstatus": 2,
             }
         )
         cancelled.insert(ignore_permissions=True)
+        # Document.insert() enforces a real docstatus transition (0 -> 2 is
+        # illegal even with ignore_permissions -- "Cannot change docstatus
+        # from 0 (Draft) to 2 (Cancelled)"), so go straight to the DB row
+        # instead; this test only needs a row that LOOKS like a cancelled
+        # plan for get_plan_status()'s own query, not a real workflow walk.
+        _frappe.db.set_value("URY Sales Plan", cancelled.name, "docstatus", 2)
 
         result = get_plan_status(branch=self.branch, plan_date=self.plan_date)
         self.assertIsNone(result["name"])
