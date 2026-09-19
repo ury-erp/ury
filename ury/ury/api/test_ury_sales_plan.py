@@ -373,6 +373,35 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
         result = get_plan_status(branch=self.branch, plan_date="2099-01-01")
         self.assertIsNone(result["name"])
         self.assertIsNone(result["status"])
+        self.assertIsNone(result["superseded_plan"])
+
+    def test_get_plan_status_ignores_a_cancelled_plan_so_a_new_one_can_start(self):
+        """Regression test for a real live bug: Superseded/Cancelled has no
+        outgoing transitions at all (see ury/fixtures/workflow.json), so if
+        get_plan_status() kept returning it as "the" plan for its
+        branch+date (being the most recently modified row), a user could
+        never start a fresh plan for that scope again -- reloading the page
+        would keep reloading the same dead cancelled plan forever."""
+        import frappe as _frappe
+
+        from ury.ury.api.ury_sales_plan import get_plan_status
+
+        cancelled = _frappe.get_doc(
+            {
+                "doctype": "URY Sales Plan",
+                "status": "Superseded/Cancelled",
+                "branch": self.branch,
+                "company": self.company,
+                "plan_date": self.plan_date,
+                "docstatus": 2,
+            }
+        )
+        cancelled.insert(ignore_permissions=True)
+
+        result = get_plan_status(branch=self.branch, plan_date=self.plan_date)
+        self.assertIsNone(result["name"])
+        self.assertIsNone(result["status"])
+        self.assertEqual(result["superseded_plan"], cancelled.name)
 
 
 class TestFlagStaleBomRevisions(FrappeTestCase):

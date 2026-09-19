@@ -401,6 +401,27 @@ describe('SalesPlanPage', () => {
       expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument();
     });
 
+    it('starts a fresh Draft and explains why when the prior plan for this date was cancelled', async () => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({
+        name: null,
+        status: null,
+        superseded_plan: 'SP-OLD-CANCELLED',
+      } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      expect(
+        await screen.findByText("The previous plan for this branch and date (SP-OLD-CANCELLED) was cancelled. You're starting a new one below.")
+      ).toBeInTheDocument();
+      // A cancelled plan is a dead end with no path forward -- confirm the
+      // page actually offers a fresh start rather than just explaining why
+      // it's stuck: Save Draft/Add item must be available, same as any
+      // other new Draft.
+      expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add item' })).toBeInTheDocument();
+    });
+
     it('shows Save Draft for a Draft plan', async () => {
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
 
