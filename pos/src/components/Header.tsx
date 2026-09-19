@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
+import { clearCachedStorage } from '../lib/storage-keys';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Command,
@@ -103,11 +104,11 @@ const Header = () => {
   };
 
   const handleClearCache = () => {
-    // Clear all local storage
-    localStorage.clear();
-    // Clear all session storage
-    sessionStorage.clear();
-    // Reload the page
+    // Only the re-fetchable entries. `localStorage.clear()` also took
+    // `posOrderTabsData` — the open tabs and their unsent lines — so the
+    // button a cashier presses when a screen looks stale deleted the order
+    // they were building (UX-04). See lib/storage-keys.ts for the split.
+    clearCachedStorage();
     window.location.reload();
   };
 

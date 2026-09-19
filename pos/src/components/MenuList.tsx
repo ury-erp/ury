@@ -1,15 +1,18 @@
 import { useEffect, useMemo } from 'react';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 import MenuCard from './MenuCard';
 import { EmptyState, Skeleton, cn } from '@ury/ui';
 import { SearchX, UtensilsCrossed, AlertTriangle } from 'lucide-react';
 import { t } from '../i18n';
 
 interface MenuListProps {
-  onItemClick: (item: any) => void;
+  onItemClick: (item: MenuItem) => void;
+  /** Opens the item's options panel. Separate from onItemClick so adding an
+      item never has to wait on a double-click window (UX-01). */
+  onItemCustomize: (item: MenuItem) => void;
 }
 
-const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
+const MenuList: React.FC<MenuListProps> = ({ onItemClick, onItemCustomize }) => {
   const {
     menuItems,
     menuLoading,
@@ -87,6 +90,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
                 course={item.course_label || item.course}
                 item={item.item}
                 onClick={() => onItemClick(item)}
+                onCustomize={() => onItemCustomize(item)}
                 disabled={isInteractionDisabled}
               />
             ))}

@@ -45,7 +45,10 @@
     "help": "Help"
   },
   "menu": {
-    "special_items": "Special Items"
+    "special_items": "Special Items",
+    "add_item": "Add {{item}}",
+    "customize_item": "Customise {{item}}",
+    "customize": "Customise"
   },
   "pos_sidebar": {
     "categories": "Categories",

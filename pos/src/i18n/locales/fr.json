@@ -38,7 +38,10 @@
     "logout": "Déconnexion"
   },
   "menu": {
-    "special_items": "Plats spéciaux"
+    "special_items": "Plats spéciaux",
+    "add_item": "Ajouter {{item}}",
+    "customize_item": "Personnaliser {{item}}",
+    "customize": "Personnaliser"
   },
   "pos_sidebar": {
     "categories": "Catégories",

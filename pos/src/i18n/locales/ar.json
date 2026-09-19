@@ -50,7 +50,10 @@
     "help": "المساعدة"
   },
   "menu": {
-    "special_items": "أصناف مميزة"
+    "special_items": "أصناف مميزة",
+    "add_item": "إضافة {{item}}",
+    "customize_item": "تخصيص {{item}}",
+    "customize": "تخصيص"
   },
   "pos_sidebar": {
     "categories": "الفئات",

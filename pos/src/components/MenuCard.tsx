@@ -1,6 +1,8 @@
 import React, { FC, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
+import { t } from '../i18n';
 
 interface MenuCardProps {
   id: string;
@@ -10,6 +12,9 @@ interface MenuCardProps {
   course?: string;
   item: string;
   onClick?: () => void;
+  /** Opens the item's detail/options panel. Rendered as its own control so
+      customising never depends on a double click. */
+  onCustomize?: () => void;
   disabled?: boolean;
   /** Position in the grid, used only to stagger the entrance animation. */
   index?: number;
@@ -26,6 +31,12 @@ interface MenuCardProps {
  * `document.createElement` + `insertBefore` it used to do on every error —
  * that inserted a fresh node each time the handler fired and fought the
  * reconciler for ownership of the subtree.
+ *
+ * Adding and customising are two sibling buttons, not one button with a
+ * click-count timer. The timer version shared its counter across every card,
+ * so tapping two different items inside the double-click window opened the
+ * second item's options and added neither (UX-01). It also left customising
+ * undiscoverable and unreachable by keyboard.
  */
 const MenuCard: FC<MenuCardProps> = ({
   name,
@@ -33,6 +44,7 @@ const MenuCard: FC<MenuCardProps> = ({
   item_image,
   course,
   onClick,
+  onCustomize,
   disabled,
   index = 0,
 }) => {
@@ -40,17 +52,20 @@ const MenuCard: FC<MenuCardProps> = ({
   const showImage = item_image && !imageFailed;
 
   return (
+    <div
+      className="group relative animate-fade-in-up stagger-fast"
+      /* The stagger index is capped inside the `.stagger` utility, so a
+         200-item menu still finishes arriving in ~320ms. */
+      style={{ '--i': index } as React.CSSProperties}
+    >
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       title={name}
-      /* The stagger index is capped inside the `.stagger` utility, so a
-         200-item menu still finishes arriving in ~320ms. */
-      style={{ '--i': index } as React.CSSProperties}
+      aria-label={t('menu.add_item', { item: name })}
       className={cn(
-        'group flex h-60 flex-col overflow-hidden rounded-2xl border border-border bg-card text-start',
-        'animate-fade-in-up stagger-fast',
+        'flex h-60 w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-start',
         'shadow-sm transition-[transform,box-shadow,border-color] duration-fast ease-out',
         'hover:-translate-y-0.5 hover:border-accent-400 hover:shadow-lg',
         'active:translate-y-0 active:scale-[0.99] active:shadow-sm',
@@ -106,6 +121,27 @@ const MenuCard: FC<MenuCardProps> = ({
         </div>
       </div>
     </button>
+
+      {onCustomize && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onCustomize}
+          aria-label={t('menu.customize_item', { item: name })}
+          title={t('menu.customize')}
+          className={cn(
+            'absolute end-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full',
+            'border border-border bg-card/90 text-muted-foreground shadow-sm backdrop-blur-sm',
+            'transition-[color,background-color,transform] duration-fast ease-out',
+            'hover:bg-card hover:text-primary active:scale-90',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'disabled:pointer-events-none disabled:opacity-50',
+          )}
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 };
 

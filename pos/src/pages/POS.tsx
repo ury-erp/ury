@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { t } from '../i18n';
 import { Star, TrendingUp, Zap } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import InitialLoader from '../components/InitialLoader';
@@ -23,37 +23,30 @@ export default function POS() {
   } = usePOSStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const clickCountRef = useRef(0);
 
-  useEffect(() => {
-    return () => {
-      if (clickTimerRef.current) {
-        clearTimeout(clickTimerRef.current);
-      }
-    };
-  }, []);
-
-  const handleItemClick = (item: any) => {
+  /**
+   * Adds the item straight away.
+   *
+   * This used to count clicks against a 250ms timer to tell a single click
+   * (add) from a double click (customise). The counter and the timer were
+   * module-level refs shared by every card, so two quick taps on two
+   * *different* items read as one double click: the dialog opened for
+   * whichever item was tapped second, and neither was added. A cashier
+   * working at speed hit this constantly, and the faster they worked the
+   * worse it got.
+   *
+   * Customising is now its own button on the card, so adding needs no
+   * disambiguation window and a tap is answered immediately.
+   */
+  const handleItemClick = (item: MenuItem) => {
     if (isMenuInteractionDisabled()) return;
-    
-    clickCountRef.current += 1;
-    
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current);
-    }
+    addToOrder({ ...item, quantity: 1 });
+  };
 
-    clickTimerRef.current = setTimeout(() => {
-      if (clickCountRef.current === 1) {
-        // Single click - add to cart
-        addToOrder({ ...item, quantity: 1 });
-      } else if (clickCountRef.current >= 2) {
-        // Double click - open dialog
-        setSelectedItem(item);
-        setIsDialogOpen(true);
-      }
-      clickCountRef.current = 0;
-    }, 250); // 250ms threshold for double click
+  const handleItemCustomize = (item: MenuItem) => {
+    if (isMenuInteractionDisabled()) return;
+    setSelectedItem(item);
+    setIsDialogOpen(true);
   };
 
   const QuickFilterButton = ({ filter, icon: Icon, label }: { 
@@ -144,7 +137,7 @@ export default function POS() {
           </div>
         </div>
 
-        <MenuList onItemClick={handleItemClick} />
+        <MenuList onItemClick={handleItemClick} onItemCustomize={handleItemCustomize} />
       </div>
       <OrderPanel />
       {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}

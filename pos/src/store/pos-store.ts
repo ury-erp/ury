@@ -590,8 +590,15 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
   setSelectedOrderType: (type) => {
     const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
-    
-    set({ 
+
+    // Re-picking the type that is already active is not a change, and must
+    // not behave like one. The path below clears `activeOrders`, so tapping
+    // the highlighted service type — which a cashier does by reflex, to
+    // reopen the table dialog or just to confirm where they are — silently
+    // emptied a cart that was already correct (UX-02).
+    if (type === selectedOrderType) return;
+
+    set({
           selectedOrderType: type,
           orderId: null
     });
