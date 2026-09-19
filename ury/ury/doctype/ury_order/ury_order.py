@@ -2248,10 +2248,51 @@ def _validate_additional_discount(additional_discount, pos_profile):
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+    """Settle an open bill.
+
+    Settling the same bill twice is not a hypothetical: the POS could be
+    dismissed mid-request, a slow network invites a second tap, and two
+    cashiers can reach the same table. So this is written to be safe to
+    repeat rather than assumed to be called once.
+
+    Two guards do that work together. The row lock serialises concurrent
+    callers on the same invoice, so the second one waits instead of reading
+    a stale docstatus and appending a second set of payments. The
+    already-submitted check then answers that second caller with the
+    settlement that already happened, instead of raising — a retry after a
+    reply that never arrived is a question about the outcome, not a new
+    instruction, and answering it with an error is what pushes a cashier
+    into collecting twice.
+    """
     additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
 
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
+
+    if invoice:
+        # Held until this transaction ends. A parallel settle for the same
+        # invoice blocks here rather than racing the docstatus read below.
+        settled_docstatus = frappe.db.get_value(
+            "POS Invoice", invoice, "docstatus", for_update=True
+        )
+        if settled_docstatus == 1:
+            return {
+                "status": "Success",
+                "invoice": invoice,
+                "already_settled": True,
+            }
+        if settled_docstatus == 2:
+            frappe.throw(_("This order has been cancelled"))
+
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
+
+    # The table path resolves the invoice by table rather than by name, so the
+    # guard above could not have seen it. Same rule, applied once it is known.
+    if invoice.docstatus == 1:
+        return {
+            "status": "Success",
+            "invoice": invoice.name,
+            "already_settled": True,
+        }
 
     if table:
         restaurant = get_restaurant_and_menu_name(table)

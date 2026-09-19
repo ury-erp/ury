@@ -31,7 +31,8 @@
     "undo": "Undo",
     "refresh": "Refresh",
     "remove": "Remove",
-    "preview": "Preview"
+    "preview": "Preview",
+    "close": "Close"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -100,7 +101,9 @@
     "processing": "Processing...",
     "short_by": "Short by {{amount}}",
     "change_due": "Change due: {{amount}}",
-    "success": "Payment successful: {{amount}} received"
+    "success": "Payment successful: {{amount}} received",
+    "processing_title": "Collecting {{amount}}…",
+    "processing_hint": "Do not close this window. The result will appear here."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",

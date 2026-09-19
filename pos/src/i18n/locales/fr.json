@@ -25,7 +25,8 @@
     "cancelling": "Annulation en cours...",
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
+    "close": "Fermer"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -92,7 +93,9 @@
     "processing": "Traitement...",
     "short_by": "Manque {{amount}}",
     "change_due": "Monnaie à rendre : {{amount}}",
-    "success": "Paiement réussi : {{amount}} reçu"
+    "success": "Paiement réussi : {{amount}} reçu",
+    "processing_title": "Encaissement de {{amount}}…",
+    "processing_hint": "Ne fermez pas cette fenêtre. Le résultat s'affichera ici."
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",

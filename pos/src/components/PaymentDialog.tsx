@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
-import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
+import { Button, Input, Dialog, DialogContent, showToast, Spinner } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 
@@ -137,7 +137,23 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     });
   };
 
+  /**
+   * Collects the amount.
+   *
+   * The dialog cannot be dismissed while this is in flight. Closing it used
+   * to be possible by Escape, by the backdrop, or by the X — and the request
+   * carried on regardless, so the cashier lost the only place the result was
+   * going to be reported and had no way to tell a completed settlement from
+   * a failed one. The honest options at that point are to ask the guest to
+   * pay again or to go hunting in the order list; both are worse than
+   * waiting (UX-03).
+   *
+   * Retrying is safe on the server side: `make_invoice` serialises callers
+   * on the invoice row and answers an already-settled bill with its existing
+   * settlement instead of collecting twice.
+   */
   const handlePayment = async () => {
+    if (isProcessing) return;
     setIsProcessing(true);
     setError(null);
     try {
@@ -164,15 +180,29 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     }
   };
 
+  // Every dismissal route goes through here, so none of them can bypass the
+  // in-flight guard the way three separate handlers previously did.
+  const handleDismiss = () => {
+    if (isProcessing) return;
+    onClose();
+  };
+
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog
+      open={true}
+      onOpenChange={handleDismiss}
+      closeOnEscape={!isProcessing}
+      closeOnBackdrop={!isProcessing}
+    >
       <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-dialog-max-h flex flex-col md:flex-row p-0" showCloseButton={false}>
         {/* Left Column - Discount and Payment Mode */}
         <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-e border-gray-200 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">{t('payment.title')}</h2>
             <Button
-              onClick={onClose}
+              onClick={handleDismiss}
+              disabled={isProcessing}
+              aria-label={t('common.close')}
               variant="ghost"
               size="icon"
               className="p-2"
@@ -262,8 +292,27 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         <div className="md:w-1/2 p-6 overflow-y-auto">
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* In-flight state. Persistent and announced, rather than only a
+              relabelled button: while this is showing, the dialog refuses to
+              close, so the cashier is told why it will not go away. */}
+          {isProcessing && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"
+            >
+              <Spinner className="mt-0.5 h-4 w-4 shrink-0" hideMessage message={t('payment.processing')} />
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  {t('payment.processing_title', { amount: formatCurrency(paymentsTotal) })}
+                </p>
+                <p className="text-xs text-blue-800">{t('payment.processing_hint')}</p>
+              </div>
             </div>
           )}
 

@@ -36,7 +36,8 @@
     "undo": "تراجع",
     "refresh": "تحديث",
     "remove": "إزالة",
-    "preview": "معاينة"
+    "preview": "معاينة",
+    "close": "إغلاق"
   },
   "header": {
     "search_placeholder_default": "ابحث في الطلبات أو الأصناف أو الزبائن...",
@@ -105,7 +106,9 @@
     "processing": "جارٍ المعالجة...",
     "short_by": "ناقص {{amount}}",
     "change_due": "الباقي: {{amount}}",
-    "success": "تم الدفع بنجاح: استُلم {{amount}}"
+    "success": "تم الدفع بنجاح: استُلم {{amount}}",
+    "processing_title": "جارٍ تحصيل {{amount}}…",
+    "processing_hint": "لا تغلق هذه النافذة. ستظهر النتيجة هنا."
   },
   "pos": {
     "not_opened_title": "نقطة البيع غير مفتوحة",
