@@ -7,7 +7,7 @@ from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 from ury.ury_pos.api import searchPosInvoice
 from ury.ury_pos.api import get_split_group, getPosInvoiceItems
-from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
+from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu, getMenuCourses
 from ury.ury_pos.api import submit_checklist
 import json
 from datetime import date
@@ -55,6 +55,90 @@ class TestGetRestaurantMenuPhase1(unittest.TestCase):
             mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
             getRestaurantMenu("Test POS Profile")
             mock_resolve.assert_called_once_with("Branch A", None, None, False)
+
+
+class TestGetMenuCourses(unittest.TestCase):
+    """getMenuCourses() must be scoped to the menu resolved for the caller's
+    POS Profile, while a bare call keeps the legacy whole-catalog behavior."""
+
+    @staticmethod
+    def _course(name, icon=None):
+        course = MagicMock()
+        course.name = name
+        course.icon = icon
+        return course
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_without_pos_profile_returns_whole_catalog(self, mock_get_all):
+        mock_get_all.return_value = [self._course("Starters"), self._course("Desserts", "Cake")]
+
+        result = getMenuCourses()
+
+        self.assertEqual([c["name"] for c in result], ["Starters", "Desserts"])
+        args, kwargs = mock_get_all.call_args
+        self.assertEqual(args[0], "URY Menu Course")
+        self.assertEqual(kwargs["filters"], {})
+        self.assertEqual(kwargs["order_by"], "custom_serving_priority asc, name asc")
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api._resolve_menu_name")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_with_pos_profile_filters_by_resolved_menu(
+        self, mock_getBranch, mock_get_doc, mock_get_roles, mock_resolve_menu, mock_get_all
+    ):
+        mock_getBranch.return_value = "Branch A"
+        mock_role = MagicMock()
+        mock_role.role = "URY Cashier"
+        profile = MagicMock()
+        profile.branch = "Branch A"
+        profile.role_allowed_for_billing = [mock_role]
+        mock_get_doc.return_value = profile
+        mock_get_roles.return_value = ["URY Cashier"]
+        mock_resolve_menu.return_value = "Menu A"
+        mock_get_all.side_effect = [
+            ["Starters", "Starters", None, "Desserts"],
+            [self._course("Desserts"), self._course("Starters")],
+        ]
+
+        result = getMenuCourses("Test POS Profile", room="Room 1", order_type="Dine In")
+
+        mock_resolve_menu.assert_called_once_with("Branch A", "Room 1", "Dine In", True)
+        course_filters = mock_get_all.call_args_list[1].kwargs["filters"]
+        self.assertEqual(course_filters, {"name": ["in", ["Desserts", "Starters"]]})
+        self.assertEqual([c["name"] for c in result], ["Desserts", "Starters"])
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api._resolve_menu_name")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_menu_without_courses_returns_empty(
+        self, mock_getBranch, mock_get_doc, mock_get_roles, mock_resolve_menu, mock_get_all
+    ):
+        mock_getBranch.return_value = "Branch A"
+        profile = MagicMock()
+        profile.branch = "Branch A"
+        profile.role_allowed_for_billing = []
+        mock_get_doc.return_value = profile
+        mock_get_roles.return_value = []
+        mock_resolve_menu.return_value = "Menu A"
+        mock_get_all.return_value = [None, ""]
+
+        self.assertEqual(getMenuCourses("Test POS Profile"), [])
+        self.assertEqual(mock_get_all.call_count, 1)
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_pos_profile_from_another_branch_is_rejected(self, mock_getBranch, mock_get_doc):
+        mock_getBranch.return_value = "Branch A"
+        profile = MagicMock()
+        profile.branch = "Branch B"
+        mock_get_doc.return_value = profile
+
+        with self.assertRaises(frappe.PermissionError):
+            getMenuCourses("Other Branch POS Profile")
 
 
 class TestMergeBillsSEC07(unittest.TestCase):
