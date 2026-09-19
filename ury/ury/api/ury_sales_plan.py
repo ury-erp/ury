@@ -5,6 +5,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 from frappe.model.workflow import (
     apply_workflow,
     get_transitions,
@@ -16,7 +17,74 @@ from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_production_validation import validate_item_production_configuration
 
 
-def transition_sales_plan(doc, target_state, actor=None):
+#: Targets that move a plan backward (out of its forward-only approval path)
+#: or kill it outright. Both require an actor-supplied reason (for the audit
+#: trail) and are blocked once real production has happened against the plan
+#: -- see _guard_backward_transition().
+BACKWARD_OR_TERMINAL_TARGETS = ("Draft", "Superseded/Cancelled")
+
+
+def _guard_backward_transition(doc, target_state, reason):
+    """Block Return to Draft / Supersede-Cancel once production has actually
+    happened, and require a reason for the audit trail either way.
+
+    No override, ever, once any row has fulfilled_qty > 0 -- reopening or
+    cancelling a plan that already produced food is not a "maybe, with
+    permission" situation, it's simply not a safe operation: URY Sales Plan
+    is not just a demand record, it actively GATES live POS sellability by
+    branch+date scope (see ury.ury.api.ury_availability's
+    controlled_by_sales_plan handling) -- pulling an Approved/Locked plan out
+    from under a branch mid-service fails CLOSED (every item on it reads as
+    "no active plan" and becomes unsellable), on top of whatever has already
+    been produced/committed. Zero committed_qty and zero fulfilled_qty is the
+    only state in which either action is safe.
+
+    Reason is required on both actions per explicit product decision (not
+    just a nice-to-have): every reopen/cancel must leave a record of *why*,
+    independent of whether it was also blocked on production grounds.
+    """
+    if target_state not in BACKWARD_OR_TERMINAL_TARGETS:
+        return
+
+    if not (reason or "").strip():
+        frappe.throw(
+            _("A reason is required to {0} this Sales Plan").format(
+                "return to Draft" if target_state == "Draft" else "cancel"
+            ),
+            frappe.ValidationError,
+        )
+
+    blocking_items = [
+        row.get("item_code") for row in (doc.get("items") or []) if flt(row.get("fulfilled_qty"))
+    ]
+    if blocking_items:
+        frappe.throw(
+            _(
+                "Cannot {0} {1}: production has already been recorded against {2}. "
+                "This plan can no longer be reopened or cancelled."
+            ).format(
+                "return to Draft" if target_state == "Draft" else "cancel",
+                doc.get("name") or "this Sales Plan",
+                ", ".join(blocking_items),
+            ),
+            frappe.ValidationError,
+        )
+
+    if target_state == "Draft":
+        committed_items = [
+            row.get("item_code") for row in (doc.get("items") or []) if flt(row.get("committed_qty"))
+        ]
+        if committed_items:
+            frappe.throw(
+                _(
+                    "Cannot return {0} to Draft while {1} still has open Stock Reservation commitments. "
+                    "Cancel this plan instead, or release those commitments first."
+                ).format(doc.get("name") or "this Sales Plan", ", ".join(committed_items)),
+                frappe.ValidationError,
+            )
+
+
+def transition_sales_plan(doc, target_state, actor=None, reason=None):
     """Apply a state transition via Frappe's real Workflow engine.
 
     Finds the workflow transition whose current state matches ``doc.status``
@@ -25,10 +93,13 @@ def transition_sales_plan(doc, target_state, actor=None):
     both enforces the role gating declared in the "URY Sales Plan" Workflow
     fixture (raising ``frappe.PermissionError``/``WorkflowPermissionError``
     if the current user's role doesn't allow the transition) and performs the
-    actual save -- including a real ``doc.submit()``/``doc.cancel()`` when
-    the transition crosses a ``doc_status`` boundary (see
+    actual save -- including a real ``doc.submit()``/``doc.cancel()`` when the
+    transition crosses a ``doc_status`` boundary (see
     ``ury/fixtures/workflow.json``: Approved/Locked for Production are
-    doc_status 1, Superseded/Cancelled is doc_status 2).
+    doc_status 1, Superseded/Cancelled is doc_status 2). This replaces the
+    hand-rolled ``TRANSITIONS`` edge dict that used to live here -- it was a
+    second, independently-maintained copy of the same graph Frappe's own
+    ``validate_workflow()`` already re-checks on every save.
 
     The guardrails that used to run here directly (scope check, item
     validation, approval-snapshot freeze, audit append) now run
@@ -44,9 +115,9 @@ def transition_sales_plan(doc, target_state, actor=None):
     transitions = get_transitions(doc, raise_exception=False)
     transition = next((t for t in transitions if t.state == current and t.next_state == target_state), None)
     if not transition:
-        # Either there is no such edge in the workflow at all, or the
-        # current user's role does not permit it (get_transitions() already
-        # filters by frappe.get_roles()) -- in the latter case surface a
+        # Either there is no such edge in the workflow at all, or the current
+        # user's role does not permit it (get_transitions() already filters
+        # by frappe.get_roles()) -- in the latter case surface a
         # PermissionError instead of a generic ValidationError so callers can
         # distinguish "no such transition" from "not allowed to do this".
         all_transitions = frappe.get_doc("Workflow", workflow_name).transitions
@@ -66,6 +137,19 @@ def transition_sales_plan(doc, target_state, actor=None):
                 )
             frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
         frappe.throw(_("Invalid Sales Plan transition from {0} to {1}").format(current, target_state), frappe.ValidationError)
+
+    _guard_backward_transition(doc, target_state, reason)
+    if target_state in BACKWARD_OR_TERMINAL_TARGETS:
+        # apply_workflow() below reconstructs its own Document instance and
+        # calls doc.load_from_db() on it before doing anything else --
+        # setting `doc.cancellation_reason` on THIS in-memory object would be
+        # silently discarded the moment that reload happens. Write it
+        # directly to the DB row first so it's already there by the time
+        # apply_workflow()'s fresh load reads it back; URYSalesPlan's
+        # _record_transition() (validate()/before_cancel(), whichever this
+        # transition's docstatus edge actually triggers) then folds it into
+        # append_audit().
+        frappe.db.set_value(doc.doctype, doc.name, "cancellation_reason", reason)
 
     return apply_workflow(doc, transition.action)
 
@@ -127,11 +211,27 @@ def populate_item_production_context(doc):
 
 
 def validate_plan_items(doc):
-    """Validate every mapped line before approval can freeze demand."""
+    """Validate every mapped line that is actually part of the plan before
+    approval can freeze demand.
+
+    The comparable-history panel pre-populates every catalog item the branch
+    has ever sold as a row on the plan, most left at their default
+    ``qty: 0`` -- they are suggestions the user never acted on, not lines the
+    user is actually planning. Requiring a complete production configuration
+    (department/BOM/etc.) for those untouched rows would make history-derived
+    suggestions gate approval of the whole plan, exactly what
+    "historical-data-driven suggestions must be additive, never gating"
+    (see PLAN.md's own Context and the workspace's
+    feedback_history_is_suggestion_not_precondition memory) forbids. Only a
+    row with a nonzero qty is actually being planned, so only those need a
+    valid production configuration.
+    """
     for row in doc.get("items") or []:
         item_code = row.get("item_code")
         if not item_code:
             frappe.throw(_("Sales Plan item is required"), frappe.ValidationError)
+        if not row.get("qty"):
+            continue
         validate_item_production_configuration(item_code, doc.get("branch"))
 
 
@@ -248,7 +348,7 @@ def snapshot_item(row):
     return {key: row.get(key) for key in ("item_code", "qty", "stock_uom", "department", "production_unit", "production_policy", "bom", "bom_revision")}
 
 
-def append_audit(doc, from_state, to_state, actor):
+def append_audit(doc, from_state, to_state, actor, reason=None):
     audits = doc.get("audit_log") or []
     # audit_log is a Long Text (JSON) field: once a plan has gone through one
     # transition and been saved, the stored value is a JSON string, not a
@@ -257,7 +357,17 @@ def append_audit(doc, from_state, to_state, actor):
     # throws AttributeError on any plan with existing audit history.
     if isinstance(audits, str):
         audits = json.loads(audits) if audits else []
-    audits.append({"from_state": from_state, "to_state": to_state, "actor": actor, "branch": doc.get("branch"), "company": doc.get("company")})
+    entry = {
+        "from_state": from_state,
+        "to_state": to_state,
+        "actor": actor,
+        "branch": doc.get("branch"),
+        "company": doc.get("company"),
+        "timestamp": frappe.utils.now(),
+    }
+    if reason:
+        entry["reason"] = reason
+    audits.append(entry)
     doc.audit_log = audits
 
 
@@ -331,6 +441,20 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
                 ).format(existing_name, existing_status, existing_docstatus),
                 frappe.ValidationError,
             )
+        # Tightened from ("Draft", "Proposed") -- "Proposed" is already a
+        # claim made to someone else in the approval chain, not a private
+        # scratchpad; per the accepted "items editable only in Draft" design,
+        # editing past Draft must go through the explicit, audited
+        # "Return to Draft" workflow action (transition_plan), not silently
+        # through this endpoint. (Proposed still has docstatus 0, so the
+        # check above alone would not catch it.)
+        if existing_status != "Draft":
+            frappe.throw(
+                _(
+                    "Sales Plan {0} for this branch, company and date is already {1} and can no longer be saved as a draft -- ask a manager to Return to Draft first"
+                ).format(existing_name, existing_status),
+                frappe.ValidationError,
+            )
         doc = frappe.get_doc("URY Sales Plan", existing_name)
     else:
         doc = frappe.get_doc(
@@ -369,10 +493,25 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
 
 
 @frappe.whitelist(methods=["POST"])
-def transition_plan(name, target_state):
-    """Apply an audited state transition to an existing Sales Plan and persist it."""
+def transition_plan(name, target_state, reason=None):
+    """Apply an audited state transition to an existing Sales Plan and persist it.
+
+    ``transition_sales_plan()`` now calls ``apply_workflow()`` itself, which
+    already performs the save (a real ``submit()``/``cancel()`` where the
+    transition crosses a doc_status boundary) -- an extra ``doc.save()`` here
+    would be redundant and, worse, would fail outright once the doc has been
+    submitted (docstatus 1), since a plain save on a submitted doc requires
+    going through ``before_update_after_submit`` semantics rather than a
+    normal save.
+
+    ``reason`` is required (enforced inside ``transition_sales_plan()`` ->
+    ``_guard_backward_transition()``) whenever ``target_state`` is "Draft"
+    (Return to Draft) or "Superseded/Cancelled" (Supersede/Cancel) -- both
+    also blocked outright once any plan item has real production recorded
+    against it.
+    """
     doc = frappe.get_doc("URY Sales Plan", name)
-    doc = transition_sales_plan(doc, target_state, actor=frappe.session.user)
+    doc = transition_sales_plan(doc, target_state, actor=frappe.session.user, reason=reason)
     # The scope check / item validation / snapshot freeze / audit append that
     # used to happen inside transition_sales_plan() now run automatically in
     # URYSalesPlan.validate() on every save (including Desk/Workflow-driven
@@ -394,22 +533,51 @@ def get_plan(name):
 
 @frappe.whitelist(methods=["GET"])
 def get_plan_status(branch, plan_date):
-    """Look up the (at most one, non-cancelled in normal operation) Sales Plan
-    for a branch+date scope without needing its name up front."""
+    """Look up the active (non-cancelled) Sales Plan for a branch+date scope,
+    without needing its name up front.
+
+    A Superseded/Cancelled plan is a genuine dead end -- see
+    ury/fixtures/workflow.json, it has no outgoing transitions at all -- so
+    it is deliberately excluded here, the same way save_draft() already
+    excludes it when deciding whether to reuse an existing row or insert a
+    fresh Draft. Without this exclusion, a cancelled plan (being the most
+    recently modified row for its scope) would keep being returned as "the"
+    plan forever, leaving the caller with no way to ever start a new one for
+    that branch+date -- exactly the live bug a real user hit: reloading the
+    page kept reloading the same dead cancelled plan with no path forward.
+
+    Still reports the most recent cancelled plan's name (as
+    `superseded_plan`) when that's the only reason nothing active was found,
+    so the frontend can surface "a previous plan for this date was
+    cancelled" instead of silently pretending no plan ever existed.
+    """
     if not frappe.has_permission("URY Sales Plan", "read"):
         frappe.throw(_("Not permitted to read Sales Plans"), frappe.PermissionError)
 
     rows = frappe.get_all(
         "URY Sales Plan",
-        filters={"branch": branch, "plan_date": plan_date},
+        filters={"branch": branch, "plan_date": plan_date, "status": ["!=", "Superseded/Cancelled"]},
         fields=["name", "status", "enforcement_mode"],
         order_by="modified desc",
         limit=1,
     )
     if not rows:
-        return {"name": None, "status": None, "enforcement_mode": None}
+        superseded = frappe.get_all(
+            "URY Sales Plan",
+            filters={"branch": branch, "plan_date": plan_date, "status": "Superseded/Cancelled"},
+            fields=["name"],
+            order_by="modified desc",
+            limit=1,
+        )
+        return {
+            "name": None,
+            "status": None,
+            "enforcement_mode": None,
+            "superseded_plan": superseded[0]["name"] if superseded else None,
+        }
     return {
         "name": rows[0]["name"],
         "status": rows[0]["status"],
         "enforcement_mode": rows[0]["enforcement_mode"],
+        "superseded_plan": None,
     }

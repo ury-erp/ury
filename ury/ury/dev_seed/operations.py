@@ -86,6 +86,13 @@ ITEM_GROUP_TO_DEPARTMENT = {
 	"Chinese": "Chinese",
 	"Beverages": "Beverage Station",
 	"Desserts": "Beverage Station",
+	# "Pizza" (and any other item_group not covered above) previously had no
+	# entry here at all -- _ensure_item_production_configurations() treats a
+	# missing key the same as a deliberate demo gap (department=None), which
+	# is why every Pizza-group item (Margherita Pizza included) ended up
+	# with no department/BOM on any branch this seed ever touched. Only the
+	# two names in NEEDS_ATTENTION_DEMO_ITEMS are meant to be gapped.
+	"Pizza": "Indian Kitchen",
 }
 
 # item_group -> production_policy. Beverages/Desserts are made on demand
@@ -567,6 +574,82 @@ def _ensure_aggregators(branch_name):
 	return created
 
 
+#: Barfi (MADE_TO_ORDER) and Margherita Pizza (PRE_PRODUCED) both slipped
+#: through catalog.py with no BOM ever seeded -- in fact no MADE_TO_ORDER
+#: item in the whole catalog has one, and "Pizza" was entirely missing from
+#: ITEM_GROUP_TO_DEPARTMENT above (fixed there, but that only helps a FUTURE
+#: seed run -- an already-provisioned branch's config row needs backfilling
+#: directly, which is what _ensure_item_bom_and_department() below does).
+#: This is exactly what let real Sales Plan approvals hit
+#: "Department/BOM is required for manufactured Item X" on rows that had
+#: nothing else to do with the item's own data. Raw materials reused from
+#: BLCS's own BOM (BOM-BLCS-003) -- these are already generic pantry items
+#: (Garlic/Salt/Oil/Seasoning) reused across unrelated dishes in this demo
+#: data, not literally item-specific ingredients; accuracy of the recipe
+#: itself is not the point of this seed.
+ITEMS_NEEDING_BOM_BACKFILL = {
+	"Barfi": {"department": "Beverage Station", "production_unit": "Beverage Station", "raw_materials": ["SLTPDR", "SFOIL"]},
+	"Margherita Pizza": {"department": "Indian Kitchen", "production_unit": "Indian Kitchen", "raw_materials": ["SLTPDR", "SFOIL", "GAR"]},
+}
+
+
+def _ensure_item_bom_and_department(item_code, department, production_unit, raw_materials, company_name):
+	"""Idempotently create+submit a minimal BOM for `item_code`, and backfill
+	it plus `department`/`production_unit` onto every URY Item Production
+	Configuration row for that item that's still missing them (e.g. a live
+	environment seeded/branch-configured before this function existed)."""
+	existing = frappe.db.get_value("BOM", {"item": item_code, "docstatus": 1, "is_default": 1}, "name")
+	if not existing:
+		missing = [i for i in raw_materials if not frappe.db.exists("Item", i)]
+		if missing or not frappe.db.exists("Item", item_code):
+			print(f"operations.seed: expected Items not found ({[item_code] + missing}) — skipping {item_code} BOM.")
+			return None
+		try:
+			doc = frappe.get_doc(
+				{
+					"doctype": "BOM",
+					"item": item_code,
+					"company": company_name,
+					"quantity": 1,
+					"is_active": 1,
+					"is_default": 1,
+					"items": [{"item_code": raw_item, "qty": 1} for raw_item in raw_materials],
+				}
+			)
+			doc.insert(ignore_permissions=True)
+			doc.submit()
+			existing = doc.name
+			print(f"Created BOM: {existing}")
+		except Exception as e:
+			print(f"  ! Failed to create BOM for {item_code}: {e}")
+			frappe.db.rollback()
+			return None
+
+	for config_name in frappe.db.get_all("URY Item Production Configuration", {"item": item_code}, pluck="name"):
+		updates = {}
+		current = frappe.db.get_value(
+			"URY Item Production Configuration", config_name, ["bom", "department", "production_unit"], as_dict=True
+		)
+		if not current.bom:
+			updates["bom"] = existing
+		if not current.department:
+			updates["department"] = department
+		if not current.production_unit:
+			updates["production_unit"] = production_unit
+		if updates:
+			frappe.db.set_value("URY Item Production Configuration", config_name, updates)
+			print(f"Backfilled {updates} onto Item Production Configuration {config_name}")
+
+	return existing
+
+
+def _ensure_bom_backfills(company_name):
+	for item_code, spec in ITEMS_NEEDING_BOM_BACKFILL.items():
+		_ensure_item_bom_and_department(
+			item_code, spec["department"], spec["production_unit"], spec["raw_materials"], company_name
+		)
+
+
 def seed():
 	"""Idempotent entrypoint — safe to call repeatedly, e.g. via
 	``bench execute ury.ury.dev_seed.operations.seed``.
@@ -585,6 +668,7 @@ def seed():
 	item_configs_created += _ensure_item_production_configurations_for_stray_history_items(
 		branch_name, dept_names
 	)
+	_ensure_bom_backfills(company_name)
 	report_settings = _ensure_report_settings(branch_name)
 	aggregators_created = _ensure_aggregators(branch_name)
 
@@ -597,6 +681,7 @@ def seed():
 		"production_units_created": len(production_units_created),
 		"production_item_groups_updated": production_item_groups_updated,
 		"item_configs_created": len(item_configs_created),
+		"bom_backfills": list(ITEMS_NEEDING_BOM_BACKFILL.keys()),
 		"report_settings_created": report_settings,
 		"aggregators_created": aggregators_created,
 	}
