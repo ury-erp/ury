@@ -448,18 +448,41 @@ def get_plan(name):
 
 @frappe.whitelist(methods=["GET"])
 def get_plan_status(branch, plan_date):
-    """Look up the (at most one, non-cancelled in normal operation) Sales Plan
-    for a branch+date scope without needing its name up front."""
+    """Look up the active (non-cancelled) Sales Plan for a branch+date scope,
+    without needing its name up front.
+
+    A Superseded/Cancelled plan is a genuine dead end -- see
+    ury/fixtures/workflow.json, it has no outgoing transitions at all -- so
+    it is deliberately excluded here, the same way save_draft() already
+    excludes it when deciding whether to reuse an existing row or insert a
+    fresh Draft. Without this exclusion, a cancelled plan (being the most
+    recently modified row for its scope) would keep being returned as "the"
+    plan forever, leaving the caller with no way to ever start a new one for
+    that branch+date -- exactly the live bug a real user hit: reloading the
+    page kept reloading the same dead cancelled plan with no path forward.
+
+    Still reports the most recent cancelled plan's name (as
+    `superseded_plan`) when that's the only reason nothing active was found,
+    so the frontend can surface "a previous plan for this date was
+    cancelled" instead of silently pretending no plan ever existed.
+    """
     if not frappe.has_permission("URY Sales Plan", "read"):
         frappe.throw(_("Not permitted to read Sales Plans"), frappe.PermissionError)
 
     rows = frappe.get_all(
         "URY Sales Plan",
-        filters={"branch": branch, "plan_date": plan_date},
+        filters={"branch": branch, "plan_date": plan_date, "status": ["!=", "Superseded/Cancelled"]},
         fields=["name", "status"],
         order_by="modified desc",
         limit=1,
     )
     if not rows:
-        return {"name": None, "status": None}
-    return {"name": rows[0]["name"], "status": rows[0]["status"]}
+        superseded = frappe.get_all(
+            "URY Sales Plan",
+            filters={"branch": branch, "plan_date": plan_date, "status": "Superseded/Cancelled"},
+            fields=["name"],
+            order_by="modified desc",
+            limit=1,
+        )
+        return {"name": None, "status": None, "superseded_plan": superseded[0]["name"] if superseded else None}
+    return {"name": rows[0]["name"], "status": rows[0]["status"], "superseded_plan": None}

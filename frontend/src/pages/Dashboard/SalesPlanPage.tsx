@@ -501,6 +501,11 @@ export const SalesPlanPage: React.FC = () => {
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  // Name of a prior Superseded/Cancelled plan for the current branch+date,
+  // when that's why planStatus/planName are null and a fresh Draft is
+  // starting instead -- see get_plan_status()'s docstring for why a
+  // cancelled plan is deliberately excluded from being "the" active plan.
+  const [supersededPlanName, setSupersededPlanName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -572,6 +577,7 @@ export const SalesPlanPage: React.FC = () => {
     setHistoryScope(null);
     setPlanName(null);
     setPlanStatus(null);
+    setSupersededPlanName(null);
 
     if (!activeBranchId || activeBranchId === 'all') {
       // Sales Plan is inherently branch-scoped -- there is no meaningful
@@ -613,6 +619,7 @@ export const SalesPlanPage: React.FC = () => {
             if (!cancelled) {
               setPlanName(status.name);
               setPlanStatus((status.status as PlanStatus) || null);
+              setSupersededPlanName(status.superseded_plan || null);
             }
           } catch (statusErr) {
             // A missing/unsaved plan is expected and non-fatal (the stepper
@@ -1095,6 +1102,11 @@ export const SalesPlanPage: React.FC = () => {
 
         {transitionError && (
           <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+        )}
+        {!planStatus && supersededPlanName && (
+          <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
+            The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
+          </p>
         )}
       </div>
 

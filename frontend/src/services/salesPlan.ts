@@ -212,6 +212,13 @@ export interface GetPlanStatusParams {
 export interface GetPlanStatusResponse {
   name: string | null;
   status: string | null;
+  /** Name of the most recently Superseded/Cancelled plan for this
+   * branch+date, when that's the reason no active plan was found (a
+   * cancelled plan is a dead end -- see ury_sales_plan.py's
+   * get_plan_status() -- so it's excluded from name/status, but the
+   * frontend still needs to know one existed to explain why a fresh Draft
+   * is starting instead of silently pretending nothing was ever there). */
+  superseded_plan?: string | null;
 }
 
 export interface BranchItemSearchResult {
