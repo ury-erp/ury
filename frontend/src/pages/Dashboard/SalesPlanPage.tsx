@@ -1003,7 +1003,6 @@ export const SalesPlanPage: React.FC = () => {
       setPlanStatus((result.status as PlanStatus) || currentBackwardAction.targetState);
       closeBackwardActionModal();
     } catch (err) {
-      const actionName = currentBackwardAction.label.toLowerCase();
       const fallbackMessage = currentBackwardAction.destructive
         ? `Unable to cancel this Sales Plan. Please try again.`
         : `Unable to return this Sales Plan to Draft. Please try again.`;
@@ -1495,7 +1494,13 @@ export const SalesPlanPage: React.FC = () => {
                   className={currentBackwardAction.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
                   size="compactLg"
                 >
-                  {backwardActionTransitioning ? 'Updating...' : currentBackwardAction.label}
+                  {/* Deliberately NOT reusing currentBackwardAction.label here --
+                      that's also the text of the button that opened this modal,
+                      so while the modal is open both would carry the identical
+                      accessible name ("Return to Draft"/"Supersede/Cancel"),
+                      ambiguous for screen readers and for anything selecting by
+                      role+name. */}
+                  {backwardActionTransitioning ? 'Updating...' : 'Confirm'}
                 </Button>
               </div>
             </div>
