@@ -268,7 +268,9 @@
       "today_s_sales": "Today's Sales",
       "total_invoices": "Total Invoices",
       "total_taxes_charges": "Total Taxes & Charges"
-    }
+    },
+    "hub_subtitle": "Pick a report. Branch and period stay as you set them.",
+    "none_available": "No reports are available."
   },
   "tables": {
     "autosave_hint": "• Changes autosave",

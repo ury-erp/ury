@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/useAuth';
 import { reportsRegistry, groupReports, reportLabel, reportGroupLabel } from '../../pages/Reports/reportsRegistry';
 import { t } from '../../i18n';
@@ -17,7 +17,6 @@ import {
   Settings,
   Store,
   BarChart3,
-  ArrowLeft,
   Grid
 } from 'lucide-react';
 
@@ -56,16 +55,10 @@ const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 
 const ReportsPanel: React.FC = () => (
-  <nav className="flex-1 px-3 py-4 overflow-y-auto">
-    <Link
-      to="/dashboard"
-      className={cn(sidebarItemVariants({ active: false }), 'mb-4')}
-    >
-      <div className="flex items-center gap-3 ms-1">
-        <ArrowLeft className="w-4 h-4 text-gray-500 shrink-0" />
-        <span>{t('common.back')}</span>
-      </div>
-    </Link>
+  <nav className="border-t border-[#eadfce] px-3 py-4">
+    <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      {t('nav.reports')}
+    </p>
 
     <div className="space-y-4">
       {reportGroupEntries.map(([group, reports], index) => (
@@ -206,9 +199,17 @@ export const Sidebar: React.FC = () => {
   const { isManager } = useAuth();
   const inReports = location.pathname.startsWith('/reports');
 
+  // Opening a report used to replace the whole navigation tree with a list of
+  // reports, so the rest of the app vanished and the only way back was a
+  // "Back" link at the top of the list. The global nav now stays put and the
+  // report list is appended under it, which keeps a report one click from the
+  // work it was opened to explain (UX-23).
   return (
     <SidebarContainer>
-      {inReports ? <ReportsPanel /> : <MainPanel isManager={isManager} />}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <MainPanel isManager={isManager} />
+        {inReports && <ReportsPanel />}
+      </div>
     </SidebarContainer>
   );
 };
