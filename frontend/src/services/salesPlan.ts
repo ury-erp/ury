@@ -201,6 +201,7 @@ export interface SaveSalesPlanDraftResponse {
 export interface TransitionSalesPlanParams {
   name: string;
   target_state: string;
+  reason?: string;
 }
 
 export interface GetPlanStatusParams {
@@ -257,12 +258,16 @@ export const salesPlanService = {
   },
 
   async transitionPlan(params: TransitionSalesPlanParams): Promise<SaveSalesPlanDraftResponse> {
+    const body: any = {
+      name: params.name,
+      target_state: params.target_state,
+    };
+    if (params.reason !== undefined) {
+      body.reason = params.reason;
+    }
     const res = await call.post<SaveSalesPlanDraftResponse>(
       'ury.ury.api.ury_sales_plan.transition_plan',
-      {
-        name: params.name,
-        target_state: params.target_state,
-      },
+      body,
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
   },
