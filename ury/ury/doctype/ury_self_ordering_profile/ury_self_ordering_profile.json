@@ -34,6 +34,8 @@
   "column_break_billing_payment",
   "enable_payment_link",
   "enable_pay_at_counter",
+  "service_section",
+  "enable_call_waiter",
   "session_section",
   "session_idle_timeout_minutes",
   "qr_signing_secret",
@@ -188,6 +190,18 @@
    "fieldname": "enable_pay_at_counter",
    "fieldtype": "Check",
    "label": "Enable Pay at Counter"
+  },
+  {
+   "fieldname": "service_section",
+   "fieldtype": "Section Break",
+   "label": "Table Service"
+  },
+  {
+   "default": "1",
+   "description": "Lets a seated customer call a member of staff from their screen. The call appears on the POS terminal's alert bell, the same as a bill request.",
+   "fieldname": "enable_call_waiter",
+   "fieldtype": "Check",
+   "label": "Enable Call Waiter"
   },
   {
    "fieldname": "session_section",

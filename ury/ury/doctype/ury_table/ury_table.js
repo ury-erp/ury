@@ -26,8 +26,35 @@ frappe.ui.form.on('URY Table', {
     branch(frm) {
         // Clear room when restaurant changes
         frm.set_value('restaurant_room', null);
+    },
+
+    enable_self_ordering(frm) {
+        // The panel below is the answer to "is this table on self ordering?",
+        // so it has to change with the switch rather than a page reload later.
+        if (frm.is_new() || frm.is_dirty()) {
+            render_toggle_pending(frm);
+            return;
+        }
+        render_self_ordering_qr(frm);
     }
 });
+
+/**
+ * Shown between flipping the switch and saving. The code is minted by the
+ * server from the saved document, so until the save lands the panel would
+ * otherwise keep showing the old state and look like the switch did nothing.
+ */
+function render_toggle_pending(frm) {
+    const wrapper = frm.get_field('self_ordering_qr');
+    if (!wrapper) return;
+    wrapper.$wrapper.html(
+        empty_state(
+            frm.doc.enable_self_ordering
+                ? __('Save this table to issue its ordering code.')
+                : __('Save this table to switch its ordering code off.')
+        )
+    );
+}
 
 /**
  * Draws the table's self-ordering code into the Self Ordering tab.
@@ -89,6 +116,18 @@ function qr_panel(frm, data) {
     // internal hostname still produces a perfectly valid code — one that no
     // customer phone can resolve. Seeing the address is the only way to
     // catch that before a few hundred cards are printed.
+    // An unreachable address is the one failure that only shows up after the
+    // cards are printed and a customer is holding a dead link, so it is shown
+    // as a warning on the panel rather than left for someone to notice.
+    const warning = data.warning
+        ? `<div style="margin-top:1rem;padding:.75rem 1rem;border-radius:var(--border-radius-md);
+                       border:1px solid var(--yellow-300, #f0c000);background:var(--yellow-50, #fffbe6);
+                       color:var(--text-color);font-size:var(--text-sm)">
+               <strong>${__('Check this address before printing')}</strong><br>
+               ${frappe.utils.escape_html(data.warning)}
+           </div>`
+        : '';
+
     const takeaway_note = data.is_take_away
         ? `<div class="text-muted" style="margin-top:.75rem;font-size:var(--text-sm)">
                ${__('This is a takeaway table. Customers scanning this code order against it as a seated table.')}
@@ -139,6 +178,7 @@ function qr_panel(frm, data) {
                     </button>
                 </div>
 
+                ${warning}
                 ${takeaway_note}
             </div>
         </div>`;

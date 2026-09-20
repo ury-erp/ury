@@ -30,6 +30,7 @@
   "latest_invoice_time",
   "merged_with",
   "self_ordering_tab",
+  "enable_self_ordering",
   "self_ordering_qr"
  ],
  "fields": [
@@ -153,6 +154,13 @@
    "fieldname": "self_ordering_tab",
    "fieldtype": "Tab Break",
    "label": "Self Ordering"
+  },
+  {
+   "default": "1",
+   "description": "When off, this table's QR code stops working and no customer can open a self-ordering session against it. Staff can still take orders for it on the POS as usual.",
+   "fieldname": "enable_self_ordering",
+   "fieldtype": "Check",
+   "label": "Enable Self Ordering"
   },
   {
    "fieldname": "self_ordering_qr",
