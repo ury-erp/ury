@@ -111,7 +111,8 @@
     "navigation": "Navigation",
     "reservations": "Reservations",
     "restaurant_website": "Restaurant Website",
-    "waitlist": "Waitlist"
+    "waitlist": "Waitlist",
+    "feedback": "Guest feedback"
   },
   "notifications": {
     "empty": "No new notifications",
@@ -1011,6 +1012,39 @@
         "average_wait": "Average wait",
         "seated_today": "Seated today",
         "turn": "Average sitting"
+      }
+    },
+    "feedback": {
+      "title": "Guest feedback",
+      "subtitle": "What guests said, and who is still waiting for an answer",
+      "get_card": "Feedback link & QR",
+      "card_hint": "Print this on a table card or add it to the receipt. It reveals nothing about the bill.",
+      "card_failed": "Could not generate the link",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "copy_failed": "Could not copy",
+      "no_qr": "The QR could not be rendered; the link below works.",
+      "empty": "No feedback yet.",
+      "all": "All",
+      "food": "Food",
+      "service": "Service",
+      "cleanliness": "Cleanliness",
+      "needs_attention": "Needs a reply",
+      "follow_up": "Follow up",
+      "follow_up_notes": "Follow-up notes",
+      "save_failed": "Could not save",
+      "not_asked_yet": "Not asked yet",
+      "awaiting_contact": "{{count}} guests left a number and are waiting for a call.",
+      "statuses": {
+        "new": "New",
+        "acknowledged": "Acknowledged",
+        "resolved": "Resolved"
+      },
+      "stats": {
+        "responses": "Responses",
+        "overall": "Average overall",
+        "nps": "Recommendation score",
+        "unanswered": "Unanswered complaints"
       }
     }
   },
