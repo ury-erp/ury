@@ -24,9 +24,11 @@
           :key="'bar-' + tab.path"
           :to="tab.to"
           class="pos-tab press"
-          :class="{ 'pos-tab-active': isActive(tab.path) }"
+          :class="[{ 'pos-tab-active': isActive(tab.path) }, tab.disabled && 'opacity-50']"
           :aria-current="isActive(tab.path) ? 'page' : undefined"
-          @click="tab.onClick && tab.onClick()"
+          :aria-disabled="tab.disabled || undefined"
+          :tabindex="tab.disabled ? -1 : undefined"
+          @click="onTabClick(tab, $event)"
         >
           <span
             v-if="isActive(tab.path)"
@@ -55,9 +57,11 @@
         :key="'rail-' + tab.path"
         :to="tab.to"
         class="pos-tab press"
-        :class="{ 'pos-tab-active': isActive(tab.path) }"
+        :class="[{ 'pos-tab-active': isActive(tab.path) }, tab.disabled && 'opacity-50']"
         :aria-current="isActive(tab.path) ? 'page' : undefined"
-        @click="tab.onClick && tab.onClick()"
+        :aria-disabled="tab.disabled || undefined"
+        :tabindex="tab.disabled ? -1 : undefined"
+        @click="onTabClick(tab, $event)"
       >
         <span
           v-if="isActive(tab.path)"
@@ -83,6 +87,7 @@
 <script>
 import { useAuthStore } from "@/stores/Auth.js";
 import { tabFunctions } from "@/stores/bottomTabs.js";
+import { isInvoiceNavigationBlocked } from "@/router/invoiceNavigation.js";
 import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { useMenuStore } from "@/stores/Menu.js";
 
@@ -129,33 +134,24 @@ export default {
       return (this.menu.cart || []).length;
     },
 
-    /**
-     * Navigation is blocked while an invoice is being amended, which the old
-     * markup expressed by routing to `#`. Kept as-is so behaviour does not
-     * change, but expressed once instead of per tab.
-     */
-    lockedTarget() {
-      return this.invoiceData.invoiceUpdating;
-    },
-
     tabs() {
       const list = [
         {
           path: "/Table",
-          to: this.lockedTarget ? "#" : "/Table",
+          to: "/Table",
           label: this.$t("tables.title"),
           paths: ICONS.tables,
         },
         {
           path: "/Menu",
-          to: this.lockedTarget ? "#" : "/Menu",
+          to: "/Menu",
           label: this.$t("menu.title"),
           paths: ICONS.menu,
           onClick: () => this.tabClick.clickMenuTab(),
         },
         {
           path: "/Customer",
-          to: this.lockedTarget ? "#" : "/Customer",
+          to: "/Customer",
           label: this.$t("customer.title"),
           paths: ICONS.customer,
           onClick: () => !this.auth.cashier && this.tabClick.checkActiveTable(),
@@ -173,18 +169,38 @@ export default {
       if (this.auth.cashier) {
         list.push({
           path: "/recentOrder",
-          to: this.lockedTarget ? "#" : "/recentOrder",
+          to: "/recentOrder",
           label: this.$t("order.order_log"),
           paths: ICONS.orders,
         });
       }
 
-      return list;
+      /**
+       * One rule decides what an open amendment blocks, shared with the step
+       * bar and the router guard (`router/invoiceNavigation.js`). These tabs
+       * used to state it inline and enforce it by routing to `#`, which the
+       * step bar did not do at all: the same amendment was protected on one
+       * navigation surface and not the other (UX-24). The tab now keeps its
+       * real destination and is marked disabled, so what a user sees matches
+       * what the guard will actually allow.
+       */
+      return list.map((tab) => ({
+        ...tab,
+        disabled: isInvoiceNavigationBlocked(this.invoiceData.invoiceUpdating, tab.path),
+      }));
     },
   },
   methods: {
     isActive(path) {
       return this.tabClick.currentTab === path;
+    },
+
+    onTabClick(tab, event) {
+      if (tab.disabled) {
+        event.preventDefault();
+        return;
+      }
+      tab.onClick && tab.onClick();
     },
   },
 };

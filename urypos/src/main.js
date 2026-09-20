@@ -4,6 +4,8 @@ import App from "./App.vue";
 
 import { useAuthStore } from "@/stores/Auth.js";
 import router from './router';
+import { useInvoiceDataStore } from './stores/invoiceData';
+import { isInvoiceNavigationBlocked } from './router/invoiceNavigation';
 import { createPinia } from 'pinia'
 import NotificationModal from './components/NotificationModal.vue';
 import { initI18n, i18nPlugin } from './i18n';
@@ -26,6 +28,11 @@ router.beforeEach((to, from, next) => {
 		next({ name: 'Login' });
 	} else if (to.name === 'Login' && isAuthenticated) {
 		next({ name: 'Table' });
+	} else if (isInvoiceNavigationBlocked(useInvoiceDataStore().invoiceUpdating, to.path)) {
+		// Backstop for the dimmed tabs and steps: a direct URL, the browser
+		// back button or a stale link must not walk away from an amendment
+		// that has already been started on the server.
+		next(false);
 	} else {
 		next();
 	}

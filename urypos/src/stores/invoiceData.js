@@ -342,6 +342,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           const message = JSON.parse(messages[0]);
     
           await this.alert.createAlert("Message", message.message, "OK");
+          this.invoiceUpdating = false;
           await router.push("/Table");
           window.location.reload();
           return;

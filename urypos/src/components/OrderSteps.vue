@@ -23,9 +23,11 @@
       <router-link
         :to="step.to"
         class="press group flex shrink-0 items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors duration-fast"
-        :class="step.current ? 'bg-secondary' : 'hover:bg-muted'"
+        :class="[step.current ? 'bg-secondary' : 'hover:bg-muted', step.disabled && 'opacity-50']"
         :aria-current="step.current ? 'step' : undefined"
-        @click="step.onClick && step.onClick()"
+        :aria-disabled="step.disabled || undefined"
+        :tabindex="step.disabled ? -1 : undefined"
+        @click="onStepClick(step, $event)"
       >
         <span
           class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-fast"
@@ -78,6 +80,8 @@ import { useAuthStore } from "@/stores/Auth.js";
 import { useTableStore } from "@/stores/Table.js";
 import { useMenuStore } from "@/stores/Menu.js";
 import { useCustomerStore } from "@/stores/Customer.js";
+import { useInvoiceDataStore } from "@/stores/invoiceData.js";
+import { isInvoiceNavigationBlocked } from "@/router/invoiceNavigation.js";
 import { tabFunctions } from "@/stores/bottomTabs.js";
 
 export default {
@@ -88,7 +92,8 @@ export default {
     const menu = useMenuStore();
     const customers = useCustomerStore();
     const tabClick = tabFunctions();
-    return { auth, table, menu, customers, tabClick };
+    const invoiceData = useInvoiceDataStore();
+    return { auth, table, menu, customers, tabClick, invoiceData };
   },
   computed: {
     /**
@@ -138,9 +143,12 @@ export default {
         },
       ];
 
+      // Same rule as the tab bar and the router guard; see
+      // `router/invoiceNavigation.js` (UX-24).
       return list.map((step) => ({
         ...step,
         to: step.path,
+        disabled: isInvoiceNavigationBlocked(this.invoiceData.invoiceUpdating, step.path),
         current: current === step.path,
       }));
     },
@@ -162,6 +170,14 @@ export default {
       if (step.current) return "bg-primary text-primary-foreground";
       if (step.done) return "bg-success text-success-foreground";
       return "bg-muted text-muted-foreground";
+    },
+
+    onStepClick(step, event) {
+      if (step.disabled) {
+        event.preventDefault();
+        return;
+      }
+      step.onClick && step.onClick();
     },
   },
 };
