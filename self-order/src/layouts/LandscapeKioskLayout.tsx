@@ -35,6 +35,10 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    billStatus,
+    waiterStatus,
+    kitchenStatus,
+    handleCallWaiter,
     payingOnline,
     addToCart,
     decrementCart,
@@ -51,7 +55,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   // Same search and course filtering as every other ordering surface,
   // so finding a dish does not depend on which screen the guest is at.
   const discovery = useMenuDiscovery(menu)
-  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   function handleReset() {
     if (window.confirm(t('order.confirm_restart'))) {
@@ -82,7 +86,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-xl text-muted-foreground">
-        Loading menu…
+        {t('order.loading_menu')}
       </div>
     )
   }
@@ -127,8 +131,8 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
             cart={cart}
             capabilities={context?.capabilities}
             onAdd={addToCart}
-            gridClassName="grid grid-cols-4 gap-6 xl:grid-cols-5"
-            cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-left text-lg transition active:scale-[0.97]"
+            gridClassName="grid grid-cols-2 gap-6 xl:grid-cols-3 2xl:grid-cols-4"
+            cardClassName="flex min-w-0 flex-col overflow-hidden rounded-2xl border text-start text-lg transition active:scale-[0.97]"
             imageClassName="h-40 w-full object-cover"
           />
         </main>
@@ -141,13 +145,17 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
           cartTotal={cartTotal}
           submitting={submitting}
           billRequested={billRequested}
+          billStatus={billStatus}
+          waiterStatus={waiterStatus}
+          kitchenStatus={kitchenStatus}
+          onCallWaiter={handleCallWaiter}
           payingOnline={payingOnline}
           onIncrement={addToCart}
           onDecrement={decrementCart}
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
-          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-l bg-background p-6 text-base"
+          className="flex w-[420px] shrink-0 flex-col overflow-hidden border-s bg-background p-6 text-base"
         />
       </div>
 

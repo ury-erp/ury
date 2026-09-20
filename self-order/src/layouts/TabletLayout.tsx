@@ -33,6 +33,10 @@ function TabletLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    billStatus,
+    waiterStatus,
+    kitchenStatus,
+    handleCallWaiter,
     payingOnline,
     addToCart,
     decrementCart,
@@ -49,7 +53,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
   // Same search and course filtering as every other ordering surface,
   // so finding a dish does not depend on which screen the guest is at.
   const discovery = useMenuDiscovery(menu)
-  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   function handleReset() {
     if (window.confirm(t('order.confirm_restart'))) {
@@ -80,7 +84,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading menu…
+        {t('order.loading_menu')}
       </div>
     )
   }
@@ -115,7 +119,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="w-[68%] overflow-y-auto p-6">
+        <main className="w-[60%] overflow-y-auto p-6">
           <div className="mb-5">
             <MenuDiscoveryBar discovery={discovery} size="default" />
           </div>
@@ -125,8 +129,8 @@ function TabletLayout({ initialContext }: LayoutProps) {
             cart={cart}
             capabilities={context?.capabilities}
             onAdd={addToCart}
-            gridClassName="grid grid-cols-3 gap-4 lg:grid-cols-4"
-            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
+            gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            cardClassName="flex min-w-0 flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
             imageClassName="h-32 w-full object-cover"
           />
         </main>
@@ -139,13 +143,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
           cartTotal={cartTotal}
           submitting={submitting}
           billRequested={billRequested}
+          billStatus={billStatus}
+          waiterStatus={waiterStatus}
+          kitchenStatus={kitchenStatus}
+          onCallWaiter={handleCallWaiter}
           payingOnline={payingOnline}
           onIncrement={addToCart}
           onDecrement={decrementCart}
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
-          className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
+          className="flex w-[40%] flex-col overflow-hidden border-s bg-background p-4"
         />
       </div>
 

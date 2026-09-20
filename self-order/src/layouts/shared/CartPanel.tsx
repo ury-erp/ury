@@ -1,9 +1,12 @@
 import React from 'react'
 import { formatCurrency } from '@ury/core'
-import type { CustomerOrder, MenuItem, OrderingContext } from '../../lib/api'
+import type { BillStatus, CustomerOrder, KitchenStatus, MenuItem, OrderingContext, WaiterStatus } from '../../lib/api'
 import { AnimatedNumber, EmptyState } from '@ury/ui'
 import { Minus, Plus, ShoppingBasket } from 'lucide-react'
 import { t, tPlural } from '../../i18n'
+import BillStatusNotice from './BillStatusNotice'
+import CallWaiterButton from './CallWaiterButton'
+import KitchenStatusStrip from './KitchenStatusStrip'
 
 type CartEntry = { item: MenuItem; qty: number }
 
@@ -15,6 +18,10 @@ interface CartPanelProps {
   cartTotal: number
   submitting: boolean
   billRequested: boolean
+  billStatus: BillStatus | null
+  waiterStatus: WaiterStatus | null
+  kitchenStatus: KitchenStatus | null
+  onCallWaiter: () => void
   payingOnline: boolean
   onIncrement: (item: MenuItem) => void
   onDecrement: (itemCode: string) => void
@@ -37,6 +44,10 @@ function CartPanel({
   cartTotal,
   submitting,
   billRequested,
+  billStatus,
+  waiterStatus,
+  kitchenStatus,
+  onCallWaiter,
   payingOnline,
   onIncrement,
   onDecrement,
@@ -49,6 +60,11 @@ function CartPanel({
     <aside className={className}>
       <div className="flex-1 overflow-y-auto">
         {order && order.items.length > 0 && (
+          <div className="mb-4">
+            <KitchenStatusStrip status={kitchenStatus} />
+          </div>
+        )}
+        {order && order.items.length > 0 && (
           <section className="mb-4 rounded-lg border p-3">
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order.so_far')}</h2>
             <ul className="space-y-1 text-sm">
@@ -57,13 +73,13 @@ function CartPanel({
                   <span>
                     {row.item_name} × {row.qty}
                   </span>
-                  <span>{row.amount}</span>
+                  <span>{formatCurrency(row.amount)}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-2 flex justify-between border-t pt-2 text-sm font-semibold">
               <span>{t('common.total')}</span>
-              <span>{order.grand_total}</span>
+              <span>{formatCurrency(order.grand_total)}</span>
             </div>
           </section>
         )}
@@ -89,7 +105,7 @@ function CartPanel({
                   <span className="flex items-center gap-2">
                     <button
                       onClick={() => onDecrement(entry.item.item)}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border bg-card press transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-12 w-12 items-center justify-center rounded-full border bg-card press transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={t('order.remove_one', { item: entry.item.item_name })}
                     >
                       <Minus className="h-4 w-4" aria-hidden="true" />
@@ -97,7 +113,7 @@ function CartPanel({
                     <span className="w-6 text-center font-semibold tabular-nums">{entry.qty}</span>
                     <button
                       onClick={() => onIncrement(entry.item)}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border bg-card press transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-12 w-12 items-center justify-center rounded-full border bg-card press transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={t('order.add_one', { item: entry.item.item_name })}
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
@@ -140,6 +156,13 @@ function CartPanel({
             {billRequested ? t('order.bill_requested') : t('order.request_bill')}
           </button>
         )}
+        <BillStatusNotice status={billStatus} />
+        <CallWaiterButton
+          context={context}
+          status={waiterStatus}
+          onCall={onCallWaiter}
+          className="mt-2"
+        />
       </div>
     </aside>
   )

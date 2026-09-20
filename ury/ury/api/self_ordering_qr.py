@@ -13,6 +13,8 @@ laminated card on the table keeps pointing at a dead link.
 """
 
 import io
+import ipaddress
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
@@ -64,7 +66,57 @@ def _unavailable(table, reason):
         "profile": None,
         "url": None,
         "svg": None,
+        "warning": None,
     }
+
+
+def _url_warning(url):
+    """Explain why a customer's phone will not open this link.
+
+    A code is only ever scanned away from the desk, on a phone that is not
+    on the restaurant's LAN and has no idea what the server's internal
+    address is. The address baked into the symbol comes from `get_url()`,
+    which falls back to whatever host the staff member happened to be
+    browsing the desk on — so a perfectly valid code routinely points
+    somewhere no customer can reach, and nothing says so until a few hundred
+    cards have been printed and a customer is standing there with
+    ERR_CONNECTION_REFUSED.
+
+    Returns a message to show beside the code, or None when the address
+    looks like something the outside world can resolve.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+
+    is_ip = False
+    try:
+        ipaddress.ip_address(host)
+        is_ip = True
+    except ValueError:
+        pass
+
+    if is_ip:
+        return _(
+            "This code points at the raw address {0}, not a domain name. Customer "
+            "phones are not on this network and cannot open it. Set \"host_name\" "
+            "in the site config to the public address of this site, then reload "
+            "this page before printing."
+        ).format(url)
+
+    if parsed.port and parsed.port not in (80, 443):
+        return _(
+            "This code points at port {0}, which is normally closed to the public "
+            "internet. Set \"host_name\" in the site config to the public address "
+            "of this site, then reload this page before printing."
+        ).format(parsed.port)
+
+    if host in ("localhost", "127.0.0.1", "0.0.0.0"):
+        return _(
+            "This code points at this machine only. Set \"host_name\" in the site "
+            "config to the public address of this site before printing."
+        )
+
+    return None
 
 
 def _build(table):
@@ -82,6 +134,15 @@ def _build(table):
     if not table_doc.branch:
         return _unavailable(table, _("This table is not assigned to a branch."))
 
+    if not table_doc.enable_self_ordering:
+        return _unavailable(
+            table,
+            _(
+                "Self ordering is switched off for this table. Turn on "
+                "\"Enable Self Ordering\" above to issue its code."
+            ),
+        )
+
     profile = _resolve_profile(table_doc)
     if not profile:
         return _unavailable(
@@ -96,6 +157,7 @@ def _build(table):
     # which is the real gate here: minting a code is granting access to order
     # against this table. Reused rather than repeated so there is one rule.
     token = generate_qr_token(profile, table)
+    url = frappe.utils.get_url(f"/order?t={token}")
 
     return {
         "table": table,
@@ -105,8 +167,9 @@ def _build(table):
         # get_url() honours the site's host_name. A site left on its internal
         # hostname produces a code no customer phone can resolve, which is why
         # the form shows the URL next to the image instead of only the image.
-        "url": frappe.utils.get_url(f"/order?t={token}"),
+        "url": url,
         "svg": None,
+        "warning": _url_warning(url),
         "is_take_away": bool(table_doc.is_take_away),
     }
 

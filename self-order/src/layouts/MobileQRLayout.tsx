@@ -4,6 +4,9 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import { t, tPlural } from '../i18n'
 import { LanguageToggle } from '../components/LanguageToggle'
+import BillStatusNotice from './shared/BillStatusNotice'
+import CallWaiterButton from './shared/CallWaiterButton'
+import KitchenStatusStrip from './shared/KitchenStatusStrip'
 import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
 import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
 
@@ -29,6 +32,10 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    billStatus,
+    waiterStatus,
+    kitchenStatus,
+    handleCallWaiter,
     paymentRequest,
     payingOnline,
     addToCart,
@@ -58,7 +65,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     // of sight along with the error explaining it (UX-20). It now closes only
     // on a confirmed success.
     const placed = await submitCart()
-    if (placed) setCartOpen(false)
+    setCartOpen(!placed)
   }
 
   if (loading) {
@@ -137,6 +144,12 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
       )}
 
       {hasOrder && (
+        <div className="mx-4 mt-4">
+          <KitchenStatusStrip status={kitchenStatus} />
+        </div>
+      )}
+
+      {hasOrder && (
         <section className="mx-4 mt-4 overflow-hidden rounded-2xl border bg-background shadow-sm">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-semibold">{t('order.so_far')}</h2>
@@ -196,6 +209,13 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
                 {billRequested ? t('order.bill_requested') : t('order.request_bill')}
               </button>
             )}
+            <BillStatusNotice status={billStatus} />
+            <CallWaiterButton
+              context={context}
+              status={waiterStatus}
+              onCall={handleCallWaiter}
+              className="h-12"
+            />
           </div>
         </section>
       )}
@@ -233,6 +253,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
           )}
 
           <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t bg-background shadow-[0_-8px_30px_rgba(0,0,0,0.12)]">
+            {error && <p role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
             {cartOpen && (
               <ul className="max-h-[45vh] divide-y overflow-y-auto px-4">
                 {cartItems.map((entry) => (
@@ -365,7 +386,7 @@ function QtyStepper({
       <button
         onClick={onRemove}
         aria-label={t('order.remove_one', { item: itemName })}
-        className="h-9 w-9 rounded-full border text-lg leading-none transition active:scale-90"
+        className="h-12 w-12 rounded-full border text-lg leading-none transition active:scale-90"
       >
         −
       </button>
@@ -373,7 +394,7 @@ function QtyStepper({
       <button
         onClick={onAdd}
         aria-label={t('order.add_one', { item: itemName })}
-        className="h-9 w-9 rounded-full border text-lg leading-none transition active:scale-90"
+        className="h-12 w-12 rounded-full border text-lg leading-none transition active:scale-90"
       >
         +
       </button>

@@ -29,6 +29,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import add_to_date, now_datetime
 
 from ury.ury_pos.api import resolve_restaurant_menu
@@ -37,10 +38,48 @@ from ury.ury.doctype.ury_order.ury_order import (
     price_items_for_invoice,
 )
 from ury.ury.api.ury_kot_generate import kot_execute
+from ury.ury.api.service_requests import notify_service_request
 
 SESSION_TOKEN_BYTES_HASH_LEN = 64  # frappe.generate_hash(length=..)
 MAX_ITEMS_PER_REQUEST = 50
 MAX_COMMENT_LEN = 200
+
+
+# ---------------------------------------------------------------------------
+# Rate limits
+# ---------------------------------------------------------------------------
+#
+# Every endpoint below is `allow_guest=True`: the only thing standing between
+# an anonymous caller and the restaurant's data is the session/QR token. A
+# token is printed on a card that sits on a table in public, so "holding a
+# valid token" is not scarce — anyone who photographs a QR code has one for
+# as long as the card exists.
+#
+# Without a limit, that card is an open invitation to mint sessions, spray
+# order lines into a live invoice, or walk item codes to enumerate the menu,
+# and every one of those lands in the kitchen or on the cashier's screen.
+#
+# Limits are per-IP per-window (frappe.rate_limiter.rate_limit), sized from how a real
+# customer behaves, not from what the server could survive:
+#
+#   - bootstrap/session minting is the expensive, abusable one, so it is the
+#     tightest.
+#   - reads a customer's own screen polls (menu, order, status) are generous:
+#     get_order_status alone is polled every 8s by a waiting table.
+#   - writes that reach staff (orders, bill requests, payment links) sit in
+#     between — enough for a large table correcting its order, far short of
+#     a script.
+#
+# A shared restaurant wifi puts many phones behind one IP, so nothing here is
+# tight enough to catch a busy table; these are abuse ceilings, not quotas.
+
+RL_WINDOW = 60 * 60  # one hour, for everything below
+
+RL_BOOTSTRAP = 30       # opening a session / assigning a device to a table
+RL_READ = 600           # menu, product, order reads
+RL_STATUS_POLL = 1200   # status polling: one waiting table is ~450/hour
+RL_WRITE = 120          # adding items to an order
+RL_STAFF_PING = 30      # bill requests / payment links — these reach a human
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +159,22 @@ def generate_qr_token(profile, table=None):
     return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
 
 
+def _assert_table_self_ordering_enabled(table):
+    """Refuse a table that staff have switched out of self ordering.
+
+    This is the gate behind the per-table toggle, and it has to live on the
+    server: the QR card on the table is already printed and out of our
+    hands, so the only way to switch a table off is to stop honouring its
+    token. Checked at every entry point that can open a session against a
+    table — a scanned code, a fixed tablet, or a tablet staff hand over.
+    """
+    if not frappe.db.get_value("URY Table", table, "enable_self_ordering"):
+        frappe.throw(
+            _("Self ordering is not available at this table. Please ask a member of staff."),
+            frappe.ValidationError,
+        )
+
+
 def _verify_qr_token(token):
     try:
         padded = token + "=" * (-len(token) % 4)
@@ -146,6 +201,17 @@ def _verify_qr_token(token):
         frappe.throw(_("Table ordering is not enabled"), frappe.ValidationError)
     if not frappe.db.exists("URY Table", table):
         frappe.throw(_("Invalid table"), frappe.ValidationError)
+    # The signature only proves the token was minted for (profile, table) —
+    # it says nothing about whether that table still belongs to this
+    # profile's branch. A table re-assigned to a different branch/restaurant
+    # after the QR code was printed (or a profile reused across branches by
+    # mistake) would otherwise let a stale code place orders against a
+    # branch it was never authorized for. Same check `assign_device_table`
+    # already applies to its own table parameter, for the same reason.
+    table_branch = frappe.db.get_value("URY Table", table, "branch")
+    if table_branch != profile_doc.branch:
+        frappe.throw(_("Invalid table"), frappe.ValidationError)
+    _assert_table_self_ordering_enabled(table)
     return profile_doc, table, "QR Table"
 
 
@@ -189,6 +255,8 @@ def _resolve_device(device_id, credential):
         frappe.throw(_("Kiosk ordering is currently unavailable"), frappe.ValidationError)
 
     table = device.fixed_table if device.table_mode == "Fixed" else None
+    if table:
+        _assert_table_self_ordering_enabled(table)
     source = "Table Tablet" if device.device_type == "Table Tablet" else "Kiosk"
 
     with _elevated():
@@ -294,6 +362,9 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
             "show_item_descriptions": bool(profile.show_item_descriptions),
             "item_notes_enabled": bool(profile.enable_item_notes),
             "request_bill_enabled": bool(profile.enable_request_bill) and bool(table),
+            # Both are table-only: a pickup or kiosk customer is already
+            # standing at the counter, so there is nobody to call to them.
+            "call_waiter_enabled": bool(profile.enable_call_waiter) and bool(table),
             "customer_payment_enabled": bool(profile.enable_customer_payment),
             "payment_link_enabled": bool(profile.enable_payment_link),
             "pay_at_counter_enabled": bool(profile.enable_pay_at_counter),
@@ -303,6 +374,7 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_BOOTSTRAP, seconds=RL_WINDOW)
 def get_ordering_context(token=None, device_id=None, device_credential=None):
     """Entry point for every customer-facing surface. Resolves a QR token
     or a device credential into a fresh ordering session and returns only
@@ -324,6 +396,7 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_BOOTSTRAP, seconds=RL_WINDOW)
 def assign_device_table(device_id, device_credential, staff_pin, table):
     """Bind a shared/portable tablet (`table_mode = "Selectable"`) to a
     table for the duration of a session. Used by `PortableTabletAssignment`
@@ -355,6 +428,7 @@ def assign_device_table(device_id, device_credential, staff_pin, table):
     table_branch = frappe.db.get_value("URY Table", table, "branch")
     if table_branch != profile.branch:
         frappe.throw(_("Invalid table"), frappe.ValidationError)
+    _assert_table_self_ordering_enabled(table)
 
     raw_session_token, session = _open_session(profile, source, table, device_name)
 
@@ -366,6 +440,7 @@ def assign_device_table(device_id, device_credential, staff_pin, table):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_READ, seconds=RL_WINDOW)
 def get_customer_menu(session):
     session = _resolve_session(session)
     order_type = "Dine In" if session.table else "Take Away"
@@ -384,6 +459,7 @@ def get_customer_menu(session):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_READ, seconds=RL_WINDOW)
 def get_customer_product(session, item_code):
     session = _resolve_session(session)
     profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
@@ -474,6 +550,7 @@ def _sanitize_invoice_for_customer(invoice):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_READ, seconds=RL_WINDOW)
 def get_customer_order(session):
     session = _resolve_session(session)
     if not session.invoice:
@@ -486,6 +563,7 @@ def get_customer_order(session):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_WRITE, seconds=RL_WINDOW)
 def add_customer_items(session, items):
     """Append-only customer order mutation. `items` is a list of
     {"item": <item_code>, "qty": <number>, "comment": <optional str>} —
@@ -707,7 +785,51 @@ def add_customer_items(session, items):
 # Request bill
 # ---------------------------------------------------------------------------
 
+def _raise_service_request(session, request_type):
+    """Create (or re-ring) one open service request for this table.
+
+    Shared by request_bill and call_waiter because the two differ only in
+    what staff are being asked for. Everything that matters — one open row
+    per table per type, a second tap re-alerting instead of doing nothing,
+    the POS broadcast — is the same behaviour and belongs in one place.
+    """
+    with _elevated():
+        filters = {
+            "table": session.table,
+            "request_type": request_type,
+            "status": ["!=", "Resolved"],
+        }
+        # A bill belongs to one invoice; a call for help belongs to the table
+        # and may come before any order exists.
+        if request_type == "Bill":
+            filters["invoice"] = session.invoice
+
+        existing = frappe.db.exists("URY Service Request", filters)
+        if existing:
+            # A second tap is the customer asking again, not a no-op: the
+            # cashier may have missed or dismissed the first alert, so the
+            # terminal is notified again (flagged as a repeat so the POS can
+            # word it differently) while the request row stays the same one.
+            notify_service_request(existing, repeat=True)
+            return {"status": "Already Requested", "request": existing}
+
+        req = frappe.get_doc({
+            "doctype": "URY Service Request",
+            "request_type": request_type,
+            "table": session.table,
+            "invoice": session.invoice,
+            "session": session.name,
+            "status": "Open",
+            "requested_at": now_datetime(),
+        })
+        req.insert(ignore_permissions=True)
+        notify_service_request(req)
+
+    return {"status": "Requested", "request": req.name}
+
+
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STAFF_PING, seconds=RL_WINDOW)
 def request_bill(session):
     session = _resolve_session(session)
     profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
@@ -717,36 +839,99 @@ def request_bill(session):
     if not session.table or not session.invoice:
         frappe.throw(_("No active order for this table"), frappe.ValidationError)
 
-    with _elevated():
-        existing = frappe.db.exists(
-            "URY Service Request",
-            {"table": session.table, "invoice": session.invoice, "request_type": "Bill", "status": ["!=", "Resolved"]},
-        )
-        if existing:
-            return {"status": "Already Requested", "request": existing}
+    return _raise_service_request(session, "Bill")
 
-        req = frappe.get_doc({
-            "doctype": "URY Service Request",
-            "request_type": "Bill",
-            "table": session.table,
-            "invoice": session.invoice,
-            "session": session.name,
-            "status": "Open",
-            "requested_at": now_datetime(),
-        })
-        req.insert(ignore_permissions=True)
 
-    return {"status": "Requested", "request": req.name}
+@frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STAFF_PING, seconds=RL_WINDOW)
+def call_waiter(session):
+    """Ask a member of staff to come to the table.
+
+    Deliberately does NOT require an order to exist. The most common reason
+    a table calls is that they cannot work the screen or want to ask about a
+    dish — which is exactly before anything has been ordered, and precisely
+    the moment the self-ordering page used to leave them with no way to
+    reach anyone.
+    """
+    session = _resolve_session(session)
+    profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
+
+    if not profile.enable_call_waiter:
+        frappe.throw(_("Calling a waiter is not enabled"), frappe.ValidationError)
+    if not session.table:
+        frappe.throw(_("This is only available at a table"), frappe.ValidationError)
+
+    return _raise_service_request(session, "Assistance")
 
 
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------
 
+def _kitchen_status(invoice):
+    """How far the kitchen has got, in terms a customer understands.
+
+    Derived from the KOTs rather than stored: the kitchen display already
+    owns this lifecycle (`order_status` plus `start_time_prep`), and a second
+    copy of it on the session would be one more thing that can disagree with
+    the tickets the cooks are actually working from.
+
+    Reports the LEAST advanced ticket, not the most: a table whose starter is
+    plated and whose main has not been touched has not been served, and
+    telling them "ready" would send them looking for food that is not coming.
+
+    Cancelled and duplicate tickets are excluded — a reprint is not progress,
+    and a cancelled dish is not something anyone is waiting for.
+    """
+    with _elevated():
+        kots = frappe.get_all(
+            "URY KOT",
+            filters={
+                "invoice": invoice,
+                "type": ["not in", ["Cancelled", "Duplicate"]],
+                "docstatus": ["!=", 2],
+            },
+            fields=["order_status", "start_time_prep"],
+        )
+
+    if not kots:
+        return None
+
+    unserved = [k for k in kots if k.order_status != "Served"]
+    if not unserved:
+        return "ready"
+    if any(k.start_time_prep for k in unserved):
+        return "preparing"
+    return "queued"
+
+
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STATUS_POLL, seconds=RL_WINDOW)
 def get_order_status(session):
     session = _resolve_session(session)
     result = {"session_status": session.status, "invoice": session.invoice}
+
+    # Outside the invoice block on purpose: a table can call for help before
+    # it has ordered anything, and that call still has to be reflected back
+    # on the customer's own screen.
+    if session.table:
+        with _elevated():
+            waiter_call = frappe.get_all(
+                "URY Service Request",
+                filters={
+                    "table": session.table,
+                    "request_type": "Assistance",
+                    "status": ["!=", "Resolved"],
+                },
+                fields=["status"],
+                order_by="requested_at desc",
+                limit=1,
+            )
+        result["waiter_status"] = (
+            ("called" if waiter_call[0].status == "Open" else "coming")
+            if waiter_call
+            else None
+        )
 
     if session.invoice:
         with _elevated():
@@ -758,11 +943,38 @@ def get_order_status(session):
                 filters={"invoice": session.invoice, "status": ["!=", "Resolved"]},
                 fields=["name", "request_type", "status"],
             )
+            # Any status, not just the open ones: a request the cashier has
+            # already closed still means "staff have seen this", which is
+            # exactly what the customer is waiting to be told.
+            latest_bill_request = frappe.get_all(
+                "URY Service Request",
+                filters={"invoice": session.invoice, "request_type": "Bill"},
+                fields=["status"],
+                order_by="requested_at desc",
+                limit=1,
+            )
         result["billed"] = bool(invoice_fields and invoice_fields.invoice_printed)
         result["submitted"] = bool(invoice_fields and invoice_fields.docstatus == 1)
         result["open_requests"] = open_requests
+        result["bill_status"] = _bill_status(result["billed"], latest_bill_request)
+        result["kitchen_status"] = _kitchen_status(session.invoice)
 
     return result
+
+
+def _bill_status(billed, latest_bill_request):
+    """What the customer should be told about their bill request.
+
+    The three states the customer's screen distinguishes: they asked
+    ("requested"), a cashier picked it up ("acknowledged"), and the bill has
+    actually been printed ("printed"). Printing wins over everything else —
+    it is the thing they were waiting for, whatever the request row says.
+    """
+    if billed:
+        return "printed"
+    if not latest_bill_request:
+        return None
+    return "requested" if latest_bill_request[0].status == "Open" else "acknowledged"
 
 
 # ---------------------------------------------------------------------------
@@ -787,6 +999,7 @@ def get_order_status(session):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STAFF_PING, seconds=RL_WINDOW)
 def create_payment_request(session):
     session = _resolve_session(session)
     profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
@@ -866,6 +1079,7 @@ def create_payment_request(session):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STATUS_POLL, seconds=RL_WINDOW)
 def get_payment_status(session):
     session = _resolve_session(session)
     if not session.invoice:
@@ -908,6 +1122,7 @@ def register_communication_provider(fn):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=RL_STAFF_PING, seconds=RL_WINDOW)
 def share_payment_link(session, recipient):
     """Send the current Payment Request's link to `recipient` (whatever
     format the active communication provider expects — a phone number for

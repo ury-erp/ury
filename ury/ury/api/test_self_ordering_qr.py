@@ -13,8 +13,13 @@ from unittest.mock import patch
 from ury.ury.api import self_ordering_qr as qr
 
 
-def _table(name="T1", branch="Branch A", takeaway=0):
-    return frappe._dict(name=name, branch=branch, is_take_away=takeaway)
+def _table(name="T1", branch="Branch A", takeaway=0, self_ordering=1):
+    return frappe._dict(
+        name=name,
+        branch=branch,
+        is_take_away=takeaway,
+        enable_self_ordering=self_ordering,
+    )
 
 
 class TestTableQR(FrappeTestCase):
@@ -124,3 +129,57 @@ class TestTableQR(FrappeTestCase):
         self.assertTrue(frappe.local.response.filename.endswith(".png"))
         # PNG magic number — proves a real image was written, not a stub.
         self.assertTrue(frappe.local.response.filecontent.startswith(b"\x89PNG"))
+
+
+class TestTableToggle(FrappeTestCase):
+    """The per-table self-ordering switch, seen from the QR panel."""
+
+    @patch("ury.ury.api.self_ordering_qr.generate_qr_token")
+    @patch("ury.ury.api.self_ordering_qr.frappe.get_doc")
+    @patch("ury.ury.api.self_ordering_qr.frappe.has_permission", return_value=True)
+    def test_a_switched_off_table_issues_no_code(self, mock_perm, mock_get_doc, mock_token):
+        mock_get_doc.return_value = _table(self_ordering=0)
+
+        result = qr.get_table_qr("T1")
+
+        self.assertFalse(result["available"])
+        self.assertIsNone(result["svg"])
+        self.assertIn("switched off", result["reason"].lower())
+        # No token is minted for a table nobody may order from.
+        mock_token.assert_not_called()
+
+    @patch("ury.ury.api.self_ordering_qr.frappe.get_doc")
+    @patch("ury.ury.api.self_ordering_qr.frappe.has_permission", return_value=True)
+    def test_a_switched_off_table_cannot_be_downloaded_either(self, mock_perm, mock_get_doc):
+        """Otherwise the panel would refuse while the endpoint still served
+        a printable card for the same table."""
+        mock_get_doc.return_value = _table(self_ordering=0)
+
+        with self.assertRaises(frappe.ValidationError):
+            qr.download_table_qr("T1")
+
+
+class TestUrlWarning(FrappeTestCase):
+    """The address baked into the symbol is only wrong in ways that show up
+    after the cards are printed, so each one is caught here."""
+
+    def test_a_public_domain_is_not_flagged(self):
+        self.assertIsNone(qr._url_warning("https://menu.example.com/order?t=X"))
+        self.assertIsNone(qr._url_warning("http://menu.example.com/order?t=X"))
+
+    def test_a_raw_ip_is_flagged(self):
+        warning = qr._url_warning("http://142.93.168.28/order?t=X")
+        self.assertIsNotNone(warning)
+        self.assertIn("142.93.168.28", warning)
+
+    def test_a_development_port_is_flagged(self):
+        warning = qr._url_warning("http://menu.example.com:8000/order?t=X")
+        self.assertIsNotNone(warning)
+        self.assertIn("8000", warning)
+
+    def test_the_standard_ports_are_not_flagged(self):
+        self.assertIsNone(qr._url_warning("https://menu.example.com:443/order?t=X"))
+        self.assertIsNone(qr._url_warning("http://menu.example.com:80/order?t=X"))
+
+    def test_localhost_is_flagged(self):
+        self.assertIsNotNone(qr._url_warning("http://localhost/order?t=X"))

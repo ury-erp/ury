@@ -24,6 +24,7 @@ interface MenuGridProps {
  * differ (larger cards, more columns on the kiosk).
  */
 function MenuGrid({ menu, cart, capabilities, onAdd, gridClassName, cardClassName, imageClassName }: MenuGridProps) {
+  if (!menu.length) return <p role="status" className="py-8 text-center text-muted-foreground">{t('menu.no_results_hint')}</p>
   return (
     <div className={gridClassName}>
       {menu.map((item, index) => {
