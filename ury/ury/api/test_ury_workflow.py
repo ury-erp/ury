@@ -110,7 +110,14 @@ class TestURYWorkflowGeneric(FrappeTestCase):
         self._ensure_branch(self.branch, self.company)
         self._ensure_item("MTPL")
         self._ensure_item_production_configuration("MTPL", self.branch, self.company)
-        self._create_user(TEST_MANAGER, roles=["URY Manager"])
+        # "URY Sales Plan Controller" is required for the Supersede/Cancel
+        # and Return to Draft edges (see ury.ury.api.test_ury_sales_plan for
+        # the dedicated role-separation coverage) -- this module's own tests
+        # exercise apply_workflow_action()'s generic mechanics (docstatus
+        # flips, audit trail across docstatus boundaries), not that policy,
+        # so TEST_MANAGER is granted both roles here rather than narrowing
+        # what edges this walk can cover.
+        self._create_user(TEST_MANAGER, roles=["URY Manager", "URY Sales Plan Controller"])
         # "URY Admin" (read-only on URY Sales Plan, per its doctype
         # permissions) -- not a roleless user, which couldn't even read the
         # document and would get PermissionError before get_workflow_status
@@ -208,6 +215,19 @@ class TestURYWorkflowGeneric(FrappeTestCase):
         try:
             previous_state = "Draft"
             for hop, (action, next_state, docstatus) in enumerate(walk, start=1):
+                if action == "Supersede/Cancel":
+                    # apply_workflow_action() is generic and has no `reason`
+                    # parameter of its own -- URYSalesPlan.before_cancel()'s
+                    # _guard_backward_transition() call requires one on this
+                    # doctype's Superseded/Cancelled edge regardless of which
+                    # endpoint drove the transition (see
+                    # ury.ury.api.test_ury_sales_plan for the dedicated
+                    # reason-requirement coverage), so set it directly here,
+                    # the same way ury_sales_plan.transition_sales_plan()
+                    # itself does before calling apply_workflow().
+                    frappe.db.set_value(
+                        "URY Sales Plan", self.plan_name, "cancellation_reason", "generic workflow test walk"
+                    )
                 result = apply_workflow_action("URY Sales Plan", self.plan_name, action)
                 self.assertEqual(result["status"], next_state)
                 self.assertEqual(
