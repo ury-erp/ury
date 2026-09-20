@@ -29,6 +29,10 @@ BASE_LANG = "en"
 KEY_RE = re.compile(r"""(?<![\w$])\$?t\(\s*['"]([a-zA-Z0-9_.]+)['"]""")
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
+# Intl.PluralRules categories that stand for one exact number, so a language
+# may write the number as a word instead of interpolating it.
+SELF_COUNTING_PLURALS = {"zero", "one", "two"}
+
 # --- unkeyed-literal detection -------------------------------------------
 # Comparing ar.json against en.json only proves the *keyed* strings are
 # translated. It says nothing about UI text that was never keyed at all, which
@@ -146,6 +150,11 @@ def audit_app(app: str) -> int:
         for key in sorted(base_keys & keys):
             want = set(PLACEHOLDER_RE.findall(str(base[key])))
             got = set(PLACEHOLDER_RE.findall(str(data[key])))
+            # A plural form that names its own number needs no placeholder:
+            # Arabic "صنفان" *is* two, and English "1 item" spells the one out.
+            # Only the open-ended categories must carry the count through.
+            if key.rsplit(".", 1)[-1] in SELF_COUNTING_PLURALS and got < want:
+                continue
             if want != got:
                 problems += 1
                 print(f"    PLACEHOLDER MISMATCH {key}: {sorted(want)} -> {sorted(got)}")
