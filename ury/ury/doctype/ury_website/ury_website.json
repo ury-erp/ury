@@ -1,0 +1,301 @@
+{
+ "doctype": "DocType",
+ "name": "URY Website",
+ "module": "URY",
+ "creation": "2026-09-20 18:00:00.000000",
+ "modified": "2026-09-20 18:00:00.000000",
+ "engine": "InnoDB",
+ "autoname": "field:slug",
+ "field_order": [
+  "published",
+  "slug",
+  "restaurant",
+  "restaurant_name",
+  "language",
+  "design_section",
+  "theme",
+  "logo",
+  "hero_image",
+  "eyebrow",
+  "hero_title",
+  "hero_description",
+  "content_section",
+  "show_story",
+  "story_title",
+  "story",
+  "story_image",
+  "gallery",
+  "show_menu",
+  "menu",
+  "menu_note",
+  "contact_section",
+  "address",
+  "phone",
+  "map_url",
+  "instagram_url",
+  "hours",
+  "booking_section",
+  "enable_reservations",
+  "duration_minutes",
+  "lead_minutes",
+  "advance_days",
+  "max_guests",
+  "booking_note",
+  "privacy_note",
+  "seo_section",
+  "seo_title",
+  "seo_description"
+ ],
+ "fields": [
+  {
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "label": "Published",
+   "default": "0",
+   "description": "Enable only after reviewing the public page."
+  },
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Page Address",
+   "reqd": 1,
+   "unique": 1,
+   "description": "Lowercase letters, numbers and hyphens. Public URL: /restaurant?slug=your-name"
+  },
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "label": "Restaurant",
+   "options": "URY Restaurant",
+   "reqd": 1
+  },
+  {
+   "fieldname": "restaurant_name",
+   "fieldtype": "Data",
+   "label": "Display Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "language",
+   "fieldtype": "Select",
+   "label": "Language",
+   "options": "ar\nen",
+   "default": "ar",
+   "reqd": 1
+  },
+  {
+   "fieldname": "design_section",
+   "fieldtype": "Section Break",
+   "label": "Design & Identity"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Theme",
+   "options": "Olive\nTerracotta\nMidnight",
+   "default": "Olive",
+   "reqd": 1
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "hero_image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "eyebrow",
+   "fieldtype": "Data",
+   "label": "Introductory Label",
+   "default": "أهلاً بكم على مائدتنا"
+  },
+  {
+   "fieldname": "hero_title",
+   "fieldtype": "Data",
+   "label": "Headline",
+   "default": "لحظات تُذاق، وذكريات تبقى."
+  },
+  {
+   "fieldname": "hero_description",
+   "fieldtype": "Small Text",
+   "label": "Introduction"
+  },
+  {
+   "fieldname": "content_section",
+   "fieldtype": "Section Break",
+   "label": "Content"
+  },
+  {
+   "fieldname": "show_story",
+   "fieldtype": "Check",
+   "label": "Show Our Story",
+   "default": "1"
+  },
+  {
+   "fieldname": "story_title",
+   "fieldtype": "Data",
+   "label": "Story Heading",
+   "default": "لكل مائدة حكاية"
+  },
+  {
+   "fieldname": "story",
+   "fieldtype": "Small Text",
+   "label": "Our Story"
+  },
+  {
+   "fieldname": "story_image",
+   "fieldtype": "Attach Image",
+   "label": "Story Image"
+  },
+  {
+   "fieldname": "gallery",
+   "fieldtype": "Table",
+   "label": "Gallery",
+   "options": "URY Website Image"
+  },
+  {
+   "fieldname": "show_menu",
+   "fieldtype": "Check",
+   "label": "Show Menu",
+   "default": "1"
+  },
+  {
+   "fieldname": "menu",
+   "fieldtype": "Link",
+   "label": "Public Menu",
+   "options": "URY Menu",
+   "description": "Leave empty to use the restaurant's default menu."
+  },
+  {
+   "fieldname": "menu_note",
+   "fieldtype": "Small Text",
+   "label": "Menu Note",
+   "description": "Explain taxes, service charges or menu availability."
+  },
+  {
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Visit & Contact"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Public Address"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Public Phone"
+  },
+  {
+   "fieldname": "map_url",
+   "fieldtype": "Data",
+   "label": "Map Link"
+  },
+  {
+   "fieldname": "instagram_url",
+   "fieldtype": "Data",
+   "label": "Instagram Link"
+  },
+  {
+   "fieldname": "hours",
+   "fieldtype": "Table",
+   "label": "Opening Hours",
+   "options": "URY Website Hours",
+   "description": "One row per day; omit closed days. Hours use the site's time zone. Closing earlier than opening means the next day."
+  },
+  {
+   "fieldname": "booking_section",
+   "fieldtype": "Section Break",
+   "label": "Online Reservations"
+  },
+  {
+   "fieldname": "enable_reservations",
+   "fieldtype": "Check",
+   "label": "Accept Online Reservations",
+   "default": "0"
+  },
+  {
+   "fieldname": "duration_minutes",
+   "fieldtype": "Int",
+   "label": "Sitting Duration (Minutes)",
+   "default": "90",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lead_minutes",
+   "fieldtype": "Int",
+   "label": "Minimum Advance Notice (Minutes)",
+   "default": "30",
+   "reqd": 1
+  },
+  {
+   "fieldname": "advance_days",
+   "fieldtype": "Int",
+   "label": "Booking Horizon (Days)",
+   "default": "30",
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_guests",
+   "fieldtype": "Int",
+   "label": "Maximum Guests per Online Booking",
+   "default": "12",
+   "reqd": 1
+  },
+  {
+   "fieldname": "booking_note",
+   "fieldtype": "Small Text",
+   "label": "Reservation Policy",
+   "default": "طلب الحجز بانتظار تأكيد المطعم. يرجى التواصل معنا للتعديل أو الإلغاء."
+  },
+  {
+   "fieldname": "privacy_note",
+   "fieldtype": "Small Text",
+   "label": "Privacy Notice",
+   "default": "نستخدم الاسم ورقم الهاتف للتواصل بشأن حجزك فقط."
+  },
+  {
+   "fieldname": "seo_section",
+   "fieldtype": "Section Break",
+   "label": "Search & Sharing"
+  },
+  {
+   "fieldname": "seo_title",
+   "fieldtype": "Data",
+   "label": "Search Title"
+  },
+  {
+   "fieldname": "seo_description",
+   "fieldtype": "Small Text",
+   "label": "Search Description"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "track_changes": 1,
+ "title_field": "restaurant_name",
+ "search_fields": "restaurant_name,restaurant",
+ "allow_rename": 0
+}
