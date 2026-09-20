@@ -74,7 +74,7 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
         </div>
       </div>
 
-      {usersLength > 1 && (
+      {usersLength > 0 && (
         <Button
           type="button"
           variant="ghost"
@@ -111,7 +111,7 @@ export function UserSection() {
           <div className="flex-1">{t('dash.user_section.email_address')}</div>
           <div className="flex-1">{t('dash.user_section.password')}</div>
           <div className="flex-1">{t('dash.user_section.role')}</div>
-          {users.length > 1 && <div className="w-8"></div>}
+          {users.length > 0 && <div className="w-8"></div>}
         </div>
 
         {users.map((user) => (

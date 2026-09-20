@@ -29,7 +29,7 @@ export function ConfigureSidebar() {
         <div className="space-y-1">
           {SIDEBAR_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
-            const isCompleted = completedSections.has(item.id);
+            const isCompleted = completedSections.has(item.id) && sectionValidity[item.id];
             // Seen, left, and still not usable. Previously this wore the same
             // green tick as a finished step, so the sidebar reported a setup
             // that was done when it was not (UX-16).
@@ -54,7 +54,7 @@ export function ConfigureSidebar() {
                   )}
                   <div className="flex items-center gap-3 ms-1">
                     <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    <span className="text-start">{item.label}</span>
+                    <span className="text-start">{t(`setup.sections.${item.id}.title`)}</span>
                   </div>
                   {isCompleted && !isActive && (
                     <Check className="w-4 h-4 text-green-600 flex-shrink-0" aria-label={t('setup.section_complete')} />

@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { call } from '@ury/core';
+import { isSectionValid } from '../lib/configureValidation';
+export { isSectionValid } from '../lib/configureValidation';
 import { nextId } from '../utils/id';
 import { uniqueShortCode, generateTableNames, isAutoTableName } from '../utils/shortCode';
 
@@ -83,42 +85,6 @@ export interface ConfigureState {
   taxConfig: TaxConfigData;
   paymentMethods: PaymentMethodData[];
   users: UserData[];
-}
-
-/**
- * Whether a section's data is actually usable, as opposed to merely seen.
- *
- * `completedSections` was set by `goToNextSection` regardless of content, so
- * "complete" meant "visited" — a wizard could report every step done while
- * the branch had no name (UX-16). Completion is now derived from the values,
- * and visiting is tracked separately by `visitedSections`.
- *
- * Deliberately the same floor the backend needs, not a stricter one: rooms,
- * tables, menu and payments all ship seeded defaults, so their requirement is
- * "at least one row", which is what POS Profile creation depends on.
- */
-export function isSectionValid(
-  section: SectionId,
-  state: Pick<ConfigureState, 'branch' | 'rooms' | 'tables' | 'menuItems' | 'paymentMethods' | 'users'>
-): boolean {
-  switch (section) {
-    case 'branch':
-      return state.branch.branchName.trim().length > 0;
-    case 'rooms':
-      return state.rooms.length > 0 && state.rooms.every((room) => room.name.trim().length > 0);
-    case 'tables':
-      return state.tables.length > 0;
-    case 'menu':
-      return state.menuItems.length > 0;
-    case 'payment':
-      return state.paymentMethods.length > 0;
-    case 'users':
-      // Users are genuinely optional — the installing administrator is
-      // already a user. An empty list is a valid choice, not an omission.
-      return true;
-    default:
-      return true;
-  }
 }
 
 export interface ConfigureContextType extends ConfigureState {
@@ -288,11 +254,11 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
     () =>
       SECTION_ORDER.reduce((acc, section) => {
         acc[section] = isSectionValid(section, {
-          branch, rooms, tables, menuItems, paymentMethods, users,
+          branch, rooms, tables, menuItems, taxConfig, paymentMethods, users,
         });
         return acc;
       }, {} as Record<SectionId, boolean>),
-    [branch, rooms, tables, menuItems, paymentMethods, users]
+    [branch, rooms, tables, menuItems, taxConfig, paymentMethods, users]
   );
 
   const markSectionCompleted = useCallback(
@@ -316,21 +282,23 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
     (section?: SectionId) => {
       const sec = section || activeSection;
       markSectionCompleted(sec);
+      if (!sectionValidity[sec]) return;
       const currentIndex = SECTION_ORDER.indexOf(sec);
       if (currentIndex >= 0 && currentIndex < SECTION_ORDER.length - 1) {
         setActiveSection(SECTION_ORDER[currentIndex + 1]);
       }
     },
-    [activeSection, markSectionCompleted, setActiveSection]
+    [activeSection, markSectionCompleted, setActiveSection, sectionValidity]
   );
 
   const goToNextSection = useCallback(() => {
     markSectionCompleted(activeSection);
+    if (!sectionValidity[activeSection]) return;
     const currentIndex = SECTION_ORDER.indexOf(activeSection);
     if (currentIndex < SECTION_ORDER.length - 1) {
       setActiveSection(SECTION_ORDER[currentIndex + 1]);
     }
-  }, [activeSection, markSectionCompleted, setActiveSection]);
+  }, [activeSection, markSectionCompleted, setActiveSection, sectionValidity]);
 
   const goToPrevSection = useCallback(() => {
     const currentIndex = SECTION_ORDER.indexOf(activeSection);
