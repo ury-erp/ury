@@ -9,6 +9,8 @@ from frappe.utils import flt
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
+from ury.ury.doctype.ury_audit_log.ury_audit_log import record_event
+from ury.ury.api.loyalty import apply_loyalty_to_invoice
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 
 from frappe import cache
@@ -933,6 +935,18 @@ def split_bill(source_invoice, items_to_move, customer=None):
     finally:
         frappe.flags.ury_bill_split = False
 
+    record_event(
+        "Bill Split",
+        reference_doctype="POS Invoice",
+        reference_name=source.name,
+        amount=frappe.db.get_value("POS Invoice", new_invoice.name, "grand_total"),
+        old_value=source.name,
+        new_value=new_invoice.name,
+        details={"items_moved": len(items_to_move), "split_group": split_group},
+        branch=source.branch,
+        pos_profile=source.pos_profile,
+    )
+
     return {
         "source_invoice": source.name,
         "new_invoice": new_invoice.name,
@@ -1106,7 +1120,13 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
 
     for d in items:
 
-        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"), "parent": menu}, "course")
+        menu_row = frappe.db.get_value(
+            "URY Menu Item",
+            {"item": d.get("item"), "parent": menu},
+            ["course", "rate"],
+            as_dict=True,
+        )
+        course = menu_row.course if menu_row else None
 
         item_prices = frappe.db.get_list(
             "Item Price",
@@ -1114,25 +1134,47 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
             fields=["price_list_rate"],
         )
 
-        if not item_prices:
-            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
-
-        else:
-            priced_items.append(
-                dict(
-                    item_code=d.get("item"),
-                    item_name=d.get("item_name"),
-                    qty=d.get("qty"),
-                    **({"custom_course": course} if course else {}),
-                    comment=d.get("comment"),
-                    rate = item_prices[0].price_list_rate,
-                    price_list_rate = item_prices[0].price_list_rate,
-                    base_price_list_rate = item_prices[0].price_list_rate,
-                    cost_center = frappe.db.get_value(
-                        "POS Profile", pos_profile, "cost_center"
-                        ),
-                )
+        if item_prices:
+            rate = item_prices[0].price_list_rate
+        elif menu_row and menu_row.rate:
+            # The price list is published FROM the menu (URY Menu.make_price_list),
+            # so a menu row with a rate but no Item Price is a sync gap, not a
+            # missing price. The menu rate is also the number the customer was
+            # just shown — both the POS grid and the self-ordering page render
+            # `URY Menu Item.rate` — so charging it is the only answer that
+            # matches what they agreed to. Throwing here instead meant a whole
+            # branch could not take a single order because one published row
+            # was missing, and it was the customer's turn to wait for it.
+            rate = menu_row.rate
+            frappe.log_error(
+                f"Item {d.get('item')} has no Item Price in '{price_list}'; "
+                f"charged the menu rate {menu_row.rate} from '{menu}'. "
+                f"Save the menu to republish its price list.",
+                "Menu price out of sync",
             )
+        else:
+            frappe.throw(
+                _(
+                    "No price is set for Item: {0}. Set its rate on menu {1} and "
+                    "save the menu to publish it to Price List {2}."
+                ).format(d.get("item"), menu, price_list)
+            )
+
+        priced_items.append(
+            dict(
+                item_code=d.get("item"),
+                item_name=d.get("item_name"),
+                qty=d.get("qty"),
+                **({"custom_course": course} if course else {}),
+                comment=d.get("comment"),
+                rate=rate,
+                price_list_rate=rate,
+                base_price_list_rate=rate,
+                cost_center=frappe.db.get_value(
+                    "POS Profile", pos_profile, "cost_center"
+                ),
+            )
+        )
 
     return priced_items
 
@@ -1554,9 +1596,27 @@ def sync_order(
     order_type=None,
     aggregator_id=None,
     room=None,
-    merged_tables=None
+    merged_tables=None,
+    request_id=None,
 ):
-    
+
+    # Idempotency gate, before anything is read or written.
+    #
+    # A POS that loses its link mid-request cannot tell a request that never
+    # arrived from one that arrived and whose reply was lost. Retrying is the
+    # only thing it can do, and without this the retry puts the same dishes
+    # on the pass a second time. `make_invoice` has had this protection for
+    # settlement since the beginning (see test_make_invoice_idempotency.py);
+    # the order itself had none.
+    #
+    # `request_id` is minted by the client per *submission attempt*, not per
+    # order: adding a course to a running table is a new attempt with a new
+    # key, while retrying that same attempt reuses it.
+    if request_id:
+        applied = _already_applied_sync(request_id)
+        if applied is not None:
+            return applied
+
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
     
@@ -1845,7 +1905,55 @@ def sync_order(
                     "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
                 )
 
+    if request_id:
+        _record_sync_request(request_id, invoice.name, pos_profile)
+
     return invoice.as_dict()
+
+
+def _already_applied_sync(request_id):
+    """The invoice this submission produced, if the server already took it.
+
+    Returns None when the key is new. Returns the invoice as a dict when it
+    is a replay — the same shape a fresh call returns, so the caller cannot
+    tell the difference and does not have to.
+    """
+    invoice_name = frappe.db.get_value(
+        "URY Sync Request", {"idempotency_key": request_id}, "invoice"
+    )
+    if not invoice_name:
+        return None
+
+    if not frappe.db.exists("POS Invoice", invoice_name):
+        # The order was applied and the invoice has since been deleted. The
+        # submission still must not be replayed — re-creating a deleted order
+        # from a stale queue is the opposite of what the cashier wants.
+        return {"status": "Already Applied", "invoice": invoice_name}
+
+    return frappe.get_doc("POS Invoice", invoice_name).as_dict()
+
+
+def _record_sync_request(request_id, invoice_name, pos_profile):
+    """Remember that this submission was applied.
+
+    A failure to record must not fail the order: the food is already going to
+    the kitchen, and the worst case of a missing row is that a retry which
+    almost never happens would be applied twice — strictly better than
+    throwing away an order that succeeded.
+    """
+    try:
+        frappe.get_doc({
+            "doctype": "URY Sync Request",
+            "idempotency_key": request_id,
+            "invoice": invoice_name,
+            "pos_profile": pos_profile,
+            "applied_by": frappe.session.user,
+        }).insert(ignore_permissions=True)
+    except frappe.DuplicateEntryError:
+        # Two retries raced. The first one won; there is nothing to add.
+        pass
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Could not record sync request key")
 
 
 @frappe.whitelist()
@@ -2019,6 +2127,19 @@ def table_transfer(table, newTable, invoice):
     pos_invoice.custom_restaurant_room = new_table.restaurant_room
     pos_invoice.save()
 
+    # A bill that moves between tables is how an order ends up on a table
+    # that never ordered it, so the move itself is worth a line.
+    record_event(
+        "Table Transferred",
+        reference_doctype="POS Invoice",
+        reference_name=pos_invoice.name,
+        amount=pos_invoice.grand_total,
+        old_value=current_table.name,
+        new_value=new_table.name,
+        branch=pos_invoice.branch,
+        pos_profile=pos_invoice.pos_profile,
+    )
+
     try:
         change_table_in_kot(
             pos_invoice.name, new_table.name, pos_invoice.branch
@@ -2159,6 +2280,27 @@ def cancel_order(invoice_id, reason):
                 frappe.PermissionError,
             )
 
+    # Written before the cancellation, while the invoice still has its totals
+    # and its table on it. Afterwards the row is a husk, and a manager asking
+    # "what did we just void" would have nothing to read.
+    record_event(
+        "Invoice Cancelled",
+        reference_doctype="POS Invoice",
+        reference_name=invoice_id,
+        amount=pos_invoice.grand_total,
+        old_value=pos_invoice.status,
+        new_value="Cancelled",
+        reason=reason,
+        details={
+            "table": pos_invoice.restaurant_table,
+            "customer": pos_invoice.customer,
+            "docstatus": pos_invoice.docstatus,
+            "items": len(pos_invoice.items or []),
+        },
+        branch=pos_invoice.branch,
+        pos_profile=pos_invoice.pos_profile,
+    )
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
@@ -2247,7 +2389,7 @@ def _validate_additional_discount(additional_discount, pos_profile):
 
 # Method for URY POS
 @frappe.whitelist()
-def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None, redeem_loyalty_points=None):
     """Settle an open bill.
 
     Settling the same bill twice is not a hypothetical: the POS could be
@@ -2316,6 +2458,19 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
 
         invoice.additional_discount_percentage = discount_val
+        # Recorded at the moment of authorisation, with the percentage the
+        # cashier actually asked for. The resulting field diff on the invoice
+        # says what changed; this says who decided it and on which table.
+        record_event(
+            "Discount Applied",
+            reference_doctype="POS Invoice",
+            reference_name=invoice.name,
+            amount=frappe.utils.flt(invoice.grand_total) * discount_val / 100,
+            old_value=invoice.get("additional_discount_percentage") or 0,
+            new_value=discount_val,
+            details={"table": table, "customer": customer, "pos_profile": pos_profile},
+            pos_profile=pos_profile,
+        )
     else:
         invoice.additional_discount_percentage = 0
         
@@ -2362,6 +2517,20 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             invoice.append(
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
+
+    # Attach the loyalty programme (and any redemption) before the save.
+    # ERPNext awards and redeems points inside the invoice's own validate and
+    # on_submit, so this has to be on the document before either runs — and
+    # the award half happens on every settled bill, not only the ones where a
+    # customer spends points.
+    try:
+        apply_loyalty_to_invoice(invoice, redeem_loyalty_points)
+    except frappe.ValidationError:
+        raise
+    except Exception:
+        # A loyalty misconfiguration must not stop a guest paying. The bill is
+        # the transaction; points are a courtesy on top of it.
+        frappe.log_error(frappe.get_traceback(), "Could not apply loyalty to invoice")
 
     # invoice.owner = owner
     invoice.save()

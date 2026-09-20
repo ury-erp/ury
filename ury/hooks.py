@@ -223,7 +223,10 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
 		]
-	}
+	},
+    "daily": [
+        "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests"
+    ]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
