@@ -8,6 +8,7 @@ import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { MenuBulkUpload } from '../../components/common/MenuBulkUpload';
+import { uploadImage } from '../../lib/uploadImage';
 import { t } from '../../i18n';
 
 interface URYMenuRecord {
@@ -243,80 +244,6 @@ export const MenuPage: React.FC = () => {
 
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
 
-  const extractFileUrl = (res: any): string | null => {
-    if (!res) return null;
-    if (typeof res === 'string' && (res.startsWith('/') || res.startsWith('http'))) return res;
-    if (typeof res.file_url === 'string' && (res.file_url.startsWith('/') || res.file_url.startsWith('http'))) return res.file_url;
-    if (res.message) {
-      if (typeof res.message === 'string' && (res.message.startsWith('/') || res.message.startsWith('http'))) return res.message;
-      if (typeof res.message.file_url === 'string' && (res.message.file_url.startsWith('/') || res.message.file_url.startsWith('http'))) return res.message.file_url;
-      if (typeof res.message.name === 'string' && (res.message.name.startsWith('/') || res.message.name.startsWith('http'))) return res.message.name;
-    }
-    return null;
-  };
-
-  const uploadImageFile = async (file: File): Promise<string> => {
-    // 1. Primary Method: Standard Frappe multipart/form-data upload using fetch
-    try {
-      const formData = new FormData();
-      formData.append('file', file, file.name);
-      formData.append('filename', file.name);
-      formData.append('file_name', file.name);
-      formData.append('is_private', '0');
-
-      const baseUrl = import.meta.env?.VITE_FRAPPE_BASE_URL || '';
-      const uploadEndpoint = `${baseUrl}/api/method/upload_file`;
-
-      const response = await fetch(uploadEndpoint, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json',
-          'X-Frappe-CSRF-Token': (window as any).csrf_token || '',
-        },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const resJson = await response.json();
-        const url = extractFileUrl(resJson);
-        if (url) return url;
-      }
-    } catch (err) {
-      console.warn('multipart FormData upload failed, falling back to call("upload_file")', err);
-    }
-
-    // 2. Fallback: call upload_file RPC using base64 with explicit file_name
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Failed to read image file'));
-      reader.onload = async (event) => {
-        const dataUrl = event.target?.result as string;
-        if (!dataUrl) {
-          reject(new Error('Failed to read image data'));
-          return;
-        }
-        try {
-          const base64Data = dataUrl.split(',')[1];
-          const uploadRes = await call<any>('upload_file', {
-            file_name: file.name,
-            filename: file.name,
-            filedata: base64Data,
-            is_private: 0,
-          });
-          const url = extractFileUrl(uploadRes);
-          if (url) {
-            resolve(url);
-          } else {
-            reject(new Error('Upload response did not contain a valid file URL'));
-          }
-        } catch (err: any) {
-          reject(err);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
 
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -329,7 +256,7 @@ export const MenuPage: React.FC = () => {
 
     setUploadingImage(true);
     try {
-      const fileUrl = await uploadImageFile(file);
+      const fileUrl = await uploadImage(file);
       setNewItem(prev => ({
         ...prev,
         image: fileUrl,
