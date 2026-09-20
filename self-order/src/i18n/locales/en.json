@@ -63,7 +63,16 @@
     "item_count": {
       "one": "{{count}} item",
       "other": "{{count}} items"
-    }
+    },
+    "bill_status_requested": "Your request has been sent to the cashier…",
+    "bill_status_acknowledged": "The cashier has your request — your bill is on its way",
+    "bill_status_printed": "Your bill has been printed and is on its way to your table",
+    "call_waiter": "Call a waiter",
+    "waiter_called": "A member of staff has been called",
+    "waiter_coming": "Staff have seen your call — someone is on their way",
+    "kitchen_queued": "Your order is with the kitchen",
+    "kitchen_preparing": "Your order is being prepared",
+    "kitchen_ready": "Your order is ready"
   },
   "language": {
     "label": "Language"
@@ -75,6 +84,7 @@
     "payment_failed": "Could not start online payment. You can pay at the counter.",
     "cannot_open_title": "This ordering link did not open",
     "cannot_open_hint": "Scan the code on your table again, or ask a staff member.",
-    "missing_code": "This link is missing an ordering code. Please rescan the code on your table."
+    "missing_code": "This link is missing an ordering code. Please rescan the code on your table.",
+    "waiter_failed": "Could not call a waiter. Please try again."
   }
 }

@@ -107,7 +107,10 @@
     "room": "Room",
     "settings": "Settings",
     "table": "Table",
-    "user": "User"
+    "user": "User",
+    "navigation": "Navigation",
+    "reservations": "Reservations",
+    "restaurant_website": "Restaurant Website"
   },
   "notifications": {
     "empty": "No new notifications",
@@ -225,7 +228,9 @@
       "repeated-customers": "Repeated Customers",
       "service-wise-sales": "Service Wise Sales",
       "time-wise-sales": "Time Wise Sales",
-      "today-sales": "Today's Sales"
+      "today-sales": "Today's Sales",
+      "audit-log": "Audit Log",
+      "food-cost": "Food Cost & Waste"
     },
     "month_wise_sales": {
       "avg_monthly": "Avg Monthly",
@@ -270,7 +275,53 @@
       "total_taxes_charges": "Total Taxes & Charges"
     },
     "hub_subtitle": "Pick a report. Branch and period stay as you set them.",
-    "none_available": "No reports are available."
+    "none_available": "No reports are available.",
+    "audit_log": {
+      "audit_log": "Audit Log",
+      "subtitle": "Who did what to money, and what it was worth.",
+      "when": "When",
+      "event": "Event",
+      "by": "By",
+      "reference": "Reference",
+      "amount": "Amount",
+      "change": "Change",
+      "reason": "Reason",
+      "discount_given": "Discount given",
+      "value_cancelled": "Value cancelled",
+      "events_recorded": "Events recorded",
+      "nothing_recorded": "Nothing recorded in this range"
+    },
+    "food_cost": {
+      "food_cost": "Food Cost & Waste",
+      "subtitle": "Where the food money goes: into a plate, or into a bin.",
+      "dish": "Dish",
+      "course": "Course",
+      "price": "Price",
+      "cost": "Cost",
+      "margin": "Margin",
+      "food_cost_pct": "Food cost %",
+      "not_costed": "Not costed",
+      "average_food_cost": "Average food cost",
+      "wasted_in_period": "Wasted in period",
+      "dishes_not_costed": "Dishes not costed",
+      "waste_by_reason": "Waste by reason",
+      "no_menu_items": "No dishes on the active menu",
+      "uncosted_hint": "{{count}} dishes have no cost, so they are left out of the average above. Add a BOM, or a plate cost on the menu row.",
+      "sources": {
+        "bom": "recipe",
+        "manual": "entered",
+        "none": "—"
+      },
+      "reasons": {
+        "Spoilage": "Spoilage",
+        "Overproduction": "Overproduction",
+        "Preparation Error": "Preparation error",
+        "Customer Return": "Customer return",
+        "Breakage": "Breakage",
+        "Staff Meal": "Staff meal",
+        "Other": "Other"
+      }
+    }
   },
   "tables": {
     "autosave_hint": "• Changes autosave",
@@ -654,7 +705,8 @@
       "room_name": "Room Name"
     },
     "searchable_select": {
-      "no_matching_options": "No matching options"
+      "no_matching_options": "No matching options",
+      "toggle_options": "Show options"
     },
     "setup": {
       "installation_type": "Installation Type",
@@ -680,7 +732,12 @@
       "status": "Status",
       "table_name": "Table Name",
       "table_saved": "Table saved",
-      "table_shape": "Table Shape"
+      "table_shape": "Table Shape",
+      "enable_self_ordering": "Enable self ordering",
+      "enable_self_ordering_hint": "When off, this table's QR code stops working. Staff can still take its orders on the POS.",
+      "self_ordering": "Self ordering",
+      "self_ordering_on": "On",
+      "self_ordering_off": "Off"
     },
     "table_layout_view": {
       "reset_zoom_pan": "Reset Zoom & Pan",
@@ -723,6 +780,44 @@
     "errors": {
       "failed_load": "Could not load the dashboard",
       "setup_check_failed": "Could not check the setup status"
+    },
+    "common": {
+      "load_failed": "Couldn't load this list",
+      "load_failed_hint": "This is a loading failure, not an empty list. The error has been logged.",
+      "retry": "Try again"
+    },
+    "reservations": {
+      "title": "Reservations",
+      "new": "New reservation",
+      "time": "Time",
+      "guest": "Guest",
+      "pax": "Guests",
+      "table": "Table",
+      "status": "Status",
+      "actions": "Actions",
+      "mobile": "Mobile",
+      "notes": "Notes",
+      "notes_hint": "Allergies, a birthday, a preferred corner…",
+      "any_table": "Any table",
+      "too_small": "too small",
+      "only_free_shown": "Only tables free for this time are listed.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Reservation saved",
+      "save_failed": "Could not save the reservation",
+      "none_today": "No reservations for this day",
+      "covers_expected": "{{count}} covers expected",
+      "seat": "Seat the guest",
+      "no_show": "Mark as no show",
+      "complete": "Complete",
+      "statuses": {
+        "Requested": "Requested",
+        "Confirmed": "Confirmed",
+        "Seated": "Seated",
+        "Completed": "Completed",
+        "No Show": "No show",
+        "Cancelled": "Cancelled"
+      }
     }
   },
   "auth": {
@@ -736,6 +831,59 @@
   "setup": {
     "config_error": "Configuration Error:",
     "section_complete": "Complete",
-    "section_incomplete": "Needs attention"
+    "section_incomplete": "Needs attention",
+    "next": "Next",
+    "review_launch": "Review and launch",
+    "launch": "Launch",
+    "change_later": "All of this can be changed later from Settings.",
+    "review_hint": "Check what will be created. Nothing is saved until you launch.",
+    "progress_description": "Setting up your restaurant. Keep this page open.",
+    "incomplete_result": "Setup did not finish. Some steps may have been applied.",
+    "retry_hint": "Try again, or check the details of the failed step.",
+    "progress": {
+      "0": "Preparing setup",
+      "1": "Creating restaurant configuration",
+      "2": "Configuring menu and operational data",
+      "3": "Finalizing setup"
+    },
+    "sections": {
+      "branch": {
+        "title": "Branch",
+        "description": "The restaurant, its currency and its working hours."
+      },
+      "rooms": {
+        "title": "Rooms",
+        "description": "The areas guests are seated in."
+      },
+      "tables": {
+        "title": "Tables",
+        "description": "The tables in each room, and how many each seats."
+      },
+      "menu": {
+        "title": "Menu",
+        "description": "Courses and the items sold under them."
+      },
+      "payment": {
+        "title": "Payments",
+        "description": "The payment methods the cashier may take."
+      },
+      "users": {
+        "title": "Users",
+        "description": "Who works here, and what each of them may do."
+      }
+    }
+  },
+  "audit": {
+    "events": {
+      "Discount Applied": "Discount applied",
+      "Invoice Cancelled": "Invoice cancelled",
+      "Price Overridden": "Price overridden",
+      "Payment Refunded": "Payment refunded",
+      "Bill Split": "Bill split",
+      "Bill Merged": "Bills merged",
+      "Table Transferred": "Table transferred",
+      "Captain Transferred": "Captain transferred",
+      "Shift Closed With Difference": "Shift closed with a difference"
+    }
   }
 }

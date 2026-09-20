@@ -85,7 +85,8 @@
     "order_actions": "Order actions",
     "edit_order": "Edit order",
     "close_table": "Close Table",
-    "close_table_confirm": "Every bill on table {{table}} has been settled. Close it and make the table available again?"
+    "close_table_confirm": "Every bill on table {{table}} has been settled. Close it and make the table available again?",
+    "details_title": "Order details"
   },
   "payment": {
     "title": "Payment",
@@ -105,7 +106,12 @@
     "change_due": "Change due: {{amount}}",
     "success": "Payment successful: {{amount}} received",
     "processing_title": "Collecting {{amount}}…",
-    "processing_hint": "Do not close this window. The result will appear here."
+    "processing_hint": "Do not close this window. The result will appear here.",
+    "preview_failed": "Couldn't work out the amount due. The bill has not been changed.",
+    "loyalty_balance": "{{points}} loyalty points ({{amount}})",
+    "points_to_redeem": "Points",
+    "redeem_max": "Use all",
+    "bill_too_small_to_redeem": "This bill is smaller than one point is worth."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
@@ -388,7 +394,11 @@
     "take_away": "Take away",
     "no_rooms_for_branch": "No rooms found for this branch",
     "open_table": "Open table {{table}}",
-    "refreshing": "Checking for changes…"
+    "refreshing": "Checking for changes…",
+    "stale_data": "Couldn't refresh the tables. What you see is the last known state.",
+    "reserved_now": "Reserved now",
+    "reserved_for": "Reserved for {{guest}} at {{time}}",
+    "reservations": "Reservations"
   },
   "bill_split": {
     "split_bill": "Split bill",
@@ -523,7 +533,11 @@
   },
   "order_panel": {
     "current_ticket": "Current ticket",
-    "your_order": "Your order"
+    "your_order": "Your order",
+    "item_count": {
+      "one": "1 item",
+      "other": "{{count}} items"
+    }
   },
   "order_tabs": {
     "add_new_order": "Add new order",
@@ -599,10 +613,12 @@
   },
   "screen_size": {
     "current_width": "Current screen width:",
-    "desktop_only": "Desktop Only",
-    "required": "Required:",
+    "desktop_only": "Phone screens not supported",
+    "required": "Minimum width:",
     "switch_v1": "Switch to Version 1",
-    "use_v1_mobile": "You can use URY POS Version 1 for mobile devices."
+    "use_v1_mobile": "Version 1 is available for phones.",
+    "built_for": "The cashier screen is built for counter displays and tablets.",
+    "phone_alternative": "On a phone, use Version 1 below. This screen needs a width of {{width}}px or more."
   },
   "time": {
     "just_now": "just now",
@@ -655,5 +671,35 @@
     "failed": "Could not send the message",
     "empty": "Write a message first",
     "preview": "How it will appear"
+  },
+  "service_requests": {
+    "title": "Table requests",
+    "empty": "No open requests",
+    "bill_at": "Table {{table}} is asking for the bill",
+    "assistance_at": "Table {{table}} is asking for assistance",
+    "repeat_hint": "asked again",
+    "mark_done": "Mark as done",
+    "resolve_failed": "Could not update the request. Please try again.",
+    "customer_notified": "Customer told it's coming"
+  },
+  "offline": {
+    "title": "No connection to the server",
+    "hint": "Orders and payments cannot be saved until it returns.",
+    "check_again": "Check again",
+    "blocked": "This cannot be done while the connection is down. Nothing has been changed.",
+    "order_queued": "Saved on this terminal. The kitchen has NOT seen it yet — it will be sent when the connection returns.",
+    "queued_count": {
+      "one": "1 order waiting to be sent",
+      "other": "{{count}} orders waiting to be sent"
+    },
+    "send_now": "Send now",
+    "queue_sent": {
+      "one": "1 queued order sent",
+      "other": "{{count}} queued orders sent"
+    },
+    "queue_rejected": {
+      "one": "1 queued order was refused by the server and removed. Re-enter it.",
+      "other": "{{count}} queued orders were refused by the server and removed. Re-enter them."
+    }
   }
 }

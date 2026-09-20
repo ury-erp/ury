@@ -110,7 +110,10 @@
     "waiter": "Waiter",
     "load_failed": "Orders could not be loaded",
     "load_failed_hint": "This is a connection problem, not an empty kitchen. Check the network, then try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "stale_data": "Tickets may be out of date. The latest update failed.",
+    "last_synced": "Last updated: {time}",
+    "syncing": "Updating kitchen orders…"
   },
   "language": {
     "label": "Language"
@@ -156,7 +159,8 @@
     "restored": "Ticket is back on the board",
     "restoring": "Restoring…",
     "subtitle": "Served in the last three hours",
-    "title": "Recall a ticket"
+    "title": "Recall a ticket",
+    "load_failed": "Could not load served tickets. Please try again."
   },
   "toolbar": {
     "all": "All",

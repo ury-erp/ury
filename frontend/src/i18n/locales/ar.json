@@ -112,7 +112,10 @@
     "room": "القاعات",
     "settings": "الإعدادات",
     "table": "الطاولات",
-    "user": "المستخدمون"
+    "user": "المستخدمون",
+    "navigation": "التنقل",
+    "reservations": "الحجوزات",
+    "restaurant_website": "موقع المطعم"
   },
   "notifications": {
     "empty": "لا توجد إشعارات جديدة",
@@ -230,7 +233,9 @@
       "repeated-customers": "الزبائن المتكررون",
       "service-wise-sales": "المبيعات حسب نوع الخدمة",
       "time-wise-sales": "المبيعات حسب الوقت",
-      "today-sales": "مبيعات اليوم"
+      "today-sales": "مبيعات اليوم",
+      "audit-log": "سجل التدقيق",
+      "food-cost": "تكلفة الطعام والهدر"
     },
     "month_wise_sales": {
       "avg_monthly": "المعدل الشهري",
@@ -275,7 +280,53 @@
       "total_taxes_charges": "إجمالي الضرائب والرسوم"
     },
     "hub_subtitle": "اختر تقريراً. يبقى الفرع والفترة كما ضبطتهما.",
-    "none_available": "لا توجد تقارير متاحة."
+    "none_available": "لا توجد تقارير متاحة.",
+    "audit_log": {
+      "audit_log": "سجل التدقيق",
+      "subtitle": "من فعل ماذا بالمال، وكم كانت قيمته.",
+      "when": "الوقت",
+      "event": "الحدث",
+      "by": "المستخدم",
+      "reference": "المرجع",
+      "amount": "المبلغ",
+      "change": "التغيير",
+      "reason": "السبب",
+      "discount_given": "خصومات ممنوحة",
+      "value_cancelled": "قيمة مُلغاة",
+      "events_recorded": "أحداث مسجّلة",
+      "nothing_recorded": "لا شيء مسجّل في هذه الفترة"
+    },
+    "food_cost": {
+      "food_cost": "تكلفة الطعام والهدر",
+      "subtitle": "إلى أين يذهب مال الطعام: إلى الطبق أم إلى النفايات.",
+      "dish": "الطبق",
+      "course": "الصنف",
+      "price": "السعر",
+      "cost": "التكلفة",
+      "margin": "الهامش",
+      "food_cost_pct": "نسبة التكلفة",
+      "not_costed": "بلا تكلفة",
+      "average_food_cost": "متوسط تكلفة الطعام",
+      "wasted_in_period": "الهدر في الفترة",
+      "dishes_not_costed": "أطباق بلا تكلفة",
+      "waste_by_reason": "الهدر حسب السبب",
+      "no_menu_items": "لا أطباق في القائمة النشطة",
+      "uncosted_hint": "{{count}} طبقاً بلا تكلفة، ولذلك استُبعدت من المتوسط أعلاه. أضف وصفة (BOM) أو تكلفة طبق في سطر القائمة.",
+      "sources": {
+        "bom": "وصفة",
+        "manual": "مُدخلة",
+        "none": "—"
+      },
+      "reasons": {
+        "Spoilage": "تلف",
+        "Overproduction": "إنتاج زائد",
+        "Preparation Error": "خطأ تحضير",
+        "Customer Return": "إرجاع زبون",
+        "Breakage": "كسر",
+        "Staff Meal": "وجبة موظفين",
+        "Other": "أخرى"
+      }
+    }
   },
   "tables": {
     "autosave_hint": "• تُحفظ التغييرات تلقائياً",
@@ -659,7 +710,8 @@
       "room_name": "اسم القاعة"
     },
     "searchable_select": {
-      "no_matching_options": "لا توجد خيارات مطابقة"
+      "no_matching_options": "لا توجد خيارات مطابقة",
+      "toggle_options": "إظهار الخيارات"
     },
     "setup": {
       "installation_type": "نوع التركيب",
@@ -685,7 +737,12 @@
       "status": "الحالة",
       "table_name": "اسم الطاولة",
       "table_saved": "تم حفظ الطاولة",
-      "table_shape": "شكل الطاولة"
+      "table_shape": "شكل الطاولة",
+      "enable_self_ordering": "تفعيل الطلب الذاتي",
+      "enable_self_ordering_hint": "عند الإيقاف يتوقف رمز QR لهذه الطاولة عن العمل، ويبقى بإمكان الموظفين تسجيل طلباتها من نقطة البيع.",
+      "self_ordering": "الطلب الذاتي",
+      "self_ordering_on": "مُفعّل",
+      "self_ordering_off": "متوقف"
     },
     "table_layout_view": {
       "reset_zoom_pan": "إعادة تعيين التكبير والتحريك",
@@ -728,6 +785,44 @@
     "errors": {
       "failed_load": "تعذّر تحميل لوحة المعلومات",
       "setup_check_failed": "تعذّر التحقق من حالة الإعداد"
+    },
+    "common": {
+      "load_failed": "تعذّر تحميل هذه القائمة",
+      "load_failed_hint": "هذا عطل في التحميل وليس قائمة فارغة. سُجّل الخطأ في سجل الأخطاء.",
+      "retry": "أعد المحاولة"
+    },
+    "reservations": {
+      "title": "الحجوزات",
+      "new": "حجز جديد",
+      "time": "الوقت",
+      "guest": "الضيف",
+      "pax": "عدد الأشخاص",
+      "table": "الطاولة",
+      "status": "الحالة",
+      "actions": "إجراءات",
+      "mobile": "الهاتف",
+      "notes": "ملاحظات",
+      "notes_hint": "حساسية، عيد ميلاد، ركن مُفضّل…",
+      "any_table": "أي طاولة",
+      "too_small": "صغيرة",
+      "only_free_shown": "تُعرض الطاولات الشاغرة في هذا الوقت فقط.",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "saved": "تم حفظ الحجز",
+      "save_failed": "تعذّر حفظ الحجز",
+      "none_today": "لا حجوزات في هذا اليوم",
+      "covers_expected": "{{count}} شخصاً متوقعاً",
+      "seat": "أجلِس الضيف",
+      "no_show": "لم يحضر",
+      "complete": "إنهاء",
+      "statuses": {
+        "Requested": "مطلوب",
+        "Confirmed": "مؤكّد",
+        "Seated": "جالس",
+        "Completed": "مكتمل",
+        "No Show": "لم يحضر",
+        "Cancelled": "ملغى"
+      }
     }
   },
   "auth": {
@@ -741,6 +836,59 @@
   "setup": {
     "config_error": "خطأ في التهيئة:",
     "section_complete": "مكتمل",
-    "section_incomplete": "يحتاج إكمالاً"
+    "section_incomplete": "يحتاج إكمالاً",
+    "next": "التالي",
+    "review_launch": "المراجعة والإطلاق",
+    "launch": "إطلاق",
+    "change_later": "كل هذا قابل للتغيير لاحقًا من الإعدادات.",
+    "review_hint": "راجع ما سيُنشأ. لا يُحفظ شيء قبل الإطلاق.",
+    "progress_description": "جارٍ إعداد مطعمك. أبقِ هذه الصفحة مفتوحة.",
+    "incomplete_result": "لم يكتمل الإعداد. قد تكون بعض الخطوات طُبقت.",
+    "retry_hint": "أعد المحاولة، أو راجع تفاصيل الخطوة المتعثرة.",
+    "progress": {
+      "0": "تهيئة الإعداد",
+      "1": "إنشاء إعدادات المطعم",
+      "2": "تهيئة القائمة والبيانات التشغيلية",
+      "3": "إنهاء الإعداد"
+    },
+    "sections": {
+      "branch": {
+        "title": "الفرع",
+        "description": "المطعم وعملته وأوقات عمله."
+      },
+      "rooms": {
+        "title": "الغرف",
+        "description": "المناطق التي يجلس فيها الضيوف."
+      },
+      "tables": {
+        "title": "الطاولات",
+        "description": "طاولات كل غرفة وعدد مقاعد كل منها."
+      },
+      "menu": {
+        "title": "القائمة",
+        "description": "التصنيفات والأصناف المباعة ضمنها."
+      },
+      "payment": {
+        "title": "وسائل الدفع",
+        "description": "وسائل الدفع المسموح للكاشير بقبولها."
+      },
+      "users": {
+        "title": "المستخدمون",
+        "description": "من يعمل هنا، وما يُسمح لكل منهم به."
+      }
+    }
+  },
+  "audit": {
+    "events": {
+      "Discount Applied": "خصم مُطبَّق",
+      "Invoice Cancelled": "فاتورة مُلغاة",
+      "Price Overridden": "سعر مُتجاوَز",
+      "Payment Refunded": "دفعة مُستردّة",
+      "Bill Split": "فاتورة مقسومة",
+      "Bill Merged": "فواتير مدموجة",
+      "Table Transferred": "طاولة محوَّلة",
+      "Captain Transferred": "كابتن محوَّل",
+      "Shift Closed With Difference": "وردية أُغلقت بفارق"
+    }
   }
 }
