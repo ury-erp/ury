@@ -148,12 +148,20 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
       })}
 
       {isManager && (
-        <a href="/app/ury-website" className={sidebarItemVariants({ active: false })}>
-          <div className="flex items-center gap-3 ms-1">
-            <Globe className="w-4 h-4 text-gray-500 shrink-0" />
-            <span>{t('nav.restaurant_website')}</span>
-          </div>
-        </a>
+        <NavLink
+          to="/website"
+          className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+        >
+          {({ isActive }) => (
+            <>
+              {isActive && <SidebarActiveIndicator />}
+              <div className="flex items-center gap-3 ms-1">
+                <Globe className="w-4 h-4 text-gray-500 shrink-0" />
+                <span>{t('nav.restaurant_website')}</span>
+              </div>
+            </>
+          )}
+        </NavLink>
       )}
 
       <div>

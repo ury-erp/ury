@@ -818,6 +818,153 @@
         "No Show": "No show",
         "Cancelled": "Cancelled"
       }
+    },
+    "website": {
+      "title": "Restaurant website",
+      "subtitle": "A public page for your restaurant, with online booking",
+      "steps_label": "Page setup steps",
+      "save": "Save",
+      "saved": "Changes saved",
+      "save_failed": "Could not save",
+      "publish": "Publish site",
+      "published": "The page is now live for guests",
+      "unpublish": "Unpublish",
+      "unpublished": "The page is closed and no longer reachable",
+      "publish_failed": "Could not publish",
+      "read_only": "You have view-only access to this page.",
+      "state": {
+        "published": "Published",
+        "draft": "Draft",
+        "unsaved": "Unsaved changes"
+      },
+      "steps": {
+        "identity": "Identity",
+        "design": "Design",
+        "content": "Content & photos",
+        "visit": "Visit & hours",
+        "booking": "Booking",
+        "seo": "Search"
+      },
+      "languages": {
+        "ar": "Arabic",
+        "en": "English"
+      },
+      "create": {
+        "title": "Create your restaurant page",
+        "intro": "Start with a name and an address. Everything else is editable later, with a live preview.",
+        "action": "Create page"
+      },
+      "fields": {
+        "restaurant": "Restaurant",
+        "display_name": "Display name",
+        "slug": "Page address",
+        "slug_hint": "The page will live at /restaurant?slug={{slug}}",
+        "language": "Page language",
+        "language_hint": "The public site's language, separate from the management app's.",
+        "logo": "Logo",
+        "hero_image": "Cover image",
+        "hero_image_hint": "A wide, clear photo; it is the first thing a visitor sees.",
+        "eyebrow": "Introductory label",
+        "hero_title": "Headline",
+        "hero_description": "Introduction",
+        "show_menu": "Show the menu",
+        "show_menu_hint": "Real prices from the branch's menu, without disabled items.",
+        "menu": "Public menu",
+        "menu_hint": "Leave empty to use the restaurant's active menu.",
+        "show_story": "Show the Our Story section",
+        "story_title": "Story heading",
+        "story": "Story text",
+        "story_image": "Story image",
+        "gallery": "Photo gallery",
+        "address": "Address",
+        "phone": "Phone number",
+        "map_url": "Map link",
+        "instagram_url": "Instagram link",
+        "hours": "Opening hours",
+        "enable_reservations": "Accept online reservations",
+        "enable_reservations_hint": "Requests arrive as Requested and are not confirmed until staff approve them.",
+        "duration": "Sitting duration (minutes)",
+        "duration_hint": "Between 30 and 240 minutes.",
+        "lead": "Minimum advance notice (minutes)",
+        "lead_hint": "How long before a slot online booking closes.",
+        "advance": "Booking horizon (days)",
+        "advance_hint": "The furthest day a guest may book.",
+        "max_guests": "Maximum guests per booking",
+        "booking_note": "Reservation policy",
+        "privacy_note": "Privacy notice",
+        "seo_title": "Search title",
+        "seo_description": "Search description",
+        "seo_hint": "What appears in search results and when the link is shared."
+      },
+      "design": {
+        "theme": "Colour theme",
+        "layout": "Page layout",
+        "hint": "The theme sets the colours; the layout sets how sections are arranged.",
+        "themes": {
+          "olive": "Olive",
+          "terracotta": "Terracotta",
+          "midnight": "Midnight"
+        },
+        "layouts": {
+          "classic": "Classic",
+          "centered": "Centered",
+          "editorial": "Editorial"
+        }
+      },
+      "images": {
+        "drop_here": "Drop an image here, or click to choose",
+        "remove": "Remove image",
+        "upload_failed": "Could not upload the image",
+        "not_an_image": "That file is not an image"
+      },
+      "gallery": {
+        "add": "Add photos",
+        "caption": "Caption (optional)",
+        "hint": "Drag photos to reorder them. Up to {{count}} photos.",
+        "full": "The gallery is full"
+      },
+      "hours": {
+        "opens": "Opens",
+        "closes": "Closes",
+        "closed": "Closed",
+        "past_midnight": "Runs past midnight"
+      },
+      "days": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday"
+      },
+      "preview": {
+        "title": "Page preview",
+        "sizes": "Preview sizes",
+        "phone": "Phone",
+        "tablet": "Tablet",
+        "desktop": "Desktop",
+        "refresh": "Refresh",
+        "syncing": "Updating preview…",
+        "open_tab": "Open in a tab"
+      },
+      "checks": {
+        "blocking_title": "Required before publishing",
+        "advised_title": "Suggestions to improve the page",
+        "restaurant_name": "Enter the restaurant's display name.",
+        "hero_title": "Enter the page headline.",
+        "address": "Add the address so guests know where to find you.",
+        "phone": "Add a phone number.",
+        "hours": "Set opening hours before accepting reservations.",
+        "menu": "Choose a public menu, or turn the menu section off.",
+        "logo": "Add the restaurant's logo.",
+        "hero_image": "Add a cover image.",
+        "hero_description": "Add a short introduction.",
+        "story": "Write the Our Story text, or turn the section off.",
+        "gallery": "Add at least three photos to the gallery.",
+        "seo_description": "Add a description for search results.",
+        "map_url": "Add a map link so guests can find you."
+      }
     }
   },
   "auth": {
