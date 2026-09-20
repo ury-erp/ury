@@ -1,0 +1,172 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-09-20 19:00:00.000000",
+ "default_view": "List",
+ "description": "An append-only record of the operations that move money without selling anything: discounts, cancellations, price overrides, refunds and transfers. Frappe's own Version tracking records field diffs on a saved document; this records the act, who performed it, and what it was worth.",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "event",
+  "reference_doctype",
+  "reference_name",
+  "column_break_ref",
+  "branch",
+  "pos_profile",
+  "amount",
+  "actor_section",
+  "performed_by",
+  "occurred_at",
+  "column_break_actor",
+  "old_value",
+  "new_value",
+  "detail_section",
+  "reason",
+  "details"
+ ],
+ "fields": [
+  {
+   "fieldname": "event",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Event",
+   "options": "\nDiscount Applied\nInvoice Cancelled\nPrice Overridden\nPayment Refunded\nBill Split\nBill Merged\nTable Transferred\nCaptain Transferred\nShift Closed With Difference",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Document Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Reference",
+   "options": "reference_doctype",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "read_only": 1
+  },
+  {
+   "description": "What the act was worth, where that is meaningful: the discount given, the bill cancelled, the amount refunded.",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actor_section",
+   "fieldtype": "Section Break",
+   "label": "Who and When"
+  },
+  {
+   "fieldname": "performed_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Performed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "occurred_at",
+   "fieldtype": "Datetime",
+   "label": "Occurred At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_actor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "old_value",
+   "fieldtype": "Data",
+   "label": "Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_value",
+   "fieldtype": "Data",
+   "label": "After",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break",
+   "label": "Detail"
+  },
+  {
+   "description": "The reason the operator gave, where the operation asks for one.",
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details",
+   "fieldtype": "Small Text",
+   "label": "Details",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-20 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Audit Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "export": 1,
+   "email": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "export": 1,
+   "email": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "URY Admin"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
