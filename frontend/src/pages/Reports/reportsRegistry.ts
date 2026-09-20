@@ -18,6 +18,8 @@ import {
   ClipboardList,
   Factory,
   IndianRupee,
+  ShieldAlert,
+  ChefHat,
 } from 'lucide-react';
 
 export interface ReportEntry {
@@ -51,6 +53,8 @@ export const reportsRegistry: ReportEntry[] = [
   { id: 'completed-work-orders', label: 'Completed Work Orders', group: 'Employees & Operations', path: 'completed-work-orders', icon: Factory },
 
   { id: 'daily-pnl', label: 'Daily P&L', group: 'Financial', path: 'daily-pnl', icon: IndianRupee },
+  { id: 'audit-log', label: 'Audit Log', group: 'Financial', path: 'audit-log', icon: ShieldAlert },
+  { id: 'food-cost', label: 'Food Cost & Waste', group: 'Financial', path: 'food-cost', icon: ChefHat },
 ];
 
 /**

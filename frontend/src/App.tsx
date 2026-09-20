@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ErrorState } from '@ury/ui';
 import { parseFrappeError } from '@ury/core';
 import { t } from './i18n';
+import { readWizardStatus, type WizardStatus } from './lib/managementValidation';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -10,6 +11,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/Dashboard/DashboardPage';
 import { MenuPage } from './pages/Dashboard/MenuPage';
 import { TablePage } from './pages/Dashboard/TablePage';
+import ReservationPage from './pages/Dashboard/ReservationPage';
 import { RoomPage } from './pages/Dashboard/RoomPage';
 import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
@@ -22,6 +24,8 @@ import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
+import { AuditLog } from './pages/Reports/AuditLog';
+import { FoodCost } from './pages/Reports/FoodCost';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
 import { DaywiseInvoices } from './pages/Reports/DaywiseInvoices';
 import { MonthWiseSales } from './pages/Reports/MonthWiseSales';
@@ -39,11 +43,6 @@ import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
 
-interface WizardStatus {
-  step1_complete: boolean;
-  step2_complete: boolean;
-}
-
 function SetupGuard() {
   const [status, setStatus] = useState<WizardStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -51,13 +50,14 @@ function SetupGuard() {
 
   useEffect(() => {
     let cancelled = false;
+    setStatusError(null);
 
     (async () => {
       try {
         const res = await call<any>(
           'ury.ury.api.minimal.setup_organization.get_wizard_status'
         );
-        const wizardStatus: WizardStatus = res?.message ?? res;
+        const wizardStatus = readWizardStatus(res);
 
         if (!cancelled) {
           setStatusError(null);
@@ -143,6 +143,7 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
+          <Route path="reservations" element={<ReservationPage />} />
           <Route path="room" element={<RoomPage />} />
           <Route path="pos-profile" element={<PosProfilePage />} />
           <Route path="user" element={<UserPage />} />
@@ -191,6 +192,8 @@ function App() {
               element={<CompletedWorkOrders />}
             />
             <Route path="daily-pnl" element={<DailyPnl />} />
+            <Route path="audit-log" element={<AuditLog />} />
+            <Route path="food-cost" element={<FoodCost />} />
           </Route>
         </Route>
       </Route>

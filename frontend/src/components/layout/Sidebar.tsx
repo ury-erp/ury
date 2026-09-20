@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   UtensilsCrossed,
   Grid3X3,
+  Globe,
   Map,
   Building2,
   SlidersHorizontal,
@@ -18,7 +19,7 @@ import {
   Store,
   BarChart3,
   Grid
-} from 'lucide-react';
+, CalendarClock } from 'lucide-react';
 
 interface NavItem {
   /** i18n key; resolved at render time, not module scope. */
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'nav.dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { labelKey: 'nav.menu', label: 'Menu', path: '/menu', icon: UtensilsCrossed },
   { labelKey: 'nav.table', label: 'Table', path: '/table', icon: Grid3X3 },
+  { labelKey: 'nav.reservations', label: 'Reservations', path: '/reservations', icon: CalendarClock },
   { labelKey: 'nav.room', label: 'Room', path: '/room', icon: Map },
   { labelKey: 'nav.branch', label: 'Branch', path: '/branch', icon: Building2 },
 ];
@@ -106,7 +108,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   }, [isSettingsPath]);
 
   return (
-    <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+    <nav className="shrink-0 px-3 py-4 space-y-1">
       {isManager && (
         <NavLink
           to="/reports"
@@ -145,8 +147,19 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         );
       })}
 
+      {isManager && (
+        <a href="/app/ury-website" className={sidebarItemVariants({ active: false })}>
+          <div className="flex items-center gap-3 ms-1">
+            <Globe className="w-4 h-4 text-gray-500 shrink-0" />
+            <span>{t('nav.restaurant_website')}</span>
+          </div>
+        </a>
+      )}
+
       <div>
         <button
+          type="button"
+          aria-expanded={isSettingsOpen}
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
           className={sidebarItemVariants({ active: isSettingsPath })}
         >
