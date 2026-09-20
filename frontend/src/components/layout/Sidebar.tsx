@@ -19,7 +19,7 @@ import {
   Store,
   BarChart3,
   Grid
-, CalendarClock } from 'lucide-react';
+, CalendarClock, Hourglass } from 'lucide-react';
 
 interface NavItem {
   /** i18n key; resolved at render time, not module scope. */
@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'nav.menu', label: 'Menu', path: '/menu', icon: UtensilsCrossed },
   { labelKey: 'nav.table', label: 'Table', path: '/table', icon: Grid3X3 },
   { labelKey: 'nav.reservations', label: 'Reservations', path: '/reservations', icon: CalendarClock },
+  { labelKey: 'nav.waitlist', label: 'Waitlist', path: '/waitlist', icon: Hourglass },
   { labelKey: 'nav.room', label: 'Room', path: '/room', icon: Map },
   { labelKey: 'nav.branch', label: 'Branch', path: '/branch', icon: Building2 },
 ];

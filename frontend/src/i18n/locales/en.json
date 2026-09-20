@@ -110,7 +110,8 @@
     "user": "User",
     "navigation": "Navigation",
     "reservations": "Reservations",
-    "restaurant_website": "Restaurant Website"
+    "restaurant_website": "Restaurant Website",
+    "waitlist": "Waitlist"
   },
   "notifications": {
     "empty": "No new notifications",
@@ -964,6 +965,52 @@
         "gallery": "Add at least three photos to the gallery.",
         "seo_description": "Add a description for search results.",
         "map_url": "Add a map link so guests can find you."
+      }
+    },
+    "waitlist": {
+      "title": "Waitlist",
+      "subtitle": "{{count}} guests waiting right now",
+      "add": "Add to waitlist",
+      "added": "Added to the waitlist",
+      "save_failed": "Could not save",
+      "empty": "Nobody is waiting.",
+      "guest": "Guest",
+      "mobile": "Phone",
+      "pax": "Party",
+      "waited": "Waited",
+      "estimate": "Estimate",
+      "status": "Status",
+      "actions": "Actions",
+      "notes": "Notes",
+      "notify": "Call guest",
+      "seat": "Seat",
+      "cancel": "Cancel",
+      "no_show": "No show",
+      "minutes": "{{count}} min",
+      "about_minutes": "about {{count}} min",
+      "seat_now": "A table is free now",
+      "no_table_fits": "No table seats this party",
+      "tell_the_guest": "What to tell the guest:",
+      "quote_basis": "Based on {{tables}} suitable tables and an average sitting of {{turn}} minutes.",
+      "quote_accuracy": "Quoted today: {{quoted}} min on average. Actually waited: {{actual}} min.",
+      "seat_title": "Seat {{guest}}",
+      "no_tables_yet": "No suggested tables right now.",
+      "seats": "{{count}} seats",
+      "free_now": "Free now",
+      "free_in": "Free in {{count}} min",
+      "table_free_toast": "Table {{table}} is free — next: {{guest}}",
+      "statuses": {
+        "waiting": "Waiting",
+        "notified": "Notified",
+        "seated": "Seated",
+        "cancelled": "Cancelled",
+        "no_show": "No show"
+      },
+      "stats": {
+        "waiting": "Parties waiting",
+        "average_wait": "Average wait",
+        "seated_today": "Seated today",
+        "turn": "Average sitting"
       }
     }
   },

@@ -3,6 +3,7 @@ from datetime import datetime
 from frappe.utils import now_datetime, get_time, now, get_datetime
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 from ury.ury.api.service_requests import resolve_requests_for_invoice
+from ury.ury.api.waitlist import announce_table_free
 
 
 def before_insert(doc, method):
@@ -337,3 +338,7 @@ def release_merged_tables(doc):
             },
             update_modified=False,
         )
+
+        # A table coming free is the only moment the queue at the door can
+        # move, and the host is rarely looking at the screen when it happens.
+        announce_table_free(invoice.restaurant_table)

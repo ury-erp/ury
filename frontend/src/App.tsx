@@ -13,6 +13,7 @@ import { MenuPage } from './pages/Dashboard/MenuPage';
 import { TablePage } from './pages/Dashboard/TablePage';
 import ReservationPage from './pages/Dashboard/ReservationPage';
 import WebsiteEditorPage from './pages/Website/WebsiteEditorPage';
+import WaitlistPage from './pages/Dashboard/WaitlistPage';
 import { RoomPage } from './pages/Dashboard/RoomPage';
 import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
@@ -146,6 +147,7 @@ function App() {
           <Route path="table" element={<TablePage />} />
           <Route path="reservations" element={<ReservationPage />} />
           <Route path="website" element={<WebsiteEditorPage />} />
+          <Route path="waitlist" element={<WaitlistPage />} />
           <Route path="room" element={<RoomPage />} />
           <Route path="pos-profile" element={<PosProfilePage />} />
           <Route path="user" element={<UserPage />} />

@@ -115,7 +115,8 @@
     "user": "المستخدمون",
     "navigation": "التنقل",
     "reservations": "الحجوزات",
-    "restaurant_website": "موقع المطعم"
+    "restaurant_website": "موقع المطعم",
+    "waitlist": "قائمة الانتظار"
   },
   "notifications": {
     "empty": "لا توجد إشعارات جديدة",
@@ -969,6 +970,52 @@
         "gallery": "أضف ثلاث صور على الأقل إلى المعرض.",
         "seo_description": "أضف وصفاً يظهر في نتائج البحث.",
         "map_url": "أضف رابط الخريطة لتسهيل الوصول."
+      }
+    },
+    "waitlist": {
+      "title": "قائمة الانتظار",
+      "subtitle": "{{count}} ضيفاً في الانتظار الآن",
+      "add": "إضافة إلى الانتظار",
+      "added": "أُضيف إلى قائمة الانتظار",
+      "save_failed": "تعذّر الحفظ",
+      "empty": "لا أحد في الانتظار.",
+      "guest": "الضيف",
+      "mobile": "رقم الهاتف",
+      "pax": "العدد",
+      "waited": "انتظر",
+      "estimate": "المتوقع",
+      "status": "الحالة",
+      "actions": "إجراءات",
+      "notes": "ملاحظات",
+      "notify": "نادِ الضيف",
+      "seat": "إجلاس",
+      "cancel": "إلغاء",
+      "no_show": "لم يحضر",
+      "minutes": "{{count}} دقيقة",
+      "about_minutes": "نحو {{count}} دقيقة",
+      "seat_now": "طاولة متاحة الآن",
+      "no_table_fits": "لا توجد طاولة تتسع لهذا العدد",
+      "tell_the_guest": "ما تقوله للضيف:",
+      "quote_basis": "بناءً على {{tables}} طاولة مناسبة، ومتوسط جلسة {{turn}} دقيقة.",
+      "quote_accuracy": "متوسط ما وُعد به اليوم {{quoted}} دقيقة، ومتوسط الانتظار الفعلي {{actual}} دقيقة.",
+      "seat_title": "إجلاس {{guest}}",
+      "no_tables_yet": "لا توجد طاولات مقترحة الآن.",
+      "seats": "{{count}} مقاعد",
+      "free_now": "متاحة الآن",
+      "free_in": "تفرغ خلال {{count}} دقيقة",
+      "table_free_toast": "الطاولة {{table}} فرغت — التالي: {{guest}}",
+      "statuses": {
+        "waiting": "بالانتظار",
+        "notified": "نُودي",
+        "seated": "جلس",
+        "cancelled": "أُلغي",
+        "no_show": "لم يحضر"
+      },
+      "stats": {
+        "waiting": "أطراف بالانتظار",
+        "average_wait": "متوسط الانتظار",
+        "seated_today": "أُجلسوا اليوم",
+        "turn": "متوسط الجلسة"
       }
     }
   },
