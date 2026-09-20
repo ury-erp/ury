@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { t } from '../i18n';
-import { Star, TrendingUp, Zap } from 'lucide-react';
+import { LayoutGrid, Star, TrendingUp, Zap } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
+import OrderSummaryBar from '../components/OrderSummaryBar';
+import SlideOverPanel from '../components/SlideOverPanel';
+import { useDockedPanels } from '../hooks/useViewport';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import { usePOSStore, type MenuItem } from '../store/pos-store';
@@ -24,6 +27,23 @@ export default function POS() {
   } = usePOSStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  /**
+   * Below 1024px the categories rail and the order panel are sheets rather
+   * than columns (UX-06). Both are closed when the layout goes back to
+   * docked, so resizing or rotating a tablet never leaves a stranded overlay
+   * on top of panels that are now visible anyway.
+   */
+  const docked = useDockedPanels();
+  const [showCategories, setShowCategories] = useState(false);
+  const [showOrder, setShowOrder] = useState(false);
+
+  useEffect(() => {
+    if (docked) {
+      setShowCategories(false);
+      setShowOrder(false);
+    }
+  }, [docked]);
 
   /**
    * Adds the item straight away.
@@ -111,8 +131,13 @@ export default function POS() {
 
   return (
     <div className="flex flex-1 overflow-hidden bg-[#f8f4eb]">
-      <Sidebar disabled={isMenuInteractionDisabled()} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden pe-96">
+      {docked && <Sidebar disabled={isMenuInteractionDisabled()} />}
+      <div
+        className={cn(
+          'flex-1 flex flex-col min-w-0 overflow-hidden',
+          docked && 'pe-80 xl:pe-96'
+        )}
+      >
         <div className="px-5 py-4 bg-[#fffdf8] border-b border-[#eadfce]">
           <div className="max-w-screen-xl mx-auto space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -124,6 +149,20 @@ export default function POS() {
                 <Zap className="w-3.5 h-3.5 text-[#d89917]" />{t('pos_page.tap_item_hint')}</div>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
+              {!docked && (
+                <button
+                  type="button"
+                  onClick={() => setShowCategories(true)}
+                  disabled={isMenuInteractionDisabled()}
+                  className={cn(
+                    'flex items-center gap-2 rounded-xl border border-[#eadfce] bg-white px-4 py-2 text-sm font-semibold text-[#735d4e] transition-all hover:border-[#f0b83e] hover:bg-[#fff8e8]',
+                    isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
+                  )}
+                >
+                  <LayoutGrid className="w-4 h-4 text-primary" />
+                  {t('pos_sidebar.categories')}
+                </button>
+              )}
               {/* <SearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
@@ -139,8 +178,39 @@ export default function POS() {
         </div>
 
         <MenuList onItemClick={handleItemClick} onItemCustomize={handleItemCustomize} />
+
+        {!docked && <OrderSummaryBar onOpen={() => setShowOrder(true)} />}
       </div>
-      <OrderPanel />
+
+      {docked && <OrderPanel />}
+
+      {!docked && (
+        <>
+          <SlideOverPanel
+            isOpen={showCategories}
+            onClose={() => setShowCategories(false)}
+            title={t('pos_sidebar.categories')}
+            side="start"
+            className="max-w-xs"
+          >
+            <Sidebar
+              disabled={isMenuInteractionDisabled()}
+              onCategorySelect={() => setShowCategories(false)}
+              className="w-full border-e-0"
+            />
+          </SlideOverPanel>
+
+          <SlideOverPanel
+            isOpen={showOrder}
+            onClose={() => setShowOrder(false)}
+            title={t('order_panel.your_order')}
+            className="max-w-lg"
+          >
+            <OrderPanel docked={false} />
+          </SlideOverPanel>
+        </>
+      )}
+
       {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
     </div>
   );

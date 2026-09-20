@@ -17,6 +17,7 @@ import {
 import { Button, Input } from '@ury/ui';
 import LanguageSwitcher from './LanguageSwitcher';
 import KitchenMessageDialog from './KitchenMessageDialog';
+import ServiceRequestBell from './ServiceRequestBell';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
@@ -158,6 +159,8 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-2">
+          {/* Tables calling for the bill from the self-ordering page. */}
+          <ServiceRequestBell />
           {/* Reachable in one tap mid-service, alongside the other header
               actions, rather than buried in the user menu. */}
           <button

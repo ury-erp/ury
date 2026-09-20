@@ -132,7 +132,6 @@ const TableMergeDialog = ({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('tables.search_table_placeholder')}
                 className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                disabled={phase === 'merging'}
               />
             </div>
 

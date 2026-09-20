@@ -13,6 +13,8 @@ import {
   tableTransfer,
 } from '../../lib/order-api';
 import { printOrder } from '../../lib/print';
+import { connectivity } from '../../lib/connectivity';
+import { enqueueOrder, newRequestId } from '../../lib/sync-queue';
 import { resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
 import { DINE_IN } from '../../data/order-types';
@@ -223,7 +225,30 @@ export default function CaptainOrder() {
         comments: orderComment || undefined,
       };
 
-      const result = await syncOrder(orderData);
+      // One key per submission attempt, carried through a queued retry so
+      // the server recognises a delivery we never heard the answer to
+      // rather than cooking it twice.
+      const requestId = newRequestId();
+      const payload = { ...orderData, request_id: requestId };
+
+      if (connectivity.getState() === 'offline') {
+        enqueueOrder({
+          request_id: requestId,
+          queued_at: Date.now(),
+          label: table || '',
+          payload,
+        });
+        // Said plainly: the kitchen has NOT seen this. A cashier who thinks
+        // the order is on the pass will not chase it, and the table waits
+        // for food nobody is cooking.
+        showToast.warning('Saved on this device. The kitchen has NOT seen it yet — it will be sent when the connection returns.');
+        setIsSubmitting(false);
+        clearTableOrder();
+        navigate('/order');
+        return;
+      }
+
+      const result = await syncOrder(payload);
 
       if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
         showToast.error(

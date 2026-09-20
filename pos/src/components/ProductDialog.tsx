@@ -42,7 +42,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     addToOrder, 
     removeFromOrder, 
     setSelectedItem, 
-    getItemQuantityFromCart,
     activeOrders,
     menuItems
   } = usePOSStore();

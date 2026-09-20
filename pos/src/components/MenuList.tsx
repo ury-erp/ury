@@ -45,8 +45,17 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick, onItemCustomize }) => 
 
   const isInteractionDisabled = isMenuInteractionDisabled() || isOrderInteractionDisabled();
 
+  /**
+   * Column counts track the space this grid actually gets, not the viewport.
+   *
+   * Tailwind breakpoints read the window, and the two rails beside the menu
+   * come back at `lg` — a 256px categories rail plus a 320px order panel.
+   * Keeping `lg:grid-cols-4` therefore squeezed four cards into ~430px on a
+   * 1024px landscape tablet, about 110px each. The count drops where the
+   * rails return and climbs again once the screen can pay for them (UX-06).
+   */
   const gridClasses =
-    'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
+    'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4';
 
   return (
     <div className="flex-1 overflow-auto bg-background">

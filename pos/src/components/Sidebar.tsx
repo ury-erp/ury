@@ -8,9 +8,16 @@ import { t } from '../i18n';
 
 interface SidebarProps {
   disabled?: boolean;
+  className?: string;
+  /**
+   * Called after a category is picked. On a tablet this rail lives inside a
+   * sheet (UX-06), and leaving the sheet open over the results it just
+   * filtered would hide the very menu the cashier asked for.
+   */
+  onCategorySelect?: (category: string) => void;
 }
 
-const Sidebar = ({ disabled }: SidebarProps) => {
+const Sidebar = ({ disabled, className, onCategorySelect }: SidebarProps) => {
   const { selectedCategory, setSelectedCategory, menuItems, categories, orderComment, setOrderComment } = usePOSStore();
   const [showCommentDialog, setShowCommentDialog] = useState(false);
 
@@ -29,8 +36,13 @@ const Sidebar = ({ disabled }: SidebarProps) => {
     setOrderComment(comment);
   };
 
+  const chooseCategory = (category: string) => {
+    setSelectedCategory(category);
+    onCategorySelect?.(category);
+  };
+
   return (
-    <SidebarContainer disabled={disabled}>
+    <SidebarContainer disabled={disabled} className={className}>
       {/* Categories List */}
       <nav className="flex-1 p-4 overflow-y-auto">
         <SidebarCard className="bg-transparent border-0 p-1">
@@ -44,7 +56,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           
           {/* All Items */}
           <Button
-            onClick={() => setSelectedCategory('')}
+            onClick={() => chooseCategory('')}
             variant="ghost"
             className={sidebarItemVariants({ active: selectedCategory === '' }) + ' mb-1'}
             disabled={disabled}
@@ -73,7 +85,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
               return (
                 <Button
                   key={category.name}
-                  onClick={() => setSelectedCategory(category.name)}
+                  onClick={() => chooseCategory(category.name)}
                   variant="ghost"
                   className={sidebarItemVariants({ active: isActive })}
                   disabled={disabled}

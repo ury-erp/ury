@@ -88,6 +88,13 @@ export interface SyncOrderRequest {
   last_modified_time?: string;
   comments?: string | null;
   room?: string;
+  /**
+   * Minted once per submission attempt so the server can recognise a retry.
+   * See ury/ury/doctype/ury_order/ury_order.py::sync_order — a replay of a
+   * key it has already applied gets the original invoice back instead of a
+   * second order in the kitchen.
+   */
+  request_id?: string;
 }
 
 /**

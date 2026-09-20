@@ -1,10 +1,11 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Layout, Loader2, Square } from 'lucide-react';
+import { AlertTriangle, Layout, Loader2, RefreshCw, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import { getRooms, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getTableReservationStatus, type ReservationsByTable } from '../lib/reservation-api';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups } from '../lib/table-utils';
 import { Spinner, ErrorState } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
@@ -20,7 +21,8 @@ import TableMergeDialog from '../components/TableMergeDialog';
 import TableUnmergeDialog from '../components/TableUnmergeDialog';
 import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
-import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
+import TableCard from '../components/TableCard';
+import { useRoomTables } from '../hooks/useRoomTables';
 import MergeLinkConnector from '../components/MergeLinkConnector';
 
 const TableView = () => {
@@ -32,15 +34,16 @@ const TableView = () => {
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [reservations, setReservations] = useState<ReservationsByTable>({});
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-  const [tables, setTables] = useState<Table[]>([]);
-  const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
   const [loadingRooms, setLoadingRooms] = useState(false);
-  const [refreshingTables, setRefreshingTables] = useState(false);
-  const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
 
-  const [error, setError] = useState<string | null>(null);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+  const roomRequest = useRef(0);
+  const { tables, loading: loadingTables, refreshing: refreshingTables,
+    error: tablesError, lastUpdated, loadTables } = useRoomTables(selectedRoom, branch);
+  const error = roomsError || tablesError;
   const [printingTable, setPrintingTable] = useState<string | null>(null);
   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
@@ -60,36 +63,31 @@ const TableView = () => {
     sessionStorage.setItem(`ury_room_counts_${branch}`, JSON.stringify(counts));
   }, [branch]);
 
-  useEffect(() => {
-    async function fetchRooms() {
-      if (!branch) return;
-      setLoadingRooms(true);
-      setError(null);
-
-      try {
-        const sessionKey = `ury_rooms_${branch}`;
-        const cachedRooms = sessionStorage.getItem(sessionKey);
-
-        if (cachedRooms) {
-          const parsedRooms = JSON.parse(cachedRooms) as Room[];
-          setRooms(parsedRooms);
-          setSelectedRoom((prev) => prev ?? (parsedRooms[0]?.name ?? null));
-        } else {
-          const fetchedRooms = await getRooms(branch);
-          setRooms(fetchedRooms);
-          setSelectedRoom((prev) => prev ?? (fetchedRooms[0]?.name ?? null));
-          sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
-        }
-      } catch (e) {
-        console.error(e);
-        setError('Failed to load rooms');
-      } finally {
-        setLoadingRooms(false);
-      }
+  const fetchRooms = useCallback(async () => {
+    const id = ++roomRequest.current;
+    if (!branch) return;
+    setLoadingRooms(true);
+    setRoomsError(null);
+    try {
+      const fetchedRooms = await getRooms(branch);
+      if (id !== roomRequest.current) return;
+      setRooms(fetchedRooms);
+      setSelectedRoom((current) => fetchedRooms.some((item) => item.name === current)
+        ? current : fetchedRooms[0]?.name ?? null);
+    } catch {
+      if (id === roomRequest.current) setRoomsError(t('errors.failed_load_rooms'));
+    } finally {
+      if (id === roomRequest.current) setLoadingRooms(false);
     }
-
-    fetchRooms();
   }, [branch]);
+
+  useEffect(() => {
+    setRooms([]);
+    setSelectedRoom(null);
+    setRoomCounts({});
+    void fetchRooms();
+    return () => { roomRequest.current++; };
+  }, [fetchRooms]);
 
   useEffect(() => {
     if (!branch || rooms.length === 0) return;
@@ -130,60 +128,6 @@ const TableView = () => {
 
     fetchRoomCounts();
   }, [branch, rooms, persistRoomCounts]);
-
-  /**
-   * Loads a room's tables, showing what is cached while confirming it.
-   *
-   * The cache used to be terminal: a hit returned and never checked the
-   * server again, so a table seated from another till stayed green here
-   * until the room was switched away and back. Occupancy is exactly the
-   * thing two devices disagree about (UX-08).
-   *
-   * So a hit now paints immediately and revalidates behind it — the grid
-   * stays usable instead of flashing a spinner, and it corrects itself
-   * within one round trip. A failed revalidation keeps the cached rows on
-   * screen rather than blanking a working grid; only a cold load with
-   * nothing to show falls back to the error state.
-   */
-  const loadTables = useCallback(
-    async (roomName: string, options?: { useCache?: boolean }) => {
-      if (!roomName) return;
-      setError(null);
-
-      const shouldUseCache = options?.useCache !== false;
-      const cached = shouldUseCache ? tablesCache[roomName] : undefined;
-
-      if (cached) {
-        setTables(sortTablesByMergeGroups(cached));
-        setLoadingTables(false);
-        setRefreshingTables(true);
-      } else {
-        setLoadingTables(true);
-      }
-
-      try {
-        const fetchedTables = await getTables(roomName);
-        const sortedTables = sortTablesByMergeGroups(fetchedTables);
-        setTables(sortedTables);
-        setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
-      } catch (e) {
-        console.error(e);
-        if (!cached) {
-          setError(t('errors.failed_load_tables'));
-          setTables([]);
-        }
-      } finally {
-        setLoadingTables(false);
-        setRefreshingTables(false);
-      }
-    },
-    [tablesCache]
-  );
-
-  useEffect(() => {
-    if (!selectedRoom) return;
-    loadTables(selectedRoom);
-  }, [selectedRoom, loadTables]);
 
   const handleNavigateToPOS = (tableName: string) => {
     if (!selectedRoom) return;
@@ -376,13 +320,13 @@ const TableView = () => {
   }, [mergeSourceTable, tables]);
 
   const tablesToDisplay = useMemo(() => {
-    const sorted = sortTablesByMergeGroups(tables);
+    // Already grouped by merge cluster when it was fetched (useRoomTables).
     const needle = tableSearchQuery.trim().toLowerCase();
-    if (!needle) return sorted;
+    if (!needle) return tables;
     // Name and room both: staff say "table 12" and "the terrace", and the
     // header box gives no hint that only one of them would work.
-    return sorted.filter(
-      (table) =>
+    return tables.filter(
+      (table: Table) =>
         table.name.toLowerCase().includes(needle) ||
         (table.restaurant_room || '').toLowerCase().includes(needle)
     );
@@ -394,6 +338,23 @@ const TableView = () => {
   }, [unmergeSourceTable, tablesToDisplay]);
 
   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
+
+  // Refreshed on a timer, not once: "booked in twenty minutes" becomes
+  // "booked now" while the cashier is looking at the same screen, and a
+  // stale hint is the one that lets a walk-in take a booked table.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const next = await getTableReservationStatus();
+      if (!cancelled) setReservations(next);
+    };
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   /** `index` is the card's position in the room grid; it only staggers the
       entrance animation, so a missing value just means "animate with the
@@ -409,6 +370,7 @@ const TableView = () => {
       key={table.name}
       index={index}
       table={table}
+      reservation={reservations[table.name]}
       mergeGroupLabel={mergeGroupLabel}
       className={className}
       menuOpen={menuOpenForTable === table.name}
@@ -428,7 +390,7 @@ const TableView = () => {
   };
 
   const hasRooms = rooms.length > 0;
-  const showGridSkeleton = loadingTables || !selectedRoom;
+  const showGridSkeleton = loadingTables || loadingRooms;
 
   const handleRoomChange = (roomName: string) => {
     if (roomName === selectedRoom) {
@@ -438,13 +400,7 @@ const TableView = () => {
 
     setSelectedRoom(roomName);
 
-    if (tablesCache[roomName]) {
-      setTables(sortTablesByMergeGroups(tablesCache[roomName]));
-      setLoadingTables(false);
-    } else {
-      setLoadingTables(true);
-      setTables([]);
-    }
+
   };
 
   const [isLayoutView, setIsLayoutView] = useState(false);
@@ -476,7 +432,7 @@ const TableView = () => {
               <div className="flex flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
-                    <Spinner message="Loading rooms..." />
+                    <Spinner message={t('common.loading_rooms')} />
                   </div>
                 )}
 
@@ -503,11 +459,17 @@ const TableView = () => {
                 ))}
               </div>
 
-              <div className="flex-shrink-0">
+              <div className="flex shrink-0 gap-2">
+                <Button variant="outline" size="icon" disabled={loadingRooms || loadingTables || refreshingTables}
+                  aria-label={t('common.refresh')}
+                  onClick={() => selectedRoom ? loadTables(selectedRoom) : fetchRooms()}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="tab"
                   className="flex items-center gap-2 text-sm"
                   onClick={() => handleLayoutView()}
+                  disabled={!selectedRoom}
                 >
                   <Layout className="w-4 h-4" />
                   {t('tables.layout_view')}
@@ -532,15 +494,26 @@ const TableView = () => {
               {t('tables.refreshing')}
             </div>
           )}
-          {error && !loadingTables ? (
+          {tablesError && tables.length > 0 && !loadingTables && (
+            <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <span>{t('tables.stale_data')}</span>
+              <Button variant="outline" size="sm" onClick={() => loadTables(selectedRoom)}>{t('common.retry')}</Button>
+            </div>
+          )}
+          {lastUpdated && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {t('tables.last_updated', { time: lastUpdated.toLocaleTimeString() })}
+            </p>
+          )}
+          {error && (roomsError || tables.length === 0) && !loadingTables ? (
             <ErrorState
               className="h-full"
-              title={t('errors.failed_load_tables')}
+              title={t(roomsError ? 'errors.failed_load_rooms' : 'errors.failed_load_tables')}
               description={error}
               retryLabel={t('common.retry')}
               // Cache bypassed: the previous attempt failed, so whatever is
               // cached is either absent or the reason we are here.
-              onRetry={() => loadTables(selectedRoom, { useCache: false })}
+              onRetry={() => roomsError ? fetchRooms() : loadTables(selectedRoom)}
             />
           ) : showGridSkeleton ? (
             <Spinner message={t('common.loading_tables')} />
@@ -550,7 +523,7 @@ const TableView = () => {
               <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-40">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-4 pb-10">
               {tableRenderGroups.map((group, groupIndex) =>
                 group.length === 1 ? (
                   renderTableCard(group[0], undefined, groupIndex)

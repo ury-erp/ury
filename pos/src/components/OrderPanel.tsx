@@ -12,13 +12,25 @@ import OrderTabs from './OrderTabs';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
+import { connectivity } from '../lib/connectivity';
+import { enqueueOrder, newRequestId } from '../lib/sync-queue';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
-import { t } from '../i18n';
+import { t, tPlural } from '../i18n';
 
-const OrderPanel = () => {
+interface OrderPanelProps {
+  /**
+   * Docked panels are parked on the trailing edge of a counter screen and own
+   * their own width and height. Below 1024px the panel is carried by
+   * `SlideOverPanel` instead, which already sizes and positions it, so the
+   * panel must not fix itself to the viewport a second time (UX-06).
+   */
+  docked?: boolean;
+}
+
+const OrderPanel = ({ docked = true }: OrderPanelProps) => {
   const { 
     activeOrders, 
     removeFromOrder, 
@@ -130,7 +142,29 @@ const OrderPanel = () => {
         comments: orderComment || undefined
       };
 
-      const result = await syncOrder(orderData);
+      // One key per submission attempt, carried through a queued retry so
+      // the server recognises a delivery we never heard the answer to
+      // rather than cooking it twice.
+      const requestId = newRequestId();
+      const payload = { ...orderData, request_id: requestId };
+
+      if (connectivity.getState() === 'offline') {
+        enqueueOrder({
+          request_id: requestId,
+          queued_at: Date.now(),
+          label: selectedTable || selectedOrderType || '',
+          payload,
+        });
+        // Said plainly: the kitchen has NOT seen this. A cashier who thinks
+        // the order is on the pass will not chase it, and the table waits
+        // for food nobody is cooking.
+        showToast.warning(t('offline.order_queued'));
+        setIsSubmitting(false);
+        resetOrderState();
+        return;
+      }
+
+      const result = await syncOrder(payload);
 
       // sync_order returns { status: 'Failure' } instead of throwing when the
       // write is rejected (stale last_modified_time, table already occupied,
@@ -196,7 +230,14 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-[#fffdf8] border-s border-[#eadfce] flex flex-col h-[calc(100vh-4.5rem)] fixed end-0 z-10 shadow-[-10px_0_30px_rgba(74,48,30,0.06)]">
+    <div
+      className={cn(
+        'bg-[#fffdf8] flex flex-col',
+        docked
+          ? 'w-80 xl:w-96 border-s border-[#eadfce] h-[calc(100vh-4.5rem)] fixed end-0 z-10 shadow-[-10px_0_30px_rgba(74,48,30,0.06)]'
+          : 'w-full flex-1 min-h-0'
+      )}
+    >
       <div className="p-5 border-b border-[#eadfce] flex-shrink-0 bg-[#fffaf0]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
@@ -209,7 +250,7 @@ const OrderPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-xs font-medium text-[#9a7e6b]">
-            <ReceiptText className="w-3.5 h-3.5" /> {activeOrders.length} items
+            <ReceiptText className="w-3.5 h-3.5" /> {tPlural('order_panel.item_count', activeOrders.length)}
           </div>
         </div>
         <OrderTabs disabled={isInteractionDisabled} />
@@ -247,7 +288,7 @@ const OrderPanel = () => {
         <EmptyCartUI />
       ) : (
         <>
-          <div className="flex-1 overflow-y-auto px-6">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6">
             {activeOrders.map((item) => (
               <div
                 key={item.uniqueId}

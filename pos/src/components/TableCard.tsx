@@ -1,5 +1,5 @@
 import React, { type MouseEvent } from 'react';
-import { Eye, Loader2, Printer, Users } from 'lucide-react';
+import { CalendarClock, Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table } from '../lib/table-api';
@@ -7,6 +7,7 @@ import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { t } from '../i18n';
+import type { TableReservationHint } from '../lib/reservation-api';
 
 export const TABLE_STATE_STYLES = {
   available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
@@ -32,6 +33,8 @@ interface TableCardProps {
   isRestricted?: boolean;
   /** Position in the room grid; drives only the entrance stagger. */
   index?: number;
+  /** Set when this table is booked now or within the next 45 minutes. */
+  reservation?: TableReservationHint;
 }
 
 const TableCard = ({
@@ -51,6 +54,7 @@ const TableCard = ({
   isPrinting,
   isRestricted = false,
   index = 0,
+  reservation,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
 
@@ -118,6 +122,24 @@ const TableCard = ({
               ) : null}
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
+            {/* A booking on a free table is the only thing that changes what
+                a cashier should do with it, so it sits next to the status
+                rather than on a screen they would have to go and open. */}
+            {reservation && !isOccupied && (
+              <Badge
+                variant="outline"
+                className="gap-1 whitespace-nowrap border-violet-300 bg-violet-50 text-violet-900"
+                title={t('tables.reserved_for', {
+                  guest: reservation.guest_name,
+                  time: reservation.reserved_from.slice(11, 16),
+                })}
+              >
+                <CalendarClock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                {reservation.in_progress
+                  ? t('tables.reserved_now')
+                  : reservation.reserved_from.slice(11, 16)}
+              </Badge>
+            )}
             <div className="pointer-events-auto">
             <TableActionsMenu
               table={table}
