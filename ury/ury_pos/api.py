@@ -1,4 +1,6 @@
 import frappe
+
+from ury.ury.doctype.ury_audit_log.ury_audit_log import record_event
 import json
 from frappe import _
 from datetime import date, datetime, timedelta
@@ -1767,6 +1769,21 @@ def merge_bills(primary_invoice, secondary_invoice):
 
         update_merge_details(secondary_doc.name,primary_doc,)
 
+
+        record_event(
+            "Bill Merged",
+            reference_doctype="POS Invoice",
+            reference_name=primary_doc.name,
+            amount=primary_doc.grand_total,
+            old_value=secondary_doc.name,
+            new_value=primary_doc.name,
+            details={
+                "secondary_table": secondary_doc.restaurant_table,
+                "primary_table": primary_doc.restaurant_table,
+            },
+            branch=primary_doc.branch,
+            pos_profile=primary_doc.pos_profile,
+        )
 
         frappe.db.commit()
 

@@ -2,6 +2,7 @@ import frappe
 from datetime import datetime
 from frappe.utils import now_datetime, get_time, now, get_datetime
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+from ury.ury.api.service_requests import resolve_requests_for_invoice
 
 
 def before_insert(doc, method):
@@ -299,6 +300,9 @@ def on_update(doc, method):
 def on_submit(doc, method):
     sync_merged_invoice(doc)
     release_merged_tables(doc)
+    # A settled bill answers any "request bill" the table raised from the
+    # self-ordering page, so clear it off the cashier's alert list.
+    resolve_requests_for_invoice(doc.name)
 
 def release_merged_tables(doc):
 
