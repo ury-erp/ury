@@ -116,7 +116,19 @@
     "loyalty_balance": "{{points}} نقطة ولاء ({{amount}})",
     "points_to_redeem": "النقاط",
     "redeem_max": "استخدم الكل",
-    "bill_too_small_to_redeem": "قيمة الفاتورة أقل من قيمة نقطة واحدة."
+    "bill_too_small_to_redeem": "قيمة الفاتورة أقل من قيمة نقطة واحدة.",
+    "coupon_placeholder": "كود الخصم",
+    "coupon_apply": "تطبيق",
+    "coupon_remove": "إزالة",
+    "coupon_saved": "وفّر {{amount}}",
+    "coupon_failed": "تعذّر تطبيق الكوبون",
+    "coupon_reason": {
+      "unknown": "كود غير معروف. تحقق من الأحرف.",
+      "not_started": "هذا الكوبون لم يبدأ بعد.",
+      "expired": "انتهت صلاحية هذا الكوبون.",
+      "exhausted": "استُخدم هذا الكوبون بالكامل.",
+      "other_customer": "هذا الكوبون مخصص لعميل آخر."
+    }
   },
   "pos": {
     "not_opened_title": "نقطة البيع غير مفتوحة",

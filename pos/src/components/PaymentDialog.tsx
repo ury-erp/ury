@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { guardOnline } from '../lib/offline-guard';
 import { useConnectivity } from '../lib/connectivity';
 import { getCustomerLoyalty, maxRedeemablePoints, type CustomerLoyalty } from '../lib/loyalty-api';
+import { promotionsApi, type CouponTotals } from '../lib/promotions-api';
 import { paymentDiscountPercentage } from '../lib/payment-amounts';
 
 
@@ -104,10 +105,14 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   };
 
   // Order summary logic
-  const subtotal = preview ? preview.grand_total + preview.discount_amount : baseTotal;
-  const discountedTotal = preview?.grand_total ?? grandTotal;
+  // A discount preview already includes any coupon on the invoice, because
+  // the server recalculates from the saved bill — so it wins when both exist,
+  // and the coupon's own totals are used until a discount is quoted.
+  const quoted = preview ?? coupon;
+  const subtotal = quoted ? quoted.grand_total + quoted.discount_amount : baseTotal;
+  const discountedTotal = quoted?.grand_total ?? grandTotal;
   // Keep the server's rounding/decimal precision; never round money again here.
-  const finalTotal = preview?.rounded_total ?? (roundedTotal || grandTotal);
+  const finalTotal = quoted?.rounded_total ?? (roundedTotal || grandTotal);
 
   // Calculate split payment total
   const payments = paymentModes
@@ -176,6 +181,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const { isOffline } = useConnectivity();
 
   const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<CouponTotals | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Looked up per customer, not cached across them: the balance changes on
@@ -198,6 +207,57 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   const maxPoints = loyalty ? maxRedeemablePoints(loyalty, finalTotal) : 0;
   const redeemValue = loyalty ? pointsToRedeem * loyalty.conversion_factor : 0;
+
+  /**
+   * Coupons are applied on the server, against the draft invoice, and the
+   * totals below are whatever comes back. The dialog deliberately holds no
+   * opinion about what a coupon is worth — ERPNext's pricing rules decide,
+   * and the same calculation posts the sale a moment later.
+   */
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code || couponBusy) return;
+    if (!guardOnline()) return;
+
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const check = await promotionsApi.checkCoupon(code, invoice);
+      if (!check.valid) {
+        // A mistyped code is the normal case at a counter, so it is answered
+        // in the field rather than as a failure of the payment.
+        setCouponError(t(`payment.coupon_reason.${check.reason ?? 'unknown'}`));
+        return;
+      }
+      const totals = await promotionsApi.applyCoupon(invoice, code);
+      setCoupon(totals);
+      // Any amounts typed against the old total belong to a bill that no
+      // longer exists.
+      setPaymentInputs({});
+      setPreview(null);
+    } catch (err) {
+      setCouponError(parseFrappeError(err, t('payment.coupon_failed')));
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    if (couponBusy || !guardOnline()) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      await promotionsApi.removeCoupon(invoice);
+      setCoupon(null);
+      setCouponInput('');
+      setPaymentInputs({});
+      setPreview(null);
+    } catch (err) {
+      setCouponError(parseFrappeError(err, t('payment.coupon_failed')));
+    } finally {
+      setCouponBusy(false);
+    }
+  };
 
   const handlePayment = async () => {
     if (paymentInFlight.current || isPreviewing || isShort || !Number.isFinite(finalTotal) || finalTotal < 0) return;
@@ -411,6 +471,59 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Coupon. The field is always present because a guest produces the
+              code at the till, not before: hiding it behind a menu is how a
+              promotion goes unredeemed and the restaurant hears about it. */}
+          <div className="mb-3 rounded-lg border border-gray-200 p-3">
+            {coupon?.coupon_code ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-green-800">
+                    {coupon.coupon_code}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {t('payment.coupon_saved', { amount: formatCurrency(coupon.discount_amount) })}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveCoupon}
+                  disabled={couponBusy || isProcessing}
+                >
+                  {t('payment.coupon_remove')}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={couponInput}
+                  onChange={(e) => {
+                    setCouponInput(e.target.value.toUpperCase());
+                    setCouponError(null);
+                  }}
+                  placeholder={t('payment.coupon_placeholder')}
+                  aria-label={t('payment.coupon_placeholder')}
+                  className="flex-1"
+                  disabled={couponBusy || isProcessing}
+                  dir="ltr"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleApplyCoupon}
+                  disabled={!couponInput.trim() || couponBusy || isProcessing}
+                >
+                  {couponBusy ? <Spinner className="h-4 w-4" /> : t('payment.coupon_apply')}
+                </Button>
+              </div>
+            )}
+            {couponError && (
+              <p role="alert" className="mt-2 text-xs font-medium text-red-700">
+                {couponError}
+              </p>
+            )}
           </div>
 
           {/* Loyalty. Shown only when the customer actually has points to

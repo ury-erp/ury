@@ -97,7 +97,19 @@
     "change_due": "Monnaie à rendre : {{amount}}",
     "success": "Paiement réussi : {{amount}} reçu",
     "processing_title": "Encaissement de {{amount}}…",
-    "processing_hint": "Ne fermez pas cette fenêtre. Le résultat s'affichera ici."
+    "processing_hint": "Ne fermez pas cette fenêtre. Le résultat s'affichera ici.",
+    "coupon_placeholder": "Code promo",
+    "coupon_apply": "Appliquer",
+    "coupon_remove": "Retirer",
+    "coupon_saved": "Économisé {{amount}}",
+    "coupon_failed": "Impossible d'appliquer le code",
+    "coupon_reason": {
+      "unknown": "Code inconnu. Vérifiez les caractères.",
+      "not_started": "Ce code n'est pas encore valable.",
+      "expired": "Ce code a expiré.",
+      "exhausted": "Ce code a été entièrement utilisé.",
+      "other_customer": "Ce code appartient à un autre client."
+    }
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",

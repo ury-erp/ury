@@ -112,7 +112,8 @@
     "reservations": "Reservations",
     "restaurant_website": "Restaurant Website",
     "waitlist": "Waitlist",
-    "feedback": "Guest feedback"
+    "feedback": "Guest feedback",
+    "offers": "Offers & coupons"
   },
   "notifications": {
     "empty": "No new notifications",
@@ -1046,6 +1047,22 @@
         "nps": "Recommendation score",
         "unanswered": "Unanswered complaints"
       }
+    },
+    "offers": {
+      "title": "Offers & coupons",
+      "subtitle": "What is running now, and what a guest has to ask for",
+      "automatic": "Applied automatically",
+      "automatic_hint": "Already in the price; do not promise a second discount on top.",
+      "coupon": "Needs a code",
+      "coupon_hint": "Nothing happens until the cashier enters the code at payment.",
+      "none": "No live offers.",
+      "min_amount": "Minimum {{amount}}",
+      "min_qty": "Minimum {{count}} items",
+      "until": "Until {{date}}",
+      "no_end_date": "No end date",
+      "see_rule": "Per the rule",
+      "edit_rule": "Edit rule",
+      "new_rule": "New rule"
     }
   },
   "auth": {

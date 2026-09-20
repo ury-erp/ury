@@ -111,7 +111,19 @@
     "loyalty_balance": "{{points}} loyalty points ({{amount}})",
     "points_to_redeem": "Points",
     "redeem_max": "Use all",
-    "bill_too_small_to_redeem": "This bill is smaller than one point is worth."
+    "bill_too_small_to_redeem": "This bill is smaller than one point is worth.",
+    "coupon_placeholder": "Coupon code",
+    "coupon_apply": "Apply",
+    "coupon_remove": "Remove",
+    "coupon_saved": "Saved {{amount}}",
+    "coupon_failed": "Could not apply the coupon",
+    "coupon_reason": {
+      "unknown": "Unknown code. Check the characters.",
+      "not_started": "This coupon has not started yet.",
+      "expired": "This coupon has expired.",
+      "exhausted": "This coupon has been fully used.",
+      "other_customer": "This coupon belongs to another customer."
+    }
   },
   "pos": {
     "not_opened_title": "POS Not Opened",

@@ -37,6 +37,8 @@ EVENTS = (
 	"Table Transferred",
 	"Captain Transferred",
 	"Shift Closed With Difference",
+	"Coupon Applied",
+	"Coupon Removed",
 )
 
 
