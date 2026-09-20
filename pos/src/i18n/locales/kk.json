@@ -159,6 +159,7 @@
   },
   "customer": {
     "search_placeholder": "Клиентті іздеу...",
+    "search_placeholder_optional": "Клиентті іздеу (міндетті емес)...",
     "type_to_search": "Іздеу үшін жаза бастаңыз...",
     "no_customers_found": "Клиенттер табылмады",
     "add_new": "Жаңа клиент қосу",

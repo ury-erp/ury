@@ -92,6 +92,7 @@
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
+    "search_placeholder_optional": "Rechercher un client (facultatif)...",
     "type_to_search": "Tapez pour rechercher...",
     "no_customers_found": "Aucun client trouvé",
     "add_new": "Ajouter un nouveau client",

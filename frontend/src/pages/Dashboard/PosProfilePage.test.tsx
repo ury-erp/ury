@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import PosProfilePage from "./PosProfilePage";
 import { call } from "@ury/core";
 
@@ -114,5 +115,40 @@ describe("PosProfilePage", () => {
       expect.anything(),
       expect.objectContaining({ doctype: "POS Profile" })
     );
+  });
+
+  it("reflects the stored Allow Order Without Customer flag in edit mode", async () => {
+    vi.mocked(call).mockImplementation((method: any, args: any) => {
+      if (method === "frappe.client.get" && args?.doctype === "POS Profile") {
+        return Promise.resolve({
+          message: {
+            ...posProfiles[0],
+            customer: "Walk-in Customer",
+            custom_allow_order_without_customer: 1,
+            applicable_for_users: [],
+            payments: [],
+          },
+        });
+      }
+      if (args?.doctype === "POS Profile") {
+        return Promise.resolve({ message: posProfiles });
+      }
+      return Promise.resolve({ message: [] });
+    });
+
+    render(<PosProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("POSPROFILE-001")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTitle("Edit Profile"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: "Allow Order Without Customer" })
+      ).toBeChecked();
+    });
+    expect(screen.getByDisplayValue("Walk-in Customer")).toBeInTheDocument();
   });
 });

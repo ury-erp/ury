@@ -935,6 +935,7 @@ def getPosProfileFull(pos_profile):
         "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
+        "custom_allow_order_without_customer": profile.get("custom_allow_order_without_customer"),
     }
 
 
