@@ -7,6 +7,7 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { t } from '../../i18n';
+import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 
 interface ProductionUnitRecord {
   name: string;
@@ -30,6 +31,7 @@ export const ProductionUnitPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [units, setUnits] = useState<ProductionUnitRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingUnit, setEditingUnit] = useState<ProductionUnitRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
@@ -76,8 +78,9 @@ export const ProductionUnitPage: React.FC = () => {
     try {
       const records = await dashboardService.getModuleRecords<ProductionUnitRecord>('URY Production Unit', activeBranchId);
       setUnits(records || []);
+      setLoadError(false);
     } catch {
-      setUnits([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -257,6 +260,8 @@ export const ProductionUnitPage: React.FC = () => {
           <span>{t('dash.production_unit.add_production_unit')}</span>
         </Button>
       </div>
+
+      {loadError && <LoadErrorBanner onRetry={fetchUnits} />}
 
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">

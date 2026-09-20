@@ -1,4 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useModalFocus } from '../../hooks/useModalFocus';
+import { t } from '../../i18n';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from '@ury/ui';
@@ -11,13 +13,7 @@ interface SideDrawerProps {
 }
 
 export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, children }) => {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
+  const panelRef = useModalFocus(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -41,12 +37,17 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, 
         onClick={handleBackdropClick}
       />
       <div 
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
         className="relative h-fit max-h-[90vh] w-full max-w-lg bg-white rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden"
         onClick={handleContentClick}
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-          <Button variant="outline" size="sm" onClick={onClose} className="p-2 h-auto rounded-full border-none hover:bg-gray-100 bg-transparent text-gray-500 hover:text-gray-900">
+          <Button type="button" aria-label={t('common.close')} variant="outline" size="sm" onClick={onClose} className="p-2 h-auto rounded-full border-none hover:bg-gray-100 bg-transparent text-gray-500 hover:text-gray-900">
             <X className="w-5 h-5" />
           </Button>
         </div>

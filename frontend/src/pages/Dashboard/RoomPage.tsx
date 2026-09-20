@@ -8,6 +8,7 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { t } from '../../i18n';
+import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 
 interface UryRoomRecord {
   name: string;
@@ -23,6 +24,7 @@ export const RoomPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [rooms, setRooms] = useState<UryRoomRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<UryRoomRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
@@ -53,8 +55,9 @@ export const RoomPage: React.FC = () => {
     try {
       const records = await dashboardService.getModuleRecords<UryRoomRecord>('URY Room', activeBranchId);
       setRooms(records);
+      setLoadError(false);
     } catch {
-      setRooms([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -188,6 +191,8 @@ export const RoomPage: React.FC = () => {
           <span>{t('dash.room.add_room')}</span>
         </Button>
       </div>
+
+      {loadError && <LoadErrorBanner onRetry={fetchRooms} />}
 
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">

@@ -55,6 +55,7 @@ export function SearchableSelect({
     width: 0,
   });
 
+  const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -97,13 +98,15 @@ export function SearchableSelect({
       const gap = 6;
       const boundaryMargin = 16;
       const spaceBelow = window.innerHeight - rect.bottom - gap - boundaryMargin;
-      const compactMaxHeight = 260; // Compact max height showing ~8 options cleanly
+      const spaceAbove = rect.top - gap - boundaryMargin;
+      const openAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+      const maxHeight = Math.min(260, Math.max(0, openAbove ? spaceAbove : spaceBelow));
 
       setPortalStyle({
-        top: rect.bottom + gap,
+        top: openAbove ? Math.max(boundaryMargin, rect.top - gap - maxHeight) : rect.bottom + gap,
         left: rect.left,
         width: rect.width,
-        maxHeight: Math.min(compactMaxHeight, Math.max(120, spaceBelow)),
+        maxHeight,
       });
     };
 
@@ -118,31 +121,12 @@ export function SearchableSelect({
     };
   }, [isOpen]);
 
-  // Close dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(target) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(target)
-      ) {
-        setIsOpen(false);
-        setIsTyping(false);
-        if (strict) {
-          setSearchTerm(selectedOption ? selectedOption.label : '');
-        } else {
-          setSearchTerm(selectedOption ? selectedOption.label : value || '');
-        }
-        onBlur?.(id);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [id, value, selectedOption, onBlur, strict]);
+  const closeOptions = () => {
+    setIsOpen(false);
+    setActiveIndex(-1);
+    setIsTyping(false);
+    setSearchTerm(selectedOption?.label ?? (strict ? '' : value || ''));
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -162,7 +146,14 @@ export function SearchableSelect({
 
   useEffect(() => {
     setActiveIndex(-1);
-  }, [searchTerm, isOpen]);
+  }, [searchTerm, isOpen, options]);
+
+  useEffect(() => {
+    if (isOpen && activeIndex >= 0) {
+      dropdownRef.current?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isOpen, activeIndex]);
 
   /**
    * Keyboard control for the list.
@@ -199,22 +190,20 @@ export function SearchableSelect({
       return;
     }
 
-    if (e.key === 'Enter') {
-      if (isOpen && activeIndex >= 0 && activeIndex < filteredOptions.length) {
-        // Only swallow Enter when it is actually committing a highlighted
-        // option; otherwise the surrounding form keeps its submit behaviour.
-        e.preventDefault();
+    if (e.key === 'Enter' && isOpen) {
+      e.preventDefault();
+      if (activeIndex >= 0 && activeIndex < filteredOptions.length) {
         handleSelectOption(filteredOptions[activeIndex]);
+      } else {
+        closeOptions();
       }
       return;
     }
 
-    if (e.key === 'Escape') {
-      if (isOpen) {
-        e.preventDefault();
-        setIsOpen(false);
-        setActiveIndex(-1);
-      }
+    if (e.key === 'Escape' && isOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeOptions();
     }
   };
 
@@ -272,7 +261,9 @@ export function SearchableSelect({
               key={opt.value}
               id={`${id}-option-${optIndex}`}
               role="option"
-              aria-selected={isSelected}
+              data-option-index={optIndex}
+              aria-selected={Boolean(isSelected)}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => handleSelectOption(opt)}
               onMouseEnter={() => setActiveIndex(optIndex)}
               className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
@@ -299,17 +290,19 @@ export function SearchableSelect({
     <div ref={containerRef} className="relative w-full">
       <div className="relative flex items-center">
         <Input
+          ref={inputRef}
           id={id}
           value={searchTerm}
           onChange={handleInputChange}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
+          onBlur={() => { closeOptions(); onBlur?.(id); }}
           role="combobox"
           aria-expanded={isOpen && !disabled}
           aria-controls={`${id}-listbox`}
           aria-autocomplete="list"
           aria-activedescendant={
-            isOpen && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined
+            isOpen && activeIndex >= 0 && activeIndex < filteredOptions.length ? `${id}-option-${activeIndex}` : undefined
           }
           placeholder={placeholder}
           error={error}
@@ -317,10 +310,18 @@ export function SearchableSelect({
           autoComplete="off"
           className="w-full pe-9 cursor-text"
         />
-        <div
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={disabled}
+          aria-label={t('dash.searchable_select.toggle_options')}
+          aria-expanded={isOpen && !disabled}
+          aria-controls={`${id}-listbox`}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             if (!disabled) {
-              setIsOpen((prev) => !prev);
+              inputRef.current?.focus();
+              setIsOpen(!isOpen);
               if (!isOpen) setIsTyping(false);
             }
           }}
@@ -336,7 +337,7 @@ export function SearchableSelect({
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
-        </div>
+        </button>
       </div>
 
       {typeof document !== 'undefined' && createPortal(dropdownContent, document.body)}

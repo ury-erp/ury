@@ -9,6 +9,7 @@ import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import TableLayoutView from './TableLayoutView';
 import { t } from '../../i18n';
+import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 
 interface UryTableRecord {
   name: string;
@@ -20,6 +21,8 @@ interface UryTableRecord {
   branch?: string;
   table_shape?: string;
   is_take_away?: boolean;
+  // Frappe returns Check fields as 0/1, not booleans.
+  enable_self_ordering?: number | boolean;
   status?: string;
 }
 
@@ -27,6 +30,7 @@ export const TablePage: React.FC = () => {
   const { activeBranchId, activeBranch } = useBranchContext();
   const [tables, setTables] = useState<UryTableRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'layout'>('list');
   const [editingTable, setEditingTable] = useState<UryTableRecord | null>(null);
@@ -45,6 +49,10 @@ export const TablePage: React.FC = () => {
     restaurant_room: '',
     table_shape: 'Square',
     is_take_away: false,
+    // New tables carry the code by default, the same as every table did
+    // before the switch existed — a restaurant turns a table off, it does
+    // not have to turn forty on.
+    enable_self_ordering: true,
   });
 
   const fetchBranches = async () => {
@@ -70,8 +78,11 @@ export const TablePage: React.FC = () => {
     try {
       const records = await dashboardService.getModuleRecords<UryTableRecord>('URY Table', activeBranchId);
       setTables(records);
+      setLoadError(false);
     } catch {
-      setTables([]);
+      // Not `setTables([])`: an empty table list is a real state, and
+      // showing it here would hide the failure behind a plausible answer.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -93,6 +104,7 @@ export const TablePage: React.FC = () => {
       restaurant_room: '',
       table_shape: 'Square',
       is_take_away: false,
+      enable_self_ordering: true,
     });
     setIsDrawerOpen(true);
   };
@@ -107,6 +119,7 @@ export const TablePage: React.FC = () => {
       restaurant_room: table.restaurant_room || '',
       table_shape: table.table_shape || 'Square',
       is_take_away: !!table.is_take_away,
+      enable_self_ordering: table.enable_self_ordering !== 0 && table.enable_self_ordering !== false,
     });
     setIsDrawerOpen(true);
   };
@@ -131,6 +144,7 @@ export const TablePage: React.FC = () => {
           restaurant_room: editingTable.restaurant_room || '',
           table_shape: editingTable.table_shape || 'Square',
           is_take_away: editingTable.is_take_away ? 1 : 0,
+          enable_self_ordering: editingTable.enable_self_ordering === 0 || editingTable.enable_self_ordering === false ? 0 : 1,
         };
         const current = {
           table_name: newTable.table_name || '',
@@ -140,6 +154,7 @@ export const TablePage: React.FC = () => {
           restaurant_room: newTable.restaurant_room || '',
           table_shape: newTable.table_shape || 'Square',
           is_take_away: newTable.is_take_away ? 1 : 0,
+          enable_self_ordering: newTable.enable_self_ordering ? 1 : 0,
         };
         if (JSON.stringify(original) === JSON.stringify(current)) {
           showToast.warning(t('dash.table.no_changes_in_document'));
@@ -170,6 +185,7 @@ export const TablePage: React.FC = () => {
             restaurant_room: newTable.restaurant_room,
             table_shape: newTable.table_shape,
             is_take_away: newTable.is_take_away ? 1 : 0,
+            enable_self_ordering: newTable.enable_self_ordering ? 1 : 0,
           },
         });
       } else {
@@ -210,6 +226,7 @@ export const TablePage: React.FC = () => {
             restaurant_room: newTable.restaurant_room,
             table_shape: newTable.table_shape,
             is_take_away: newTable.is_take_away ? 1 : 0,
+            enable_self_ordering: newTable.enable_self_ordering ? 1 : 0,
           },
         });
       }
@@ -223,6 +240,11 @@ export const TablePage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // Resolved out here because the row loop below binds `t` to the table
+  // record, shadowing the translation function.
+  const selfOrderingOnLabel = t('dash.table.self_ordering_on');
+  const selfOrderingOffLabel = t('dash.table.self_ordering_off');
 
   return (
     <div className="space-y-6">
@@ -260,6 +282,8 @@ export const TablePage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {loadError && <LoadErrorBanner onRetry={fetchTables} />}
 
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
@@ -329,6 +353,7 @@ export const TablePage: React.FC = () => {
                 <th className="px-6 py-4">{t('dash.table.seats')}</th>
                 <th className="px-6 py-4">{t('dash.table.shape')}</th>
                 <th className="px-6 py-4">{t('dash.table.status')}</th>
+                <th className="px-6 py-4">{t('dash.table.self_ordering')}</th>
                 <th className="px-6 py-4 text-end">{t('dash.table.actions')}</th>
               </tr>
             </thead>
@@ -347,6 +372,19 @@ export const TablePage: React.FC = () => {
                     <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
                       {t.status || 'Available'}
                     </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    {/* Which tables carry a working code is the question staff
+                        ask of the whole list, not one table at a time. */}
+                    {t.enable_self_ordering === 0 || t.enable_self_ordering === false ? (
+                      <Badge variant="outline" size="sm" className="border-gray-300 bg-gray-100 text-gray-600">
+                        {selfOrderingOffLabel}
+                      </Badge>
+                    ) : (
+                      <Badge variant="success" size="sm">
+                        {selfOrderingOnLabel}
+                      </Badge>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-end">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(t)} className="text-gray-500 hover:text-primary">
@@ -448,6 +486,22 @@ export const TablePage: React.FC = () => {
                 onCheckedChange={(checked) => setNewTable({ ...newTable, is_take_away: checked })}
               />
               <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">{t('dash.table.is_take_away_table')}</label>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="enable_self_ordering"
+                  checked={newTable.enable_self_ordering}
+                  onCheckedChange={(checked) => setNewTable({ ...newTable, enable_self_ordering: checked })}
+                />
+                <label htmlFor="enable_self_ordering" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  {t('dash.table.enable_self_ordering')}
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 ms-11">
+                {t('dash.table.enable_self_ordering_hint')}
+              </p>
             </div>
           </div>
 
