@@ -28,6 +28,11 @@
             {{ $t('recall.loading') }}
           </p>
 
+          <div v-else-if="error" role="alert" class="py-10 text-center">
+            <p class="font-semibold text-red-700">{{ $t('recall.load_failed') }}</p>
+            <button type="button" class="press mt-3 min-h-[48px] rounded-lg border px-4 font-bold" @click="$emit('retry')">{{ $t('kot.retry') }}</button>
+          </div>
+
           <p v-else-if="!tickets.length" class="py-10 text-center text-sm font-semibold text-[#9a7e6b]">
             {{ $t('recall.empty') }}
           </p>
@@ -75,10 +80,11 @@ export default {
     open: { type: Boolean, default: false },
     tickets: { type: Array, default: () => [] },
     loading: { type: Boolean, default: false },
+    error: { type: Boolean, default: false },
     busy: { type: String, default: "" },
     dailyOrderNumber: { type: [Number, Boolean], default: 0 },
   },
-  emits: ["close", "recall"],
+  emits: ["close", "recall", "retry"],
   methods: {
     destination(ticket) {
       if (!ticket.restaurant_table || ticket.table_takeaway) return this.$t("kot.takeaway");

@@ -65,10 +65,17 @@
       :socket="socketRef"
     />
 
+    <div v-if="kotsError && stationKots.length > 0" role="alert" class="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+      <p class="font-bold">{{ $t('kot.stale_data') }}</p>
+      <p v-if="lastSyncedAt" class="text-sm">{{ $t('kot.last_synced', { time: lastSyncedAt }) }}</p>
+      <button type="button" class="press mt-2 min-h-[48px] rounded-lg border px-4 font-bold" :disabled="loadingKots" @click="retryFetchKot">{{ $t('kot.retry') }}</button>
+    </div>
+    <p v-if="loadingKots" role="status" class="mb-4 text-center font-semibold">{{ $t('kot.syncing') }}</p>
+
     <!-- Load failure. Shown ahead of every empty state so a broken feed is
          never reported as a clear kitchen. Any tickets already on screen stay
          where they are; this only replaces the "nothing here" message. -->
-    <div v-if="kotsError && stationKots.length === 0 && !loadingKots" class="text-center py-20 animate-fade-in">
+    <div v-if="kotsError && stationKots.length === 0 && !loadingKots" role="alert" class="text-center py-20 animate-fade-in">
       <div class="empty-kitchen-icon">!</div>
       <p class="text-lg font-bold text-[#3f2a20]">{{ $t('kot.load_failed') }}</p>
       <p class="mt-1 text-sm text-[#9a7e6b]">{{ $t('kot.load_failed_hint') }}</p>
@@ -375,6 +382,8 @@
       :open="recallOpen"
       :tickets="recallTickets"
       :loading="recallLoading"
+      :error="recallError"
+      @retry="fetchRecall"
       :busy="recallBusy"
       :daily-order-number="daily_order_number"
       @close="recallOpen = false"
@@ -477,7 +486,7 @@ async function initializeSocket() {
     }
 }
 
-initializeSocket(); // Initialize the socket after fetching the site name
+// The mounted component waits for socket initialization before subscribing.
 
 
 const frappe = new FrappeApp(url);
@@ -521,6 +530,10 @@ export default {
       // rather than opening a second connection per component.
       socketRef: null,
       socketConnected: false,
+      socketHandlersAttached: false,
+      channelHandlers: {},
+      lastSyncedAt: "",
+      disposed: false,
       detailsKot: null,
 
       // --- Board controls -------------------------------------------------
@@ -540,6 +553,7 @@ export default {
       recallOpen: false,
       recallTickets: [],
       recallLoading: false,
+      recallError: false,
       recallBusy: "",
 
       // --- Shift stats ----------------------------------------------------
@@ -570,12 +584,112 @@ export default {
           });
       });
     },
+    async connectKitchen() {
+      try {
+        if (!socket) await initializeSocket();
+      } catch (error) {
+        console.error("Socket initialization failed:", error);
+      }
+      if (this.disposed) return;
+      this.socketRef = socket || null;
+      if (socket && !this.socketHandlersAttached) {
+        socket.on("connect", this.resyncKitchen);
+        socket.on("disconnect", this.onSocketDisconnect);
+        this.socketHandlersAttached = true;
+      }
+      return this.resyncKitchen();
+    },
+    resyncKitchen() {
+      this.socketConnected = false;
+      return this.fetchKOT().then(() => {
+        this.fetchStats();
+        this.fetchUnavailable();
+      }).catch(() => {});
+    },
+    onSocketDisconnect() {
+      this.socketConnected = false;
+    },
+    registerRealtimeChannels() {
+      if (!socket || this.disposed) return;
+      for (const [channel, handler] of Object.entries(this.channelHandlers)) socket.off(channel, handler);
+      this.channelHandlers = {};
+      const on = (channel, handler) => {
+        this.channelHandlers[channel] = handler;
+        socket.on(channel, handler);
+      };
+          on(this.kot_channel, (doc) => {
+            // An uploaded POS Profile tone, when one is configured, replaces
+            // the bundled new-order chime. Previously a missing attachment
+            // meant the client requested `origin + "null"`, a 404, and the
+            // kitchen heard nothing at all.
+            if (doc.audio_file) {
+              setSoundOverrides({ new_order: doc.audio_file });
+            }
+            // The branch's own "Enable KOT Audio Alert" setting still decides
+            // whether this station makes any noise; the toolbar's mute is a
+            // second, per-screen control on top of it. Note this gate covers
+            // the sound only — the ticket itself must reach the board either
+            // way, or a kitchen with alerts switched off would stop receiving
+            // live orders entirely.
+            this.alertSound(this.alertFor(doc.kot && doc.kot.type));
+
+            let kottime = localStorage.getItem("kot_time");
+            if (doc.last_kot_time !== null) {
+              if (doc.last_kot_time !== kottime) {
+                this.fetchKOT().catch(() => {});
+              }
+            }
+            if (!doc.kot) return;
+            const existingIndex = this.kot.findIndex((ticket) => ticket.name === doc.kot.name);
+            if (existingIndex === -1) this.kot.unshift(doc.kot);
+            else this.kot.splice(existingIndex, 1, doc.kot);
+            this.updateQtyColorTable();
+            this.updateTimeRemaining();
+            setTimeout(()=>{
+              if (doc.kot.type === "Cancelled"){
+                this.fetchKOT().catch(() => {});
+              }
+            },1500)
+            localStorage.setItem("kot_time", doc.kot.time);
+          });
+
+          // Another screen on this station plated an item.
+          on(this.kot_item_channel, (payload) => {
+            this.applyItemUpdate(payload);
+          });
+
+          // Somebody took a dish off the menu, here or at the till.
+          on(this.menu_channel, () => {
+            this.fetchUnavailable();
+          });
+
+          // New socket listener for KOT error alerts (delayed orders)
+          on(this.kot_error_channel, (doc) => {
+            // Look up the matching KOT in the local array to get table/order info
+            const matchingKot = this.kot.find(k => k.name === doc.kot);
+
+            this.kotErrorAlert = {
+              invoice: doc.invoice,
+              tableortakeaway: matchingKot?.tableortakeaway || 'Table/Takeaway info unavailable',
+              order_no: matchingKot?.order_no || 'N/A',
+              timestamp: new Date().toLocaleTimeString()
+            };
+            this.showKotErrorAlert = true;
+            this.alertSound("late");
+            // Auto-hide after 8 seconds
+            setTimeout(() => {
+              this.hideKotErrorAlert();
+            }, 8000);
+          });
+    },
     fetchKOT() {
+      this.socketConnected = false;
       return new Promise((resolve, reject) => {
         try {
           this.call
             .get("ury.ury.api.ury_kot_display.kot_list", {})
             .then((result) => {
+              if (this.disposed) { resolve(); return; }
               this.branch = result.message.Branch;
               this.kot_alert_time = result.message.kot_alert_time;
               this.audio_alert = result.message.audio_alert;
@@ -589,6 +703,9 @@ export default {
               this.loadingKots = false;
               this.updateQtyColorTable();
               this.updateTimeRemaining();
+              this.lastSyncedAt = new Date().toLocaleTimeString();
+              this.registerRealtimeChannels();
+              this.socketConnected = !!(socket && socket.connected);
               resolve();
             })
             .catch((error) => {
@@ -614,7 +731,7 @@ export default {
     retryFetchKot() {
       this.loadingKots = true;
       this.kotsError = null;
-      this.fetchKOT().catch(() => {});
+      this.connectKitchen();
     },
 
     /** Shift counters for the toolbar. Failure is silent: a missing number
@@ -783,6 +900,7 @@ export default {
 
     fetchRecall() {
       this.recallLoading = true;
+      this.recallError = false;
       this.call
         .get("ury.ury.api.ury_kot_display.served_kot_list", {})
         .then((result) => {
@@ -793,7 +911,7 @@ export default {
         })
         .catch((error) => {
           console.error(error);
-          this.recallTickets = [];
+          this.recallError = true;
         })
         .finally(() => {
           this.recallLoading = false;
@@ -807,7 +925,7 @@ export default {
         .then(() => {
           this.recallTickets = this.recallTickets.filter((t) => t.name !== ticket.name);
           this.flash(this.$t("recall.restored"));
-          this.fetchKOT();
+          this.fetchKOT().catch(() => {});
           this.fetchStats();
         })
         .catch((error) => {
@@ -1160,11 +1278,11 @@ export default {
     handleOnline() {
       this.isOnline = true;
       this.flash(this.$t("kot.back_online"));
-      this.fetchKOT();
-      this.fetchStats();
+      this.connectKitchen();
     },
     handleOffline() {
       this.isOnline = false;
+      this.socketConnected = false;
       // No auto-clear: being offline is a state, not an event.
       clearTimeout(this._flashTimer);
       this.statusMessage = this.$t("kot.offline");
@@ -1187,102 +1305,8 @@ export default {
     // A wall-mounted board must not let the OS blank the screen mid-service.
     enableWakeLock();
 
-    const self = this;
-
     this.auth()
-      .then(() => {
-        // `socket` is created at module scope after the site name resolves,
-        // so it only becomes available here.
-        this.socketRef = socket;
-        this.socketConnected = !!(socket && socket.connected);
-        if (socket) {
-          // Reconnecting only flipped the indicator green. Tickets pushed
-          // while the socket was down are never replayed, so the board went
-          // on claiming it was live while missing every order placed during
-          // the gap (UX-22). The indicator now follows an actual resync, not
-          // the transport coming back.
-          socket.on("connect", () => {
-            this.fetchKOT()
-              .then(() => {
-                this.socketConnected = true;
-                this.fetchStats();
-                this.fetchUnavailable();
-              })
-              .catch(() => {
-                // Socket up, data not confirmed — not live yet, and the
-                // error state from fetchKOT says why.
-                this.socketConnected = false;
-              });
-          });
-          socket.on("disconnect", () => { this.socketConnected = false; });
-        }
-        self.fetchKOT().then(() => {
-          this.fetchStats();
-          this.fetchUnavailable();
-
-          socket.on(this.kot_channel, (doc) => {
-            // An uploaded POS Profile tone, when one is configured, replaces
-            // the bundled new-order chime. Previously a missing attachment
-            // meant the client requested `origin + "null"`, a 404, and the
-            // kitchen heard nothing at all.
-            if (doc.audio_file) {
-              setSoundOverrides({ new_order: doc.audio_file });
-            }
-            // The branch's own "Enable KOT Audio Alert" setting still decides
-            // whether this station makes any noise; the toolbar's mute is a
-            // second, per-screen control on top of it. Note this gate covers
-            // the sound only — the ticket itself must reach the board either
-            // way, or a kitchen with alerts switched off would stop receiving
-            // live orders entirely.
-            this.alertSound(this.alertFor(doc.kot && doc.kot.type));
-
-            let kottime = localStorage.getItem("kot_time");
-            if (doc.last_kot_time !== null) {
-              if (doc.last_kot_time !== kottime) {
-                this.fetchKOT();
-              }
-            }
-            this.kot.unshift(doc.kot);
-            this.updateQtyColorTable();
-            this.updateTimeRemaining();
-            setTimeout(()=>{
-              if (doc.kot.type === "Cancelled"){
-                this.fetchKOT();
-              }
-            },1500)
-            localStorage.setItem("kot_time", doc.kot.time);
-          });
-
-          // Another screen on this station plated an item.
-          socket.on(this.kot_item_channel, (payload) => {
-            this.applyItemUpdate(payload);
-          });
-
-          // Somebody took a dish off the menu, here or at the till.
-          socket.on(this.menu_channel, () => {
-            this.fetchUnavailable();
-          });
-
-          // New socket listener for KOT error alerts (delayed orders)
-          socket.on(this.kot_error_channel, (doc) => {
-            // Look up the matching KOT in the local array to get table/order info
-            const matchingKot = this.kot.find(k => k.name === doc.kot);
-
-            this.kotErrorAlert = {
-              invoice: doc.invoice,
-              tableortakeaway: matchingKot?.tableortakeaway || 'Table/Takeaway info unavailable',
-              order_no: matchingKot?.order_no || 'N/A',
-              timestamp: new Date().toLocaleTimeString()
-            };
-            this.showKotErrorAlert = true;
-            this.alertSound("late");
-            // Auto-hide after 8 seconds
-            setTimeout(() => {
-              this.hideKotErrorAlert();
-            }, 8000);
-          });
-        });
-      })
+      .then(() => this.connectKitchen())
       .catch((error) => {
         console.error("Authentication error:", error);
         this.showModal = true;
@@ -1301,6 +1325,7 @@ export default {
    * navigating between stations and accumulated.
    */
   beforeUnmount() {
+    this.disposed = true;
     clearInterval(this.ageTimer);
     clearInterval(this.statsTimer);
     clearTimeout(this._flashTimer);
@@ -1312,10 +1337,9 @@ export default {
     if (this.teardownUnlock) this.teardownUnlock();
     disableWakeLock();
     if (socket) {
-      if (this.kot_channel) socket.off(this.kot_channel);
-      if (this.kot_error_channel) socket.off(this.kot_error_channel);
-      if (this.kot_item_channel) socket.off(this.kot_item_channel);
-      if (this.menu_channel) socket.off(this.menu_channel);
+      socket.off("connect", this.resyncKitchen);
+      socket.off("disconnect", this.onSocketDisconnect);
+      for (const [channel, handler] of Object.entries(this.channelHandlers)) socket.off(channel, handler);
     }
   },
   computed: {
