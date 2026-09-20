@@ -14,6 +14,7 @@
   "language",
   "design_section",
   "theme",
+  "layout",
   "logo",
   "hero_image",
   "eyebrow",
@@ -94,6 +95,15 @@
    "label": "Theme",
    "options": "Olive\nTerracotta\nMidnight",
    "default": "Olive",
+   "reqd": 1
+  },
+  {
+   "default": "Classic",
+   "description": "How the page arranges its sections. The theme sets the colours; the layout sets the shape.",
+   "fieldname": "layout",
+   "fieldtype": "Select",
+   "label": "Layout",
+   "options": "Classic\nCentered\nEditorial",
    "reqd": 1
   },
   {

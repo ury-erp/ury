@@ -9,10 +9,10 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, get_datetime, get_time, now_datetime
 
 from ury.ury.doctype.ury_table_reservation.ury_table_reservation import BLOCKING_STATUSES
-from ury.ury.doctype.ury_website.ury_website import DAYS, public_url
+from ury.ury.doctype.ury_website.ury_website import DAYS, apply_draft, draft_key, public_url
 
 
-def website(slug, preview=False):
+def website(slug, preview=False, draft=False):
 	name = frappe.db.get_value("URY Website", {"slug": str(slug or "")[:80]}, "name")
 	if not name:
 		frappe.throw(_("Page not found."), frappe.DoesNotExistError)
@@ -21,12 +21,18 @@ def website(slug, preview=False):
 		doc.check_permission("write")
 	elif not doc.published:
 		frappe.throw(_("Page not found."), frappe.DoesNotExistError)
+	if draft and preview:
+		# Only ever reached behind the write check above: an unsaved draft is
+		# the editor's own work and no guest may render it.
+		cached = frappe.cache().get_value(draft_key(doc.slug))
+		if cached:
+			apply_draft(doc, cached)
 	return doc
 
 
-def page_content(slug, preview=False):
-	doc = website(slug, preview=preview)
-	keys = ("slug", "restaurant_name", "language", "theme", "eyebrow", "hero_title", "hero_description",
+def page_content(slug, preview=False, draft=False):
+	doc = website(slug, preview=preview, draft=draft)
+	keys = ("slug", "restaurant_name", "language", "theme", "layout", "eyebrow", "hero_title", "hero_description",
 			"show_story", "story_title", "story", "show_menu", "menu_note", "address", "phone",
 			"enable_reservations", "duration_minutes", "lead_minutes", "advance_days", "max_guests",
 			"booking_note", "privacy_note", "seo_title", "seo_description")

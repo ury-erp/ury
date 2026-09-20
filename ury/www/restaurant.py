@@ -62,7 +62,8 @@ DAY_AR = dict(zip(("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satu
 
 def get_context(context):
 	preview = frappe.form_dict.get("preview") == "1"
-	page = page_content(frappe.form_dict.get("slug"), preview=preview)
+	draft = preview and frappe.form_dict.get("draft") == "1"
+	page = page_content(frappe.form_dict.get("slug"), preview=preview, draft=draft)
 	if preview:
 		# Let managers inspect the reservation design before configuring hours.
 		page["enable_reservations"] = 1

@@ -17,7 +17,7 @@
   <script id="restaurant-boot" type="application/json">{{ boot_json | safe }}</script>
   <script src="/assets/ury/js/restaurant-website.js" defer></script>
 </head>
-<body class="theme-{{ page.theme | lower | e }}">
+<body class="theme-{{ page.theme | lower | e }} layout-{{ (page.layout or 'Classic') | lower | e }}">
   <a class="skip-link" href="#main">{{ text.skip }}</a>
   {% if preview %}<div class="preview-banner" role="status">{{ text.preview }}</div>{% endif %}
   <header class="site-header" id="top">
