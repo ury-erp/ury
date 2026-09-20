@@ -1,3 +1,4 @@
+import { invoiceDisplayTotals } from './payment-amounts';
 import { DOCTYPES } from '../data/doctypes';
 import { call, db } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
@@ -275,23 +276,10 @@ export interface MergeBillsResponse {
   name?: string;
 }
 
-// export function getCombinedOrderTotals(order: Pick<POSInvoice, 'grand_total' | 'rounded_total' | 'custom_merged_total'>) {
-//   const mergedTotal = order.custom_merged_total ?? 0;
-//   return {
-//     grandTotal: order.grand_total + mergedTotal,
-//     roundedTotal: order.rounded_total + mergedTotal,
-//   };
-// }
 export function getCombinedOrderTotals(
-  order: Pick<POSInvoice, 'rounded_total' | 'custom_merged_total'>
+  order: Pick<POSInvoice, 'grand_total' | 'rounded_total' | 'custom_merged_total'>
 ) {
-  const roundedTotal =
-    (order.rounded_total ?? 0) + Math.round(order.custom_merged_total ?? 0);
-
-  return {
-    grandTotal: roundedTotal,
-    roundedTotal,
-  };
+  return invoiceDisplayTotals(order);
 }
 
 export function isMergedBill(order: Pick<POSInvoice, 'custom_merged_pos_invoice'>) {

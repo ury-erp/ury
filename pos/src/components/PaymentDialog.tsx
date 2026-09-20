@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
-import { Button, Input, Dialog, DialogContent, showToast, Spinner } from '@ury/ui';
+import { Button, Input, Dialog, DialogContent, DialogTitle, showToast, Spinner } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { guardOnline } from '../lib/offline-guard';
+import { useConnectivity } from '../lib/connectivity';
+import { getCustomerLoyalty, maxRedeemablePoints, type CustomerLoyalty } from '../lib/loyalty-api';
+import { paymentDiscountPercentage } from '../lib/payment-amounts';
 
 
 interface PaymentDialogProps {
@@ -43,7 +47,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
+  const paymentInFlight = useRef(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [appliedPercentage, setAppliedPercentage] = useState(discountPercentage || 0);
+  const [preview, setPreview] = useState<{ grand_total: number; rounded_total: number; discount_amount: number } | null>(null);
   
   // Calculate effective percentage if only amount is provided (for invoice-level discounts)
   const effectivePercentage = discountPercentage 
@@ -63,7 +70,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
 
-  const handleApplyDiscount = () => {
+  const handleApplyDiscount = async () => {
+    if (isProcessing || isPreviewing) return;
     const value = parseFloat(discountValue);
     if (isNaN(value) || value <= 0) {
       setError(t('errors.invalid_discount'));
@@ -73,20 +81,33 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setError(t('errors.discount_exceeds_max'));
       return;
     }
-    const calculatedDiscount = (baseTotal * value) / 100;
-    setAppliedDiscount(calculatedDiscount);
+    setIsPreviewing(true);
     setError(null);
+    try {
+      const response = await call.post('ury.ury.api.payment_preview.preview_payment', {
+        invoice, pos_profile: posProfile, additionalDiscount: paymentDiscountPercentage(value),
+      });
+      const quote = response.message;
+      if (!quote || ![quote.grand_total, quote.rounded_total, quote.discount_amount].every(Number.isFinite)) {
+        throw new Error(t('payment.preview_failed'));
+      }
+      setPreview(quote);
+      setAppliedPercentage(value);
+      setAppliedDiscount(quote.discount_amount);
+      // Any previously typed amounts belonged to the old quote.
+      setPaymentInputs({});
+    } catch (err) {
+      setError(parseFrappeError(err, t('payment.preview_failed')));
+    } finally {
+      setIsPreviewing(false);
+    }
   };
 
   // Order summary logic
-  const subtotal = baseTotal;
-  const adjustment = roundedTotal - grandTotal;
-  const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
-  const totalDiscount = appliedDiscount;
-  const discountedTotal = Math.max(0, subtotal - totalDiscount);
-  // If discount is applied, round up; else, round normally
-  const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+  const subtotal = preview ? preview.grand_total + preview.discount_amount : baseTotal;
+  const discountedTotal = preview?.grand_total ?? grandTotal;
+  // Keep the server's rounding/decimal precision; never round money again here.
+  const finalTotal = preview?.rounded_total ?? (roundedTotal || grandTotal);
 
   // Calculate split payment total
   const payments = paymentModes
@@ -152,13 +173,43 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
    * on the invoice row and answers an already-settled bill with its existing
    * settlement instead of collecting twice.
    */
+  const { isOffline } = useConnectivity();
+
+  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  // Looked up per customer, not cached across them: the balance changes on
+  // every settled bill, and showing a stale one invites a cashier to promise
+  // a discount the server will then refuse.
+  useEffect(() => {
+    let cancelled = false;
+    setPointsToRedeem(0);
+    if (!customer) {
+      setLoyalty(null);
+      return;
+    }
+    getCustomerLoyalty(customer, posProfile).then((result) => {
+      if (!cancelled) setLoyalty(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customer, posProfile]);
+
+  const maxPoints = loyalty ? maxRedeemablePoints(loyalty, finalTotal) : 0;
+  const redeemValue = loyalty ? pointsToRedeem * loyalty.conversion_factor : 0;
+
   const handlePayment = async () => {
-    if (isProcessing) return;
+    if (paymentInFlight.current || isPreviewing || isShort || !Number.isFinite(finalTotal) || finalTotal < 0) return;
+    // Checked here rather than only on the button: the connection can drop
+    // between the cashier deciding to press it and the press landing.
+    if (!guardOnline()) return;
+    paymentInFlight.current = true;
     setIsProcessing(true);
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: appliedDiscount > 0 ? appliedDiscount : null,
+        additionalDiscount: paymentDiscountPercentage(appliedPercentage),
         cashier,
         customer,
         invoice,
@@ -166,6 +217,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         payments,
         pos_profile: posProfile,
         table,
+        redeem_loyalty_points: pointsToRedeem || undefined,
       });
       showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
       onClose();
@@ -176,6 +228,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       // parseFrappeError extracts human-readable message from _server_messages (e.g. stock validation error)
       setError(parseFrappeError(err, t('errors.payment_failed')));
     } finally {
+      paymentInFlight.current = false;
       setIsProcessing(false);
     }
   };
@@ -183,7 +236,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // Every dismissal route goes through here, so none of them can bypass the
   // in-flight guard the way three separate handlers previously did.
   const handleDismiss = () => {
-    if (isProcessing) return;
+    if (paymentInFlight.current) return;
     onClose();
   };
 
@@ -198,7 +251,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         {/* Left Column - Discount and Payment Mode */}
         <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-e border-gray-200 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">{t('payment.title')}</h2>
+            <DialogTitle className="text-2xl font-bold text-gray-900">{t('payment.title')}</DialogTitle>
             <Button
               onClick={handleDismiss}
               disabled={isProcessing}
@@ -221,6 +274,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               <div className="flex gap-2">
                 <Input
                   type="number"
+                  aria-label={t('payment.apply_discount')}
+                  disabled={isProcessing || isPreviewing}
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
                   placeholder={t('payment.discount_placeholder')}
@@ -229,6 +284,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 />
                 <Button
                   onClick={handleApplyDiscount}
+                  loading={isPreviewing}
+                  disabled={isProcessing}
                   variant="default"
                   size="sm"
                 >
@@ -246,8 +303,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 const id = typeof mode === 'string' ? mode : mode.id;
                 return (
                   <div key={id} className="flex items-center gap-3">
-                    <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
+                    <label htmlFor={`payment-mode-${id}`} className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</label>
                     <Input
+                      id={`payment-mode-${id}`}
                       type="number"
                       min="0"
                       step="0.01"
@@ -257,7 +315,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                       placeholder={t('payment.amount_placeholder')}
                       className="flex-1"
                       size="sm"
-                      disabled={isProcessing}
+                      disabled={isProcessing || isPreviewing}
                     />
                   </div>
                 );
@@ -355,14 +413,71 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             </div>
           </div>
 
+          {/* Loyalty. Shown only when the customer actually has points to
+              spend: an empty balance is noise between a cashier and the
+              Pay button, and the accrual half needs no interface at all. */}
+          {loyalty?.enrolled && loyalty.loyalty_points > 0 && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-amber-900">
+                  {t('payment.loyalty_balance', {
+                    points: loyalty.loyalty_points,
+                    amount: formatCurrency(loyalty.redeemable_amount),
+                  })}
+                </span>
+                {loyalty.tier_name && (
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                    {loyalty.tier_name}
+                  </span>
+                )}
+              </div>
+
+              {maxPoints > 0 ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={maxPoints}
+                    value={pointsToRedeem || ''}
+                    placeholder={t('payment.points_to_redeem')}
+                    onChange={(e) => {
+                      // Clamped here as well as on the server: ERPNext
+                      // refuses a redemption worth more than the bill, and
+                      // discovering that at submit means the guest is already
+                      // waiting with a card in their hand.
+                      const raw = parseInt(e.target.value, 10);
+                      setPointsToRedeem(Number.isFinite(raw) ? Math.max(0, Math.min(raw, maxPoints)) : 0);
+                    }}
+                    className="h-9 w-32"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPointsToRedeem(maxPoints)}
+                    className="rounded-md bg-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-300"
+                  >
+                    {t('payment.redeem_max')}
+                  </button>
+                  {pointsToRedeem > 0 && (
+                    <span className="text-sm font-semibold text-amber-900">
+                      −{formatCurrency(redeemValue)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-amber-800">{t('payment.bill_too_small_to_redeem')}</p>
+              )}
+            </div>
+          )}
+
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0 || isShort}
-            variant={isProcessing || payments.length === 0 || isShort ? "secondary" : "default"}
+            disabled={isOffline || isProcessing || isPreviewing || (payments.length === 0 && finalTotal > 0) || isShort}
+            title={isOffline ? t('offline.blocked') : undefined}
+            variant="default"
             className="w-full"
           >
-            {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
+            {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(finalTotal) })}
           </Button>
         </div>
       </DialogContent>
