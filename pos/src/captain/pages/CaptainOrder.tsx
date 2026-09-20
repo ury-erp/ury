@@ -218,7 +218,8 @@ export default function CaptainOrder() {
       // live E2E test — a 500 "missing 1 required positional argument:
       // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
       // exact validate-before-submit gate rather than only omitting the field.
-      if (!selectedCustomer?.name) {
+      const customerOptional = Boolean(posProfile.custom_allow_order_without_customer);
+      if (!customerOptional && !selectedCustomer?.name) {
         showToast.error('Please select a customer before sending the order.');
         return;
       }
@@ -241,7 +242,7 @@ export default function CaptainOrder() {
         order_type: tableOrderType,
         table,
         room: selectedRoom || undefined,
-        customer: selectedCustomer.name,
+        customer: selectedCustomer?.name ?? '',
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
