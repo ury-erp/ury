@@ -200,6 +200,7 @@
   },
   "customer": {
     "search_placeholder": "Поиск клиента...",
+    "search_placeholder_optional": "Поиск клиента (необязательно)...",
     "type_to_search": "Начните ввод для поиска...",
     "no_customers_found": "Клиенты не найдены",
     "add_new": "Добавить нового клиента",

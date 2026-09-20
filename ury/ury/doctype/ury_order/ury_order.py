@@ -1984,10 +1984,15 @@ def sync_order(
             )
             return {"status": "Failure"}
 
+    # Customer selection is optional only when the POS Profile opts in; the
+    # fallback is resolved server-side so a client can never pick it.
+    if not customer and posprofile.get("custom_allow_order_without_customer"):
+        customer = posprofile.customer
+
     if not customer:
-        frappe.throw("Please enter valid customer details")
-    else:
-        invoice.customer = customer
+        frappe.throw(_("Please enter valid customer details"))
+
+    invoice.customer = customer
 
     if order_type:
         invoice.order_type = order_type
