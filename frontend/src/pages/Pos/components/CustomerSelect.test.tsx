@@ -18,8 +18,8 @@ vi.mock('./AggregatorSelect', () => ({
 }));
 
 vi.mock('./CustomerPicker', () => ({
-  CustomerPicker: ({ value, onChange, disabled }: any) => (
-    <div data-testid="customer-picker">
+  CustomerPicker: ({ value, onChange, disabled, optional }: any) => (
+    <div data-testid="customer-picker" data-optional={String(Boolean(optional))}>
       <input
         type="text"
         value={value?.name || ''}
@@ -75,5 +75,31 @@ describe('CustomerSelect', () => {
     render(<CustomerSelect />);
     const input = screen.getByPlaceholderText('Select customer') as HTMLInputElement;
     expect(input).toBeDisabled();
+  });
+
+  it('marks the picker optional when the POS Profile allows orders without a customer', () => {
+    usePOSStoreMock = vi.fn(() => ({
+      selectedCustomer: null,
+      setSelectedCustomer: vi.fn(),
+      selectedOrderType: 'Dine In',
+      isUpdatingOrder: false,
+      posProfile: { custom_allow_order_without_customer: 1 },
+    })) as any;
+
+    render(<CustomerSelect />);
+    expect(screen.getByTestId('customer-picker')).toHaveAttribute('data-optional', 'true');
+  });
+
+  it('keeps the picker required when the POS Profile flag is off', () => {
+    usePOSStoreMock = vi.fn(() => ({
+      selectedCustomer: null,
+      setSelectedCustomer: vi.fn(),
+      selectedOrderType: 'Dine In',
+      isUpdatingOrder: false,
+      posProfile: { custom_allow_order_without_customer: 0 },
+    })) as any;
+
+    render(<CustomerSelect />);
+    expect(screen.getByTestId('customer-picker')).toHaveAttribute('data-optional', 'false');
   });
 });

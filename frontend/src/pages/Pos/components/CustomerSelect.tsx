@@ -7,7 +7,7 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ disabled }: CustomerSelectProps) {
-  const { selectedCustomer, setSelectedCustomer, selectedOrderType, isUpdatingOrder } = usePOSStore();
+  const { selectedCustomer, setSelectedCustomer, selectedOrderType, isUpdatingOrder, posProfile } = usePOSStore();
 
   if (selectedOrderType === 'Aggregators') {
     return <AggregatorSelect />;
@@ -18,6 +18,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
       value={selectedCustomer}
       onChange={setSelectedCustomer}
       disabled={disabled || isUpdatingOrder}
+      optional={Boolean(posProfile?.custom_allow_order_without_customer)}
     />
   );
 }

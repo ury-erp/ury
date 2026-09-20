@@ -2468,3 +2468,77 @@ class TestSyncOrderLineIdentity(unittest.TestCase):
             [{"item": "Biryani", "qty": 1, "reservation_line_key": "LINE-A"}],
         )
         self.assertEqual([p["reservation_line_key"] for p in previous], ["LINE-A", None])
+
+
+class TestSyncOrderOptionalCustomer(FrappeTestCase):
+    """Customer selection is optional only when the POS Profile opts in, and
+    the fallback must be the profile's own default Customer — never a value
+    the client supplied."""
+
+    def _profile(self, allow_without_customer, default_customer="Walk-in Customer"):
+        profile = _make_pos_profile(role_allowed_for_billing=("URY Cashier",))
+        profile.applicable_for_users = []
+        profile.customer = default_customer
+        profile.get = lambda field, default=None: (
+            allow_without_customer
+            if field == "custom_allow_order_without_customer"
+            else default
+        )
+        return profile
+
+    def _invoice(self):
+        invoice = MagicMock()
+        invoice.name = "POS-INV-001"
+        invoice.branch = "Test Branch"
+        invoice.invoice_printed = 0
+        invoice.items = []
+        invoice.waiter = "cashier@example.com"
+        return invoice
+
+    def _call(self, profile, invoice, customer):
+        with patch(
+            "ury.ury.doctype.ury_order.ury_order.get_order_invoice", return_value=invoice
+        ), patch(
+            "ury.ury.doctype.ury_order.ury_order.frappe.has_permission", return_value=True
+        ), patch(
+            "ury.ury.doctype.ury_order.ury_order.frappe.get_doc", return_value=profile
+        ), patch(
+            "ury.ury.doctype.ury_order.ury_order.frappe.get_roles",
+            return_value=["URY Cashier"],
+        ), patch(
+            "ury.ury.doctype.ury_order.ury_order.frappe.session"
+        ) as mock_session:
+            mock_session.user = "cashier@example.com"
+            return sync_order(
+                items="[]",
+                cashier="cashier@example.com",
+                owner="cashier@example.com",
+                mode_of_payment="Cash",
+                customer="",
+                no_of_pax=2,
+                last_invoice=None,
+                waiter="cashier@example.com",
+                pos_profile="Test POS Profile",
+            )
+
+    def test_missing_customer_rejected_when_flag_off(self):
+        invoice = self._invoice()
+        with self.assertRaises(frappe.ValidationError) as ctx:
+            self._call(self._profile(0), invoice, "")
+        self.assertIn("Please enter valid customer details", str(ctx.exception))
+
+    def test_missing_customer_falls_back_to_profile_default_when_flag_on(self):
+        invoice = self._invoice()
+        try:
+            self._call(self._profile(1), invoice, "")
+        except Exception:
+            # Downstream pricing/KOT stages are out of scope here.
+            pass
+        self.assertEqual(invoice.customer, "Walk-in Customer")
+
+    def test_flag_on_without_profile_default_still_rejects(self):
+        invoice = self._invoice()
+        with self.assertRaises(frappe.ValidationError) as ctx:
+            self._call(self._profile(1, default_customer=None), invoice, "")
+        self.assertIn("Please enter valid customer details", str(ctx.exception))
+

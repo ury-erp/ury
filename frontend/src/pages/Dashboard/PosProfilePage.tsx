@@ -14,11 +14,13 @@ interface PosProfileRecord {
   warehouse?: string;
   selling_price_list?: string;
   print_format?: string;
+  customer?: string;
   custom_enable_discount?: number;
   custom_enable_multiple_cashier?: number;
   custom_enable_kot_reprint?: number;
   custom_daily_pos_close?: number;
   custom_edit_order_type?: number;
+  custom_allow_order_without_customer?: number;
   paid_limit?: number;
   table_attention_time?: number;
   custom_reset_order_number_daily?: number;
@@ -213,8 +215,9 @@ export const PosProfilePage: React.FC = () => {
         doctype: 'POS Profile',
         filters: activeBranchId !== 'all' ? [['branch', '=', activeBranchId]] : [],
         fields: ['name', 'branch', 'company', 'warehouse', 'selling_price_list', 'print_format',
-          'custom_enable_discount', 'custom_enable_multiple_cashier',
+          'customer', 'custom_enable_discount', 'custom_enable_multiple_cashier',
           'custom_enable_kot_reprint', 'custom_daily_pos_close', 'custom_edit_order_type',
+          'custom_allow_order_without_customer',
           'paid_limit', 'table_attention_time', 'custom_reset_order_number_daily', 'disabled'],
         limit: 50,
       });
@@ -240,11 +243,13 @@ export const PosProfilePage: React.FC = () => {
         warehouse: profile.warehouse || '',
         selling_price_list: profile.selling_price_list || '',
         print_format: profile.print_format || '',
+        customer: profile.customer || '',
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
         custom_enable_multiple_cashier: profile.custom_enable_multiple_cashier || 0,
         custom_daily_pos_close: profile.custom_daily_pos_close || 0,
         custom_edit_order_type: profile.custom_edit_order_type || 0,
+        custom_allow_order_without_customer: profile.custom_allow_order_without_customer || 0,
         paid_limit: profile.paid_limit || '',
         table_attention_time: profile.table_attention_time || '',
         custom_reset_order_number_daily: profile.custom_reset_order_number_daily || 0,
@@ -311,11 +316,13 @@ export const PosProfilePage: React.FC = () => {
         warehouse: form.warehouse || '',
         selling_price_list: form.selling_price_list || '',
         print_format: form.print_format || '',
+        customer: form.customer || '',
         custom_enable_discount: form.custom_enable_discount ? 1 : 0,
         custom_enable_kot_reprint: form.custom_enable_kot_reprint ? 1 : 0,
         custom_enable_multiple_cashier: form.custom_enable_multiple_cashier ? 1 : 0,
         custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
         custom_edit_order_type: form.custom_edit_order_type ? 1 : 0,
+        custom_allow_order_without_customer: form.custom_allow_order_without_customer ? 1 : 0,
         paid_limit: form.paid_limit || '',
         table_attention_time: form.table_attention_time || '',
         custom_reset_order_number_daily: form.custom_reset_order_number_daily ? 1 : 0,
@@ -333,6 +340,12 @@ export const PosProfilePage: React.FC = () => {
 
     if (JSON.stringify(originalNorm) === JSON.stringify(currentNorm)) {
       showToast.warning('No changes in document');
+      return;
+    }
+
+    // sync_order falls back to this profile's Customer, so the toggle is inert without one.
+    if (profileForm.custom_allow_order_without_customer && !profileForm.customer) {
+      showToast.error('Set a Default Customer before allowing orders without a customer');
       return;
     }
 
@@ -359,11 +372,13 @@ export const PosProfilePage: React.FC = () => {
           warehouse: profileForm.warehouse,
           selling_price_list: profileForm.selling_price_list,
           print_format: profileForm.print_format,
+          customer: profileForm.customer,
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
           custom_enable_multiple_cashier: profileForm.custom_enable_multiple_cashier,
           custom_daily_pos_close: profileForm.custom_daily_pos_close,
           custom_edit_order_type: profileForm.custom_edit_order_type,
+          custom_allow_order_without_customer: profileForm.custom_allow_order_without_customer,
           paid_limit: profileForm.paid_limit,
           table_attention_time: profileForm.table_attention_time,
           custom_reset_order_number_daily: profileForm.custom_reset_order_number_daily,
@@ -536,6 +551,18 @@ export const PosProfilePage: React.FC = () => {
                         placeholder="Default"
                       />
                     </div>
+                    <div>
+                      <label className="block font-semibold text-foreground mb-1.5">Default Customer</label>
+                      <Input
+                        disabled={!isEditMode}
+                        value={profileForm.customer || ''}
+                        onChange={(e) => setProfileForm(p => ({ ...p, customer: e.target.value }))}
+                        placeholder="Walk-in Customer"
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Used when orders are allowed without a customer.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -551,6 +578,7 @@ export const PosProfilePage: React.FC = () => {
                       { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing' },
                       { key: 'custom_edit_order_type', label: 'Enable Order Type Edit' },
                       { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily' },
+                      { key: 'custom_allow_order_without_customer', label: 'Allow Order Without Customer' },
                     ].map(({ key, label }) => (
                       <div key={key} className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/50">
                         <Switch

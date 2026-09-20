@@ -157,6 +157,7 @@
   },
   "customer": {
     "search_placeholder": "Search customer...",
+    "search_placeholder_optional": "Search customer (optional)...",
     "type_to_search": "Please type to search...",
     "no_customers_found": "No customers found",
     "add_new": "Add New Customer",

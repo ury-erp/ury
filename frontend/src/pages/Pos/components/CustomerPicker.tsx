@@ -10,6 +10,7 @@ export interface CustomerPickerProps {
   value: Customer | null;
   onChange: (customer: Customer | null) => void;
   disabled?: boolean;
+  optional?: boolean;
 }
 
 function NewCustomerForm({
@@ -153,7 +154,7 @@ function NewCustomerForm({
   );
 }
 
-export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, disabled, optional }: CustomerPickerProps) {
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -251,7 +252,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
             onFocus={() => setIsOpen(true)}
             onBlur={() => setTimeout(() => setIsOpen(false), 100)}
             onKeyDown={handleKeyDown}
-            placeholder={t('customer.search_placeholder')}
+            placeholder={t(optional ? 'customer.search_placeholder_optional' : 'customer.search_placeholder')}
             className="h-10 w-full rounded-[7px] border border-hair2 px-4 py-2 text-[12px] font-medium text-muted-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-primary outline-offset-1"
             autoComplete="off"
           />
