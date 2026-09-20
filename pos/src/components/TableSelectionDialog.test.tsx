@@ -127,11 +127,10 @@ describe("TableSelectionDialog", () => {
 
     render(<TableSelectionDialog onClose={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Room-1")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("common.loading_tables")).toBeInTheDocument();
+    // findByText retries until the loading state commits; waiting on
+    // "Room-1" and then asserting synchronously raced the passive effect that
+    // sets loadingTables.
+    expect(await screen.findByText("common.loading_tables")).toBeInTheDocument();
   });
 
   it("shows error message when room loading fails", async () => {

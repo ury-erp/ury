@@ -7,6 +7,8 @@ import frappe
 from frappe.model.document import Document
 
 from ury.ury.api.ury_sales_plan import (
+	BACKWARD_OR_TERMINAL_TARGETS,
+	_guard_backward_transition,
 	_validate_plan_scope,
 	append_audit,
 	flag_stale_bom_revisions,
@@ -35,8 +37,9 @@ class URYSalesPlan(Document):
 	"""
 
 	def validate(self):
-		old = self.get_doc_before_save()
-		prev_status = old.status if old else None
+		self._guard_amend_scope()
+
+		prev_status = self._previous_status()
 
 		# Resolve item production context (department/production_unit/
 		# production_policy/bom) server-side from URY Item Production
@@ -71,6 +74,17 @@ class URYSalesPlan(Document):
 						title="URY Sales Plan auto Production Plan call failed",
 						message=frappe.get_traceback(),
 					)
+			# Hook-level backstop for _guard_backward_transition(): this
+			# doctype's Workflow is also reachable from Desk's own workflow
+			# Actions button, which flips `status` directly and never calls
+			# transition_sales_plan() (see the module docstring above). The
+			# "Draft" ("Return to Draft") edge is always a docstatus 0 -> 0
+			# save, so it always reaches here regardless of which UI drove
+			# it -- the "Superseded/Cancelled" edge is covered separately in
+			# before_cancel() below, since that one crosses a docstatus
+			# boundary validate() never sees.
+			if self.status == "Draft":
+				_guard_backward_transition(self, self.status, self.get("cancellation_reason"))
 			self._record_transition(prev_status)
 
 	# ------------------------------------------------------------------
@@ -120,17 +134,83 @@ class URYSalesPlan(Document):
 		self._record_transition(self._previous_status())
 
 	def before_cancel(self):
+		# Hook-level backstop for _guard_backward_transition() on the
+		# "Superseded/Cancelled" edge -- see the comment on the "Draft" case
+		# in validate() above for why this needs its own call site.
+		_guard_backward_transition(self, "Superseded/Cancelled", self.get("cancellation_reason"))
 		self._record_transition(self._previous_status())
 
 	def _previous_status(self):
 		old = self.get_doc_before_save()
 		return old.status if old else None
 
+	def _guard_amend_scope(self):
+		"""Reject amending a cancelled plan into a scope another LIVE plan
+		already covers.
+
+		Frappe's native Desk Cancel+Amend affordance (always available on a
+		submittable doctype, entirely independent of the Workflow's own
+		declared transitions) is what let a user hit exactly this: cancel one
+		plan, then amend it, producing a second document for the same
+		branch/company/plan_date -- a confusing pair when the branch/date
+		already had (or later gets) a fresh Draft covering the same scope.
+		Reuse the same overlap check approval already relies on
+		(validate_no_overlapping_plan_scope) so an amend can't silently
+		resurrect a scope something else is actively covering.
+		"""
+		if not self.get("amended_from") or not self.get("__islocal"):
+			return
+		existing = frappe.db.get_value(
+			"URY Sales Plan",
+			{
+				"branch": self.branch,
+				"company": self.company,
+				"plan_date": self.plan_date,
+				"name": ["!=", self.amended_from],
+				"docstatus": ["!=", 2],
+			},
+			"name",
+		)
+		if existing:
+			frappe.throw(
+				frappe._(
+					"Cannot amend {0}: {1} already covers this branch, company and date -- "
+					"resolve or cancel it first instead of creating a second live plan for the "
+					"same scope."
+				).format(self.amended_from, existing),
+				frappe.ValidationError,
+			)
+
 	def _record_transition(self, prev_status):
-		"""Append one audit entry if `status` actually changed."""
+		"""Append one audit entry if `status` actually changed.
+
+		`cancellation_reason` is written directly to the DB row by
+		`transition_sales_plan()`'s `_guard_backward_transition()` right
+		before it calls `apply_workflow()` (see that function's docstring for
+		why it can't just be set on the in-memory doc), so it's already
+		there by the time whichever of validate() / before_update_after_submit()
+		/ before_cancel() fires for this particular docstatus edge reads it
+		back here.
+
+		Only fold it into THIS transition's audit entry when the transition
+		actually landing right now is itself a backward/terminal one
+		(`self.status in BACKWARD_OR_TERMINAL_TARGETS`) -- and clear the
+		field on every OTHER transition. Without that: (a) a reason given for
+		one Return to Draft would silently get attached to every later,
+		unrelated transition's audit entry too (the field never resets on
+		its own), and (b) a stale reason left over from a PRIOR Return to
+		Draft would satisfy _guard_backward_transition's "reason required"
+		check on Desk's native Actions button -- which supplies no reason of
+		its own -- letting a second reopen through with no fresh
+		explanation, silently defeating the requirement for exactly the
+		bypass path the hook-level guard exists to close.
+		"""
 		if not prev_status or prev_status == self.status:
 			return
-		append_audit(self, prev_status, self.status, frappe.session.user)
+		reason = self.get("cancellation_reason") if self.status in BACKWARD_OR_TERMINAL_TARGETS else None
+		append_audit(self, prev_status, self.status, frappe.session.user, reason=reason)
+		if self.get("cancellation_reason"):
+			self.db_set("cancellation_reason", None, update_modified=False)
 		# audit_log is a Long Text (JSON) field -- append_audit leaves it
 		# as a Python list in memory, which must be serialized back to a
 		# string before Document.save() persists it.
