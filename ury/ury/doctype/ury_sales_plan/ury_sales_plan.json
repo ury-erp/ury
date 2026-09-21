@@ -1,13 +1,11 @@
 {
  "actions": [],
- "allow_rename": 0,
- "autoname": "hash",
- "creation": "2026-08-28 00:00:00.000000",
+ "autoname": "SP-.YYYY.-#####",
+ "creation": "2026-08-28 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "is_submittable": 1,
  "field_order": [
   "status",
   "enforcement_mode",
@@ -37,8 +35,7 @@
    "label": "Status",
    "options": "Draft\nProposed\nSubmitted for Approval\nApproved\nLocked for Production\nSuperseded/Cancelled",
    "read_only": 1,
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "default": "Hard",
@@ -126,34 +123,34 @@
    "fieldname": "audit_log",
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
-   "read_only": 1,
-   "allow_on_submit": 1
+   "read_only": 1
   },
   {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
-   "options": "URY Sales Plan",
    "no_copy": 1,
+   "options": "URY Sales Plan",
    "print_hide": 1,
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
+   "description": "Required input when Returning a plan to Draft or Supersede/Cancelling it; carried into that transition audit_log entry and cleared immediately after -- a transient input, not a standing display field. See the note in audit_log for the permanent record.",
    "fieldname": "cancellation_reason",
    "fieldtype": "Small Text",
    "label": "Reason (Return to Draft / Cancel)",
-   "no_copy": 1,
-   "allow_on_submit": 1,
-   "description": "Required input when Returning a plan to Draft or Supersede/Cancelling it; carried into that transition audit_log entry and cleared immediately after -- a transient input, not a standing display field. See the note in audit_log for the permanent record."
+   "no_copy": 1
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 0,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-09-11 00:00:00.000000",
+ "modified": "2026-09-21 15:50:37.353047",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -189,8 +186,8 @@
    "role": "URY Admin"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
- "is_submittable": 1
+ "states": []
 }
