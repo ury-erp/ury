@@ -1113,27 +1113,30 @@ export const SalesPlanPage: React.FC = () => {
             )}
           </>
         }
+        footer={
+          <>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <LifecycleStepper status={planStatus} />
+              {actionBlockedByRole && (
+                <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
+              )}
+            </div>
+
+            {transitionError && (
+              <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+            )}
+            {!planStatus && supersededPlanName && (
+              <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
+                The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
+              </p>
+            )}
+          </>
+        }
       >
         {isPastPlanDate && (
           <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
         )}
       </PageHeader>
-
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <LifecycleStepper status={planStatus} />
-        {actionBlockedByRole && (
-          <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
-        )}
-      </div>
-
-      {transitionError && (
-        <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
-      )}
-      {!planStatus && supersededPlanName && (
-        <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
-          The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
-        </p>
-      )}
 
       <Section>
         <KpiStrip
