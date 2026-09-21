@@ -11,6 +11,9 @@ export interface PageHeaderProps {
   actions?: React.ReactNode
   /** Extra content under the description (e.g. a warning line). */
   children?: React.ReactNode
+  /** Full-width content under the title/actions row, inside the bleed
+   *  (e.g. a lifecycle stepper or an error banner). */
+  footer?: React.ReactNode
   /** Full-bleed variant: the -mx/-mt bleed + bottom border that
    *  SalesPlanPage and RequirementsPage hand-roll today. */
   bleed?: boolean
@@ -22,6 +25,7 @@ export function PageHeader({
   description,
   actions,
   children,
+  footer,
   bleed = false,
   className,
 }: PageHeaderProps) {
@@ -53,6 +57,7 @@ export function PageHeader({
           </div>
         )}
       </div>
+      {footer != null && footer}
     </div>
   )
 }

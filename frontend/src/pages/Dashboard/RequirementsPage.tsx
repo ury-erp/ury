@@ -364,7 +364,16 @@ export const RequirementsPage: React.FC = () => {
       <PageHeader
         bleed
         title="Requirements"
-        description="Materials and production targets derived from the approved Sales Plan."
+        description={
+          <p className="mt-1 text-sm text-text-tertiary">
+            Materials and production targets derived from the approved Sales Plan.
+            {planName && (
+              <span className="ml-1 text-text-tertiary">
+                Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
+              </span>
+            )}
+          </p>
+        }
         actions={
           <DatePicker
             id="requirements-date"
@@ -375,13 +384,7 @@ export const RequirementsPage: React.FC = () => {
             className="w-[180px]"
           />
         }
-      >
-        {planName && (
-          <span className="ml-1 text-text-tertiary">
-            Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
-          </span>
-        )}
-      </PageHeader>
+      />
 
       {loading ? (
         <Section>
