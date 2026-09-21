@@ -380,7 +380,6 @@ export const RequirementsPage: React.FC = () => {
             aria-label="Requirements date"
             value={requirementsDate}
             onChange={(_id, next) => setRequirementsDate(next)}
-            size="compactLg"
             className="w-[180px]"
           />
         }

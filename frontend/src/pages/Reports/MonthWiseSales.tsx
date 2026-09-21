@@ -80,7 +80,6 @@ export function MonthWiseSales() {
           <Select
             value={monthsBack}
             onChange={(e) => setMonthsBack(Number(e.target.value))}
-            size="sm"
           >
             {MONTH_OPTIONS.map((m) => (
               <option key={m} value={m}>

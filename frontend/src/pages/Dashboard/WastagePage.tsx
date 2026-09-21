@@ -336,7 +336,6 @@ const WastageContent: React.FC = () => {
             Department
             <Select
               aria-label="Department"
-              size="compactLg"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
               className="mt-1"
@@ -356,7 +355,6 @@ const WastageContent: React.FC = () => {
               aria-label="From date"
               value={fromDate}
               onChange={(_id, next) => setFromDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>
@@ -367,7 +365,6 @@ const WastageContent: React.FC = () => {
               aria-label="To date"
               value={toDate}
               onChange={(_id, next) => setToDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>
@@ -409,19 +406,19 @@ const WastageContent: React.FC = () => {
                 <span className="mr-auto self-center text-xs text-muted-foreground">
                   {drawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
                 </span>
-                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>
+                <Button type="button" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>
                   Cancel
                 </Button>
-                <Button type="button" size="sm" onClick={handleDrawerConfirm} disabled={drawerActionBusy}>
+                <Button type="button" onClick={handleDrawerConfirm} disabled={drawerActionBusy}>
                   Confirm
                 </Button>
               </>
             ) : (
               <>
-                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction('reject')}>
+                <Button type="button" variant="outline" onClick={() => setDrawerAction('reject')}>
                   Reject
                 </Button>
-                <Button type="button" size="sm" onClick={() => setDrawerAction('approve')}>
+                <Button type="button" onClick={() => setDrawerAction('approve')}>
                   Approve
                 </Button>
               </>

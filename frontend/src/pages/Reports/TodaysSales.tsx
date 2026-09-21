@@ -163,7 +163,6 @@ export function TodaysSales() {
               value={date}
               maxDate={toApiDate(new Date())}
               onChange={(_id, next) => setDate(next)}
-              size="compactLg"
               className="w-[150px]"
             />
             {data && (

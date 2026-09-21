@@ -46,7 +46,7 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, 
       >
         <div className="flex items-center justify-between p-6 border-b border-border bg-muted/50">
           <h2 className="text-xl font-bold text-foreground">{title}</h2>
-          <Button variant="outline" size="sm" onClick={onClose} className="p-2 h-auto rounded-full border-none hover:bg-muted bg-transparent text-muted-foreground hover:text-foreground">
+          <Button variant="outline" onClick={onClose} className="p-2 h-auto rounded-full border-none hover:bg-muted bg-transparent text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </Button>
         </div>

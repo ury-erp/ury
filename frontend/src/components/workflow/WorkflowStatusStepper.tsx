@@ -76,7 +76,6 @@ export const WorkflowStatusStepper: React.FC<WorkflowStatusStepperProps> = ({
               onClick={() => handleAction(action.action)}
               disabled={applying || restricted}
               title={restricted ? actionRestrictedReason : undefined}
-              size="compactLg"
               className="gap-2"
             >
               <span>{applying ? 'Updating...' : action.action}</span>
