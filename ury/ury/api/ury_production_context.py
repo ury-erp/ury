@@ -35,11 +35,19 @@ def resolve_production_context(item, branch, company=None, department=None):
 	row.production_policy = normalize_production_policy(row.get("production_policy"))
 	if not row.production_policy:
 		return None
-	# Finished goods for pre-produced/direct-retail items are held in the
-	# explicitly configured retail warehouse. MTO issues components from the
-	# production unit's warehouse (with the department warehouse as a narrow
-	# fallback for older configurations).
-	if row.production_policy in ("PRE_PRODUCED", "DIRECT_RETAIL"):
+	# D13: the Department Warehouse is the PRE_PRODUCED stock authority.
+	# `direct_retail_warehouse` is for DIRECT_RETAIL goods only (bought in,
+	# not prepared -- water bottles, sodas). A PRE_PRODUCED item's finished
+	# goods live in its department warehouse, so manufacturing output
+	# (Production Plan path and the batch-manufacture path alike) and POS
+	# availability never read different warehouses. MTO issues components
+	# from the production unit's warehouse (with the department warehouse as
+	# a narrow fallback for older configurations).
+	if row.production_policy == "PRE_PRODUCED":
+		row.warehouse = frappe.db.get_value(
+			"URY Production Department", row.get("department"), "department_warehouse"
+		)
+	elif row.production_policy == "DIRECT_RETAIL":
 		row.warehouse = row.get("direct_retail_warehouse")
 	else:
 		row.warehouse = frappe.db.get_value(

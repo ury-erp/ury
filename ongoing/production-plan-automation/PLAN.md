@@ -699,7 +699,7 @@ finished-goods warehouse across several shipped paths.
 | --- | --- | --- |
 | `ury_production_context.py` | PRE_PRODUCED and DIRECT_RETAIL both resolve to `direct_retail_warehouse` | Yes |
 | `ury_batch_manufacture_service.py:337` | `target_warehouse = direct_retail_warehouse or source_warehouse` — the existing PRE_PRODUCED batch path produces **into** it | Yes, or the two PRE_PRODUCED production paths land stock in different warehouses |
-| `ury_production_validation.py:48` | `"warehouse": config.get("direct_retail_warehouse")` for every policy | Yes |
+| `ury_production_validation.py:48` | `"warehouse": config.get("direct_retail_warehouse")` for every policy, inside `validate_item_production_configuration` (there is no `_build_context` in this file) | Yes |
 | `ury_fulfilment_posting_service.py:595` | Documents that the sale deducts from the same `direct_retail_warehouse` the batch path produced into | Comment and assumption |
 | `ury_order_reservation_service.py:131` | A second `resolve_production_context`; its `_warehouse_for_context` already falls back to the department warehouse | Reconcile to one rule |
 | `ury_availability.py:184` | Passes `direct_retail_warehouse` through to `_fill_pre_produced` | Follows the resolver |
@@ -1301,8 +1301,9 @@ those warehouses.
    the department warehouse; DIRECT_RETAIL keeps `direct_retail_warehouse`.
 2. `ury_batch_manufacture_service.start_batch`: receive finished goods into the
    department warehouse, so the batch path and the Production Plan path agree.
-3. `ury_production_validation._build_context`: resolve `warehouse` by policy
-   rather than always from `direct_retail_warehouse`.
+3. `ury_production_validation.validate_item_production_configuration`: resolve
+   the returned `warehouse` by policy rather than always from
+   `direct_retail_warehouse`.
 4. Reconcile the duplicate resolver at `ury_order_reservation_service.py:131`
    and its `_warehouse_for_context` helper to the single rule.
 5. Update `ury_fulfilment_posting_service`'s comment and its assumption about

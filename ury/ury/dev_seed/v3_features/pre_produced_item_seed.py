@@ -15,17 +15,25 @@ Creates:
   - Item `TEST-RAW-A`: a plain stock-item raw material.
   - Item `TEST-FG-PP`: the pre-produced finished good, sellable, stock-tracked.
   - BOM `BOM-TEST-FG-PP-001`: 2x TEST-RAW-A -> 1x TEST-FG-PP, submitted/active/default.
-  - Warehouse `Direct Retail - U` (company URY): the PRE_PRODUCED
-    finished-goods retail warehouse, if it does not already exist.
+  - Warehouse `Direct Retail - U` (company URY), if it does not already
+    exist. D13 (the Department Warehouse is the PRE_PRODUCED stock
+    authority) means this warehouse is no longer where PRE_PRODUCED
+    finished goods land -- it is kept only as a populated
+    `direct_retail_warehouse` value on the configuration below, matching
+    what a DIRECT_RETAIL configuration would set, and is never read for
+    this PRE_PRODUCED item's stock.
   - `URY Item Production Configuration` for TEST-FG-PP: PRE_PRODUCED /
     IN_HOUSE, department/production_unit = Kitchen, direct_retail_warehouse
-    = the warehouse above.
+    = the warehouse above (unused for PRE_PRODUCED stock, see D13).
+  - The Kitchen department's `department_warehouse` (`Kitchen - U`) if not
+    already set -- this is the actual PRE_PRODUCED finished-goods warehouse
+    after D13.
   - A Material Receipt of TEST-RAW-A into Kitchen - U (enough for one batch)
     and then a real `start_batch` call (see
     `ury.ury.api.ury_batch_manufacture_service.start_batch`) that posts a
     genuine submitted Manufacture Stock Entry receiving TEST-FG-PP into
-    Direct Retail - U -- exactly the "existing batch-manufactured stock"
-    Scenario B's instructions call for.
+    the Kitchen department warehouse -- exactly the "existing
+    batch-manufactured stock" Scenario B's instructions call for.
   - Adds TEST-FG-PP to the "Default Menu" URY Menu (see
     `ury.ury.dev_seed.add_menu_item` for the equivalent GRCN wiring) so it
     is orderable through the POS frontend.
@@ -50,6 +58,13 @@ FG_ITEM = "TEST-FG-PP"
 BOM_NAME_HINT = "BOM-TEST-FG-PP-001"
 DIRECT_RETAIL_WAREHOUSE = "Direct Retail - U"
 SOURCE_WAREHOUSE = "Kitchen - U"
+DEPARTMENT = "Kitchen"
+# D13: the Department Warehouse is the PRE_PRODUCED stock authority, not
+# direct_retail_warehouse. Reuse the same warehouse as SOURCE_WAREHOUSE for
+# this seed's single-department demo item -- raw materials in and finished
+# goods out share one department warehouse here, same as a real Kitchen
+# department with skip_transfer production would.
+DEPARTMENT_WAREHOUSE = SOURCE_WAREHOUSE
 CONFIG_NAME = f"UIPC-{FG_ITEM}-{BRANCH}"
 MENU_NAME = "Default Menu"
 BATCH_QTY = 10
@@ -134,6 +149,22 @@ def _ensure_direct_retail_warehouse():
     print(f"  + Created warehouse {DIRECT_RETAIL_WAREHOUSE}.")
 
 
+def _ensure_department_warehouse():
+    """Set the Kitchen department's `department_warehouse` (D13's
+    PRE_PRODUCED stock authority) if it exists and does not already have
+    one set. Non-fatal (just prints and returns) if the `Kitchen`
+    department itself does not exist on this bench -- creating production
+    departments is not this seed's job."""
+    if not frappe.db.exists("URY Production Department", DEPARTMENT):
+        print(f"  ! Production Department {DEPARTMENT} does not exist -- skipping department warehouse wiring.")
+        return
+    existing = frappe.db.get_value("URY Production Department", DEPARTMENT, "department_warehouse")
+    if existing:
+        return
+    frappe.db.set_value("URY Production Department", DEPARTMENT, "department_warehouse", DEPARTMENT_WAREHOUSE)
+    print(f"  + Set {DEPARTMENT}.department_warehouse = {DEPARTMENT_WAREHOUSE}.")
+
+
 def _ensure_production_configuration():
     if frappe.db.exists("URY Item Production Configuration", CONFIG_NAME):
         return
@@ -175,7 +206,11 @@ def _ensure_raw_stock():
 
 
 def _ensure_batch_manufactured():
-    existing_fg = flt(frappe.db.get_value("Bin", {"item_code": FG_ITEM, "warehouse": DIRECT_RETAIL_WAREHOUSE}, "actual_qty"))
+    # D13: `start_batch` receives finished goods into the department
+    # warehouse, not `direct_retail_warehouse` -- check stock (and report
+    # below) against wherever it actually lands.
+    target_warehouse = frappe.db.get_value("URY Production Department", DEPARTMENT, "department_warehouse") or DEPARTMENT_WAREHOUSE
+    existing_fg = flt(frappe.db.get_value("Bin", {"item_code": FG_ITEM, "warehouse": target_warehouse}, "actual_qty"))
     if existing_fg > 0:
         return
     from ury.ury.api.ury_batch_manufacture_service import start_batch
@@ -186,7 +221,7 @@ def _ensure_batch_manufactured():
         idempotency_key="SEED-PRE-PRODUCED-BATCH-1",
         actor="Administrator",
     )
-    print(f"  + start_batch posted {result.get('stock_entry')}: {BATCH_QTY} {FG_ITEM} into {DIRECT_RETAIL_WAREHOUSE}.")
+    print(f"  + start_batch posted {result.get('stock_entry')}: {BATCH_QTY} {FG_ITEM} into {result.get('target_warehouse')}.")
 
 
 def _ensure_on_menu():
@@ -223,6 +258,7 @@ def seed():
     _ensure_fg_item()
     _ensure_bom()
     _ensure_direct_retail_warehouse()
+    _ensure_department_warehouse()
     _ensure_production_configuration()
     _ensure_raw_stock()
     _ensure_batch_manufactured()

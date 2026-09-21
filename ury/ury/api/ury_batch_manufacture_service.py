@@ -21,12 +21,16 @@ Two branches, selected by the config row's `sourcing_mode`:
   `erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry` --
   raw-material components as `s_warehouse` rows sourced from the production
   unit/department warehouse, the finished item as a `t_warehouse` row
-  landing in the config's `direct_retail_warehouse` -- the same warehouse
-  `ury_production_context.resolve_production_context` and
+  landing in the config's *department warehouse* (D13: the Department
+  Warehouse is the PRE_PRODUCED stock authority -- `direct_retail_warehouse`
+  is for DIRECT_RETAIL goods only and is no longer read here). This is the
+  same warehouse `ury_production_context.resolve_production_context` and
   `ury_availability._fill_pre_produced` already treat as the PRE_PRODUCED
-  finished-goods location. As of Track-Item N3, this is no longer a
-  hand-built entry: the generated Stock Entry always carries a `work_order`
-  link, and `ury_manufacture_enforcement.validate_manufacture_requires_work_order`
+  finished-goods location, so this batch path and the Production Plan path
+  land finished goods in the same place instead of splitting stock across
+  two warehouses. As of Track-Item N3, this is no longer a hand-built
+  entry: the generated Stock Entry always carries a `work_order` link, and
+  `ury_manufacture_enforcement.validate_manufacture_requires_work_order`
   (a `Stock Entry.validate` hook) rejects any *other* Manufacture Stock
   Entry for a PRE_PRODUCED/IN_HOUSE item that lacks one. This deliberately
   diverges from `ury_fulfilment_posting_service._submit_stock_entry`/
@@ -146,6 +150,33 @@ def _resolve_source_warehouse(config_row):
 		raise BatchManufactureError(
 			"SOURCE_WAREHOUSE_NOT_CONFIGURED",
 			_("Production configuration {0} has no production unit/department warehouse configured").format(
+				config_row["name"]
+			),
+		)
+	return warehouse
+
+
+def _resolve_target_warehouse(config_row):
+	"""Finished-goods warehouse for a PRE_PRODUCED batch (D13).
+
+	The Department Warehouse is the PRE_PRODUCED stock authority --
+	`direct_retail_warehouse` is for DIRECT_RETAIL goods only (bought in,
+	not prepared). Resolving to the department warehouse here, the same
+	warehouse `ury_production_context.resolve_production_context` resolves
+	for PRE_PRODUCED and the Production Plan path already uses, keeps this
+	batch path and the Production Plan path agreeing on where pre-produced
+	stock lives -- otherwise a site running both paths would split its
+	pre-produced stock across two warehouses and POS would read only one.
+	"""
+	warehouse = None
+	if config_row.get("department"):
+		warehouse = frappe.db.get_value(
+			"URY Production Department", config_row["department"], "department_warehouse"
+		)
+	if not warehouse:
+		raise BatchManufactureError(
+			"TARGET_WAREHOUSE_NOT_CONFIGURED",
+			_("Production configuration {0} has no department warehouse configured").format(
 				config_row["name"]
 			),
 		)
@@ -308,10 +339,11 @@ def start_batch(production_configuration, qty, idempotency_key=None, actor=None)
 
 	Raw-material components are issued from the production unit/department
 	warehouse; the finished pre-produced item is received into the config's
-	`direct_retail_warehouse` (the same warehouse availability reads FG
-	stock from). Fails closed if `sourcing_mode` is not IN_HOUSE, if the
-	configuration is inactive, or if no active BOM/source warehouse can be
-	resolved.
+	department warehouse (D13 -- the same warehouse availability reads FG
+	stock from, and the same warehouse the Production Plan path receives
+	into). Fails closed if `sourcing_mode` is not IN_HOUSE, if the
+	configuration is inactive, or if no active BOM/source/target warehouse
+	can be resolved.
 
 	A Work Order is created and submitted for the resolved BOM/item/qty, and
 	the Manufacture Stock Entry is generated through ERPNext's own
@@ -334,7 +366,7 @@ def start_batch(production_configuration, qty, idempotency_key=None, actor=None)
 	item_code = config_row["item"]
 	company = _resolve_company(config_row["branch"])
 	source_warehouse = _resolve_source_warehouse(config_row)
-	target_warehouse = config_row.get("direct_retail_warehouse") or source_warehouse
+	target_warehouse = _resolve_target_warehouse(config_row)
 
 	# Reuses the same active-BOM resolution contract as
 	# ury_batch_work_order_adapter._resolve_active_bom / ury_bom_compiler --
