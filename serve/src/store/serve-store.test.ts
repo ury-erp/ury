@@ -279,4 +279,21 @@ describe('serve-store draft + cart keys', () => {
     expect(useServeStore.getState().selectedRoom).toBe('Hall A')
     expect(useServeStore.getState().selectedOrderType).toBe(DINE_IN)
   })
+
+  it('addToOrder stamps reservationLineKey from uniqueId for new lines (B02b)', async () => {
+    await useServeStore.getState().addToOrder({
+      id: 'ITEM-NEW',
+      item: 'ITEM-NEW',
+      item_name: 'New Dish',
+      name: 'New Dish',
+      price: 11,
+      quantity: 1,
+      image: null,
+      course: '',
+    })
+    const line = useServeStore.getState().activeOrders[0]
+    expect(line.uniqueId).toBeTruthy()
+    expect(line.reservationLineKey).toBe(line.uniqueId)
+    expect(line.uniqueId).not.toMatch(/^inv:/)
+  })
 })

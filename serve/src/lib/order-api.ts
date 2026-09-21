@@ -9,6 +9,12 @@ export interface POSInvoiceItem {
   image: string;
   qty: number;
   comment: string;
+  /**
+   * Stable per-line identity persisted on the invoice row (custom field
+   * `POS Invoice Item-reservation_line_key`). Echoed unchanged on the next
+   * `sync_order` so the server diffs by identity, not child-row name.
+   */
+  reservation_line_key?: string | null;
   rate: number;
   amount: number;
   discount_percentage: number;
@@ -69,6 +75,11 @@ export interface SyncOrderRequest {
     rate: number;
     qty: number;
     comment?: string;
+    /**
+     * Stable line identity (cart `uniqueId` / persisted reservation key).
+     * Server accepts it via `_line_ref` / `_normalize_current_line_keys`.
+     */
+    reservation_line_key?: string;
   }>;
   no_of_pax: number;
   mode_of_payment?: string;

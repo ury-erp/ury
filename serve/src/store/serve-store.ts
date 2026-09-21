@@ -35,7 +35,16 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image' | 'dis
   uniqueId?: string
   tax_rate?: number
   course_label?: string
-  /** POS Invoice Item row name when loaded from server — keeps cart keys stable. */
+  /**
+   * Stable server-side line identity for this cart line.
+   *
+   * Loaded lines use `POS Invoice Item-reservation_line_key` when present;
+   * new lines use the locally generated `uniqueId`. The same string is
+   * echoed on every `sync_order` so the backend diffs by identity (B02b).
+   * Never derive this from the invoice child row's `name`.
+   */
+  reservationLineKey?: string
+  /** POS Invoice Item row `name` from a fresh load — not a stable sync identity. */
   invoiceItemName?: string
 }
 
@@ -65,7 +74,8 @@ export interface DraftBaseline {
 
 
 function generateUniqueId(item: OrderItem, indexHint = 0): string {
-  if (item.invoiceItemName) return `inv:${item.invoiceItemName}`
+  // Never seed identity from the invoice child-row `name` (autoname regenerates
+  // on every sync_order save). Content + indexHint keeps same-item lines distinct.
   const variant = item.selectedVariant?.id || ''
   const addons = (item.selectedAddons || []).map((a) => a.id).sort().join(',')
   const rate = Number(item.price) || 0
@@ -288,6 +298,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
   addToOrder: async (item) => {
     if (!get().validateQuantity(item.quantity)) return
     const uniqueId = item.uniqueId || generateUniqueId(item)
+    const reservationLineKey = item.reservationLineKey || uniqueId
     const existingIndex = get().activeOrders.findIndex((row) => row.uniqueId === uniqueId)
     const draftTable = draftKeyForCart(get())
     if (existingIndex >= 0 && !item.invoiceItemName) {
@@ -302,7 +313,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
       return
     }
     set({
-      activeOrders: [...get().activeOrders, { ...item, uniqueId }],
+      activeOrders: [...get().activeOrders, { ...item, uniqueId, reservationLineKey }],
       draftTable,
     })
   },
@@ -412,7 +423,14 @@ export const useServeStore = create<ServeState>((set, get) => ({
             comment: item.comment || '',
             invoiceItemName: item.name,
           }
-          return { ...mapped, uniqueId: generateUniqueId(mapped, index) }
+          // Prefer the persisted server key so identity survives round-trips.
+          // Legacy unkeyed rows fall back to a local uniqueId (server adopts it).
+          const uniqueId = item.reservation_line_key || generateUniqueId(mapped, index)
+          return {
+            ...mapped,
+            uniqueId,
+            reservationLineKey: item.reservation_line_key || uniqueId,
+          }
         })
         const selectedCustomer = order.customer
           ? { id: order.customer, name: order.customer_name, phone: order.mobile_number }
