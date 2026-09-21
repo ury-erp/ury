@@ -112,6 +112,8 @@ ury_demo_master_doctypes = [
     "Product Bundle",
     "URY Production Department",
     "URY Production Unit",
+    "URY Item Production Configuration",
+    "URY Branch Stock Policy",
     "URY Report Settings",
     "POS Profile"
 ]
