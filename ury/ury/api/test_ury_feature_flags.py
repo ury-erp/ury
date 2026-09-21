@@ -18,116 +18,387 @@ from ury.ury.api.ury_feature_flags import (
     is_pos_stock_authority_flag_enabled,
     maybe_wire_fulfilment_on_submit,
 )
+from ury.ury.api.ury_stock_policy import clear_branch_stock_policy_cache
 
 
 class TestPosStockAuthorityFlagDefaultsSafe(FrappeTestCase):
     """The single most important test in this task: the flag must default
     to False/off whenever it is unset, or whenever reading it fails for any
-    reason (missing doctype, DB error, etc). It must never fail open."""
+    reason (missing doctype, DB error, etc). It must never fail open.
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.db.get_single_value")
-    def test_flag_defaults_false_when_unset(self, mock_get_single_value):
-        mock_get_single_value.return_value = 0
+    Since T1 (I-1) this function is a deprecated shim over
+    `ury_stock_policy.get_branch_stock_policy(...).realtime_production_posting_enabled`,
+    so these tests now drive the shim through the resolver's underlying
+    read rather than through the retired `URY Feature Flags` Single. The
+    guarantee under test is unchanged.
+    """
+
+    def setUp(self):
+        clear_branch_stock_policy_cache()
+
+    def tearDown(self):
+        clear_branch_stock_policy_cache()
+
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_defaults_false_when_unset(self, mock_get_value):
+        mock_get_value.return_value = {
+            "reservation_control_enabled": 0,
+            "realtime_production_posting_enabled": 0,
+            "closing_reconciliation_enabled": 0,
+        }
+        self.assertFalse(is_pos_stock_authority_flag_enabled(branch="Main Branch"))
+
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_defaults_false_when_no_policy_row(self, mock_get_value):
+        # No URY Branch Stock Policy row for this branch: Tier 1.
+        mock_get_value.return_value = None
+        self.assertFalse(is_pos_stock_authority_flag_enabled(branch="Main Branch"))
+
+    def test_flag_defaults_false_when_no_branch_given(self):
+        # No branch at all -- nothing to resolve, so Tier 1.
         self.assertFalse(is_pos_stock_authority_flag_enabled())
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.db.get_single_value")
-    def test_flag_defaults_false_when_field_missing_none(self, mock_get_single_value):
-        # get_single_value returns None if the field/doctype doesn't resolve
-        mock_get_single_value.return_value = None
-        self.assertFalse(is_pos_stock_authority_flag_enabled())
-
-    @patch("ury.ury.api.ury_feature_flags.frappe.db.get_single_value")
-    def test_flag_fails_closed_on_missing_doctype_or_db_error(self, mock_get_single_value):
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_fails_closed_on_missing_doctype_or_db_error(self, mock_get_value):
         # Simulate the doctype not existing yet / any DB-level error.
-        mock_get_single_value.side_effect = Exception("DocType URY Feature Flags not found")
-        self.assertFalse(is_pos_stock_authority_flag_enabled())
+        mock_get_value.side_effect = Exception(
+            "DocType URY Branch Stock Policy not found"
+        )
+        self.assertFalse(is_pos_stock_authority_flag_enabled(branch="Main Branch"))
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.db.get_single_value")
-    def test_flag_true_only_when_explicitly_enabled(self, mock_get_single_value):
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_true_only_when_explicitly_enabled(self, mock_get_value):
         # This is the ONLY case that should return True -- proves the
         # function is capable of reporting "on" so the flag-on branch is
         # reachable and testable, without that capability implying it is
-        # ever true by default anywhere in shipped code.
-        mock_get_single_value.return_value = 1
-        self.assertTrue(is_pos_stock_authority_flag_enabled())
+        # ever true by default anywhere in shipped code. Note the shim maps
+        # onto `realtime_production_posting_enabled`, which is only legal
+        # with `reservation_control_enabled` also on.
+        mock_get_value.return_value = {
+            "reservation_control_enabled": 1,
+            "realtime_production_posting_enabled": 1,
+            "closing_reconciliation_enabled": 0,
+        }
+        self.assertTrue(is_pos_stock_authority_flag_enabled(branch="Main Branch"))
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.db.get_single_value")
-    def test_flag_accepts_optional_scope_args_without_changing_default(self, mock_get_single_value):
-        mock_get_single_value.return_value = 0
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_false_in_reservations_only_state(self, mock_get_value):
+        # State 2 of the tier gate: reservations on, no production posting.
+        # The shim tracks production posting specifically, so it reads off.
+        mock_get_value.return_value = {
+            "reservation_control_enabled": 1,
+            "realtime_production_posting_enabled": 0,
+            "closing_reconciliation_enabled": 0,
+        }
+        self.assertFalse(is_pos_stock_authority_flag_enabled(branch="Main Branch"))
+
+    @patch("ury.ury.api.ury_stock_policy.frappe.db.get_value")
+    def test_flag_accepts_optional_scope_args_without_changing_default(self, mock_get_value):
+        mock_get_value.return_value = None
         self.assertFalse(
             is_pos_stock_authority_flag_enabled(company="Acme Co", branch="Main Branch")
         )
 
 
 class TestMaybeWireFulfilmentOnSubmit(FrappeTestCase):
-    """V3-73 flag-on wiring, added on top of the accepted flag-read path."""
+    """Flag-on invoice-submit gate. Under the flag this VERIFIES that the
+    fulfilment posting service already posted; it never posts anything
+    itself."""
 
     @patch("ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled")
-    @patch("ury.ury.api.ury_feature_flags._wire_fulfilment_for_invoice")
-    def test_noop_when_flag_off(self, mock_wire, mock_flag):
+    @patch("ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice")
+    def test_noop_when_flag_off(self, mock_verify, mock_flag):
         mock_flag.return_value = False
         doc = {"name": "POS-INV-001", "branch": "Main Branch"}
         maybe_wire_fulfilment_on_submit(doc)
-        mock_wire.assert_not_called()
+        mock_verify.assert_not_called()
 
     @patch("ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled")
-    @patch("ury.ury.api.ury_feature_flags._wire_fulfilment_for_invoice")
-    def test_calls_wiring_when_flag_on(self, mock_wire, mock_flag):
+    @patch("ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice")
+    def test_verifies_when_flag_on(self, mock_verify, mock_flag):
         mock_flag.return_value = True
         doc = {"name": "POS-INV-001", "branch": "Main Branch"}
         maybe_wire_fulfilment_on_submit(doc)
-        mock_wire.assert_called_once_with(doc)
+        mock_verify.assert_called_once_with(doc)
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.log_error")
     @patch("ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled")
-    @patch("ury.ury.api.ury_feature_flags._wire_fulfilment_for_invoice")
-    def test_wiring_failure_is_caught_and_logged_never_raised(
-        self, mock_wire, mock_flag, mock_log_error
-    ):
+    @patch("ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice")
+    def test_verification_failure_is_propagated(self, mock_verify, mock_flag):
         mock_flag.return_value = True
-        mock_wire.side_effect = Exception("boom")
+        mock_verify.side_effect = frappe.ValidationError("boom")
         doc = {"name": "POS-INV-001", "branch": "Main Branch"}
-        # Must not raise -- a fulfilment bookkeeping failure can never be
-        # allowed to block or roll back a real invoice submission.
-        maybe_wire_fulfilment_on_submit(doc)
-        mock_log_error.assert_called_once()
+        with self.assertRaises(frappe.ValidationError):
+            maybe_wire_fulfilment_on_submit(doc)
 
     @patch("ury.ury.api.ury_feature_flags.frappe.get_all")
-    def test_wire_for_invoice_noop_when_no_kots(self, mock_get_all):
-        from ury.ury.api.ury_feature_flags import _wire_fulfilment_for_invoice
+    def test_noop_when_invoice_has_no_kots(self, mock_get_all):
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
 
         mock_get_all.return_value = []
         doc = frappe._dict({"name": "POS-INV-001"})
-        # Must not raise, and must not proceed past the KOT lookup.
-        _wire_fulfilment_for_invoice(doc)
+        _verify_fulfilment_posted_for_invoice(doc)
         mock_get_all.assert_called_once()
 
-    @patch("ury.ury.api.ury_feature_flags.frappe.log_error")
-    @patch("ury.ury.api.ury_feature_flags.frappe.get_doc")
-    @patch("ury.ury.api.ury_feature_flags.frappe.get_all")
-    def test_wire_for_invoice_skips_when_no_matching_reservation(
-        self, mock_get_all, mock_get_doc, mock_log_error
+
+class TestFulfilmentVerificationGate(FrappeTestCase):
+    """G-07: a POSTED intent for the right kot_item is not on its own proof
+    that what was posted is what is being invoiced."""
+
+    def _run(
+        self,
+        intent,
+        execution_state="READY",
+        idempotency_key="rev-2",
+        revision_key="rev-2",
+        invoiced_qty=3,
     ):
-        from ury.ury.api.ury_feature_flags import _wire_fulfilment_for_invoice
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
 
-        # First get_all call: KOTs linked to invoice.
-        # Second: KOT Execution rows (READY). Third: reservation lookup (none).
-        mock_get_all.side_effect = [
-            [frappe._dict({"name": "KOT-001"})],
-            [frappe._dict({"state": "READY"})],
-            [],
-        ]
-        kot_doc = frappe._dict(
-            {"kot_items": [frappe._dict({"item": "BURGER", "quantity": 2})]}
+        def get_all(doctype, **kwargs):
+            if doctype == "URY KOT":
+                return [frappe._dict({"name": "KOT-001"})]
+            if doctype == "URY KOT Item Execution":
+                return [
+                    frappe._dict(
+                        {
+                            "name": "EXEC-1",
+                            "kot_item": "KOTITEM-1",
+                            "state": execution_state,
+                            "idempotency_key": idempotency_key,
+                            "revision_key": revision_key,
+                            "branch": "Main Branch",
+                            "company": "Acme Co",
+                        }
+                    )
+                ]
+            if doctype == "URY Fulfilment Posting Intent":
+                return [frappe._dict(intent)] if intent else []
+            raise AssertionError(doctype)
+
+        doc = frappe._dict({"name": "POS-INV-001", "branch": "Main Branch", "company": "Acme Co"})
+        with patch("ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all), patch(
+            "ury.ury.api.ury_feature_flags.frappe.db.get_value",
+            return_value=frappe._dict({"item": "BURGER", "quantity": invoiced_qty}),
+        ), patch(
+            "ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+        ):
+            _verify_fulfilment_posted_for_invoice(doc)
+
+    def _posted(self, **overrides):
+        intent = {
+            "name": "INTENT-1",
+            "status": "POSTED",
+            "accepted_revision": "rev-2",
+            "accepted_qty": 3,
+        }
+        intent.update(overrides)
+        return intent
+
+    def test_matching_posted_intent_passes(self):
+        self._run(self._posted())
+
+    def test_missing_intent_blocks_submit(self):
+        with self.assertRaises(frappe.ValidationError):
+            self._run(None)
+
+    def test_stale_revision_blocks_submit(self):
+        """A re-fired item whose new READY transition never created an intent
+        would otherwise pass on the previous fire's POSTED intent.
+
+        `bump_item_execution_revision` moved the line from rev-1 to rev-2, so
+        the intent frozen against rev-1 no longer describes what is being
+        invoiced.
+        """
+        with self.assertRaises(frappe.ValidationError):
+            self._run(self._posted(accepted_revision="rev-1"), revision_key="rev-2")
+
+    def test_served_unedited_item_is_not_reported_stale(self):
+        """Regression for the false "stale production posting" block.
+
+        `idempotency_key` is a per-RPC replay token: Mosaic mints a fresh
+        UUID for `mark_item_ready` and another for `serve_item_execution`,
+        and `_transition` writes whichever call is running onto the row. The
+        intent is frozen at READY. So for EVERY normally served
+        made-to-order item, the row's `idempotency_key` at invoice-submit
+        time is the SERVE call's key while the intent holds the READY call's
+        key -- a guaranteed mismatch, with no user edit anywhere.
+
+        This case is exactly that: nothing about the line changed, only its
+        state advanced READY -> SERVED. Before the fix (gate reading
+        `idempotency_key`) this raised and the bill could not be settled;
+        with the gate reading `revision_key`, which a state transition never
+        touches, it must pass.
+        """
+        self._run(
+            self._posted(accepted_revision="rev-2"),
+            execution_state="SERVED",
+            idempotency_key="serve-call-uuid",
+            revision_key="rev-2",
         )
-        mock_get_doc.return_value = kot_doc
-        doc = frappe._dict({"name": "POS-INV-001"})
 
-        with patch("ury.ury.api.ury_feature_flags.frappe.db.get_value", return_value=None):
-            # Must not raise even though no reservation exists -- this is
-            # the expected, documented state until reservation-on-order
-            # creation is wired in as a separate follow-up.
-            _wire_fulfilment_for_invoice(doc)
+    def test_missing_revision_key_skips_revision_check_only(self):
+        """A row seeded before `revision_key` existed and not yet backfilled
+        carries no revision claim, so there is nothing for the revision half
+        to compare. It is skipped rather than guessed at -- such a row cannot
+        have been re-fired, because re-firing is what writes the field. The
+        quantity half still runs, which is the check that independently
+        catches an order edited upward after READY."""
+        self._run(self._posted(accepted_revision="anything"), revision_key=None)
 
+        with self.assertRaises(frappe.ValidationError):
+            self._run(
+                self._posted(accepted_revision="anything", accepted_qty=1),
+                revision_key=None,
+                invoiced_qty=3,
+            )
+
+    def test_quantity_increased_after_ready_blocks_submit(self):
+        """Order edited 1 -> 3 after READY: one was produced, three are sold."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run(self._posted(accepted_qty=1), invoiced_qty=3)
+
+    def test_unproduced_item_is_skipped_not_blocked(self):
+        """An item the kitchen has not finished is a workflow question, not a
+        stock one, and must not refuse payment at the till."""
+        self._run(None, execution_state="QUEUED")
+
+    def _run_with_unposted_intent(self, closing_reconciliation_enabled, retry_posts=False, strict=False):
+        """Drive `_verify_item_execution_intent` down the "found an intent,
+        but it is not POSTED, and the synchronous retry didn't fix it" path
+        -- the one I-11 downgrades to advisory when T5's closing-time
+        reconciliation is active for the branch."""
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+
+        calls = {"retry": 0}
+
+        unposted = {
+            "name": "INTENT-1",
+            "status": "PENDING",
+            "accepted_revision": "rev-2",
+            "accepted_qty": 3,
+        }
+        posted = dict(unposted, status="POSTED")
+
+        def get_all(doctype, **kwargs):
+            if doctype == "URY KOT":
+                return [frappe._dict({"name": "KOT-001"})]
+            if doctype == "URY KOT Item Execution":
+                return [
+                    frappe._dict(
+                        {
+                            "name": "EXEC-1",
+                            "kot_item": "KOTITEM-1",
+                            "state": "READY",
+                            "idempotency_key": "rev-2",
+                            "revision_key": "rev-2",
+                            "branch": "Main Branch",
+                            "company": "Acme Co",
+                        }
+                    )
+                ]
+            if doctype == "URY Fulfilment Posting Intent":
+                current = posted if (retry_posts and calls["retry"]) else unposted
+                return [frappe._dict(current)]
+            raise AssertionError(doctype)
+
+        def fake_process_posting_intent(name):
+            calls["retry"] += 1
+
+        doc = frappe._dict({"name": "POS-INV-001", "branch": "Main Branch", "company": "Acme Co"})
+        with patch(
+            "ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+        ), patch(
+            "ury.ury.api.ury_feature_flags.frappe.db.get_value",
+            return_value=frappe._dict({"item": "BURGER", "quantity": 3}),
+        ), patch(
+            "ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+        ), patch(
+            "ury.ury.api.ury_fulfilment_posting_service.process_posting_intent",
+            side_effect=fake_process_posting_intent,
+        ), patch(
+            "ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+            return_value=frappe._dict(
+                {"closing_reconciliation_enabled": closing_reconciliation_enabled}
+            ),
+        ), patch("ury.ury.api.ury_feature_flags.frappe.log_error") as mock_log_error:
+            _verify_fulfilment_posted_for_invoice(doc, strict=strict)
+            return mock_log_error, calls
+
+    def test_closing_reconciliation_disabled_still_throws(self):
+        """Safety net preserved: if T5's real enforcement is not active for
+        this branch (closing_reconciliation_enabled is False), the till-time
+        gate remains the sole protection and must still block the submit."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(closing_reconciliation_enabled=False)
+
+    def test_closing_reconciliation_enabled_is_advisory_not_blocking(self):
+        """I-11: with T5 genuinely active for the branch, a final posting
+        failure after the synchronous retry logs instead of throwing, and
+        the invoice is allowed to submit."""
+        mock_log_error, calls = self._run_with_unposted_intent(
+            closing_reconciliation_enabled=True
+        )
         mock_log_error.assert_called_once()
-        self.assertIn("no reservation found", mock_log_error.call_args.kwargs["title"].lower())
+        self.assertEqual(calls["retry"], 1)
+
+    def test_strict_ignores_closing_reconciliation_advisory_downgrade(self):
+        """The composition bug this parameter exists to prevent: T5's closing
+        check calls this function with strict=True precisely because
+        closing_reconciliation_enabled is True for the branch it's running
+        against -- the exact condition that makes the till-time (strict=False)
+        caller go advisory. If strict=True didn't override that, T5 would
+        call a verifier that always advisory-passes on the one branch T5 ever
+        runs on, silently defeating both the till-time advisory AND T5's own
+        enforcement for the failure mode both commits' messages describe."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(
+                closing_reconciliation_enabled=True, strict=True
+            )
+
+    def test_retry_still_fires_before_either_outcome(self):
+        """The synchronous retry must run exactly once regardless of which
+        branch (advisory or strict) decides the final outcome."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(closing_reconciliation_enabled=False)
+
+    def test_retry_success_is_unaffected_by_policy(self):
+        """When the retry actually posts the intent, behaviour is unchanged
+        from today regardless of closing_reconciliation_enabled: no log, no
+        throw."""
+        mock_log_error, calls = self._run_with_unposted_intent(
+            closing_reconciliation_enabled=True, retry_posts=True
+        )
+        mock_log_error.assert_not_called()
+        self.assertEqual(calls["retry"], 1)
+
+    def test_non_made_to_order_item_requires_no_intent(self):
+        """Pre-produced and direct-retail items post nothing at READY, so
+        demanding an intent for them would block every submit."""
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+
+        def get_all(doctype, **kwargs):
+            if doctype == "URY KOT":
+                return [frappe._dict({"name": "KOT-001"})]
+            if doctype == "URY KOT Item Execution":
+                return [
+                    frappe._dict(
+                        {
+                            "name": "EXEC-1",
+                            "kot_item": "KOTITEM-1",
+                            "state": "READY",
+                            "idempotency_key": "rev-1",
+                            "branch": "Main Branch",
+                            "company": "Acme Co",
+                        }
+                    )
+                ]
+            raise AssertionError(doctype)
+
+        doc = frappe._dict({"name": "POS-INV-001", "branch": "Main Branch", "company": "Acme Co"})
+        with patch("ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all), patch(
+            "ury.ury.api.ury_feature_flags.frappe.db.get_value",
+            return_value=frappe._dict({"item": "COLA", "quantity": 1}),
+        ), patch(
+            "ury.ury.api.ury_feature_flags._is_made_to_order", return_value=False
+        ):
+            _verify_fulfilment_posted_for_invoice(doc)

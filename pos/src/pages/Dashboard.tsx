@@ -8,7 +8,7 @@ import {
   PackageSearch,
   ArrowRight,
 } from 'lucide-react';
-import { Card, CardContent, KpiStrip, AttentionFeed, cn } from '@ury/ui';
+import { Badge, Card, CardContent, KpiStrip, AttentionFeed, cn } from '@ury/ui';
 import type { AttentionItemProps } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
@@ -406,10 +406,10 @@ export default function Dashboard() {
           tone="primary"
           meta={
             overCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                {overCount} over time
-              </span>
+              <Badge size="tag" variant="tagDestructive" className="gap-[5px]">
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-current" />
+                <span className="font-mono tabular-nums">{overCount}</span> over time
+              </Badge>
             ) : serviceLine.length > 0 ? (
               `${serviceLine.length} tables tracked`
             ) : undefined
@@ -428,21 +428,25 @@ export default function Dashboard() {
                 so the legend doubles as the shift summary and a cashier reads
                 "4 fired, 1 over" without decoding a bar chart.
               */}
-              <div className="mb-5 flex flex-wrap gap-2">
-                {stageCounts.map((stage) => (
-                  <span
-                    key={stage.key}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
-                      stage.chip,
-                      stage.count === 0 && 'opacity-45'
-                    )}
-                  >
-                    <span className={cn('h-2 w-2 rounded-full', stage.dot)} />
-                    {stage.label}
-                    <span className="tabular-nums font-semibold">{stage.count}</span>
-                  </span>
-                ))}
+              <div className="mb-[14px] flex flex-wrap gap-1.5">
+                {stageCounts.map((stage) => {
+                  const stageVariant: 'default' | 'tagAccent' | 'tagDestructive' =
+                    stage.key === 'over' ? 'tagDestructive' :
+                    stage.key === 'open' ? 'default' :
+                    'tagAccent';
+                  return (
+                    <Badge
+                      key={stage.key}
+                      size="tag"
+                      variant={stageVariant}
+                      className={stage.count === 0 ? 'opacity-45' : ''}
+                    >
+                      <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', stage.dot)} />
+                      {stage.label}
+                      <span className="font-mono tabular-nums font-semibold">{stage.count}</span>
+                    </Badge>
+                  );
+                })}
               </div>
 
               {/* Bars */}
@@ -566,16 +570,13 @@ export default function Dashboard() {
                       <div key={idx}>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <span className="truncate text-sm font-medium text-gray-900">{item.item_name}</span>
-                          <span
-                            className={cn(
-                              'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1',
-                              critical
-                                ? 'bg-red-50 text-red-700 ring-red-200'
-                                : 'bg-warning-50 text-warning-700 ring-warning-200'
-                            )}
+                          <Badge
+                            size="tag"
+                            variant={critical ? 'tagDestructive' : 'tagWarning'}
+                            className="shrink-0 font-mono tabular-nums"
                           >
                             {formatETA(item.eta_minutes)}
-                          </span>
+                          </Badge>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                           <div

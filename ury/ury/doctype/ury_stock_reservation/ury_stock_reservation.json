@@ -36,7 +36,8 @@
    "in_list_view": 1,
    "label": "Reservation Group",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "order_ref",
@@ -121,7 +122,8 @@
    "label": "Component Item",
    "options": "Item",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "qty",
@@ -205,6 +207,22 @@
    "read": 1,
    "report": 1,
    "role": "Stock Manager"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain"
   }
  ],
  "sort_field": "modified",

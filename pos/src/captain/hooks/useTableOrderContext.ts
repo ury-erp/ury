@@ -13,6 +13,8 @@ export interface BaselineItem {
   price: number;
   quantity: number;
   comment?: string;
+  /** The real POS Invoice Item child-table row name for this baseline (server-synced) line. */
+  invoiceItemName?: string;
 }
 
 export interface OrderDeltaLine {
@@ -34,6 +36,13 @@ export interface OrderDeltaLine {
    * belongs in that group; the rest shows as a distinct reduction line.
    */
   confirmedQty: number;
+  /**
+   * The real POS Invoice Item child-table row name for this line, when it
+   * has one (i.e. it exists in the server baseline) — the authoritative
+   * selector for `reduce_order_item_qty`. Undefined for a brand-new,
+   * not-yet-synced line (`baseQty === 0`).
+   */
+  invoiceItemName?: string;
 }
 
 export interface UseTableOrderContextResult {
@@ -154,6 +163,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
         price: item.price,
         quantity: item.quantity,
         comment: item.comment,
+        invoiceItemName: item.invoiceItemName,
       }))
     );
   }, [orderLoading, activeOrders, context, table]);
@@ -182,6 +192,7 @@ export const useTableOrderContext = (table: string | undefined): UseTableOrderCo
         curQty,
         delta: curQty - baseQty,
         confirmedQty: Math.min(baseQty, curQty),
+        invoiceItemName: base?.invoiceItemName,
       });
     });
   }

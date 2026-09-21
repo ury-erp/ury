@@ -96,6 +96,13 @@ class TestQueuedMapping(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_kot_with_no_execution_row_is_implicitly_queued(self):
 		"""A KOT with no `URY KOT Execution` row yet is treated as QUEUED --
 		this is the documented mapping for 'KOT submitted maps to QUEUED',
@@ -135,6 +142,13 @@ class TestStartRecordsActorOnce(FrappeTestCase):
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
 
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
+
 	def test_start_records_actor_and_timestamp(self):
 		get_doc_side_effect, created = _new_doc_recorder()
 
@@ -148,7 +162,7 @@ class TestStartRecordsActorOnce(FrappeTestCase):
 			f"{MODULE}.frappe.session"
 		) as mock_session:
 			mock_session.user = "chef1@example.com"
-			result = start_execution("KOT-1", idempotency_key="KEY-1", actor="chef1@example.com")
+			result = start_execution("KOT-1", idempotency_key="KEY-1")
 
 		self.assertEqual(result["started_by"], "chef1@example.com")
 		self.assertIsNotNone(result["started_at"])
@@ -167,6 +181,13 @@ class TestDoubleStartSameKey(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_double_start_with_same_idempotency_key_returns_original(self):
 		"""A second call with the SAME idempotency_key must return the
@@ -193,7 +214,7 @@ class TestDoubleStartSameKey(FrappeTestCase):
 		) as mock_get_all, patch(f"{MODULE}.frappe.db.sql") as mock_sql, patch(
 			f"{MODULE}.frappe.get_doc"
 		) as mock_get_doc:
-			result = start_execution("KOT-1", idempotency_key="KEY-1", actor="chef1@example.com")
+			result = start_execution("KOT-1", idempotency_key="KEY-1")
 
 		self.assertTrue(result["idempotent_replay"])
 		self.assertEqual(result["started_by"], "chef1@example.com")
@@ -213,6 +234,13 @@ class TestDoubleCompleteNoDuplicate(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_double_serve_with_same_key_does_not_duplicate(self):
 		prior_row = frappe._dict(
@@ -234,7 +262,7 @@ class TestDoubleCompleteNoDuplicate(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.db.sql") as mock_sql, patch(
 			f"{MODULE}.frappe.get_doc"
 		) as mock_get_doc:
-			result = serve_execution("KOT-1", idempotency_key="KEY-SERVE-1", actor="waiter1@example.com")
+			result = serve_execution("KOT-1", idempotency_key="KEY-SERVE-1")
 
 		self.assertTrue(result["idempotent_replay"])
 		self.assertEqual(result["served_by"], "waiter1@example.com")
@@ -268,7 +296,7 @@ class TestDoubleCompleteNoDuplicate(FrappeTestCase):
 		), patch(
 			f"{MODULE}.frappe.get_doc"
 		) as mock_get_doc:
-			result = serve_execution("KOT-1", idempotency_key="KEY-SERVE-2", actor="waiter2@example.com")
+			result = serve_execution("KOT-1", idempotency_key="KEY-SERVE-2")
 
 		self.assertTrue(result["idempotent_replay"])
 		self.assertEqual(result["served_by"], "waiter1@example.com")
@@ -285,6 +313,13 @@ class TestCompleteWithoutStart(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_mark_ready_without_start_fails_closed(self):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
@@ -306,10 +341,15 @@ class TestCompleteWithoutStart(FrappeTestCase):
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
 		), patch(
 			f"{MODULE}.frappe.get_roles", return_value=["URY Manager"]
-		):
-			result = mark_ready(
-				"KOT-1", idempotency_key="KEY-2", actor="manager1@example.com", manager_override=True
-			)
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session:
+			# N1 fix: actor is no longer caller-suppliable -- it is always
+			# frappe.session.user, including for the manager-override path
+			# (this closes the bypass where a non-manager could previously
+			# pass actor="<a manager's email>" to spoof the override check).
+			mock_session.user = "manager1@example.com"
+			result = mark_ready("KOT-1", idempotency_key="KEY-2", manager_override=True)
 
 		self.assertEqual(result["state"], READY)
 		self.assertEqual(created[0]["ready_by"], "manager1@example.com")
@@ -321,11 +361,20 @@ class TestCompleteWithoutStart(FrappeTestCase):
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 		), patch(
 			f"{MODULE}.frappe.get_roles", return_value=["Cashier"]
-		):
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session:
+			mock_session.user = "cashier1@example.com"
 			with self.assertRaises(ExecutionError):
-				mark_ready(
-					"KOT-1", idempotency_key="KEY-2", actor="cashier1@example.com", manager_override=True
-				)
+				mark_ready("KOT-1", idempotency_key="KEY-2", manager_override=True)
+
+	def test_manager_override_cannot_be_spoofed_via_actor_kwarg(self):
+		"""N1 regression guard: start_execution/mark_ready/serve_execution
+		must not accept a caller-supplied `actor` at all -- passing one
+		(as a real attacker would have, pre-fix) must raise TypeError, not
+		silently authorize as that spoofed identity."""
+		with self.assertRaises(TypeError):
+			mark_ready("KOT-1", idempotency_key="KEY-2", actor="manager1@example.com", manager_override=True)
 
 
 class TestReverseTransitionGuard(FrappeTestCase):
@@ -338,6 +387,13 @@ class TestReverseTransitionGuard(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_start_on_already_ready_kot_fails_closed_and_preserves_state(self):
 		"""There is no public function whose target_state is QUEUED, so a
@@ -370,7 +426,7 @@ class TestReverseTransitionGuard(FrappeTestCase):
 			f"{MODULE}.frappe.get_doc"
 		) as mock_get_doc:
 			with self.assertRaises(ExecutionError) as ctx:
-				start_execution("KOT-1", idempotency_key="KEY-NEW", actor="chef2@example.com")
+				start_execution("KOT-1", idempotency_key="KEY-NEW")
 
 		self.assertEqual(ctx.exception.reason_code, "INVALID_EXECUTION_TRANSITION")
 		# No document was loaded/saved -- existing state was never touched.
@@ -387,6 +443,13 @@ class TestConcurrency(FrappeTestCase):
 		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
 		now_patcher.start()
 		self.addCleanup(now_patcher.stop)
+
+		# _transition() now also calls _require_kot_branch_scope() (a real
+		# security fix, see test_ury_kot_execution_service_permissions.py) --
+		# not this test class''' concern, so make it a no-op here.
+		branch_scope_patcher = patch(f"{MODULE}._require_kot_branch_scope")
+		branch_scope_patcher.start()
+		self.addCleanup(branch_scope_patcher.stop)
 
 	def test_concurrent_start_by_two_chefs_not_executed(self):
 		"""Two chefs call start_execution on the same KOT 'simultaneously';

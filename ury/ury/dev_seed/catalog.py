@@ -235,7 +235,11 @@ def _get_branch():
 	return branch_name
 
 
-def _get_company():
+def _get_company(branch_name=None):
+	if branch_name:
+		branch_company = frappe.db.get_value("Branch", branch_name, "company")
+		if branch_company:
+			return branch_company
 	company_name = frappe.db.get_value("Company", {}, "name")
 	if not company_name:
 		frappe.throw("No Company found on this site — cannot seed catalog demo data.")
@@ -478,6 +482,12 @@ def _ensure_menu_items(branch_name):
 						"items": [],
 					}
 				)
+				# URY Menu.items is a mandatory Table field, but this menu
+				# is intentionally created empty here -- the loop below
+				# populates it and saves again right after. Without
+				# ignore_mandatory, this insert() itself throws
+				# MandatoryError before that loop ever runs.
+				menu_doc.flags.ignore_mandatory = True
 				menu_doc.insert(ignore_permissions=True)
 				print(f"Created URY Menu: {active_menu}")
 		# Set it as active on the restaurant
@@ -541,7 +551,7 @@ def seed():
 	``bench execute ury.ury.dev_seed.catalog.seed``.
 	"""
 	branch_name = _get_branch()
-	company_name = _get_company()
+	company_name = _get_company(branch_name)
 
 	_ensure_uom()
 	item_groups = _ensure_item_groups()

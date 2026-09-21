@@ -2,70 +2,28 @@
 # For license information, please see license.txt
 
 import json
+from collections import defaultdict
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, flt
+from frappe.utils import cint, flt, get_datetime
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
-from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+from ury.ury.api.ury_order_reservation_service import (
+    _line_ref,
+    reconcile_order_reservations,
+    release_order_reservations,
+    resolve_production_context,
+    _warehouse_for_context,
+)
+from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
+from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
 from frappe import cache
-
-
-def _apply_pos_stock_authority(invoice, branch=None):
-    """V3-73: the SOLE integration point between POS Invoice creation and the
-    new fulfilment services (V3-71/V3-72).
-
-    Flag OFF (the only state that is ever true today, and the default in
-    every environment): behavior is byte-for-byte identical to before this
-    task -- `invoice.update_stock` is set to 1, nothing else happens. This
-    is the safe/current/rollback state. See the governing contract at
-    tracks/sa-v3_nxt/outputs/V3-70-fulfilment-accounting-transition-checklist.md.
-
-    Flag ON (never true today; only reachable if a human explicitly flips
-    the "URY Feature Flags" > "POS Stock Authority V2 Enabled" checkbox,
-    which no code in this app does): sets `invoice.update_stock = 0` and
-    makes a best-effort, minimal call into the V3-71/V3-72 fulfilment
-    services.
-
-    *** WARNING -- FLAG-ON PATH IS AN INTEGRATION STUB, NOT PRODUCTION-READY
-    ***: V3-71/V3-72 are standalone service functions
-    (`fulfil_preproduced_order` / `fulfil_mto_order`) that are not yet
-    robustly wired to a real invoice-submission trigger point (they expect a
-    KOT/reservation/execution-state context that this call site does not
-    have at invoice-creation time -- before items are finalized, taxes are
-    calculated, or the invoice is submitted). This function intentionally
-    does NOT call them here, to avoid guessing at parameter mapping that
-    could misfire against real stock/KOT state. Wiring the flag-on path to
-    the actual fulfilment services, at the correct trigger point in the
-    invoice lifecycle (submission, not creation), with real parameter
-    mapping and error handling, is explicitly out of scope for V3-73 and
-    requires its own dedicated integration-testing task before this flag may
-    ever be enabled in a real environment.
-    """
-
-    if is_pos_stock_authority_flag_enabled(branch=branch):
-        # FLAG-ON STUB -- see warning above. Only reachable via a deliberate,
-        # out-of-band admin action; never the default in any environment.
-        invoice.update_stock = 0
-        frappe.log_error(
-            title="V3-73 POS stock authority flag is ON",
-            message=(
-                "pos_stock_authority_v2 is enabled but the flag-on "
-                "integration path is a stub (see _apply_pos_stock_authority "
-                "in ury_order.py). update_stock has been set to 0; no "
-                "fulfilment service call has been made. This flag must not "
-                "be enabled in any real environment until dedicated "
-                "integration work wires this path to V3-71/V3-72 at the "
-                "correct invoice-submission trigger point."
-            ),
-        )
-    else:
-        # Flag OFF -- identical to this app's behavior before V3-73.
-        invoice.update_stock = 1
 
 
 class URYOrder(Document):
@@ -592,6 +550,18 @@ def _copy_invoice_item_fields(item_row, qty):
         uom=item_row.uom,
         conversion_factor=item_row.conversion_factor,
         warehouse=item_row.warehouse,
+        # Preserve the stable line identity the reservation/KOT layers key
+        # on (see ury_order_reservation_service.LINE_REF_FIELDS). A row with
+        # a real persisted key carries it forward as-is (sa-arch-splitbill).
+        # A LEGACY row with no key (saved before this field existed) must
+        # NOT fall back to its own row name: `_previous_line_snapshot` no
+        # longer falls back to `name` either (see B02b), so a name-derived
+        # key here would be a bogus, client-unmatchable value that also
+        # poisons `_backfill_previous_line_keys`'s `claimed` set for any
+        # sibling row of the same item_code -- leaving `None` lets the
+        # split invoice's own backfill logic rescue it on the next sync,
+        # the same way an un-split legacy invoice already gets rescued.
+        reservation_line_key=item_row.get("reservation_line_key") or None,
     )
 
 
@@ -693,7 +663,25 @@ def split_bill(source_invoice, items_to_move, customer=None):
         new_invoice.customer_name = frappe.db.get_value("Customer", customer, "customer_name")
         new_invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_no")
 
+    # Snapshot the pre-split source lines (stable reservation_line_key ->
+    # item_code/qty) before anything is mutated/removed below. This is the
+    # "previous_items" side of a reconcile_order_reservations() call further
+    # down, exactly like sync_order's `past_item` (sa-arch-splitbill: without
+    # this, reservations tied to lines that move to the new invoice are
+    # never released from the source invoice, and the moved lines arrive on
+    # the new invoice with zero reservation coverage).
+    previous_source_items = [
+        {
+            "reservation_line_key": item.get("reservation_line_key") or item.name,
+            "item_code": item.item_code,
+            "item_name": item.item_name,
+            "qty": item.qty,
+        }
+        for item in source.items
+    ]
+
     items_to_remove = []
+    moved_line_keys = set()
     for item in source.items:
         move_qty = move_map.get(item.name, 0)
         if move_qty <= 0:
@@ -701,6 +689,7 @@ def split_bill(source_invoice, items_to_move, customer=None):
         if move_qty >= item.qty:
             new_invoice.append("items", _copy_invoice_item_fields(item, item.qty))
             items_to_remove.append(item)
+            moved_line_keys.add(item.get("reservation_line_key") or item.name)
         else:
             new_invoice.append("items", _copy_invoice_item_fields(item, move_qty))
             item.qty -= move_qty
@@ -739,6 +728,85 @@ def split_bill(source_invoice, items_to_move, customer=None):
             update_modified=False,
         )
         source.save()
+
+        # Reconcile reservations for both sides of the split, reusing the
+        # same reconcile_order_reservations() primitive sync_order already
+        # relies on (sa-arch-splitbill) rather than inventing a new
+        # reservation lifecycle state or mutating existing `URY Stock
+        # Reservation` rows' order_ref in place (that doctype's rows are
+        # meant to be an append-only audit trail of what was reserved when
+        # -- see ury_stock_reservation.py docstring -- so "moving" a
+        # reservation to a different invoice is modelled the same way any
+        # other quantity change is: release/shrink the old side, create the
+        # new side).
+        company = source.company or frappe.db.get_value("Branch", source.branch, "company")
+
+        accepted_source_items = [
+            {
+                "reservation_line_key": item.get("reservation_line_key") or item.name,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+            }
+            for item in source.items
+        ]
+        if get_branch_stock_policy(branch=source.branch, company=company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=source.name,
+                previous_items=previous_source_items,
+                accepted_items=accepted_source_items,
+                branch=source.branch,
+                company=company,
+                actor=frappe.session.user,
+            )
+
+        new_invoice_items = [
+            {
+                "reservation_line_key": item.get("reservation_line_key") or item.name,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+            }
+            for item in new_invoice.items
+        ]
+        if get_branch_stock_policy(branch=new_invoice.branch, company=company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=new_invoice.name,
+                previous_items=[],
+                accepted_items=new_invoice_items,
+                branch=new_invoice.branch,
+                company=company,
+                actor=frappe.session.user,
+            )
+
+        # Best-effort KOT reassignment: URY KOT has a single `invoice` link
+        # (not a per-line one), so a KOT can only be reassigned wholesale to
+        # the new invoice when EVERY one of its items moved there. A KOT
+        # that mixes moved and staying items has no correct single owner
+        # under the current schema -- that is a genuine data-model gap
+        # (URY KOT Items would need its own invoice/order_ref per row to
+        # resolve it), so such KOTs are deliberately left pointing at the
+        # source invoice rather than guessed at. Downstream fulfilment
+        # posting resolves an order_ref via `_kot_order_ref()` -> KOT.invoice,
+        # so this is what lets `mark_item_ready`/posting find the reservation
+        # that just moved to the new invoice for fully-moved KOTs.
+        if moved_line_keys:
+            kot_names = frappe.get_all(
+                "URY KOT", filters={"invoice": source.name}, pluck="name"
+            )
+            for kot_name in kot_names:
+                kot_item_rows = frappe.get_all(
+                    "URY KOT Items",
+                    filters={"parent": kot_name, "parenttype": "URY KOT"},
+                    fields=["reservation_line_key"],
+                )
+                kot_line_keys = {
+                    row.reservation_line_key for row in kot_item_rows if row.reservation_line_key
+                }
+                if kot_line_keys and kot_line_keys.issubset(moved_line_keys):
+                    frappe.db.set_value(
+                        "URY KOT", kot_name, "invoice", new_invoice.name, update_modified=False
+                    )
     finally:
         frappe.flags.ury_bill_split = False
 
@@ -747,6 +815,20 @@ def split_bill(source_invoice, items_to_move, customer=None):
         "new_invoice": new_invoice.name,
     }
 
+
+
+def _resolve_pos_invoice_naming_series(restaurant):
+    """Resolve the POS Invoice naming series for `restaurant`.
+
+    Single source of truth for both the dine-in (table) and non-dine-in
+    (Take Away/Aggregator) new-invoice paths in `_resolve_or_create_pos_invoice`,
+    so they cannot structurally drift apart on this field again. Mirrors
+    `frappe.db.get_value` behavior of returning None when the restaurant has
+    no `invoice_series_prefix` configured, so a new POS Invoice falls back to
+    ERPNext's default POS Profile series exactly as the dine-in path already
+    does in that case.
+    """
+    return frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
 
 
 def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, check_permission=True, override_branch=None):
@@ -821,12 +903,9 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
         else:
             invoice = frappe.new_doc("POS Invoice")
 
-            invoice.naming_series = frappe.db.get_value(
-                "URY Restaurant", restaurant, "invoice_series_prefix"
-            )
+            invoice.naming_series = _resolve_pos_invoice_naming_series(restaurant)
 
             invoice.is_pos = 1
-            _apply_pos_stock_authority(invoice, branch=branch)
             invoice.restaurant = restaurant
             invoice.branch = branch
 
@@ -873,10 +952,13 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
-            _apply_pos_stock_authority(invoice, branch=getBranch())
 
         branch = override_branch or getBranch()
+        invoice.branch = branch
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
+
+        if not invoice_name:
+            invoice.naming_series = _resolve_pos_invoice_naming_series(restaurant)
 
         menu=get_menu_name(order_type)
 
@@ -904,13 +986,60 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
     return invoice
 
 
+def _department_warehouse_for_item(item_code, branch, company):
+    """sa-architecture-closure (Gap B): resolve the same department warehouse
+    the availability/reservation/fulfilment pipeline uses for this item, via
+    `resolve_production_context` + `_warehouse_for_context` -- the exact pair
+    `ury_order_reservation_service._reserve_line` already uses to pick a
+    warehouse for reservation.
+
+    Returns `None` when the item has no resolvable department-controlled
+    production config (e.g. a genuinely direct-retail item, or the
+    production-config table/row is missing) -- callers should fall back to
+    ERPNext's own default (POS Profile warehouse) in that case, which is
+    correct for direct-retail items that aren't tied to a department.
+    """
+    if not item_code or not branch:
+        return None
+    try:
+        context = resolve_production_context(item_code, branch, company)
+    except Exception:
+        return None
+    if not context:
+        return None
+    return _warehouse_for_context(context)
+
+
 def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
     """Resolve course and price for each item and build the invoice item dicts.
 
     Returns a list of dicts in the same shape previously passed directly to
     `invoice.append("items", ...)` inside `sync_order`. Does not append to
     the invoice itself.
+
+    sa-architecture-closure (Gap B): also resolves each item's
+    `department_warehouse` (the same warehouse availability/reservation/
+    fulfilment already agree on) and sets it explicitly on the item dict.
+
+    This is load-bearing for stock correctness, not tidiness. The POS
+    Invoice itself never posts a stock ledger entry -- `POS Invoice` has no
+    `update_stock` field at all. The sale-side deduction happens once per
+    session, at POS Closing Entry: consolidation copies each POS Invoice
+    Item onto a consolidated `Sales Invoice` **with its warehouse carried
+    over verbatim** and sets `update_stock = 1` on that document, whose
+    submit writes the SLEs. So the warehouse set here is the warehouse the
+    sale is ultimately deducted from, hours later.
+
+    That is what makes a made-to-order item net out correctly: the
+    fulfilment posting service receives the finished good into this same
+    department warehouse at KOT READY, and closing then issues it from
+    there. Weaken this resolution and the two land in different warehouses.
+
+    Items with no resolvable department (genuinely direct-retail) are left
+    unset, so ERPNext's own POS Profile default still applies for them --
+    they are deducted once, at closing, from that default warehouse.
     """
+    company = frappe.db.get_value("Branch", branch, "company")
     priced_items = []
 
     for d in items:
@@ -927,12 +1056,15 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
             frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
 
         else:
+            department_warehouse = _department_warehouse_for_item(d.get("item"), branch, company)
             priced_items.append(
                 dict(
                     item_code=d.get("item"),
                     item_name=d.get("item_name"),
                     qty=d.get("qty"),
+                    reservation_line_key=d.get("reservation_line_key"),
                     **({"custom_course": course} if course else {}),
+                    **({"warehouse": department_warehouse} if department_warehouse else {}),
                     comment=d.get("comment"),
                     rate = item_prices[0].price_list_rate,
                     price_list_rate = item_prices[0].price_list_rate,
@@ -951,6 +1083,20 @@ def _has_role(user_roles, role_permitted_rows):
     of "Role Permitted" rows (e.g. transfer_role_permissions, role_allowed_for_billing,
     role_restricted_for_table_order)."""
     return any(row.role in user_roles for row in (role_permitted_rows or []))
+
+
+def _ensure_invoice_reservation_ref(invoice):
+    if invoice.name:
+        return invoice.name
+
+    set_new_name = getattr(invoice, "set_new_name", None)
+    if callable(set_new_name):
+        set_new_name()
+
+    if not invoice.name:
+        frappe.throw(_("Unable to allocate an order reference for stock reservation."), frappe.ValidationError)
+
+    return invoice.name
 
 
 def _order_ownership_flags(invoice, pos_profile_name=None):
@@ -1255,7 +1401,7 @@ def _validate_dine_in_pax(no_of_pax, order_type):
     except Exception:
         pax = 0
 
-    # cint("abc") / None / "" → 0; reject non-positive and non-integral floats.
+    # cint("abc") / None / "" -> 0; reject non-positive and non-integral floats.
     if no_of_pax is None or no_of_pax == "" or pax < 1:
         frappe.throw(_("Number of guests must be a positive integer for Dine In orders."))
 
@@ -1507,7 +1653,7 @@ def get_captain_context():
     - single-cashier: branch-wide `posOpening()` (0 = open, 1 = closed)
     - multi-cashier (`custom_enable_multiple_cashier`): room-scoped
       `pos_opening_check().opening_exists` for the user's assigned room
-      via `getBranchRoom()` — not any open room on the branch
+      via `getBranchRoom()` - not any open room on the branch
 
     Failures while resolving opening state return `opening_state: None`
     (fail closed). Capability field names mirror what
@@ -1586,6 +1732,105 @@ def get_captain_context():
         "role_restricted_for_table_order": role_restricted_for_table_order,
         "opening_state": opening_state,
     }
+
+
+def _previous_line_snapshot(invoice_items):
+    """Snapshot the already-saved invoice lines for the previous-vs-current diff.
+
+    The `reservation_line_key` here is the STABLE, client-supplied line
+    identity persisted on `POS Invoice Item-reservation_line_key` (the POS
+    cart's `uniqueId`, round-tripped back to the client on reload).
+
+    It deliberately does NOT fall back to `item.name`. The child row's
+    autoname is regenerated every time `sync_order` rebuilds `invoice.items`,
+    so it cannot carry identity across saves — and worse, using it produced a
+    `ref:<item>:<rowname>` key on the PREVIOUS side that the CURRENT side
+    could never produce, so EVERY edit to an existing line diffed as
+    "remove the old line + add a brand-new one". That is what made a plain
+    1 -> 2 quantity bump cancel the original KOT and re-raise a full KOT for
+    the new quantity instead of raising a clean +1 delta (B02b).
+
+    A row with no persisted key yields `reservation_line_key: None`, which
+    lets `_line_key()` in `ury_order_reservation_service` fall back to its
+    context/occurrence keying — the same fallback the current-items side
+    uses for an unkeyed line, so the two still agree.
+    """
+    snapshot = []
+    for item in invoice_items or []:
+        snapshot.append(
+            {
+                "reservation_line_key": item.get("reservation_line_key") or None,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+                "comments": "",
+            }
+        )
+    return snapshot
+
+
+def _normalize_current_line_keys(items):
+    """Promote whatever stable line identity the client sent into
+    `reservation_line_key`, so it is (a) used by the diff and (b) persisted
+    by `price_items_for_invoice` for the NEXT sync's previous-side snapshot.
+
+    `_line_ref` is the shared accessor already used by the reservation and
+    KOT-generation sides (`reservation_line_key` / `reservation_line_ref` /
+    `line_ref` / `pos_line_ref` / `pos_line_id` / `unique_id` / `uniqueId`),
+    so no new client contract is invented here — the POS cart's `uniqueId`
+    is accepted as-is.
+    """
+    for item in items or []:
+        if item.get("reservation_line_key"):
+            continue
+        # `name` is last in LINE_REF_FIELDS and is never present on a client
+        # payload; guard anyway so a stray echoed row name cannot become an
+        # identity (same trap as the previous-side `or item.name` bug).
+        probe = {key: value for key, value in item.items() if key != "name"}
+        line_ref = _line_ref(probe)
+        if line_ref:
+            item["reservation_line_key"] = line_ref
+    return items
+
+
+def _backfill_previous_line_keys(previous_items, current_items):
+    """Legacy bridge for orders placed BEFORE line keys were persisted.
+
+    Such an invoice's saved rows have no `reservation_line_key`, while the
+    client now sends one for every cart line. Without this, the first edit of
+    a pre-existing order would still diff as remove+add.
+
+    Adoption is deliberately conservative: a previous unkeyed row inherits a
+    current line's key ONLY when that item_code has exactly one unkeyed
+    previous row and exactly one current line whose key is not already
+    claimed by a keyed previous row. Anything ambiguous (two lines of the
+    same item_code with different comments/courses) is left unkeyed and falls
+    through to context/occurrence matching, so this can never fuse two
+    genuinely distinct lines into one.
+    """
+    claimed = {p.get("reservation_line_key") for p in previous_items if p.get("reservation_line_key")}
+
+    unkeyed_previous = defaultdict(list)
+    for prev in previous_items:
+        if not prev.get("reservation_line_key"):
+            unkeyed_previous[prev.get("item_code")].append(prev)
+
+    if not unkeyed_previous:
+        return previous_items
+
+    available_current = defaultdict(list)
+    for cur in current_items or []:
+        key = cur.get("reservation_line_key")
+        if not key or key in claimed:
+            continue
+        available_current[cur.get("item") or cur.get("item_code")].append(key)
+
+    for item_code, prev_rows in unkeyed_previous.items():
+        candidates = available_current.get(item_code) or []
+        if len(prev_rows) == 1 and len(candidates) == 1:
+            prev_rows[0]["reservation_line_key"] = candidates[0]
+
+    return previous_items
 
 
 @frappe.whitelist()
@@ -1829,16 +2074,7 @@ def sync_order(
         )
         invoice.invoice_created = 1
 
-    past_item = []
-    for item in invoice.items:
-        previous_item = {
-            "item_code": item.item_code,
-            "item_name": item.item_name,
-            "qty": item.qty,
-            "comments": "",
-        }
-        past_item.append(previous_item)
-        
+    past_item = _previous_line_snapshot(invoice.items)
 
     # Conditional checking for 'items' type:
     # - 'ury': JSON passed, hence using isinstance
@@ -1846,10 +2082,19 @@ def sync_order(
     if isinstance(items, str):
         items = json.loads(items)
 
+    # Preserve the stable line identity supplied by POS clients. This is
+    # required so same-item lines cannot be reconciled into one reservation,
+    # AND so a quantity change on an existing line matches its own previous
+    # line instead of diffing as remove+add (B02b).
+    items = _normalize_current_line_keys(items)
+    past_item = _backfill_previous_line_keys(past_item, items)
+
     # Reduction/removal permission: gate any decrease in a previously-sent
     # item's quantity (including full removal) by POS Profile `remove_items`,
-    # matching Phase 2's can_reduce_items/can_remove_items derivation.
-    if past_item and not _can_remove_sent_items(posprofile, invoice, pos_profile):
+    # matching Phase 2's can_reduce_items/can_remove_items derivation. Managers
+    # (elevated roles) may still correct a sent order even when the profile
+    # withholds this from ordinary captains — see _can_remove_sent_items().
+    if past_item and not _can_remove_sent_items(posprofile, invoice=invoice, pos_profile_name=pos_profile):
         requested_qty_by_item = {}
         for d in items:
             requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(
@@ -1874,25 +2119,34 @@ def sync_order(
                     frappe.PermissionError,
                 )
 
+    # Reject newly-added lines that are disabled or off the active menu
+    # before pricing runs; historic lines already on the invoice are exempt
+    # (see _validate_sync_items_against_menu docstring).
     _validate_sync_items_against_menu(
         items,
         past_item,
         invoice.branch,
-        table=table or invoice.restaurant_table,
-        room=opening_room,
+        table=table,
+        room=opening_room or room,
         order_type=effective_order_type,
     )
 
-    invoice.items = []
-
-    menu = _resolve_menu_for_sync(
-        invoice.branch,
-        table=table or invoice.restaurant_table,
-        room=opening_room,
-        order_type=effective_order_type,
-    ) or frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
+    menu = _resolve_menu_for_sync(invoice.branch, table=table or invoice.restaurant_table, room=opening_room or room, order_type=effective_order_type) or frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
 
     priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
+
+    _sync_order_company = invoice.company or getattr(posprofile, "company", None) or frappe.db.get_value("Branch", invoice.branch, "company")
+    if get_branch_stock_policy(branch=invoice.branch, company=_sync_order_company).reservation_control_enabled:
+        reconcile_order_reservations(
+            order_ref=_ensure_invoice_reservation_ref(invoice),
+            previous_items=past_item,
+            accepted_items=items,
+            branch=invoice.branch,
+            company=_sync_order_company,
+            actor=frappe.session.user,
+        )
+
+    invoice.items = []
     for item_dict in priced_items:
         invoice.append("items", item_dict)
 
@@ -1901,14 +2155,18 @@ def sync_order(
     except Exception as e:
         frappe.throw(f"Error while updating order: {e}")   
 
-
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
-
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        # KOT creation/routing failing is not a side detail to swallow: a
+        # customer must never be charged for an item the kitchen never
+        # receives. Log for diagnostics, then re-raise so the whole request
+        # (including the invoice.save() above) rolls back and the caller
+        # sees a real failure instead of a silently accepted order.
+        # See sa-post-373-review-fixes Blocker 2.
+        error_msg = f"KOT Creation Failed: {str(e)}"
         frappe.log_error(error_msg, "KOT Error")
+        frappe.throw(_("Failed to create kitchen order ticket(s) for this order: {0}").format(str(e)))
 
     # table status
     if invoice.invoice_printed == 0:
@@ -2095,12 +2353,12 @@ def table_transfer(table, newTable, invoice):
     pos_invoice.custom_restaurant_room = new_table.restaurant_room
     pos_invoice.save()
 
-    try:
-        change_table_in_kot(
-            pos_invoice.name, new_table.name, pos_invoice.branch
-        )
-    except Exception:
-        pass
+    # Do not swallow KOT-transfer failures: a raise here aborts the request
+    # (and its transaction) so the table/invoice changes above are rolled
+    # back instead of silently leaving order/table/KOT locations
+    # inconsistent. An empty matching-KOT set is a valid no-op and does not
+    # raise.
+    change_table_in_kot(pos_invoice.name, new_table.name, pos_invoice.branch)
 
 
 @frappe.whitelist()
@@ -2239,16 +2497,48 @@ def cancel_order(invoice_id, reason):
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
 
-    try:
-        cancel_kot(invoice_id)
+    # KOT cancellation is part of the order-cancellation transaction. If it
+    # fails, stop immediately so the invoice is not cancelled while the KOT
+    # state remains out of sync.
+    cancel_kot(invoice_id)
 
+    # Release any still-active stock reservations held for this order.
+    # cancel_order() previously cancelled the KOT/invoice but left
+    # `URY Stock Reservation` rows in Reserved status, leaking reserved
+    # capacity indefinitely after cancellation (sa-post-373-review-fixes
+    # Blocker 3). order_ref is the invoice name, matching how sync_order()
+    # reserves via `_ensure_invoice_reservation_ref`.
+    release_order_reservations(invoice_id, reason=f"Order cancelled: {reason}" if reason else "Order cancelled")
+
+    # Best-effort delayed-cancellation fraud alert: notify if order was open longer than threshold
+    try:
+        alert_rule = get_alert_rule("Cancel Delay", branch=pos_invoice.branch)
+        if alert_rule:
+            creation_time = pos_invoice.creation
+            current_time = get_datetime()
+            time_diff = current_time - creation_time
+            minutes_open = int(time_diff.total_seconds() / 60)
+
+            threshold_minutes = alert_rule.get("threshold_minutes", 0)
+            if minutes_open > threshold_minutes:
+                # Resolve notify_roles to users and send notifications
+                notify_roles = alert_rule.get("notify_roles", [])
+                if notify_roles:
+                    for role_row in notify_roles:
+                        role_name = role_row.get("role") if isinstance(role_row, dict) else role_row.role
+                        users = get_users_with_role(role_name, branch=pos_invoice.branch)
+                        for user in users:
+                            message = f"Invoice {invoice_id} has been cancelled after {minutes_open} minutes"
+                            subject = f"Invoice {invoice_id} ({pos_invoice.branch}) is cancelled"
+                            create_system_notification(message, user.get("name"), subject)
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-        pass
+        # Log error but don't block cancellation
+        frappe.log_error(
+            title="Delayed cancellation alert notification failed",
+            message=f"Failed to send fraud alert for invoice {invoice_id}: {str(e)}"
+        )
 
     # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
         # Submitted invoice: cancel through the standard document workflow so
         # on_cancel hooks run and GL/payment reversals and audit entries are

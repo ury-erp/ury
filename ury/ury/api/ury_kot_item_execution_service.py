@@ -1,0 +1,491 @@
+"""Item-grain KOT execution service.
+
+This module adds item-level execution rows for the existing KOT lifecycle
+without changing the current `URY KOT` submit-time printing/realtime flow.
+It is intentionally additive: the existing KOT-level compatibility record
+(`URY KOT Execution`) is kept in sync as a derived aggregate view so older
+consumers can keep reading a single row per KOT while the new item-grain
+records track the real production lifecycle.
+"""
+
+from __future__ import annotations
+
+import json
+
+import frappe
+from frappe import _
+from frappe.exceptions import DuplicateEntryError
+
+from ury.ury.api.ury_kot_execution_service import (
+	IN_PREPARATION,
+	QUEUED,
+	READY,
+	SERVED,
+	ExecutionError,
+	_kot_scope,
+	_require_execution_doctype,
+	_require_kot,
+	append_audit,
+)
+
+ITEM_EXECUTION_DOCTYPE = "URY KOT Item Execution"
+KOT_EXECUTION_DOCTYPE = "URY KOT Execution"
+KOT_DOCTYPE = "URY KOT"
+KOT_ITEMS_DOCTYPE = "URY KOT Items"
+
+ITEM_EXECUTION_STATES = (QUEUED, IN_PREPARATION, READY, SERVED)
+MANAGER_ROLES = {"URY Manager", "URY Admin", "System Manager"}
+EXECUTION_ROLES = MANAGER_ROLES | {"Chef", "URY Chef", "Production Manager"}
+
+NOT_PERMITTED = "NOT_PERMITTED"
+KOT_NOT_FOUND = "KOT_NOT_FOUND"
+ITEM_EXECUTION_DOCTYPE_NOT_FOUND = "ITEM_EXECUTION_DOCTYPE_NOT_FOUND"
+KOT_ITEM_NOT_FOUND = "KOT_ITEM_NOT_FOUND"
+INVALID_EXECUTION_TRANSITION = "INVALID_EXECUTION_TRANSITION"
+
+
+class ItemExecutionError(frappe.ValidationError):
+	def __init__(self, reason_code, message=None):
+		self.reason_code = reason_code
+		super().__init__(message or reason_code)
+
+
+def _require_execution_actor(user, branch, company):
+	"""Authorize mutations against server-derived role and scope."""
+	if user == "Administrator":
+		return
+	if not set(frappe.get_roles(user)) & EXECUTION_ROLES:
+		raise ItemExecutionError(NOT_PERMITTED, _("User is not permitted to execute KOT items"))
+	from ury.ury.api.ury_kot_execution_service import _require_kot_branch_scope
+	_require_kot_branch_scope(branch, user)
+	if not company:
+		raise ItemExecutionError(NOT_PERMITTED, _("KOT branch/company scope is invalid"))
+
+
+def _require_item_execution_doctype():
+	if not frappe.db.exists("DocType", ITEM_EXECUTION_DOCTYPE):
+		raise ItemExecutionError(ITEM_EXECUTION_DOCTYPE_NOT_FOUND, _("{0} is not available on this site").format(ITEM_EXECUTION_DOCTYPE))
+
+
+def _require_kot_item(kot_item):
+	if not kot_item or not frappe.db.exists(KOT_ITEMS_DOCTYPE, kot_item):
+		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("KOT item {0} not found").format(kot_item))
+
+
+def _kot_for_item(kot_item):
+	return frappe.db.get_value(KOT_ITEMS_DOCTYPE, kot_item, "parent")
+
+
+def _audit(doc, actor, event):
+	append_audit(doc, actor, event=event)
+
+
+def _kot_items(kot):
+	doc = frappe.get_doc(KOT_DOCTYPE, kot)
+	return list(doc.get("kot_items") or [])
+
+
+def _execution_filter(kot_item):
+	return {"kot_item": kot_item}
+
+
+def _lock_item_execution_row(kot_item):
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, state, idempotency_key, revision_key, started_by, started_at,
+		       ready_by, ready_at, served_by, served_at, kot, kot_item,
+		       branch, company, production_unit, audit_log
+		FROM `tab{ITEM_EXECUTION_DOCTYPE}`
+		WHERE kot_item = %(kot_item)s
+		ORDER BY creation DESC
+		LIMIT 1
+		FOR UPDATE
+		""",
+		{"kot_item": kot_item},
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def _find_prior_result(kot_item, target_state, idempotency_key):
+	rows = frappe.get_all(
+		ITEM_EXECUTION_DOCTYPE,
+		filters={"kot_item": kot_item, "state": target_state, "idempotency_key": idempotency_key},
+		fields=[
+			"name", "state", "idempotency_key", "revision_key", "started_by", "started_at",
+			"ready_by", "ready_at", "served_by", "served_at", "kot", "kot_item",
+			"branch", "company",
+		],
+		order_by="creation desc",
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
+def _result_dict(row, idempotent=False):
+	return {
+		"name": row.get("name"),
+		"kot": row.get("kot"),
+		"kot_item": row.get("kot_item"),
+		"branch": row.get("branch"),
+		"company": row.get("company"),
+		"state": row.get("state"),
+		"idempotency_key": row.get("idempotency_key"),
+		"revision_key": row.get("revision_key"),
+		"started_by": row.get("started_by"),
+		"started_at": row.get("started_at"),
+		"ready_by": row.get("ready_by"),
+		"ready_at": row.get("ready_at"),
+		"served_by": row.get("served_by"),
+		"served_at": row.get("served_at"),
+		"idempotent_replay": idempotent,
+	}
+
+
+def _new_revision_key():
+	"""Mint a fresh line-revision identity.
+
+	See `bump_item_execution_revision` for what "revision" means here and
+	why it must not be `idempotency_key`.
+	"""
+	return frappe.generate_hash(length=32)
+
+
+def bump_item_execution_revision(kot_item, actor=None, reason=None):
+	"""Advance a KOT item's `revision_key` because the LINE ITSELF changed.
+
+	Call this -- and only this -- from code paths that represent a genuine
+	edit or re-fire of an order line: a quantity change after the kitchen
+	already produced it, or a re-fire after a failed production run. It is
+	the single writer of `revision_key`.
+
+	Why a separate field at all: `idempotency_key` is a per-RPC replay
+	token. The Mosaic client mints a fresh UUID for *each* call
+	(`mark_item_ready`, then `serve_item_execution`), and `_transition`
+	rewrites the row's copy on every state change so `_find_prior_result`
+	can dedupe replays of that specific call. It therefore answers "which
+	RPC was this?", never "which version of the line is this?". The G-07
+	stale-posting gate needs the latter: it compares the revision frozen
+	onto the READY-time posting intent against the row's current revision.
+	Pointing that gate at `idempotency_key` made it compare the READY call's
+	UUID against the SERVED call's UUID, which can never match -- a false
+	"stale production posting" block on every normally served made-to-order
+	item.
+
+	The real protection G-07 exists for is preserved: the quantity half of
+	the gate independently catches "order edited upward after READY", and a
+	genuine re-fire routed through this function still trips the revision
+	half.
+	"""
+	_require_item_execution_doctype()
+	_require_kot_item(kot_item)
+	actor = actor or frappe.session.user
+	locked = _lock_item_execution_row(kot_item)
+	if not locked:
+		raise ItemExecutionError(
+			KOT_ITEM_NOT_FOUND,
+			_("No execution row exists for KOT item {0}").format(kot_item),
+		)
+	_require_execution_actor(actor, locked["branch"], locked["company"])
+	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, locked["name"])
+	doc.audit_log = locked["audit_log"]
+	doc.revision_key = _new_revision_key()
+	_audit(doc, actor, reason or "revise")
+	doc.save(ignore_permissions=True)
+	return _result_dict(doc.as_dict(), idempotent=False)
+
+
+def _attach_ready_posting_intent(result, actor):
+	if result.get("idempotent_replay"):
+		return result
+
+	# There are two distinct stock ledgers here, with one owner each, and
+	# they are NOT competitors for the same quantity:
+	#
+	#   Sale       -- owned by native ERPNext, always, in every mode. Posted
+	#                 once per session at POS Closing Entry, via the
+	#                 consolidated Sales Invoice's `update_stock = 1`. The
+	#                 POS Invoice itself posts nothing (it has no
+	#                 `update_stock` field), so nothing here suppresses
+	#                 anything: native's deduction is never opted out of.
+	#   Production -- owned by the fulfilment posting service, and only when
+	#                 POS Stock Authority V2 is enabled. Posted in real time
+	#                 at READY, as a `Manufacture` Stock Entry that consumes
+	#                 raw components and receives the finished good into the
+	#                 same department warehouse the sale later deducts from,
+	#                 so the two net out.
+	#
+	# With the flag off there is simply no production ledger: the item is
+	# deducted once, by native, at closing. A quiet no-op (not a thrown
+	# error) because READY is a routine kitchen-workflow transition that must
+	# keep working in the default configuration.
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+
+	branch = result.get("branch")
+	company = result.get("company")
+	policy = get_branch_stock_policy(branch=branch, company=company)
+	if not policy.realtime_production_posting_enabled:
+		result["posting_intent"] = None
+		result["posting_intent_status"] = "SKIPPED_NATIVE_POS_AUTHORITY"
+		return result
+
+	from ury.ury.api.ury_fulfilment_posting_service import (
+		create_or_get_posting_intent_for_ready,
+		enqueue_posting_intent,
+	)
+
+	# Only MADE_TO_ORDER items have a production event to post here; the
+	# service itself decides that, from the policy frozen onto the
+	# reservation at order time, and returns a name-less intent with status
+	# "SKIPPED_NOT_MADE_TO_ORDER" for anything else. Keeping the decision
+	# there rather than duplicating a policy lookup here means it is made
+	# once, from the authoritative frozen value, for every caller.
+	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, result["name"])
+	intent = create_or_get_posting_intent_for_ready(doc, actor=actor)
+	result["posting_intent"] = intent.get("name")
+	result["posting_intent_status"] = intent.get("status")
+	if intent.get("name"):
+		enqueue_posting_intent(intent["name"])
+	return result
+
+
+def _aggregate_state(rows):
+	states = [row.get("state") for row in rows]
+	if not states:
+		return QUEUED
+	if all(state == SERVED for state in states):
+		return SERVED
+	if any(state in (READY, SERVED) for state in states):
+		return READY
+	if any(state == IN_PREPARATION for state in states):
+		return IN_PREPARATION
+	return QUEUED
+
+
+def _lock_sibling_item_execution_rows(kot):
+	"""Lock every `URY KOT Item Execution` row for `kot` with `FOR UPDATE`.
+
+	`_transition` only locks the single item row it is mutating (via
+	`_lock_item_execution_row`); by the time this function runs, that row's
+	own transition has already been written. A concurrent transition on a
+	*sibling* item of the same KOT can be mutating another row right now. A
+	plain `get_all` here would be served from whatever consistent-read
+	snapshot this transaction already pinned (e.g. via `_find_prior_result`
+	earlier in the same request), which can be older than that concurrent
+	sibling's commit -- so the KOT-level aggregate would be computed from a
+	stale sibling set. Locking every sibling row up front forces MariaDB to
+	wait for any in-flight sibling transaction and then read its latest
+	committed state, bypassing the pinned snapshot.
+	"""
+	return frappe.db.sql(
+		f"""
+		SELECT name, state, idempotency_key, started_by, started_at,
+		       ready_by, ready_at, served_by, served_at
+		FROM `tab{ITEM_EXECUTION_DOCTYPE}`
+		WHERE kot = %(kot)s
+		ORDER BY creation ASC
+		FOR UPDATE
+		""",
+		{"kot": kot},
+		as_dict=True,
+	)
+
+
+def _sync_kot_execution(kot):
+	rows = _lock_sibling_item_execution_rows(kot)
+	if not rows:
+		return None
+	state = _aggregate_state(rows)
+	branch, company, production_unit = _kot_scope(kot)
+	aggregate = frappe.get_all(
+		KOT_EXECUTION_DOCTYPE,
+		filters={"kot": kot},
+		fields=["name", "state", "idempotency_key", "started_by", "started_at", "ready_by", "ready_at", "served_by", "served_at"],
+		limit=1,
+	)
+	if aggregate:
+		doc = frappe.get_doc(KOT_EXECUTION_DOCTYPE, aggregate[0]["name"])
+	else:
+		doc = frappe.get_doc({"doctype": KOT_EXECUTION_DOCTYPE, "kot": kot, "state": QUEUED, "branch": branch, "company": company, "production_unit": production_unit, "idempotency_key": rows[0].get("idempotency_key") or kot})
+	doc.state = state
+	doc.idempotency_key = rows[0].get("idempotency_key") or kot
+	if state == SERVED:
+		served = next(row for row in reversed(rows) if row.get("served_by"))
+		doc.set("served_by", served.get("served_by"))
+		doc.set("served_at", served.get("served_at"))
+	elif state == READY:
+		ready = next(row for row in reversed(rows) if row.get("ready_by"))
+		doc.set("ready_by", ready.get("ready_by"))
+		doc.set("ready_at", ready.get("ready_at"))
+	elif state == IN_PREPARATION:
+		started = next(row for row in reversed(rows) if row.get("started_by"))
+		doc.set("started_by", started.get("started_by"))
+		doc.set("started_at", started.get("started_at"))
+	if aggregate:
+		doc.save(ignore_permissions=True)
+	else:
+		doc.insert(ignore_permissions=True)
+	return doc.as_dict()
+
+
+def seed_kot_item_executions(kot, actor=None):
+	"""Materialize one execution row per KOT item.
+
+	This is idempotent and safe to call on KOT submit.
+	"""
+	_require_item_execution_doctype()
+	_require_kot(kot)
+	actor = actor or frappe.session.user
+	branch, company, production_unit = _kot_scope(kot)
+	created = []
+	for row in _kot_items(kot):
+		kot_item = row.get("name")
+		_require_kot_item(kot_item)
+		if frappe.db.exists(ITEM_EXECUTION_DOCTYPE, {"kot_item": kot_item}):
+			continue
+		frappe.db.savepoint("ury_seed_kot_item_execution")
+		doc = frappe.get_doc({
+			"doctype": ITEM_EXECUTION_DOCTYPE,
+			"kot": kot,
+			"kot_item": kot_item,
+			"state": QUEUED,
+			"branch": branch,
+			"company": company,
+			"production_unit": production_unit,
+			"idempotency_key": kot_item,
+			# First revision of this line. Distinct from `idempotency_key`
+			# (a per-RPC replay token) and advanced only by
+			# `bump_item_execution_revision`, never by a state transition.
+			"revision_key": _new_revision_key(),
+		})
+		_audit(doc, actor, "seed")
+		try:
+			doc.insert(ignore_permissions=True)
+		except DuplicateEntryError:
+			# A concurrent submit won the unique kot_item insert.
+			frappe.db.rollback(save_point="ury_seed_kot_item_execution")
+			continue
+		created.append(doc.as_dict())
+	_sync_kot_execution(kot)
+	return created
+
+
+def seed_kot_item_executions_on_submit(doc, method=None):
+	"""Seed item execution rows while allowing an older site to migrate."""
+	try:
+		# Pass doc.name, not doc itself: seed_kot_item_executions()/_kot_items()
+		# feed this straight into frappe.get_doc(KOT_DOCTYPE, kot). A Document
+		# is dict-like, so passing the Document there makes frappe.get_doc
+		# treat it as a *filter dict* instead of a name lookup -- it silently
+		# resolves to whatever row the filter happens to match (occasionally
+		# the same KOT by luck, since its own field values are self-
+		# consistent, but just as easily an unrelated KOT, e.g. a cancelled
+		# one) rather than raising. That produced a live, reproducible bug:
+		# KOT Item Execution rows sometimes seeded against the wrong KOT and
+		# sometimes not created at all for the KOT that just submitted, with
+		# no error surfaced anywhere (found while live-bench verifying
+		# tracks/sa-nontable-production-gap; see test_seed_on_submit_uses_kot_name_not_document
+		# for the regression test).
+		return seed_kot_item_executions(doc.name)
+	except ItemExecutionError as exc:
+		if exc.reason_code == ITEM_EXECUTION_DOCTYPE_NOT_FOUND:
+			frappe.logger("ury").warning(
+				"Skipping KOT item execution seed because %s is not installed yet",
+				ITEM_EXECUTION_DOCTYPE,
+			)
+			return []
+		raise
+
+
+def _transition(kot_item, target_state, idempotency_key, actor_field, timestamp_field, event):
+	_require_item_execution_doctype()
+	_require_kot_item(kot_item)
+	if not idempotency_key:
+		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("idempotency_key is required"))
+	# The actor is always the authenticated session user. Callers cannot
+	# supply an actor value, which would otherwise allow false audit
+	# attribution or an authorization bypass via a spoofed identity.
+	actor = frappe.session.user
+	kot = _kot_for_item(kot_item)
+	if kot:
+		branch, company, _production_unit = _kot_scope(kot)
+		_require_execution_actor(actor, branch, company)
+	prior = _find_prior_result(kot_item, target_state, idempotency_key)
+	if prior:
+		return _result_dict(prior, idempotent=True)
+	locked = _lock_item_execution_row(kot_item)
+	if not locked:
+		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("No execution row exists for KOT item {0}").format(kot_item))
+	# Authorize from the just-locked row's own branch/company columns rather
+	# than re-deriving scope from the KOT doc with a fresh plain read: that
+	# plain read would be served from this transaction's pinned consistent-
+	# read snapshot (established earlier by e.g. `_find_prior_result`), which
+	# can be stale relative to the row we just took `FOR UPDATE` on. The
+	# locked row's branch/company/production_unit are stamped once at seed
+	# time and are exactly what `_kot_scope(locked["kot"])` would resolve to.
+	_require_execution_actor(actor, locked["branch"], locked["company"])
+	if locked["state"] == target_state:
+		return _result_dict(locked, idempotent=True)
+	if locked["state"] not in (QUEUED, IN_PREPARATION, READY) or (locked["state"] == QUEUED and target_state not in (IN_PREPARATION, READY)):
+		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("Cannot transition KOT item {0} execution from {1} to {2}").format(kot_item, locked["state"], target_state))
+	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, locked["name"])
+	# `doc.audit_log` above came from the same pinned-snapshot plain read as
+	# the scope lookup would have; overwrite it with the value from the
+	# locked row so the read-modify-write in `_audit` below appends onto the
+	# latest committed audit_log rather than silently dropping a
+	# concurrently committed entry.
+	doc.audit_log = locked["audit_log"]
+	doc.state = target_state
+	# Per-RPC replay token only: this is what `_find_prior_result` matches on,
+	# so it must track the call that is being applied right now. It is
+	# deliberately NOT the line's revision -- `revision_key` is that, and
+	# nothing in this generic transition path may touch it (only
+	# `bump_item_execution_revision` may). Writing a revision here is what
+	# made every normal READY -> SERVED progression look "stale" to the G-07
+	# gate at POS Invoice submit.
+	doc.idempotency_key = idempotency_key
+	doc.set(actor_field, actor)
+	doc.set(timestamp_field, frappe.utils.now())
+	_audit(doc, actor, event)
+	doc.save(ignore_permissions=True)
+	_sync_kot_execution(doc.kot)
+	return _result_dict(doc.as_dict(), idempotent=False)
+
+
+@frappe.whitelist()
+def start_item_execution(kot_item, idempotency_key):
+	return _transition(kot_item, IN_PREPARATION, idempotency_key, "started_by", "started_at", "start")
+
+
+@frappe.whitelist()
+def mark_item_ready(kot_item, idempotency_key):
+	actor = frappe.session.user
+	# READY is not a valid durable state without a corresponding posting
+	# intent. Keep both writes inside one savepoint so missing reservations,
+	# migration drift, or enqueue failures cannot leave the item READY alone.
+	savepoint = "ury_ready_posting_intent"
+	frappe.db.savepoint(savepoint)
+	try:
+		result = _transition(kot_item, READY, idempotency_key, "ready_by", "ready_at", "mark_ready")
+		return _attach_ready_posting_intent(result, actor)
+	except Exception:
+		frappe.db.rollback(save_point=savepoint)
+		raise
+
+
+@frappe.whitelist()
+def serve_item_execution(kot_item, idempotency_key):
+	kot = _kot_for_item(kot_item)
+	if kot:
+		kot_type = frappe.db.get_value(KOT_DOCTYPE, kot, "type")
+		if kot_type in ("Cancelled", "Partially cancelled"):
+			raise ItemExecutionError(
+				INVALID_EXECUTION_TRANSITION,
+				_("KOT has been cancelled and cannot be served"),
+			)
+	return _transition(kot_item, SERVED, idempotency_key, "served_by", "served_at", "serve")
+
+
+def get_kot_execution_state(kot):
+	rows = frappe.get_all(ITEM_EXECUTION_DOCTYPE, filters={"kot": kot}, fields=["state"], order_by="creation asc")
+	return _aggregate_state(rows)

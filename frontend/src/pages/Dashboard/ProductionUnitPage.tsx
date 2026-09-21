@@ -12,6 +12,8 @@ interface ProductionUnitRecord {
   production?: string;
   production_unit_name?: string;
   branch?: string;
+  department?: string;
+  pos_profile?: string;
   item_groups?: any;
 }
 
@@ -34,11 +36,15 @@ export const ProductionUnitPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   const [branches, setBranches] = useState<{ name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ name: string }[]>([]);
+  const [posProfiles, setPosProfiles] = useState<{ name: string }[]>([]);
   const [itemGroupOptions, setItemGroupOptions] = useState<{ name: string; item_group_name?: string }[]>([]);
 
   const [newUnit, setNewUnit] = useState({
     production_unit_name: '',
     branch: '',
+    department: '',
+    pos_profile: '',
   });
   const [originalUnit, setOriginalUnit] = useState<any>(null);
 
@@ -50,6 +56,15 @@ export const ProductionUnitPage: React.FC = () => {
       setBranches(res || []);
     } catch {
       setBranches([]);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await dashboardService.getModuleRecords<{ name: string }>('URY Production Department', 'all');
+      setDepartments(res || []);
+    } catch {
+      setDepartments([]);
     }
   };
 
@@ -70,6 +85,15 @@ export const ProductionUnitPage: React.FC = () => {
     }
   };
 
+  const fetchPosProfiles = async (branch?: string) => {
+    try {
+      const res = await dashboardService.getModuleRecords<{ name: string }>('POS Profile', branch || 'all');
+      setPosProfiles(res || []);
+    } catch {
+      setPosProfiles([]);
+    }
+  };
+
   const fetchUnits = async () => {
     setLoading(true);
     try {
@@ -84,15 +108,26 @@ export const ProductionUnitPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
+    fetchDepartments();
     fetchItemGroupOptions();
     fetchUnits();
   }, [activeBranchId]);
+
+  // Keep the POS Profile options scoped to the branch currently selected in the form,
+  // since branch/warehouse on the backend are unconditionally fetched from pos_profile.
+  useEffect(() => {
+    if (isDrawerOpen) {
+      fetchPosProfiles(newUnit.branch);
+    }
+  }, [isDrawerOpen, newUnit.branch]);
 
   const openAddDrawer = () => {
     setEditingUnit(null);
     setNewUnit({
       production_unit_name: '',
       branch: activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || ''),
+      department: '',
+      pos_profile: '',
     });
     setItemGroupRows([createEmptyItemGroupRow()]);
     setIsDrawerOpen(true);
@@ -127,11 +162,15 @@ export const ProductionUnitPage: React.FC = () => {
       const initialForm = {
         production_unit_name: data.production || data.production_unit_name || data.name,
         branch: data.branch || '',
+        department: data.department || '',
+        pos_profile: data.pos_profile || '',
         item_groups: rows.map(r => r.item_group.trim()).filter(g => g).sort(),
       };
       setNewUnit({
         production_unit_name: initialForm.production_unit_name,
         branch: initialForm.branch,
+        department: initialForm.department,
+        pos_profile: initialForm.pos_profile,
       });
       setItemGroupRows(rows);
       setOriginalUnit(initialForm);
@@ -139,11 +178,15 @@ export const ProductionUnitPage: React.FC = () => {
       const initialForm = {
         production_unit_name: unit.production || unit.production_unit_name || unit.name,
         branch: unit.branch || '',
+        department: unit.department || '',
+        pos_profile: unit.pos_profile || '',
         item_groups: [],
       };
       setNewUnit({
         production_unit_name: initialForm.production_unit_name,
         branch: initialForm.branch,
+        department: initialForm.department,
+        pos_profile: initialForm.pos_profile,
       });
       setItemGroupRows([createEmptyItemGroupRow()]);
       setOriginalUnit(initialForm);
@@ -157,6 +200,11 @@ export const ProductionUnitPage: React.FC = () => {
     const prodName = newUnit.production_unit_name.trim();
     if (!prodName) {
       showToast.error('Production Unit Name is required');
+      return;
+    }
+
+    if (!newUnit.department) {
+      showToast.error('Department is required');
       return;
     }
 
@@ -179,11 +227,15 @@ export const ProductionUnitPage: React.FC = () => {
       const original = {
         production_unit_name: (originalUnit.production_unit_name || '').trim(),
         branch: originalUnit.branch || '',
+        department: originalUnit.department || '',
+        pos_profile: originalUnit.pos_profile || '',
         item_groups: originalUnit.item_groups || [],
       };
       const current = {
         production_unit_name: prodName,
         branch: newUnit.branch || '',
+        department: newUnit.department || '',
+        pos_profile: newUnit.pos_profile || '',
         item_groups: [...selectedGroups].sort(),
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
@@ -202,6 +254,8 @@ export const ProductionUnitPage: React.FC = () => {
       const payload = {
         production: prodName,
         branch: newUnit.branch,
+        department: newUnit.department,
+        pos_profile: newUnit.pos_profile,
         item_groups: childTableData
       };
 
@@ -283,6 +337,7 @@ export const ProductionUnitPage: React.FC = () => {
           columns={[
             { key: 'production', header: 'Production Unit', render: (row) => <span className="font-semibold">{row.production || row.production_unit_name || row.name}</span> },
             { key: 'branch', header: 'Branch', render: (row) => row.branch || 'Main' },
+            { key: 'department', header: 'Department', render: (row) => row.department || '-' },
             { key: 'item_groups', header: 'Item Groups', render: (row) => {
               let itemGroupsStr = '';
               if (Array.isArray(row.item_groups)) {
@@ -334,10 +389,40 @@ export const ProductionUnitPage: React.FC = () => {
             <SearchableSelect
               id="branch"
               value={newUnit.branch}
-              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val })}
+              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val, pos_profile: '' })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
               placeholder="Select Branch..."
             />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">
+              Department <span className="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              id="department"
+              value={newUnit.department}
+              onChange={(_, val) => setNewUnit({ ...newUnit, department: val })}
+              options={departments.map(d => ({ value: d.name, label: d.name }))}
+              placeholder="Select Department..."
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">
+              POS Profile
+            </label>
+            <SearchableSelect
+              id="pos_profile"
+              value={newUnit.pos_profile}
+              onChange={(_, val) => setNewUnit({ ...newUnit, pos_profile: val })}
+              options={posProfiles.map(p => ({ value: p.name, label: p.name }))}
+              placeholder="Select POS Profile..."
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Options are limited to POS Profiles for the selected Branch. Branch and Warehouse
+              on this unit are always taken from the chosen POS Profile when it is saved.
+            </p>
           </div>
 
           {/* Item Groups Section */}

@@ -18,6 +18,12 @@ interface UryRoomRecord {
   block_takeaway?: number;
 }
 
+interface PrinterSetting {
+  name?: string; // Frappe's document name for existing child rows
+  bill: number;
+  printer: string;
+}
+
 export const RoomPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [rooms, setRooms] = useState<UryRoomRecord[]>([]);
@@ -25,6 +31,7 @@ export const RoomPage: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<UryRoomRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  const [originalRoomDisplayName, setOriginalRoomDisplayName] = useState<string>('');
 
   // Branch options
   const [branches, setBranches] = useState<{ name: string }[]>([]);
@@ -38,12 +45,24 @@ export const RoomPage: React.FC = () => {
     block_takeaway: false,
   });
 
+  const [printerSettings, setPrinterSettings] = useState<PrinterSetting[]>([]);
+  const [networkPrinters, setNetworkPrinters] = useState<{ name: string }[]>([]);
+
   const fetchBranches = async () => {
     try {
       const res = await dashboardService.getModuleRecords<{ name: string }>('Branch', 'all');
       setBranches(res || []);
     } catch {
       setBranches([]);
+    }
+  };
+
+  const fetchNetworkPrinters = async () => {
+    try {
+      const res = await dashboardService.getModuleRecords<{ name: string }>('Network Printer Settings', 'all');
+      setNetworkPrinters(res || []);
+    } catch {
+      setNetworkPrinters([]);
     }
   };
 
@@ -61,11 +80,13 @@ export const RoomPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
+    fetchNetworkPrinters();
     fetchRooms();
   }, [activeBranchId]);
 
   const openAddDrawer = () => {
     setEditingRoom(null);
+    setOriginalRoomDisplayName('');
     setNewRoom({
       room_name: '',
       room_type: 'AC',
@@ -74,16 +95,19 @@ export const RoomPage: React.FC = () => {
       print_format: '',
       block_takeaway: false,
     });
+    setPrinterSettings([]);
     setIsDrawerOpen(true);
   };
 
-  const openEditDrawer = (room: any) => {
+  const openEditDrawer = async (room: any) => {
     setEditingRoom(room);
     // Derive display name from room.name, stripping branch suffix if present
     let displayName = room.name;
     if (room.branch && displayName.endsWith(` - ${room.branch}`)) {
       displayName = displayName.substring(0, displayName.length - (` - ${room.branch}`).length);
     }
+    // Store the original display name to use for rename detection later
+    setOriginalRoomDisplayName(displayName);
     setNewRoom({
       room_name: displayName,
       room_type: room.room_type || 'AC',
@@ -92,6 +116,20 @@ export const RoomPage: React.FC = () => {
       print_format: room.print_format || '',
       block_takeaway: room.block_takeaway === 1,
     });
+
+    // Fetch full document including printer_settings child table
+    try {
+      const response = await call('frappe.client.get', {
+        doctype: 'URY Room',
+        name: room.name,
+      });
+      const fullDoc = response.message || response;
+      setPrinterSettings(fullDoc.printer_settings || []);
+    } catch (err) {
+      console.error('Failed to fetch full room document', err);
+      setPrinterSettings([]);
+    }
+
     setIsDrawerOpen(true);
   };
 
@@ -101,14 +139,11 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
-        // Derive display name from room.name, stripping branch suffix if present
-        let originalDisplayName = editingRoom.name;
-        if (editingRoom.branch && originalDisplayName.endsWith(` - ${editingRoom.branch}`)) {
-          originalDisplayName = originalDisplayName.substring(0, originalDisplayName.length - (` - ${editingRoom.branch}`).length);
-        }
-
+        // Use the stored original display name (captured when drawer opened) for accurate comparison.
+        // This avoids issues where reconstructing the name from stored values could fail due to
+        // whitespace differences in the branch field or other formatting edge cases.
         const original = {
-          room_name: originalDisplayName || '',
+          room_name: originalRoomDisplayName || '',
           room_type: editingRoom.room_type || 'AC',
           branch: editingRoom.branch || '',
           kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
@@ -130,14 +165,20 @@ export const RoomPage: React.FC = () => {
         }
 
         let currentName = editingRoom.name;
-        const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
-        if (newDocName !== editingRoom.name) {
-          await call('frappe.client.rename_doc', {
-            doctype: 'URY Room',
-            old_name: editingRoom.name,
-            new_name: newDocName,
-          });
-          currentName = newDocName;
+        // Only rename if the user actually changed the room name field
+        if (newRoom.room_name !== originalRoomDisplayName) {
+          // Construct new and old document names consistently using the stored display name
+          const oldDocName = editingRoom.branch ? `${originalRoomDisplayName} - ${editingRoom.branch}` : originalRoomDisplayName;
+          const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+
+          if (newDocName !== oldDocName) {
+            await call('frappe.client.rename_doc', {
+              doctype: 'URY Room',
+              old_name: editingRoom.name,
+              new_name: newDocName,
+            });
+            currentName = newDocName;
+          }
         }
 
         await call('frappe.client.set_value', {
@@ -149,6 +190,7 @@ export const RoomPage: React.FC = () => {
             kot_printing: newRoom.kot_printing ? 1 : 0,
             print_format: newRoom.print_format,
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
+            printer_settings: printerSettings,
           },
         });
       } else {
@@ -161,6 +203,7 @@ export const RoomPage: React.FC = () => {
             kot_printing: newRoom.kot_printing ? 1 : 0,
             print_format: newRoom.print_format,
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
+            printer_settings: [],
           },
         });
       }
@@ -315,7 +358,76 @@ export const RoomPage: React.FC = () => {
                 />
                 <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
               </div>
+
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Printer Settings</h3>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setPrinterSettings([...printerSettings, { bill: 1, printer: '' }]);
+                }}
+                className="text-primary border-primary"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add
+              </Button>
+            </div>
+
+            {printerSettings.length === 0 ? (
+              <p className="text-sm text-gray-500 py-3">No printer settings configured</p>
+            ) : (
+              <div className="space-y-3">
+                {printerSettings.map((setting, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-200">
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <Switch
+                        checked={setting.bill === 1}
+                        onCheckedChange={(checked) => {
+                          const updated = [...printerSettings];
+                          updated[idx].bill = checked ? 1 : 0;
+                          setPrinterSettings(updated);
+                        }}
+                      />
+                      <label className="text-sm text-gray-700 cursor-pointer">Bill</label>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <SearchableSelect
+                        id={`printer_${idx}`}
+                        value={setting.printer}
+                        onChange={(_, value) => {
+                          const updated = [...printerSettings];
+                          updated[idx].printer = value;
+                          setPrinterSettings(updated);
+                        }}
+                        options={[
+                          { value: '', label: 'Select Printer' },
+                          ...networkPrinters.map(p => ({ value: p.name, label: p.name }))
+                        ]}
+                      />
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setPrinterSettings(printerSettings.filter((_, i) => i !== idx));
+                      }}
+                      className="text-red-500 hover:text-red-700 flex-shrink-0"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">

@@ -51,8 +51,55 @@ const MenuCard: FC<MenuCardProps> = ({
     };
   }, [item, branch, company]);
 
-  const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0);
-  const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null;
+  // `available_qty == null` means "unconstrained" (e.g. an "Always
+  // Available" override) -- never treat it as zero/out-of-stock.
+  const isUnavailable =
+    !!availability &&
+    (!availability.sellable ||
+      (availability.available_qty != null && availability.available_qty <= 0));
+  const unavailableMessage = isUnavailable
+    ? getAvailabilityMessage(availability?.reason_code)
+    : null;
+
+  // Determine badge variant and text for availability status
+  const getAvailabilityTag = (): {
+    variant: 'tagDestructive' | 'tagWarning' | 'tagSuccess';
+    text: string;
+    showDot: boolean;
+  } | null => {
+    if (!availability) return null;
+
+    if (
+      !availability.sellable ||
+      (availability.available_qty != null && availability.available_qty <= 0)
+    ) {
+      return {
+        variant: 'tagDestructive',
+        text: unavailableMessage || 'Unavailable',
+        showDot: false,
+      };
+    }
+
+    if (availability.available_qty != null && availability.available_qty < 5) {
+      return {
+        variant: 'tagWarning',
+        text: `${availability.available_qty} left`,
+        showDot: false,
+      };
+    }
+
+    if (availability.available_qty == null) {
+      return { variant: 'tagSuccess', text: 'Available', showDot: true };
+    }
+
+    return {
+      variant: 'tagSuccess',
+      text: `${availability.available_qty} left`,
+      showDot: true,
+    };
+  };
+
+  const availabilityTag = getAvailabilityTag();
 
   return (
     <MenuItemCard
@@ -61,8 +108,8 @@ const MenuCard: FC<MenuCardProps> = ({
       imageUrl={item_image}
       course={course}
       onClick={onClick}
-      disabled={disabled}
-      unavailableMessage={unavailableMessage}
+      disabled={disabled || isUnavailable}
+      availabilityTag={availabilityTag}
     />
   );
 };

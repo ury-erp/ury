@@ -8,3 +8,15 @@ ury.patches.v2_0.fix_waiter_order_slip_print_format
 ury.patches.v3_0.repair_waiter_user_values
 ury.patches.v3_0.backfill_invoice_employee_attribution
 ury.patches.v3_0.backfill_pos_invoice_item_entered_by
+ury.patches.v3_14.production_unit_department_migration
+ury.patches.v3_15.backfill_production_unit_company
+ury.patches.v3_16.add_stock_entry_posting_intent_field
+ury.patches.v3_17.backfill_bom_yield_qty_and_revision
+ury.patches.v3_18.add_batch_sourcing_mode_fields
+ury.patches.v3_19.add_pos_closing_entry_branch_field
+ury.patches.v3_20.migrate_stock_authority_flag_to_branch_policy
+ury.patches.v3_21.backfill_kot_item_execution_revision_key
+ury.patches.v3_22.backfill_sales_plan_docstatus
+ury.patches.v3_23.ensure_erpnext_address_contact_custom_fields
+ury.patches.v3_24.backfill_branch_company
+ury.patches.v3_25.add_stock_reservation_availability_index

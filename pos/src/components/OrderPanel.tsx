@@ -15,6 +15,7 @@ import type { RootState } from '../store/root-store';
 import { showToast } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
 import { t } from '../i18n';
+import { useCartAvailability, cartQtyForItem, remainingHeadroom } from '../lib/cart-capacity';
 
 const OrderPanel = () => {
   const { 
@@ -45,6 +46,15 @@ const OrderPanel = () => {
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
+
+  // B04: real-time cart capacity headroom, keyed by item_code. Display-only
+  // (see cart-capacity.ts docstring) -- sync_order remains the sole
+  // transactional authority against oversell.
+  const { availabilityByItem } = useCartAvailability({
+    itemCodes: activeOrders.map((item) => item.item),
+    branch: posProfile?.branch,
+    company: posProfile?.company,
+  });
 
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
@@ -106,7 +116,12 @@ const OrderPanel = () => {
           item_name: item.name,
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
-          comment: item.comment || undefined
+          comment: item.comment || undefined,
+          // Stable line identity — without it the server cannot tell a
+          // quantity change on an existing line from a remove + re-add, and
+          // a 1 -> 2 bump cancels the original KOT and re-fires a full one
+          // instead of raising a +1 delta (B02b).
+          reservation_line_key: item.reservationLineKey || item.uniqueId,
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,
@@ -294,15 +309,25 @@ const OrderPanel = () => {
                         -
                       </Button>
                       <span className="w-6 text-center">{item.quantity}</span>
-                      <Button
-                        onClick={() => updateQuantity(item.uniqueId!, Math.round((item.quantity + 1) * 1000) / 1000)}
-                        variant="outline"
-                        size="icon"
-                        className="w-8 h-8 rounded-full"
-                        disabled={isInteractionDisabled}
-                      >
-                        +
-                      </Button>
+                      {(() => {
+                        const headroom = remainingHeadroom(
+                          availabilityByItem[item.item],
+                          cartQtyForItem(activeOrders, item.item),
+                        );
+                        const atCapacity = headroom !== undefined && headroom <= 0;
+                        return (
+                          <Button
+                            onClick={() => updateQuantity(item.uniqueId!, Math.round((item.quantity + 1) * 1000) / 1000)}
+                            variant="outline"
+                            size="icon"
+                            className="w-8 h-8 rounded-full"
+                            disabled={isInteractionDisabled || atCapacity}
+                            title={atCapacity ? t('cart.insufficient_capacity') : undefined}
+                          >
+                            +
+                          </Button>
+                        );
+                      })()}
                     </div>
                     
                     <Button

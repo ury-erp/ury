@@ -4,6 +4,8 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from ury.ury.tests import factories as _factories
+
 
 class TestURYProductionDepartment(FrappeTestCase):
 	def make_company(self, company_name, company_abbr):
@@ -16,13 +18,7 @@ class TestURYProductionDepartment(FrappeTestCase):
 			}).insert()
 
 	def make_branch(self, branch_name, company):
-		if not frappe.db.exists("Branch", branch_name):
-			frappe.get_doc({
-				"doctype": "Branch",
-				"branch": branch_name,
-				"company": company,
-				"user": [{"user": "Administrator"}],
-			}).insert()
+		_factories.make_branch(branch=branch_name, company=company, user=[{"user": "Administrator"}])
 
 	def make_warehouse(self, warehouse_name, company):
 		if not frappe.db.exists("Warehouse", warehouse_name):
@@ -48,7 +44,6 @@ class TestURYProductionDepartment(FrappeTestCase):
 		dept.branch = branch
 		dept.department_warehouse = warehouse
 		dept.cost_center = cost_center
-		dept.issue_control_policy = "Plan Controlled"
 		return dept
 
 	def test_company_ownership_validation_warehouse_on_insert(self):
@@ -71,10 +66,11 @@ class TestURYProductionDepartment(FrappeTestCase):
 		self.make_company(company2, "T2")
 		warehouse_name = "Test Warehouse 2 - T1"
 		self.make_warehouse(warehouse_name, company1)
-		cost_center_name = "Test Cost Center 2 - T2"
-		self.make_cost_center(cost_center_name, company2)
+		cost_center_name = "Test Cost Center 2 - T1"
+		self.make_cost_center(cost_center_name, company1)
 		foreign_cost_center = "Test Cost Center 2B - T2"
 		self.make_cost_center(foreign_cost_center, company2)
+		self.make_branch("Test Branch", company1)
 
 		dept = self.make_department("Test Dept 2", company1, "Test Branch", warehouse_name, cost_center_name)
 		dept.insert()

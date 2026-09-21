@@ -34,9 +34,12 @@ from frappe.utils import add_to_date, now_datetime
 from ury.ury_pos.api import resolve_restaurant_menu
 from ury.ury.doctype.ury_order.ury_order import (
     _resolve_or_create_pos_invoice,
+    _ensure_invoice_reservation_ref,
     price_items_for_invoice,
 )
 from ury.ury.api.ury_kot_generate import kot_execute
+from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 SESSION_TOKEN_BYTES_HASH_LEN = 64  # frappe.generate_hash(length=..)
 MAX_ITEMS_PER_REQUEST = 50
@@ -113,6 +116,14 @@ def generate_qr_token(profile, table=None):
     if not frappe.has_permission("URY Self Ordering Profile", "write", frappe.get_doc("URY Self Ordering Profile", profile)):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
+    if table:
+        if not frappe.db.exists("URY Table", table):
+            frappe.throw(_("Invalid table"), frappe.ValidationError)
+        table_branch = frappe.db.get_value("URY Table", table, "branch")
+        profile_branch = frappe.db.get_value("URY Self Ordering Profile", profile, "branch")
+        if table_branch != profile_branch:
+            frappe.throw(_("Table does not belong to this restaurant"), frappe.ValidationError)
+
     secret = _get_profile_secret(profile)
     payload = f"{profile}|{table or 'PICKUP'}"
     signature = _sign(payload, secret)
@@ -145,6 +156,12 @@ def _verify_qr_token(token):
     if not profile_doc.enable_qr_table_ordering:
         frappe.throw(_("Table ordering is not enabled"), frappe.ValidationError)
     if not frappe.db.exists("URY Table", table):
+        frappe.throw(_("Invalid table"), frappe.ValidationError)
+    # Same branch-membership check the device (kiosk/tablet) path enforces
+    # in assign_device_table() -- a QR token must not be honored for a table
+    # that doesn't belong to the token's own ordering profile's branch.
+    table_branch = frappe.db.get_value("URY Table", table, "branch")
+    if table_branch != profile_doc.branch:
         frappe.throw(_("Invalid table"), frappe.ValidationError)
     return profile_doc, table, "QR Table"
 
@@ -282,6 +299,11 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
         "session": raw_session_token,
         "source": source,
         "restaurant": profile.restaurant,
+        # Company for the V3-44 availability display check (get_item_availability
+        # requires branch+company; see self-order's lib/availability.ts). Derived
+        # from profile.branch the same way _resolve_or_create_pos_invoice() already
+        # does (see this file's invoice.company fallback), never guessed client-side.
+        "company": frappe.db.get_value("Branch", profile.branch, "company"),
         "table": table,
         # "Mobile" for QR sessions (no device involved); otherwise the
         # provisioned URY Ordering Device's configured layout (Tablet /
@@ -394,14 +416,6 @@ def get_customer_product(session, item_code):
     profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
 
     with _elevated():
-        item = frappe.db.get_value(
-            "Item", item_code,
-            ["item_code", "item_name", "description", "image"],
-            as_dict=True,
-        )
-        if not item:
-            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
-
         # Resolve the same price list add_customer_items()/price_items_for_invoice()
         # would end up using for this session, so variant/add-on rates aren't
         # null: resolve_restaurant_menu() picks the active menu the same way
@@ -413,6 +427,22 @@ def get_customer_product(session, item_code):
         order_type = "Dine In" if session.table else "Take Away"
         branch = frappe.db.get_value("URY Self Ordering Profile", session.ordering_profile, "branch")
         menu = resolve_restaurant_menu(branch=branch, room=None, order_type=order_type, cashier=False)
+
+        # U12: a guest session must only be able to fetch metadata for an
+        # Item that's actually on its active menu -- not any arbitrary Item
+        # in the system.
+        menu_item_codes = {row.get("item") for row in (menu.get("items") or [])}
+        if item_code not in menu_item_codes:
+            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
+
+        item = frappe.db.get_value(
+            "Item", item_code,
+            ["item_code", "item_name", "description", "image"],
+            as_dict=True,
+        )
+        if not item:
+            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
+
         price_list = frappe.db.get_value(
             "Price List", {"restaurant_menu": menu["name"], "enabled": 1}, "name"
         )
@@ -653,6 +683,31 @@ def add_customer_items(session, items):
             for code in past_qty_by_item
         ]
 
+        # Mirror sync_order()'s reservation gate (ury_order.py ~L1644) so a
+        # self-order cannot silently save/KOT an item whose production
+        # config is PLAN_EXHAUSTED / FG_OUT_OF_STOCK / NOT_PRODUCED /
+        # DEPARTMENT_DISABLED. `clean_items` already carries the same
+        # {"item": ..., "qty": ...} shape sync_order() passes as
+        # accepted_items, and `past_item` the same {"item_code": ...}
+        # shape it passes as previous_items, so this call reuses the exact
+        # same reconciliation/pre-flight path staff POS orders go through.
+        # reconcile_order_reservations() raises a clean frappe.throw(...,
+        # frappe.ValidationError) naming the item and reason on rejection
+        # (see _check_line_availability / the rejections block in
+        # ury_order_reservation_service.py) -- no raw traceback reaches the
+        # customer, consistent with this module's other ValidationError
+        # throws.
+        _self_order_company = invoice.company or frappe.db.get_value("Branch", invoice.branch, "company")
+        if get_branch_stock_policy(branch=invoice.branch, company=_self_order_company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=_ensure_invoice_reservation_ref(invoice),
+                previous_items=past_item,
+                accepted_items=clean_items,
+                branch=invoice.branch,
+                company=_self_order_company,
+                actor=frappe.session.user,
+            )
+
         menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
         priced_items = price_items_for_invoice(
             clean_items, invoice.selling_price_list, profile.pos_profile, invoice.branch, menu,
@@ -704,7 +759,14 @@ def add_customer_items(session, items):
             ]
             kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, current_items_for_kot, past_item, None)
         except Exception as e:
+            # Same class of bug as sa-post-373-review-fixes Blocker 2 in
+            # sync_order(): swallowing this exception let a QR self-order be
+            # fully accepted (invoice saved, customer sees confirmation)
+            # while the kitchen silently never received one or more items.
+            # Log for diagnostics, then re-raise so the whole confirm
+            # request -- including the invoice.save() above -- rolls back.
             frappe.log_error(f"Self-order KOT creation failed: {e}", "KOT Error")
+            frappe.throw(_("Failed to create kitchen order ticket(s) for this order: {0}").format(str(e)))
 
     return _sanitize_invoice_for_customer(invoice)
 

@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from ury.ury.controllers.setup_redirect import is_ury_setup_complete
+
 @frappe.whitelist()
 def get_business_setup():
     if frappe.session.user == "Guest":
@@ -40,6 +42,14 @@ def get_branches():
 def update_business_setup(branch=None, restaurant=None):
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
+
+    # Branch/Restaurant are business-configuration records; require the
+    # caller to actually hold write permission on them (URY Manager per
+    # this app's DocPerm fixtures -- note System Manager is NOT granted
+    # write on Branch/URY Restaurant here, live-verified against the
+    # actual fixtures) rather than trusting any authenticated session.
+    if not frappe.has_permission("Branch", "write") or not frappe.has_permission("URY Restaurant", "write"):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
 
     if branch:
         if isinstance(branch, str):
@@ -91,11 +101,47 @@ def update_business_setup(branch=None, restaurant=None):
             
     return {"status": "success"}
 
+# Roles a non-System-Manager caller is allowed to hand out via
+# create_setup_user(). Anything not in this set (System Manager,
+# Administrator, etc.) requires the caller to already be a System Manager.
+_SELF_SERVICE_SETUP_ROLES = {"URY Cashier", "URY Captain", "URY Manager"}
+
+
+def _is_bootstrap_setup():
+    """True only while this site has no real System Manager user yet and
+    setup has not been completed -- the one-time window a fresh install is
+    meant to be configured through before any authentication exists."""
+    from frappe.utils import cint
+
+    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+        return False
+
+    existing_managers = frappe.get_all(
+        "Has Role",
+        filters={"role": "System Manager", "parenttype": "User"},
+        fields=["parent"],
+    )
+    real_managers = {r.parent for r in existing_managers if r.parent not in ("Administrator", "Guest")}
+    return not real_managers
+
+
 @frappe.whitelist()
 def create_setup_user(email, name, password=None, role="URY Cashier"):
+    caller = frappe.session.user
+    is_system_manager = caller == "Administrator" or "System Manager" in frappe.get_roles(caller)
+
+    if not is_system_manager and not _is_bootstrap_setup():
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if not is_system_manager and role not in _SELF_SERVICE_SETUP_ROLES:
+        # A caller who isn't already a System Manager (including the
+        # one-time bootstrap window, where nobody is authenticated yet)
+        # cannot mint a user with an elevated/arbitrary role.
+        frappe.throw(_("Not permitted to assign role {0}").format(role), frappe.PermissionError)
+
     if frappe.db.exists("User", email):
         return {"status": "exists", "email": email}
-    
+
     user = frappe.get_doc({
         "doctype": "User",
         "email": email,
@@ -105,6 +151,10 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
         "user_type": "System User",
         "roles": [{"role": role}]
     })
+    # Permission check above already gates who may reach this point and
+    # which role they may assign; ignore_permissions is only needed because
+    # a Guest-tier bootstrap caller has no User-doctype create permission at
+    # all yet, which is expected during the one-time setup window.
     user.insert(ignore_permissions=True)
     if password:
         from frappe.utils.password import update_password
@@ -113,12 +163,12 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
-    from frappe.utils import cint
-
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
 
-    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+    # Step 1 (Frappe's setup_complete) already sets System Settings.setup_complete,
+    # so that flag cannot guard Step 2. Use the URY-level check instead.
+    if is_ury_setup_complete():
         frappe.throw("Setup already completed")
 
     if isinstance(data, str):

@@ -1,7 +1,90 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
-from ury.ury.api.ury_kot_display import confirm_cancel_kot
+from datetime import datetime
+from ury.ury.api.ury_kot_display import (
+    confirm_cancel_kot,
+    serve_kot,
+    _get_cancel_confirmed_original_kots,
+)
+
+
+class TestServeKotBlocksCancelled(FrappeTestCase):
+
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_rejects_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value):
+        mock_doc = MagicMock()
+        mock_doc.type = "Cancelled"
+        mock_get_doc.return_value = mock_doc
+        mock_has_permission.return_value = True
+
+        with self.assertRaisesRegex(frappe.ValidationError, "KOT has been cancelled and cannot be served"):
+            serve_kot("KOT-001")
+
+        mock_set_value.assert_not_called()
+
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_rejects_partially_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value):
+        mock_doc = MagicMock()
+        mock_doc.type = "Partially cancelled"
+        mock_get_doc.return_value = mock_doc
+        mock_has_permission.return_value = True
+
+        with self.assertRaisesRegex(frappe.ValidationError, "KOT has been cancelled and cannot be served"):
+            serve_kot("KOT-001")
+
+        mock_set_value.assert_not_called()
+
+    @patch("ury.ury.api.ury_kot_display.get_datetime")
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_allows_non_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_datetime):
+        mock_doc = MagicMock()
+        mock_doc.type = "New Order"
+        mock_doc.creation = datetime(2024, 1, 1)
+        mock_get_doc.return_value = mock_doc
+        mock_get_datetime.return_value = datetime(2024, 1, 1, 0, 5)
+        mock_has_permission.return_value = True
+
+        serve_kot("KOT-001")
+
+        mock_set_value.assert_any_call("URY KOT", "KOT-001", "order_status", "Served")
+
+
+class TestGetCancelConfirmedOriginalKots(FrappeTestCase):
+
+    @patch("ury.ury.api.ury_kot_display.frappe.get_all")
+    def test_collects_and_splits_original_kot_names(self, mock_get_all):
+        mock_get_all.return_value = [
+            {"original_kot": "KOT-001,KOT-002"},
+            {"original_kot": "KOT-003"},
+            {"original_kot": None},
+        ]
+
+        result = _get_cancel_confirmed_original_kots("Branch A")
+
+        self.assertEqual(result, {"KOT-001", "KOT-002", "KOT-003"})
+        filters = mock_get_all.call_args.kwargs["filters"]
+        self.assertEqual(filters["branch"], "Branch A")
+        self.assertEqual(filters["verified"], 1)
+        self.assertEqual(filters["type"], ["in", ["Cancelled", "Partially cancelled"]])
+
+    @patch("ury.ury.api.ury_kot_display.frappe.get_all")
+    def test_no_cancel_confirmed_kots_returns_empty_set(self, mock_get_all):
+        mock_get_all.return_value = []
+
+        result = _get_cancel_confirmed_original_kots("Branch A")
+
+        self.assertEqual(result, set())
+
 
 class TestURYKOTDisplaySEC06(FrappeTestCase):
 

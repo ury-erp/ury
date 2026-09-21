@@ -1,9 +1,10 @@
-import { Lock, User, Users } from 'lucide-react';
+import { AlertTriangle, Lock, User, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import type { Table } from '../../lib/table-api';
 import type { ActiveTableOrder } from '../lib/captain-table-api';
+import TableActionsMenu from '../../components/TableActionsMenu';
 
 export type CaptainTableOwnership = 'free' | 'mine' | 'other' | 'occupied-unknown';
 
@@ -15,14 +16,64 @@ export interface CaptainTableCardProps {
   /** Names of other tables merged into this one's cluster (excludes `table.name` itself). */
   mergePartners?: string[];
   onTap: () => void;
+  /** Per-branch attention threshold, from `posProfile.tableAttention`. `null` while
+   * unresolved or when the profile has no threshold configured — the indicator renders
+   * nothing in either case, matching the previous "not implemented" behavior. */
+  attentionThresholdMinutes?: number | null;
+  /** `serverNow - Date.now()` at the time it was fetched (see `CaptainTables.tsx`), so
+   * elapsed-time math lines up with `latest_invoice_time`'s site-timezone value instead
+   * of the viewing device's own (possibly different-timezone, possibly wrong) clock.
+   * Defaults to 0 (trust the device clock) if the server-time fetch hasn't resolved yet
+   * or failed — the same behavior this had before the fix existed. */
+  serverTimeOffsetMs?: number;
+  /** Table-level merge/unmerge overflow menu (sa-v3-captain-app-parity/GAPS.md Gap 3).
+   * Omit both handlers to hide the menu entirely (e.g. while permissions are loading). */
+  showTableActions?: boolean;
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+  onMerge?: () => void;
+  onUnmerge?: () => void;
 }
 
-const elapsedLabel = (isoTimestamp: string | null): string | null => {
-  if (!isoTimestamp) return null;
-  const started = new Date(isoTimestamp).getTime();
-  if (Number.isNaN(started)) return null;
+/**
+ * `URY Table.latest_invoice_time` is a Frappe `Time` field — a bare
+ * "HH:MM:SS(.ffffff)" string with no date component, not a full timestamp.
+ * `new Date("16:45:26.537906")` is not valid ISO 8601 and parses to
+ * `Invalid Date` in every browser, so this was silently broken (returning
+ * `null`, no elapsed label at all) before this attention-indicator feature
+ * existed too — reusing the field's actual value on today's date is the
+ * only way to get a real elapsed duration out of it. This assumes the table
+ * was last occupied today, which holds for the normal case (a captain
+ * screen showing live floor state) but can undercount right after midnight
+ * for a table that's been open since the previous day — an inherent limit
+ * of the field being Time-only, not something a client-side parse fix can
+ * fully correct.
+ *
+ * `serverTimeOffsetMs` (see `CaptainTables.tsx`) anchors "today"/"now" to
+ * the SITE's configured timezone rather than the viewing device's own —
+ * `latest_invoice_time` was written server-side in that timezone, and a
+ * captain's tablet, a manager's laptop, or just a misconfigured device
+ * clock can easily be a different timezone (or simply wrong), which would
+ * otherwise silently skew every comparison against it.
+ */
+const minutesElapsed = (time: string | null, serverTimeOffsetMs: number): number | null => {
+  if (!time) return null;
+  const match = /^(\d{1,2}):(\d{2}):(\d{2})/.exec(time);
+  if (!match) return null;
 
-  const minutes = Math.max(0, Math.round((Date.now() - started) / 60000));
+  const [, hours, minutes, seconds] = match;
+  const nowMs = Date.now() + serverTimeOffsetMs;
+  const started = new Date(nowMs);
+  started.setHours(Number(hours), Number(minutes), Number(seconds), 0);
+
+  const startedMs = started.getTime();
+  if (Number.isNaN(startedMs)) return null;
+
+  return Math.max(0, Math.round((nowMs - startedMs) / 60000));
+};
+
+const elapsedLabel = (minutes: number | null): string | null => {
+  if (minutes === null) return null;
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
@@ -32,14 +83,15 @@ const elapsedLabel = (isoTimestamp: string | null): string | null => {
 
 /**
  * Large, touch-friendly table card for the Captain's mobile "Tables" home
- * screen. Deliberately no cashier-oriented chrome (no print/preview/payment
- * affordances) — a card here only communicates status and is a single tap
- * target, per PLAN.md §5/§6.
+ * screen. Deliberately minimal cashier-oriented chrome (no print/preview/
+ * payment affordances) — a card here is primarily a single tap target, per
+ * PLAN.md §5/§6, with a small overflow menu for table-level merge/unmerge
+ * (Gap 3) and an "Attention" indicator (Gap 4) layered on top of that.
  *
- * Visual states implemented: Free, Mine, Occupied-by-another-Captain,
- * Billed/locked, Merged. "Attention" is intentionally not implemented — see
- * report; the data it would need (a time threshold) isn't exposed by
- * `get_captain_context()` today.
+ * The outer element is a `div` (not `button`) so the overflow menu's own
+ * trigger button can nest inside it without invalid nested-`<button>` HTML —
+ * same structural choice as the main POS's `TableCard.tsx`, which this
+ * mirrors for the menu itself (`TableActionsMenu`, reused as-is).
  */
 const CaptainTableCard = ({
   table,
@@ -48,19 +100,37 @@ const CaptainTableCard = ({
   ownerName,
   mergePartners,
   onTap,
+  attentionThresholdMinutes,
+  serverTimeOffsetMs = 0,
+  showTableActions = false,
+  menuOpen = false,
+  onMenuOpenChange,
+  onMerge,
+  onUnmerge,
 }: CaptainTableCardProps) => {
   const isOccupied = table.occupied === 1;
   const isBilled = Boolean(order?.invoicePrinted);
   const hasMergePartners = Boolean(mergePartners && mergePartners.length > 0);
-  const elapsed = isOccupied ? elapsedLabel(table.latest_invoice_time) : null;
+  const minutesOpen = isOccupied
+    ? minutesElapsed(table.latest_invoice_time, serverTimeOffsetMs)
+    : null;
+  const elapsed = elapsedLabel(minutesOpen);
+  const needsAttention =
+    isOccupied &&
+    !isBilled &&
+    typeof attentionThresholdMinutes === 'number' &&
+    minutesOpen !== null &&
+    minutesOpen >= attentionThresholdMinutes;
 
   const colorClasses = isBilled
     ? 'border-success-tint-border bg-success-tint text-success'
-    : ownership === 'mine'
-      ? 'border-primary bg-primary-tint text-primary'
-      : ownership === 'free'
-        ? 'border-dashed border-hair bg-muted text-muted-foreground'
-        : 'border-warning-tint-border bg-warning-tint text-warning';
+    : needsAttention
+      ? 'border-destructive bg-destructive/10 text-destructive'
+      : ownership === 'mine'
+        ? 'border-primary bg-primary-tint text-primary'
+        : ownership === 'free'
+          ? 'border-gray-300 bg-muted text-muted-foreground'
+          : 'border-warning-tint-border bg-warning-tint text-warning';
 
   const statusLabel = isBilled
     ? 'Billed'
@@ -81,11 +151,18 @@ const CaptainTableCard = ({
         : 'warning';
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onTap}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onTap();
+        }
+      }}
       className={cn(
-        'flex min-h-[7.5rem] flex-col items-stretch rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98]',
+        'relative flex min-h-[7.5rem] flex-col items-stretch touch-manipulation select-none rounded-lg border border-s-4 p-3 text-left transition-colors duration-150 ease-out active:scale-[0.98]',
         colorClasses
       )}
     >
@@ -93,7 +170,24 @@ const CaptainTableCard = ({
         <span className="truncate text-lg font-bold" title={table.name}>
           {table.name}
         </span>
-        {isBilled && <Lock className="h-4 w-4 shrink-0" aria-label="Billed / locked" />}
+        <div className="flex shrink-0 items-center gap-1">
+          {needsAttention && (
+            <AlertTriangle
+              className="h-4 w-4 shrink-0"
+              aria-label={`Needs attention — open ${elapsed ?? `${minutesOpen}m`}`}
+            />
+          )}
+          {isBilled && <Lock className="h-4 w-4 shrink-0" aria-label="Billed / locked" />}
+          {showTableActions && (onMerge || onUnmerge) && (
+            <TableActionsMenu
+              table={table}
+              isOpen={menuOpen}
+              onOpenChange={(open) => onMenuOpenChange?.(open)}
+              onMerge={onMerge}
+              onUnmerge={onUnmerge}
+            />
+          )}
+        </div>
       </div>
 
       {hasMergePartners && (
@@ -105,7 +199,7 @@ const CaptainTableCard = ({
         </span>
       )}
 
-      <div className="mt-2 flex flex-1 flex-col justify-end gap-1.5">
+      <div className="mt-2 flex flex-1 flex-col justify-end gap-1">
         <Badge variant={statusBadgeVariant} size="sm" className="w-fit truncate max-w-full">
           {statusLabel}
         </Badge>
@@ -133,7 +227,7 @@ const CaptainTableCard = ({
           </span>
         )}
       </div>
-    </button>
+    </div>
   );
 };
 

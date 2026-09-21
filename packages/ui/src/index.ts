@@ -1,5 +1,7 @@
 export { cn } from './lib/cn';
 
+export * from './chart-colors';
+
 export * from './components/button';
 export * from './components/dialog';
 export * from './components/drawer';
@@ -15,6 +17,7 @@ export * from './components/card';
 export * from './components/stat-card';
 export * from './components/kpi-strip';
 export * from './components/data-table';
+export * from './components/editable-table';
 export * from './components/empty-state';
 export * from './components/table-cells';
 export * from './components/toast';

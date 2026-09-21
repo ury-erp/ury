@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
-import { cn, Spinner } from '@ury/ui';
+import { cn, Spinner, Button, Input } from '@ury/ui';
+import { db } from '@ury/core';
 import MenuCard from '../../components/MenuCard';
+import ProductDialog from '../../components/ProductDialog';
 
 interface CaptainMenuProps {
   /** From the per-table permission map (`get_table_order_context`). When
@@ -31,7 +33,11 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     fetchMenuItems,
     addToOrder,
     isOrderInteractionDisabled,
+    posProfile,
+    setSelectedItem,
   } = usePOSStore();
+
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchMenuItems();
@@ -52,8 +58,32 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   const disabled = !canAddItems || isOrderInteractionDisabled();
 
-  const handleTap = (item: (typeof menuItems)[number]) => {
+  const handleTap = async (item: (typeof menuItems)[number]) => {
     if (disabled) return;
+
+    // Touch UI has no double-click, so (unlike the desktop POS's click-count
+    // gesture) we decide up front whether this item needs configuration:
+    // fetch the full Item doc and reuse the same "has variants/add-ons"
+    // check ProductDialog itself uses to populate its pickers. Items with
+    // neither keep the previous instant single-tap add.
+    try {
+      const itemDoc: any = await db.getDoc('Item', item.item);
+      const hasVariants =
+        Array.isArray(itemDoc?.custom_pos_item_variants) && itemDoc.custom_pos_item_variants.length > 0;
+      const hasAddons =
+        Array.isArray(itemDoc?.custom_pos_add_on_items) && itemDoc.custom_pos_add_on_items.length > 0;
+
+      if (hasVariants || hasAddons) {
+        setSelectedItem(item);
+        setIsProductDialogOpen(true);
+        return;
+      }
+    } catch (err) {
+      // If we can't confirm the item's configuration, fall back to the
+      // instant add rather than blocking order-taking on a lookup failure.
+      console.error('Failed to check item configuration for', item.item, err);
+    }
+
     addToOrder({ ...item, quantity: 1 });
   };
 
@@ -61,41 +91,41 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     <div className="flex flex-col h-full">
       <div className="sticky top-0 z-10 bg-card border-b border-border p-3 space-y-2">
         <div className="relative">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+          <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search menu"
-            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-muted text-base focus:outline-none focus:ring-2 focus:ring-primary"
+            className="ps-9 pe-3"
+            variant="search"
           />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3">
-          <button
-            onClick={() => setSelectedCategory('')}
-            className={cn(
-              'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
-              selectedCategory === ''
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-card text-muted-foreground border-border'
-            )}
-          >
-            All
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.name}
-              onClick={() => setSelectedCategory(category.name)}
-              className={cn(
-                'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
-                selectedCategory === category.name
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-card text-muted-foreground border-border'
-              )}
+        <div className="relative">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <Button
+              variant="tab"
+              size="sm"
+              data-selected={selectedCategory === ''}
+              onClick={() => setSelectedCategory('')}
+              className="shrink-0 rounded-full"
             >
-              {category.label}
-            </button>
-          ))}
+              All
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category.name}
+                variant="tab"
+                size="sm"
+                data-selected={selectedCategory === category.name}
+                onClick={() => setSelectedCategory(category.name)}
+                className="shrink-0 rounded-full"
+              >
+                {category.label}
+              </Button>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 end-0 w-8 bg-gradient-to-l from-card to-transparent" />
         </div>
 
         {!canAddItems && (
@@ -123,11 +153,17 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 item={item.item}
                 onClick={() => handleTap(item)}
                 disabled={disabled}
+                branch={posProfile?.branch}
+                company={posProfile?.company}
               />
             ))}
           </div>
         )}
       </div>
+
+      {isProductDialogOpen && (
+        <ProductDialog onClose={() => setIsProductDialogOpen(false)} />
+      )}
     </div>
   );
 };

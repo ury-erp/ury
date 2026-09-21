@@ -18,16 +18,26 @@ merely mirroring it:
 
   - Capacity formula mirrors V3-42's ``get_allocatable_qty``:
     ``allocatable_qty = Bin.projected_qty - active URY reservation qty``,
-    where "active" means status in (Reserved, Fulfilled). This module reads
+    where "active" means status in (Reserved,) only -- see
+    ``ACTIVE_STATUSES``. A Fulfilled reservation has, by definition,
+    already been reflected in `Bin` by the stock posting that fulfilled
+    it, so continuing to subtract it would double-count. This module reads
     `Bin` directly rather than through the stub (which always returns 0), so
     an item's real active reservation qty is honoured even before the
     wiring task lands.
   - Shared-component decomposition delegates to V3-41's
-    ``compile_bom_vector``: a composite/MTO item (one with an active BOM for
-    the company) is reserved by reserving every one of its exploded leaf
-    components -- including components nested under sub-assemblies -- not
-    the top-level item itself and not any intermediate sub-assembly. A plain
-    stock item (no active BOM) is reserved directly.
+    ``compile_bom_vector``: a MADE_TO_ORDER item (per its resolved
+    `production_policy`, mirroring `ury_availability.py`'s own policy-driven
+    branching -- NOT merely "has an active BOM") is reserved by reserving
+    every one of its exploded leaf components -- including components nested
+    under sub-assemblies -- not the top-level item itself and not any
+    intermediate sub-assembly. A PRE_PRODUCED/DIRECT_RETAIL item is reserved
+    directly against its own finished-goods stock, even when it has an
+    active BOM (the BOM documents the recipe but is not what's checked at
+    sale time). A caller that supplies no `production_policy` at all falls
+    back to the legacy has-active-BOM heuristic (logged) for backward
+    compatibility with genuinely unconfigured items -- see
+    `_resolve_components`.
 
 Atomicity strategy (read this before changing capacity-check code):
 
@@ -47,8 +57,10 @@ Atomicity strategy (read this before changing capacity-check code):
        avoid lock-order deadlocks between two concurrent multi-component
        reservations),
     2. compute available capacity for each locked component from the now
-       lock-held Bin snapshot plus a live aggregate of active
-       ``URY Stock Reservation`` rows,
+       lock-held Bin snapshot plus a **read-committed** aggregate of active
+       ``URY Stock Reservation`` rows, taken on a short-lived second DB
+       connection -- see the CRITICAL note below; a plain read on the
+       request's own connection is NOT sufficient and caused a live oversell,
     3. if every component has sufficient capacity, insert all reservation
        rows (still inside the same transaction/lock scope) and return,
     4. if any component is short, raise before inserting anything -- no
@@ -69,30 +81,96 @@ Atomicity strategy (read this before changing capacity-check code):
   by the qty>0 check for any positive-supply resource in practice) and is
   flagged here rather than silently assumed safe.
 
-  EXPLICIT LIMITATION: this module's locking strategy is *reasoned about*
-  from Frappe/MySQL transaction semantics and cannot be executed or proven
-  under real concurrent load in this environment -- there is no live bench
-  or database available. `test_two_terminal_concurrent_reservation` below is
-  written as the test that WOULD prove correctness against a real Frappe
-  test site (using threads + a real DB transaction per thread), but it is
-  explicitly marked NOT EXECUTED / unexecutable here.
+  CRITICAL -- the Bin ``FOR UPDATE`` alone is NOT sufficient, and assuming it
+  was caused a live-reproduced oversell. Under MariaDB/MySQL's default
+  REPEATABLE READ, a transaction's consistent-read snapshot is established at
+  its *first plain (non-locking) read* and is never re-armed -- not by a
+  subsequent ``SELECT ... FOR UPDATE``, not by acquiring any lock.
+  `create_reservation` performs several plain reads before it locks the Bin
+  row (permission check, scope check, and `_resolve_components`' BOM/company
+  lookups), so its snapshot is already pinned by the time the Bin lock is
+  taken. The Bin lock does serialize the transactions correctly -- but a
+  *plain* re-read of the reservation rows afterwards still returns that
+  pre-lock snapshot, so each queued transaction computes capacity as though no
+  sibling reservation exists.
+
+  Live reproduction (bench `sa-prodctrl-unif-live`, 16 concurrent OS
+  processes, two MADE_TO_ORDER items sharing raw component GLMR with 5.0
+  units in stock): all 16 calls succeeded, reserving 16.0 units against 5.0.
+  The same two-call scenario run *sequentially* correctly rejected the
+  over-limit call, isolating the fault to snapshot staleness rather than the
+  capacity formula.
+
+  The fix: step 2's reservation-sum is read on a short-lived second DB
+  connection (`_active_reservation_qty(..., read_committed=True)`), giving that
+  one query its own transaction and its own fresh read view, so it sees every
+  reservation committed up to that instant. The caller's transaction is not
+  committed, rolled back, or otherwise disturbed. This is sound precisely
+  because the Bin ``FOR UPDATE`` (unchanged) already grants mutual exclusion:
+  while this transaction holds it, no competing reservation transaction can be
+  between its own Bin lock and its commit for that component, so there is no
+  phantom window for the fresh read to miss.
+
+  ...and the fix to the fix: a second connection is a second *transaction*, so
+  it is blind to the CALLING transaction's own uncommitted writes, which the
+  plain read always saw. Taking the fresh connection's answer as the whole
+  truth traded one oversell for another and broke an everyday non-concurrent
+  flow as well (both live-reproduced): a multi-line order's second
+  `create_reservation` could not see the first line's uncommitted insert
+  (oversell), and `_reconcile_line`'s release-then-recreate could not see its
+  own uncommitted release, so a quantity edit was counted against itself and
+  hard-rejected with "Insufficient capacity". The reservation-sum is therefore
+  neither view alone but a reconciliation of the two per row name --
+  `latest-committed-by-everyone-else` UNION `this transaction's own
+  uncommitted delta`. See `_reconciled_active_rows` for the exact case
+  analysis and the two insert-only/qty-immutable invariants it relies on.
+
+  Two alternatives were tried and rejected on evidence -- see
+  `_active_reservation_qty`'s docstring before changing this. In short: making
+  the sum a ``SELECT ... FOR UPDATE`` removed the oversell but made MariaDB
+  fail 15 of 16 concurrent calls with ``QueryDeadlockError (1020, "Record has
+  changed since last read")``, because MariaDB refuses a locking read of rows
+  committed after an existing read view; and committing / changing isolation
+  to force a fresh read view would break the all-or-nothing multi-line
+  guarantee of `ury_order_reservation_service.reconcile_order_reservations`,
+  which calls this function several times inside one transaction.
+
+  `component_item` carries a `search_index` so the reservation-sum query uses
+  an index range rather than a full table scan. Do not weaken the Bin lock.
+
+  `test_two_terminal_concurrent_reservation` below remains marked NOT EXECUTED
+  because a unit test in a single process cannot prove cross-connection
+  transaction behaviour -- and note that this is precisely why the bug above
+  survived: no mocked or sequential test could ever have caught it. Real
+  proof for this module's concurrency claims comes only from the live
+  multi-process bench run documented above and in the track's
+  live-bench-test-results files.
 
 Reservation states (per V3-40): Reserved, Fulfilled, Released, Expired,
-Cancelled. `Reserved` and `Fulfilled` are the only "active" states that
-consume capacity. `Released`, `Expired`, and `Cancelled` are terminal and
-free capacity by simply no longer counting toward the active sum -- this
-module never mutates `Bin`, so "restoring capacity" is nothing more than a
-status transition.
+Cancelled. Only `Reserved` consumes *reserved* capacity. `Fulfilled` means
+the underlying stock movement has already consumed inventory and must not be
+counted again, otherwise availability is deducted twice.
 
 Fulfilment (`fulfil_reservation`) is expected to be called by a later task
 at order/production settlement time. This module intentionally does not
 touch POS Invoice / invoice settlement code anywhere.
 """
 
+from contextlib import contextmanager
+
 import frappe
 from frappe import _
+from frappe.utils import cint, flt
 
-from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
+from ury.ury.api.ury_sales_plan_commit import apply_commit_delta
+
+# Slack allowed when comparing a required quantity against available capacity,
+# to absorb binary-float drift in accumulated BOM quantities. One millionth of
+# a stock unit is orders of magnitude below any real sellable quantity, so this
+# cannot admit a meaningful oversell, while it does stop an order that exactly
+# fits the remaining capacity from being rejected.
+QTY_TOLERANCE = 1e-6
 
 
 RESERVATION_DOCTYPE = "URY Stock Reservation"
@@ -100,13 +178,51 @@ BIN_DOCTYPE = "Bin"
 BOM_DOCTYPE = "BOM"
 BOM_ITEM_DOCTYPE = "BOM Item"
 
+# Mirrors ury_availability.py's policy constants. A PRE_PRODUCED/DIRECT_RETAIL
+# item is sold from its own finished-goods stock, never from raw-component
+# stock, even when it has an active BOM (the BOM merely documents the
+# recipe -- see `_resolve_components` below).
+POLICY_PRE_PRODUCED = "PRE_PRODUCED"
+POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
+POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+
 RESERVED = "Reserved"
 FULFILLED = "Fulfilled"
 RELEASED = "Released"
 EXPIRED = "Expired"
 CANCELLED = "Cancelled"
 
-ACTIVE_STATUSES = (RESERVED, FULFILLED)
+ACTIVE_STATUSES = (RESERVED,)
+
+# Audit-log event name for one contributor's partial consumption of a shared
+# reservation group. See `fulfil_reservation_if_pending`.
+PARTIAL_FULFIL_EVENT = "partial_fulfil"
+
+
+def _best_effort_department(item_code, branch):
+	"""Best-effort department lookup for the H1 fan-out event payload only.
+
+	Looks up the active `URY Item Production Configuration` mapping for
+	`item_code`/`branch`. This is deliberately a plain, non-raising lookup
+	(unlike `ury_kot_routing.resolve_production_units`, which fails closed
+	on ambiguity/missing config for routing purposes) -- department here is
+	informational context on a best-effort realtime event, not something a
+	stock mutation should ever be blocked or failed by. Returns None on any
+	ambiguity, absence, or lookup error.
+	"""
+	try:
+		rows = frappe.get_all(
+			"URY Item Production Configuration",
+			filters={"item": item_code, "branch": branch, "active": 1},
+			pluck="department",
+			limit=1,
+		)
+		return rows[0] if rows else None
+	except Exception:
+		frappe.logger("ury_reservation_service").exception(
+			"Failed to resolve department for item {0} branch {1}".format(item_code, branch)
+		)
+		return None
 
 
 # ---------------------------------------------------------------------------
@@ -134,14 +250,293 @@ def _lock_bin_row(item_code, warehouse):
 	return rows[0] if rows else None
 
 
-def _active_reservation_qty(item_code, warehouse, company, exclude_group=None):
-	filters = {
-		"component_item": item_code,
-		"warehouse": warehouse,
-		"company": company,
-		"status": ["in", list(ACTIVE_STATUSES)],
-	}
-	rows = frappe.get_all(RESERVATION_DOCTYPE, filters=filters, fields=["qty", "reservation_group"])
+_RESERVATION_SUM_SQL = """
+	SELECT name, qty, reservation_group
+	FROM `tabURY Stock Reservation`
+	WHERE component_item = %(item_code)s
+	  AND warehouse = %(warehouse)s
+	  AND company = %(company)s
+	  AND status IN %(statuses)s
+"""
+
+_RESERVATION_EXISTS_SQL = """
+	SELECT name
+	FROM `tabURY Stock Reservation`
+	WHERE name IN %(names)s
+"""
+
+
+@contextmanager
+def committed_read_connection():
+	"""Yield a short-lived second DB connection with its own fresh read view.
+
+	Opening a separate connection gives its queries their own transaction and
+	therefore their own read view, so they observe every reservation committed
+	up to that instant -- independent of the calling transaction's (already
+	stale) REPEATABLE READ view. The caller's transaction is left completely
+	untouched: nothing is committed, rolled back, or locked on it.
+
+	Open this ONCE per critical section and thread it through, rather than
+	once per component: `create_reservation` performs this read while holding
+	`SELECT ... FOR UPDATE` on every component's Bin row, and each connect is
+	a full TCP connect + MySQL auth handshake. Opening one per component put N
+	handshakes inside the lock critical section for an N-component MTO item,
+	extending lock hold time and cutting reservation throughput under
+	contention for no benefit -- the connection is stateless with respect to
+	the component being read.
+
+	Reusing it across components does pin ITS read view at its first read, so
+	later components are read from that instant rather than from a brand new
+	one. That is sound here and only here: `create_reservation` locks EVERY
+	component's Bin row before performing any of these reads, so from the
+	first read onward no other reservation transaction can commit a row for
+	any component in the set. It must not be hoisted any wider than one
+	`create_reservation` call -- in particular not across the lines of
+	`reconcile_order_reservations`, whose lock sets differ per line.
+
+	See `_active_reservation_qty` for why a second connection is required at
+	all, and why the two more obvious alternatives are not usable here.
+	"""
+	from frappe.database import get_db
+
+	conf = frappe.conf
+	conn = get_db(
+		socket=conf.db_socket,
+		host=conf.db_host,
+		port=conf.db_port,
+		user=conf.db_name,
+		password=conf.db_password,
+		cur_db_name=conf.db_name,
+	)
+	try:
+		conn.connect()
+		yield conn
+	finally:
+		try:
+			conn.close()
+		except Exception:
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to close read-committed reservation connection"
+			)
+
+
+def _committed_active_rows(conn, item_code, warehouse, company):
+	"""Active reservation rows for the component as of latest commit."""
+	return conn.sql(
+		_RESERVATION_SUM_SQL,
+		{
+			"item_code": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"statuses": list(ACTIVE_STATUSES),
+		},
+		as_dict=True,
+	)
+
+
+def _own_active_rows(item_code, warehouse, company):
+	"""Active reservation rows for the component as this transaction sees them.
+
+	i.e. this transaction's pinned REPEATABLE READ snapshot *plus* its own
+	uncommitted inserts and status changes, which are exactly what the
+	committed view above cannot see.
+	"""
+	return frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={
+			"component_item": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"status": ["in", list(ACTIVE_STATUSES)],
+		},
+		fields=["name", "qty", "reservation_group"],
+	)
+
+
+def _reconciled_active_rows(conn, item_code, warehouse, company):
+	"""Active reservation rows as of *now*, including this transaction's own writes.
+
+	Neither available view is sufficient on its own:
+
+	  - the committed view (fresh connection) sees everyone else's latest
+	    committed state but is blind to the calling transaction's own
+	    uncommitted INSERTs and RELEASEs -- it is a different transaction;
+	  - the own view (`frappe.get_all` on the request's connection) sees this
+	    transaction's own uncommitted writes perfectly, but its committed
+	    baseline is the transaction's stale snapshot.
+
+	The truth is `latest-committed-by-everyone-else` UNION
+	`this-transaction's-own-uncommitted-delta`, and it is recovered here by
+	reconciling the two views per row name. Reservation rows are insert-only
+	(nothing in this app deletes a `URY Stock Reservation` row) and `qty` is
+	never mutated after insert -- only `status` moves -- so every row name
+	falls into exactly one of four cases:
+
+	  1. active in BOTH views -> genuinely active. Count it.
+	  2. active in own view, absent from the committed active set -> either
+	     (a) this transaction's own uncommitted INSERT (the row does not exist
+	     at all on the other connection), which must be counted, or (b) a row
+	     someone else released and committed after our snapshot (the row does
+	     exist, just not active), which must not be. One keyed existence probe
+	     on the committed connection separates them exactly.
+	  3. active in the committed set, not active in own view -> either (a) a
+	     row someone else inserted and committed after our snapshot (absent
+	     from our snapshot entirely), which must be counted, or (b) a row THIS
+	     transaction just released, uncommitted (present in our view, inactive)
+	     which must not be. One keyed probe on our own connection, unfiltered
+	     by status, separates them exactly.
+	  4. active in neither -> not counted.
+
+	Both symmetric-difference sets are tiny (they contain only rows written
+	since the snapshot), so the two probes are keyed primary-key lookups over
+	a handful of names, and are skipped entirely when a difference is empty.
+	"""
+	own = {row["name"]: row for row in _own_active_rows(item_code, warehouse, company)}
+	committed = {row["name"]: row for row in _committed_active_rows(conn, item_code, warehouse, company)}
+
+	resolved = {}
+	for name, row in committed.items():
+		if name in own:
+			resolved[name] = row  # case 1
+
+	# Case 2: active for us, not in the committed active set.
+	own_only = [name for name in own if name not in committed]
+	if own_only:
+		exists_committed = {
+			r["name"]
+			for r in conn.sql(_RESERVATION_EXISTS_SQL, {"names": own_only}, as_dict=True)
+		}
+		for name in own_only:
+			if name not in exists_committed:
+				# Our own uncommitted insert.
+				resolved[name] = own[name]
+
+	# Case 3: active per latest commit, not active for us.
+	committed_only = [name for name in committed if name not in own]
+	if committed_only:
+		exists_own = {
+			r["name"]
+			for r in frappe.get_all(
+				RESERVATION_DOCTYPE, filters={"name": ["in", committed_only]}, fields=["name"]
+			)
+		}
+		for name in committed_only:
+			if name not in exists_own:
+				# Committed by someone else after our snapshot was pinned.
+				resolved[name] = committed[name]
+
+	return list(resolved.values())
+
+
+def _active_reservation_qty(
+	item_code, warehouse, company, exclude_group=None, read_committed=False, committed_conn=None
+):
+	"""Sum active reservation qty for `item_code`/`warehouse`/`company`.
+
+	`read_committed=True` reconciles the request's own view with a read on a
+	short-lived second DB connection (see `_reconciled_active_rows`), so the
+	sum is `latest-committed-by-everyone-else` UNION `this transaction's own
+	uncommitted delta`. Pass an already-open `committed_conn` to reuse one
+	connection across the components of a single critical section. This MUST
+	be used by the
+	reservation critical section (`create_reservation`), where it is a
+	correctness requirement, not a performance knob -- it is the fix for a
+	live-reproduced oversell:
+
+	  MariaDB/MySQL default to REPEATABLE READ, where a transaction's
+	  consistent read view is established at its *first plain (non-locking)
+	  read* and is never re-armed afterwards -- not by a later
+	  ``SELECT ... FOR UPDATE``, and not by acquiring any lock.
+	  `create_reservation` runs several plain reads before it locks the Bin
+	  row (`_require_create_permission`, `_require_scope`, and
+	  `_resolve_components`' BOM/company lookups), so the read view is already
+	  pinned by the time `_lock_bin_row` runs. The Bin ``FOR UPDATE`` does
+	  serialize the transactions correctly (confirmed live via reservation
+	  timestamps) -- but a plain re-read of the reservation rows afterwards
+	  still returns that pre-lock read view, so each queued transaction
+	  computed capacity as though no sibling reservation existed. Live result:
+	  16 concurrent calls against 5.0 units of stock and all 16 succeeded.
+
+	Why a second connection, rather than the two more obvious fixes -- both of
+	which were tried and rejected on evidence, so please do not "simplify"
+	this back into either of them:
+
+	  1. Making this a locking read (``SELECT ... FOR UPDATE``) does NOT work
+	     on MariaDB here. Live re-test: the oversell was indeed gone, but 15 of
+	     16 concurrent calls died with
+	     ``QueryDeadlockError (1020, "Record has changed since last read in
+	     table 'tabURY Stock Reservation'")`` instead of the intended
+	     "Insufficient capacity". MariaDB refuses a locking read of a row that
+	     was committed after the transaction's existing read view, rather than
+	     silently reading the latest version. Since the stale read view is the
+	     very condition we are trying to work around, a locking read cannot
+	     escape it -- it just converts a silent oversell into a storm of
+	     spurious transient failures on the money path.
+	  2. Committing (or resetting the isolation level) to force a fresh read
+	     view is not permissible here, because `create_reservation` is called
+	     from inside a larger transaction:
+	     `ury_order_reservation_service.reconcile_order_reservations` releases
+	     and re-creates reservations for several order lines in ONE
+	     transaction and documents an explicit all-or-nothing guarantee
+	     ("either the whole batch passes and is applied, or nothing in this
+	     call is mutated"). A commit here would make earlier lines' mutations
+	     permanent and destroy that guarantee. A mid-transaction
+	     ``SET SESSION TRANSACTION ISOLATION LEVEL`` is also unreliable -- it
+	     applies from the next transaction, so it would not affect the
+	     in-flight one anyway.
+
+	The second connection is safe precisely because the Bin row's
+	``SELECT ... FOR UPDATE`` (taken before this read, and deliberately left
+	untouched) already grants mutual exclusion: while this transaction holds
+	that lock, no other reservation transaction can be between its own Bin
+	lock and its commit for the same component. So "latest committed" read on
+	a fresh connection is exactly the true current state, with no phantom
+	window, and it takes no gap locks -- which is why it does not reintroduce
+	the deadlocks of option 1.
+
+	But the second connection is a *different transaction*, so on its own it
+	is also blind to the CALLING transaction's own uncommitted writes -- which
+	the plain read always saw. Taking its result as the whole answer was a
+	regression in both directions, and both were live-reproduced:
+
+	  - own uncommitted INSERTs invisible => intra-transaction oversell.
+	    `reconcile_order_reservations` makes N `create_reservation` calls in
+	    ONE transaction; line 2's check could not see line 1's just-inserted
+	    reservation, so every line saw a world with no siblings. Live: two
+	    reservations of 25.9 both accepted against a capacity of 49.8.
+	  - own uncommitted RELEASEs invisible => spurious hard rejection.
+	    `_reconcile_line` releases a line's group and immediately re-creates
+	    it at the new quantity in the same transaction; the released rows
+	    still read as `Reserved` on the fresh connection, so the replacement
+	    was counted against itself. Live: releasing a full-capacity 49.8
+	    reservation and re-requesting 49.8 threw "available 0.0".
+
+	Hence `read_committed=True` does not read *only* on the second connection:
+	it reconciles both views per row name (`_reconciled_active_rows`), which
+	recovers `latest-committed-by-everyone-else UNION own uncommitted delta`
+	exactly. See that function for the four-case argument.
+
+	Read-only availability queries outside the reservation critical section
+	keep the default `read_committed=False` plain read on the request's own
+	connection: they are not serialized by any Bin lock, they must not pay for
+	an extra connection, and a slightly stale read is harmless for a display
+	hint.
+	"""
+	if read_committed:
+		if committed_conn is not None:
+			rows = _reconciled_active_rows(committed_conn, item_code, warehouse, company)
+		else:
+			with committed_read_connection() as conn:
+				rows = _reconciled_active_rows(conn, item_code, warehouse, company)
+	else:
+		filters = {
+			"component_item": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"status": ["in", list(ACTIVE_STATUSES)],
+		}
+		rows = frappe.get_all(RESERVATION_DOCTYPE, filters=filters, fields=["qty", "reservation_group"])
+
 	total = 0
 	for row in rows:
 		if exclude_group and row.get("reservation_group") == exclude_group:
@@ -150,7 +545,9 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None):
 	return total
 
 
-def get_available_capacity(item_code, warehouse, company, locked_bin=None):
+def get_available_capacity(
+	item_code, warehouse, company, locked_bin=None, read_committed=False, committed_conn=None
+):
 	"""Return allocatable capacity for `item_code`/`warehouse`, per V3-42's formula.
 
 	``allocatable_qty = Bin.projected_qty - active URY reservation qty``. A
@@ -159,6 +556,14 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 	instead of re-reading; if omitted this re-reads (unlocked) via
 	`frappe.db.get_value`, which is fine for read-only availability queries
 	outside the reservation critical section.
+
+	`read_committed` is forwarded to `_active_reservation_qty`: pass True from
+	inside the reservation critical section (after the Bin lock) so the
+	reservation-sum is read on a fresh connection and therefore sees
+	latest-committed data rather than this transaction's already-stale
+	REPEATABLE READ read view. See `_active_reservation_qty`'s docstring for
+	the full rationale and for the two alternatives that were tried and
+	rejected. Read-only availability callers leave it False.
 	"""
 	if locked_bin is not None:
 		bin_projected_qty = locked_bin.get("projected_qty") or 0
@@ -167,7 +572,9 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 			BIN_DOCTYPE, {"item_code": item_code, "warehouse": warehouse}, "projected_qty"
 		) or 0
 
-	reservation_qty = _active_reservation_qty(item_code, warehouse, company)
+	reservation_qty = _active_reservation_qty(
+		item_code, warehouse, company, read_committed=read_committed, committed_conn=committed_conn
+	)
 	return bin_projected_qty - reservation_qty
 
 
@@ -176,17 +583,46 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_components(item_code, qty, company):
+def _resolve_components(item_code, qty, company, production_policy=None):
 	"""Return [{"component_item": ..., "qty": ...}, ...] for `item_code` at `qty`.
 
-	If `item_code` has an active BOM for `company`, it is treated as
-	composite/MTO: the full leaf-level component vector is returned (via
-	V3-41's `compile_bom_vector`, which reads ERPNext's precomputed
-	`BOM Explosion Item` table and recurses through any nested sub-assembly
-	when explosion rows are absent), scaled to `qty`. Otherwise `item_code`
-	is treated as a plain stock item and is returned as its own sole
-	"component".
+	Component resolution is driven by `production_policy` (the same
+	single source of truth `ury_availability.py`'s `_fill_pre_produced`/
+	`_fill_made_to_order` already use), NOT by "does this item happen to
+	have an active BOM":
+
+	  - PRE_PRODUCED / DIRECT_RETAIL: the item is sold from its own
+	    finished-goods stock. It is returned as its own sole "component",
+	    even if it has an active BOM -- a PRE_PRODUCED item's BOM merely
+	    documents the recipe used ahead of time; it is not what gets
+	    checked/reserved at sale time. Exploding it here would (and did,
+	    live) check raw-ingredient stock instead of FG stock, leaking
+	    ingredient names into a validation error on a customer-facing flow.
+	  - MADE_TO_ORDER: composite; the full leaf-level component vector is
+	    returned (via V3-41's `compile_bom_vector`, which reads ERPNext's
+	    precomputed `BOM Explosion Item` table and recurses through any
+	    nested sub-assembly when explosion rows are absent), scaled to `qty`.
+
+	`production_policy=None` (no IPC config resolved -- a legacy/unconfigured
+	item, or a caller that hasn't been updated to pass it) falls back to the
+	pre-existing "has an active default BOM => composite" heuristic, so
+	genuinely unconfigured items keep working exactly as before. This
+	fallback is logged (not silently used) because it is the exact heuristic
+	responsible for the PRE_PRODUCED-with-BOM bug this function now fixes --
+	seeing it fire in logs flags any caller that still isn't threading
+	`production_policy` through.
 	"""
+	if production_policy in (POLICY_PRE_PRODUCED, POLICY_DIRECT_RETAIL):
+		return [{"component_item": item_code, "qty": qty}]
+
+	if production_policy == POLICY_MADE_TO_ORDER:
+		vector = compile_bom_vector(item_code, qty, company)
+		return [
+			{"component_item": component["component_item"], "qty": component["qty"]}
+			for component in sorted(vector["components"], key=lambda c: c["component_item"])
+		]
+
+	# No production_policy supplied -- fall back to the legacy heuristic.
 	bom_name = frappe.db.get_value(
 		BOM_DOCTYPE,
 		{"item": item_code, "company": company, "is_active": 1, "is_default": 1},
@@ -194,6 +630,14 @@ def _resolve_components(item_code, qty, company):
 	)
 	if not bom_name:
 		return [{"component_item": item_code, "qty": qty}]
+
+	frappe.logger("ury_reservation_service").warning(
+		"create_reservation for item {0} (company {1}) received no production_policy; "
+		"falling back to legacy has-active-BOM heuristic (composite reservation). "
+		"If this item is actually PRE_PRODUCED/DIRECT_RETAIL, this will incorrectly "
+		"reserve raw components instead of finished-goods stock -- caller should be "
+		"updated to pass production_policy.".format(item_code, company)
+	)
 
 	vector = compile_bom_vector(item_code, qty, company)
 
@@ -237,7 +681,7 @@ def _require_create_permission():
 		frappe.throw(_("Not permitted to create reservations"), frappe.PermissionError)
 
 
-def append_audit(doc, actor, event, reason=None):
+def append_audit(doc, actor, event, reason=None, frozen_context=None, extra=None):
 	import json
 
 	existing = doc.get("audit_log")
@@ -253,6 +697,10 @@ def append_audit(doc, actor, event, reason=None):
 	}
 	if reason:
 		entry["reason"] = reason
+	if frozen_context:
+		entry["frozen_context"] = frozen_context
+	if extra:
+		entry.update(extra)
 	entries.append(entry)
 	doc.audit_log = json.dumps(entries, sort_keys=True, default=str)
 
@@ -268,6 +716,7 @@ def create_reservation(
 	policy=None,
 	actor=None,
 	expires_at=None,
+	frozen_context=None,
 ):
 	"""Atomically reserve capacity for `item_code` (or all of its BOM components).
 
@@ -284,7 +733,7 @@ def create_reservation(
 	_require_positive_qty(qty)
 	_require_scope(branch, company, warehouse, item_code, order_ref)
 
-	components = _resolve_components(item_code, qty, company)
+	components = _resolve_components(item_code, qty, company, production_policy=policy)
 	components_sorted = sorted(components, key=lambda c: c["component_item"])
 
 	# Step 1: lock every distinct component's Bin row, in a stable sorted
@@ -298,19 +747,56 @@ def create_reservation(
 	# Step 2: check capacity for every component against the now-locked
 	# snapshot. Collect all shortfalls before raising, so the error message
 	# is complete rather than reporting only the first shortfall found.
+	#
+	# `read_committed=True` is REQUIRED here and is not an optimisation: it
+	# reads the active-reservation sum on a fresh connection, so it returns
+	# latest-committed data rather than this transaction's REPEATABLE READ
+	# read view -- which was already pinned by the plain reads above, *before*
+	# the Bin lock was taken. Without it, queued concurrent transactions each
+	# see a pre-lock world with no sibling reservations and all pass the check:
+	# a live-reproduced oversell (16 concurrent calls all reserved against 5.0
+	# units). It is sound only because the Bin lock above is held across this
+	# read and the inserts below. See `_active_reservation_qty`'s docstring for
+	# the full rationale and for the two alternatives that were tried live and
+	# rejected. Do not weaken this, and do not weaken the Bin lock.
+	#
+	# The connection is opened ONCE for the whole call rather than once per
+	# component: each connect is a TCP connect + MySQL auth handshake, and
+	# this loop runs while holding `FOR UPDATE` on every component's Bin row.
 	shortfalls = []
-	for component in components_sorted:
-		available = get_available_capacity(
-			component["component_item"], warehouse, company, locked_bin=locked_bins[component["component_item"]]
-		)
-		if component["qty"] > available:
-			shortfalls.append(
-				{
-					"component_item": component["component_item"],
-					"required": component["qty"],
-					"available": available,
-				}
+	with committed_read_connection() as committed_conn:
+		for component in components_sorted:
+			available = get_available_capacity(
+				component["component_item"],
+				warehouse,
+				company,
+				locked_bin=locked_bins[component["component_item"]],
+				read_committed=True,
+				committed_conn=committed_conn,
 			)
+			# Compare with a tolerance rather than a bare `>`. Component
+			# quantities are products of BOM per-unit rates (e.g. 0.1) and
+			# `available` is a Bin quantity minus an accumulated sum of many such
+			# products, so both sides carry binary-float drift. A bare `>`
+			# therefore rejects an order that exactly fits the remaining
+			# capacity -- live-reproduced at volume as "required 0.2, available
+			# 0.1999999999999993"; 7 of the 19 capacity rejections in the Phase 2
+			# load test were this artifact and nothing else, i.e. the last
+			# portion of a component was unsellable.
+			#
+			# QTY_TOLERANCE is applied as plain arithmetic on purpose. `flt(x,
+			# precision)` would be the idiomatic-looking choice but resolves the
+			# rounding method through `frappe.get_system_settings`, i.e. a DB
+			# read -- and this loop runs while holding `FOR UPDATE` on every
+			# component Bin row. No DB access belongs in here.
+			if component["qty"] - available > QTY_TOLERANCE:
+				shortfalls.append(
+					{
+						"component_item": component["component_item"],
+						"required": component["qty"],
+						"available": available,
+					}
+				)
 
 	if shortfalls:
 		frappe.throw(
@@ -325,6 +811,63 @@ def create_reservation(
 			),
 			frappe.ValidationError,
 		)
+
+	# Sales Plan committed_qty tracking: this reservation's `qty` is the
+	# TOP-LEVEL item's requested quantity (not a per-component quantity, which
+	# for a MADE_TO_ORDER item differs per exploded component) -- the same
+	# unit `URY Sales Plan Item.qty` is denominated in. `department` comes
+	# from `frozen_context` (set by `_reconcile_line` in
+	# `ury_order_reservation_service.py`) when the caller supplied one; a
+	# caller with no frozen_context (e.g. a direct/legacy create_reservation
+	# call) simply resolves without a department filter.
+	#
+	# The applied delta is recorded into `frozen_context` (and therefore into
+	# every created row's `audit_log` via `append_audit` below) so that
+	# `_transition_group` can symmetrically reverse it on release/cancel/
+	# expire/fulfil without needing to re-derive the top-level item/qty from
+	# component rows, which is not always possible (a MADE_TO_ORDER item's
+	# component rows never equal the top-level item/qty).
+	commit_qty = flt(qty)
+	commit_department = (frozen_context or {}).get("department")
+	try:
+		commit_result = apply_commit_delta(
+			item_code, branch, company, department=commit_department, committed_delta=commit_qty
+		)
+	except Exception:
+		# Sales Plan commit-tracking is best-effort accounting on top of the
+		# reservation, not a precondition for it -- a failure here (no
+		# matching plan, a transient DB/locking issue, etc.) must never abort
+		# an otherwise-valid reservation. Same fail-soft contract already
+		# established for realtime event publishing in this file.
+		frappe.logger("ury_reservation_service").exception(
+			"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
+		)
+		commit_result = None
+	frozen_context = dict(frozen_context or {})
+	# The TOP-LEVEL item quantity this group reserves, frozen explicitly and
+	# under its own purpose-named key.
+	#
+	# A group's component rows carry per-component quantities (a MADE_TO_ORDER
+	# item's row `qty` is `per_unit_rate * commit_qty`), so the top-level
+	# quantity cannot be recovered from them. It is needed by every consumer
+	# that has to divide one group between several fulfilling parties -- see
+	# `fulfil_reservation_if_pending`'s partial accounting and
+	# `ury_fulfilment_posting_service._freeze_payload`'s per-KOT component
+	# scaling. `sales_plan_commit["qty"]` happens to hold the same number today
+	# (it is the same `flt(qty)`), and `group_reserved_top_level_qty` still
+	# reads it as a fallback for groups created before this key existed -- but
+	# that is a Sales Plan accounting detail which must be free to change, so
+	# it is not the contract.
+	frozen_context["reserved_top_level_qty"] = commit_qty
+	frozen_context["sales_plan_commit"] = {
+		"applied": bool(commit_result),
+		"item_code": item_code,
+		"branch": branch,
+		"company": company,
+		"department": commit_department,
+		"qty": commit_qty,
+		"plan_item": commit_result.get("name") if commit_result else None,
+	}
 
 	# Step 3: all components have capacity -- insert every reservation row
 	# inside the same transaction/lock scope, all-or-nothing.
@@ -348,31 +891,226 @@ def create_reservation(
 				"actor": actor,
 			}
 		)
-		append_audit(doc, actor, event="create")
+		append_audit(doc, actor, event="create", frozen_context=frozen_context)
 		doc.insert(ignore_permissions=False)
 		created_names.append(doc.name)
+
+	# Emit realtime events (cheap component-level + rich fan-out) for each
+	# distinct component_item affected. `publish_component_stock_fanout` is
+	# itself fully failure-isolated (see H1/ury_bom_compiler.py), so no
+	# try/except is needed here -- but this loop must still never raise, so
+	# a defensive except stays in place in case department resolution above
+	# it is ever inlined here in future.
+	department = _best_effort_department(item_code, branch)
+	for component in components_sorted:
+		try:
+			publish_component_stock_fanout(
+				component["component_item"],
+				warehouse,
+				company,
+				branch,
+				department=department,
+				logger_name="ury_reservation_service",
+				# Still inside the transaction: defer to commit so a rollback
+				# does not fan out phantom availability changes to clients.
+				after_commit=True,
+			)
+		except Exception:
+			# Failure to publish is best-effort, fire-and-forget.
+			# Log but do not raise, so the reservation commit is never aborted.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to publish realtime fan-out for component {0}".format(
+					component["component_item"]
+				)
+			)
 
 	return {"reservation_group": reservation_group, "reservations": created_names}
 
 
 def _resolve_group_rows(reservation_name):
-	"""Resolve `reservation_name` (a single row's docname or a reservation_group) to rows.
+	"""Resolve `reservation_name` (a single row's docname or a reservation_group)
+	to its full row set, taking a `SELECT ... FOR UPDATE` lock on every row.
 
 	Accepts either a single `URY Stock Reservation` docname or a
 	`reservation_group` value, so callers can operate on the whole atomic
 	group (all components of one composite reservation) with one call, as
 	release/fulfil/cancel must to keep the group's state consistent.
+
+	Unlike every other row this module locks, this path previously took NO
+	lock at all: a plain read -> status-eligibility decision -> write, reached
+	post-lock from `ury_kot_cancellation_service.cancel_before_start` and
+	`ury_fulfilment_posting_service._fulfil_reservation_once` on reservation
+	rows that those callers' own locks (on KOT Execution / posting intent
+	rows, in different tables) do not cover. Without a lock here, two
+	concurrent transitions of the same group (e.g. a release racing a
+	fulfil) could each read the group as eligible and both write, or one
+	could silently clobber the other's status. `FOR UPDATE` serializes
+	concurrent callers on this group, and stays on this request's own
+	connection/transaction.
 	"""
-	single = frappe.db.get_value(RESERVATION_DOCTYPE, reservation_name, "reservation_group")
-	group = single or reservation_name
-	rows = frappe.get_all(
-		RESERVATION_DOCTYPE,
-		filters={"reservation_group": group},
-		fields=["name", "status", "reservation_group"],
+	single_rows = frappe.db.sql(
+		f"""
+		SELECT reservation_group
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE name = %(name)s
+		FOR UPDATE
+		""",
+		{"name": reservation_name},
+		as_dict=True,
+	)
+	group = (single_rows[0]["reservation_group"] if single_rows else None) or reservation_name
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, status, reservation_group, audit_log
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE reservation_group = %(group)s
+		ORDER BY name ASC
+		FOR UPDATE
+		""",
+		{"group": group},
+		as_dict=True,
 	)
 	if not rows:
 		frappe.throw(_("No reservation found for {0}").format(reservation_name), frappe.ValidationError)
 	return rows
+
+
+def _group_sales_plan_commit(rows):
+	"""Read back the `sales_plan_commit` info `create_reservation` recorded.
+
+	Every row's `audit_log` carries a "create" entry with `frozen_context`
+	(see `create_reservation`), including the `sales_plan_commit` dict this
+	looks for. All rows in a group share the same value (it is set once,
+	before the group's rows are created), so the first row with a usable
+	entry is authoritative for the whole group.
+	"""
+	import json
+
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries:
+			frozen_context = entry.get("frozen_context") or {}
+			commit_info = frozen_context.get("sales_plan_commit")
+			if commit_info and commit_info.get("applied"):
+				return commit_info
+	return None
+
+
+def _group_frozen_context(rows):
+	"""The order-time `frozen_context` recorded on this group, or {}.
+
+	`create_reservation` writes one "create" entry per row, all carrying the
+	SAME frozen_context (it is built once, before any row is inserted), so the
+	first usable one is authoritative for the whole group. Entries are scanned
+	forward because only the create entry ever carries a frozen_context --
+	release/cancel/fulfil/partial_fulfil entries do not.
+	"""
+	import json
+
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries or []:
+			frozen_context = entry.get("frozen_context")
+			if frozen_context:
+				return frozen_context
+	return {}
+
+
+def group_reserved_top_level_qty(rows):
+	"""The TOP-LEVEL item quantity this reservation group covers, or None.
+
+	`rows` may be the locked snapshot from `_resolve_group_rows` or any row set
+	fetched with an `audit_log` field (e.g. `ury_fulfilment_posting_service`'s
+	`frappe.get_all`), so this is deliberately shape-tolerant.
+
+	Returns None -- meaning "unknown, treat the group as indivisible" -- for
+	any group whose order-time context predates `reserved_top_level_qty` and
+	carries no `sales_plan_commit` either. Every caller must fall back to
+	whole-group behaviour on None rather than guessing a quantity, which is
+	what keeps this change a strict no-op for legacy groups.
+	"""
+	context = _group_frozen_context(rows)
+	qty = context.get("reserved_top_level_qty")
+	if qty is None:
+		qty = (context.get("sales_plan_commit") or {}).get("qty")
+	if qty is None:
+		return None
+	qty = flt(qty)
+	return qty if qty > 0 else None
+
+
+def group_partial_fulfilments(rows):
+	"""`{contributor: qty}` already recorded against this group.
+
+	Keyed by contributor, so re-reading the same entry off every row of the
+	group collapses to one value rather than N -- the entry is appended to
+	every row (see `_record_partial_fulfilment`) precisely so no single row is
+	load-bearing for the ledger.
+	"""
+	import json
+
+	ledger = {}
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries or []:
+			if entry.get("event") != PARTIAL_FULFIL_EVENT:
+				continue
+			contributor = entry.get("contributor")
+			if not contributor:
+				continue
+			ledger[contributor] = flt(entry.get("contributed_qty"))
+	return ledger
+
+
+def _record_partial_fulfilment(rows, contributor, contributed_qty):
+	"""Append one contributor's partial-fulfilment entry to every row of the group.
+
+	Status is deliberately NOT touched: the group stays `Reserved` -- and
+	therefore still subtracts capacity, and is still visible to
+	`_reservation_rows` for the sibling KOT items that have yet to be served --
+	until the cumulative contributions reach the reserved total, at which point
+	`fulfil_reservation_if_pending` performs the real
+	`Reserved -> Fulfilled` transition.
+
+	Runs under the `SELECT ... FOR UPDATE` `_resolve_group_rows` already took
+	on every row, so the read-modify-write of the ledger is serialized against
+	a concurrent contributor for the same group.
+	"""
+	actor = frappe.session.user
+	for row in rows:
+		doc = frappe.get_doc(RESERVATION_DOCTYPE, row.name)
+		# Same reason as `_transition_group`: `frappe.get_doc` is a plain read,
+		# so overwrite audit_log with the value the locking SELECT fetched
+		# before appending, or a concurrently committed entry can be dropped.
+		doc.audit_log = row.get("audit_log")
+		append_audit(
+			doc,
+			actor,
+			event=PARTIAL_FULFIL_EVENT,
+			extra={"contributor": contributor, "contributed_qty": flt(contributed_qty)},
+		)
+		doc.save(ignore_permissions=False)
+		# Keep the locked snapshot current for anything that reads `rows`
+		# after this call within the same transition.
+		row["audit_log"] = doc.audit_log
 
 
 def _transition_group(reservation_name, from_status, to_status, reason, event):
@@ -388,14 +1126,92 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 			frappe.ValidationError,
 		)
 
+	# Resolve the group's committed_qty commitment (if any) BEFORE mutating
+	# any row, from the locked snapshot `_resolve_group_rows` already fetched
+	# -- reading it after the row updates below would see each row's
+	# just-rewritten `audit_log` instead of the original "create" entry.
+	# Every transition out of RESERVED (release/cancel/expire/fulfil) ends the
+	# "committed" state for this line, so committed_qty is decremented in all
+	# of them; only a FULFILLED transition additionally moves that same qty
+	# into fulfilled_qty (same locked update, so the two counters never
+	# observe an inconsistent intermediate state -- see
+	# `ury_sales_plan_commit.apply_commit_delta`).
+	sales_plan_commit = None
+	if from_status == RESERVED:
+		sales_plan_commit = _group_sales_plan_commit(rows)
+
+	# OPEN BUSINESS DECISION (extends G-08/G-09): a group can now be `Reserved`
+	# yet ALREADY PARTLY CONSUMED -- one of several KOT items sharing it has
+	# been produced and has posted its Stock Entry, while its siblings have not
+	# (see `fulfil_reservation_if_pending`). Releasing / cancelling / expiring
+	# such a group hands its FULL reserved quantity back as available capacity,
+	# including the portion whose raw materials are genuinely already gone.
+	#
+	# This is the same class of question G-08/G-09 leaves open for a wholly
+	# Fulfilled group cancelled after production ("what is the consumption
+	# charged to -- waste, staff meal, a re-plate?"), and it is NOT decided
+	# here: partial consumption makes the existing gap finer-grained, it does
+	# not create a new one, and inventing a disposition policy inside a status
+	# transition would be guessing. What IS guaranteed is that it cannot happen
+	# silently -- the transition proceeds (a cancellation must always be able
+	# to complete, per `release_order_reservations`) and is logged with the
+	# exact quantity involved so the discrepancy is attributable.
+	if from_status == RESERVED and to_status != FULFILLED:
+		partial = group_partial_fulfilments(rows)
+		if partial:
+			frappe.logger("ury_reservation_service").warning(
+				"Reservation group %s is being transitioned %s -> %s while %s of its "
+				"reserved quantity has already been consumed by %s completed "
+				"fulfilment(s) (%s). That consumed portion's capacity is being "
+				"handed back; disposition of the already-produced food is an open "
+				"decision (see G-08/G-09).",
+				rows[0].reservation_group,
+				from_status,
+				to_status,
+				sum(partial.values()),
+				len(partial),
+				", ".join(sorted(partial)),
+			)
+
 	actor = frappe.session.user
 	for row in rows:
 		doc = frappe.get_doc(RESERVATION_DOCTYPE, row.name)
+		# `frappe.get_doc` is a plain read; overwrite audit_log with the value
+		# `_resolve_group_rows`'s locking SELECT already fetched so the
+		# read-modify-write append below cannot silently drop a concurrently
+		# committed audit entry.
+		doc.audit_log = row.get("audit_log")
 		doc.status = to_status
 		if reason:
 			doc.reason = reason
 		append_audit(doc, actor, event=event, reason=reason)
 		doc.save(ignore_permissions=False)
+
+	if sales_plan_commit:
+		committed_delta = -flt(sales_plan_commit.get("qty"))
+		fulfilled_delta = flt(sales_plan_commit.get("qty")) if to_status == FULFILLED else 0
+		try:
+			apply_commit_delta(
+				sales_plan_commit.get("item_code"),
+				sales_plan_commit.get("branch"),
+				sales_plan_commit.get("company"),
+				department=sales_plan_commit.get("department"),
+				committed_delta=committed_delta,
+				fulfilled_delta=fulfilled_delta,
+			)
+		except Exception:
+			# Same fail-soft contract as the create-side apply_commit_delta
+			# call above: this reservation's status transition has already
+			# been saved: a Sales Plan counter-reversal failure must be
+			# logged, not allowed to undo/abort an otherwise-successful
+			# release/cancel/expire/fulfil.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to reverse Sales Plan commit delta for %s/%s/%s",
+				sales_plan_commit.get("item_code"),
+				sales_plan_commit.get("branch"),
+				sales_plan_commit.get("company"),
+			)
+
 	return [row.name for row in rows]
 
 
@@ -405,10 +1221,47 @@ def release_reservation(reservation_name, reason=None):
 
 	"Restoring capacity" is entirely the status transition: this module
 	never mutates Bin, so once a row is no longer in an active status
-	(Reserved/Fulfilled) it simply stops being counted by
+	(`ACTIVE_STATUSES`, i.e. Reserved) it simply stops being counted by
 	`_active_reservation_qty`/`get_available_capacity`.
 	"""
-	return _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
+	result = _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
+
+	# Emit realtime events (cheap component-level + rich fan-out) for each
+	# distinct component_item affected.
+	# Extract distinct components from the released reservation group.
+	# Since _transition_group transitions the entire group, get distinct
+	# components from the result row names' parent rows.
+	group_rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={"name": ["in", result]},
+		fields=["component_item", "warehouse", "company", "branch", "top_level_item"],
+	)
+	seen = set()
+	for row in group_rows:
+		key = (row.component_item, row.warehouse, row.company)
+		if key not in seen:
+			try:
+				department = _best_effort_department(row.top_level_item, row.branch)
+				publish_component_stock_fanout(
+					row.component_item,
+					row.warehouse,
+					row.company,
+					row.branch,
+					department=department,
+					logger_name="ury_reservation_service",
+					# Still inside the transaction -- see create_reservation.
+					after_commit=True,
+				)
+			except Exception:
+				# Failure to publish is best-effort, fire-and-forget.
+				frappe.logger("ury_reservation_service").exception(
+					"Failed to publish realtime fan-out for released component {0}".format(
+						row.component_item
+					)
+				)
+			seen.add(key)
+
+	return result
 
 
 @frappe.whitelist()
@@ -420,6 +1273,144 @@ def fulfil_reservation(reservation_name):
 	code themselves.
 	"""
 	return _transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
+
+
+def fulfil_reservation_if_pending(reservation_name, contributor=None, contributed_qty=None):
+	"""Idempotent, non-raising variant of `fulfil_reservation`.
+
+	Optionally PARTIAL (B03b). Pass `contributor` (a stable, unique identity for
+	the fulfilling unit of work -- `ury_fulfilment_posting_service` passes the
+	posting intent's `idempotency_key`) together with `contributed_qty` (in
+	TOP-LEVEL item units) to fulfil only that contributor's share of a group
+	that several parties legitimately share. See the section below.
+
+	`fulfil_reservation` delegates to `_transition_group`, which deliberately
+	refuses a partial transition (frappe.throw) when any row of the group is
+	not still `Reserved`. That strictness is right for a caller that believes
+	it is the sole fulfiller, but wrong for the two callers that legitimately
+	race each other on the SAME group:
+
+	  - `ury_fulfilment_posting_service` fulfils a MADE_TO_ORDER group at
+	    production time (Tier 2 only), and
+	  - `ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`
+	    fulfils every sold order's groups at the consolidated Sales Invoice
+	    submit -- i.e. at the moment `Bin` actually drops, for every sale in
+	    both tiers.
+
+	Either may run first, so both must tolerate finding the group already
+	`Fulfilled`. Returns one of:
+
+	  "fulfilled"      -- this call performed the transition
+	  "partial"        -- this contributor's share was recorded, but the group
+	                      is not yet fully consumed and stays RESERVED
+	  "already"        -- nothing to do: every row was already FULFILLED, or
+	                      this contributor's share was already recorded (a
+	                      replay)
+	  "not_eligible"   -- the group is in some other/mixed state (e.g. partly
+	                      Released by a cancellation, or mid-transition);
+	                      logged and skipped rather than raised, because
+	                      neither caller may abort a submitted stock posting
+	                      or a submitted Sales Invoice over it
+	  "missing"        -- no such reservation group
+
+	The group rows are read through `_resolve_group_rows`, which takes a
+	`SELECT ... FOR UPDATE` lock, so the status observed here cannot be a
+	stale snapshot of a concurrent worker's already-committed fulfilment.
+
+	Partial fulfilment (B03b) -- why a group can have more than one fulfiller
+	--------------------------------------------------------------------------
+	A straight quantity bump on ONE POS line (Coffee 1 -> 2) does not create a
+	second reservation group. `ury_order_reservation_service._reconcile_line`
+	releases the line's existing group and creates ONE replacement sized for
+	the new TOTAL, under the same `reservation_line_key`. The delta KOT raised
+	for the +1 inherits that same line key, so the original KOT item and the
+	delta KOT item both resolve -- correctly, per B03's line scoping -- to that
+	one group, which covers both of them together.
+
+	Fulfilling a group is purely the `Reserved -> Fulfilled` status transition
+	below; the stock movement itself is posted separately, per KOT item, by
+	`ury_fulfilment_posting_service`. So before this, whichever KOT item was
+	served FIRST flipped the whole group to `Fulfilled` for its own posting
+	alone. The sibling KOT item, served minutes later, then found nothing
+	`Reserved` for its line and failed with `RESERVATION_NOT_FOUND` -- the same
+	user-visible symptom B03 fixed for two separate lines, reached by a second
+	mechanism. (Worse, had it not failed, both postings consumed components
+	sized for the group's FULL quantity: `_freeze_payload` now scales those to
+	the KOT item's own share for exactly this reason.)
+
+	The accounting here is therefore cumulative rather than all-or-nothing:
+
+	  - Each contributor's share is appended to every row's `audit_log` as a
+	    `partial_fulfil` entry keyed by `contributor`. Nothing else changes;
+	    the group stays `Reserved`, keeps subtracting capacity, and stays
+	    visible to the siblings that have yet to be served.
+	  - The group transitions to `Fulfilled` -- once, terminally, with the
+	    single Sales Plan committed -> fulfilled counter move `_transition_group`
+	    performs -- only when the cumulative recorded quantity reaches the
+	    group's reserved total.
+	  - Replays are free: a contributor already present in the ledger is
+	    counted once and returns "already", so a retried posting intent can
+	    never double-count.
+	  - A group whose reserved total is unknown (`group_reserved_top_level_qty`
+	    returns None -- a legacy group predating the frozen key), or a caller
+	    that passes no contributor/quantity (the consolidated Sales Invoice
+	    close-out), takes the whole-group path unchanged. The single-KOT case
+	    also closes in one shot, because its single share already equals the
+	    reserved total.
+
+	If the contributors' quantities never add up to the reserved total -- e.g.
+	one of the sharing KOT items is cancelled after production started (G-08/
+	G-09) -- the group simply stays `Reserved` and is swept to `Fulfilled` by
+	the consolidated Sales Invoice close-out at POS closing
+	(`ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`,
+	which calls this function with no contributor). That is a safe under-fulfil:
+	capacity stays reserved until the sale actually posts, rather than being
+	handed back or double-counted. It is deliberately NOT resolved by guessing
+	a disposition here; see the open-decision note in `_transition_group`.
+	"""
+	try:
+		rows = _resolve_group_rows(reservation_name)
+	except frappe.ValidationError:
+		return "missing"
+
+	if not rows:
+		return "missing"
+
+	statuses = {row.status for row in rows}
+	if statuses == {FULFILLED}:
+		return "already"
+	if statuses != {RESERVED}:
+		frappe.logger("ury_reservation_service").info(
+			"Skipping fulfilment of reservation group %s: rows are in %s, not %s",
+			rows[0].reservation_group,
+			", ".join(sorted(statuses)),
+			RESERVED,
+		)
+		return "not_eligible"
+
+	contributed_qty = flt(contributed_qty)
+	reserved_total = group_reserved_top_level_qty(rows) if contributor else None
+	if contributor and contributed_qty > 0 and reserved_total is not None:
+		ledger = group_partial_fulfilments(rows)
+		if contributor in ledger:
+			# Replay of an already-recorded contribution. Counting it again
+			# would close the group early and under-consume the siblings.
+			return "already"
+		_record_partial_fulfilment(rows, contributor, contributed_qty)
+		ledger[contributor] = contributed_qty
+		# Tolerance, not a bare `>=`: shares are quotients of float quantities
+		# (`accepted_qty / reserved_total` per KOT item) and their sum carries
+		# binary-float drift, so an exactly-complete group can land a few ulps
+		# short and would otherwise never reach its terminal status. Same
+		# reasoning, and the same constant, as the capacity check in
+		# `create_reservation`.
+		if sum(ledger.values()) < reserved_total - QTY_TOLERANCE:
+			return "partial"
+		# Cumulative contributions have reached the reserved total: close the
+		# group out for real, below.
+
+	_transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
+	return "fulfilled"
 
 
 @frappe.whitelist()
@@ -474,3 +1465,40 @@ def expire_stale_reservations(ttl_minutes, now=None):
 	for group in groups:
 		_transition_group(group, RESERVED, EXPIRED, reason="TTL expiry", event="expire")
 	return groups
+
+
+# A reservation is created when an order is placed and is closed out when the
+# sale posts, at POS Closing Entry -> consolidated Sales Invoice submit (see
+# `ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`), or
+# when the order is cancelled. The sweeper below is ONLY a backstop for rows
+# that reached neither end -- an abandoned order that was never billed or
+# cancelled, or a close-out that failed -- so its TTL must comfortably exceed
+# the longest legitimate open shift, or it would expire live reservations for
+# orders that are still being served. 24h is deliberately generous for that
+# reason; capacity leaked by a genuinely stuck row is reclaimed a day late,
+# which is far cheaper than silently un-reserving stock mid-service.
+DEFAULT_STALE_RESERVATION_TTL_MINUTES = 24 * 60
+
+
+def expire_stale_reservations_scheduled():
+	"""Zero-argument entry point for `hooks.py`'s `scheduler_events`.
+
+	`expire_stale_reservations` takes a required `ttl_minutes`, which the
+	scheduler cannot supply, so this wrapper resolves the TTL and calls it.
+	Override with `ury_reservation_ttl_minutes` in site config; see
+	`DEFAULT_STALE_RESERVATION_TTL_MINUTES` above for why the default is
+	deliberately long.
+
+	Never raises: a scheduler job that throws is retried forever and buries
+	the real error in the job log.
+	"""
+	try:
+		ttl_minutes = cint(
+			frappe.conf.get("ury_reservation_ttl_minutes")
+		) or DEFAULT_STALE_RESERVATION_TTL_MINUTES
+		return expire_stale_reservations(ttl_minutes)
+	except Exception:
+		frappe.logger("ury_reservation_service").exception(
+			"expire_stale_reservations_scheduled failed"
+		)
+		return []

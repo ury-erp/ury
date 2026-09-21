@@ -67,19 +67,16 @@ field names and reconcile this function's return shape with whatever
 resolution helper V3-13/V3-15 itself exposes (this function may become a
 thin wrapper over that helper instead of querying the table directly).
 
-## Reconciliation debt: plan_qty/plan_remaining resolution (V3-23 dependency gap)
+## Sales Plan entitlement resolution (`_resolve_plan_remaining`)
 
-Likewise, "approved Sales Plan entitlement" (`URY Sales Plan`, V3-20/V3-23)
-is not in this worktree. `_resolve_plan_remaining` is implemented the same
-defensive way: `frappe.db.table_exists("URY Sales Plan")` guards against a
-missing table, and a best-guess field read (`plan_qty`,
-`committed_qty`/`fulfilled_qty`) returns `None` for plan_qty/plan_remaining
-when no approved/submitted plan row is found, or when the table does not
-exist -- callers treat `plan_qty is None` as `NO_ACTIVE_PLAN` (fail closed).
-
-TODO(V3-23 merge): replace the guessed field list with V3-23's accepted
-frozen-snapshot schema (approved qty, committed/fulfilled qty, revision
-state) once it exists.
+`URY Sales Plan`/`URY Sales Plan Item` now carry real `committed_qty`/
+`fulfilled_qty` columns, transactionally maintained by
+`ury_sales_plan_commit.apply_commit_delta` at reservation create/release/
+fulfil time (see `ury_reservation_service.py`). `_resolve_plan_remaining`
+still guards `frappe.db.table_exists("URY Sales Plan")` (defensive against a
+site where the doctype migration hasn't run) and returns `None` when no
+matching plan/plan-item row is found -- callers treat `plan_qty is None` as
+`NO_ACTIVE_PLAN` (fail closed).
 
 ## Server-authoritative branch/company scope
 
@@ -98,14 +95,16 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import getdate, now_datetime
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_inventory_projection import (
 	get_allocatable_qty,
 	project_component_allocatable,
 	project_fg_allocatable,
 )
+from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 
 # Imported for its side effect of making `URY Stock Reservation` a real,
 # loaded doctype module in this app (ury_inventory_projection's reservation
@@ -123,18 +122,36 @@ POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 
 
 def _verify_branch_scope(user, branch, company):
-	"""Fail closed unless `branch`/`company` are present; TODO: real session wiring.
+	"""Fail closed unless `branch`/`company` are present, then verify the
+	caller is actually assigned to `branch` (and that `branch` belongs to
+	`company`) before any availability data for it is returned.
 
-	TODO(server-authoritative scope): wire this to the real session/permission
-	system once one is available in this codebase's request context -- verify
-	`user`'s POS Profile / assigned branch and company against `branch`/
-	`company`, per V3-40 ("derive or verify it server-side against the
-	session user, POS Profile, document permission"). Until then this
-	function only enforces that branch/company are non-empty (never trusts a
-	blank/missing scope), which is the fail-closed half of that requirement.
+	Mirrors the branch-assignment check used elsewhere in this codebase
+	(e.g. `ury/ury_pos/api.py:getBranch()` and
+	`self_ordering.py:assign_device_table()`'s table-branch check): a user
+	is scoped to a branch via the `URY User` child table on `Branch`
+	(`tabURY User.parent == Branch.name`, `tabURY User.user == user`).
+	System Manager / URY Admin are treated as branch-agnostic staff who
+	manage availability across branches, consistent with the manager-role
+	handling in `ury_kot_item_execution_service.py`.
 	"""
 	if not branch or not company:
 		frappe.throw(_("Branch and company are required"), frappe.ValidationError)
+
+	if user == "Administrator":
+		return
+
+	roles = set(frappe.get_roles(user))
+	if roles & {"System Manager", "URY Admin"}:
+		return
+
+	branch_company = frappe.db.get_value("Branch", branch, "company")
+	if branch_company and branch_company != company:
+		frappe.throw(_("Branch does not belong to the given company"), frappe.PermissionError)
+
+	assigned = frappe.db.exists("URY User", {"parenttype": "Branch", "parent": branch, "user": user})
+	if not assigned:
+		frappe.throw(_("You are not permitted to view availability for this branch"), frappe.PermissionError)
 
 
 def _resolve_production_config(item_code, branch, company, department=None):
@@ -146,32 +163,32 @@ def _resolve_production_config(item_code, branch, company, department=None):
 	exception) when the table is absent or no matching row exists, so callers
 	can fail closed with `CONFIGURATION_ERROR` rather than crash.
 
-	Returns (when resolved) a dict with whichever of these keys the
-	underlying table actually has (missing ones come back `None`):
+	Returns (when resolved) a `frappe._dict` with whichever of these keys the
+	underlying table actually has (missing ones come back `None`), so callers
+	may use either attribute (`config.production_policy`) or dict-style
+	(`config.get("production_policy")`) access -- this matches the shape
+	`resolve_production_context` (the authoritative production resolver this
+	adapter wraps) itself already returns:
 		production_policy, department, production_unit, warehouse,
 		production_unit_disabled, department_disabled
 	"""
-	if not frappe.db.table_exists(PRODUCTION_CONFIG_DOCTYPE):
+	row = resolve_production_context(item_code, branch, company=company, department=department)
+	if not row:
 		return None
-
-	filters = {"item_code": item_code, "branch": branch}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		PRODUCTION_CONFIG_DOCTYPE,
-		filters,
-		[
-			"production_policy",
-			"department",
-			"production_unit",
-			"warehouse",
-			"production_unit_disabled",
-			"department_disabled",
-		],
-		as_dict=True,
+	return frappe._dict(
+		{
+			"production_policy": row.get("production_policy"),
+			"department": row.get("department"),
+			"production_unit": row.get("production_unit"),
+			"warehouse": row.get("warehouse"),
+			"direct_retail_warehouse": row.get("direct_retail_warehouse"),
+			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
+			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
+			"availability_mode": row.get("availability_mode"),
+			"production_unit_disabled": row.get("production_unit_disabled", 0),
+			"department_disabled": row.get("department_disabled", 0),
+		}
 	)
-	return row
 
 
 def _resolve_plan_remaining(item_code, branch, company, department=None):
@@ -182,27 +199,54 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	table is absent or no approved/submitted plan row is found -- callers
 	treat that as `NO_ACTIVE_PLAN`.
 
+	`URY Sales Plan` stores per-item quantities in its `items` child table
+	(`URY Sales Plan Item`: `item_code`, `qty`, ...), not on the parent --
+	the parent only carries scope/status fields (`branch`, `company`,
+	`status`, `plan_date`, ...). `URY Sales Plan` is NOT a submittable
+	doctype (`is_submittable` unset in its JSON), so `docstatus` is always
+	0 for every row -- its approval workflow is tracked entirely via the
+	`status` field, not Frappe's submit mechanism. A `docstatus: 1` filter
+	here was a bug: it made this query match zero rows on any site,
+	regardless of how many plans were genuinely `Approved`/`Locked for
+	Production` (found live, tracing why a real seeded-and-approved plan
+	was still invisible to this resolver). This resolves the parent
+	plan(s) in scope for today's service date and an active `status`
+	(`Approved`/`Locked for Production` -- excluding `Draft`/`Proposed`/
+	`Submitted for Approval`/`Superseded/Cancelled`), then sums the
+	matching child rows, following the same `parent`/`parenttype`
+	child-table query convention used elsewhere in this codebase (e.g.
+	`ury_bom_compiler.py`) rather than `frappe.db.get_value`
+	against nonexistent parent columns.
+
+	`committed_qty`/`fulfilled_qty` are real, transactionally-maintained
+	columns on `URY Sales Plan Item` (see `ury_sales_plan_commit.py`'s
+	`apply_commit_delta`, wired into `ury_reservation_service.create_reservation`
+	/ `_transition_group` at reservation create/release/fulfil time) -- this is
+	a plain aggregate `SELECT` over the matched rows, not a locking read, since
+	this function only ever informs a display/pre-flight decision and never
+	itself mutates the counters.
+
 	Returns (when resolved) a dict: {"plan_qty": ..., "plan_remaining": ...}
 	"""
 	if not frappe.db.table_exists(SALES_PLAN_DOCTYPE):
 		return None
 
-	filters = {"item_code": item_code, "branch": branch, "docstatus": 1}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		SALES_PLAN_DOCTYPE,
-		filters,
-		["plan_qty", "committed_qty", "fulfilled_qty"],
-		as_dict=True,
-	)
-	if not row or row.plan_qty is None:
+	# Scope to plans that are still in force for today's service date and in
+	# an active status -- an unfiltered query sums every submitted plan in
+	# the branch/company's entire history, including Superseded/Cancelled
+	# ones, so plan_qty/plan_remaining would inflate without bound.
+	rows = resolve_plan_item_rows(item_code, branch, company, department=department, plan_date=getdate())
+	if not rows:
 		return None
 
-	committed = (row.committed_qty or 0) + (row.fulfilled_qty or 0)
-	plan_remaining = row.plan_qty - committed
-	return {"plan_qty": row.plan_qty, "plan_remaining": plan_remaining}
+	plan_qty = sum(row.get("qty") or 0 for row in rows)
+	if not plan_qty:
+		return None
+
+	committed = sum(row.get("committed_qty") or 0 for row in rows)
+	fulfilled = sum(row.get("fulfilled_qty") or 0 for row in rows)
+	plan_remaining = plan_qty - committed - fulfilled
+	return {"plan_qty": plan_qty, "plan_remaining": plan_remaining}
 
 
 def _base_response(item_code, company, branch, department, production_policy):
@@ -297,26 +341,63 @@ def get_item_availability(item_code, branch, company, department=None):
 	response["warehouse"] = warehouse
 
 	if production_policy == POLICY_PRE_PRODUCED:
-		_fill_pre_produced(response, item_code, branch, company, resolved_department, warehouse)
+		_fill_pre_produced(response, item_code, branch, company, resolved_department, warehouse, config)
 	elif production_policy == POLICY_MADE_TO_ORDER:
-		_fill_made_to_order(response, item_code, branch, company, resolved_department, warehouse)
+		_fill_made_to_order(response, item_code, branch, company, resolved_department, warehouse, config)
 	elif production_policy == POLICY_DIRECT_RETAIL:
 		_fill_direct_retail(response, item_code, branch, company, warehouse)
 	else:
 		response["reason_code"] = "CONFIGURATION_ERROR"
 		return response
 
+	# `availability_mode` has two options: "Plan Available" (default/safe, no
+	# override) and "Always Available". "Always Available" overrides
+	# *commercial* not-sellable reasons only (stock/plan-derived: out of
+	# stock, no/exhausted plan, blocking recipe component) — it must NEVER
+	# override a structural/config error (missing BOM, missing/disabled
+	# department or production unit, generic configuration error), since
+	# those indicate the item is not actually safe to sell/produce at all,
+	# regardless of plan or stock.
+	#
+	# There is no "Stock Available" mode: selling on stock/recipe-capacity
+	# alone while ignoring the Sales Plan is already covered by turning off
+	# `controlled_by_sales_plan` (see `_fill_pre_produced`/`_fill_made_to_order`
+	# below). A separate "Stock Available" availability_mode was considered
+	# and dropped as functionally identical to that flag.
+	_STRUCTURAL_ERROR_CODES = {
+		"MISSING_BOM",
+		"CONFIGURATION_ERROR",
+		"MISSING_DEPARTMENT",
+		"DEPARTMENT_DISABLED",
+		"PRODUCTION_UNIT_DISABLED",
+		"MISSING_PRODUCTION_UNIT",
+	}
+	availability_mode = config.get("availability_mode") if config else None
+	if availability_mode == "Always Available" and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES:
+		response["reason_code"] = "AVAILABLE"
+		response["sellable"] = True
+		# The override makes the item unconditionally sellable, so its computed
+		# (possibly zero/negative) stock-derived quantities no longer reflect a
+		# real constraint. Signal "unconstrained" with None rather than leaving
+		# the real, possibly-zero value in place, which would otherwise block
+		# cart-capacity/headroom checks downstream despite sellable=True.
+		response["available_qty"] = None
+		if "max_producible" in response:
+			response["max_producible"] = None
+
 	return response
 
 
-def _fill_pre_produced(response, item_code, branch, company, department, warehouse):
+def _fill_pre_produced(response, item_code, branch, company, department, warehouse, config=None):
 	"""Fill `response` in place for a PRE_PRODUCED item, per V3-40's formula.
 
 	`effective_available = min(plan_remaining, fg_allocatable)`. Reason-code
 	priority (per this task's spec): NOT_PRODUCED (fg_available<=0 and never
 	produced, i.e. no Bin.actual_qty ever recorded) takes precedence, then
 	PLAN_EXHAUSTED, then FG_OUT_OF_STOCK, else AVAILABLE. A missing/absent
-	plan is reported as NO_ACTIVE_PLAN before any of those.
+	plan is reported as NO_ACTIVE_PLAN before any of those, unless
+	`controlled_by_sales_plan` is False, in which case the item falls through
+	to stock-based availability.
 	"""
 	fg_projection = project_fg_allocatable(item_code, warehouse, company)
 	fg_available = fg_projection["allocatable_qty"]
@@ -325,8 +406,29 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	response["fg_available"] = fg_available
 	response["max_producible"] = fg_available
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (V3-40 no-plan case) or exists
+	# but is exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: stock alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		effective_available = fg_available
+		response["available_qty"] = max(effective_available, 0)
+		if fg_available <= 0 and never_produced:
+			response["reason_code"] = "NOT_PRODUCED"
+			response["sellable"] = False
+		elif fg_available <= 0:
+			response["reason_code"] = "FG_OUT_OF_STOCK"
+			response["sellable"] = False
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = effective_available > 0
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
+		# Plan gate is enabled; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -342,8 +444,16 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 		response["reason_code"] = "NOT_PRODUCED"
 		response["sellable"] = False
 	elif plan["plan_remaining"] <= 0:
-		response["reason_code"] = "PLAN_EXHAUSTED"
-		response["sellable"] = False
+		# If allow_over_plan_sale is True, allow selling past the plan quantity.
+		allow_over_plan_sale = config.get("allow_over_plan_sale", 0) if config else 0
+		if allow_over_plan_sale and fg_available > 0:
+			# Plan exhausted but over-plan sales are allowed; use stock availability
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = fg_available > 0
+			response["available_qty"] = max(fg_available, 0)
+		else:
+			response["reason_code"] = "PLAN_EXHAUSTED"
+			response["sellable"] = False
 	elif fg_available <= 0:
 		response["reason_code"] = "FG_OUT_OF_STOCK"
 		response["sellable"] = False
@@ -352,7 +462,7 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 		response["sellable"] = effective_available > 0
 
 
-def _fill_made_to_order(response, item_code, branch, company, department, warehouse):
+def _fill_made_to_order(response, item_code, branch, company, department, warehouse, config=None):
 	"""Fill `response` in place for a MADE_TO_ORDER item, per V3-40's formula.
 
 	`recipe_capacity = floor(min(component_allocatable_i / required_qty_i))`;
@@ -360,7 +470,10 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	`blocking_component` is set to the limiting component's item_code
 	whenever recipe_capacity is the binding constraint (i.e. whenever
 	recipe_capacity < plan_remaining, or there is no plan and
-	recipe_capacity <= 0), per this task's spec.
+	recipe_capacity <= 0), per this task's spec. If `controlled_by_sales_plan`
+	is False, plan is optional and the item falls through to capacity-based
+	availability. If `allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
+	overridden by available recipe capacity.
 	"""
 	try:
 		bom_vector = compile_bom_vector(item_code, 1, company)
@@ -392,8 +505,26 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	response["max_producible"] = recipe_capacity
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (no-plan case) or exists but is
+	# exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: capacity alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		response["available_qty"] = max(recipe_capacity, 0)
+		if recipe_capacity <= 0:
+			response["reason_code"] = "BLOCKING_COMPONENT"
+			response["sellable"] = False
+			response["blocking_component"] = blocking_component
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = True
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
+		# Plan gate is enabled; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -412,8 +543,17 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 		response["reason_code"] = "BLOCKING_COMPONENT"
 		response["sellable"] = False
 	elif plan["plan_remaining"] <= 0:
-		response["reason_code"] = "PLAN_EXHAUSTED"
-		response["sellable"] = False
+		# If allow_over_plan_sale is True, allow selling past the plan quantity.
+		allow_over_plan_sale = config.get("allow_over_plan_sale", 0) if config else 0
+		if allow_over_plan_sale and recipe_capacity > 0:
+			# Plan exhausted but over-plan sales are allowed; use capacity.
+			# No blocking component in this case since we have available capacity.
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = True
+			response["available_qty"] = max(recipe_capacity, 0)
+		else:
+			response["reason_code"] = "PLAN_EXHAUSTED"
+			response["sellable"] = False
 	else:
 		response["reason_code"] = "AVAILABLE"
 		response["sellable"] = effective_available > 0

@@ -13,11 +13,13 @@
   "department",
   "production_unit",
   "production_policy",
+  "sourcing_mode",
   "bom",
   "controlled_by_sales_plan",
   "allow_over_plan_sale",
   "availability_mode",
-  "direct_retail_warehouse"
+  "direct_retail_warehouse",
+  "external_receiving_warehouse"
  ],
  "fields": [
   {
@@ -50,16 +52,27 @@
    "options": "URY Production Department"
   },
   {
+   "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
    "fieldname": "production_unit",
    "fieldtype": "Link",
    "label": "Production Unit",
    "options": "URY Production Unit"
   },
   {
+   "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit).",
    "fieldname": "production_policy",
    "fieldtype": "Select",
    "label": "Production Policy",
    "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
+  },
+  {
+   "default": "IN_HOUSE",
+   "depends_on": "eval:doc.production_policy==\"PRE_PRODUCED\"",
+   "description": "Only meaningful when Production Policy is PRE_PRODUCED (MADE_TO_ORDER is always in-house at order time; DIRECT_RETAIL is already a receipt-only path via Direct Retail Warehouse). IN_HOUSE: batch is manufactured at this branch/unit via a real BOM-based Manufacture Stock Entry. EXTERNAL_RECEIPT: item arrives already finished from a central kitchen/processing location and is received directly as finished stock, no BOM consumption.",
+   "fieldname": "sourcing_mode",
+   "fieldtype": "Select",
+   "label": "Sourcing Mode",
+   "options": "IN_HOUSE\nEXTERNAL_RECEIPT"
   },
   {
    "fieldname": "bom",
@@ -68,28 +81,40 @@
    "options": "BOM"
   },
   {
-   "default": "0",
+   "default": "1",
+   "description": "When checked (default), item availability requires an active approved/locked sales plan for the branch/department. When unchecked (an explicit opt-out), item availability is based on stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) alone, without plan requirement.",
    "fieldname": "controlled_by_sales_plan",
    "fieldtype": "Check",
    "label": "Controlled by Sales Plan"
   },
   {
    "default": "0",
+   "description": "When checked and plan is exhausted, allows selling/producing beyond the approved plan quantity if stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) is available. Only applicable when Controlled by Sales Plan is enabled.",
    "fieldname": "allow_over_plan_sale",
    "fieldtype": "Check",
    "label": "Allow Over-Plan Sale",
    "depends_on": "eval:doc.controlled_by_sales_plan==1"
   },
   {
+   "default": "Plan Available",
+   "description": "Controls availability override behavior; distinct from 'Controlled by Sales Plan' below, which decides whether a Sales Plan gates this item at all. 'Plan Available' (default/safe): normal plan+stock (PRE_PRODUCED) or plan+recipe-capacity (MADE_TO_ORDER) based availability checking, no override. 'Always Available' makes the item sellable regardless of plan/stock/capacity constraints (but never overrides structural/config errors such as a missing BOM). There is no separate 'Stock Available' mode: to sell purely on stock/capacity while ignoring the Sales Plan, turn off 'Controlled by Sales Plan' instead -- a dedicated 'Stock Available' mode was considered and dropped because it would be functionally identical to that existing flag and only added a second, confusing way to configure the same outcome.",
    "fieldname": "availability_mode",
    "fieldtype": "Select",
    "label": "Availability Mode",
-   "options": "Always Available\nStock Available\nPlan Available"
+   "options": "Plan Available\nAlways Available"
   },
   {
    "fieldname": "direct_retail_warehouse",
    "fieldtype": "Link",
    "label": "Direct Retail Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "depends_on": "eval:doc.sourcing_mode==\"EXTERNAL_RECEIPT\"",
+   "description": "Warehouse the finished item is received into when produced off-site (e.g. a central kitchen/processing location). Used by the Receive Batch action instead of the BOM-based Manufacture Stock Entry.",
+   "fieldname": "external_receiving_warehouse",
+   "fieldtype": "Link",
+   "label": "External Receiving Warehouse",
    "options": "Warehouse"
   }
  ],
@@ -112,6 +137,15 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1
   }
  ],
  "sort_field": "modified",

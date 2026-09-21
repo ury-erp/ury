@@ -14,6 +14,8 @@ NOT EXECUTED / unexecutable by design -- see its docstring.
 import json
 from unittest.mock import MagicMock, patch
 
+from contextlib import contextmanager
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -25,11 +27,66 @@ from ury.ury.api.ury_reservation_service import (
     cancel_reservation,
     create_reservation,
     fulfil_reservation,
+    fulfil_reservation_if_pending,
     release_reservation,
+    _active_reservation_qty,
 )
 
 
 MODULE = "ury.ury.api.ury_reservation_service"
+BOM_MODULE = "ury.ury.api.ury_bom_compiler"
+
+RESERVATION_DOCTYPE = "URY Stock Reservation"
+
+
+def patch_read_committed_reservation_rows(test_case):
+    """Keep `create_reservation` tests hermetic after the oversell fix.
+
+    `create_reservation`'s capacity check reads the active-reservation sum on
+    a short-lived SECOND database connection
+    (`_read_committed_reservation_rows`), so that it sees latest-committed
+    data instead of its own transaction's stale REPEATABLE READ view -- see
+    that function's docstring for why this is required and why a locking read
+    or a commit could not be used instead.
+
+    That real connection would bypass these tests' `frappe.get_all` mocks
+    entirely and quietly hit the live database, so every test that calls
+    `create_reservation` would silently stop controlling the
+    reservation-sum input (it would just read an empty real table and appear
+    to pass). This redirects the fresh-connection read back through the
+    module's `frappe.get_all`, which each test already mocks, so the mocked
+    reservation rows keep driving the capacity arithmetic exactly as before.
+
+    Note this makes the unit tests exercise the *arithmetic*, not the
+    isolation behaviour: no single-process test can prove cross-connection
+    read consistency. That is proven only by the live multi-process bench run
+    documented in the module docstring -- which is precisely why the original
+    oversell bug survived a green unit suite.
+    """
+
+    def fake_reconciled(conn, item_code, warehouse, company):
+        return frappe.get_all(
+            RESERVATION_DOCTYPE,
+            filters={
+                "component_item": item_code,
+                "warehouse": warehouse,
+                "company": company,
+                "status": ["in", [RESERVED]],
+            },
+            fields=["name", "qty", "reservation_group"],
+        )
+
+    @contextmanager
+    def fake_connection():
+        yield None
+
+    for target, kwargs in (
+        (f"{MODULE}._reconciled_active_rows", {"side_effect": fake_reconciled}),
+        (f"{MODULE}.committed_read_connection", {"side_effect": fake_connection}),
+    ):
+        patcher = patch(target, **kwargs)
+        patcher.start()
+        test_case.addCleanup(patcher.stop)
 
 
 def _new_doc_recorder():
@@ -51,6 +108,7 @@ def _new_doc_recorder():
 
 class TestCreateReservationSimpleItem(FrappeTestCase):
     def setUp(self):
+        patch_read_committed_reservation_rows(self)
         # append_audit() calls frappe.utils.now(), which otherwise
         # chains into get_system_settings() -> get_cached_doc("System
         # Settings") -- a real DB/cache path these unit tests do not
@@ -118,6 +176,7 @@ class TestCreateReservationSimpleItem(FrappeTestCase):
 
 class TestCreateReservationCompositeItem(FrappeTestCase):
     def setUp(self):
+        patch_read_committed_reservation_rows(self)
         # append_audit() calls frappe.utils.now(), which otherwise
         # chains into get_system_settings() -> get_cached_doc("System
         # Settings") -- a real DB/cache path these unit tests do not
@@ -350,6 +409,208 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
         self.assertEqual(result["reservation_group"], "GRP3")
 
 
+class TestCreateReservationProductionPolicy(FrappeTestCase):
+    """Regression coverage: `production_policy` (not "has an active BOM")
+    must decide whether create_reservation checks FG stock directly or
+    explodes the BOM into raw components -- see `_resolve_components`.
+    """
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_pre_produced_item_with_active_bom_reserves_own_fg_stock_not_components(self):
+        """PRNPM-style item: PRE_PRODUCED, has an active default BOM (documents
+        the recipe), but must reserve/check its OWN finished-goods stock, not
+        explode into raw ingredients. If this regresses to the has-BOM
+        heuristic, the reservation would instead check MZRCHSE/ORGNO-style
+        raw component Bin rows and raise a raw-ingredient shortfall error.
+        """
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM":
+                # A real active default BOM exists for this item -- proving
+                # its mere presence must NOT trigger component explosion
+                # once production_policy is PRE_PRODUCED.
+                if isinstance(filters, dict) and "item" in filters:
+                    return "BOM-PRNPM"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            self.assertEqual(params["item_code"], "PRNPM")
+            return [{"name": "BIN-PRNPM", "actual_qty": 20, "projected_qty": 20}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-PRNPM"
+        ), patch(
+            f"{MODULE}.compile_bom_vector"
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="PRNPM",
+                qty=5,
+                warehouse="WH-FG",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-PRNPM",
+                policy="PRE_PRODUCED",
+            )
+
+        mock_compile.assert_not_called()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["component_item"], "PRNPM")
+        self.assertEqual(created[0]["qty"], 5)
+        self.assertEqual(result["reservation_group"], "GRP-PRNPM")
+
+    def test_direct_retail_item_with_active_bom_reserves_own_fg_stock(self):
+        """Same guard as PRE_PRODUCED, for DIRECT_RETAIL."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-RETAIL-ITEM"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            return [{"name": "BIN-1", "actual_qty": 20, "projected_qty": 20}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-RETAIL"
+        ), patch(
+            f"{MODULE}.compile_bom_vector"
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="RETAIL-ITEM",
+                qty=2,
+                warehouse="WH-FG",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-RETAIL",
+                policy="DIRECT_RETAIL",
+            )
+
+        mock_compile.assert_not_called()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["component_item"], "RETAIL-ITEM")
+        self.assertEqual(result["reservation_group"], "GRP-RETAIL")
+
+    def test_made_to_order_item_still_reserves_bom_components(self):
+        """Regression guard: MADE_TO_ORDER items keep exploding into BOM
+        components exactly as before, when production_policy is passed
+        explicitly."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def sql_side_effect(query, params, **kwargs):
+            item_code = params["item_code"]
+            bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+            return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            return []
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-MTO"
+        ), patch(
+            f"{MODULE}.compile_bom_vector",
+            return_value={
+                "item_code": "MENU-A",
+                "components": [
+                    {"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+                    {"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+                ],
+            },
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="MENU-A",
+                qty=3,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-MTO",
+                policy="MADE_TO_ORDER",
+            )
+
+        mock_compile.assert_called_once()
+        self.assertEqual(len(created), 2)
+        by_item = {row["component_item"]: row["qty"] for row in created}
+        self.assertEqual(by_item["FLOUR"], 6)
+        self.assertEqual(by_item["SUGAR"], 3)
+        self.assertEqual(result["reservation_group"], "GRP-MTO")
+
+    def test_no_production_policy_falls_back_to_legacy_has_bom_heuristic(self):
+        """Backward compatibility: a caller that supplies no production_policy
+        (e.g. not yet updated, or item genuinely unconfigured) keeps the
+        pre-existing has-active-BOM => composite-reservation behaviour."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-MENU-A"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            item_code = params["item_code"]
+            bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+            return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-LEGACY"
+        ), patch(
+            f"{MODULE}.compile_bom_vector",
+            return_value={
+                "item_code": "MENU-A",
+                "components": [
+                    {"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+                    {"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+                ],
+            },
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="MENU-A",
+                qty=3,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-LEGACY",
+            )
+
+        mock_compile.assert_called_once()
+        self.assertEqual(len(created), 2)
+        self.assertEqual(result["reservation_group"], "GRP-LEGACY")
+
+
 class TestReleaseFulfilCancel(FrappeTestCase):
     def setUp(self):
         # append_audit() calls frappe.utils.now(), which otherwise
@@ -363,8 +624,38 @@ class TestReleaseFulfilCancel(FrappeTestCase):
 
     def _rows(self, status):
         return [
-            frappe._dict({"name": "RES-1", "status": status, "reservation_group": "GRP9"}),
+            frappe._dict({"name": "RES-1", "status": status, "reservation_group": "GRP9", "audit_log": None}),
         ]
+
+    def _sql_side_effect(self, rows):
+        """Mock for `_resolve_group_rows`'s two locking `frappe.db.sql` reads.
+
+        `_resolve_group_rows` now does a `SELECT ... FOR UPDATE` for the
+        single-docname -> reservation_group lookup, then another for the
+        full group's rows, instead of `frappe.db.get_value`/`frappe.get_all`.
+        This mirrors `rows` (as `self._rows(...)` would supply) back through
+        both shapes so the existing get_all-based fixtures still apply.
+        """
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                for row in rows:
+                    if row.get("name") == values["name"]:
+                        return [frappe._dict({"reservation_group": row.get("reservation_group")})]
+                return []
+            if values and "group" in values:
+                return [
+                    frappe._dict(dict(row))
+                    for row in rows
+                    if row.get("reservation_group") == values["group"]
+                ]
+            return []
+        return _sql
+
+    def test_fulfilled_rows_are_not_counted_as_reserved_capacity(self):
+        with patch(f"{MODULE}.frappe.get_all", return_value=[]) as get_all:
+            result = _active_reservation_qty("ITEM-1", "WH-1", "Company")
+        self.assertEqual(result, 0)
+        self.assertEqual(get_all.call_args.kwargs["filters"]["status"], ["in", [RESERVED]])
 
     def test_release_restores_capacity_for_subsequent_reservation(self):
         """Releasing a Reserved row transitions it to Released.
@@ -381,9 +672,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
@@ -399,9 +693,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
@@ -410,9 +707,10 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         self.assertEqual(loaded_doc.status, CANCELLED)
 
     def test_cancel_on_fulfilled_is_rejected(self):
+        rows = self._rows(FULFILLED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(FULFILLED)
-        ):
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)):
             with self.assertRaises(frappe.ValidationError):
                 cancel_reservation("RES-1", reason="attempted post-production cancel")
 
@@ -423,15 +721,569 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
             fulfil_reservation("RES-1")
 
         self.assertEqual(loaded_doc.status, FULFILLED)
+
+    def _fulfil_if_pending(self, rows, loaded_doc=None):
+        loaded_doc = loaded_doc or frappe._dict(
+            {"name": "RES-1", "status": rows[0].status, "audit_log": None}
+        )
+        loaded_doc.save = MagicMock()
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "tester@example.com"
+            outcome = fulfil_reservation_if_pending("RES-1")
+        return outcome, loaded_doc
+
+    def test_fulfil_if_pending_transitions_a_reserved_group(self):
+        outcome, loaded_doc = self._fulfil_if_pending(self._rows(RESERVED))
+
+        self.assertEqual(outcome, "fulfilled")
+        self.assertEqual(loaded_doc.status, FULFILLED)
+
+    def test_fulfil_if_pending_is_a_no_op_on_an_already_fulfilled_group(self):
+        """The consolidated Sales Invoice close-out and the fulfilment posting
+        service both fulfil the same group and can race; whichever loses must
+        do nothing rather than throw (`fulfil_reservation` would)."""
+        outcome, loaded_doc = self._fulfil_if_pending(self._rows(FULFILLED))
+
+        self.assertEqual(outcome, "already")
+        loaded_doc.save.assert_not_called()
+
+    def test_fulfil_if_pending_skips_a_group_in_a_mixed_or_other_state(self):
+        """A partly-released / mid-transition group is skipped and logged, not
+        raised: neither caller may abort a submitted stock posting or a
+        submitted Sales Invoice over a reservation row's state."""
+        rows = [
+            frappe._dict(
+                {"name": "RES-1", "status": RESERVED, "reservation_group": "GRP9", "audit_log": None}
+            ),
+            frappe._dict(
+                {"name": "RES-2", "status": FULFILLED, "reservation_group": "GRP9", "audit_log": None}
+            ),
+        ]
+        outcome, loaded_doc = self._fulfil_if_pending(rows)
+
+        self.assertEqual(outcome, "not_eligible")
+        loaded_doc.save.assert_not_called()
+
+
+class TestSalesPlanCommitWiring(FrappeTestCase):
+    """Sales Plan committed_qty/fulfilled_qty maintenance wired into
+    create_reservation (increment) and _transition_group (decrement on
+    release/cancel/expire, decrement+increment-fulfilled on fulfil)."""
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_create_reservation_increments_committed_qty_for_matched_plan_item(self):
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta",
+            return_value={"name": "PLI-1", "committed_qty": 4, "fulfilled_qty": 0},
+        ) as mock_apply:
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+                frozen_context={"department": "Hot Line"},
+            )
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE", "Branch A", "Company A", department="Hot Line", committed_delta=4
+        )
+        # The applied commit is recorded on the created row's audit_log so
+        # release/fulfil can symmetrically reverse it later.
+        audit = json.loads(created[0]["audit_log"])
+        commit_info = audit[0]["frozen_context"]["sales_plan_commit"]
+        self.assertTrue(commit_info["applied"])
+        self.assertEqual(commit_info["qty"], 4)
+        self.assertEqual(commit_info["plan_item"], "PLI-1")
+
+    def test_create_reservation_with_no_plan_match_records_not_applied(self):
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta", return_value=None
+        ):
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+            )
+
+        audit = json.loads(created[0]["audit_log"])
+        commit_info = audit[0]["frozen_context"]["sales_plan_commit"]
+        self.assertFalse(commit_info["applied"])
+        self.assertIsNone(commit_info["plan_item"])
+
+    def _rows_with_commit(self, status, qty=4):
+        audit_log = json.dumps(
+            [
+                {
+                    "event": "create",
+                    "frozen_context": {
+                        "sales_plan_commit": {
+                            "applied": True,
+                            "item_code": "ITEM-SIMPLE",
+                            "branch": "Branch A",
+                            "company": "Company A",
+                            "department": "Hot Line",
+                            "qty": qty,
+                            "plan_item": "PLI-1",
+                        }
+                    },
+                }
+            ]
+        )
+        return [
+            frappe._dict(
+                {"name": "RES-1", "status": status, "reservation_group": "GRP9", "audit_log": audit_log}
+            )
+        ]
+
+    def _sql_side_effect(self, rows):
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                for row in rows:
+                    if row.get("name") == values["name"]:
+                        return [frappe._dict({"reservation_group": row.get("reservation_group")})]
+                return []
+            if values and "group" in values:
+                return [frappe._dict(dict(row)) for row in rows if row.get("reservation_group") == values["group"]]
+            return []
+
+        return _sql
+
+    def test_release_decrements_committed_qty_by_recorded_amount(self):
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_commit(RESERVED, qty=4)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1", reason="order cancelled before production")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-4,
+            fulfilled_delta=0,
+        )
+
+    def test_fulfil_moves_qty_from_committed_to_fulfilled_in_one_call(self):
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_commit(RESERVED, qty=6)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            fulfil_reservation("RES-1")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-6,
+            fulfilled_delta=6,
+        )
+
+    def test_no_commit_recorded_means_no_counter_call(self):
+        """A group whose create predates this feature (no sales_plan_commit in
+        its audit_log) must not touch the counter helper at all."""
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = [
+            frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP9", "audit_log": None})
+        ]
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1")
+
+        mock_apply.assert_not_called()
+
+
+class TestRealtimeEventEmission(FrappeTestCase):
+	"""Tests for realtime event emissions on reservation create/release."""
+
+	def setUp(self):
+		patch_read_committed_reservation_rows(self)
+		# append_audit() calls frappe.utils.now(), which otherwise
+		# chains into get_system_settings() -> get_cached_doc("System
+		# Settings") -- a real DB/cache path these unit tests do not
+		# stub. Fix the clock instead of routing that lookup through
+		# the get_doc mocks below.
+		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+		now_patcher.start()
+		self.addCleanup(now_patcher.stop)
+
+	def test_create_reservation_emits_realtime_event_per_component(self):
+		"""create_reservation() emits one ury_component_stock_changed event per component_item."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		def sql_side_effect(query, params, **kwargs):
+			item_code = params["item_code"]
+			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+		# Component resolution for a MADE_TO_ORDER item goes through
+		# compile_bom_vector() (a real function in a different module) --
+		# mocked directly here, same pattern already used by
+		# test_made_to_order_item_explodes_into_bom_components above, rather
+		# than trying to drive it indirectly via frappe.db.get_value/get_all
+		# (the legacy no-policy fallback path, which this test doesn't take
+		# since it now passes policy=MADE_TO_ORDER explicitly).
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-REALTIME"
+		), patch(
+			f"{MODULE}.compile_bom_vector",
+			return_value={
+				"item_code": "MENU-A",
+				"components": [
+					{"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+					{"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+				],
+			},
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="MENU-A",
+				qty=3,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-REALTIME",
+				policy="MADE_TO_ORDER",
+			)
+
+		# Should emit one event per component (FLOUR, SUGAR)
+		self.assertEqual(mock_publish.call_count, 2)
+
+		# Verify the events have the expected channel and payload
+		calls = mock_publish.call_args_list
+		channels = [call[0][0] for call in calls]
+		self.assertEqual(channels, ["ury_component_stock_changed", "ury_component_stock_changed"])
+
+		payloads = [call[0][1] for call in calls]
+		# Components are sorted by item_code, so FLOUR before SUGAR
+		self.assertEqual(payloads[0]["component_item"], "FLOUR")
+		self.assertEqual(payloads[0]["warehouse"], "WH-1")
+		self.assertEqual(payloads[0]["company"], "Company A")
+
+		self.assertEqual(payloads[1]["component_item"], "SUGAR")
+		self.assertEqual(payloads[1]["warehouse"], "WH-1")
+		self.assertEqual(payloads[1]["company"], "Company A")
+
+	def test_create_reservation_emits_single_event_for_simple_item(self):
+		"""create_reservation() emits one event for a simple (non-composite) item."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-SIMPLE"
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="ITEM-SIMPLE",
+				qty=4,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-SIMPLE",
+			)
+
+		# Should emit one event for the item itself
+		mock_publish.assert_called_once()
+		call_args = mock_publish.call_args
+		self.assertEqual(call_args[0][0], "ury_component_stock_changed")
+		self.assertEqual(call_args[0][1]["component_item"], "ITEM-SIMPLE")
+		self.assertEqual(call_args[0][1]["warehouse"], "WH-1")
+		self.assertEqual(call_args[0][1]["company"], "Company A")
+
+	def test_release_reservation_emits_realtime_events(self):
+		"""release_reservation() emits one ury_component_stock_changed event per component_item."""
+		loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+		loaded_doc.save = MagicMock()
+
+		def get_doc_dispatch(*args, **kwargs):
+			return loaded_doc
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if doctype == "URY Stock Reservation" and "status" in filters and filters["status"] == RELEASED:
+				# Return rows that were just transitioned to RELEASED
+				return []
+			elif doctype == "URY Stock Reservation" and "name" in filters:
+				# Return the row data for the released reservation
+				return [
+					frappe._dict({
+						"name": "RES-1",
+						"component_item": "COMPONENT-A",
+						"warehouse": "WH-1",
+						"company": "Company A",
+					}),
+				]
+			elif doctype == "URY Stock Reservation" and "reservation_group" in filters:
+				# Initial group lookup
+				return [frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP-RELEASE"})]
+			return []
+
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			if values and "name" in values:
+				return [frappe._dict({"reservation_group": "GRP-RELEASE"})]
+			if values and "group" in values:
+				return [frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP-RELEASE", "audit_log": None})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+		), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			mock_session.user = "tester@example.com"
+			release_reservation("RES-1", reason="order cancelled")
+
+		# Should emit one event for the released component
+		mock_publish.assert_called_once()
+		call_args = mock_publish.call_args
+		self.assertEqual(call_args[0][0], "ury_component_stock_changed")
+		self.assertEqual(call_args[0][1]["component_item"], "COMPONENT-A")
+		self.assertEqual(call_args[0][1]["warehouse"], "WH-1")
+		self.assertEqual(call_args[0][1]["company"], "Company A")
+
+	def test_publish_realtime_failure_does_not_abort_reservation(self):
+		"""If frappe.publish_realtime raises, the reservation is still created and not rolled back."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FAIL"
+		), patch(
+			f"{MODULE}.frappe.publish_realtime", side_effect=Exception("socketio down")
+		):
+			# Should not raise, even though publish_realtime failed
+			result = create_reservation(
+				item_code="ITEM-TEST",
+				qty=1,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FAIL",
+			)
+
+		# Reservation should still be created
+		self.assertEqual(result["reservation_group"], "GRP-FAIL")
+		self.assertEqual(len(created), 1)
+
+	def test_create_reservation_emits_rich_fanout_event_with_affected_items(self):
+		"""H1: create_reservation() for a MADE_TO_ORDER item with a shared
+		component also publishes a richer `menu_availability_update_{branch}`
+		event per component, carrying the items resolved by
+		`get_items_affected_by_component` (mocked here to a known list),
+		alongside the unchanged cheap `ury_component_stock_changed` event."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		def sql_side_effect(query, params, **kwargs):
+			item_code = params["item_code"]
+			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+		affected_by_component = {
+			"FLOUR": [{"top_level_item": "MENU-A", "qty_per_unit": 2, "stock_uom": "Kg"}],
+			"SUGAR": [{"top_level_item": "MENU-A", "qty_per_unit": 1, "stock_uom": "Kg"}],
+		}
+
+		def get_items_affected_side_effect(component_item, branch, company):
+			return affected_by_component.get(component_item, [])
+
+		# Component resolution for a MADE_TO_ORDER item goes through
+		# compile_bom_vector() (a real function in a different module) --
+		# mocked directly here, same pattern already used by
+		# test_made_to_order_item_explodes_into_bom_components above, rather
+		# than trying to drive it indirectly via frappe.db.get_value/get_all
+		# (the legacy no-policy fallback path, which this test doesn't take
+		# since it now passes policy=MADE_TO_ORDER explicitly).
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FANOUT"
+		), patch(
+			f"{MODULE}.compile_bom_vector",
+			return_value={
+				"item_code": "MENU-A",
+				"components": [
+					{"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+					{"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+				],
+			},
+		), patch(
+			f"{BOM_MODULE}.get_items_affected_by_component", side_effect=get_items_affected_side_effect
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="MENU-A",
+				qty=3,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FANOUT",
+				policy="MADE_TO_ORDER",
+			)
+
+		calls = mock_publish.call_args_list
+		# Two components -> two cheap events + two rich fan-out events.
+		self.assertEqual(len(calls), 4)
+
+		cheap_calls = [c for c in calls if c[0][0] == "ury_component_stock_changed"]
+		rich_calls = [c for c in calls if c[0][0] == "menu_availability_update_Branch A"]
+		self.assertEqual(len(cheap_calls), 2)
+		self.assertEqual(len(rich_calls), 2)
+
+		rich_payloads = {c[0][1]["component_item"]: c[0][1] for c in rich_calls}
+		self.assertEqual(rich_payloads["FLOUR"]["affected_items"], ["MENU-A"])
+		self.assertEqual(rich_payloads["FLOUR"]["branch"], "Branch A")
+		self.assertEqual(rich_payloads["SUGAR"]["affected_items"], ["MENU-A"])
+
+	def test_create_reservation_fanout_lookup_failure_does_not_abort_or_raise(self):
+		"""H1 defensive requirement: if `get_items_affected_by_component`
+		raises, create_reservation() still completes normally (the reservation
+		is created, no exception propagates), and the cheap
+		`ury_component_stock_changed` event still fires independently -- a
+		fan-out failure must never be a single point of failure."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FANOUT-FAIL"
+		), patch(
+			f"{BOM_MODULE}.get_items_affected_by_component", side_effect=Exception("bom index unavailable")
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			# Should not raise, even though the fan-out lookup failed.
+			result = create_reservation(
+				item_code="ITEM-TEST",
+				qty=1,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FANOUT-FAIL",
+			)
+
+		# Reservation should still be created despite the fan-out failure.
+		self.assertEqual(result["reservation_group"], "GRP-FANOUT-FAIL")
+		self.assertEqual(len(created), 1)
+
+		# The cheap event still fired independently of the failed fan-out.
+		mock_publish.assert_called_once()
+		self.assertEqual(mock_publish.call_args[0][0], "ury_component_stock_changed")
 
 
 class TestConcurrency(FrappeTestCase):
@@ -492,3 +1344,398 @@ class TestConcurrency(FrappeTestCase):
         # rejected = [r for r in results if r[0] == "rejected"]
         # self.assertEqual(len(succeeded), 1)
         # self.assertEqual(len(rejected), 1)
+
+
+class TestReconciledActiveRows(FrappeTestCase):
+	"""Unit coverage for the two-view reconciliation behind `read_committed=True`.
+
+	These are the cases the four prior review gates had no test for, and are
+	exactly where the F1 (own uncommitted INSERT invisible => oversell) and F2
+	(own uncommitted RELEASE invisible => spurious rejection) regressions lived.
+	A single-process test cannot prove cross-connection isolation -- that is
+	what the live bench run proves -- but it can pin the reconciliation rule
+	itself, which is the part that is easy to "simplify" back into a bug.
+	"""
+
+	def _run(self, own_active, committed_active, exists_committed, exists_own):
+		from ury.ury.api.ury_reservation_service import (
+			_RESERVATION_EXISTS_SQL,
+			_reconciled_active_rows,
+		)
+
+		conn = MagicMock()
+
+		def conn_sql(query, params, **kwargs):
+			if query is _RESERVATION_EXISTS_SQL:
+				return [{"name": n} for n in params["names"] if n in exists_committed]
+			return committed_active
+
+		conn.sql.side_effect = conn_sql
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if fields == ["name"]:
+				names = filters["name"][1]
+				return [{"name": n} for n in names if n in exists_own]
+			return own_active
+
+		with patch(f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect):
+			rows = _reconciled_active_rows(conn, "FLOUR", "WH-1", "Company A")
+		return sorted(row["name"] for row in rows), sum(row["qty"] for row in rows)
+
+	def test_active_in_both_views_is_counted(self):
+		row = {"name": "R1", "qty": 3, "reservation_group": "G1"}
+		names, total = self._run([row], [row], {"R1"}, {"R1"})
+		self.assertEqual((names, total), (["R1"], 3))
+
+	def test_own_uncommitted_insert_is_counted(self):
+		"""F1: the row exists only in our transaction, so the fresh connection
+		cannot see it -- but it is real and must count against capacity."""
+		row = {"name": "R2", "qty": 5, "reservation_group": "G2"}
+		names, total = self._run([row], [], exists_committed=set(), exists_own={"R2"})
+		self.assertEqual((names, total), (["R2"], 5))
+
+	def test_release_committed_by_someone_else_is_not_counted(self):
+		"""Same shape as the case above (active for us, not in the committed
+		active set) but the row DOES exist on the other connection, i.e. it was
+		released and committed after our snapshot was pinned. Must not count."""
+		row = {"name": "R3", "qty": 7, "reservation_group": "G3"}
+		names, total = self._run([row], [], exists_committed={"R3"}, exists_own={"R3"})
+		self.assertEqual((names, total), ([], 0))
+
+	def test_insert_committed_by_someone_else_is_counted(self):
+		"""The concurrent-oversell case c5e73d299 fixed: committed after our
+		snapshot, so absent from our view entirely. Must still count."""
+		row = {"name": "R4", "qty": 2, "reservation_group": "G4"}
+		names, total = self._run([], [row], exists_committed={"R4"}, exists_own=set())
+		self.assertEqual((names, total), (["R4"], 2))
+
+	def test_own_uncommitted_release_is_not_counted(self):
+		"""F2: we released it in this transaction, so it still reads as
+		Reserved on the fresh connection. It must not be counted against its
+		own replacement."""
+		row = {"name": "R5", "qty": 49.8, "reservation_group": "G5"}
+		names, total = self._run([], [row], exists_committed={"R5"}, exists_own={"R5"})
+		self.assertEqual((names, total), ([], 0))
+
+	def test_all_five_cases_together(self):
+		own = [
+			{"name": "R1", "qty": 3, "reservation_group": "G1"},
+			{"name": "R2", "qty": 5, "reservation_group": "G2"},
+			{"name": "R3", "qty": 7, "reservation_group": "G3"},
+		]
+		committed = [
+			{"name": "R1", "qty": 3, "reservation_group": "G1"},
+			{"name": "R4", "qty": 2, "reservation_group": "G4"},
+			{"name": "R5", "qty": 49.8, "reservation_group": "G5"},
+		]
+		names, total = self._run(
+			own, committed, exists_committed={"R1", "R3", "R4", "R5"}, exists_own={"R1", "R2", "R3", "R5"}
+		)
+		self.assertEqual(names, ["R1", "R2", "R4"])
+		self.assertEqual(total, 10)
+
+
+class TestSharedGroupPartialFulfilment(FrappeTestCase):
+    """B03b: one reservation group legitimately shared by several fulfillers.
+
+    A straight quantity bump on ONE POS line (Coffee 1 -> 2) does not create a
+    second reservation group: `ury_order_reservation_service._reconcile_line`
+    releases the line's group and creates ONE replacement sized for the new
+    TOTAL under the same `reservation_line_key`, and the delta KOT raised for
+    the +1 inherits that same line key. So the original KOT item and the delta
+    KOT item both resolve -- correctly, per B03's line scoping -- to that one
+    group, which covers both of them together.
+
+    Before this, fulfilling was all-or-nothing, so whichever KOT item was
+    served FIRST flipped the whole group to Fulfilled for its own posting
+    alone, and the sibling served minutes later found nothing Reserved for its
+    line (`RESERVATION_NOT_FOUND`). The accounting below is cumulative: each
+    contributor's share is recorded, and only the contribution that completes
+    the reserved total performs the terminal transition.
+    """
+
+    GROUP = "GRP-SHARED"
+
+    def setUp(self):
+        patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00").start()
+        self.addCleanup(patch.stopall)
+
+    def _store(self, reserved_top_level_qty=2, status=RESERVED, rows=2):
+        """Two component rows of one group, as `create_reservation` writes them.
+
+        `reserved_top_level_qty` is the key `create_reservation` now freezes
+        into every row's create-time `frozen_context`; `None` models a legacy
+        group created before it existed (and with no `sales_plan_commit`
+        fallback either), which must keep whole-group behaviour.
+        """
+        context = {"item_code": "COFFEE", "warehouse": "WH-1"}
+        if reserved_top_level_qty is not None:
+            context["reserved_top_level_qty"] = reserved_top_level_qty
+        return {
+            "RES-{0}".format(i): frappe._dict(
+                {
+                    "name": "RES-{0}".format(i),
+                    "status": status,
+                    "reservation_group": self.GROUP,
+                    "audit_log": json.dumps([{"event": "create", "frozen_context": context}]),
+                }
+            )
+            for i in range(1, rows + 1)
+        }
+
+    def _call(self, store, contributor=None, contributed_qty=None):
+        """Drive the real `fulfil_reservation_if_pending` against `store`.
+
+        `store` is a live dict of row name -> row: every `doc.save()` writes
+        the row's new `audit_log`/`status` straight back into it, so a second
+        call in the same test reads what the first one actually persisted --
+        which is the whole point, since the ledger lives in `audit_log`.
+        """
+        def get_doc_dispatch(_doctype, name, *a, **k):
+            row = store[name]
+            doc = frappe._dict(dict(row))
+
+            def _save(*_a, **_k):
+                row["audit_log"] = doc.audit_log
+                row["status"] = doc.status
+
+            doc.save = MagicMock(side_effect=_save)
+            return doc
+
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                row = store.get(values["name"])
+                return [frappe._dict({"reservation_group": row.reservation_group})] if row else []
+            if values and "group" in values:
+                return [frappe._dict(dict(r)) for r in store.values()]
+            return []
+
+        with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+            f"{MODULE}.apply_commit_delta"
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "chef@example.com"
+            return fulfil_reservation_if_pending(
+                "RES-1", contributor=contributor, contributed_qty=contributed_qty
+            )
+
+    def _statuses(self, store):
+        return {row.status for row in store.values()}
+
+    def test_original_then_delta_each_fulfil_their_own_share(self):
+        """The exact reported repro, original KOT served first."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+        # Still Reserved: the delta KOT has not been served yet and must still
+        # find this group. This is the failure B03b fixes -- before it, the
+        # group was already Fulfilled here.
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_delta_then_original_each_fulfil_their_own_share(self):
+        """Reverse order: the delta KOT is served first. Serving order must not
+        matter -- neither KOT item is privileged over the other."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "partial")
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_replayed_contributor_is_counted_once_and_does_not_close_the_group(self):
+        """A posting intent is retried on failure, so the same contributor can
+        call twice. Counting it twice would close a half-consumed group early
+        and strand the sibling KOT item."""
+        store = self._store(reserved_top_level_qty=2)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "already")
+        self.assertEqual(self._statuses(store), {RESERVED})
+
+        self.assertEqual(self._call(store, contributor="INTENT-DELTA", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_contribution_after_the_group_closed_is_a_no_op(self):
+        store = self._store(reserved_top_level_qty=2)
+        self._call(store, contributor="A", contributed_qty=1)
+        self._call(store, contributor="B", contributed_qty=1)
+
+        self.assertEqual(self._call(store, contributor="C", contributed_qty=1), "already")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_single_kot_covering_the_whole_group_closes_in_one_shot(self):
+        """The ordinary case -- one line, one KOT, no quantity bump. Cumulative
+        tracking must be invisible here: the single share equals the reserved
+        total, so the group reaches its terminal status on the first call
+        exactly as before."""
+        store = self._store(reserved_top_level_qty=1)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ONLY", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_a_legacy_group_with_no_frozen_reserved_qty_closes_in_one_shot(self):
+        """A group created before `reserved_top_level_qty` was frozen has no
+        divisible total, so it must keep today's whole-group behaviour rather
+        than being left Reserved forever by an un-completable ledger."""
+        store = self._store(reserved_top_level_qty=None)
+
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_the_sales_plan_close_out_still_fulfils_the_whole_group(self):
+        """`fulfil_reservations_on_consolidation` passes no contributor. It is
+        the backstop that sweeps a group whose contributors never added up (a
+        KOT item cancelled after production, G-08/G-09), so it must still close
+        a partially-fulfilled group in one shot."""
+        store = self._store(reserved_top_level_qty=2)
+        self.assertEqual(self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1), "partial")
+
+        self.assertEqual(self._call(store), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_the_ledger_survives_on_every_row_not_just_one(self):
+        """The ledger is appended to every row of the group, so no single row
+        is load-bearing, and reading it back de-duplicates by contributor
+        rather than summing the same entry N times."""
+        from ury.ury.api.ury_reservation_service import group_partial_fulfilments
+
+        store = self._store(reserved_top_level_qty=3, rows=2)
+        self._call(store, contributor="A", contributed_qty=1)
+
+        for row in store.values():
+            self.assertIn("partial_fulfil", row.audit_log)
+        self.assertEqual(group_partial_fulfilments(list(store.values())), {"A": 1.0})
+
+    def test_fractional_shares_still_reach_the_terminal_status(self):
+        """Shares are float quotients, so three thirds can sum a few ulps short
+        of the total. QTY_TOLERANCE must absorb that or the group would never
+        close."""
+        store = self._store(reserved_top_level_qty=1)
+        third = 1.0 / 3.0
+
+        self.assertEqual(self._call(store, contributor="A", contributed_qty=third), "partial")
+        self.assertEqual(self._call(store, contributor="B", contributed_qty=third), "partial")
+        self.assertEqual(self._call(store, contributor="C", contributed_qty=third), "fulfilled")
+        self.assertEqual(self._statuses(store), {FULFILLED})
+
+    def test_cancelling_a_partially_fulfilled_group_still_completes(self):
+        """G-08/G-09 interaction: a group can now be Reserved yet already partly
+        consumed. Cancellation must not crash over that -- a cancellation must
+        always be able to complete -- and the discrepancy must be logged rather
+        than silently swallowed. The disposition of the already-produced food
+        remains an open business decision.
+        """
+        store = self._store(reserved_top_level_qty=2)
+        self._call(store, contributor="INTENT-ORIGINAL", contributed_qty=1)
+
+        def get_doc_dispatch(_doctype, name, *a, **k):
+            row = store[name]
+            doc = frappe._dict(dict(row))
+            doc.save = MagicMock(side_effect=lambda *_a, **_k: row.update({"status": doc.status}))
+            return doc
+
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                return [frappe._dict({"reservation_group": self.GROUP})]
+            if values and "group" in values:
+                return [frappe._dict(dict(r)) for r in store.values()]
+            return []
+
+        with patch(f"{MODULE}.frappe.db.sql", side_effect=_sql), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+            f"{MODULE}.apply_commit_delta"
+        ), patch(
+            f"{MODULE}.frappe.logger"
+        ) as logger, patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "captain@example.com"
+            cancel_reservation("RES-1", reason="customer left")
+
+        self.assertEqual(self._statuses(store), {CANCELLED})
+        self.assertTrue(logger.return_value.warning.called)
+
+
+class TestCreateReservationRealPermissionBoundary(FrappeTestCase):
+	"""Real (non-mocked, `frappe.set_user()`-based) negative-permission coverage for
+	`create_reservation()`'s `_require_create_permission()` gate.
+
+	Every other test in this file mocks `frappe` entirely (per the module
+	docstring's own admission that these were "not executed... only a
+	detached checkout"), so the actual doctype-role permission check on
+	`URY Stock Reservation` has never been exercised against a real
+	site/role-permission table. This uses a real user + real role
+	assignment and asserts the actual raised exception, per this track's
+	Phase 4 acceptance criteria.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from ury.ury.tests.factories import make_user
+
+		# "Stock Manager" has read/report on URY Stock Reservation per the
+		# doctype's fixture permissions, but explicitly NOT "create" -- the
+		# permission set most likely to be mistaken for sufficient by a
+		# future reviewer, which makes it the sharpest negative case.
+		cls.read_only_user = make_user(
+			email="p4r3-reservation-readonly@ury.test", roles=["Stock Manager"]
+		).name
+		# A user with zero URY-specific roles at all -- the baseline case.
+		cls.no_role_user = make_user(
+			email="p4r3-reservation-norole@ury.test", roles=[]
+		).name
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_read_only_role_cannot_create_reservation(self):
+		frappe.set_user(self.read_only_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code="P4R3-NONEXISTENT-ITEM",
+				qty=1,
+				warehouse="P4R3-NONEXISTENT-WAREHOUSE",
+				branch="P4R3-NONEXISTENT-BRANCH",
+				company="P4R3-NONEXISTENT-COMPANY",
+				order_ref="P4R3-ORDER-1",
+			)
+
+	def test_no_role_user_cannot_create_reservation(self):
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code="P4R3-NONEXISTENT-ITEM",
+				qty=1,
+				warehouse="P4R3-NONEXISTENT-WAREHOUSE",
+				branch="P4R3-NONEXISTENT-BRANCH",
+				company="P4R3-NONEXISTENT-COMPANY",
+				order_ref="P4R3-ORDER-1",
+			)
+
+	def test_permission_check_runs_before_scope_validation(self):
+		"""The permission gate must fail closed even when every other
+		argument is also invalid/missing -- i.e. it is genuinely the first
+		check, not incidentally passing because of a later validation
+		error with the same exception type. Confirmed here by omitting
+		required scope fields entirely; if `_require_create_permission()`
+		were ever reordered after `_require_scope()`, this would start
+		raising `frappe.ValidationError` instead and the test would fail."""
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code=None,
+				qty=None,
+				warehouse=None,
+				branch=None,
+				company=None,
+				order_ref=None,
+			)
