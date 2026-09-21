@@ -732,6 +732,31 @@ Locked for Production
 `custom_ury_snapshot_hash` and the staleness check depend on, and moving it
 would change the meaning of an approved plan.
 
+**Correction, found during implementation.** This decision originally said to
+move the creation call from `validate()`'s Approved branch to the Lock
+transition, still inside `validate()`. That would never have fired.
+
+Approved and Locked for Production are both `docstatus 1`, so the hop between
+them is an `update_after_submit` save. `frappe/model/document.py`'s
+`run_before_save_methods` runs `validate` only for `_action` in
+(`save`, `submit`); for `update_after_submit` it runs
+`before_update_after_submit` and nothing else:
+
+```
+db 0 -> new 0 : save                -> runs validate()
+db 0 -> new 1 : submit              -> runs validate()
+db 1 -> new 1 : update_after_submit -> NO validate()
+db 1 -> new 2 : cancel              -> NO validate()
+```
+
+The creation call therefore lives in `URYSalesPlan.before_update_after_submit`,
+gated on `prev_status == "Approved" and self.status == "Locked for Production"`.
+The doctype already documented this lifecycle table for its audit-trail hooks,
+which is why the same hook already existed.
+
+Had this shipped as first written, locking a Sales Plan would have created
+nothing, silently, with every unit test still green.
+
 **The `enable_auto_production_plan` toggle is kept.** Its meaning moves from
 Approval to Lock for Production, and its label and description are reworded to
 say so. Both paths remain:
@@ -887,6 +912,23 @@ build artefact of that change, not a hand edit. Note that `ury/setup.py`, which
 the review named, does not exist; `ury/setup_customizations.py` is the real
 module.
 
+
+### D19 — EXTERNAL_RECEIPT targets stay off `po_items`
+
+A department Production Plan's `po_items` drive Work Order creation.
+`sourcing_mode = EXTERNAL_RECEIPT` targets are received, not manufactured, so
+putting them there would invite ERPNext to raise Work Orders for goods nobody
+produces.
+
+They are therefore compiled (Agent 2 keeps them in each department's
+`external_receipt_targets`) but never written to `po_items`. Their demand
+reaches procurement through the readiness engine and the consolidated Purchase
+MR, both of which read the compiler's output directly rather than the plan's
+item table.
+
+Agent 4 owns making sure that demand is not lost. Agent 10 scenario 19 already
+asserts no Work Order is created for them; it should also assert their demand
+appears in the Purchase requirement.
 
 ## Wave 0 — Integration owner
 
