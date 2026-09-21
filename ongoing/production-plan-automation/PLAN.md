@@ -930,6 +930,32 @@ Agent 4 owns making sure that demand is not lost. Agent 10 scenario 19 already
 asserts no Work Order is created for them; it should also assert their demand
 appears in the Purchase requirement.
 
+### D20 — Purchase MR rows split across departments for traceability only
+
+When one item's Store shortfall is driven by several departments, the
+consolidated Purchase MR carries one row per contributing department rather
+than a single merged row, split proportionally to each department's own
+`department_shortage`, with float remainder absorbed by the last contributor
+so the parts sum exactly to the requirement.
+
+The split exists to satisfy D8: `Material Request Item.production_plan` is a
+per-row field, so a merged row could only ever point at one arbitrary plan.
+
+**It has no physical consequence.** The goods are purchased into the Store
+Warehouse whichever way the rows are divided. The rule decides only which
+department plan is credited with which slice of `requested_qty`. It is not an
+allocation policy with stock semantics, and must not be read as one.
+
+`Material Request Plan Item.warehouse` on each plan's `mr_items` is the
+**Store** warehouse, not the department's. ERPNext's own
+`ProductionPlan.make_material_request` copies that field straight onto the
+generated Material Request Item's `warehouse`, so to native code it means
+"where the requested material is received". Setting it to the department
+warehouse would make the native Material Request button raise a Purchase MR
+receiving goods into the department, inverting the Store to Department model.
+The destination department stays recoverable through the row's
+`production_plan` link.
+
 ## Wave 0 — Integration owner
 
 Owned solely by the integration owner. Blocks every other wave.
