@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect, useState } from 'react';
 import TableMergeDialog from './TableMergeDialog';
 import type { Table } from '../lib/table-api';
 
@@ -17,17 +18,81 @@ vi.mock('../i18n', () => ({
 }));
 
 vi.mock('@ury/ui', () => ({
-  Dialog: ({ children, open, onOpenChange }: any) => open ? <div>{children}</div> : null,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2>{children}</h2>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
-  Button: ({ children, onClick, disabled, ...props }: any) => (
-    <button onClick={onClick} disabled={disabled} {...props}>{children}</button>
-  ),
-  Badge: ({ children, variant }: any) => <span data-variant={variant}>{children}</span>,
-  cn: (...args: any[]) => args.filter(Boolean).join(' '),
+  MultiSelectTableDialog: ({
+    open,
+    onOpenChange,
+    sourceName,
+    options,
+    onConfirm,
+    labels,
+    renderIcon,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    sourceName: string;
+    options: Array<{ name: string; occupied?: number; seatsLabel?: string }>;
+    onConfirm: (names: string[]) => Promise<void>;
+    labels: {
+      title: string;
+      description: string;
+      empty: string;
+      cancel: string;
+      confirm: string;
+      selectedCount: (n: number) => string;
+    };
+    renderIcon?: (name: string) => React.ReactNode;
+  }) => {
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+      if (open) setSelected(new Set());
+    }, [open, sourceName]);
+
+    if (!open) return null;
+
+    const candidates = options.filter(
+      (table) => table.occupied !== 1 && table.name !== sourceName
+    );
+
+    const toggle = (name: string) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+    };
+
+    const handleConfirm = async () => {
+      if (selected.size === 0) return;
+      await onConfirm(Array.from(selected));
+      onOpenChange(false);
+    };
+
+    return (
+      <div>
+        <h2>{labels.title}</h2>
+        <p>{labels.description}</p>
+        {candidates.length === 0 ? (
+          <p>{labels.empty}</p>
+        ) : (
+          candidates.map((table) => (
+            <button key={table.name} type="button" onClick={() => toggle(table.name)}>
+              {renderIcon?.(table.name)}
+              {table.name}
+            </button>
+          ))
+        )}
+        <button type="button" onClick={() => onOpenChange(false)}>
+          {labels.cancel}
+        </button>
+        <button type="button" disabled={selected.size === 0} onClick={() => void handleConfirm()}>
+          {labels.confirm}
+        </button>
+        {selected.size > 0 && <span>{labels.selectedCount(selected.size)}</span>}
+      </div>
+    );
+  },
 }));
 
 const mockTable1: Table = {
