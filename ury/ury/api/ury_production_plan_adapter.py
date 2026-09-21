@@ -132,7 +132,6 @@ UNMAPPED_PRODUCTION_PLAN_FIELDS = (
 #: Production Plan Item (child, ``po_items``) fields this adapter cannot
 #: populate from a Sales Plan snapshot line alone.
 UNMAPPED_PRODUCTION_PLAN_ITEM_FIELDS = (
-    "include_exploded_items",
     "pending_qty",
     "ordered_qty",
     "produced_qty",
@@ -227,19 +226,18 @@ def _filter_items_in_scope(items):
     their pre-produced inner-BOM sub-items, which the current snapshot shape
     cannot identify (out of scope, see the NOTE above
     ``INCLUDED_PRODUCTION_POLICIES``).
+
+    Deliberately does NOT filter on ``Item.is_sales_item`` -- a non-sellable
+    kitchen base (a PRE_PRODUCED sub-assembly with no menu presence of its
+    own, e.g. Biryani Base) is exactly the kind of row this Production Plan
+    must cover. Restricting to sellable items excluded every such base,
+    which is the opposite of what the target rules (see
+    ``ury_production_target_compiler``) require.
     """
-    sellable = set(
-        frappe.get_all(
-            "Item",
-            filters={"name": ["in", [r.get("item_code") for r in items if r.get("item_code")] or [""]], "is_sales_item": 1},
-            pluck="name",
-        )
-    )
     return [
         row
         for row in items
-        if row.get("item_code") in sellable
-        and row.get("production_policy") in INCLUDED_PRODUCTION_POLICIES
+        if row.get("production_policy") in INCLUDED_PRODUCTION_POLICIES
         # Untouched history suggestions carry qty 0; nothing to produce.
         and flt(row.get("qty")) > 0
     ]
@@ -277,6 +275,12 @@ def _snapshot_item_to_production_plan_item(row, snapshot):
         # ury/fixtures/custom_field.json) so department is stored directly on
         # the item rather than only in the out-of-band index below.
         "custom_ury_department": department,
+        # D2: every URY Production Plan Item sets include_exploded_items = 0.
+        # Left at ERPNext's default of 1, get_production_items() would copy
+        # it into the Work Order as use_multi_level_bom and explode
+        # PRE_PRODUCED sub-assemblies into raw materials -- the exact
+        # double-count the target rules exist to prevent.
+        "include_exploded_items": 0,
         # URY-specific context preserved verbatim, namespaced so it is never
         # mistaken for a stock ERPNext field. _ury_department is kept for
         # backwards compat with any other caller of this module.
