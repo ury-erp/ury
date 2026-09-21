@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Button, Card } from '@ury/ui';
+import { Button, Card, Page } from '@ury/ui';
 import { Check } from 'lucide-react';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
 
@@ -15,7 +15,12 @@ interface WizardLayoutProps {
   secondaryAction?: ReactNode;
 }
 
-const SHELL_WIDTH = 'max-w-[1400px] mx-auto px-6 md:px-10';
+// App.tsx routes the wizard as a *sibling* of the dashboard, not a child, so
+// it never inherits DashboardLayout's shell. Everything below therefore
+// restates that shell by hand: the same `text-sm`/Inter base, the same h-12
+// header, and the same max-width + `page-x` gutter that `<Page>` applies to
+// every dashboard route. Keep this in step with DashboardLayout/Header.
+const SHELL = 'max-w-[1440px] mx-auto px-page-x';
 
 export function WizardLayout({
   step,
@@ -27,20 +32,19 @@ export function WizardLayout({
   isNextLoading,
   secondaryAction,
 }: WizardLayoutProps) {
-  const version = (window as any).frappe?.boot?.versions?.ury || 'v3.2.0';
-
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background">
-      {/* Header bar */}
-      <header className="w-full border-b border-border bg-card">
-        <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
-          <div className="flex items-center gap-3">
-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
-            <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
+    <div className="min-h-screen w-full flex flex-col bg-background text-foreground font-inter text-sm">
+      {/* Header bar — mirrors components/layout/Header.tsx */}
+      <header className="w-full border-b border-border bg-background">
+        <div className={`${SHELL} h-12 flex items-center justify-between gap-4`}>
+          <div className="flex items-center space-x-4 min-w-0">
+            <img src={uryLogo} alt="URY Logo" className="h-8 w-auto shrink-0" />
+            <div className="hidden sm:block h-4 w-px bg-border shrink-0" />
+            <span className="text-sm font-semibold text-foreground truncate">Let's get your restaurant ready</span>
           </div>
 
           {/* 2-step breadcrumb (Setup, Configure) */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
             <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
             <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
@@ -49,14 +53,14 @@ export function WizardLayout({
       </header>
 
       {/* Content */}
-      <main className={`${SHELL_WIDTH} flex-1 w-full py-8`}>
-        <Card padding="none" className="rounded-xl p-6 md:p-8">{children}</Card>
-      </main>
+      <Page className="flex-1 w-full">
+        <Card padding="lg">{children}</Card>
+      </Page>
 
       {/* Footer nav bar */}
-      <footer className="w-full border-t border-border bg-card sticky bottom-0 h-12 flex items-center">
-        <div className={`${SHELL_WIDTH} w-full h-full flex items-center justify-between gap-4`}>
-          <div className="flex items-center h-full">
+      <footer className="w-full border-t border-border bg-card sticky bottom-0 py-4">
+        <div className={`${SHELL} w-full flex items-center justify-between gap-4`}>
+          <div className="flex items-center">
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
                 Previous
@@ -64,7 +68,7 @@ export function WizardLayout({
             )}
           </div>
 
-          <div className="flex items-center gap-4 h-full">
+          <div className="flex items-center gap-4">
             {secondaryAction}
             <Button variant="default" onClick={onNext} disabled={isNextDisabled || isNextLoading} className="px-6">
               {isNextLoading ? 'Working...' : nextLabel}
@@ -72,8 +76,6 @@ export function WizardLayout({
           </div>
         </div>
       </footer>
-
-      <div className="py-3 text-center text-xs text-muted-foreground">URY · {version}</div>
     </div>
   );
 }
