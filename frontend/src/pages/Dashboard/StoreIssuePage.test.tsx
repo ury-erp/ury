@@ -78,8 +78,11 @@ describe('StoreIssuePage', () => {
       </BrowserRouter>
     );
     await waitFor(() => {
-      const dateInputs = document.querySelectorAll('input[type="date"]');
-      expect(dateInputs.length >= 2).toBe(true);
+      // The filters are @ury/ui DatePickers, whose trigger is a <button>
+      // carrying the aria-label -- assert on the accessible name rather than
+      // on the markup a native date input used to produce.
+      expect(screen.getByLabelText('From date')).toBeInTheDocument();
+      expect(screen.getByLabelText('To date')).toBeInTheDocument();
     });
   });
 });

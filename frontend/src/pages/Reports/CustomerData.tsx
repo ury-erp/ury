@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
 import { Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -94,13 +94,11 @@ export function CustomerData() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Customer Data</h1>
-          <p className="text-sm text-muted-foreground">Per-customer purchase history</p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Customer Data"
+        description="Per-customer purchase history"
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       <div className="relative max-w-sm">
         <div className="flex items-center border border-input rounded-md px-3.5 py-2 gap-2">

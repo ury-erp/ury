@@ -7,16 +7,17 @@ import {
   CardTitle,
   KpiStrip,
   DataTable,
+  DatePicker,
   Alert,
   AlertDescription,
   cn,
+  PageHeader,
   type DataTableColumn,
   type KpiItemProps,
 } from '@ury/ui';
 import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
-import { DatePicker } from '../../components/setup/DatePicker';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface MissingPriceSection {
@@ -224,47 +225,47 @@ export function DailyPnl() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Daily P&amp;L</h1>
-          <p className="text-sm text-muted-foreground">Full daily profit &amp; loss breakdown</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-48">
-            <SearchableSelect
-              id="branch-select"
-              value={branch}
-              onChange={(_, val) => setBranch(val)}
-              options={branches.map((b) => ({
-                value: b.id,
-                label: b.name,
-              }))}
-              strict
-            />
-          </div>
-          {availableDates.length > 0 ? (
-            <div className="w-40">
+      <PageHeader
+        title="Daily P&L"
+        description="Full daily profit & loss breakdown"
+        actions={
+          <>
+            <div className="w-48">
               <SearchableSelect
-                id="date-select"
-                value={date}
-                onChange={(_, val) => setDate(val)}
-                options={availableDates.map((d) => ({
-                  value: d,
-                  label: d,
+                id="branch-select"
+                value={branch}
+                onChange={(_, val) => setBranch(val)}
+                options={branches.map((b) => ({
+                  value: b.id,
+                  label: b.name,
                 }))}
                 strict
               />
             </div>
-          ) : (
-            <DatePicker
-              id="daily-pnl-date"
-              value={date}
-              onChange={(_id, val) => setDate(val)}
-              className="w-36"
-            />
-          )}
-        </div>
-      </div>
+            {availableDates.length > 0 ? (
+              <div className="w-40">
+                <SearchableSelect
+                  id="date-select"
+                  value={date}
+                  onChange={(_, val) => setDate(val)}
+                  options={availableDates.map((d) => ({
+                    value: d,
+                    label: d,
+                  }))}
+                  strict
+                />
+              </div>
+            ) : (
+              <DatePicker
+                id="daily-pnl-date"
+                value={date}
+                onChange={(_id, val) => setDate(val)}
+                className="w-36"
+              />
+            )}
+          </>
+        }
+      />
 
       {error && (
         <Alert variant="danger" icon={<AlertTriangle />}>

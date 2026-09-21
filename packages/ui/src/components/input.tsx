@@ -26,12 +26,14 @@ const inputVariants = cva(
         search:
           "border-gray-200 bg-gray-50 shadow-none hover:border-gray-300 focus-visible:border-primary focus-visible:bg-background",
       },
-      // Shared control height scale — sm 36 / default 44 / lg 48 — so an Input
-      // sits flush with the Button or Select beside it.
+      // Shared control height scale. `default` is the dashboard chrome size
+      // (same metrics as Button/Select/DatePicker). `sm` is the same 36px box
+      // with text-xs. `compactLg` is an alias of `default` for existing call sites.
       size: {
-        default: "h-11 px-3.5 py-2",
+        default: "h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]",
         sm: "h-9 px-3 py-1.5 text-xs",
         lg: "h-12 px-4 py-3 text-base",
+        compactLg: "h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]",
       },
     },
     defaultVariants: {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Factory, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -890,9 +890,16 @@ export const SalesPlanPage: React.FC = () => {
 
   const currentAction = planStatus ? NEXT_ACTION[planStatus] : undefined;
   const currentBackwardActionDef = planStatus ? BACKWARD_ACTIONS[planStatus] : undefined;
+  // Mirrors validate_plan_has_demand() in ury/ury/api/ury_sales_plan.py: the
+  // server refuses the Draft -> Proposed hop on a plan that states no
+  // quantity anywhere, so don't offer a button whose only outcome is that
+  // error. Scoped to that one hop for the same reason the backend guard is --
+  // a plan zeroed out AFTER it started circulating is a different problem,
+  // and silently disabling its Lock button is the wrong way to raise it.
+  const blockedAsEmptyPlan = currentAction?.targetState === 'Proposed' && totalPlannedQty <= 0;
   // Draft plans that have never been saved to the backend don't have a name
   // yet, so there is nothing to transition -- the manager must save first.
-  const canTransition = Boolean(currentAction && planName);
+  const canTransition = Boolean(currentAction && planName) && !blockedAsEmptyPlan;
   const canShowBackwardAction = Boolean(currentBackwardActionDef && planName && roles.includes('URY Sales Plan Controller'));
   const actionBlockedByRole = Boolean(currentAction?.managerOnly && !isManager);
   // Items (and by extension the plan's item list itself) are editable only
@@ -1071,30 +1078,19 @@ export const SalesPlanPage: React.FC = () => {
 
   return (
     <Page>
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">
-              Sales Plan — {dateHeading} · {branchName}
-            </h1>
-            <p className="mt-1 text-sm text-text-tertiary">
-              We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval.
-            </p>
-            {isPastPlanDate && (
-              <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="relative block">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                aria-label="Plan date"
-                type="date"
-                value={planDate}
-                onChange={(event) => setPlanDate(event.target.value)}
-                className="pl-9"
-              />
-            </label>
+      <PageHeader
+        bleed
+        title={`Sales Plan — ${dateHeading} · ${branchName}`}
+        description="We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval."
+        actions={
+          <>
+            <DatePicker
+              id="plan-date"
+              aria-label="Plan date"
+              value={planDate}
+              onChange={(_id, next) => setPlanDate(next)}
+              className="w-[180px]"
+            />
             {isEditable && (
               <Select
                 aria-label="Enforcement Mode"
@@ -1102,6 +1098,7 @@ export const SalesPlanPage: React.FC = () => {
                 value={enforcementMode}
                 onChange={(event) => setEnforcementMode(event.target.value as 'Hard' | 'Soft' | 'Alert')}
                 disabled={loading || saving}
+                className="w-[130px]"
               >
                 <option value="Hard">Hard</option>
                 <option value="Soft">Soft</option>
@@ -1109,7 +1106,7 @@ export const SalesPlanPage: React.FC = () => {
               </Select>
             )}
             {isEditable && (
-              <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
+              <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" className="gap-2">
                 <Save className="h-4 w-4" />
                 <span>{saving ? 'Saving...' : 'Save Draft'}</span>
               </Button>
@@ -1118,8 +1115,13 @@ export const SalesPlanPage: React.FC = () => {
               <Button
                 onClick={runTransition}
                 disabled={!canTransition || transitioning || actionBlockedByRole}
-                title={actionBlockedByRole ? 'Only managers can approve a Sales Plan.' : undefined}
-                size="compactLg"
+                title={
+                  actionBlockedByRole
+                    ? 'Only managers can approve a Sales Plan.'
+                    : blockedAsEmptyPlan
+                      ? 'Set a quantity on at least one item before submitting this plan for review.'
+                      : undefined
+                }
                 className="gap-2"
               >
                 <currentAction.icon className="h-4 w-4" />
@@ -1156,33 +1158,39 @@ export const SalesPlanPage: React.FC = () => {
                 onClick={() => openBackwardActionModal(currentBackwardActionDef)}
                 disabled={backwardActionTransitioning}
                 variant="secondary"
-                size="compactLg"
                 className={`gap-2 ${currentBackwardActionDef.destructive ? 'text-destructive' : ''}`}
               >
                 <currentBackwardActionDef.icon className="h-4 w-4" />
                 <span>{currentBackwardActionDef.label}</span>
               </Button>
             )}
-          </div>
-          {ppError && <div className="mt-2 text-sm text-destructive">{ppError}</div>}
-        </div>
+          </>
+        }
+        footer={
+          <>
+            {ppError && <div className="mt-2 text-sm text-destructive">{ppError}</div>}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <LifecycleStepper status={planStatus} />
+              {actionBlockedByRole && (
+                <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
+              )}
+            </div>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <LifecycleStepper status={planStatus} />
-          {actionBlockedByRole && (
-            <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
-          )}
-        </div>
-
-        {transitionError && (
-          <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+            {transitionError && (
+              <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+            )}
+            {!planStatus && supersededPlanName && (
+              <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
+                The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
+              </p>
+            )}
+          </>
+        }
+      >
+        {isPastPlanDate && (
+          <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
         )}
-        {!planStatus && supersededPlanName && (
-          <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
-            The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
-          </p>
-        )}
-      </div>
+      </PageHeader>
 
       <Section>
         <KpiStrip
@@ -1222,7 +1230,6 @@ export const SalesPlanPage: React.FC = () => {
             <div className="mt-2 flex justify-end">
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => setAttentionExpanded((current) => !current)}
                 className="gap-1"
               >
@@ -1497,7 +1504,6 @@ export const SalesPlanPage: React.FC = () => {
                       <div className="flex justify-center pt-2">
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() =>
                             setTruncationExpanded((current) => ({ ...current, [department]: !current[department] }))
                           }
@@ -1569,7 +1575,6 @@ export const SalesPlanPage: React.FC = () => {
                   variant="secondary"
                   onClick={closeBackwardActionModal}
                   disabled={backwardActionTransitioning}
-                  size="compactLg"
                 >
                   Cancel
                 </Button>
@@ -1578,7 +1583,6 @@ export const SalesPlanPage: React.FC = () => {
                   onClick={runBackwardTransition}
                   disabled={backwardActionTransitioning || backwardActionReason.trim().length === 0}
                   className={currentBackwardAction.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
-                  size="compactLg"
                 >
                   {/* Deliberately NOT reusing currentBackwardAction.label here --
                       that's also the text of the button that opened this modal,

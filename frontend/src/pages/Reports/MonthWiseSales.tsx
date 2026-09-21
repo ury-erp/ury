@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Select } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Select, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 
@@ -73,25 +73,22 @@ export function MonthWiseSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Month Wise Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            Monthly revenue trend {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <Select
-          value={monthsBack}
-          onChange={(e) => setMonthsBack(Number(e.target.value))}
-          size="sm"
-        >
-          {MONTH_OPTIONS.map((m) => (
-            <option key={m} value={m}>
-              Last {m} months
-            </option>
-          ))}
-        </Select>
-      </div>
+      <PageHeader
+        title="Month Wise Sales"
+        description={`Monthly revenue trend ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={
+          <Select
+            value={monthsBack}
+            onChange={(e) => setMonthsBack(Number(e.target.value))}
+          >
+            {MONTH_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                Last {m} months
+              </option>
+            ))}
+          </Select>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -281,7 +281,7 @@ export const UserPage: React.FC = () => {
                     header: 'Actions',
                     align: 'right',
                     render: (row) => (
-                      <Button variant="ghost" size="sm" onClick={() => openEditDrawer(row)} className="text-gray-500 hover:text-primary">
+                      <Button variant="ghost" onClick={() => openEditDrawer(row)} className="text-gray-500 hover:text-primary">
                         <Edit2 className="w-4 h-4" />
                       </Button>
                     )

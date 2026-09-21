@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { DeskLink } from '../../components/DeskLink';
 import { toApiDate } from '../../lib/reportDate';
@@ -73,13 +73,11 @@ export function CompletedWorkOrders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Completed Work Orders</h1>
-          <p className="text-sm text-muted-foreground">Manufacturing production history</p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Completed Work Orders"
+        description="Manufacturing production history"
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -213,7 +213,6 @@ export const QuickActions: React.FC = () => {
             <div className="mt-4">
               <Button
                 variant={idx === 0 ? 'default' : 'outline'}
-                size="sm"
                 className={`w-full justify-center text-xs font-bold ${idx === 0 ? 'bg-primary-600 hover:bg-primary-700 text-white' : 'border-primary-200 text-primary-700 hover:bg-primary-50'}`}
               >
                 {card.actionText}
