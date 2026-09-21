@@ -6,7 +6,7 @@ import { InstallationTypeCard } from '../../components/setup/InstallationTypeCar
 import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { ProgressModal } from '../../components/setup/ProgressModal';
-import { Switch } from '../../components/ui/switch';
+import { SwitchCard } from '@ury/ui';
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -266,22 +266,14 @@ export default function SetupPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">
-              Set up with demo data
-            </label>
-            <p className="text-sm text-muted-foreground">
-              Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
-            </p>
-          </div>
-          <Switch
-            id="setup-ury-demo"
-            checked={setupUryDemo}
-            onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
-            disabled={submitting}
-          />
-        </div>
+        <SwitchCard
+          id="setup-ury-demo"
+          label="Set up with demo data"
+          description="Adds a sample branch, rooms, tables, menu, and POS you can change or delete later."
+          checked={setupUryDemo}
+          onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
+          disabled={submitting}
+        />
       </div>
       
       {submitting && (
