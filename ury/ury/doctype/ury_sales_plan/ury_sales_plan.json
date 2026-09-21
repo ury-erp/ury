@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "hash",
+ "autoname": "SP-.YYYY.-#####",
  "creation": "2026-08-28 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
