@@ -102,6 +102,7 @@
   },
   "customer": {
     "search_placeholder": "ابحث عن عميل...",
+    "search_placeholder_optional": "ابحث عن عميل (اختياري)...",
     "type_to_search": "يرجى الكتابة للبحث...",
     "no_customers_found": "لم يتم العثور على عملاء",
     "add_new": "إضافة عميل جديد",

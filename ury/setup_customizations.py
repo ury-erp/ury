@@ -357,6 +357,16 @@ def get_custom_fields():
 				"insert_after": "qz_print",
 				"label": "QZ Host",
 				"translatable": 0,
+			},
+			{
+				# Off by default so existing profiles keep requiring an explicit customer.
+				"fieldname": "custom_allow_order_without_customer",
+				"fieldtype": "Check",
+				"default": "0",
+				"insert_after": "customer",
+				"label": "Allow Order Without Customer",
+				"description": "If enabled, orders placed without a selected customer fall back to this profile's default Customer.",
+				"translatable": 0,
 			}
 		],
   

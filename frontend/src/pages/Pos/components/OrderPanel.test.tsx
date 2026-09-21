@@ -2,9 +2,15 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import OrderPanel from './OrderPanel';
+import { syncOrder } from '../lib/order-api';
 
 vi.mock('../i18n', () => ({
   t: (key: string, params?: any) => key,
+}));
+
+vi.mock('@ury/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@ury/ui')>()),
+  showToast: { error: vi.fn(), success: vi.fn() },
 }));
 
 vi.mock('@ury/core', () => ({
@@ -185,5 +191,27 @@ describe('OrderPanel', () => {
     render(<OrderPanel />);
     const commentButtons = screen.getAllByRole('button').filter(b => b.getAttribute('title')?.includes('comment'));
     expect(commentButtons.length).toBeGreaterThan(0);
+  });
+
+  it('blocks submit without a customer when the POS Profile requires one', async () => {
+    vi.mocked(syncOrder).mockClear();
+    mockPOSStoreState.selectedCustomer = null;
+    (mockPOSStoreState.posProfile as any).custom_allow_order_without_customer = 0;
+
+    render(<OrderPanel />);
+    await userEvent.click(screen.getByText('cart.add_new_order').closest('button')!);
+
+    expect(syncOrder).not.toHaveBeenCalled();
+  });
+
+  it('submits an empty customer so the backend resolves the POS Profile default', async () => {
+    vi.mocked(syncOrder).mockClear();
+    mockPOSStoreState.selectedCustomer = null;
+    (mockPOSStoreState.posProfile as any).custom_allow_order_without_customer = 1;
+
+    render(<OrderPanel />);
+    await userEvent.click(screen.getByText('cart.add_new_order').closest('button')!);
+
+    expect(syncOrder).toHaveBeenCalledWith(expect.objectContaining({ customer: '' }));
   });
 });

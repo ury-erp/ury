@@ -92,12 +92,13 @@ const OrderPanel = () => {
       }
 
       // Validate customer/aggregator details
+      const customerOptional = Boolean(posProfile.custom_allow_order_without_customer);
       if (selectedOrderType === 'Aggregators') {
         if (!selectedAggregator?.customer) {
           showToast.error(t('errors.select_aggregator'));
           return;
         }
-      } else if (!selectedCustomer?.name) {
+      } else if (!customerOptional && !selectedCustomer?.name) {
         showToast.error(t('errors.select_customer'));
         return;
       }
@@ -128,7 +129,9 @@ const OrderPanel = () => {
         order_type: selectedOrderType,
         table: selectedTable || undefined,
         room: selectedRoom || undefined,
-        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
+        // Empty string keeps the required `customer` arg present so sync_order
+        // can resolve the POS Profile default itself.
+        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : (selectedCustomer?.name ?? ''),
         aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
