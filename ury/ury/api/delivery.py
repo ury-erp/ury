@@ -192,7 +192,7 @@ def get_drivers(branch=None, active_only=1):
 		"URY Driver",
 		filters=filters,
 		fields=["name", "driver_name", "mobile_number", "vehicle", "active",
-				"last_latitude", "last_longitude", "last_seen_at", "position_accuracy"],
+				"last_latitude", "last_longitude", "position_updated_at", "position_accuracy"],
 		order_by="driver_name asc",
 		limit_page_length=0,
 	)

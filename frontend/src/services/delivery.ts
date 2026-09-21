@@ -33,7 +33,7 @@ export interface DeliveryRow {
 export interface DriverRow {
   last_latitude: number | null;
   last_longitude: number | null;
-  last_seen_at: string | null;
+  position_updated_at: string | null;
   position_accuracy: number | null;
   /** null when this driver has never reported a position today. */
   position_age_minutes: number | null;

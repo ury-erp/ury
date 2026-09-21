@@ -136,7 +136,7 @@ def report_position(token, latitude, longitude, accuracy=None):
 			"last_latitude": lat,
 			"last_longitude": lng,
 			"position_accuracy": flt(accuracy or 0),
-			"last_seen_at": now_datetime(),
+			"position_updated_at": now_datetime(),
 		},
 		update_modified=False,
 	)
@@ -170,8 +170,16 @@ def driver_set_status(token, delivery, status, failure_reason=None):
 
 
 def position_age_minutes(driver_row, now=None):
-	"""How old this driver's position is, or None when there is none."""
-	seen = driver_row.get("last_seen_at")
+	"""How old this driver's position is, or None when there is none.
+
+	The field is `position_updated_at` rather than the obvious `last_seen_at`
+	because Frappe's `set_optional_columns` removes any requested field whose
+	*name contains* one of its optional columns — and `_seen` is one of them,
+	so `last_seen_at` was silently dropped from every `get_all` result while
+	raw SQL returned it. A timestamp that reads as "never" on a live map is
+	worse than no timestamp at all, so the name avoids the substring.
+	"""
+	seen = driver_row.get("position_updated_at")
 	if not seen:
 		return None
 	return max(0, int(((now or now_datetime()) - get_datetime(seen)).total_seconds() // 60))
@@ -192,9 +200,9 @@ def clear_old_positions():
 		"""
 		UPDATE `tabURY Driver`
 		SET `last_latitude` = NULL, `last_longitude` = NULL,
-			`position_accuracy` = NULL, `last_seen_at` = NULL
-		WHERE `last_seen_at` IS NOT NULL
-			AND `last_seen_at` < DATE_SUB(NOW(), INTERVAL %(hours)s HOUR)
+			`position_accuracy` = NULL, `position_updated_at` = NULL
+		WHERE `position_updated_at` IS NOT NULL
+			AND `position_updated_at` < DATE_SUB(NOW(), INTERVAL %(hours)s HOUR)
 		""",
 		{"hours": KEEP_POSITION_HOURS},
 	)

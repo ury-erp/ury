@@ -167,18 +167,32 @@ class TestDriverStatusChanges(DriverCase):
 		doc.save.assert_called_once()
 
 
+class TestPositionFieldName(unittest.TestCase):
+	"""The field name is load-bearing, which is not obvious from reading it."""
+
+	def test_the_name_avoids_frappe_optional_column_substrings(self):
+		# `set_optional_columns` removes a requested field whose name merely
+		# *contains* one of these, so `last_seen_at` came back empty from
+		# every get_all while raw SQL had the value.
+		from frappe.model import optional_fields
+
+		field = "position_updated_at"
+		for optional in optional_fields:
+			self.assertNotIn(optional, field)
+
+
 class TestPositionAge(unittest.TestCase):
 	def test_no_position_is_not_a_fresh_one(self):
-		self.assertIsNone(api.position_age_minutes({"last_seen_at": None}, now=NOW))
+		self.assertIsNone(api.position_age_minutes({"position_updated_at": None}, now=NOW))
 		self.assertTrue(api.is_stale(None))
 
 	def test_a_recent_position_is_live(self):
-		age = api.position_age_minutes({"last_seen_at": "2026-09-21 19:58:00"}, now=NOW)
+		age = api.position_age_minutes({"position_updated_at": "2026-09-21 19:58:00"}, now=NOW)
 		self.assertEqual(age, 2)
 		self.assertFalse(api.is_stale(age))
 
 	def test_an_old_position_means_was_not_is(self):
-		age = api.position_age_minutes({"last_seen_at": "2026-09-21 19:40:00"}, now=NOW)
+		age = api.position_age_minutes({"position_updated_at": "2026-09-21 19:40:00"}, now=NOW)
 		self.assertEqual(age, 20)
 		self.assertTrue(api.is_stale(age))
 

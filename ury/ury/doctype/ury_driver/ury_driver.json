@@ -19,7 +19,7 @@
   "last_latitude",
   "last_longitude",
   "column_break_position",
-  "last_seen_at",
+  "position_updated_at",
   "position_accuracy"
  ],
  "fields": [
@@ -93,7 +93,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "last_seen_at",
+   "fieldname": "position_updated_at",
    "fieldtype": "Datetime",
    "label": "Position Reported At",
    "read_only": 1
