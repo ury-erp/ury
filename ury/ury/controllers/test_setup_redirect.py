@@ -4,6 +4,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.controllers.setup_redirect import (
+	_claim_repair,
 	_has_stale_wizard_home_page,
 	_setup_wizard_target,
 	repair_interrupted_setup,
@@ -214,8 +215,9 @@ class TestInterruptedSetupRepair(FrappeTestCase):
 
 	@patch("frappe.desk.page.setup_wizard.setup_wizard.disable_future_access")
 	@patch("ury.ury.controllers.setup_redirect.frappe.db.commit")
+	@patch("ury.ury.controllers.setup_redirect._claim_repair", return_value=True)
 	@patch("ury.ury.controllers.setup_redirect._has_stale_wizard_home_page", return_value=True)
-	def test_repair_runs_frappes_own_wrap_up(self, _mock_stale, mock_commit, mock_wrap_up):
+	def test_repair_runs_frappes_own_wrap_up(self, _mock_stale, _mock_claim, mock_commit, mock_wrap_up):
 		frappe.local.request = object()
 		frappe.local.flags.read_only = False
 
@@ -285,3 +287,56 @@ class TestBootUnwedgesDesk(FrappeTestCase):
 		frappe.session.user = "Guest"
 		extend_bootinfo(frappe._dict())
 		mock_repair.assert_not_called()
+
+
+class TestRepairIsSingleFlight(FrappeTestCase):
+	"""Every parallel boot sees the same stale pair. Without a claim they all
+	write the same row and deadlock on SELECT ... FOR UPDATE -- which is what
+	happened the first time this repair ran against a live site.
+	"""
+
+	def setUp(self):
+		self.original_request = getattr(frappe.local, "request", None)
+		self.original_read_only = frappe.local.flags.read_only
+		frappe.local.request = object()
+		frappe.local.flags.read_only = False
+
+	def tearDown(self):
+		frappe.local.request = self.original_request
+		frappe.local.flags.read_only = self.original_read_only
+
+	@patch("frappe.desk.page.setup_wizard.setup_wizard.disable_future_access")
+	@patch("ury.ury.controllers.setup_redirect._claim_repair", return_value=False)
+	@patch("ury.ury.controllers.setup_redirect._has_stale_wizard_home_page", return_value=True)
+	def test_loser_of_the_claim_does_not_write(self, _mock_stale, _mock_claim, mock_wrap_up):
+		self.assertFalse(repair_interrupted_setup())
+		mock_wrap_up.assert_not_called()
+
+	@patch("ury.ury.controllers.setup_redirect.frappe.db.rollback")
+	@patch(
+		"frappe.desk.page.setup_wizard.setup_wizard.disable_future_access",
+		side_effect=frappe.QueryDeadlockError("deadlock"),
+	)
+	@patch("ury.ury.controllers.setup_redirect._claim_repair", return_value=True)
+	@patch("ury.ury.controllers.setup_redirect._has_stale_wizard_home_page", return_value=True)
+	def test_deadlock_is_not_an_error_for_this_boot(
+		self, _mock_stale, _mock_claim, _mock_wrap_up, mock_rollback
+	):
+		# A concurrent writer is repairing the same row; that repair stands.
+		self.assertFalse(repair_interrupted_setup())
+		mock_rollback.assert_called_once()
+
+	def test_claim_is_taken_only_once(self):
+		frappe.cache.delete_value("ury_setup_repair_in_flight")
+		try:
+			self.assertTrue(_claim_repair())
+			self.assertFalse(_claim_repair())
+		finally:
+			frappe.cache.delete_value("ury_setup_repair_in_flight")
+
+	@patch(
+		"ury.ury.controllers.setup_redirect.frappe.cache.set",
+		side_effect=Exception("redis down"),
+	)
+	def test_unreachable_cache_means_no_claim(self, _mock_set):
+		self.assertFalse(_claim_repair())
