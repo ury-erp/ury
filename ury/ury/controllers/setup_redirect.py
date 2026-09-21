@@ -7,6 +7,21 @@ _SKIP_PREFIXES = ("ury", "api", "assets", "files", "private", "login")
 # PathResolver strips leading slashes, so these are first-segment matches.
 _REDIRECT_PREFIXES = ("", "app", "desk", "apps", "setup-wizard")
 
+# Frappe's installer points the Desk home page at its setup wizard and only
+# moves it on in the final "Wrapping up" stage. A stage that fails before that
+# leaves the page behind, while earlier stages' implicit DDL commits keep the
+# completion flags they already wrote -- so setup reads as complete.
+_WIZARD_HOME_PAGE = "setup-wizard"
+_DESK_HOME_PAGE = "Workspaces"
+
+
+def _is_setup_complete_safe():
+    """`frappe.is_setup_complete()` without letting a boot-time failure raise."""
+    try:
+        return bool(frappe.is_setup_complete())
+    except Exception:
+        return False
+
 
 def is_ury_setup_complete():
     """Return True only once both Frappe's own setup wizard AND URY's Step 2
@@ -17,10 +32,7 @@ def is_ury_setup_complete():
     trustworthy signal that URY is actually ready to use. A Branch record only
     exists once Step 2's `submit_configure_data` has finished, so require both.
     """
-    try:
-        if not frappe.is_setup_complete():
-            return False
-    except Exception:
+    if not _is_setup_complete_safe():
         return False
     return bool(frappe.db.exists("Branch", {}))
 
@@ -85,6 +97,44 @@ def on_session_creation(login_manager=None):
     frappe.local.response["home_page"] = _setup_wizard_target()
 
 
+def _has_stale_wizard_home_page():
+    """True when setup reads as complete but Desk still lands on the wizard.
+
+    Desk cannot resolve that pair: it opens `home_page`, the wizard page sees
+    `setup_complete` and bounces straight back to /app, forever.
+    """
+    if not _is_setup_complete_safe():
+        return False
+    return frappe.db.get_default("desktop:home_page") == _WIZARD_HOME_PAGE
+
+
+def repair_interrupted_setup():
+    """Finish the wrap-up a failed setup stage skipped.
+
+    A stage that raises rolls back, but DDL run by earlier stages has already
+    committed implicitly -- including the Installed Application rows that make
+    `frappe.is_setup_complete()` true. Frappe's final stage never runs, so the
+    Desk home page keeps pointing at the wizard and Desk loops between /app and
+    the wizard page with no way out through the UI.
+
+    Running Frappe's own wrap-up is the repair: it is what the missing stage
+    would have done, and it is idempotent.
+    """
+    from frappe.desk.page.setup_wizard.setup_wizard import disable_future_access
+
+    if not _has_stale_wizard_home_page():
+        return False
+
+    if frappe.local.flags.read_only or getattr(frappe.local, "request", None) is None:
+        # Nothing to write into: leave the boot-time override to unwedge Desk,
+        # and repair on the next writable request.
+        return False
+
+    disable_future_access()
+    frappe.db.commit()  # nosemgrep -- boot path; the repair must outlive this request
+    return True
+
+
 def extend_bootinfo(bootinfo):
     """Expose URY setup status for the Desk JS fallback redirect.
 
@@ -95,3 +145,18 @@ def extend_bootinfo(bootinfo):
     bootinfo.ury_setup_complete = complete
     if not complete:
         bootinfo.ury_setup_wizard_target = _setup_wizard_target()
+
+    if frappe.session.user == "Guest":
+        return
+
+    try:
+        repaired = repair_interrupted_setup()
+    except Exception:
+        # Never let a repair attempt break the boot the user is waiting on.
+        frappe.log_error(title="URY setup repair failed")
+        repaired = False
+
+    # Whether or not the stored default could be rewritten, this boot must not
+    # hand Desk the pair it loops on. A cached boot carries the stale value too.
+    if (repaired or bootinfo.get("home_page") == _WIZARD_HOME_PAGE) and _is_setup_complete_safe():
+        bootinfo["home_page"] = _DESK_HOME_PAGE
