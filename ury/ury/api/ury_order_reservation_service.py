@@ -120,6 +120,27 @@ def _line_quantities(rows):
 
 
 def _warehouse_for_context(context):
+	"""Reservation warehouse for `context` (as returned by
+	`resolve_production_context` below).
+
+	The department-warehouse fallback here used to be the only place a
+	PRE_PRODUCED context reliably resolved to the department warehouse --
+	before D13, the canonical resolver
+	(`ury_production_context.resolve_production_context`) put PRE_PRODUCED's
+	`warehouse` on `direct_retail_warehouse`, which was blank on every
+	active PRE_PRODUCED configuration measured, so this fallback (silently)
+	carried the real weight of pointing reservation at the department
+	warehouse while `ury_availability`'s stock projection still read the
+	(blank) `direct_retail_warehouse` and reported `NOT_PRODUCED` -- the two
+	paths already disagreed. D13 fixes the canonical resolver itself, so
+	`context.get("warehouse")` is now already the department warehouse for
+	PRE_PRODUCED (and already the production-unit/department fallback for
+	MADE_TO_ORDER); the department lookup below is therefore redundant in
+	the common case and kept only as a defensive fallback for a context
+	whose `warehouse` came back empty (e.g. a DIRECT_RETAIL configuration
+	with no `direct_retail_warehouse` set) -- one rule (the canonical
+	resolver), reasserted here rather than re-implemented.
+	"""
 	warehouse = context.get("warehouse")
 	if not warehouse and context.get("department"):
 		warehouse = frappe.db.get_value(
@@ -129,7 +150,16 @@ def _warehouse_for_context(context):
 
 
 def resolve_production_context(item_code, branch, company):
-	"""Resolve the existing production configuration shape for reservation use."""
+	"""Resolve the existing production configuration shape for reservation use.
+
+	Not a second resolution implementation: it delegates straight to
+	`ury_availability._resolve_production_config`, which itself wraps the
+	single canonical resolver, `ury_production_context.resolve_production_context`.
+	This name is kept (rather than importing the canonical resolver directly
+	under its own name) only because `ury_order.py` imports it from this
+	module by this name; the resolution rule itself lives in exactly one
+	place.
+	"""
 	context = _resolve_production_config(item_code, branch, company)
 	if not context:
 		return None
