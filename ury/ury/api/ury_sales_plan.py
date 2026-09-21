@@ -24,6 +24,29 @@ from ury.ury.api.ury_production_validation import validate_item_production_confi
 BACKWARD_OR_TERMINAL_TARGETS = ("Draft", "Superseded/Cancelled")
 
 
+def _check_live_production_plan(doc, target_state):
+    """Block (default) or warn when a live Production Plan is linked.
+
+    Mode comes from URY Production Settings.sales_plan_backward_guard.
+    """
+    from ury.ury.api.ury_production_settings import sales_plan_backward_guard_mode
+    from ury.ury.api.ury_sales_plan_production_plan import get_live_production_plan
+
+    if not doc.get("name"):
+        return
+    live = get_live_production_plan(doc.get("name"))
+    if not live:
+        return
+    action = "return to Draft" if target_state == "Draft" else "cancel"
+    message = _(
+        "{0} has a live Production Plan ({1}). Cancel or delete it before you {2} this Sales Plan."
+    ).format(doc.get("name"), live["name"], action)
+    if sales_plan_backward_guard_mode() == "Warn":
+        frappe.msgprint(message, indicator="orange", alert=True)
+        return
+    frappe.throw(message, frappe.ValidationError)
+
+
 def _guard_backward_transition(doc, target_state, reason):
     """Block Return to Draft / Supersede-Cancel once production has actually
     happened, and require a reason for the audit trail either way.
@@ -69,6 +92,8 @@ def _guard_backward_transition(doc, target_state, reason):
             ),
             frappe.ValidationError,
         )
+
+    _check_live_production_plan(doc, target_state)
 
     if target_state == "Draft":
         committed_items = [
@@ -208,6 +233,54 @@ def populate_item_production_context(doc):
             row.bom = context.get("bom")
         if context.get("production_policy"):
             row.production_policy = context.get("production_policy")
+
+
+def prune_zero_qty_rows(doc):
+    """Zero means nothing: drop untouched suggestion rows before approval so the
+    locked plan holds exactly what was planned."""
+    kept = [row for row in (doc.get("items") or []) if flt(row.get("qty")) > 0]
+    if not kept:
+        frappe.throw(_("Enter a quantity for at least one item before approving."), frappe.ValidationError)
+    if len(kept) != len(doc.get("items") or []):
+        doc.set("items", kept)
+
+
+def validate_items_on_active_menu(doc, strict=True):
+    """Sales Plan takes sellable items only. An item's URY Menu membership for
+    this branch is the single source of truth for "sellable" here -- it is
+    the same doctype that already gates what the cashier cart (ury_order.py)
+    and the captain/self-order app (self_ordering.py, ury_kot_generate.py)
+    can sell, per branch. A sub-assembly has no reason to ever be on a menu,
+    so menu membership alone is sufficient to exclude it; no separate
+    "is sub-assembly" flag is needed. Controlled by setting
+    require_active_menu_for_planning (default on).
+    """
+    from ury.ury.api.ury_production_settings import require_active_menu_for_planning
+
+    if not require_active_menu_for_planning() or not doc.get("branch"):
+        return
+    codes = [r.get("item_code") for r in (doc.get("items") or []) if flt(r.get("qty")) > 0 and r.get("item_code")]
+    if not codes:
+        return
+    sellable = set(codes)
+    menus = frappe.get_all("URY Menu", filters={"branch": doc.get("branch"), "enabled": 1}, pluck="name")
+    on_menu = set(
+        frappe.get_all(
+            "URY Menu Item",
+            filters={"item": ["in", list(sellable)], "disabled": 0, "parent": ["in", menus or [""]]},
+            pluck="item",
+        )
+    )
+    missing = sorted(sellable - on_menu)
+    if missing:
+        message = _(
+            "Not on an active menu for {0}: {1}. Add them to the branch menu or remove them from the plan."
+        ).format(doc.get("branch"), ", ".join(missing))
+        if not strict:
+            # Drafts may plan ahead of a menu change; approval is the hard gate.
+            frappe.msgprint(message, indicator="orange", alert=True)
+            return
+        frappe.throw(message, frappe.ValidationError)
 
 
 def validate_plan_items(doc):

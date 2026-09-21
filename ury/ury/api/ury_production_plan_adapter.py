@@ -70,6 +70,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 
 #: Approved-plan states from ury.ury.api.ury_sales_plan.TRANSITIONS that carry
@@ -227,10 +228,20 @@ def _filter_items_in_scope(items):
     cannot identify (out of scope, see the NOTE above
     ``INCLUDED_PRODUCTION_POLICIES``).
     """
+    sellable = set(
+        frappe.get_all(
+            "Item",
+            filters={"name": ["in", [r.get("item_code") for r in items if r.get("item_code")] or [""]], "is_sales_item": 1},
+            pluck="name",
+        )
+    )
     return [
         row
         for row in items
-        if row.get("production_policy") in INCLUDED_PRODUCTION_POLICIES
+        if row.get("item_code") in sellable
+        and row.get("production_policy") in INCLUDED_PRODUCTION_POLICIES
+        # Untouched history suggestions carry qty 0; nothing to produce.
+        and flt(row.get("qty")) > 0
     ]
 
 
