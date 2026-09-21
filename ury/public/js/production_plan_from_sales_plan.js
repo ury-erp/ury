@@ -7,10 +7,59 @@
 // review before saving. Nothing is auto-submitted or auto-created.
 frappe.ui.form.on("Production Plan", {
 	refresh(frm) {
+		// Cancelling a Production Plan that has a live linked URY Sales Plan
+		// (custom_ury_sales_plan) surfaces it in ERPNext's own "Cancel All
+		// Documents" cascade alongside its Work Orders. Cascading into the
+		// Sales Plan is a dead end: that cascade calls doc.cancel() with no
+		// way to supply the reason URY Sales Plan's own guard requires
+		// (_guard_backward_transition), so it throws and the whole cascade
+		// gets stuck with no way forward. The Sales Plan side has its own
+		// guard (Block/Warn on a live Production Plan, see
+		// ury_sales_plan.py) for exactly this -- once the Production Plan is
+		// cancelled here (Work Orders cascade fine), the user cancels the
+		// Sales Plan themselves, through its own UI, with a reason.
+		frm.ignore_doctypes_on_cancel_all = Array.from(
+			new Set([...(frm.ignore_doctypes_on_cancel_all || []), "URY Sales Plan"])
+		);
+
 		if (!frm.doc.__islocal) {
-			// Only offer this on a fresh, unsaved Production Plan -- mirrors
-			// ERPNext's own "Get Items From" buttons, which are for building
-			// up a new plan, not editing an existing one.
+			// N5/N6: only meaningful once the plan exists and has po_items
+			// with resolvable BOMs (i.e. saved/submitted, not a fresh draft
+			// still being filled in via "Get Items From > Sales Plan" below).
+			frm.add_custom_button(
+				__("Generate Material Requests"),
+				() => {
+					frappe.call({
+						method:
+							"ury.ury.api.ury_production_plan_material_request.generate_material_requests_for_production_plan",
+						args: { production_plan: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Generating Material Requests..."),
+						callback: (r) => {
+							const data = r.message;
+							if (!data) {
+								return;
+							}
+							const purchaseCount = (data.purchase_material_requests || []).length;
+							const transferCount = (data.transfer_material_requests || []).length;
+							const skippedCount = (data.skipped_sufficient_stock || []).length;
+							frappe.msgprint({
+								title: __("Material Requests Generated"),
+								indicator: "green",
+								message: __(
+									"Created {0} Purchase Material Request(s) and {1} Transfer Material Request(s). {2} item(s) skipped (sufficient department stock).",
+									[purchaseCount, transferCount, skippedCount]
+								),
+							});
+						},
+					});
+				},
+				__("Create")
+			);
+			// The "Get Items From > Sales Plan" button below is only for
+			// building up a fresh, unsaved Production Plan -- mirrors
+			// ERPNext's own "Get Items From" buttons -- so nothing past
+			// this point applies to an already-saved plan.
 			return;
 		}
 
@@ -75,41 +124,5 @@ frappe.ui.form.on("Production Plan", {
 			},
 			__("Get Items From")
 		);
-
-		if (!frm.doc.__islocal) {
-			// N5/N6: only meaningful once the plan exists and has po_items
-			// with resolvable BOMs (i.e. saved/submitted, not a fresh draft
-			// still being filled in via "Get Items From > Sales Plan" above).
-			frm.add_custom_button(
-				__("Generate Material Requests"),
-				() => {
-					frappe.call({
-						method:
-							"ury.ury.api.ury_production_plan_material_request.generate_material_requests_for_production_plan",
-						args: { production_plan: frm.doc.name },
-						freeze: true,
-						freeze_message: __("Generating Material Requests..."),
-						callback: (r) => {
-							const data = r.message;
-							if (!data) {
-								return;
-							}
-							const purchaseCount = (data.purchase_material_requests || []).length;
-							const transferCount = (data.transfer_material_requests || []).length;
-							const skippedCount = (data.skipped_sufficient_stock || []).length;
-							frappe.msgprint({
-								title: __("Material Requests Generated"),
-								indicator: "green",
-								message: __(
-									"Created {0} Purchase Material Request(s) and {1} Transfer Material Request(s). {2} item(s) skipped (sufficient department stock).",
-									[purchaseCount, transferCount, skippedCount]
-								),
-							});
-						},
-					});
-				},
-				__("Create")
-			);
-		}
 	},
 });
