@@ -106,6 +106,18 @@ describe("EditableDataTable — Sales-Plan-shaped fixture", () => {
     expect((inputs[0] as HTMLInputElement).value).toBe("10");
   });
 
+  it("focusing a qty input selects its current value, so the first keystroke replaces it (not appends next to a pre-filled 0)", () => {
+    // selectionStart/selectionEnd are unsupported on type="number" inputs
+    // (spec + jsdom both return null for them), so assert on the call
+    // instead of the selection range it produces.
+    const selectSpy = vi.spyOn(HTMLInputElement.prototype, "select");
+    renderSalesPlanTable([{ item_code: "Z1", item_name: "Untouched Suggestion", department: "Indian", planned_qty: 0 }]);
+    const input = screen.getByDisplayValue("0") as HTMLInputElement;
+    fireEvent.focus(input);
+    expect(selectSpy).toHaveBeenCalled();
+    selectSpy.mockRestore();
+  });
+
   it("wheel-guard blurs a focused number input on wheel instead of blocking page scroll", () => {
     renderSalesPlanTable(salesPlanRows);
     const input = screen.getAllByRole("spinbutton")[0] as HTMLInputElement;

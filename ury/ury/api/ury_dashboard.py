@@ -130,7 +130,7 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 		for cfg in frappe.db.get_all(
 			"URY Item Production Configuration",
 			filters={"item": ["in", item_codes], "branch": branch},
-			fields=["item", "department", "production_unit"],
+			fields=["item", "department", "production_unit", "production_policy", "bom"],
 		):
 			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
 			production_config_map[item_key] = cfg
@@ -147,6 +147,8 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			"stock_uom": meta.get("stock_uom") or "Nos",
 			"department": config.get("department"),
 			"production_unit": config.get("production_unit"),
+			"production_policy": config.get("production_policy"),
+			"bom": config.get("bom"),
 			"average_qty": average_qty,
 			"sample_days": sample_days,
 			"total_qty": entry["total_qty"],
@@ -219,13 +221,29 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	for cfg in frappe.db.get_all(
 		"URY Item Production Configuration",
 		filters={"branch": branch},
-		fields=["item", "department", "production_unit"],
+		fields=["item", "department", "production_unit", "production_policy", "bom"],
 	):
 		item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
 		if item_key:
 			production_config_map[item_key] = cfg
 
 	branch_item_codes = list(production_config_map.keys())
+
+	# Sales Plan takes sellable items only, and (setting, default on) only items
+	# on an enabled menu of this branch -- same rule validate_items_on_active_menu
+	# enforces on save, applied here so ineligible items are never offered.
+	from ury.ury.api.ury_production_settings import require_active_menu_for_planning
+
+	if require_active_menu_for_planning() and branch_item_codes:
+		menus = frappe.get_all("URY Menu", filters={"branch": branch, "enabled": 1}, pluck="name")
+		on_menu = set(
+			frappe.get_all(
+				"URY Menu Item",
+				filters={"item": ["in", branch_item_codes], "disabled": 0, "parent": ["in", menus or [""]]},
+				pluck="item",
+			)
+		)
+		branch_item_codes = [code for code in branch_item_codes if code in on_menu]
 
 	if not branch_item_codes:
 		return []
@@ -236,7 +254,7 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	# be real fieldnames — "|item_code|item_name" is not valid Frappe filter
 	# syntax and 500s; or_filters is the correct OR mechanism, matching the
 	# pattern used in ury/ury_pos/api.py and ury_order.py).
-	filters = {"disabled": 0, "item_code": ["in", branch_item_codes]}
+	filters = {"disabled": 0, "is_sales_item": 1, "item_code": ["in", branch_item_codes]}
 	or_filters = None
 	if query:
 		or_filters = {
@@ -271,6 +289,8 @@ def search_branch_items(branch, company=None, query="", limit=25):
 			"stock_uom": item.get("stock_uom") or "Nos",
 			"department": config.get("department"),
 			"production_unit": config.get("production_unit"),
+			"production_policy": config.get("production_policy"),
+			"bom": config.get("bom"),
 		})
 
 	return result

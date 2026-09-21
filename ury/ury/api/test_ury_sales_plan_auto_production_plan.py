@@ -61,22 +61,22 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		frappe.db.set_single_value(DOCTYPE, "enable_auto_production_plan", 0)
 		frappe.set_user("Administrator")
 
-	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
+	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
 	@patch(
-		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
+		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan"
 	)
 	def test_setting_disabled_does_not_create_plan(self, mock_adapt, mock_get_doc):
 		frappe.db.set_single_value(DOCTYPE, "enable_auto_production_plan", 0)
-		sales_plan_doc = _FakeSalesPlanDoc(name="SP-0001")
+		sales_plan_doc = _FakeSalesPlanDoc(status="Approved", name="SP-0001")
 
 		maybe_create_production_plan_on_approval(sales_plan_doc)
 
 		mock_adapt.assert_not_called()
 		mock_get_doc.assert_not_called()
 
-	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
+	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
 	@patch(
-		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
+		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan"
 	)
 	def test_setting_enabled_creates_and_submits_plan_and_links_back(
 		self, mock_adapt, mock_get_doc
@@ -86,7 +86,7 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		fake_plan = MagicMock()
 		fake_plan.name = "PP-0001"
 		mock_get_doc.return_value = fake_plan
-		sales_plan_doc = _FakeSalesPlanDoc(name="SP-0001")
+		sales_plan_doc = _FakeSalesPlanDoc(status="Approved", name="SP-0001")
 
 		maybe_create_production_plan_on_approval(sales_plan_doc)
 
@@ -107,29 +107,30 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		fake_plan.submit.assert_called_once()
 		self.assertEqual(sales_plan_doc.get("custom_ury_production_plan"), "PP-0001")
 
-	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
+	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan")
+	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
 	@patch(
-		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
+		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan"
 	)
-	def test_already_linked_production_plan_is_skipped(self, mock_adapt, mock_get_doc):
+	def test_already_linked_production_plan_is_skipped(self, mock_adapt, mock_get_doc, mock_live):
 		frappe.db.set_single_value(DOCTYPE, "enable_auto_production_plan", 1)
-		sales_plan_doc = _FakeSalesPlanDoc(
-			name="SP-0001", custom_ury_production_plan="PP-EXISTING"
-		)
+		mock_live.return_value = {"name": "PP-EXISTING", "docstatus": 1}
+		sales_plan_doc = _FakeSalesPlanDoc(status="Approved", name="SP-0001")
 
 		maybe_create_production_plan_on_approval(sales_plan_doc)
 
 		mock_adapt.assert_not_called()
 		mock_get_doc.assert_not_called()
+		self.assertEqual(sales_plan_doc.get("custom_ury_production_plan"), "PP-EXISTING")
 
 	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.log_error")
 	@patch(
-		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
+		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan"
 	)
 	def test_adapter_failure_is_swallowed_and_logged(self, mock_adapt, mock_log_error):
 		frappe.db.set_single_value(DOCTYPE, "enable_auto_production_plan", 1)
 		mock_adapt.side_effect = Exception("boom: no BOM found")
-		sales_plan_doc = _FakeSalesPlanDoc(name="SP-0001")
+		sales_plan_doc = _FakeSalesPlanDoc(status="Approved", name="SP-0001")
 
 		# Must not raise -- this is called from URY Sales Plan's validate().
 		maybe_create_production_plan_on_approval(sales_plan_doc)
@@ -137,9 +138,9 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		mock_log_error.assert_called_once()
 
 	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.log_error")
-	@patch("ury.ury.api.ury_sales_plan_auto_production_plan.frappe.get_doc")
+	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
 	@patch(
-		"ury.ury.api.ury_sales_plan_auto_production_plan.adapt_sales_plan_to_production_plan"
+		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan"
 	)
 	def test_insert_failure_is_swallowed_and_logged(
 		self, mock_adapt, mock_get_doc, mock_log_error
@@ -149,7 +150,7 @@ class TestMaybeCreateProductionPlanOnApproval(FrappeTestCase):
 		fake_plan = MagicMock()
 		fake_plan.insert.side_effect = Exception("missing warehouse")
 		mock_get_doc.return_value = fake_plan
-		sales_plan_doc = _FakeSalesPlanDoc(name="SP-0001")
+		sales_plan_doc = _FakeSalesPlanDoc(status="Approved", name="SP-0001")
 
 		maybe_create_production_plan_on_approval(sales_plan_doc)
 
