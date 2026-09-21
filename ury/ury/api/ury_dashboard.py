@@ -130,7 +130,7 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 		for cfg in frappe.db.get_all(
 			"URY Item Production Configuration",
 			filters={"item": ["in", item_codes], "branch": branch},
-			fields=["item", "department", "production_unit", "production_policy", "bom"],
+			fields=["item", "department", "production_unit"],
 		):
 			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
 			production_config_map[item_key] = cfg
@@ -147,8 +147,6 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			"stock_uom": meta.get("stock_uom") or "Nos",
 			"department": config.get("department"),
 			"production_unit": config.get("production_unit"),
-			"production_policy": config.get("production_policy"),
-			"bom": config.get("bom"),
 			"average_qty": average_qty,
 			"sample_days": sample_days,
 			"total_qty": entry["total_qty"],
@@ -221,7 +219,7 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	for cfg in frappe.db.get_all(
 		"URY Item Production Configuration",
 		filters={"branch": branch},
-		fields=["item", "department", "production_unit", "production_policy", "bom"],
+		fields=["item", "department", "production_unit"],
 	):
 		item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
 		if item_key:
@@ -273,8 +271,6 @@ def search_branch_items(branch, company=None, query="", limit=25):
 			"stock_uom": item.get("stock_uom") or "Nos",
 			"department": config.get("department"),
 			"production_unit": config.get("production_unit"),
-			"production_policy": config.get("production_policy"),
-			"bom": config.get("bom"),
 		})
 
 	return result
