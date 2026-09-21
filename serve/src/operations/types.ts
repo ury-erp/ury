@@ -1,3 +1,5 @@
+import { messageToPlainText } from '@ury/ui'
+
 /** Shared prop contract for operational Serve components (no store coupling). */
 export interface OperationsIdentityProps {
   /** Session user id (Frappe User.name). */
@@ -15,7 +17,7 @@ export function extractServerErrorMessage(error: unknown, fallback: string): str
       try {
         const messages = JSON.parse(raw)
         const first = JSON.parse(messages[0])
-        if (first?.message) return String(first.message)
+        if (first?.message) return messageToPlainText(String(first.message))
       } catch {
         // fall through
       }

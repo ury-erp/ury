@@ -9,6 +9,7 @@ import {
   Input,
   Spinner,
   cn,
+  messageToPlainText,
 } from '@ury/ui';
 import { t } from '../i18n';
 import {
@@ -43,7 +44,7 @@ function extractServerErrorMessage(error: unknown, fallback: string): string {
       try {
         const messages = JSON.parse(raw);
         const first = JSON.parse(messages[0]);
-        if (first?.message) return first.message as string;
+        if (first?.message) return messageToPlainText(first.message as string);
       } catch {
         // fall through to other extraction strategies
       }
