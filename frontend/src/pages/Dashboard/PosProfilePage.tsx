@@ -409,7 +409,6 @@ export const PosProfilePage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              size="sm"
               onClick={() => setSelectedProfile(null)}
               className="text-foreground hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
@@ -686,7 +685,6 @@ export const PosProfilePage: React.FC = () => {
                   {isEditMode && (
                     <Button
                       type="button"
-                      size="sm"
                       variant="outline"
                       className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
                       onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}
@@ -758,7 +756,6 @@ export const PosProfilePage: React.FC = () => {
                   {isEditMode && (
                     <Button
                       type="button"
-                      size="sm"
                       variant="outline"
                       className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
                       onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}
@@ -838,7 +835,6 @@ export const PosProfilePage: React.FC = () => {
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() => handleProfileView(row)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                           title="View Profile"
@@ -847,7 +843,6 @@ export const PosProfilePage: React.FC = () => {
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() => handleProfileEdit(row)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                           title="Edit Profile"
@@ -981,7 +976,6 @@ export const PosProfilePage: React.FC = () => {
             </div>
             <Button
               type="button"
-              size="sm"
               variant="outline"
               className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
               onClick={() => setAddForm({...addForm, applicable_for_users: [...addForm.applicable_for_users, {user:'', default:0}]})}
@@ -1034,7 +1028,6 @@ export const PosProfilePage: React.FC = () => {
             </div>
             <Button
               type="button"
-              size="sm"
               variant="outline"
               className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
               onClick={() => setAddForm({...addForm, payments: [...addForm.payments, {mode_of_payment:'', default:0}]})}

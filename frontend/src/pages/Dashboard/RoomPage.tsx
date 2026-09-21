@@ -273,7 +273,7 @@ export const RoomPage: React.FC = () => {
                 header: 'Actions',
                 align: 'right',
                 render: (room) => (
-                  <Button variant="ghost" size="sm" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
+                  <Button variant="ghost" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 ),
@@ -367,7 +367,6 @@ export const RoomPage: React.FC = () => {
               <h3 className="font-semibold text-gray-900">Printer Settings</h3>
               <Button
                 type="button"
-                size="sm"
                 variant="outline"
                 onClick={() => {
                   setPrinterSettings([...printerSettings, { bill: 1, printer: '' }]);
@@ -415,7 +414,6 @@ export const RoomPage: React.FC = () => {
 
                     <Button
                       type="button"
-                      size="sm"
                       variant="ghost"
                       onClick={() => {
                         setPrinterSettings(printerSettings.filter((_, i) => i !== idx));

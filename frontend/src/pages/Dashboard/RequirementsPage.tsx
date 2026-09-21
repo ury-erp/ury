@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
 import {
   AttentionFeed,
   Badge,
   Card,
   DataTable,
   DataTableColumn,
+  DatePicker,
   InlineEditCell,
-  Input,
   KpiStrip,
   Page,
+  PageHeader,
   Section,
   Spinner,
   numericCellClass,
@@ -361,31 +361,29 @@ export const RequirementsPage: React.FC = () => {
 
   return (
     <Page>
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Requirements</h1>
-            <p className="mt-1 text-sm text-text-tertiary">
-              Materials and production targets derived from the approved Sales Plan.
-              {planName && (
-                <span className="ml-1 text-text-tertiary">
-                  Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
-                </span>
-              )}
-            </p>
-          </div>
-          <label className="relative block">
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-            <Input
-              aria-label="Requirements date"
-              type="date"
-              value={requirementsDate}
-              onChange={(event) => setRequirementsDate(event.target.value)}
-              className="pl-9"
-            />
-          </label>
-        </div>
-      </div>
+      <PageHeader
+        bleed
+        title="Requirements"
+        description={
+          <p className="mt-1 text-sm text-text-tertiary">
+            Materials and production targets derived from the approved Sales Plan.
+            {planName && (
+              <span className="ml-1 text-text-tertiary">
+                Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
+              </span>
+            )}
+          </p>
+        }
+        actions={
+          <DatePicker
+            id="requirements-date"
+            aria-label="Requirements date"
+            value={requirementsDate}
+            onChange={(_id, next) => setRequirementsDate(next)}
+            className="w-[180px]"
+          />
+        }
+      />
 
       {loading ? (
         <Section>

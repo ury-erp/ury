@@ -906,7 +906,7 @@ export const MenuPage: React.FC = () => {
                 header: 'Actions',
                 align: 'right',
                 render: (item) => (
-                  <Button variant="ghost" size="sm" onClick={() => openEditItemDrawer(item)} className="text-gray-500 hover:text-primary">
+                  <Button variant="ghost" onClick={() => openEditItemDrawer(item)} className="text-gray-500 hover:text-primary">
                     <Edit2 className="w-4 h-4" />
                   </Button>
                 ),

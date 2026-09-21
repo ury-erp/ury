@@ -11,6 +11,7 @@ from ury.ury.api.ury_sales_plan import (
     freeze_approval_snapshot,
     populate_item_production_context,
     validate_no_overlapping_plan_scope,
+    validate_plan_has_demand,
     validate_plan_items,
     validate_items_on_active_menu,
     flag_stale_bom_revisions,
@@ -75,6 +76,34 @@ class TestURYSalesPlanContract(FrappeTestCase):
         ) as validate:
             validate_plan_items(doc)
         validate.assert_called_once_with("MTPL", "Branch A")
+
+    def test_plan_with_no_rows_cannot_leave_draft(self):
+        """The complement to the test above: skipping qty-0 rows one by one
+        left nothing checking that the plan as a whole plans SOMETHING, so an
+        empty plan walked the entire path to Locked for Production."""
+        with self.assertRaises(frappe.ValidationError):
+            validate_plan_has_demand(self._doc(items=[]))
+
+    def test_plan_with_only_zero_qty_rows_cannot_leave_draft(self):
+        """A plan carrying the full history-suggested catalog, every row still
+        at its default qty 0, plans exactly as much as an empty one."""
+        doc = self._doc(
+            items=[
+                {"item_code": "MTPL", "qty": 0},
+                {"item_code": "OTHER", "qty": 0},
+            ]
+        )
+        with self.assertRaises(frappe.ValidationError):
+            validate_plan_has_demand(doc)
+
+    def test_plan_with_one_nonzero_row_can_leave_draft(self):
+        doc = self._doc(
+            items=[
+                {"item_code": "MTPL", "qty": 0},
+                {"item_code": "OTHER", "qty": 3},
+            ]
+        )
+        validate_plan_has_demand(doc)
 
     def test_snapshot_is_immutable_once_created(self):
         doc = self._doc()

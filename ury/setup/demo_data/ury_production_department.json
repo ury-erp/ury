@@ -1,0 +1,11 @@
+[
+    {
+        "doctype": "URY Production Department",
+        "department_name": "Demo Kitchen Department",
+        "enabled": 1,
+        "company": "__COMPANY__",
+        "branch": "Demo Branch",
+        "department_warehouse": "__WAREHOUSE__",
+        "cost_center": "__COST_CENTER__"
+    }
+]

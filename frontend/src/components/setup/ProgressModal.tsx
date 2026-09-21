@@ -16,6 +16,13 @@ interface ProgressModalProps {
   /** Frappe setup_task status === "ok" (background setup) */
   onComplete?: () => void;
   onFail?: (message: string) => void;
+  /**
+   * HTTP fallback: polled for the same payload the `setup_task` event
+   * carries. Without it a browser that cannot reach the socket never learns
+   * that a background setup finished or failed.
+   */
+  poll?: () => Promise<unknown>;
+  pollIntervalMs?: number;
 }
 
 type SetupTaskPayload = {
@@ -49,30 +56,41 @@ export function ProgressModal({
   onReady,
   onComplete,
   onFail,
+  poll,
+  pollIntervalMs = 3000,
 }: ProgressModalProps) {
   const onStepChangeRef = useRef(onStepChange);
   const onReadyRef = useRef(onReady);
   const onCompleteRef = useRef(onComplete);
   const onFailRef = useRef(onFail);
+  const pollRef = useRef(poll);
   useEffect(() => {
     onStepChangeRef.current = onStepChange;
     onReadyRef.current = onReady;
     onCompleteRef.current = onComplete;
     onFailRef.current = onFail;
+    pollRef.current = poll;
   });
 
   useEffect(() => {
     if (!visible) return;
 
+    // Socket and poll can both deliver the terminal event; act on it once.
+    let settled = false;
+
     const handler = (data: unknown) => {
       const payload = unwrapPayload(data);
 
       if (payload.fail_msg || payload.status === 'fail') {
+        if (settled) return;
+        settled = true;
         onFailRef.current?.(payload.fail_msg || 'Setup failed');
         return;
       }
 
       if (payload.status === 'ok') {
+        if (settled) return;
+        settled = true;
         onCompleteRef.current?.();
         return;
       }
@@ -95,8 +113,25 @@ export function ProgressModal({
       onReadyRef.current?.();
     });
 
-    return unsubscribe;
-  }, [visible, eventName]);
+    if (!pollRef.current) {
+      return unsubscribe;
+    }
+
+    const timer = setInterval(async () => {
+      if (settled) return;
+      try {
+        handler(await pollRef.current?.());
+      } catch {
+        // A failed poll is not itself a setup failure -- the socket may still
+        // deliver, and the next tick retries.
+      }
+    }, pollIntervalMs);
+
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
+  }, [visible, eventName, pollIntervalMs]);
 
   if (!visible) return null;
 

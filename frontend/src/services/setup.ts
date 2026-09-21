@@ -32,6 +32,14 @@ export interface SetupProgressStep {
   app: string;
 }
 
+/** Same shape as the `setup_task` realtime payload. */
+export interface SetupTaskStatus {
+  status?: string;
+  fail_msg?: string;
+  progress?: [number, number];
+  stage_status?: string;
+}
+
 export const setupService = {
   async getDefaults(): Promise<SetupDefaults> {
     const res = await call<any>('ury.ury.api.minimal.setup_organization.get_setup_defaults');
@@ -51,6 +59,10 @@ export const setupService = {
   async submitSetup(payload: SetupPayload): Promise<{ status?: string } | void> {
     const res = await call<any>('ury.ury.api.minimal.setup_organization.complete_wizard_setup', payload);
     return res?.message ?? res;
+  },
+  async getProgressStatus(): Promise<SetupTaskStatus> {
+    const res = await call<any>('ury.ury.api.minimal.setup_organization.get_setup_progress_status');
+    return res?.message ?? res ?? {};
   },
   async submitConfigureData(data: any): Promise<any> {
     const res = await call<any>('ury.ury.api.minimal.business_setup.submit_configure_data', { data });

@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-from ury.ury.controllers.setup_redirect import is_ury_setup_complete
+from ury.ury.controllers.setup_redirect import is_ury_setup_complete, repair_interrupted_setup
 
 @frappe.whitelist()
 def get_business_setup():
@@ -178,7 +178,12 @@ def submit_configure_data(data):
     user = frappe.session.user
 
     try:
-        return _run_configure_data(data, results, user)
+        outcome = _run_configure_data(data, results, user)
+        # Step 1 may have died before Frappe's "Wrapping up" stage, leaving the
+        # Desk home page on the wizard. The site is configured now, so settle
+        # that here rather than leaving Desk to loop on it.
+        repair_interrupted_setup()
+        return outcome
     except frappe.PermissionError:
         frappe.db.rollback()
         raise

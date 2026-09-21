@@ -308,6 +308,44 @@ def validate_plan_items(doc):
         validate_item_production_configuration(item_code, doc.get("branch"))
 
 
+#: The Workflow states reachable by a forward hop out of "Draft" -- the point
+#: a scratch plan stops being the author's own working copy and becomes
+#: something other people are asked to act on. Mirrors the out-edges of
+#: "Draft" in ``ury/fixtures/workflow.json``.
+FORWARD_FROM_DRAFT = ("Proposed",)
+
+
+def validate_plan_has_demand(doc):
+    """Reject the first forward hop out of Draft on a plan that plans nothing.
+
+    ``validate_plan_items`` deliberately skips every ``qty: 0`` row (the
+    comparable-history panel pre-populates the whole branch catalog as
+    suggestions, and gating on untouched suggestions is exactly what
+    "suggestions must be additive, never gating" forbids). But skipping those
+    rows row-by-row left no check that the plan as a WHOLE plans anything:
+    a plan with no rows at all, or with every row still at its suggested
+    ``qty: 0``, satisfied every gate on the path and could be walked to
+    Locked for Production without ever stating a single quantity.
+
+    The check belongs at the Draft -> Proposed edge rather than at Approved:
+    an empty plan is a mistake the author should hear about on the hop they
+    make themselves, not three approvals later in front of a manager. It is
+    also not re-run on the later hops -- a plan that was non-empty when
+    proposed and has since had its quantities zeroed out is a different
+    problem (a real edit to a circulating plan), and quietly blocking the
+    lock step is the wrong way to surface it.
+    """
+    if any(flt(row.get("qty")) > 0 for row in (doc.get("items") or [])):
+        return
+    frappe.throw(
+        _(
+            "This Sales Plan does not plan anything yet -- set a quantity on at "
+            "least one item before submitting it for approval."
+        ),
+        frappe.ValidationError,
+    )
+
+
 def validate_no_overlapping_plan_scope(doc):
     """Reject approval if another Approved/Locked plan already covers the
     same item+branch+day scope as any row on this plan.

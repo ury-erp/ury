@@ -8,6 +8,7 @@ from frappe.model.document import Document
 
 from ury.ury.api.ury_sales_plan import (
 	BACKWARD_OR_TERMINAL_TARGETS,
+	FORWARD_FROM_DRAFT,
 	_guard_backward_transition,
 	prune_zero_qty_rows,
 	validate_items_on_active_menu,
@@ -17,6 +18,7 @@ from ury.ury.api.ury_sales_plan import (
 	freeze_approval_snapshot,
 	populate_item_production_context,
 	validate_no_overlapping_plan_scope,
+	validate_plan_has_demand,
 	validate_plan_items,
 )
 from ury.ury.api.ury_sales_plan_auto_production_plan import (
@@ -67,6 +69,14 @@ class URYSalesPlan(Document):
 
 		if prev_status and prev_status != self.status:
 			_validate_plan_scope(self)
+			# An empty plan is caught on the way OUT of Draft, not at
+			# approval -- see validate_plan_has_demand's docstring. Like
+			# every other guardrail here this has to sit in validate()
+			# rather than in transition_sales_plan(), so Desk's own
+			# workflow Actions button can't walk an empty plan forward
+			# behind the frontend's back.
+			if prev_status == "Draft" and self.status in FORWARD_FROM_DRAFT:
+				validate_plan_has_demand(self)
 			if self.status == "Approved":
 				prune_zero_qty_rows(self)
 				validate_items_on_active_menu(self, strict=True)

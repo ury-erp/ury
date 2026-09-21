@@ -386,7 +386,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                     </p>
                   </div>
                   {!addingKey && (
-                    <Button size="sm" variant="outline" onClick={openAddKey} className="inline-flex items-center gap-1.5">
+                    <Button variant="outline" onClick={openAddKey} className="inline-flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5" />
                       Add API Key
                     </Button>

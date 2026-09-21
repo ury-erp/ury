@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Card, DataTable, KpiStrip, Page, Section, Spinner, numericCellClass } from '@ury/ui';
+import { Badge, Card, DataTable, DatePicker, KpiStrip, Page, Section, Spinner, numericCellClass } from '@ury/ui';
 import type { DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DeskLink } from '../../components/DeskLink';
@@ -214,22 +214,22 @@ const StoreIssueContent: React.FC = () => {
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
-            <input
+            <DatePicker
+              id="from-date"
               aria-label="From date"
-              type="date"
               value={fromDate}
-              onChange={(event) => setFromDate(event.target.value)}
-              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
+              onChange={(_id, next) => setFromDate(next)}
+              className="mt-1 w-[150px]"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
-            <input
+            <DatePicker
+              id="to-date"
               aria-label="To date"
-              type="date"
               value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
+              onChange={(_id, next) => setToDate(next)}
+              className="mt-1 w-[150px]"
             />
           </label>
         </div>
