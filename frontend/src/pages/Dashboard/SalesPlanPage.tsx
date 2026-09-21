@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -61,7 +61,9 @@ export function describeSalesPlanApiError(err: unknown, fallback: string): strin
       const messages = JSON.parse(anyErr._server_messages) as string[];
       const first = JSON.parse(messages[0]) as { message?: string };
       if (first?.message) {
-        return first.message;
+        // Frappe wraps field/doctype names in <strong>; strip to plain text
+        // for toast and any remaining inline setState paths.
+        return messageToPlainText(first.message);
       }
     } catch {
       // Malformed/unexpected shape -- fall through to the generic message
@@ -504,7 +506,6 @@ export const SalesPlanPage: React.FC = () => {
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
   const [ppState, setPpState] = useState<ProductionPlanState | null>(null);
   const [ppBusy, setPpBusy] = useState(false);
-  const [ppError, setPpError] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -825,7 +826,7 @@ export const SalesPlanPage: React.FC = () => {
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
     } catch (err) {
-      setError(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
+      showToast.error(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
     } finally {
       setSaving(false);
     }
@@ -909,7 +910,6 @@ export const SalesPlanPage: React.FC = () => {
   const isEditable = planStatus === null || planStatus === 'Draft';
 
   useEffect(() => {
-    setPpError(null);
     if (!planName || (planStatus !== 'Approved' && planStatus !== 'Locked for Production')) {
       setPpState(null);
       return;
@@ -925,12 +925,11 @@ export const SalesPlanPage: React.FC = () => {
   const openProductionPlan = async () => {
     if (!planName) return;
     setPpBusy(true);
-    setPpError(null);
     try {
       const result = await salesPlanService.openOrCreateProductionPlan(planName);
       window.location.assign(`/app/production-plan/${encodeURIComponent(result.name)}`);
     } catch (err) {
-      setPpError(describeSalesPlanApiError(err, 'Unable to open or create the Production Plan.'));
+      showToast.error(describeSalesPlanApiError(err, 'Unable to open or create the Production Plan.'));
     } finally {
       setPpBusy(false);
     }
@@ -1015,7 +1014,7 @@ export const SalesPlanPage: React.FC = () => {
       });
       setPlanStatus((result.status as PlanStatus) || currentAction.targetState);
     } catch (err) {
-      setTransitionError(
+      showToast.error(
         describeSalesPlanApiError(err, 'Unable to update this Sales Plan. Please try again.')
       );
     } finally {
@@ -1065,7 +1064,7 @@ export const SalesPlanPage: React.FC = () => {
       const fallbackMessage = currentBackwardAction.destructive
         ? `Unable to cancel this Sales Plan. Please try again.`
         : `Unable to return this Sales Plan to Draft. Please try again.`;
-      setBackwardActionError(describeSalesPlanApiError(err, fallbackMessage));
+      showToast.error(describeSalesPlanApiError(err, fallbackMessage));
     } finally {
       setBackwardActionTransitioning(false);
     }
@@ -1168,7 +1167,6 @@ export const SalesPlanPage: React.FC = () => {
         }
         footer={
           <>
-            {ppError && <div className="mt-2 text-sm text-destructive">{ppError}</div>}
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <LifecycleStepper status={planStatus} />
               {actionBlockedByRole && (

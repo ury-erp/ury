@@ -33,6 +33,21 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
   };
 });
 
+const mockShowToastError = vi.fn();
+vi.mock('@ury/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@ury/ui')>();
+  return {
+    ...actual,
+    showToast: {
+      ...actual.showToast,
+      error: (...args: unknown[]) => mockShowToastError(...args),
+      success: actual.showToast.success,
+      warning: actual.showToast.warning,
+      info: actual.showToast.info,
+    },
+  };
+});
+
 const historyResponse = {
   plan_date: '2026-08-29',
   branch: 'Kozhikode',
@@ -78,6 +93,7 @@ describe('SalesPlanPage', () => {
     window.localStorage.clear();
     mockAuthState.isManager = false;
     mockAuthState.roles = [];
+    mockShowToastError.mockClear();
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(historyResponse);
     vi.mocked(salesPlanService.searchBranchItems).mockResolvedValue([]);
     vi.mocked(salesPlanService.getPlanStatus).mockRejectedValue(new Error('not found'));
@@ -491,7 +507,7 @@ describe('SalesPlanPage', () => {
       await screen.findByText('Currently: Draft · Next: Submit for Review');
     });
 
-    it('surfaces the real backend error in the Return to Draft modal on failure', async () => {
+    it('surfaces the real backend error as a toast on Return to Draft failure', async () => {
       mockAuthState.roles = ['URY Sales Plan Controller'];
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Approved' } as any);
       vi.mocked(salesPlanService.transitionPlan).mockRejectedValue({
@@ -508,9 +524,11 @@ describe('SalesPlanPage', () => {
       await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
       await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
-      expect(
-        await screen.findByText('Cannot cancel PLAN-1: production has already been recorded against MTPL.')
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockShowToastError).toHaveBeenCalledWith(
+          'Cannot cancel PLAN-1: production has already been recorded against MTPL.'
+        );
+      });
     });
 
     it('refuses to dismiss the modal via Escape while a transition is still in flight', async () => {
@@ -610,6 +628,24 @@ describe('describeSalesPlanApiError', () => {
     const { describeSalesPlanApiError } = await import('./SalesPlanPage');
     expect(describeSalesPlanApiError({}, 'Unable to save this Sales Plan draft.')).toBe(
       'Unable to save this Sales Plan draft.'
+    );
+  });
+
+  it('strips Frappe HTML tags from _server_messages so toasts show plain text', async () => {
+    const { describeSalesPlanApiError } = await import('./SalesPlanPage');
+    const err = {
+      exc_type: 'frappe.exceptions.ValidationError',
+      _server_messages: JSON.stringify([
+        JSON.stringify({
+          message:
+            'Field <strong>require_active_menu_for_planning</strong> does not exist on <strong>URY Production Settings</strong>',
+          title: 'Message',
+          indicator: 'red',
+        }),
+      ]),
+    };
+    expect(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.')).toBe(
+      'Field require_active_menu_for_planning does not exist on URY Production Settings'
     );
   });
 });
