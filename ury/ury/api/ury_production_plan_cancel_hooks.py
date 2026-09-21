@@ -17,7 +17,7 @@ Plan just means the making didn't happen or needs replanning, it does not
 mean the demand record itself was wrong) could never be cancelled or
 deleted: "Cannot delete or cancel because Production Plan ... is linked
 with URY Sales Plan ...". The client-side fix in
-production_plan_from_sales_plan.js (``ignore_doctypes_on_cancel_all``) only
+production_plan_cancel_guard.js (``ignore_doctypes_on_cancel_all``) only
 keeps the Sales Plan out of the "Cancel All Documents" dialog/cascade; this
 server-side hook is what actually lets a plain Cancel succeed, since
 ``check_no_back_links_exist`` runs independently of that dialog.
