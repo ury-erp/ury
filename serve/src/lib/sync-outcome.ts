@@ -1,10 +1,12 @@
 import type { SyncOrderResponse } from './order-api'
 import { getSyncedInvoiceName, isSyncFailure } from './order-api'
+import { apiErrorMessage } from './api-error'
 
 /**
  * Backend `sync_order` (`ury_order.py`):
  * - Success → `return invoice.as_dict()` (always includes POS Invoice `name`)
  * - Soft reject → `return {"status": "Failure"}` (no invoice name)
+ * - Hard fail (e.g. KOT creation after 3e879f4b) → `frappe.throw`, request rolls back
  * Frappe wraps the return value as `{ message: <return> }` from `call.post`.
  */
 
@@ -29,6 +31,27 @@ export function classifySyncOutcome(result: unknown): SyncOutcome {
   const invoiceName = getSyncedInvoiceName(message ?? null)
   if (invoiceName) return { kind: 'success', invoiceName }
   return { kind: 'uncertain' }
+}
+
+/**
+ * Thrown sync errors: KOT routing failures roll the invoice back, so treat as
+ * definitive failure (not "uncertain — ticket may exist"). Other throws stay
+ * uncertain so a flaky network response cannot open a resend path.
+ */
+export function classifySyncThrownError(error: unknown): {
+  kind: 'failure' | 'uncertain'
+  message: string
+} {
+  const message = apiErrorMessage(error, 'Send result unclear. Do not resend until verified.')
+  if (/Failed to create kitchen order ticket/i.test(message) || /KOT Creation Failed/i.test(message)) {
+    return {
+      kind: 'failure',
+      message:
+        message ||
+        'Kitchen ticket could not be created. The order was not saved — fix kitchen routing, then send again.',
+    }
+  }
+  return { kind: 'uncertain', message }
 }
 
 /**
