@@ -227,6 +227,22 @@ def search_branch_items(branch, company=None, query="", limit=25):
 
 	branch_item_codes = list(production_config_map.keys())
 
+	# Sales Plan takes sellable items only, and (setting, default on) only items
+	# on an enabled menu of this branch -- same rule validate_items_on_active_menu
+	# enforces on save, applied here so ineligible items are never offered.
+	from ury.ury.api.ury_production_settings import require_active_menu_for_planning
+
+	if require_active_menu_for_planning() and branch_item_codes:
+		menus = frappe.get_all("URY Menu", filters={"branch": branch, "enabled": 1}, pluck="name")
+		on_menu = set(
+			frappe.get_all(
+				"URY Menu Item",
+				filters={"item": ["in", branch_item_codes], "disabled": 0, "parent": ["in", menus or [""]]},
+				pluck="item",
+			)
+		)
+		branch_item_codes = [code for code in branch_item_codes if code in on_menu]
+
 	if not branch_item_codes:
 		return []
 
@@ -236,7 +252,7 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	# be real fieldnames — "|item_code|item_name" is not valid Frappe filter
 	# syntax and 500s; or_filters is the correct OR mechanism, matching the
 	# pattern used in ury/ury_pos/api.py and ury_order.py).
-	filters = {"disabled": 0, "item_code": ["in", branch_item_codes]}
+	filters = {"disabled": 0, "is_sales_item": 1, "item_code": ["in", branch_item_codes]}
 	or_filters = None
 	if query:
 		or_filters = {

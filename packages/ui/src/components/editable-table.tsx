@@ -164,6 +164,16 @@ export function EditableDataTable<T>({
             const value = e.target.value === "" ? 0 : Number(e.target.value);
             editableColumn.onChange(row, value);
           }}
+          // A "0" pre-filled qty is the common case (untouched suggestion
+          // rows). Without this, clicking in lands the cursor at some
+          // position around that "0" -- typing "1" then inserts next to it
+          // (e.g. "0" + "1" -> "10") instead of replacing it, and Backspace
+          // does nothing useful if the cursor isn't after the digit.
+          // Selecting the whole value on focus/click means the first
+          // keystroke always replaces it, matching how a spreadsheet cell
+          // behaves. Deliberately does NOT clear-to-empty on focus: that
+          // would make Tab-through-without-editing silently blank the cell.
+          onFocus={(e) => e.target.select()}
           onKeyDown={(e) => handleCellKeyDown(e, row)}
         />
       );

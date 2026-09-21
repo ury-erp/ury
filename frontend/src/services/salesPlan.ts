@@ -238,6 +238,15 @@ export interface SearchBranchItemsParams {
   limit?: number;
 }
 
+export type ProductionPlanState = {
+  state: 'none' | 'live' | 'stale' | 'ineligible';
+  name?: string;
+  docstatus?: number;
+  can_open?: boolean;
+  can_create?: boolean;
+  issues?: string[];
+};
+
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
     const res = await call.get<ComparableHistoryResponse>(
@@ -280,6 +289,22 @@ export const salesPlanService = {
       body,
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
+  async getProductionPlanState(name: string): Promise<ProductionPlanState> {
+    const res = await call.get<ProductionPlanState>(
+      'ury.ury.api.ury_sales_plan_production_plan.get_production_plan_state',
+      { sales_plan: name },
+    );
+    return ((res as any)?.message ?? res) as ProductionPlanState;
+  },
+
+  async openOrCreateProductionPlan(name: string): Promise<{ name: string; created: boolean; docstatus: number }> {
+    const res = await call.post<{ name: string; created: boolean; docstatus: number }>(
+      'ury.ury.api.ury_sales_plan_production_plan.open_or_create_production_plan',
+      { sales_plan: name },
+    );
+    return ((res as any)?.message ?? res) as { name: string; created: boolean; docstatus: number };
   },
 
   async getPlan(name: string): Promise<Record<string, unknown>> {
