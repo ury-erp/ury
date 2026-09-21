@@ -630,7 +630,19 @@ ascending, in one pass, before any write. A Bin row that does not exist is not
 created just to lock it; its absence is a zero-stock shortage and is reported as
 a blocker.
 
-Owner: Agent 5, honoured by Agent 8.
+**Single implementation, corrected.** As first written, this decision assigned
+locking to Agent 5 while the Agent 8 task section separately restated
+"acquire Store Bin locks, re-run readiness, abort with blockers" as steps
+Agent 8 performs. Read together they invite two independent locking
+implementations, which is precisely the divergence this decision exists to
+prevent.
+
+There is exactly one implementation, in
+`ury_production_transfer.execute_store_to_department_transfer`, which owns the
+whole preflight, lock, revalidate, execute sequence. **Agent 8 calls that
+function and reimplements none of it.**
+
+Owner: Agent 5. Agent 8 is a caller, not a second implementer.
 
 ### D10 — Do not reuse ERPNext's `for_warehouse`
 
@@ -946,15 +958,36 @@ Warehouse whichever way the rows are divided. The rule decides only which
 department plan is credited with which slice of `requested_qty`. It is not an
 allocation policy with stock semantics, and must not be read as one.
 
-`Material Request Plan Item.warehouse` on each plan's `mr_items` is the
-**Store** warehouse, not the department's. ERPNext's own
-`ProductionPlan.make_material_request` copies that field straight onto the
-generated Material Request Item's `warehouse`, so to native code it means
-"where the requested material is received". Setting it to the department
-warehouse would make the native Material Request button raise a Purchase MR
-receiving goods into the department, inverting the Store to Department model.
-The destination department stays recoverable through the row's
+**`mr_items.warehouse` depends on the request type. Corrected after both
+Material Request paths were built.**
+
+`ProductionPlan.make_material_request` copies that field onto the generated
+row's `warehouse`, and sets `from_warehouse` only for a Material Transfer:
+
+```python
+"from_warehouse": item.from_warehouse if material_request_type == "Material Transfer" else None,
+"warehouse": item.warehouse,
+```
+
+So `warehouse` always means **where the goods are received**, and the correct
+value is the opposite for the two paths:
+
+| `mr_items` row for | `warehouse` | `from_warehouse` |
+| --- | --- | --- |
+| Purchase (Store replenishment) | Store Warehouse | not set |
+| Material Transfer (Store to Department) | Department Warehouse | Store Warehouse |
+
+An earlier draft of this decision stated Store flatly, which is right for the
+Purchase path and wrong for the Transfer path. Anyone using the Purchase row
+as a template for a Transfer row will get it backwards. For the Purchase path
+the destination department stays recoverable through the row's
 `production_plan` link.
+
+**Transfer quantity uses `department_shortage`, not `store_shortage`.** A
+Transfer request moves stock Store is assumed to hold; whether it actually
+holds it is checked at execution time under Bin locks (D9, D17). The Purchase
+path nets against `store_shortage` instead. The two differ deliberately and
+are not an inconsistency.
 
 ## Wave 0 — Integration owner
 
