@@ -110,12 +110,12 @@ ury_demo_master_doctypes = [
     "URY Restaurant",
     "URY Table",
     "Product Bundle",
+    "POS Profile",
     "URY Production Department",
     "URY Production Unit",
     "URY Item Production Configuration",
     "URY Branch Stock Policy",
     "URY Report Settings",
-    "POS Profile"
 ]
 
 ury_demo_transaction_doctypes = [

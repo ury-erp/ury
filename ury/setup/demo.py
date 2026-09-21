@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from random import randint
 
 import frappe
@@ -21,6 +22,12 @@ from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_r
 from frappe.utils.telemetry import capture
 
 demo_cache = {}
+_DEMO_INSERT_RETRIES = 3
+_IGNORABLE_INSERT_ERRORS = (
+    "ItemPriceDuplicateItem",
+    "DuplicateEntryError",
+    "NameError",
+)
 
 def setup_ury_demo_data(company):
     global demo_cache
@@ -98,36 +105,102 @@ def ensure_master_records_exist():
 
 def process_masters(company):
     ensure_master_records_exist()
-    
+
     for doctype in frappe.get_hooks("ury_demo_master_doctypes"):
         data = read_data_file_using_hooks(doctype)
         if data:
             for item in json.loads(data):
                 if item.get("doctype") == "Employee" and not item.get("company"):
                     item["company"] = company
-                    
+
                 replace_placeholders(item, company)
-                try:
-                    doc = frappe.get_doc(item)
-                    if doc.doctype == "User":
-                        doc.send_welcome_email = 0
-                    doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
-                    if doc.meta.is_submittable:
-                        doc.submit()
-                except Exception as e:
-                    if type(e).__name__ in (
-                        "ItemPriceDuplicateItem",
-                        "DuplicateEntryError",
-                        "NameError",
-                    ) or "DuplicateEntryError" in type(e).__name__:
-                        pass
-                    else:
-                        raise
+                insert_demo_master(item)
 
     # Single DocType — cannot ride the JSON insert loop.
     frappe.db.set_single_value(
         "URY Production Settings", "store_warehouse", get_warehouse(company)
     )
+    frappe.db.commit()
+
+
+def _is_ignorable_insert_error(exc):
+    name = type(exc).__name__
+    return name in _IGNORABLE_INSERT_ERRORS or "DuplicateEntryError" in name
+
+
+def _is_retryable_db_error(exc):
+    return isinstance(exc, (frappe.QueryDeadlockError, frappe.QueryTimeoutError))
+
+
+def insert_demo_master(item):
+    """Insert one demo master, committing so a later deadlock cannot wipe prior work.
+
+    POS Profile.on_update clears DefaultValue rows and can hit MariaDB 1020/1213
+    during the long setup-wizard transaction; retry that class of error only.
+    """
+    if item.get("doctype") == "POS Profile":
+        _insert_pos_profile_demo(item)
+        return
+
+    last_error = None
+    for attempt in range(_DEMO_INSERT_RETRIES):
+        try:
+            _insert_one_demo_doc(item)
+            return
+        except Exception as e:
+            if _is_ignorable_insert_error(e):
+                frappe.db.rollback()
+                return
+            if _is_retryable_db_error(e) and attempt < _DEMO_INSERT_RETRIES - 1:
+                last_error = e
+                frappe.db.rollback()
+                time.sleep(0.25 * (attempt + 1))
+                continue
+            raise
+
+    if last_error:
+        raise last_error
+
+
+def _insert_one_demo_doc(item):
+    doc = frappe.get_doc(item)
+    if doc.doctype == "User":
+        doc.send_welcome_email = 0
+    doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
+    if doc.meta.is_submittable:
+        doc.submit()
+    frappe.db.commit()
+
+
+def _insert_pos_profile_demo(item):
+    """Skip POS Profile.set_defaults during demo — it deadlocks on tabDefaultValue.
+
+    is_pos user defaults are desk convenience only; Demo Profile itself is enough.
+    """
+    from erpnext.accounts.doctype.pos_profile.pos_profile import POSProfile
+
+    original_set_defaults = POSProfile.set_defaults
+    POSProfile.set_defaults = lambda self, include_current_pos=True: None
+    try:
+        last_error = None
+        for attempt in range(_DEMO_INSERT_RETRIES):
+            try:
+                _insert_one_demo_doc(item)
+                return
+            except Exception as e:
+                if _is_ignorable_insert_error(e):
+                    frappe.db.rollback()
+                    return
+                if _is_retryable_db_error(e) and attempt < _DEMO_INSERT_RETRIES - 1:
+                    last_error = e
+                    frappe.db.rollback()
+                    time.sleep(0.25 * (attempt + 1))
+                    continue
+                raise
+        if last_error:
+            raise last_error
+    finally:
+        POSProfile.set_defaults = original_set_defaults
 
 
 def add_global_opening_stock(company, start_date):
