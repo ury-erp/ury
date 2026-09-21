@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable } from '@ury/ui';
+import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -214,7 +214,7 @@ export const ItemProductionConfigPage: React.FC = () => {
           if (messages.length > 0) {
             const lastMessage = JSON.parse(messages[messages.length - 1]);
             if (lastMessage.message) {
-              errorMessage = lastMessage.message.replace(/<[^>]*>?/gm, '');
+              errorMessage = messageToPlainText(lastMessage.message);
             }
           }
         } catch (e) {}

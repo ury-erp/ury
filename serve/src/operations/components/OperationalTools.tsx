@@ -9,6 +9,7 @@ import {
   DialogTitle,
   Spinner,
   cn,
+  messageToPlainText,
 } from '@ury/ui'
 import type { PrintJobRow } from '../api/printers'
 import { useNotifications } from '../hooks/useNotifications'
@@ -34,7 +35,7 @@ export interface OperationalToolsProps extends OperationsIdentityProps {
 
 function stripHtml(html?: string): string {
   if (!html) return ''
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return messageToPlainText(html).replace(/\s+/g, ' ').trim()
 }
 
 /**
