@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, type KpiItemProps } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, type KpiItemProps, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -76,24 +76,22 @@ export function DaywiseCustomerDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Daywise Customer Details</h1>
-          <p className="text-sm text-muted-foreground">
-            Customer contact list {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={exportCsv}
-            disabled={!data || data.customers.length === 0}
-            className="text-sm px-3 py-1.5 border border-input rounded-md hover:bg-accent disabled:opacity-50"
-          >
-            Export CSV
-          </button>
-          <DateRangeFilter value={range} onChange={setRange} />
-        </div>
-      </div>
+      <PageHeader
+        title="Daywise Customer Details"
+        description={`Customer contact list ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={
+          <>
+            <button
+              onClick={exportCsv}
+              disabled={!data || data.customers.length === 0}
+              className="text-sm px-3 py-1.5 border border-input rounded-md hover:bg-accent disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+            <DateRangeFilter value={range} onChange={setRange} />
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

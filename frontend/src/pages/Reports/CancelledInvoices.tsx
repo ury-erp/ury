@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, Button, PageHeader } from '@ury/ui';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -102,15 +102,11 @@ export function CancelledInvoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Cancelled Invoices</h1>
-          <p className="text-sm text-muted-foreground">
-            Cancellation audit {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Cancelled Invoices"
+        description={`Cancellation audit ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

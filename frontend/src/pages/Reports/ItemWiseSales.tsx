@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Button, PageHeader } from '@ury/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -79,24 +79,22 @@ export function ItemWiseSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Item Wise Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            Best-selling items {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="text"
-            placeholder="Search items..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm w-40"
-          />
-          <DateRangeFilter value={range} onChange={setRange} />
-        </div>
-      </div>
+      <PageHeader
+        title="Item Wise Sales"
+        description={`Best-selling items ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={
+          <>
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border border-input rounded-md px-3 py-1.5 text-sm w-40"
+            />
+            <DateRangeFilter value={range} onChange={setRange} />
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

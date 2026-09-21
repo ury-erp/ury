@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, DatePicker, Select } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, DatePicker, Select, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
@@ -71,36 +71,34 @@ export function TimeWiseSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Time Wise Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            Sales by time of day {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Select
-            value={bucketSize}
-            onChange={(e) => setBucketSize(Number(e.target.value))}
-            size="compactLg"
-          >
-            {BUCKET_OPTIONS.map((b) => (
-              <option key={b} value={b}>
-                {b}-hour buckets
-              </option>
-            ))}
-          </Select>
-          <DatePicker
-            id="report-date"
-            aria-label="Report date"
-            value={date}
-            maxDate={toApiDate(new Date())}
-            onChange={(_id, next) => setDate(next)}
-            size="compactLg"
-            className="w-[150px]"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Time Wise Sales"
+        description={`Sales by time of day ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={
+          <>
+            <Select
+              value={bucketSize}
+              onChange={(e) => setBucketSize(Number(e.target.value))}
+              size="compactLg"
+            >
+              {BUCKET_OPTIONS.map((b) => (
+                <option key={b} value={b}>
+                  {b}-hour buckets
+                </option>
+              ))}
+            </Select>
+            <DatePicker
+              id="report-date"
+              aria-label="Report date"
+              value={date}
+              maxDate={toApiDate(new Date())}
+              onChange={(_id, next) => setDate(next)}
+              size="compactLg"
+              className="w-[150px]"
+            />
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

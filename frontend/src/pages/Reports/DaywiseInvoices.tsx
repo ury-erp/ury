@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { DataTable, type DataTableColumn, Button, PageHeader } from '@ury/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -95,16 +95,11 @@ export function DaywiseInvoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Daywise Invoices</h1>
-          <p className="text-sm text-muted-foreground">
-            Invoice-level detail {activeBranchId === 'all' ? '· All Branches' : ''}
-            {pagination ? ` · ${pagination.total} invoices` : ''}
-          </p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Daywise Invoices"
+        description={`Invoice-level detail ${activeBranchId === 'all' ? '· All Branches' : ''}${pagination ? ` · ${pagination.total} invoices` : ''}`}
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
