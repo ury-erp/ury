@@ -535,7 +535,7 @@ function resetFixtures(opts: {
       print_bill: printBill,
       reprint_kot: false,
       settle: false,
-      cancel: false,
+      cancel: Boolean(opts.cancelAllowed),
     },
   }
   contextState.permissions = contextState.context.permissions
@@ -1047,6 +1047,19 @@ describe('Order page flow', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
     expect(screen.getByText('Cancel order')).toBeInTheDocument()
+  })
+
+  it('hides Cancel when cancel_check is true but table permissions.cancel is false', async () => {
+    resetFixtures({ existingOrder: true, withCart: true, cancelAllowed: true })
+    // Simulate DocType cancel without billing/doc cancel on this order.
+    contextState.context!.permissions.cancel = false
+    contextState.permissions!.cancel = false
+    render(<OrderPage />)
+
+    await waitFor(() => {
+      expect(canCancelOrder).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 
   it('hides Cancel from the actions menu when cancel is not allowed', async () => {

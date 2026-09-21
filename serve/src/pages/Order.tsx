@@ -25,6 +25,7 @@ import {
 } from '../lib/order-api'
 import {
   classifySyncOutcome,
+  classifySyncThrownError,
   mayClearReconcileGate,
   reconcileBannerCopy,
   type ReconcileReason,
@@ -372,10 +373,8 @@ export default function OrderPage() {
       try {
         result = await syncOrder(orderData)
       } catch (error) {
-        enterReconcileGate(
-          'uncertain',
-          apiErrorMessage(error, 'Send result unclear. Do not resend until verified.')
-        )
+        const thrown = classifySyncThrownError(error)
+        enterReconcileGate(thrown.kind, thrown.message)
         return
       }
 
@@ -600,7 +599,11 @@ export default function OrderPage() {
   }
 
   const showSplitAction = Boolean(invoiceId) && (isTakeaway ? canModify : Boolean(permissions?.modify))
-  const showCancelAction = Boolean(cancelAllowed && invoiceId)
+  // cancel_check is DocType-level; table orders also need server permissions.cancel
+  // (billing + doc cancel). Otherwise Serve offers Cancel that cancel_order refuses.
+  const showCancelAction = Boolean(
+    cancelAllowed && invoiceId && (isTakeaway || permissions?.cancel)
+  )
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
@@ -922,7 +925,7 @@ export default function OrderPage() {
             showToast.success('Order cancelled')
             navigate('/')
           } catch (e) {
-            showToast.error(e instanceof Error ? e.message : 'Cancel failed')
+            showToast.error(apiErrorMessage(e, 'Cancel failed'))
           } finally {
             setSubmitting(false)
           }
