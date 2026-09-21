@@ -58,5 +58,85 @@
                 "parentfield": "items"
             }
         ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "GR",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 5,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 1,
+                "parentfield": "items"
+            }
+        ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "MR",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 8,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 2,
+                "parentfield": "items"
+            }
+        ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "BR",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 8,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 2,
+                "parentfield": "items"
+            }
+        ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "BG",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 10,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 1,
+                "parentfield": "items"
+            }
+        ]
     }
 ]

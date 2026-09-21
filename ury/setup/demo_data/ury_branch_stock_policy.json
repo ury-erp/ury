@@ -1,0 +1,9 @@
+[
+    {
+        "doctype": "URY Branch Stock Policy",
+        "branch": "Demo Branch",
+        "reservation_control_enabled": 0,
+        "realtime_production_posting_enabled": 0,
+        "closing_reconciliation_enabled": 0
+    }
+]

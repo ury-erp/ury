@@ -124,6 +124,11 @@ def process_masters(company):
                     else:
                         raise
 
+    # Single DocType — cannot ride the JSON insert loop.
+    frappe.db.set_single_value(
+        "URY Production Settings", "store_warehouse", get_warehouse(company)
+    )
+
 
 def add_global_opening_stock(company, start_date):
     items = frappe.get_all("Item", filters={"is_stock_item": 1}, pluck="name")
