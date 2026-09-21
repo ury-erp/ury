@@ -13,8 +13,6 @@ export interface ComparableHistoryItem {
   stock_uom?: string;
   department?: string;
   production_unit?: string;
-  production_policy?: string;
-  bom?: string;
   average_qty: number;
   sample_days: number;
   total_qty?: number;
@@ -79,8 +77,6 @@ export const addManualItemToDraft = (
     stock_uom: searchResult.stock_uom || 'Nos',
     department: searchResult.department || 'Ungrouped',
     production_unit: searchResult.production_unit || 'Unassigned',
-    production_policy: searchResult.production_policy,
-    bom: searchResult.bom,
     average_qty: 0,
     sample_days: 0,
     history: [],
@@ -119,8 +115,6 @@ export const normalizeHistoryResponse = (payload: unknown): ComparableHistoryRes
       stock_uom: item.stock_uom || 'Nos',
       department: item.department || 'Ungrouped',
       production_unit: item.production_unit || 'Unassigned',
-      production_policy: item.production_policy,
-      bom: item.bom,
       average_qty: Number(item.average_qty ?? item.avg_qty ?? 0),
       sample_days: Number(item.sample_days ?? item.history?.length ?? 0),
       total_qty: Number(item.total_qty ?? 0),
@@ -235,8 +229,6 @@ export interface BranchItemSearchResult {
   stock_uom?: string;
   department?: string;
   production_unit?: string;
-  production_policy?: string;
-  bom?: string;
 }
 
 export interface SearchBranchItemsParams {
