@@ -118,7 +118,8 @@
     "restaurant_website": "موقع المطعم",
     "waitlist": "قائمة الانتظار",
     "feedback": "تقييم الضيوف",
-    "offers": "العروض والكوبونات"
+    "offers": "العروض والكوبونات",
+    "delivery": "لوحة التوصيل"
   },
   "notifications": {
     "empty": "لا توجد إشعارات جديدة",
@@ -1068,6 +1069,42 @@
       "see_rule": "حسب القاعدة",
       "edit_rule": "تعديل القاعدة",
       "new_rule": "قاعدة جديدة"
+    },
+    "delivery": {
+      "title": "لوحة التوصيل",
+      "subtitle": "أين كل طلب، ومع من، وكم من النقد خارج المطعم",
+      "zones": "مناطق التوصيل",
+      "columns": {
+        "pending": "بانتظار سائق",
+        "assigned": "مع سائق",
+        "on_the_way": "في الطريق"
+      },
+      "column_empty": "لا شيء هنا.",
+      "assign": "تعيين سائق",
+      "change_driver": "تغيير السائق",
+      "depart": "خرج",
+      "delivered": "سُلّم",
+      "failed": "لم يُسلّم",
+      "returned": "أُعيد",
+      "reason_required": "اكتب سبب عدم التسليم؛ النمط المتكرر هو ما يهم لاحقاً.",
+      "action_failed": "تعذّر تنفيذ الإجراء",
+      "minutes": "{{count}} دقيقة",
+      "over_promise": "تأخر {{count}} دقيقة عن الوعد",
+      "very_late": "تأخر كثيراً",
+      "with_driver": "مع {{driver}}",
+      "drivers": "السائقون والنقد",
+      "no_drivers": "لا يوجد سائقون مسجّلون.",
+      "carrying": "{{count}} طلب جارٍ",
+      "holds_cash": "بحوزته {{amount}}",
+      "settle_cash": "تسليم النقد",
+      "cash_settled": "استُلم {{amount}} من {{driver}}",
+      "busy": "مشغول",
+      "stats": {
+        "open": "طلبات جارية",
+        "late": "متأخرة",
+        "on_time": "التسليم في الوقت",
+        "cash": "نقد مع السائقين"
+      }
     }
   },
   "auth": {

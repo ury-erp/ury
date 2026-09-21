@@ -16,6 +16,7 @@ import WebsiteEditorPage from './pages/Website/WebsiteEditorPage';
 import WaitlistPage from './pages/Dashboard/WaitlistPage';
 import FeedbackPage from './pages/Dashboard/FeedbackPage';
 import OffersPage from './pages/Dashboard/OffersPage';
+import DeliveryPage from './pages/Dashboard/DeliveryPage';
 import { RoomPage } from './pages/Dashboard/RoomPage';
 import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
@@ -152,6 +153,7 @@ function App() {
           <Route path="waitlist" element={<WaitlistPage />} />
           <Route path="feedback" element={<FeedbackPage />} />
           <Route path="offers" element={<OffersPage />} />
+          <Route path="delivery" element={<DeliveryPage />} />
           <Route path="room" element={<RoomPage />} />
           <Route path="pos-profile" element={<PosProfilePage />} />
           <Route path="user" element={<UserPage />} />

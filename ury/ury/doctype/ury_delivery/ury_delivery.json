@@ -1,0 +1,263 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-21 01:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "invoice",
+  "branch",
+  "zone",
+  "column_break_who",
+  "customer_name",
+  "mobile_number",
+  "address",
+  "dispatch_section",
+  "status",
+  "driver",
+  "promised_minutes",
+  "column_break_times",
+  "ordered_at",
+  "assigned_at",
+  "departed_at",
+  "closed_at",
+  "money_section",
+  "delivery_fee",
+  "order_total",
+  "cash_on_delivery",
+  "column_break_money",
+  "cash_settled",
+  "cash_settled_at",
+  "notes_section",
+  "failure_reason",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "DLV-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "DLV-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "invoice",
+   "fieldtype": "Link",
+   "label": "Invoice",
+   "options": "POS Invoice",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "One delivery per bill. A re-delivery is a new bill, not a second row against the same money."
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "zone",
+   "fieldtype": "Link",
+   "label": "Zone",
+   "options": "URY Delivery Zone"
+  },
+  {
+   "fieldname": "column_break_who",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mobile_number",
+   "fieldtype": "Data",
+   "label": "Mobile Number",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "dispatch_section",
+   "fieldtype": "Section Break",
+   "label": "Dispatch"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "options": "Pending\nAssigned\nOn The Way\nDelivered\nFailed\nReturned",
+   "default": "Pending"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "label": "Driver",
+   "options": "URY Driver",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "promised_minutes",
+   "fieldtype": "Int",
+   "label": "Promised Minutes",
+   "description": "What the customer was told when the order was taken, kept as given so the promise can be compared with the delivery."
+  },
+  {
+   "fieldname": "column_break_times",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ordered_at",
+   "fieldtype": "Datetime",
+   "label": "Ordered At",
+   "reqd": 1
+  },
+  {
+   "fieldname": "assigned_at",
+   "fieldtype": "Datetime",
+   "label": "Assigned At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "departed_at",
+   "fieldtype": "Datetime",
+   "label": "Departed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "closed_at",
+   "fieldtype": "Datetime",
+   "label": "Closed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "money_section",
+   "fieldtype": "Section Break",
+   "label": "Money"
+  },
+  {
+   "fieldname": "delivery_fee",
+   "fieldtype": "Currency",
+   "label": "Delivery Fee",
+   "read_only": 1
+  },
+  {
+   "fieldname": "order_total",
+   "fieldtype": "Currency",
+   "label": "Order Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cash_on_delivery",
+   "fieldtype": "Check",
+   "label": "Cash on Delivery",
+   "default": "0",
+   "description": "The driver is carrying this money until it is handed in."
+  },
+  {
+   "fieldname": "column_break_money",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cash_settled",
+   "fieldtype": "Check",
+   "label": "Cash Handed In",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cash_settled_at",
+   "fieldtype": "Datetime",
+   "label": "Cash Handed In At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "failure_reason",
+   "fieldtype": "Small Text",
+   "label": "Failure Reason",
+   "description": "Required when a delivery fails or comes back, because the pattern is the point."
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-21 01:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Delivery",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "ordered_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -113,7 +113,8 @@
     "restaurant_website": "Restaurant Website",
     "waitlist": "Waitlist",
     "feedback": "Guest feedback",
-    "offers": "Offers & coupons"
+    "offers": "Offers & coupons",
+    "delivery": "Dispatch board"
   },
   "notifications": {
     "empty": "No new notifications",
@@ -1063,6 +1064,42 @@
       "see_rule": "Per the rule",
       "edit_rule": "Edit rule",
       "new_rule": "New rule"
+    },
+    "delivery": {
+      "title": "Dispatch board",
+      "subtitle": "Where every order is, who has it, and how much cash is outside the building",
+      "zones": "Delivery zones",
+      "columns": {
+        "pending": "Waiting for a driver",
+        "assigned": "With a driver",
+        "on_the_way": "On the way"
+      },
+      "column_empty": "Nothing here.",
+      "assign": "Assign a driver",
+      "change_driver": "Change driver",
+      "depart": "Departed",
+      "delivered": "Delivered",
+      "failed": "Not delivered",
+      "returned": "Returned",
+      "reason_required": "Say why it was not delivered; the repeated pattern is what matters later.",
+      "action_failed": "That action failed",
+      "minutes": "{{count}} min",
+      "over_promise": "{{count}} min past the promise",
+      "very_late": "very late",
+      "with_driver": "with {{driver}}",
+      "drivers": "Drivers & cash",
+      "no_drivers": "No drivers recorded.",
+      "carrying": "{{count}} open orders",
+      "holds_cash": "holding {{amount}}",
+      "settle_cash": "Hand in cash",
+      "cash_settled": "Took {{amount}} from {{driver}}",
+      "busy": "Busy",
+      "stats": {
+        "open": "Open orders",
+        "late": "Late",
+        "on_time": "On-time rate",
+        "cash": "Cash with drivers"
+      }
     }
   },
   "auth": {
