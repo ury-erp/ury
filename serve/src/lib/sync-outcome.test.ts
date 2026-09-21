@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifySyncOutcome,
+  classifySyncThrownError,
   mayClearReconcileGate,
   reconcileBannerCopy,
   unwrapSyncMessage,
@@ -43,6 +44,19 @@ describe('sync_order outcome classification (backend semantics)', () => {
     expect(mayClearReconcileGate({ isTakeaway: true, reloadSucceeded: true })).toBe(false)
     expect(mayClearReconcileGate({ isTakeaway: false, reloadSucceeded: true })).toBe(true)
     expect(mayClearReconcileGate({ isTakeaway: false, reloadSucceeded: false })).toBe(false)
+  })
+
+  it('classifies KOT creation throw as failure (rolled back), not uncertain', () => {
+    const thrown = classifySyncThrownError({
+      message: 'Failed to create kitchen order ticket(s) for this order: no production unit',
+    })
+    expect(thrown.kind).toBe('failure')
+    expect(thrown.message).toMatch(/kitchen order ticket/i)
+  })
+
+  it('keeps non-KOT throws as uncertain (do not weaken resend gate)', () => {
+    const thrown = classifySyncThrownError({ message: 'Network Error' })
+    expect(thrown.kind).toBe('uncertain')
   })
 
   it('takeaway banner requires leave without resend; table offers reload', () => {
