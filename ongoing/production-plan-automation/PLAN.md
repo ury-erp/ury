@@ -795,8 +795,7 @@ Construction moves to the executor:
 2. Agent 7 applies the compiled component vector and the warehouse policy.
 3. Agent 7 saves and submits.
 
-The `doc_events` hook remains only as a safeguard for URY Production Plan Work
-Orders created by hand from the desk, and it is gated:
+The `doc_events` hook remains as a gated safeguard:
 
 ```python
 if doc.docstatus != 0:
@@ -812,6 +811,33 @@ if any(flt(row.transferred_qty) or flt(row.consumed_qty)
 The warehouse policy itself — `skip_transfer`, `source_warehouse`,
 `wip_warehouse`, `fg_warehouse` — stays in the hook unconditionally for URY
 plans, because it is idempotent and safe to reassert on any save.
+
+**Amendment, found during implementation.** As first written this decision
+assumed the hook could rewrite `required_items` for a URY Work Order created
+by hand from the desk. It cannot. The component vector is never persisted
+anywhere the hook could read it back from, and the coordination rules forbid
+the hook re-deriving one, since it must never re-interpret a BOM. The two
+requirements were in direct contradiction.
+
+Resolved as follows. The hook rewrites `required_items` only when a caller
+supplies a vector through `doc.flags.ury_component_vector` **and** the gate
+above passes. Agent 7 does not need the flag, because it calls
+`apply_ury_required_items` directly on a fresh draft. Absent the flag, the
+hook reasserts warehouse policy and leaves `required_items` exactly as
+ERPNext's `set_required_items()` produced them.
+
+**Residual gap, accepted for this release.** A URY Work Order created by hand
+from the desk therefore gets the correct warehouses but ERPNext's own
+`required_items`. D2 narrows the exposure: `include_exploded_items = 0` means
+`use_multi_level_bom = 0`, so nested PRE_PRODUCED sub-assemblies already
+appear correctly as items rather than being exploded. What remains wrong is
+an unstocked intermediate BOM node, which lands in `required_items` with no
+stock and no Work Order behind it, and the Manufacture entry then fails at
+submit rather than silently mis-consuming.
+
+That failure mode is loud rather than silent, which is why it is acceptable
+for now. If hand-created URY Work Orders become a real workflow, persist the
+compiled vector on the Production Plan Item and have the hook read it.
 
 ### D17 — Background execution revalidates and proves liveness
 
@@ -1378,19 +1404,22 @@ Required scenarios:
     creates the same plans (D14).
 26. A creation failure with the toggle on aborts the Lock transition and leaves
     the plan Approved (D14).
-27. Generated Purchase and Transfer MRs are submitted, and a raised requirement
+27. A URY Work Order created by hand from the desk receives the correct
+    warehouses, and an unstocked intermediate in its BOM fails at Manufacture
+    submit rather than mis-consuming silently (D16 amendment).
+28. Generated Purchase and Transfer MRs are submitted, and a raised requirement
     produces a supplementary request rather than an amendment (D15).
-28. A Work Order with a transferred or consumed quantity is not rewritten by the
+29. A Work Order with a transferred or consumed quantity is not rewritten by the
     safeguard hook (D16).
-29. Both departments pass preflight, the first consumes the shared Store stock,
+30. Both departments pass preflight, the first consumes the shared Store stock,
     and the second aborts under Bin lock before creating anything (D17).
-30. A plan whose job is still running cannot be reset despite a stale heartbeat
+31. A plan whose job is still running cannot be reset despite a stale heartbeat
     (D17).
-31. PRE_PRODUCED availability reads the department warehouse; DIRECT_RETAIL is
+32. PRE_PRODUCED availability reads the department warehouse; DIRECT_RETAIL is
     unchanged (D13).
-32. The batch-manufacture path and the Production Plan path receive PRE_PRODUCED
+33. The batch-manufacture path and the Production Plan path receive PRE_PRODUCED
     finished goods into the same warehouse (D13).
-33. Batch-controlled and serial-controlled item behaviour where applicable.
+34. Batch-controlled and serial-controlled item behaviour where applicable.
 
 ## Execution waves
 
