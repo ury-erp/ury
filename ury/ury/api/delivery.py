@@ -13,6 +13,7 @@ from frappe import _
 from frappe.utils import cint, flt, now_datetime, today
 
 from ury.ury_pos.api import getBranch
+from ury.ury.api.driver_app import is_stale, position_age_minutes
 from ury.ury.doctype.ury_delivery.ury_delivery import (
 	CLOSED_STATUSES,
 	OPEN_STATUSES,
@@ -155,9 +156,9 @@ def get_board(branch=None, include_closed=0):
 		"URY Delivery",
 		filters=filters,
 		fields=["name", "invoice", "branch", "zone", "customer_name", "mobile_number", "address",
-				"status", "driver", "promised_minutes", "ordered_at", "assigned_at", "departed_at",
-				"closed_at", "delivery_fee", "order_total", "cash_on_delivery", "cash_settled",
-				"failure_reason", "notes"],
+				"latitude", "longitude", "status", "driver", "promised_minutes", "ordered_at",
+				"assigned_at", "departed_at", "closed_at", "delivery_fee", "order_total",
+				"cash_on_delivery", "cash_settled", "failure_reason", "notes"],
 		order_by="ordered_at asc",
 		limit_page_length=0,
 	)
@@ -190,7 +191,8 @@ def get_drivers(branch=None, active_only=1):
 	drivers = frappe.get_list(
 		"URY Driver",
 		filters=filters,
-		fields=["name", "driver_name", "mobile_number", "vehicle", "active"],
+		fields=["name", "driver_name", "mobile_number", "vehicle", "active",
+				"last_latitude", "last_longitude", "last_seen_at", "position_accuracy"],
 		order_by="driver_name asc",
 		limit_page_length=0,
 	)
@@ -216,9 +218,15 @@ def get_drivers(branch=None, active_only=1):
 	for row in cash_rows:
 		cash[row.driver] = cash.get(row.driver, 0) + flt(row.order_total) + flt(row.delivery_fee)
 
+	now = now_datetime()
 	for driver in drivers:
 		driver["open_deliveries"] = load.get(driver.name, 0)
 		driver["cash_held"] = flt(cash.get(driver.name, 0))
+		# The age travels with the position, always. A dot on a map with no
+		# timestamp is read as "now" no matter how old it is.
+		age = position_age_minutes(driver, now=now)
+		driver["position_age_minutes"] = age
+		driver["position_stale"] = is_stale(age)
 
 	return drivers
 
@@ -332,3 +340,59 @@ def _row(doc):
 		"departed_at": str(doc.departed_at or ""),
 		"closed_at": str(doc.closed_at or ""),
 	}
+
+
+@frappe.whitelist()
+def set_delivery_location(delivery, latitude, longitude):
+	"""Drop a pin for an order.
+
+	Addresses here are landmarks rather than coordinates — "behind the blue
+	mosque, second lane" is a real address and no geocoder will turn it into
+	a point. So the pin is placed by the person taking the order, who is
+	talking to the customer while they do it.
+	"""
+	doc = frappe.get_doc("URY Delivery", delivery)
+	doc.check_permission("write")
+
+	lat, lng = flt(latitude), flt(longitude)
+	if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+		frappe.throw(_("That position is not valid."))
+
+	doc.latitude = lat
+	doc.longitude = lng
+	doc.save()
+	return {"name": doc.name, "latitude": flt(doc.latitude), "longitude": flt(doc.longitude)}
+
+
+@frappe.whitelist()
+def get_deliverable_invoices(branch=None):
+	"""Today's delivery bills that are not on the board yet.
+
+	Without this the board can only ever show orders somebody remembered to
+	add, which is the failure it exists to prevent.
+	"""
+	branch = _branch(branch)
+
+	invoices = frappe.get_list(
+		"POS Invoice",
+		filters={
+			"branch": branch,
+			"posting_date": today(),
+			"order_type": ["in", ["Delivery", "Phone In"]],
+		},
+		fields=["name", "customer", "grand_total", "rounded_total", "order_type", "creation"],
+		order_by="creation desc",
+		limit_page_length=50,
+	)
+	if not invoices:
+		return []
+
+	on_board = set(
+		row.invoice for row in frappe.get_all(
+			"URY Delivery",
+			filters={"invoice": ["in", [invoice.name for invoice in invoices]]},
+			fields=["invoice"],
+			limit_page_length=0,
+		)
+	)
+	return [invoice for invoice in invoices if invoice.name not in on_board]

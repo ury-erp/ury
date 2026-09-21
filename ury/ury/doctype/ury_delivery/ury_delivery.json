@@ -16,6 +16,8 @@
   "customer_name",
   "mobile_number",
   "address",
+  "latitude",
+  "longitude",
   "dispatch_section",
   "status",
   "driver",
@@ -90,6 +92,19 @@
    "fieldtype": "Small Text",
    "label": "Address",
    "reqd": 1
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "6",
+   "description": "Optional. A pin dropped on the map when the order is taken; addresses here are landmarks, not coordinates."
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "6"
   },
   {
    "fieldname": "dispatch_section",

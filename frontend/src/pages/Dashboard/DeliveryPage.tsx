@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bike, Clock, Wallet, AlertTriangle, Phone, MapPin, Check, X } from 'lucide-react';
+import { Bike, Clock, Wallet, AlertTriangle, Phone, MapPin, Check, X, Map, Link2, Copy } from 'lucide-react';
 import { Button, Badge, Textarea, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, parseFrappeError } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
+import { DeliveryMap } from './DeliveryMap';
 import {
   deliveryService,
   type DeliveryRow,
@@ -53,6 +54,10 @@ export const DeliveryPage: React.FC = () => {
   const [assigning, setAssigning] = useState<DeliveryRow | null>(null);
   const [failing, setFailing] = useState<DeliveryRow | null>(null);
   const [reason, setReason] = useState('');
+  const [showMap, setShowMap] = useState(true);
+  const [pinning, setPinning] = useState<DeliveryRow | null>(null);
+  const [link, setLink] = useState<{ url: string; driver_name: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetch = useCallback(async () => {
     try {
@@ -107,6 +112,38 @@ export const DeliveryPage: React.FC = () => {
       );
     });
 
+  /**
+   * A pin is dropped by the person who took the order, because an address
+   * here is a landmark — "behind the blue mosque, second lane" — and no
+   * geocoder turns that into a point.
+   */
+  const pickLocation = (lat: number, lng: number) => {
+    if (!pinning) return;
+    const target = pinning;
+    setPinning(null);
+    void act(async () => {
+      await deliveryService.setLocation(target.name, lat, lng);
+      showToast.success(t('dash.delivery.map.pinned'));
+    });
+  };
+
+  const openDriverLink = (driver: DriverRow) =>
+    act(async () => {
+      setLink(await deliveryService.driverLink(driver.name));
+      setCopied(false);
+    });
+
+  const copyLink = async () => {
+    if (!link?.url) return;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast.error(t('dash.delivery.map.copy_failed'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 border-b border-gray-200 pb-3 md:flex-row md:items-center md:justify-between">
@@ -117,9 +154,19 @@ export const DeliveryPage: React.FC = () => {
           </h1>
           <p className="text-sm text-gray-500">{t('dash.delivery.subtitle')}</p>
         </div>
-        <Button variant="outline" onClick={() => window.open('/app/ury-delivery-zone', '_blank', 'noopener')}>
-          {t('dash.delivery.zones')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={showMap ? 'default' : 'outline'}
+            onClick={() => setShowMap((current) => !current)}
+            aria-pressed={showMap}
+          >
+            <Map className="me-2 h-4 w-4" />
+            {t('dash.delivery.map.title')}
+          </Button>
+          <Button variant="outline" onClick={() => window.open('/app/ury-delivery-zone', '_blank', 'noopener')}>
+            {t('dash.delivery.zones')}
+          </Button>
+        </div>
       </div>
 
       {summary && (
@@ -147,6 +194,15 @@ export const DeliveryPage: React.FC = () => {
             </p>
           </div>
         </div>
+      )}
+
+      {showMap && (
+        <DeliveryMap
+          deliveries={rows}
+          drivers={drivers}
+          picking={Boolean(pinning)}
+          onPick={pickLocation}
+        />
       )}
 
       {loadError && <LoadErrorBanner onRetry={() => void fetch()} />}
@@ -248,6 +304,18 @@ export const DeliveryPage: React.FC = () => {
                           )}
                           <Button
                             size="xs"
+                            variant={row.latitude ? 'ghost' : 'outline'}
+                            onClick={() => {
+                              setShowMap(true);
+                              setPinning(row);
+                            }}
+                            title={t('dash.delivery.map.pin')}
+                          >
+                            <MapPin className="me-1 h-3.5 w-3.5" />
+                            {row.latitude ? t('dash.delivery.map.repin') : t('dash.delivery.map.pin')}
+                          </Button>
+                          <Button
+                            size="xs"
                             variant="ghost"
                             onClick={() => {
                               setFailing(row);
@@ -292,12 +360,32 @@ export const DeliveryPage: React.FC = () => {
                       ? ` · ${t('dash.delivery.holds_cash', { amount: formatCurrency(driver.cash_held) })}`
                       : ''}
                   </p>
+                  {/* The age of a position is part of the position: a dot
+                      with no timestamp is read as "now", however old it is. */}
+                  <p className={`text-xs ${driver.position_stale ? 'text-gray-400' : 'text-green-700'}`}>
+                    {driver.position_age_minutes === null
+                      ? t('dash.delivery.map.no_position')
+                      : t('dash.delivery.map.reported', {
+                          count: String(driver.position_age_minutes),
+                        })}
+                  </p>
                 </div>
-                {driver.cash_held > 0 && (
-                  <Button size="xs" variant="outline" onClick={() => settle(driver)}>
-                    {t('dash.delivery.settle_cash')}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => openDriverLink(driver)}
+                    title={t('dash.delivery.map.driver_link')}
+                    aria-label={t('dash.delivery.map.driver_link')}
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
                   </Button>
-                )}
+                  {driver.cash_held > 0 && (
+                    <Button size="xs" variant="outline" onClick={() => settle(driver)}>
+                      {t('dash.delivery.settle_cash')}
+                    </Button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -340,6 +428,28 @@ export const DeliveryPage: React.FC = () => {
             ))}
           </ul>
         )}
+      </SideDrawer>
+
+      <SideDrawer
+        isOpen={Boolean(link)}
+        onClose={() => setLink(null)}
+        title={t('dash.delivery.map.driver_link')}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            {t('dash.delivery.map.link_hint', { driver: link?.driver_name ?? '' })}
+          </p>
+          <p className="break-all rounded-lg bg-gray-50 p-3 text-xs text-gray-700" dir="ltr">
+            {link?.url}
+          </p>
+          <Button fullWidth variant="outline" onClick={copyLink}>
+            {copied ? <Check className="me-2 h-4 w-4" /> : <Copy className="me-2 h-4 w-4" />}
+            {copied ? t('dash.delivery.map.copied') : t('dash.delivery.map.copy')}
+          </Button>
+          <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+            {t('dash.delivery.map.link_privacy')}
+          </p>
+        </div>
       </SideDrawer>
 
       <SideDrawer

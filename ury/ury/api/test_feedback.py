@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import frappe
 
+from ury.ury import signed_links
 from ury.ury.api import feedback as api
 from ury.ury.doctype.ury_guest_feedback.ury_guest_feedback import net_promoter_score
 
@@ -16,7 +17,7 @@ class TokenCase(unittest.TestCase):
 	"""Signing needs a site key; a fixed fake one keeps these tests offline."""
 
 	def setUp(self):
-		self.key = patch.object(api, "get_encryption_key", return_value="test-key-not-a-real-one")
+		self.key = patch.object(signed_links, "get_encryption_key", return_value="test-key-not-a-real-one")
 		self.key.start()
 		self.addCleanup(self.key.stop)
 		self.throw = patch.object(api.frappe, "throw", side_effect=reject)
@@ -25,6 +26,12 @@ class TokenCase(unittest.TestCase):
 		self.translate = patch.object(api, "_", side_effect=lambda value: value)
 		self.translate.start()
 		self.addCleanup(self.translate.stop)
+		self.shared_translate = patch.object(signed_links, "_", side_effect=lambda value: value)
+		self.shared_translate.start()
+		self.addCleanup(self.shared_translate.stop)
+		self.shared_throw = patch.object(signed_links.frappe, "throw", side_effect=reject)
+		self.shared_throw.start()
+		self.addCleanup(self.shared_throw.stop)
 
 
 class TestTokens(TokenCase):
@@ -41,7 +48,7 @@ class TestTokens(TokenCase):
 	def test_another_branch_cannot_be_substituted(self):
 		import base64
 
-		raw = "branch|Branch 1|" + api._sign("branch|Branch 1")
+		raw = "branch|Branch 1|" + signed_links.sign("branch|Branch 1")
 		tampered = raw.replace("Branch 1", "Branch 2", 1)
 		token = base64.urlsafe_b64encode(tampered.encode()).decode().rstrip("=")
 
@@ -56,14 +63,14 @@ class TestTokens(TokenCase):
 	def test_an_unknown_scope_is_refused(self):
 		import base64
 
-		raw = "everything|Branch 1|" + api._sign("everything|Branch 1")
+		raw = "everything|Branch 1|" + signed_links.sign("everything|Branch 1")
 		token = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
 		with self.assertRaises(ValueError):
 			api.read_token(token)
 
 	def test_a_signature_from_a_different_key_is_refused(self):
 		token = api.make_token(api.BRANCH_SCOPE, "Branch 1")
-		with patch.object(api, "get_encryption_key", return_value="a-different-site-key"):
+		with patch.object(signed_links, "get_encryption_key", return_value="a-different-site-key"):
 			with self.assertRaises(ValueError):
 				api.read_token(token)
 

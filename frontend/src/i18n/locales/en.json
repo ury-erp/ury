@@ -1099,6 +1099,22 @@
         "late": "Late",
         "on_time": "On-time rate",
         "cash": "Cash with drivers"
+      },
+      "map": {
+        "title": "Map",
+        "pin": "Drop a pin",
+        "repin": "Move the pin",
+        "pick_hint": "Click the map to place this order.",
+        "pinned": "Location saved",
+        "empty": "No locations yet: pin an order, or send a driver their link.",
+        "reported": "seen {{count}} min ago",
+        "no_position": "no position",
+        "driver_link": "Driver link",
+        "link_hint": "Send this link to {{driver}} to open on their phone. No account and no app needed.",
+        "link_privacy": "Location is shared only while the driver has an open order, stops on delivery, and is erased within 12 hours.",
+        "copy": "Copy link",
+        "copied": "Copied",
+        "copy_failed": "Could not copy"
       }
     }
   },

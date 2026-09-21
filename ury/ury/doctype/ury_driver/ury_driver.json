@@ -14,7 +14,13 @@
   "column_break_driver",
   "active",
   "vehicle",
-  "user"
+  "user",
+  "position_section",
+  "last_latitude",
+  "last_longitude",
+  "column_break_position",
+  "last_seen_at",
+  "position_accuracy"
  ],
  "fields": [
   {
@@ -61,6 +67,44 @@
    "label": "System User",
    "options": "User",
    "description": "Optional. Only for a driver who signs in; most do not, and none is required."
+  },
+  {
+   "fieldname": "position_section",
+   "fieldtype": "Section Break",
+   "label": "Last Known Position",
+   "description": "Reported by the driver's own phone while they have an open delivery, and cleared daily. Nothing is kept between shifts."
+  },
+  {
+   "fieldname": "last_latitude",
+   "fieldtype": "Float",
+   "label": "Last Latitude",
+   "precision": "6",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_longitude",
+   "fieldtype": "Float",
+   "label": "Last Longitude",
+   "precision": "6",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_position",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_seen_at",
+   "fieldtype": "Datetime",
+   "label": "Position Reported At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "position_accuracy",
+   "fieldtype": "Float",
+   "label": "Accuracy (Metres)",
+   "precision": "1",
+   "read_only": 1,
+   "description": "What the phone claimed. A reading of several hundred metres is a phone guessing from cell towers, not a driver in the wrong place."
   }
  ],
  "index_web_pages_for_search": 0,

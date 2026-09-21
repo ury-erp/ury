@@ -8,6 +8,8 @@ export interface Lateness {
 }
 
 export interface DeliveryRow {
+  latitude: number | null;
+  longitude: number | null;
   name: string;
   invoice: string;
   zone: string | null;
@@ -29,6 +31,13 @@ export interface DeliveryRow {
 }
 
 export interface DriverRow {
+  last_latitude: number | null;
+  last_longitude: number | null;
+  last_seen_at: string | null;
+  position_accuracy: number | null;
+  /** null when this driver has never reported a position today. */
+  position_age_minutes: number | null;
+  position_stale: boolean;
   name: string;
   driver_name: string;
   mobile_number: string | null;
@@ -72,5 +81,13 @@ export const deliveryService = {
   },
   async settleCash(driver: string): Promise<{ settled: number; amount: number }> {
     return unwrap(await call('ury.ury.api.delivery.settle_driver_cash', { driver }));
+  },
+  async setLocation(delivery: string, latitude: number, longitude: number) {
+    return unwrap(
+      await call('ury.ury.api.delivery.set_delivery_location', { delivery, latitude, longitude }),
+    );
+  },
+  async driverLink(driver: string): Promise<{ url: string; driver_name: string }> {
+    return unwrap(await call('ury.ury.api.driver_app.get_driver_link', { driver }));
   },
 };

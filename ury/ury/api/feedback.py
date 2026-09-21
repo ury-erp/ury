@@ -9,15 +9,12 @@
 # with the site's own key and carries no personal data, so a leaked link
 # reveals nothing and lets nobody rate on someone else's behalf twice.
 
-import base64
-import hashlib
-import hmac
-
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils import cint, get_url, now_datetime, today
-from frappe.utils.password import get_encryption_key
+from frappe.utils import cint, now_datetime, today
+
+from ury.ury.signed_links import make_token, read_token as read_signed_token, signed_url
 
 from ury.ury.doctype.ury_guest_feedback.ury_guest_feedback import (
 	DETRACTOR_AT_OR_BELOW,
@@ -33,47 +30,19 @@ INVOICE_SCOPE = "invoice"
 BRANCH_SCOPE = "branch"
 
 
-def _sign(payload):
-	return hmac.new(
-		get_encryption_key().encode(), payload.encode(), hashlib.sha256
-	).hexdigest()[:32]
-
-
-def make_token(scope, reference):
-	"""An opaque, unguessable link for a bill or a branch.
-
-	Truncated to 32 hex characters so the QR stays coarse enough to scan off
-	a scuffed table card; that is 128 bits of signature, which is far more
-	than is needed to stop anyone guessing another branch's link.
-	"""
-	payload = f"{scope}|{reference}"
-	raw = f"{payload}|{_sign(payload)}"
-	return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
-
-
 def read_token(token):
-	"""Scope and reference from a link, or a refusal.
+	"""Scope and reference from a feedback link, or a refusal.
 
-	Never trusts the parts before checking the signature: the whole reason
-	this is signed is that the string arrives from a stranger's phone.
+	Only the two feedback scopes are honoured here: a driver's tracking link
+	is signed with the same key, and this endpoint must not accept it.
 	"""
-	try:
-		padded = str(token or "") + "=" * (-len(str(token or "")) % 4)
-		raw = base64.urlsafe_b64decode(padded.encode()).decode()
-		scope, reference, signature = raw.split("|")
-	except Exception:
-		frappe.throw(_("This feedback link is not valid."), frappe.PermissionError)
-
-	if not hmac.compare_digest(_sign(f"{scope}|{reference}"), signature):
-		frappe.throw(_("This feedback link is not valid."), frappe.PermissionError)
-	if scope not in (INVOICE_SCOPE, BRANCH_SCOPE):
-		frappe.throw(_("This feedback link is not valid."), frappe.PermissionError)
-
-	return scope, reference
+	return read_signed_token(
+		token, (INVOICE_SCOPE, BRANCH_SCOPE), _("This feedback link is not valid.")
+	)
 
 
 def feedback_url(scope, reference):
-	return get_url(f"/feedback?t={make_token(scope, reference)}")
+	return signed_url("/feedback", scope, reference)
 
 
 @frappe.whitelist()

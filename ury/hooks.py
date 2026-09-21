@@ -225,7 +225,8 @@ scheduler_events = {
 		]
 	},
     "daily": [
-        "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests"
+        "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests",
+        "ury.ury.api.driver_app.clear_old_positions"
     ]
 # 	"all": [
 # 		"ury.tasks.all"
