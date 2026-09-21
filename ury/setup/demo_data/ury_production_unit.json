@@ -4,6 +4,7 @@
         "production": "Demo Kitchen",
         "pos_profile": "Demo Profile",
         "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
         "item_groups": [
             {
                 "doctype": "URY Production Item Groups",
