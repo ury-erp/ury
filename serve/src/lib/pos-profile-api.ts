@@ -107,8 +107,13 @@ export async function getPosProfileLimitedFields(): Promise<PosProfileLimited> {
 }
 
 export async function getPosProfileFull(posProfileName: string): Promise<PosProfileFull> {
-  const doc = await db.getDoc(DOCTYPES.POS_PROFILE, posProfileName);
-  return doc;
+  // Cashier/Captain roles lack doctype-level read permission on POS Profile,
+  // so a raw `/api/resource/POS Profile/<name>` fetch (db.getDoc) 403s for
+  // them. Use the whitelisted server method instead (upstream 242efc77).
+  const res = await call.get<PosProfileFullResponse>('ury.ury_pos.api.getPosProfileFull', {
+    pos_profile: posProfileName,
+  });
+  return res.message;
 }
 
 export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
