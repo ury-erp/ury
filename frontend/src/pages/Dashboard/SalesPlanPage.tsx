@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -1046,20 +1046,12 @@ export const SalesPlanPage: React.FC = () => {
 
   return (
     <Page>
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">
-              Sales Plan — {dateHeading} · {branchName}
-            </h1>
-            <p className="mt-1 text-sm text-text-tertiary">
-              We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval.
-            </p>
-            {isPastPlanDate && (
-              <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
-            )}
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <PageHeader
+        bleed
+        title={`Sales Plan — ${dateHeading} · ${branchName}`}
+        description="We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval."
+        actions={
+          <>
             <DatePicker
               id="plan-date"
               aria-label="Plan date"
@@ -1119,25 +1111,29 @@ export const SalesPlanPage: React.FC = () => {
                 <span>{currentBackwardActionDef.label}</span>
               </Button>
             )}
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <LifecycleStepper status={planStatus} />
-          {actionBlockedByRole && (
-            <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
-          )}
-        </div>
-
-        {transitionError && (
-          <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+          </>
+        }
+      >
+        {isPastPlanDate && (
+          <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
         )}
-        {!planStatus && supersededPlanName && (
-          <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
-            The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
-          </p>
+      </PageHeader>
+
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <LifecycleStepper status={planStatus} />
+        {actionBlockedByRole && (
+          <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
         )}
       </div>
+
+      {transitionError && (
+        <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+      )}
+      {!planStatus && supersededPlanName && (
+        <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
+          The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
+        </p>
+      )}
 
       <Section>
         <KpiStrip

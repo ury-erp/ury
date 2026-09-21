@@ -29,4 +29,5 @@ export * from './components/attention-feed';
 export * from './components/key-value-row';
 export * from './components/panel';
 export * from './components/page-shell';
+export * from './components/page-header';
 export * from './components/sidebar';

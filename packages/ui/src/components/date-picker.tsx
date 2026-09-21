@@ -402,7 +402,7 @@ export function DatePicker({
   return (
     <div
       ref={containerRef}
-      className={`relative ${className ?? 'w-full'}`}
+      className={cn('relative w-full', className)}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && isOpen) {
           event.stopPropagation();

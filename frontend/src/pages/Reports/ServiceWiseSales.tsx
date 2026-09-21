@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
@@ -62,15 +62,11 @@ export function ServiceWiseSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Service Wise Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            Revenue by order type {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Service Wise Sales"
+        description={`Revenue by order type ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
