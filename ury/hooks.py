@@ -105,6 +105,7 @@ ury_demo_master_doctypes = [
     "URY Restaurant",
     "URY Table",
     "Product Bundle",
+    "URY Production Department",
     "URY Production Unit",
     "URY Report Settings",
     "POS Profile"
