@@ -854,6 +854,30 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 			}
 		).insert(ignore_permissions=True)
 
+	def _ensure_menu(self, item_code, branch):
+		# validate_items_on_active_menu() (invoked on every non-terminal save
+		# and strictly at the Approved transition) requires a sellable item
+		# with qty > 0 to be on an enabled URY Menu for the plan's branch
+		# (default-on setting, see ury_production_settings.py). Get-or-create
+		# so setUp is idempotent/safe to call more than once.
+		menu_name = f"{branch} Menu"
+		if frappe.db.exists("URY Menu", menu_name):
+			menu = frappe.get_doc("URY Menu", menu_name)
+			if not any(row.item == item_code for row in menu.items):
+				menu.append("items", {"item": item_code, "disabled": 0})
+				menu.enabled = 1
+				menu.save(ignore_permissions=True)
+			return
+		frappe.get_doc(
+			{
+				"doctype": "URY Menu",
+				"name": menu_name,
+				"branch": branch,
+				"enabled": 1,
+				"items": [{"item": item_code, "disabled": 0}],
+			}
+		).insert(ignore_permissions=True)
+
 	def _create_user(self, email, roles):
 		if frappe.db.exists("User", email):
 			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
@@ -879,6 +903,7 @@ class TestSalesPlanWorkflowTransitions(FrappeTestCase):
 		self._ensure_branch(self.branch, self.company)
 		self._ensure_item("MTPL")
 		self._ensure_item_production_configuration("MTPL", self.branch, self.company)
+		self._ensure_menu("MTPL", self.branch)
 		self._create_user(TEST_SALES_PLAN_MANAGER, roles=["URY Manager"])
 		self._create_user(TEST_SALES_PLAN_NON_MANAGER, roles=[])
 		self._create_user(
