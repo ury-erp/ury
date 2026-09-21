@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '../lib/cn';
 import {
   startOfDay,
   endOfDay,
@@ -14,8 +16,34 @@ export interface DateRangeValue {
   to: Date;
 }
 
-interface DatePickerProps {
+// The trigger is a button but it stands in for a form control, so its size
+// scale is the Input/Select/Button one rather than a set of metrics of its
+// own -- a DatePicker in a filter toolbar has to line up with whatever sits
+// next to it.
+const triggerVariants = cva(
+  [
+    'inline-flex items-center justify-between gap-2 rounded-md border bg-card',
+    'font-medium text-foreground shadow-sm cursor-pointer transition-colors',
+    'hover:bg-muted/50 focus:outline-none',
+  ],
+  {
+    variants: {
+      size: {
+        default: 'h-11 px-3.5 py-2 text-sm',
+        sm: 'h-9 px-3 py-1.5 text-xs',
+        lg: 'h-12 px-4 py-3 text-base',
+        compactLg: 'h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]',
+      },
+    },
+    defaultVariants: { size: 'default' },
+  }
+);
+
+export type DatePickerSize = NonNullable<VariantProps<typeof triggerVariants>['size']>;
+
+export interface DatePickerProps {
   id?: string;
+  size?: DatePickerSize;
   value: string; // Expects YYYY-MM-DD
   placeholder?: string;
   error?: boolean;
@@ -23,6 +51,9 @@ interface DatePickerProps {
   onChange: (id: string, value: string) => void;
   onBlur?: (id: string) => void;
   className?: string;
+  /** The trigger is a <button>, not an <input>, so a wrapping <label> gives
+   *  it no accessible name -- filter call sites must pass one explicitly. */
+  'aria-label'?: string;
 }
 
 const MONTH_NAMES = [
@@ -108,7 +139,9 @@ export function DatePicker({
   maxDate,
   onChange,
   onBlur,
-  className
+  className,
+  size,
+  'aria-label': ariaLabel,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,10 +279,13 @@ export function DatePicker({
       <button
         id={id}
         type="button"
+        aria-label={ariaLabel}
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full inline-flex items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none shadow-sm cursor-pointer transition-colors ${
-          error ? 'border-red-300' : 'border-gray-200 hover:border-gray-300'
-        }`}
+        className={cn(
+          'w-full',
+          triggerVariants({ size }),
+          error ? 'border-destructive' : 'border-input hover:border-ring'
+        )}
       >
         <span>{displayText || placeholder}</span>
         <svg
@@ -262,7 +298,7 @@ export function DatePicker({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="lucide lucide-chevron-down-icon lucide-chevron-down shrink-0 text-gray-400"
+          className="lucide lucide-chevron-down-icon lucide-chevron-down shrink-0 text-text-tertiary"
         >
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -272,26 +308,28 @@ export function DatePicker({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="absolute top-[calc(100%+4px)] z-[100] bg-white border border-gray-100 rounded-xl shadow-xl p-3 w-[280px] max-w-[calc(100vw-32px)] focus:outline-none"
+          className="absolute top-[calc(100%+4px)] z-[100] bg-card border border-border rounded-xl shadow-xl p-3 w-[280px] max-w-[calc(100vw-32px)] focus:outline-none"
         >
           {/* Header Month / Year Navigation */}
           <div className="flex items-center justify-between mb-2 px-1">
             <button
               type="button"
+              aria-label="Previous month"
               onClick={handlePrevMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-sm font-semibold text-gray-800">
+            <span className="text-sm font-semibold text-foreground">
               {MONTH_NAMES[viewDate.getMonth()]}, {viewDate.getFullYear()}
             </span>
             <button
               type="button"
+              aria-label="Next month"
               onClick={handleNextMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
@@ -302,7 +340,7 @@ export function DatePicker({
           {/* Weekday headers */}
           <div className="grid grid-cols-7 gap-1 text-center mb-1">
             {WEEKDAYS.map((wd) => (
-              <span key={wd} className="text-xs font-semibold text-gray-400">
+              <span key={wd} className="text-xs font-semibold text-text-tertiary">
                 {wd}
               </span>
             ))}
@@ -313,7 +351,7 @@ export function DatePicker({
             {calendarDays.map((item, index) => {
               if (!item.isCurrentMonth) {
                 return (
-                  <div key={index} className="text-sm py-1 text-gray-300 select-none">
+                  <div key={index} className="text-sm py-1 text-muted-foreground/50 select-none">
                     {item.day}
                   </div>
                 );
@@ -325,13 +363,14 @@ export function DatePicker({
               return (
                 <div
                   key={index}
+                  data-date={item.dateStr}
                   onClick={() => !isDisabled && handleSelectDay(item.dateStr)}
                   className={`text-sm py-1 rounded-lg font-medium transition-colors select-none ${
                     isDisabled
-                      ? 'text-gray-300 cursor-not-allowed'
+                      ? 'text-muted-foreground/50 cursor-not-allowed'
                       : isSelected
                       ? 'bg-foreground text-background font-bold cursor-pointer'
-                      : 'text-gray-800 hover:bg-gray-100 cursor-pointer'
+                      : 'text-foreground hover:bg-muted cursor-pointer'
                   }`}
                 >
                   {item.day}
@@ -341,11 +380,11 @@ export function DatePicker({
           </div>
 
           {/* Footer Today Button */}
-          <div className="border-t border-gray-100 pt-2 mt-2 text-center">
+          <div className="border-t border-border pt-2 mt-2 text-center">
             <button
               type="button"
               onClick={handleTodayClick}
-              className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+              className="text-sm font-medium text-foreground hover:text-primary transition-colors"
             >
               Today
             </button>
@@ -360,9 +399,10 @@ export interface UryDateRangePickerProps {
   value: DateRangeValue;
   onChange: (range: DateRangeValue) => void;
   className?: string;
+  size?: DatePickerSize;
 }
 
-export function UryDateRangePicker({ value, onChange, className }: UryDateRangePickerProps) {
+export function UryDateRangePicker({ value, onChange, className, size }: UryDateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [rangeSelection, setRangeSelection] = useState<{ from: Date | null; to: Date | null }>({
     from: null,
@@ -516,10 +556,10 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none shadow-sm"
+        className={cn(triggerVariants({ size }), 'border-input')}
       >
         <span>{labelText}</span>
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -528,16 +568,16 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="absolute top-[calc(100%+8px)] z-[100] bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-[300px] max-w-[calc(100vw-32px)] focus:outline-none"
+          className="absolute top-[calc(100%+8px)] z-[100] bg-card border border-border rounded-2xl shadow-xl p-4 w-[300px] max-w-[calc(100vw-32px)] focus:outline-none"
         >
           {/* Presets Header */}
-          <div className="flex items-center justify-between gap-1.5 pb-3 mb-3 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-1.5 pb-3 mb-3 border-b border-border">
             {presets.map((preset) => (
               <button
                 key={preset.label}
                 type="button"
                 onClick={() => applyPreset(preset.getRange())}
-                className="flex-1 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-center"
+                className="flex-1 px-2 py-1 text-xs font-medium text-muted-foreground bg-muted hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-center"
               >
                 {preset.label}
               </button>
@@ -548,20 +588,22 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
           <div className="flex items-center justify-between mb-4 px-1">
             <button
               type="button"
+              aria-label="Previous month"
               onClick={handlePrevMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-sm font-semibold text-gray-800">
+            <span className="text-sm font-semibold text-foreground">
               {MONTH_NAMES[viewDate.getMonth()]}, {viewDate.getFullYear()}
             </span>
             <button
               type="button"
+              aria-label="Next month"
               onClick={handleNextMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
@@ -572,7 +614,7 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
           {/* Weekday headers */}
           <div className="grid grid-cols-7 gap-1 text-center mb-2">
             {WEEKDAYS.map((wd) => (
-              <span key={wd} className="text-xs font-semibold text-gray-400">
+              <span key={wd} className="text-xs font-semibold text-text-tertiary">
                 {wd}
               </span>
             ))}
@@ -583,7 +625,7 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
             {calendarDays.map((item, index) => {
               if (!item.isCurrentMonth) {
                 return (
-                  <div key={index} className="text-sm py-1.5 text-gray-300 select-none">
+                  <div key={index} className="text-sm py-1.5 text-muted-foreground/50 select-none">
                     {item.day}
                   </div>
                 );
@@ -597,7 +639,7 @@ export function UryDateRangePicker({ value, onChange, className }: UryDateRangeP
                 item.dateObj >= startOfDay(activeFrom < activeTo ? activeFrom : activeTo) &&
                 item.dateObj <= endOfDay(activeFrom < activeTo ? activeTo : activeFrom);
 
-              let styleClasses = 'text-gray-800 hover:bg-gray-100 rounded-lg';
+              let styleClasses = 'text-foreground hover:bg-muted rounded-lg';
               if (isStart && isEnd) {
                 styleClasses = 'bg-foreground text-background font-bold rounded-lg';
               } else if (isStart) {

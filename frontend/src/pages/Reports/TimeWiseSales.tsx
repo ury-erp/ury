@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Input, Select } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, DatePicker, Select } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
@@ -82,7 +82,7 @@ export function TimeWiseSales() {
           <Select
             value={bucketSize}
             onChange={(e) => setBucketSize(Number(e.target.value))}
-            size="sm"
+            size="compactLg"
           >
             {BUCKET_OPTIONS.map((b) => (
               <option key={b} value={b}>
@@ -90,12 +90,14 @@ export function TimeWiseSales() {
               </option>
             ))}
           </Select>
-          <Input
-            type="date"
+          <DatePicker
+            id="report-date"
+            aria-label="Report date"
             value={date}
-            max={toApiDate(new Date())}
-            onChange={(e) => setDate(e.target.value)}
-            size="sm"
+            maxDate={toApiDate(new Date())}
+            onChange={(_id, next) => setDate(next)}
+            size="compactLg"
+            className="w-[150px]"
           />
         </div>
       </div>

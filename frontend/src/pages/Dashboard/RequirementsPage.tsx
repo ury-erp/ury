@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
 import {
   AttentionFeed,
   Badge,
   Card,
   DataTable,
   DataTableColumn,
+  DatePicker,
   InlineEditCell,
-  Input,
   KpiStrip,
   Page,
   Section,
@@ -374,16 +373,14 @@ export const RequirementsPage: React.FC = () => {
               )}
             </p>
           </div>
-          <label className="relative block">
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-            <Input
-              aria-label="Requirements date"
-              type="date"
-              value={requirementsDate}
-              onChange={(event) => setRequirementsDate(event.target.value)}
-              className="pl-9"
-            />
-          </label>
+          <DatePicker
+            id="requirements-date"
+            aria-label="Requirements date"
+            value={requirementsDate}
+            onChange={(_id, next) => setRequirementsDate(next)}
+            size="compactLg"
+            className="w-[180px]"
+          />
         </div>
       </div>
 

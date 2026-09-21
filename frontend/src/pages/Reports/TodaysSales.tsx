@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, Input, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DatePicker, DataTable, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -161,12 +161,14 @@ export function TodaysSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Input
-            type="date"
+          <DatePicker
+            id="report-date"
+            aria-label="Report date"
             value={date}
-            max={toApiDate(new Date())}
-            onChange={(e) => setDate(e.target.value)}
-            size="sm"
+            maxDate={toApiDate(new Date())}
+            onChange={(_id, next) => setDate(next)}
+            size="compactLg"
+            className="w-[150px]"
           />
           {data && (
             <span className="text-xs text-muted-foreground">

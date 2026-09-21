@@ -5,6 +5,7 @@ import {
   Card,
   DataTable,
   DataTableColumn,
+  DatePicker,
   Drawer,
   DrawerSectionLabel,
   Input,
@@ -820,7 +821,7 @@ const DepartmentStockContent: React.FC = () => {
             Department
             <Select
               aria-label="Department"
-              size="sm"
+              size="compactLg"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
               className="mt-1"
@@ -835,24 +836,24 @@ const DepartmentStockContent: React.FC = () => {
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
-            <Input
+            <DatePicker
+              id="from-date"
               aria-label="From date"
-              type="date"
-              size="sm"
               value={fromDate}
-              onChange={(event) => setFromDate(event.target.value)}
-              className="mt-1"
+              onChange={(_id, next) => setFromDate(next)}
+              size="compactLg"
+              className="mt-1 w-[150px]"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
-            <Input
+            <DatePicker
+              id="to-date"
               aria-label="To date"
-              type="date"
-              size="sm"
               value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-              className="mt-1"
+              onChange={(_id, next) => setToDate(next)}
+              size="compactLg"
+              className="mt-1 w-[150px]"
             />
           </label>
         </div>

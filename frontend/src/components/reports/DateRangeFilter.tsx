@@ -1,4 +1,4 @@
-import { UryDateRangePicker, type DateRangeValue } from '../setup/DatePicker';
+import { UryDateRangePicker, type DateRangeValue } from '@ury/ui';
 
 export type { DateRangeValue };
 
