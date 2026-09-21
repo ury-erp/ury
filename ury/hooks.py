@@ -266,6 +266,7 @@ doc_events = {
     },
     "Production Plan": {
         "on_submit": "ury.ury.api.ury_production_plan_auto_work_order.maybe_create_and_submit_work_orders",
+        "before_cancel": "ury.ury.api.ury_production_plan_cancel_hooks.before_cancel",
     },
 }
 
