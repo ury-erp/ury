@@ -86,6 +86,11 @@ setup_wizard_requires = [
 
 setup_wizard_stages = "ury.setup.setup_wizard.get_setup_stages"
 
+# Frappe reports a failed background setup only over the realtime socket.
+# Record it server-side as well so the wizard can report the failure over
+# HTTP when the socket is unreachable (see get_setup_progress_status).
+setup_wizard_exception = "ury.ury.api.minimal.setup_organization.record_setup_failure"
+
 ury_demo_master_doctypes = [
     "Gender",
     "Item Group",

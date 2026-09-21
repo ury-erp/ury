@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.desk.page.setup_wizard.setup_wizard import load_languages, setup_complete
 
 try:
@@ -135,13 +136,49 @@ def get_setup_progress_steps(setup_ury_demo=0):
     return steps
 
 
+# Site-wide, not per-user: a background setup runs in a worker process whose
+# session user need not match the one that submitted the wizard, and only one
+# setup can be in flight per site anyway.
+_PROGRESS_CACHE_KEY = "ury_setup_progress"
+_PROGRESS_CACHE_TTL = 900
+
+
 def _progress_cache_key():
-    return f"ury_setup_progress:{frappe.session.user}"
+    return _PROGRESS_CACHE_KEY
 
 
 def _remember_setup_task(message):
+    """Mirror a `setup_task` payload into the cache for HTTP pollers.
+
+    The realtime socket stays the primary channel; this copy is what
+    get_setup_progress_status() serves to a client that cannot reach it.
+    """
     if isinstance(message, dict):
-        frappe.cache.set_value(_progress_cache_key(), message, expires_in_sec=900)
+        frappe.cache.set_value(_progress_cache_key(), message, expires_in_sec=_PROGRESS_CACHE_TTL)
+
+
+def _clear_setup_progress():
+    frappe.cache.delete_value(_progress_cache_key())
+
+
+def record_setup_failure(traceback=None, args=None):
+    """`setup_wizard_exception` hook: record a failed setup for HTTP pollers.
+
+    Frappe announces a failed background setup only through the `setup_task`
+    realtime event, so with the socket down the wizard waits forever and the
+    user never learns it failed. This hook also runs inside the background
+    worker, where submit_setup()'s publish_realtime patch does not exist.
+    """
+    fail_msg = _("Setup failed")
+    if traceback:
+        last_line = next(
+            (line.strip() for line in reversed(str(traceback).splitlines()) if line.strip()),
+            "",
+        )
+        if last_line:
+            fail_msg = f"{fail_msg}: {last_line}"
+
+    _remember_setup_task({"status": "fail", "fail_msg": fail_msg})
 
 
 def _run_setup_complete(payload):
@@ -163,9 +200,18 @@ def _run_setup_complete(payload):
 
 @frappe.whitelist()
 def get_setup_progress_status():
-    """Latest setup_task payload for the current user (socket fallback)."""
+    """Latest setup_task payload, for clients that cannot use the socket.
+
+    Completion is read back from the database rather than the cache: a
+    background worker finishes the run without this process seeing the
+    final event, so the cache alone can never report "ok".
+    """
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
+
+    if frappe.is_setup_complete():
+        return {"status": "ok"}
+
     return frappe.cache.get_value(_progress_cache_key()) or {}
 
 
@@ -179,6 +225,9 @@ def submit_setup(payload=None, **kwargs):
         frappe.throw("Setup already completed")
 
     payload = _normalize_setup_payload(payload, **kwargs)
+
+    # A previous attempt's progress (or failure) must not be read as this one's.
+    _clear_setup_progress()
 
     original = frappe.publish_realtime
 

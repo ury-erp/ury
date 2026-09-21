@@ -13,6 +13,7 @@ from ury.ury.api.minimal.setup_organization import (
     get_setup_progress_steps,
     _progress_cache_key,
     _remember_setup_task,
+    record_setup_failure,
     _run_setup_complete,
     get_setup_progress_status,
     submit_setup,
@@ -88,10 +89,11 @@ class TestGetSetupDefaults(unittest.TestCase):
         self.assertEqual(result["fy_end_date"], "2025-03-31")
 
     @patch("ury.ury.api.minimal.setup_organization.frappe.session")
-    def test_progress_cache_key(self, mock_session):
+    def test_progress_cache_key_is_site_wide(self, mock_session):
+        # Not per-user: a background setup runs in a worker whose session user
+        # need not match the user who submitted the wizard.
         mock_session.user = "test@example.com"
-        key = _progress_cache_key()
-        self.assertEqual(key, "ury_setup_progress:test@example.com")
+        self.assertEqual(_progress_cache_key(), "ury_setup_progress")
 
     @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
     @patch("ury.ury.api.minimal.setup_organization.frappe.session")
@@ -154,22 +156,60 @@ class TestGetSetupDefaults(unittest.TestCase):
         with self.assertRaises(frappe.exceptions.ValidationError):
             get_setup_progress_status()
 
+    @patch("ury.ury.api.minimal.setup_organization.frappe.is_setup_complete", return_value=False)
     @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
     @patch("ury.ury.api.minimal.setup_organization.frappe.session")
-    def test_progress_status_returns_cached(self, mock_session, mock_cache):
+    def test_progress_status_returns_cached(self, mock_session, mock_cache, _mock_complete):
         mock_session.user = "test@example.com"
         expected = {"status": "step2"}
         mock_cache.get_value.return_value = expected
         result = get_setup_progress_status()
         self.assertEqual(result, expected)
 
+    @patch("ury.ury.api.minimal.setup_organization.frappe.is_setup_complete", return_value=False)
     @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
     @patch("ury.ury.api.minimal.setup_organization.frappe.session")
-    def test_progress_status_empty_when_none(self, mock_session, mock_cache):
+    def test_progress_status_empty_when_none(self, mock_session, mock_cache, _mock_complete):
         mock_session.user = "test@example.com"
         mock_cache.get_value.return_value = None
         result = get_setup_progress_status()
         self.assertEqual(result, {})
+
+    @patch("ury.ury.api.minimal.setup_organization.frappe.is_setup_complete", return_value=True)
+    @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
+    @patch("ury.ury.api.minimal.setup_organization.frappe.session")
+    def test_progress_status_reports_ok_from_database(
+        self, mock_session, mock_cache, _mock_complete
+    ):
+        # A background worker finishes the run without this process seeing the
+        # final setup_task event, so completion must come from the database.
+        mock_session.user = "test@example.com"
+        mock_cache.get_value.return_value = {"progress": [2, 5]}
+        self.assertEqual(get_setup_progress_status(), {"status": "ok"})
+
+
+class TestRecordSetupFailure(unittest.TestCase):
+    """`setup_wizard_exception` hook: a failed setup must be readable over
+    HTTP, because Frappe announces it only through the realtime socket and
+    the worker process never runs submit_setup()'s publish_realtime patch.
+    """
+
+    @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
+    def test_failure_is_cached_with_message(self, mock_cache):
+        record_setup_failure("Traceback...\nMandatoryError: department", {"company_name": "URY"})
+
+        key, payload = mock_cache.set_value.call_args[0]
+        self.assertEqual(key, "ury_setup_progress")
+        self.assertEqual(payload["status"], "fail")
+        self.assertIn("MandatoryError: department", payload["fail_msg"])
+
+    @patch("ury.ury.api.minimal.setup_organization.frappe.cache")
+    def test_failure_without_traceback_still_reports_fail(self, mock_cache):
+        record_setup_failure(None, None)
+
+        payload = mock_cache.set_value.call_args[0][1]
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(payload["fail_msg"])
 
     @patch("ury.ury.api.minimal.setup_organization.frappe.session")
     def test_progress_steps_guest_rejected(self, mock_session):

@@ -300,6 +300,7 @@ export default function SetupPage() {
           onReady={doApiCall}
           onComplete={handleSetupComplete}
           onFail={handleSetupFail}
+          poll={setupService.getProgressStatus}
         />
       )}
     </WizardLayout>
