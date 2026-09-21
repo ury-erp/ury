@@ -21,4 +21,7 @@ ury/www/urypos.html
 ury/www/mosaic.html
 build
 
+ury/www/serve.html
+ury/public/serve
+
 *.lock
