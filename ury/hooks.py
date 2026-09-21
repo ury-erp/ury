@@ -54,7 +54,10 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 # include js in doctype views
 doctype_js = {
     "POS Closing Entry": "ury/public/js/pos_closing_entry_clock_integrity.js",
-    "Production Plan": "public/js/production_plan_cancel_guard.js",
+    "Production Plan": [
+        "public/js/production_plan_cancel_guard.js",
+        "public/js/production_plan_prepare.js",
+    ],
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -280,7 +283,6 @@ doc_events = {
         "validate": "ury.ury.api.ury_work_order_hooks.validate",
     },
     "Production Plan": {
-        "on_submit": "ury.ury.api.ury_production_plan_auto_work_order.maybe_create_and_submit_work_orders",
         "before_cancel": "ury.ury.api.ury_production_plan_cancel_hooks.before_cancel",
     },
 }
@@ -455,6 +457,17 @@ fixtures = [
                     "POS Invoice-restaurant_table",
                     "POS Invoice-custom_merged_tables",
                     "Production Plan Item-custom_ury_department",
+                    "Production Plan-custom_ury_sales_plan",
+                    "Production Plan-custom_ury_snapshot_hash",
+                    "Production Plan-custom_ury_department",
+                    "Production Plan-custom_ury_department_warehouse",
+                    "Production Plan-custom_ury_production_state",
+                    "Production Plan-custom_ury_production_result",
+                    "Production Plan-custom_ury_production_started_at",
+                    "Production Plan-custom_ury_execution_job_id",
+                    "Production Plan-custom_ury_execution_attempt",
+                    "Production Plan-custom_ury_execution_heartbeat",
+                    "Production Plan-custom_ury_execution_step",
                     "URY KOT Items-custom_ury_work_order",
                     "URY Sales Plan-custom_ury_production_plan",
                     "POS Invoice-custom_restaurant_room",

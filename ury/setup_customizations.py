@@ -482,6 +482,98 @@ def get_custom_fields():
 			},
 		],
 
+		"Production Plan": [
+			{
+				"fieldname": "custom_ury_department",
+				"fieldtype": "Link",
+				"options": "URY Production Department",
+				"label": "URY Production Department",
+				"description": "The plan's one department (Wave 0 / one-Production-Plan-per-department).",
+				"insert_after": "custom_ury_snapshot_hash",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_department_warehouse",
+				"fieldtype": "Link",
+				"options": "Warehouse",
+				"label": "URY Department Warehouse",
+				"description": "The plan's one Department Warehouse. Source and target for the Store-to-Department transfer, and the fg_warehouse for this plan's Work Orders (D13).",
+				"insert_after": "custom_ury_department",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_production_state",
+				"fieldtype": "Select",
+				"options": "\nAwaiting Materials\nReady for Production\nProcessing\nProduction Completed\nProduction Failed",
+				"label": "URY Production State",
+				"description": "How far this department's execution has got. Distinct from whether the plan is still current against its Sales Plan snapshot (D12).",
+				"insert_after": "custom_ury_department_warehouse",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_production_result",
+				"fieldtype": "Long Text",
+				"label": "URY Production Result",
+				"description": "JSON: blockers, generated documents, and timings from the most recent Prepare Production attempt.",
+				"insert_after": "custom_ury_production_state",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_production_started_at",
+				"fieldtype": "Datetime",
+				"label": "URY Production Started At",
+				"description": "When the current or most recent Prepare Production attempt started.",
+				"insert_after": "custom_ury_production_result",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_execution_job_id",
+				"fieldtype": "Data",
+				"label": "URY Execution Job ID",
+				"description": "The background (RQ) job handle for the current or most recent execution attempt (D17).",
+				"insert_after": "custom_ury_production_started_at",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_execution_attempt",
+				"fieldtype": "Int",
+				"label": "URY Execution Attempt",
+				"description": "Incremented per execution attempt; written onto the documents that attempt generates (D17).",
+				"insert_after": "custom_ury_execution_job_id",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_execution_heartbeat",
+				"fieldtype": "Datetime",
+				"label": "URY Execution Heartbeat",
+				"description": "Updated by the running job as it progresses. Used with production_job_stale_minutes to decide whether an attempt is recoverable (D17).",
+				"insert_after": "custom_ury_execution_attempt",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_execution_step",
+				"fieldtype": "Data",
+				"label": "URY Execution Step",
+				"description": "The current step of the running or most recent execution attempt, for the UI and for diagnosis (D17).",
+				"insert_after": "custom_ury_execution_heartbeat",
+				"read_only": 1,
+			},
+		],
+
+		"URY Sales Plan": [
+			{
+				"fieldname": "custom_ury_production_plan",
+				"fieldtype": "Link",
+				"options": "Production Plan",
+				"label": "Production Plan",
+				"description": "Deprecated (D11): a Sales Plan now creates one Production Plan per department, so this single-value link can no longer be the source of truth. Hidden; kept for compatibility rather than deleted. Was populated by ury.ury.api.ury_sales_plan_auto_production_plan.",
+				"insert_after": "status",
+				"read_only": 1,
+				"no_copy": 1,
+				"hidden": 1,
+			},
+		],
+
     }
  
 def delete_custom_fields(custom_fields):
