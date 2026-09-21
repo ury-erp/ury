@@ -1,17 +1,21 @@
 # Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_sales_plan_production_plan import (
-	get_live_production_plan,
-	get_production_plan_state,
-	open_or_create_production_plan,
-	preflight_issues,
+	create_department_production_plans,
+	create_or_get_department_production_plans,
+	get_department_production_plan,
+	get_live_production_plans,
+	get_production_plan_states,
+	open_department_production_plan,
 )
+
+MOD = "ury.ury.api.ury_sales_plan_production_plan"
 
 
 class _FakeSalesPlanDoc(dict):
@@ -24,195 +28,297 @@ class _FakeSalesPlanDoc(dict):
 		self[key] = value
 
 
-ADAPTED_PLAN_WITH_ITEMS = {
-	"doctype": "Production Plan",
-	"company": "URY Co",
-	"posting_date": "2026-09-21",
-	"po_items": [
-		{
-			"item_code": "ITEM-1",
-			"bom_no": "BOM-ITEM-1",
-			"planned_qty": 10,
-			"stock_uom": "Nos",
-			"warehouse": "Stores - URY",
-			"custom_ury_department": "Kitchen",
-		}
-	],
-	"_source": {},
-	"_unmapped_fields": {},
-	"_ury_department_index": {},
-}
+def _target(department, item_code, warehouse, required_qty=10, bom_no="BOM-1", stock_uom="Nos"):
+	return {
+		"item_code": item_code,
+		"bom_no": bom_no,
+		"required_qty": required_qty,
+		"stock_uom": stock_uom,
+		"department": department,
+		"warehouse": warehouse,
+		"sourcing_mode": "IN_HOUSE",
+		"component_vector": [],
+		"depends_on": [],
+		"sources": [],
+	}
 
-ADAPTED_PLAN_NO_ITEMS = {
-	"doctype": "Production Plan",
-	"company": "URY Co",
-	"posting_date": "2026-09-21",
-	"po_items": [],
-	"_source": {},
-	"_unmapped_fields": {},
-	"_ury_department_index": {},
-}
 
-ADAPTED_PLAN_NO_BOM = {
-	"doctype": "Production Plan",
-	"company": "URY Co",
-	"posting_date": "2026-09-21",
-	"po_items": [{"item_code": "ITEM-1", "bom_no": None, "planned_qty": 5, "stock_uom": "Nos"}],
-	"_source": {},
-	"_unmapped_fields": {},
-	"_ury_department_index": {},
+DEPARTMENTS_TWO = {
+	"Main Kitchen": {
+		"department": "Main Kitchen",
+		"warehouse": "Main Kitchen - WH",
+		"targets": [_target("Main Kitchen", "BIRYANI-BASE", "Main Kitchen - WH")],
+		"external_receipt_targets": [],
+	},
+	"Bakery": {
+		"department": "Bakery",
+		"warehouse": "Bakery - WH",
+		"targets": [_target("Bakery", "BREAD-DOUGH", "Bakery - WH")],
+		"external_receipt_targets": [],
+	},
 }
 
 
-class TestPreflightIssues(FrappeTestCase):
-	def test_ineligible_status(self):
-		doc = _FakeSalesPlanDoc(status="Draft")
-		issues = preflight_issues(doc, production_plan_dict={})
-		self.assertTrue(any("Approved" in i for i in issues))
-
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan",
-		return_value=ADAPTED_PLAN_NO_ITEMS,
+def _sales_plan_doc(**overrides):
+	defaults = dict(
+		name="SP-0001",
+		status="Locked for Production",
+		branch="Branch A",
+		company="URY Co",
+		plan_date="2026-09-21",
+		approval_snapshot="{}",
+		approval_snapshot_hash="hash-1",
 	)
-	def test_no_plannable_items(self, mock_adapt):
-		doc = _FakeSalesPlanDoc(status="Approved")
-		issues = preflight_issues(doc)
-		self.assertTrue(any("No plannable items" in i for i in issues))
-
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan",
-		return_value=ADAPTED_PLAN_NO_BOM,
-	)
-	def test_missing_bom(self, mock_adapt):
-		doc = _FakeSalesPlanDoc(status="Approved")
-		issues = preflight_issues(doc)
-		self.assertTrue(any("no BOM" in i for i in issues))
+	defaults.update(overrides)
+	return _FakeSalesPlanDoc(**defaults)
 
 
-class TestCreateOrGetProductionPlan(FrappeTestCase):
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan",
-		return_value={"name": "PP-EXISTING", "docstatus": 1},
-	)
-	def test_idempotent_returns_existing(self, mock_live, mock_lock):
-		from ury.ury.api.ury_sales_plan_production_plan import create_or_get_production_plan
+class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_creates_one_plan_per_department(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+		created_docs = []
 
-		doc = _FakeSalesPlanDoc(name="SP-0001", status="Approved")
-		name, created = create_or_get_production_plan(doc, submit=False)
-		self.assertEqual(name, "PP-EXISTING")
-		self.assertFalse(created)
+		def _make_doc(plan_dict):
+			doc = frappe._dict(dict(plan_dict))
+			doc.name = f"MFG-PP-{plan_dict['custom_ury_department']}"
+			doc.insert = lambda: None
+			doc.submit = lambda: None
+			created_docs.append(doc)
+			return doc
 
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan",
-		return_value=ADAPTED_PLAN_WITH_ITEMS,
-	)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan", return_value=None)
-	def test_creates_draft_never_submits_unless_asked(
-		self, mock_live, mock_lock, mock_adapt, mock_get_doc
-	):
-		from ury.ury.api.ury_sales_plan_production_plan import create_or_get_production_plan
+		mock_get_doc.side_effect = _make_doc
 
-		mock_get_doc.return_value.name = "PP-NEW"
-		doc = _FakeSalesPlanDoc(name="SP-0001", status="Approved")
+		doc = _sales_plan_doc()
+		result = create_or_get_department_production_plans(doc, submit=False)
 
-		name, created = create_or_get_production_plan(doc, submit=False)
+		self.assertEqual(result["sales_plan"], "SP-0001")
+		departments_created = {row["department"] for row in result["production_plans"]}
+		self.assertEqual(departments_created, {"Main Kitchen", "Bakery"})
+		self.assertTrue(all(row["created"] for row in result["production_plans"]))
+		self.assertEqual(len(created_docs), 2)
 
-		self.assertEqual(name, "PP-NEW")
-		self.assertTrue(created)
-		mock_get_doc.return_value.insert.assert_called_once()
-		mock_get_doc.return_value.submit.assert_not_called()
+		# Row lock is taken before anything else.
+		mock_lock.assert_called_once_with("URY Sales Plan", "SP-0001", "name", for_update=True)
 
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.adapt_sales_plan_to_production_plan",
-		return_value=ADAPTED_PLAN_NO_ITEMS,
-	)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan", return_value=None)
-	def test_throws_on_preflight_issues(self, mock_live, mock_lock, mock_adapt, mock_get_doc):
-		from ury.ury.api.ury_sales_plan_production_plan import create_or_get_production_plan
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_idempotent_skips_department_with_matching_hash(self, mock_lock, mock_compile, mock_get_doc):
+		# Main Kitchen already has a live plan at the current hash; Bakery does not.
+		with patch(
+			f"{MOD}.frappe.get_all",
+			return_value=[
+				{
+					"name": "MFG-PP-EXISTING",
+					"docstatus": 1,
+					"custom_ury_department": "Main Kitchen",
+					"custom_ury_snapshot_hash": "hash-1",
+					"custom_ury_production_state": "Ready for Production",
+				}
+			],
+		):
+			doc = _sales_plan_doc(approval_snapshot_hash="hash-1")
+			result = create_or_get_department_production_plans(doc, submit=False)
 
-		doc = _FakeSalesPlanDoc(name="SP-0001", status="Approved")
+		by_department = {row["department"]: row for row in result["production_plans"]}
+		self.assertFalse(by_department["Main Kitchen"]["created"])
+		self.assertEqual(by_department["Main Kitchen"]["production_plan"], "MFG-PP-EXISTING")
+		self.assertTrue(by_department["Bakery"]["created"])
+		# Only the genuinely new department plan is ever inserted.
+		mock_get_doc.assert_called_once()
+
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_throws_without_frozen_snapshot(self, mock_lock, mock_get_all):
+		doc = _sales_plan_doc(approval_snapshot=None)
 		with self.assertRaises(frappe.ValidationError):
-			create_or_get_production_plan(doc, submit=False)
+			create_or_get_department_production_plans(doc, submit=False)
+
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(
+		f"{MOD}.compile_production_targets",
+		return_value=(
+			{
+				"Main Kitchen": {
+					"department": "Main Kitchen",
+					"warehouse": "Main Kitchen - WH",
+					"targets": [],
+					"external_receipt_targets": [],
+				}
+			},
+			[],
+		),
+	)
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_empty_department_produces_no_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+		doc = _sales_plan_doc()
+		result = create_or_get_department_production_plans(doc, submit=False)
+		self.assertEqual(result["production_plans"], [])
 		mock_get_doc.assert_not_called()
 
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_include_exploded_items_survives_onto_po_items(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+		"""D2 / the wiring point Agent 2 flagged: include_exploded_items must
+		reach every Production Plan Item row, or ERPNext silently explodes
+		pre-produced sub-assemblies into raw materials."""
+		captured = {}
 
-class TestGetProductionPlanState(FrappeTestCase):
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	def test_ineligible_status(self, mock_get_doc, mock_perm):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Draft")
-		state = get_production_plan_state("SP-0001")
-		self.assertEqual(state["state"], "ineligible")
+		def _make_doc(plan_dict):
+			captured.setdefault(plan_dict["custom_ury_department"], plan_dict)
+			doc = frappe._dict(dict(plan_dict))
+			doc.name = f"MFG-PP-{plan_dict['custom_ury_department']}"
+			doc.insert = lambda: None
+			doc.submit = lambda: None
+			return doc
 
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan")
-	def test_stale_when_hash_mismatch(self, mock_live, mock_get_doc, mock_perm):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved", approval_snapshot_hash="new")
-		mock_live.return_value = {
-			"name": "PP-1",
-			"docstatus": 0,
-			"custom_ury_snapshot_hash": "old",
-		}
-		state = get_production_plan_state("SP-0001")
-		self.assertEqual(state["state"], "stale")
+		mock_get_doc.side_effect = _make_doc
 
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan")
-	def test_live_when_hash_matches(self, mock_live, mock_get_doc, mock_perm):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved", approval_snapshot_hash="same")
-		mock_live.return_value = {
-			"name": "PP-1",
-			"docstatus": 0,
-			"custom_ury_snapshot_hash": "same",
-		}
-		state = get_production_plan_state("SP-0001")
-		self.assertEqual(state["state"], "live")
+		doc = _sales_plan_doc()
+		create_or_get_department_production_plans(doc, submit=False)
 
+		for plan_dict in captured.values():
+			self.assertTrue(plan_dict["po_items"], "expected at least one po_items row")
+			for row in plan_dict["po_items"]:
+				self.assertEqual(row["include_exploded_items"], 0)
 
-class TestOpenOrCreateProductionPlan(FrappeTestCase):
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	def test_not_approved_throws(self, mock_get_doc, mock_lock, mock_perm):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Draft", docstatus=0)
-		with self.assertRaises(frappe.ValidationError):
-			open_or_create_production_plan("SP-0001")
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_submit_true_submits_every_created_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+		docs = []
 
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.set_value")
-	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.create_or_get_production_plan",
-		return_value=("PP-NEW", True),
-	)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan", return_value=None)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	def test_creates_and_links_back(
-		self, mock_get_doc, mock_lock, mock_perm, mock_live, mock_create, mock_set_value
-	):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved", docstatus=1)
-		result = open_or_create_production_plan("SP-0001")
-		self.assertEqual(result, {"name": "PP-NEW", "created": True, "docstatus": 0})
-		mock_set_value.assert_called_once_with(
-			"URY Sales Plan", "SP-0001", "custom_ury_production_plan", "PP-NEW"
+		def _make_doc(plan_dict):
+			doc = frappe._dict(dict(plan_dict))
+			doc.name = f"MFG-PP-{plan_dict['custom_ury_department']}"
+			doc.insert = lambda: None
+			doc.submit = lambda d=doc: docs.append(d)
+			return doc
+
+		mock_get_doc.side_effect = _make_doc
+
+		doc = _sales_plan_doc()
+		create_or_get_department_production_plans(doc, submit=True)
+		self.assertEqual(len(docs), 2)
+
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_never_writes_deprecated_sales_plan_link_field(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+		"""D11: URY Sales Plan.custom_ury_production_plan is no longer written."""
+		mock_get_doc.side_effect = lambda plan_dict: frappe._dict(
+			dict(plan_dict, name="MFG-PP-1", insert=lambda: None, submit=lambda: None)
 		)
+		doc = _sales_plan_doc()
+		create_or_get_department_production_plans(doc, submit=False)
+		self.assertNotIn("custom_ury_production_plan", doc)
 
+
+class TestGetLiveProductionPlans(FrappeTestCase):
+	@patch(f"{MOD}.frappe.get_all", return_value=[{"name": "MFG-PP-1", "docstatus": 1}])
+	def test_get_live_production_plans(self, mock_get_all):
+		rows = get_live_production_plans("SP-0001")
+		self.assertEqual(rows[0]["name"], "MFG-PP-1")
+
+	@patch(f"{MOD}.frappe.get_all", return_value=[{"name": "MFG-PP-1", "docstatus": 0}])
+	def test_get_department_production_plan(self, mock_get_all):
+		row = get_department_production_plan("SP-0001", "Main Kitchen")
+		self.assertEqual(row["name"], "MFG-PP-1")
+
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	def test_get_department_production_plan_none(self, mock_get_all):
+		self.assertIsNone(get_department_production_plan("SP-0001", "Bakery"))
+
+
+class TestGetProductionPlanStates(FrappeTestCase):
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.get_live_production_plans", return_value=[])
+	def test_ineligible_status(self, mock_live, mock_get_doc, mock_perm):
+		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved")
+		state = get_production_plan_states("SP-0001")
+		self.assertFalse(state["eligible"])
+		self.assertEqual(state["production_plans"], [])
+
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.frappe.get_doc")
 	@patch(
-		"ury.ury.api.ury_sales_plan_production_plan.get_live_production_plan",
-		return_value={"name": "PP-EXISTING", "docstatus": 1},
+		f"{MOD}.get_live_production_plans",
+		return_value=[
+			{
+				"name": "MFG-PP-1",
+				"docstatus": 1,
+				"custom_ury_department": "Main Kitchen",
+				"custom_ury_snapshot_hash": "old",
+				"custom_ury_production_state": "Ready for Production",
+			}
+		],
 	)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.has_permission", return_value=True)
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.db.get_value", return_value="SP-0001")
-	@patch("ury.ury.api.ury_sales_plan_production_plan.frappe.get_doc")
-	def test_double_call_does_not_duplicate(self, mock_get_doc, mock_lock, mock_perm, mock_live):
-		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved", docstatus=1)
-		result = open_or_create_production_plan("SP-0001")
-		self.assertEqual(result["name"], "PP-EXISTING")
-		self.assertFalse(result["created"])
+	def test_stale_when_hash_mismatch(self, mock_live, mock_get_doc, mock_perm):
+		mock_get_doc.return_value = _FakeSalesPlanDoc(
+			status="Locked for Production", approval_snapshot_hash="new"
+		)
+		state = get_production_plan_states("SP-0001")
+		self.assertTrue(state["eligible"])
+		self.assertEqual(state["production_plans"][0]["link_state"], "stale")
+
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(
+		f"{MOD}.get_live_production_plans",
+		return_value=[
+			{
+				"name": "MFG-PP-1",
+				"docstatus": 1,
+				"custom_ury_department": "Main Kitchen",
+				"custom_ury_snapshot_hash": "same",
+				"custom_ury_production_state": "Ready for Production",
+			}
+		],
+	)
+	def test_live_when_hash_matches(self, mock_live, mock_get_doc, mock_perm):
+		mock_get_doc.return_value = _FakeSalesPlanDoc(
+			status="Locked for Production", approval_snapshot_hash="same"
+		)
+		state = get_production_plan_states("SP-0001")
+		self.assertEqual(state["production_plans"][0]["link_state"], "live")
+
+
+class TestCreateDepartmentProductionPlans(FrappeTestCase):
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.frappe.get_doc")
+	def test_not_locked_throws(self, mock_get_doc, mock_perm):
+		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Approved")
+		with self.assertRaises(frappe.ValidationError):
+			create_department_production_plans("SP-0001")
+
+	@patch(f"{MOD}.create_or_get_department_production_plans", return_value={"sales_plan": "SP-0001", "production_plans": [], "blockers": []})
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.frappe.get_doc")
+	def test_locked_delegates_without_submit(self, mock_get_doc, mock_perm, mock_create):
+		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Locked for Production")
+		create_department_production_plans("SP-0001")
+		mock_create.assert_called_once()
+		self.assertEqual(mock_create.call_args.kwargs.get("submit"), False)
+
+
+class TestOpenDepartmentProductionPlan(FrappeTestCase):
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.get_department_production_plan", return_value=None)
+	def test_throws_when_missing(self, mock_get, mock_perm):
+		with self.assertRaises(frappe.ValidationError):
+			open_department_production_plan("SP-0001", "Main Kitchen")
+
+	@patch(f"{MOD}.frappe.has_permission", return_value=True)
+	@patch(f"{MOD}.get_department_production_plan", return_value={"name": "MFG-PP-1", "docstatus": 1})
+	def test_returns_existing(self, mock_get, mock_perm):
+		result = open_department_production_plan("SP-0001", "Main Kitchen")
+		self.assertEqual(result, {"name": "MFG-PP-1", "docstatus": 1, "department": "Main Kitchen"})
