@@ -101,19 +101,6 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         self.mock_get_value = patcher.start()
         self.addCleanup(patcher.stop)
 
-        # _filter_items_in_scope's sellable-item defence hits
-        # frappe.get_all("Item", ...); default every item_code sellable so
-        # existing tests (not concerned with that check) are unaffected.
-        # test_excludes_non_sellable_items below overrides this per-test.
-        get_all_patcher = mock.patch(
-            "ury.ury.api.ury_production_plan_adapter.frappe.get_all",
-            side_effect=lambda doctype, filters=None, pluck=None, **kw: list(
-                (filters or {}).get("name", [""])[1]
-            ),
-        )
-        self.mock_get_all = get_all_patcher.start()
-        self.addCleanup(get_all_patcher.stop)
-
     def test_rejects_plan_with_no_status(self):
         doc = FakeDoc(name="SP-DRAFT", status="Draft", approval_snapshot=None)
         with self.assertRaises(UnapprovedSalesPlanError):
@@ -193,6 +180,11 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         self.assertNotIn(
             "warehouse", result["_unmapped_fields"]["production_plan_item"]
         )
+        # D2: include_exploded_items is now populated on every row (always
+        # 0), so it must no longer be listed as unmapped either.
+        self.assertNotIn(
+            "include_exploded_items", result["_unmapped_fields"]["production_plan_item"]
+        )
         self.assertIn(
             "planned_end_date", result["_unmapped_fields"]["production_plan_item"]
         )
@@ -256,9 +248,10 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         self.assertEqual(item_codes, ["PP-1"])
         self.assertEqual(result["total_planned_qty"], 4)
 
-    def test_non_sellable_items_excluded_even_if_pre_produced(self):
-        """Last-gate defence: a sub-assembly leaked in with a PRE_PRODUCED
-        config must still never reach a Production Plan's po_items."""
+    def test_non_sellable_items_included_when_pre_produced(self):
+        """A non-sellable kitchen base (no ``is_sales_item`` restriction
+        applies any more) must still reach po_items when PRE_PRODUCED -- it
+        is exactly the kind of row this Production Plan must cover."""
         snapshot = make_snapshot(
             items=[
                 {
@@ -280,13 +273,9 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
             ]
         )
         doc = make_approved_doc(snapshot=snapshot)
-        with mock.patch(
-            "ury.ury.api.ury_production_plan_adapter.frappe.get_all",
-            return_value=["PP-1"],
-        ):
-            result = adapt_sales_plan_to_production_plan(doc)
+        result = adapt_sales_plan_to_production_plan(doc)
         item_codes = [row["item_code"] for row in result["po_items"]]
-        self.assertEqual(item_codes, ["PP-1"])
+        self.assertEqual(sorted(item_codes), ["PP-1", "SUB-1"])
 
     def test_made_to_order_items_excluded(self):
         # Made-to-order items are excluded per Track-Item N2's scope: the
@@ -332,6 +321,15 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         self.mock_get_value.assert_any_call(
             "URY Production Department", "Bakery", "department_warehouse"
         )
+
+    def test_include_exploded_items_is_zero_on_every_row(self):
+        # D2: left at ERPNext's default of 1, get_production_items() would
+        # copy it into the Work Order as use_multi_level_bom and explode
+        # PRE_PRODUCED sub-assemblies into raw materials.
+        doc = make_approved_doc()
+        result = adapt_sales_plan_to_production_plan(doc)
+        for row in result["po_items"]:
+            self.assertEqual(row["include_exploded_items"], 0)
 
     def test_warehouse_is_none_when_department_unresolved(self):
         snapshot = make_snapshot(
