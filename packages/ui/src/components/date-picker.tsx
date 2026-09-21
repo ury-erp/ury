@@ -31,9 +31,10 @@ const triggerVariants = cva(
   {
     variants: {
       size: {
-        default: 'h-11 px-3.5 py-2 text-sm',
+        default: 'h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]',
         sm: 'h-9 px-3 py-1.5 text-xs',
         lg: 'h-12 px-4 py-3 text-base',
+        // Alias of `default` — see Input/Button.
         compactLg: 'h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]',
       },
     },
