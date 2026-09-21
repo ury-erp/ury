@@ -10,6 +10,8 @@ from ury.ury.api.ury_sales_plan import (
 	BACKWARD_OR_TERMINAL_TARGETS,
 	FORWARD_FROM_DRAFT,
 	_guard_backward_transition,
+	prune_zero_qty_rows,
+	validate_items_on_active_menu,
 	_validate_plan_scope,
 	append_audit,
 	flag_stale_bom_revisions,
@@ -50,6 +52,11 @@ class URYSalesPlan(Document):
 		# see the freshly-populated bom rather than a stale/missing value
 		# supplied by the frontend.
 		populate_item_production_context(self)
+		# Drafts: warn on off-menu items (plan-ahead is legitimate). Approved
+		# re-saves are deliberately NOT re-checked -- a frozen plan must not be
+		# bricked by a later menu change; approval below is the hard gate.
+		if self.get("status") in ("Draft", "Proposed", "Submitted for Approval"):
+			validate_items_on_active_menu(self, strict=False)
 
 		# Surface (never block on) rows whose requirement was computed from
 		# a BOM yield standard that has since changed -- but only while the
@@ -71,6 +78,8 @@ class URYSalesPlan(Document):
 			if prev_status == "Draft" and self.status in FORWARD_FROM_DRAFT:
 				validate_plan_has_demand(self)
 			if self.status == "Approved":
+				prune_zero_qty_rows(self)
+				validate_items_on_active_menu(self, strict=True)
 				validate_plan_items(self)
 				validate_no_overlapping_plan_scope(self)
 				freeze_approval_snapshot(self)

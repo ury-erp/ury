@@ -5,7 +5,10 @@
  "engine": "InnoDB",
  "field_order": [
   "store_warehouse",
-  "enable_auto_production_plan"
+  "enable_auto_production_plan",
+  "sales_plan_backward_guard",
+  "require_active_menu_for_planning",
+  "enable_auto_work_order_on_production_plan_submit"
  ],
  "fields": [
   {
@@ -19,6 +22,28 @@
    "fieldname": "enable_auto_production_plan",
    "fieldtype": "Check",
    "label": "Auto-create Production Plan on Sales Plan Approval"
+  },
+  {
+   "default": "Block",
+   "description": "What happens when a Sales Plan is Returned to Draft or Cancelled while a live (non-cancelled) Production Plan is linked to it. Block is recommended.",
+   "fieldname": "sales_plan_backward_guard",
+   "fieldtype": "Select",
+   "label": "Sales Plan Return/Cancel with Live Production Plan",
+   "options": "Block\nWarn"
+  },
+  {
+   "default": "1",
+   "description": "When on, a sellable item can only be planned for a branch if it is on an enabled URY Menu for that branch. Non-sellable (semi-finished) items are exempt.",
+   "fieldname": "require_active_menu_for_planning",
+   "fieldtype": "Check",
+   "label": "Require Active Menu Item for Sales Plan Items"
+  },
+  {
+   "default": "0",
+   "description": "When on, submitting a Production Plan (whether via the auto-create-on-Sales-Plan-approval path or a manual submit) also creates and submits a Work Order for each of its items -- stopping there, ready for Material Transfer/Start. Material transfer and manufacture are never automated.",
+   "fieldname": "enable_auto_work_order_on_production_plan_submit",
+   "fieldtype": "Check",
+   "label": "Auto-create and Submit Work Orders on Production Plan Submit"
   }
  ],
  "index_web_pages_for_search": 1,

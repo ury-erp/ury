@@ -13,6 +13,8 @@ export interface ComparableHistoryItem {
   stock_uom?: string;
   department?: string;
   production_unit?: string;
+  production_policy?: string;
+  bom?: string;
   average_qty: number;
   sample_days: number;
   total_qty?: number;
@@ -77,6 +79,8 @@ export const addManualItemToDraft = (
     stock_uom: searchResult.stock_uom || 'Nos',
     department: searchResult.department || 'Ungrouped',
     production_unit: searchResult.production_unit || 'Unassigned',
+    production_policy: searchResult.production_policy,
+    bom: searchResult.bom,
     average_qty: 0,
     sample_days: 0,
     history: [],
@@ -115,6 +119,8 @@ export const normalizeHistoryResponse = (payload: unknown): ComparableHistoryRes
       stock_uom: item.stock_uom || 'Nos',
       department: item.department || 'Ungrouped',
       production_unit: item.production_unit || 'Unassigned',
+      production_policy: item.production_policy,
+      bom: item.bom,
       average_qty: Number(item.average_qty ?? item.avg_qty ?? 0),
       sample_days: Number(item.sample_days ?? item.history?.length ?? 0),
       total_qty: Number(item.total_qty ?? 0),
@@ -229,6 +235,8 @@ export interface BranchItemSearchResult {
   stock_uom?: string;
   department?: string;
   production_unit?: string;
+  production_policy?: string;
+  bom?: string;
 }
 
 export interface SearchBranchItemsParams {
@@ -237,6 +245,15 @@ export interface SearchBranchItemsParams {
   query?: string;
   limit?: number;
 }
+
+export type ProductionPlanState = {
+  state: 'none' | 'live' | 'stale' | 'ineligible';
+  name?: string;
+  docstatus?: number;
+  can_open?: boolean;
+  can_create?: boolean;
+  issues?: string[];
+};
 
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
@@ -280,6 +297,22 @@ export const salesPlanService = {
       body,
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
+  async getProductionPlanState(name: string): Promise<ProductionPlanState> {
+    const res = await call.get<ProductionPlanState>(
+      'ury.ury.api.ury_sales_plan_production_plan.get_production_plan_state',
+      { sales_plan: name },
+    );
+    return ((res as any)?.message ?? res) as ProductionPlanState;
+  },
+
+  async openOrCreateProductionPlan(name: string): Promise<{ name: string; created: boolean; docstatus: number }> {
+    const res = await call.post<{ name: string; created: boolean; docstatus: number }>(
+      'ury.ury.api.ury_sales_plan_production_plan.open_or_create_production_plan',
+      { sales_plan: name },
+    );
+    return ((res as any)?.message ?? res) as { name: string; created: boolean; docstatus: number };
   },
 
   async getPlan(name: string): Promise<Record<string, unknown>> {

@@ -101,6 +101,19 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         self.mock_get_value = patcher.start()
         self.addCleanup(patcher.stop)
 
+        # _filter_items_in_scope's sellable-item defence hits
+        # frappe.get_all("Item", ...); default every item_code sellable so
+        # existing tests (not concerned with that check) are unaffected.
+        # test_excludes_non_sellable_items below overrides this per-test.
+        get_all_patcher = mock.patch(
+            "ury.ury.api.ury_production_plan_adapter.frappe.get_all",
+            side_effect=lambda doctype, filters=None, pluck=None, **kw: list(
+                (filters or {}).get("name", [""])[1]
+            ),
+        )
+        self.mock_get_all = get_all_patcher.start()
+        self.addCleanup(get_all_patcher.stop)
+
     def test_rejects_plan_with_no_status(self):
         doc = FakeDoc(name="SP-DRAFT", status="Draft", approval_snapshot=None)
         with self.assertRaises(UnapprovedSalesPlanError):
@@ -242,6 +255,38 @@ class AdaptSalesPlanToProductionPlanTests(unittest.TestCase):
         item_codes = [row["item_code"] for row in result["po_items"]]
         self.assertEqual(item_codes, ["PP-1"])
         self.assertEqual(result["total_planned_qty"], 4)
+
+    def test_non_sellable_items_excluded_even_if_pre_produced(self):
+        """Last-gate defence: a sub-assembly leaked in with a PRE_PRODUCED
+        config must still never reach a Production Plan's po_items."""
+        snapshot = make_snapshot(
+            items=[
+                {
+                    "item_code": "PP-1",
+                    "qty": 4,
+                    "stock_uom": "Nos",
+                    "department": "Kitchen",
+                    "production_policy": "PRE_PRODUCED",
+                    "bom": "BOM-PP-1",
+                },
+                {
+                    "item_code": "SUB-1",
+                    "qty": 2,
+                    "stock_uom": "Nos",
+                    "department": "Kitchen",
+                    "production_policy": "PRE_PRODUCED",
+                    "bom": "BOM-SUB-1",
+                },
+            ]
+        )
+        doc = make_approved_doc(snapshot=snapshot)
+        with mock.patch(
+            "ury.ury.api.ury_production_plan_adapter.frappe.get_all",
+            return_value=["PP-1"],
+        ):
+            result = adapt_sales_plan_to_production_plan(doc)
+        item_codes = [row["item_code"] for row in result["po_items"]]
+        self.assertEqual(item_codes, ["PP-1"])
 
     def test_made_to_order_items_excluded(self):
         # Made-to-order items are excluded per Track-Item N2's scope: the

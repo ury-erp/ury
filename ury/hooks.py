@@ -54,7 +54,7 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 # include js in doctype views
 doctype_js = {
     "POS Closing Entry": "ury/public/js/pos_closing_entry_clock_integrity.js",
-    "Production Plan": "ury/public/js/production_plan_from_sales_plan.js",
+    "Production Plan": "public/js/production_plan_cancel_guard.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -74,6 +74,13 @@ website_route_rules = [
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/ury/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
+    # Staff Serve PWA — must precede the generic /ury/<path> catchall.
+    # Exact + trailing-slash + nested SPA paths; SW is a more-specific rule
+    # so /ury/serve/sw.js is not swallowed by the SPA page.
+    {"from_route": "/ury/serve/sw.js", "to_route": "serve-sw.js"},
+    {"from_route": "/ury/serve", "to_route": "serve"},
+    {"from_route": "/ury/serve/", "to_route": "serve"},
+    {"from_route": "/ury/serve/<path:app_path>", "to_route": "serve"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -269,6 +276,13 @@ doc_events = {
     "Stock Entry": {
         "validate": "ury.ury.api.ury_manufacture_enforcement.validate_manufacture_requires_work_order",
     },
+    "Work Order": {
+        "validate": "ury.ury.api.ury_work_order_hooks.validate",
+    },
+    "Production Plan": {
+        "on_submit": "ury.ury.api.ury_production_plan_auto_work_order.maybe_create_and_submit_work_orders",
+        "before_cancel": "ury.ury.api.ury_production_plan_cancel_hooks.before_cancel",
+    },
 }
 
 # Scheduled Tasks
@@ -353,7 +367,8 @@ on_session_creation = [
 website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
-# after_request = ["ury.utils.after_request"]
+# Sets Service-Worker-Allowed + JS content-type for the Serve PWA worker.
+after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
 website_redirects = [
     {

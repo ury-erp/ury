@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect, useRef, useState } from 'react';
 import { CustomerPicker } from './CustomerPicker';
 import type { Customer } from '../store/pos-store';
 
@@ -23,14 +24,80 @@ vi.mock('../i18n', () => ({
 }));
 
 vi.mock('@ury/ui', () => ({
-  Button: ({ children, onClick, disabled, ...props }: any) => (
-    <button onClick={onClick} disabled={disabled} {...props}>{children}</button>
-  ),
-  Dialog: ({ children, open, onOpenChange }: any) => open ? <div>{children}</div> : null,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  Input: ({ value, onChange, onFocus, ...props }: any) => (
-    <input value={value} onChange={onChange} onFocus={onFocus} {...props} />
-  ),
+  CustomerPicker: ({
+    value,
+    onChange,
+    results,
+    searching,
+    onSearch,
+    disabled,
+    labels,
+  }: {
+    value: { id: string; name: string; phone: string } | null;
+    onChange: (customer: { id: string; name: string; phone: string } | null) => void;
+    results: Array<{ id: string; name: string; phone: string }>;
+    searching?: boolean;
+    onSearch: (query: string) => void;
+    disabled?: boolean;
+    labels: {
+      placeholder: string;
+      addNew: string;
+      changeLabel?: string;
+      cancel: string;
+      searching: string;
+      noResults: string;
+    };
+  }) => {
+    const [query, setQuery] = useState('');
+    const [listOpen, setListOpen] = useState(false);
+    const onSearchRef = useRef(onSearch);
+    onSearchRef.current = onSearch;
+
+    useEffect(() => {
+      const timer = window.setTimeout(() => onSearchRef.current(query), 300);
+      return () => window.clearTimeout(timer);
+    }, [query]);
+
+    if (value) {
+      return (
+        <div>
+          <p>{value.name}</p>
+          <p>{value.phone}</p>
+          <button type="button" disabled={disabled} onClick={() => onChange(null)}>
+            {labels.changeLabel ?? labels.cancel}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <input
+          type="search"
+          placeholder={labels.placeholder}
+          value={query}
+          disabled={disabled}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setListOpen(true);
+          }}
+          onFocus={() => setListOpen(true)}
+        />
+        {listOpen && (
+          <div>
+            {searching && <span>{labels.searching}</span>}
+            {results.map((customer) => (
+              <div key={customer.id}>{customer.name}</div>
+            ))}
+            {query.trim() && !searching && results.length === 0 && (
+              <span>{labels.noResults}</span>
+            )}
+            <button type="button">{labels.addNew}</button>
+          </div>
+        )}
+      </div>
+    );
+  },
 }));
 
 import { searchCustomers, addCustomer } from '../lib/customer-api';

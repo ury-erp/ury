@@ -36,11 +36,50 @@ vi.mock("@ury/core", () => ({
 }));
 
 vi.mock("@ury/ui", () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Input: ({ ...props }: any) => <input {...props} />,
-  Dialog: ({ children, onOpenChange, open }: any) => open ? <div>{children}</div> : null,
-  DialogContent: ({ children, ref }: any) => <div ref={ref} data-testid="dialog-content">{children}</div>,
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
+  ProductConfigurator: ({
+    open,
+    itemName,
+    quantity,
+    onQuantityChange,
+    totalLabel,
+    labels,
+    onSubmit,
+    submitDisabled,
+    onOpenChange,
+  }: {
+    open: boolean;
+    itemName: string;
+    quantity: string;
+    onQuantityChange: (value: string) => void;
+    totalLabel: string;
+    labels: { quantity: string; total: string; submit: string };
+    onSubmit: () => void;
+    submitDisabled?: boolean;
+    onOpenChange: (open: boolean) => void;
+  }) => {
+    if (!open) return null;
+
+    return (
+      <div data-testid="dialog-content">
+        <h2>{itemName}</h2>
+        <input
+          type="number"
+          role="spinbutton"
+          value={quantity}
+          onChange={(e) => onQuantityChange(e.target.value)}
+          aria-label={labels.quantity}
+        />
+        <span>{labels.total}</span>
+        <span>{totalLabel}</span>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          Close
+        </button>
+        <button type="button" onClick={onSubmit} disabled={submitDisabled}>
+          {labels.submit}
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("../i18n", () => ({
