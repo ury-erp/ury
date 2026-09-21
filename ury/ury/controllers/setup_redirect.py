@@ -14,6 +14,13 @@ _REDIRECT_PREFIXES = ("", "app", "desk", "apps", "setup-wizard")
 _WIZARD_HOME_PAGE = "setup-wizard"
 _DESK_HOME_PAGE = "Workspaces"
 
+# Boots arrive in parallel, and every one of them sees the same stale pair.
+# Without a claim they all attempt the same write and deadlock each other on
+# tabDefaultValue's SELECT ... FOR UPDATE. The claim expires so that a repair
+# that dies mid-flight is retried rather than blocked forever.
+_REPAIR_LOCK_KEY = "ury_setup_repair_in_flight"
+_REPAIR_LOCK_TTL = 60
+
 
 def _is_setup_complete_safe():
     """`frappe.is_setup_complete()` without letting a boot-time failure raise."""
@@ -108,6 +115,19 @@ def _has_stale_wizard_home_page():
     return frappe.db.get_default("desktop:home_page") == _WIZARD_HOME_PAGE
 
 
+def _claim_repair():
+    """Take the single-flight claim for the repair, or report it is taken."""
+    try:
+        return bool(
+            frappe.cache.set(
+                frappe.cache.make_key(_REPAIR_LOCK_KEY), 1, nx=True, ex=_REPAIR_LOCK_TTL
+            )
+        )
+    except Exception:
+        # No cache to coordinate through: skip the write rather than race it.
+        return False
+
+
 def repair_interrupted_setup():
     """Finish the wrap-up a failed setup stage skipped.
 
@@ -130,8 +150,18 @@ def repair_interrupted_setup():
         # and repair on the next writable request.
         return False
 
-    disable_future_access()
-    frappe.db.commit()  # nosemgrep -- boot path; the repair must outlive this request
+    if not _claim_repair():
+        return False
+
+    try:
+        disable_future_access()
+        frappe.db.commit()  # nosemgrep -- boot path; the repair must outlive this request
+    except frappe.QueryDeadlockError:
+        # Someone else is writing the same row. Their repair stands; this boot
+        # still gets the override below, so nothing is left wedged.
+        frappe.db.rollback()
+        return False
+
     return True
 
 
