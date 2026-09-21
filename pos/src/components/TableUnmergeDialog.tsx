@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@ury/ui';
-import { Button } from '@ury/ui';
+import { ConfirmDialog } from '@ury/ui';
 import { t } from '../i18n';
 import type { Table } from '../lib/table-api';
 
@@ -27,42 +19,31 @@ const TableUnmergeDialog = ({
   onConfirm,
 }: TableUnmergeDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   if (!sourceTable) return null;
 
-  const membersLabel = groupMembers.join(', ');
-
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    try {
-      await onConfirm();
-      onOpenChange(false);
-    } catch {
-      // Error toast handled by parent
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(next) => !isSubmitting && onOpenChange(next)}>
-      <DialogContent onClose={() => !isSubmitting && onOpenChange(false)}>
-        <DialogHeader>
-          <DialogTitle>{t('tables.unmerge_group_title')}</DialogTitle>
-          <DialogDescription>
-            {t('tables.unmerge_group_description', { tables: membersLabel })}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            {t('common.cancel')}
-          </Button>
-          <Button variant="danger" onClick={handleConfirm} disabled={isSubmitting}>
-            {isSubmitting ? t('common.loading') : t('tables.unmerge_confirm')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('tables.unmerge_group_title')}
+      description={t('tables.unmerge_group_description', { tables: groupMembers.join(', ') })}
+      cancelLabel={t('common.cancel')}
+      confirmLabel={t('tables.unmerge_confirm')}
+      loadingLabel={t('common.loading')}
+      confirmVariant="danger"
+      isSubmitting={isSubmitting}
+      onConfirm={async () => {
+        setIsSubmitting(true);
+        try {
+          await onConfirm();
+          onOpenChange(false);
+        } catch {
+          // Error toast handled by parent; keep dialog open.
+        } finally {
+          setIsSubmitting(false);
+        }
+      }}
+    />
   );
 };
 
