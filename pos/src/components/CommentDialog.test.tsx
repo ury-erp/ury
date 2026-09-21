@@ -110,24 +110,26 @@ describe("CommentDialog", () => {
       />
     );
 
-    const closeButton = screen.getByRole("button", { name: "" }).closest("button");
-    if (closeButton) {
-      await user.click(closeButton);
-    }
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    await user.click(closeButton);
 
     expect(onClose).toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("autofocuses textarea when opened", () => {
+  it("autofocuses textarea when opened", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
+    const user = userEvent.setup();
 
     render(
       <CommentDialog isOpen={true} onClose={onClose} onSave={onSave} />
     );
 
     const textarea = screen.getByPlaceholderText("Enter your comment here");
+    // Dialog seeds focus on Close; Tab reaches the autoFocus textarea next.
+    expect(screen.getByRole("button", { name: /close/i })).toHaveFocus();
+    await user.tab();
     expect(textarea).toHaveFocus();
   });
 

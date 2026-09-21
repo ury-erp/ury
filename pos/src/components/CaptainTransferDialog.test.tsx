@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 
 const { mockDbGetDocList } = vi.hoisted(() => {
   return {
@@ -17,16 +18,73 @@ vi.mock("@ury/core", () => {
 });
 
 vi.mock("@ury/ui", () => ({
-  Dialog: ({ children, onOpenChange, open }: any) => open ? <div>{children}</div> : null,
-  DialogContent: ({ children, onClose }: any) => <div data-testid="dialog-content">{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2>{children}</h2>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Input: ({ ...props }: any) => <input {...props} />,
-  Spinner: ({ message }: any) => <div data-testid="spinner">{message}</div>,
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
+  UserPickerDialog: ({
+    open,
+    onOpenChange,
+    sourceValue,
+    options,
+    loading,
+    loadError,
+    search,
+    onSearchChange,
+    onConfirm,
+    labels,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    sourceValue?: string;
+    options: Array<{ name: string; label: string }>;
+    loading?: boolean;
+    loadError?: string | null;
+    search: string;
+    onSearchChange: (value: string) => void;
+    onConfirm: (name: string) => Promise<void> | void;
+    labels: Record<string, string>;
+  }) => {
+    const [selected, setSelected] = useState<string | null>(null);
+
+    if (!open) return null;
+
+    return (
+      <div data-testid="dialog-content">
+        <h2>{labels.title}</h2>
+        <p>{labels.description}</p>
+        {sourceValue != null && sourceValue !== "" && (
+          <input readOnly value={sourceValue} />
+        )}
+        <input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={labels.searchPlaceholder}
+        />
+        {loading ? (
+          <div data-testid="spinner">{labels.loading}</div>
+        ) : loadError ? (
+          <p>{loadError}</p>
+        ) : options.length === 0 ? (
+          <p>{labels.empty}</p>
+        ) : (
+          options.map((opt) => (
+            <button key={opt.name} type="button" onClick={() => setSelected(opt.name)}>
+              {opt.label}
+            </button>
+          ))
+        )}
+        <button type="button" onClick={() => onOpenChange(false)}>
+          {labels.cancel}
+        </button>
+        <button
+          type="button"
+          disabled={!selected || loading || !!loadError}
+          onClick={() => {
+            if (selected) void onConfirm(selected);
+          }}
+        >
+          {labels.confirm}
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("../i18n", () => ({
