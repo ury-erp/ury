@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } fr
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/cn';
 import {
+  addDays,
+  addMonths,
   startOfDay,
   endOfDay,
   startOfWeek,
@@ -62,6 +64,113 @@ const MONTH_NAMES = [
 ];
 
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/** Full weekday names for the column headers' accessible text -- "SU" is a
+ *  visual abbreviation, and a screen reader should not have to spell it. */
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Local-calendar YYYY-MM-DD. Deliberately not toISOString().slice(0, 10),
+ *  which converts to UTC first and lands on the wrong day either side of
+ *  midnight -- the same bug SalesPlanPage's getToday() works around. */
+const toDateStr = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const fromDateStr = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+/** Split the flat 35/42-cell run into weeks, so the grid can expose one
+ *  `role="row"` per week the way a calendar grid is meant to be read. */
+function chunkWeeks<T>(cells: T[]): T[][] {
+  const weeks: T[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+  return weeks;
+}
+
+/**
+ * Roving-tabindex keyboard navigation for a calendar grid.
+ *
+ * The day cells were `<div onClick>`: not focusable, not in the tab order,
+ * and with no way to pick a date from the keyboard at all. Making each one a
+ * real `<button>` fixes that, but 42 buttons in the tab order is its own kind
+ * of unusable -- so only the focused day is tabbable and the arrow keys move
+ * between them, which is the grid pattern a date picker is expected to follow.
+ *
+ * Returns the focused day (as YYYY-MM-DD) plus the keydown handler; the
+ * caller renders `tabIndex={dateStr === focusedDate ? 0 : -1}` and keeps its
+ * own `viewDate` in step so the focused day is actually on screen.
+ */
+function useCalendarKeyboard(
+  isOpen: boolean,
+  initialDate: () => string,
+  setViewDate: React.Dispatch<React.SetStateAction<Date>>
+) {
+  const [focusedDate, setFocusedDate] = useState('');
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) setFocusedDate(initialDate());
+    // `initialDate` is read only on the open transition -- re-running this
+    // whenever the caller's closure changes would yank focus back mid-navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !focusedDate) return;
+    gridRef.current?.querySelector<HTMLButtonElement>(`[data-date="${focusedDate}"]`)?.focus();
+  }, [isOpen, focusedDate]);
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (!focusedDate) return;
+    const current = fromDateStr(focusedDate);
+    let next: Date;
+    switch (event.key) {
+      case 'ArrowLeft':
+        next = addDays(current, -1);
+        break;
+      case 'ArrowRight':
+        next = addDays(current, 1);
+        break;
+      case 'ArrowUp':
+        next = addDays(current, -7);
+        break;
+      case 'ArrowDown':
+        next = addDays(current, 7);
+        break;
+      case 'Home':
+        next = startOfWeek(current);
+        break;
+      case 'End':
+        next = endOfWeek(current);
+        break;
+      case 'PageUp':
+        next = addMonths(current, event.shiftKey ? -12 : -1);
+        break;
+      case 'PageDown':
+        next = addMonths(current, event.shiftKey ? 12 : 1);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    // Both updates have to land in the SAME commit. Paging the month from an
+    // effect instead put the new month in a later render than the one the
+    // focus effect saw, and because React reuses the day nodes across that
+    // re-render, focus stayed put on a button that had silently become a
+    // different date.
+    setFocusedDate(toDateStr(next));
+    setViewDate((prev) =>
+      prev.getFullYear() === next.getFullYear() && prev.getMonth() === next.getMonth()
+        ? prev
+        : new Date(next.getFullYear(), next.getMonth(), 1)
+    );
+  };
+
+  return { focusedDate, setFocusedDate, gridRef, handleKeyDown };
+}
 
 function useDropdownPosition(
   isOpen: boolean,
@@ -146,6 +255,7 @@ export function DatePicker({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const dropdownStyle = useDropdownPosition(isOpen, containerRef, dropdownRef, 280);
 
@@ -163,6 +273,15 @@ export function DatePicker({
   }, [value]);
 
   const [viewDate, setViewDate] = useState<Date>(selectedDate);
+
+  const { focusedDate, gridRef, handleKeyDown } = useCalendarKeyboard(
+    isOpen,
+    () => {
+      const start = value || toDateStr(new Date());
+      return maxDate && start > maxDate ? maxDate : start;
+    },
+    setViewDate
+  );
 
   // Sync viewDate when value changes
   useEffect(() => {
@@ -192,6 +311,12 @@ export function DatePicker({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [id, onBlur]);
+
+  const closeAndRestoreFocus = () => {
+    setIsOpen(false);
+    onBlur?.(id);
+    triggerRef.current?.focus();
+  };
 
   // Calendar grid calculations
   const calendarDays = useMemo(() => {
@@ -275,11 +400,23 @@ export function DatePicker({
   };
 
   return (
-    <div ref={containerRef} className={`relative ${className ?? 'w-full'}`}>
+    <div
+      ref={containerRef}
+      className={`relative ${className ?? 'w-full'}`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && isOpen) {
+          event.stopPropagation();
+          closeAndRestoreFocus();
+        }
+      }}
+    >
       <button
         id={id}
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
           'w-full',
@@ -307,6 +444,8 @@ export function DatePicker({
       {isOpen && (
         <div
           ref={dropdownRef}
+          role="dialog"
+          aria-label={ariaLabel ? `${ariaLabel} calendar` : 'Choose a date'}
           style={dropdownStyle}
           className="absolute top-[calc(100%+4px)] z-[100] bg-card border border-border rounded-xl shadow-xl p-3 w-[280px] max-w-[calc(100vw-32px)] focus:outline-none"
         >
@@ -337,46 +476,76 @@ export function DatePicker({
             </button>
           </div>
 
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {WEEKDAYS.map((wd) => (
-              <span key={wd} className="text-xs font-semibold text-text-tertiary">
-                {wd}
-              </span>
-            ))}
-          </div>
-
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {calendarDays.map((item, index) => {
-              if (!item.isCurrentMonth) {
-                return (
-                  <div key={index} className="text-sm py-1 text-muted-foreground/50 select-none">
-                    {item.day}
-                  </div>
-                );
-              }
-
-              const isSelected = item.dateStr === value;
-              const isDisabled = maxDate ? item.dateStr > maxDate : false;
-
-              return (
-                <div
-                  key={index}
-                  data-date={item.dateStr}
-                  onClick={() => !isDisabled && handleSelectDay(item.dateStr)}
-                  className={`text-sm py-1 rounded-lg font-medium transition-colors select-none ${
-                    isDisabled
-                      ? 'text-muted-foreground/50 cursor-not-allowed'
-                      : isSelected
-                      ? 'bg-foreground text-background font-bold cursor-pointer'
-                      : 'text-foreground hover:bg-muted cursor-pointer'
-                  }`}
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`${MONTH_NAMES[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
+            onKeyDown={handleKeyDown}
+          >
+            <div role="row" className="grid grid-cols-7 gap-1 text-center mb-1">
+              {WEEKDAYS.map((wd, weekdayIndex) => (
+                <span
+                  key={wd}
+                  role="columnheader"
+                  aria-label={WEEKDAY_NAMES[weekdayIndex]}
+                  className="text-xs font-semibold text-text-tertiary"
                 >
-                  {item.day}
-                </div>
-              );
-            })}
+                  {wd}
+                </span>
+              ))}
+            </div>
+
+            {chunkWeeks(calendarDays).map((week, weekIndex) => (
+              <div role="row" key={weekIndex} className="grid grid-cols-7 gap-1 text-center">
+                {week.map((item, index) => {
+                  // Padding from the neighbouring months: shown for alignment,
+                  // not selectable, so it stays out of the accessibility tree
+                  // instead of announcing a day that does nothing.
+                  if (!item.isCurrentMonth) {
+                    return (
+                      <div
+                        key={index}
+                        role="gridcell"
+                        aria-hidden="true"
+                        className="text-sm py-1 text-muted-foreground/50 select-none"
+                      >
+                        {item.day}
+                      </div>
+                    );
+                  }
+
+                  const isSelected = item.dateStr === value;
+                  const isDisabled = maxDate ? item.dateStr > maxDate : false;
+                  const isToday = item.dateStr === toDateStr(new Date());
+
+                  return (
+                    <div role="gridcell" key={index} aria-selected={isSelected}>
+                      <button
+                        type="button"
+                        data-date={item.dateStr}
+                        disabled={isDisabled}
+                        tabIndex={item.dateStr === focusedDate ? 0 : -1}
+                        aria-label={format(fromDateStr(item.dateStr), 'd MMMM yyyy')}
+                        aria-current={isToday ? 'date' : undefined}
+                        onClick={() => handleSelectDay(item.dateStr)}
+                        className={cn(
+                          'w-full text-sm py-1 rounded-lg font-medium transition-colors select-none',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          isDisabled
+                            ? 'text-muted-foreground/50 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-foreground text-background font-bold cursor-pointer'
+                              : 'text-foreground hover:bg-muted cursor-pointer'
+                        )}
+                      >
+                        {item.day}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           {/* Footer Today Button */}
@@ -412,9 +581,16 @@ export function UryDateRangePicker({ value, onChange, className, size }: UryDate
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownStyle = useDropdownPosition(isOpen, containerRef, dropdownRef, 300);
 
   const [viewDate, setViewDate] = useState<Date>(() => value.from ?? new Date());
+
+  const { focusedDate, gridRef, handleKeyDown } = useCalendarKeyboard(
+    isOpen,
+    () => toDateStr(value.from ?? new Date()),
+    setViewDate
+  );
 
   useEffect(() => {
     setViewDate(value.from ?? new Date());
@@ -442,6 +618,13 @@ export function UryDateRangePicker({ value, onChange, className, size }: UryDate
   const handleNextMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+  };
+
+  const closeAndRestoreFocus = () => {
+    setIsOpen(false);
+    setRangeSelection({ from: null, to: null });
+    setHoverDate(null);
+    triggerRef.current?.focus();
   };
 
   const applyPreset = (presetRange: DateRangeValue) => {
@@ -552,9 +735,22 @@ export function UryDateRangePicker({ value, onChange, className, size }: UryDate
   const labelText = `${format(value.from, 'MMM d, yyyy')} - ${format(value.to, 'MMM d, yyyy')}`;
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${className ?? ''}`}>
+    <div
+      ref={containerRef}
+      className={`relative inline-block ${className ?? ''}`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && isOpen) {
+          event.stopPropagation();
+          closeAndRestoreFocus();
+        }
+      }}
+    >
       <button
+        ref={triggerRef}
         type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-label={`Date range: ${labelText}`}
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(triggerVariants({ size }), 'border-input')}
       >
@@ -567,6 +763,8 @@ export function UryDateRangePicker({ value, onChange, className, size }: UryDate
       {isOpen && (
         <div
           ref={dropdownRef}
+          role="dialog"
+          aria-label="Choose a date range"
           style={dropdownStyle}
           className="absolute top-[calc(100%+8px)] z-[100] bg-card border border-border rounded-2xl shadow-xl p-4 w-[300px] max-w-[calc(100vw-32px)] focus:outline-none"
         >
@@ -611,56 +809,88 @@ export function UryDateRangePicker({ value, onChange, className, size }: UryDate
             </button>
           </div>
 
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-2">
-            {WEEKDAYS.map((wd) => (
-              <span key={wd} className="text-xs font-semibold text-text-tertiary">
-                {wd}
-              </span>
-            ))}
-          </div>
-
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {calendarDays.map((item, index) => {
-              if (!item.isCurrentMonth) {
-                return (
-                  <div key={index} className="text-sm py-1.5 text-muted-foreground/50 select-none">
-                    {item.day}
-                  </div>
-                );
-              }
-
-              const isStart = isSameDay(item.dateObj, activeFrom);
-              const isEnd = isSameDay(item.dateObj, activeTo);
-              const inRange =
-                activeFrom &&
-                activeTo &&
-                item.dateObj >= startOfDay(activeFrom < activeTo ? activeFrom : activeTo) &&
-                item.dateObj <= endOfDay(activeFrom < activeTo ? activeTo : activeFrom);
-
-              let styleClasses = 'text-foreground hover:bg-muted rounded-lg';
-              if (isStart && isEnd) {
-                styleClasses = 'bg-foreground text-background font-bold rounded-lg';
-              } else if (isStart) {
-                styleClasses = 'bg-foreground text-background font-bold rounded-l-lg';
-              } else if (isEnd) {
-                styleClasses = 'bg-foreground text-background font-bold rounded-r-lg';
-              } else if (inRange) {
-                styleClasses = 'bg-primary/10 text-primary font-medium rounded-none';
-              }
-
-              return (
-                <div
-                  key={index}
-                  onClick={() => handleDayClick(item.dateObj)}
-                  onMouseEnter={() => rangeSelection.from && !rangeSelection.to && setHoverDate(item.dateObj)}
-                  className={`text-sm py-1.5 cursor-pointer transition-colors select-none ${styleClasses}`}
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`${MONTH_NAMES[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
+            onKeyDown={handleKeyDown}
+          >
+            <div role="row" className="grid grid-cols-7 gap-1 text-center mb-2">
+              {WEEKDAYS.map((wd, weekdayIndex) => (
+                <span
+                  key={wd}
+                  role="columnheader"
+                  aria-label={WEEKDAY_NAMES[weekdayIndex]}
+                  className="text-xs font-semibold text-text-tertiary"
                 >
-                  {item.day}
-                </div>
-              );
-            })}
+                  {wd}
+                </span>
+              ))}
+            </div>
+
+            {chunkWeeks(calendarDays).map((week, weekIndex) => (
+              <div role="row" key={weekIndex} className="grid grid-cols-7 gap-1 text-center">
+                {week.map((item, index) => {
+                  if (!item.isCurrentMonth) {
+                    return (
+                      <div
+                        key={index}
+                        role="gridcell"
+                        aria-hidden="true"
+                        className="text-sm py-1.5 text-muted-foreground/50 select-none"
+                      >
+                        {item.day}
+                      </div>
+                    );
+                  }
+
+                  const isStart = isSameDay(item.dateObj, activeFrom);
+                  const isEnd = isSameDay(item.dateObj, activeTo);
+                  const inRange =
+                    activeFrom &&
+                    activeTo &&
+                    item.dateObj >= startOfDay(activeFrom < activeTo ? activeFrom : activeTo) &&
+                    item.dateObj <= endOfDay(activeFrom < activeTo ? activeTo : activeFrom);
+
+                  let styleClasses = 'text-foreground hover:bg-muted rounded-lg';
+                  if (isStart && isEnd) {
+                    styleClasses = 'bg-foreground text-background font-bold rounded-lg';
+                  } else if (isStart) {
+                    styleClasses = 'bg-foreground text-background font-bold rounded-l-lg';
+                  } else if (isEnd) {
+                    styleClasses = 'bg-foreground text-background font-bold rounded-r-lg';
+                  } else if (inRange) {
+                    styleClasses = 'bg-primary/10 text-primary font-medium rounded-none';
+                  }
+
+                  const dateStr = toDateStr(item.dateObj);
+                  const isToday = dateStr === toDateStr(new Date());
+
+                  return (
+                    <div role="gridcell" key={index} aria-selected={Boolean(isStart || isEnd || inRange)}>
+                      <button
+                        type="button"
+                        data-date={dateStr}
+                        tabIndex={dateStr === focusedDate ? 0 : -1}
+                        aria-label={format(item.dateObj, 'd MMMM yyyy')}
+                        aria-current={isToday ? 'date' : undefined}
+                        onClick={() => handleDayClick(item.dateObj)}
+                        onFocus={() => rangeSelection.from && !rangeSelection.to && setHoverDate(item.dateObj)}
+                        onMouseEnter={() => rangeSelection.from && !rangeSelection.to && setHoverDate(item.dateObj)}
+                        className={cn(
+                          'w-full text-sm py-1.5 cursor-pointer transition-colors select-none',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          styleClasses
+                        )}
+                      >
+                        {item.day}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       )}
