@@ -39,7 +39,8 @@
   "customer_group",
   "table_takeaway",
   "user",
-  "amended_from"
+  "amended_from",
+  "validation_dedup_key"
  ],
  "fields": [
   {
@@ -253,6 +254,16 @@
    "fieldtype": "Data",
    "label": "Total Production Time",
    "read_only": 1
+  },
+  {
+   "description": "Set only by the scheduled kotValidationThread fallback (ury_kot_validation.py) as \"<invoice>::<production>\". Left unset (NULL) by the live kot_execute writer path, so it never collides with normal order/modification KOTs. Its uniqueness stops the scheduler's own check-then-insert race (the same not-yet-submitted invoice can be re-selected across overlapping cron ticks) from creating more than one fallback \"Duplicate\" KOT for the same invoice+production.",
+   "fieldname": "validation_dedup_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Validation Dedup Key",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
   }
  ],
  "index_web_pages_for_search": 1,

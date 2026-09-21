@@ -19,6 +19,8 @@ import json
 import frappe
 from frappe.utils import add_days, now, nowdate
 
+from ury.ury.api.ury_sales_plan import advance_plan_to_approved
+
 
 DEMO_COMPONENTS = [
     ("Chicken", "Kg"),
@@ -32,7 +34,11 @@ DEMO_PLAN_DAYS = [0, 1, 3]
 
 def _get_branch_and_company():
     branch_name = frappe.db.get_value("Branch", {}, "name")
-    company_name = frappe.db.get_value("Company", {}, "name")
+    company_name = None
+    if branch_name:
+        company_name = frappe.db.get_value("Branch", branch_name, "company")
+    if not company_name:
+        company_name = frappe.db.get_value("Company", {}, "name")
     return branch_name, company_name
 
 
@@ -132,7 +138,17 @@ def _ensure_demo_sales_plan(branch_name, company_name, department, plan_date, de
     doc = frappe.get_doc(
         {
             "doctype": "URY Sales Plan",
-            "status": "Approved",
+            # Insert in the workflow's INITIAL state, then walk the real
+            # workflow up to "Approved" via advance_plan_to_approved().
+            # Creating the doc pre-set to "Approved" is rejected outright by
+            # Frappe's workflow engine (validate_workflow() sees a jump from
+            # the initial state to a non-adjacent one), and even where it
+            # slipped through it would leave `status = "Approved"` on a row
+            # whose `docstatus` column is still 0 -- the status/docstatus
+            # mismatch that ury.patches.v3_22.backfill_sales_plan_docstatus
+            # exists to repair. Going through apply_workflow() makes the
+            # seeded row genuinely submitted (docstatus 1) instead.
+            "status": "Draft",
             "branch": branch_name,
             "company": company_name,
             "plan_date": plan_date,
@@ -140,7 +156,16 @@ def _ensure_demo_sales_plan(branch_name, company_name, department, plan_date, de
             "approval_snapshot": encoded,
         }
     )
-    doc.insert(ignore_permissions=True)
+    try:
+        doc.insert(ignore_permissions=True)
+        doc = advance_plan_to_approved(doc)
+    except (frappe.ValidationError, frappe.PermissionError) as e:
+        # Same graceful-skip precedent more_seed.py already uses for its own
+        # demo Sales Plan: don't fail the whole stock_issue module (and every
+        # authorization/movement downstream of it) over one plan date the
+        # workflow engine won't take.
+        print(f"  ! Could not create demo URY Sales Plan for {plan_date}: {e}")
+        return None
     print(f"  + Created URY Sales Plan: {doc.name}")
     return doc.name
 
@@ -262,6 +287,11 @@ def seed():
         plan_name = _ensure_demo_sales_plan(
             branch_name, company_name, department, plan_date, demand_vector
         )
+        if not plan_name:
+            # Workflow engine rejected a pre-approved insert for this date
+            # (see _ensure_demo_sales_plan) -- nothing to build authorizations
+            # or movements against for it, skip straight to the next date.
+            continue
         created_plans.append(plan_name)
 
         for item_name, uom in DEMO_COMPONENTS:

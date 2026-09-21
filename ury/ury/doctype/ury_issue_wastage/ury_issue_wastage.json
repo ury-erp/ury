@@ -263,6 +263,11 @@
    "read": 1,
    "report": 1,
    "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager"
   }
  ],
  "sort_field": "modified",

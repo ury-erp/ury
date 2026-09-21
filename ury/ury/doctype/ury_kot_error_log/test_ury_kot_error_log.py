@@ -5,6 +5,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_kot_validation import get_kot_errors
+from ury.ury.tests.factories import make_branch
 
 TEST_CASHIER = "_test_kot_error_cashier@example.com"
 BRANCH_A = "_Test KOT Error Branch A"
@@ -102,13 +103,7 @@ class TestGetKOTErrors(FrappeTestCase):
 			if frappe.db.exists("Branch", branch):
 				frappe.delete_doc("Branch", branch, force=True, ignore_permissions=True)
 
-			frappe.get_doc(
-				{
-					"doctype": "Branch",
-					"branch": branch,
-					"user": [{"user": member}],
-				}
-			).insert(ignore_permissions=True)
+			make_branch(branch=branch, user=[{"user": member}])
 
 	def _create_pos_profile(self):
 		"""Clone an existing POS Profile and re-point it at Branch A.
@@ -131,6 +126,27 @@ class TestGetKOTErrors(FrappeTestCase):
 		profile.applicable_for_users = []
 		profile.disabled = 1
 		profile.branch = BRANCH_A
+		# ERPNext validates linked warehouses against the profile company;
+		# the source profile may use a warehouse from another demo company.
+		profile.warehouse = frappe.db.get_value(
+			"Warehouse", {"company": profile.company, "is_group": 0}, "name"
+		)
+		company = frappe.get_doc("Company", profile.company)
+		profile.income_account = company.default_income_account
+		profile.expense_account = company.default_expense_account
+		profile.write_off_account = company.default_expense_account
+		profile.cost_center = frappe.db.get_value(
+			"Cost Center", {"company": profile.company, "is_group": 0}, "name"
+		)
+		profile.write_off_cost_center = profile.cost_center
+		for payment in profile.payments:
+			account = frappe.db.get_value(
+				"Account", {"company": profile.company, "account_type": "Cash", "is_group": 0}, "name"
+			)
+			if hasattr(payment, "account"):
+				payment.account = account
+			elif hasattr(payment, "default_account"):
+				payment.default_account = account
 		profile.insert(ignore_permissions=True, set_name=POS_PROFILE)
 
 		# The branch field is a fetched/custom field, so force it after insert.

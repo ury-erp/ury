@@ -40,6 +40,7 @@ SUMMARY_FIELDS = [
 	("tax", "tax_percent", "Tax"),
 	("net_sales", "net_sales_percent", "Net Sales"),
 	("cogs", "cogs_percent", "Cost of Goods Sold"),
+	("disposables_cost", "disposables_percent", "Disposables"),
 	("total_direct_expenses", "total_direct_expenses_percent", "Total Direct Expenses"),
 	("gross_profit", "gross_profit_percent", "Gross Profit/Loss"),
 	("total_employee_costs", "total_employee_costs_percent", "Employee Costs"),
@@ -99,17 +100,21 @@ def get_daily_pnl(date, branch):
 			for r in (doc.get(table_field) or [])
 		]
 
-	cost_of_goods = [
-		{
-			"item_code": r.item_code,
-			"item_name": r.item_name,
-			"item_group": r.item_group,
-			"qty": r.qty or 0,
-			"buying_price": r.buying_price or 0,
-			"amount": r.amount or 0,
-		}
-		for r in (doc.get("cost_of_goods") or [])
-	]
+	def cost_rows(table_field):
+		return [
+			{
+				"item_code": r.item_code,
+				"item_name": r.item_name,
+				"item_group": r.item_group,
+				"qty": r.qty or 0,
+				"buying_price": r.buying_price or 0,
+				"amount": r.amount or 0,
+			}
+			for r in (doc.get(table_field) or [])
+		]
+
+	cost_of_goods = cost_rows("cost_of_goods")
+	disposables = cost_rows("disposables")
 
 	missing_price_sections = _parse_missing_price_remarks(doc.remarks)
 	# If the remarks text matched the known "BUYING PRICE NOT SET" pattern,
@@ -131,6 +136,7 @@ def get_daily_pnl(date, branch):
 		"employee_costs_breakup": breakup_rows("employee_costs_breakup"),
 		"indirect_expenses_breakup": breakup_rows("indirect_expenses_breakup"),
 		"cost_of_goods": cost_of_goods,
+		"disposables": disposables,
 	}
 
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, Minus } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
@@ -18,7 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -29,6 +29,12 @@ import {
   type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
+import {
+  reduceOrderItemQty,
+  isOrderTypeNotAllowedError,
+  isLastItemCannotBeRemovedError,
+} from '../lib/order-api';
+import { parseFrappeError } from '../lib/pos-opening-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
 
@@ -46,6 +52,15 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     (order.split_total ?? 0) >= 2 ||
     !!order.custom_split_group ||
     !!order.custom_split_from
+  );
+}
+
+function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <Badge size="tag" variant="tagAccent">
+      <Icon className="h-2.5 w-2.5" />
+      {children}
+    </Badge>
   );
 }
 
@@ -83,6 +98,7 @@ export default function Orders() {
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
   const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+  const [reducingItemKey, setReducingItemKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (selectedOrder?.name) {
@@ -191,10 +207,7 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
+      await cancelOrder(selectedOrder.name, cancelReason);
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
@@ -249,6 +262,42 @@ export default function Orders() {
       showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  // Reduces a saved/printed order's line item by 1 (or removes it at qty 1)
+  // via `reduce_order_item_qty` — a partial cancel-KOT is generated
+  // server-side for the delta. Only permitted for the invoice's Order Type
+  // when the POS Profile's allow-list includes it; that rejection is
+  // surfaced as a specific message rather than a generic failure toast.
+  async function handleReduceItemQty(item: (typeof selectedOrderItems)[number]) {
+    if (!selectedOrder) return;
+    setReducingItemKey(item.name);
+    try {
+      // `item.name` is the real POS Invoice Item child-table row name (see
+      // `getPOSInvoiceItems`/`POSInvoiceItem` in invoice-api.ts) — the
+      // authoritative selector `reduce_order_item_qty` matches on, not a
+      // locally-derived key.
+      const newQty = item.qty - 1;
+      const result = await reduceOrderItemQty(selectedOrder.name, item.name, newQty);
+      const kotNames = result.cancel_kot_names?.length ? result.cancel_kot_names.join(', ') : null;
+      showToast.success(
+        newQty === 0
+          ? `${item.item_name} removed from the order. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+          : `${item.item_name} reduced to qty ${newQty}. Cancel-KOT ${kotNames || 'generated'} sent to kitchen.`
+      );
+      await selectOrder(selectedOrder);
+    } catch (err) {
+      const parsedMessage = parseFrappeError(err) || (err instanceof Error ? err.message : null);
+      if (isOrderTypeNotAllowedError(parsedMessage)) {
+        showToast.error(`Quantity reduction isn't allowed for ${selectedOrder.order_type} orders.`);
+      } else if (isLastItemCannotBeRemovedError(parsedMessage)) {
+        showToast.error('This is the last item on the order. Cancel the whole order instead.');
+      } else {
+        showToast.error(parsedMessage || 'Failed to reduce item quantity.');
+      }
+    } finally {
+      setReducingItemKey(null);
     }
   }
 
@@ -409,29 +458,17 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
-                        {mergedBill && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                          >
-                            <GitMerge className="h-3 w-3" />
-                            {t('bill_merge.merged_bill')}
-                          </Badge>
-                        )}
+                        {mergedBill && <LinkTag icon={GitMerge}>{t('bill_merge.merged_bill')}</LinkTag>}
                         {splitBill && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                        >
-                          <GitBranch className="h-3 w-3" />
-                          {(order.split_total ?? 0) >= 2
-                            ? t('bill_split.split_indicator', {
-                                index: order.split_index ?? 0,
-                                total: order.split_total ?? 0,
-                              })
-                            : t('bill_split.split_bill')}
-                        </Badge>
-                      )}
+                          <LinkTag icon={GitBranch}>
+                            {(order.split_total ?? 0) >= 2
+                              ? t('bill_split.split_indicator', {
+                                  index: order.split_index ?? 0,
+                                  total: order.split_total ?? 0,
+                                })
+                              : t('bill_split.split_bill')}
+                          </LinkTag>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -584,27 +621,19 @@ export default function Orders() {
                 isMergedBill(selectedOrder)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitBranch className="h-3 w-3" />
+                    <LinkTag icon={GitBranch}>
                       {(selectedOrder.split_total ?? 0) >= 2
                         ? t('bill_split.split_indicator', {
                             index: selectedOrder.split_index ?? 0,
                             total: selectedOrder.split_total ?? 0,
                           })
                         : t('bill_split.split_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                   {isMergedBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitMerge className="h-3 w-3" />
+                    <LinkTag icon={GitMerge}>
                       {t('bill_merge.merged_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                 </div>
               )}
@@ -682,19 +711,58 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
-                  {selectedOrderItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                  {/* qty === 0 rows are a fully-reduced item kept server-side
+                      (zeroed, not deleted -- see ury_pos_invoice_qty_reduction's
+                      full-removal note) and must stay hidden here. */}
+                  {selectedOrderItems.filter((item) => !item.is_disposable && item.qty > 0).map((item, index) => {
+                    const discountPercentage = item.rate < item.price_list_rate
+                      ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
+                      : null;
+                    const canReduceQty =
+                      String(selectedOrder.invoice_printed) === '1' &&
+                      isOrderEditable(selectedOrder.status) &&
+                      !isMergedBill(selectedOrder) &&
+                      item.qty > 0;
+                    const isReducingThisItem = reducingItemKey === item.name;
+
+                    return (
+                      <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+                            {discountPercentage !== null && (
+                              <Badge className="shrink-0 bg-red-50 text-red-700 border-red-200 hover:bg-red-50 text-xs">
+                                -{discountPercentage}%
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {canReduceQty && (
+                              <button
+                                type="button"
+                                onClick={() => handleReduceItemQty(item)}
+                                disabled={isReducingThisItem}
+                                aria-label={`Reduce quantity of ${item.item_name}`}
+                                className="flex items-center justify-center w-5 h-5 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isReducingThisItem ? (
+                                  <Spinner className="w-3 h-3" hideMessage message="" />
+                                ) : (
+                                  <Minus className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                            <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(item.amount)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

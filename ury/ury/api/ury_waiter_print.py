@@ -51,6 +51,8 @@ def _aggregate_kot_items(kot_docs):
 					"comments": row.comments,
 					"course": row.course,
 					}
+				else:
+					add_items[key]["quantity"] += int(row.quantity or 0)
 
 	return list(add_items.values()) + list(cancel_items.values())
 

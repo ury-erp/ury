@@ -185,6 +185,18 @@ def _kot_scope(kot):
 	return row["branch"], company, row.get("production")
 
 
+def _require_kot_branch_scope(branch, user=None):
+	"""Require the KOT branch to match the user's server-side branch scope."""
+	from ury.ury_pos.api import getBranch
+
+	user = user or frappe.session.user
+	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+		return
+	active_branch = getBranch()
+	if not active_branch or active_branch in {"all", "All", "ALL"} or active_branch != branch:
+		raise ExecutionError(BRANCH_SCOPE_MISMATCH, _("KOT branch {0} is outside your active branch scope").format(branch))
+
+
 # ---------------------------------------------------------------------------
 # Audit
 # ---------------------------------------------------------------------------
@@ -221,7 +233,7 @@ def _lock_execution_row(kot):
 	rows = frappe.db.sql(
 		"""
 		SELECT name, state, idempotency_key, started_by, started_at,
-		       ready_by, ready_at, served_by, served_at
+		       ready_by, ready_at, served_by, served_at, audit_log
 		FROM `tab{doctype}`
 		WHERE kot = %(kot)s
 		ORDER BY creation DESC
@@ -275,7 +287,7 @@ def _result_dict(row, idempotent=False):
 # ---------------------------------------------------------------------------
 
 
-def _transition(kot, target_state, idempotency_key, actor, actor_field, timestamp_field, event, manager_override=False):
+def _transition(kot, target_state, idempotency_key, actor_field, timestamp_field, event, manager_override=False):
 	"""Shared transition body for start/mark_ready/serve.
 
 	Order of operations (all inside one request-scoped DB transaction):
@@ -299,7 +311,10 @@ def _transition(kot, target_state, idempotency_key, actor, actor_field, timestam
 		raise ExecutionError(
 			INVALID_EXECUTION_TRANSITION, _("idempotency_key is required")
 		)
-	actor = actor or frappe.session.user
+	# The actor is always the authenticated session user. Callers cannot
+	# supply an actor value, which would otherwise allow false audit
+	# attribution and (via _require_manager below) an authorization bypass.
+	actor = frappe.session.user
 
 	# Step 2: idempotency dedup -- no lock needed for a pure replay-of-success
 	# lookup; if this exact transition already landed under this exact key,
@@ -309,6 +324,7 @@ def _transition(kot, target_state, idempotency_key, actor, actor_field, timestam
 		return _result_dict(prior, idempotent=True)
 
 	branch, company, production_unit = _kot_scope(kot)
+	_require_kot_branch_scope(branch, actor)
 
 	# Step 4: lock any existing row for this KOT before reading its state,
 	# so two concurrent callers serialize on this SELECT ... FOR UPDATE.
@@ -353,6 +369,15 @@ def _transition(kot, target_state, idempotency_key, actor, actor_field, timestam
 	# insert the first row, seeding it as having been QUEUED.
 	if locked:
 		doc = frappe.get_doc(EXECUTION_DOCTYPE, locked["name"])
+		# `frappe.get_doc` above is a plain read: under MariaDB REPEATABLE READ
+		# it can be served from this transaction's consistent read view pinned
+		# by an earlier statement (e.g. the idempotency dedup lookup), not from
+		# the latest committed row -- even though it runs after
+		# `_lock_execution_row` took `FOR UPDATE` on this same row. Overwrite
+		# `audit_log` with the value the locking read just fetched so the
+		# read-modify-write append below lands on top of the latest committed
+		# entries instead of silently dropping a concurrently committed one.
+		doc.audit_log = locked.get("audit_log")
 	else:
 		doc = frappe.get_doc(
 			{
@@ -386,18 +411,18 @@ def _transition(kot, target_state, idempotency_key, actor, actor_field, timestam
 
 
 @frappe.whitelist()
-def start_execution(kot, idempotency_key, actor=None):
+def start_execution(kot, idempotency_key):
 	"""QUEUED -> IN_PREPARATION. Records actor+timestamp once.
 
 	A repeated call with the SAME idempotency_key returns the original
 	transition result (no duplicate state change) -- see `_transition`'s
-	dedup lookup.
+	dedup lookup. The actor is always frappe.session.user -- it cannot be
+	supplied by the caller.
 	"""
 	return _transition(
 		kot,
 		target_state=IN_PREPARATION,
 		idempotency_key=idempotency_key,
-		actor=actor,
 		actor_field="started_by",
 		timestamp_field="started_at",
 		event="start",
@@ -405,15 +430,16 @@ def start_execution(kot, idempotency_key, actor=None):
 
 
 @frappe.whitelist()
-def mark_ready(kot, idempotency_key, actor=None, manager_override=False):
+def mark_ready(kot, idempotency_key, manager_override=False):
 	"""IN_PREPARATION -> READY. Same idempotency semantics as start_execution.
 
 	Rejected (fail closed) if the KOT execution is not currently
 	IN_PREPARATION, UNLESS `manager_override=True` is passed AND the acting
-	user holds a manager role (`_require_manager`) -- this is an explicit,
-	non-silent override path, never a default bypass. The override does not
-	relax the reverse-transition guard: it can only move a KOT that has not
-    yet started (still QUEUED, or has no execution row at all) directly to
+	user (always frappe.session.user, never caller-supplied) holds a manager
+	role (`_require_manager`) -- this is an explicit, non-silent override
+	path, never a default bypass. The override does not relax the
+	reverse-transition guard: it can only move a KOT that has not yet
+    started (still QUEUED, or has no execution row at all) directly to
     READY under manager authority; it can never move READY/SERVED backward.
 	"""
 	manager_override = manager_override in (True, "true", "1", 1)
@@ -421,7 +447,6 @@ def mark_ready(kot, idempotency_key, actor=None, manager_override=False):
 		kot,
 		target_state=READY,
 		idempotency_key=idempotency_key,
-		actor=actor,
 		actor_field="ready_by",
 		timestamp_field="ready_at",
 		event="mark_ready",
@@ -430,13 +455,12 @@ def mark_ready(kot, idempotency_key, actor=None, manager_override=False):
 
 
 @frappe.whitelist()
-def serve_execution(kot, idempotency_key, actor=None):
+def serve_execution(kot, idempotency_key):
 	"""READY -> SERVED. Same idempotency semantics as start_execution."""
 	return _transition(
 		kot,
 		target_state=SERVED,
 		idempotency_key=idempotency_key,
-		actor=actor,
 		actor_field="served_by",
 		timestamp_field="served_at",
 		event="serve",

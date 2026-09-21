@@ -17,10 +17,10 @@ and its branch-isolation guarantee.
 
 from unittest.mock import patch
 
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_availability import get_item_availability
-
+from ury.ury.api.ury_availability import _resolve_plan_remaining, get_item_availability
 
 MODULE = "ury.ury.api.ury_availability"
 
@@ -33,6 +33,17 @@ def _config(**overrides):
         "warehouse": "Kitchen Warehouse - URY",
         "production_unit_disabled": 0,
         "department_disabled": 0,
+        # These three mirror the doctype's real defaults (B-1/B-2 fix):
+        # controlled_by_sales_plan defaults to 1 (mandatory plan gating,
+        # fail-closed), allow_over_plan_sale defaults to 0, and
+        # availability_mode defaults to "Plan Available" (no override).
+        # Using the real defaults here -- instead of omitting the keys and
+        # relying on the production code's `.get(..., default)` fallback --
+        # is what B-5 requires: a test suite that would have caught the B-1
+        # polarity bug instead of silently masking it.
+        "controlled_by_sales_plan": 1,
+        "allow_over_plan_sale": 0,
+        "availability_mode": "Plan Available",
     }
     base.update(overrides)
     return base
@@ -225,6 +236,39 @@ class TestGetItemAvailabilityFailClosed(FrappeTestCase):
         self.assertFalse(result["sellable"])
 
     @patch(f"{MODULE}._resolve_production_config")
+    def test_department_disabled(self, mock_config):
+        mock_config.return_value = _config(department_disabled=1)
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "DEPARTMENT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_production_unit_disabled_pre_produced(self, mock_config):
+        mock_config.return_value = _config(
+            production_policy="PRE_PRODUCED",
+            production_unit_disabled=1
+        )
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "PRODUCTION_UNIT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_production_unit_disabled_made_to_order(self, mock_config):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER",
+            production_unit_disabled=1
+        )
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "PRODUCTION_UNIT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
     def test_configuration_error_when_config_unresolvable(self, mock_config):
         mock_config.return_value = None
 
@@ -307,3 +351,357 @@ class TestGetItemAvailabilityBranchIsolation(FrappeTestCase):
         fg_calls = [call.args for call in mock_fg.call_args_list]
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse A - URY", "Company A"), fg_calls)
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse B - URY", "Company A"), fg_calls)
+
+
+class TestGetItemAvailabilityDirectRetail(FrappeTestCase):
+
+    @patch(f"{MODULE}.get_allocatable_qty")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_direct_retail_zero_stock(self, mock_config, mock_alloc):
+        mock_config.return_value = _config(production_policy="DIRECT_RETAIL")
+        mock_alloc.return_value = {
+            "allocatable_qty": 0,
+        }
+
+        result = get_item_availability("ITEM-RETAIL", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "FG_OUT_OF_STOCK")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertEqual(result["production_policy"], "DIRECT_RETAIL")
+
+
+class TestAvailabilityProductionContextIntegration(FrappeTestCase):
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.frappe.db.get_value", return_value="Company A")
+    @patch(f"{MODULE}.frappe.get_all")
+    def test_uses_canonical_production_context_resolver(self, mock_get_all, mock_get_value, mock_plan, mock_fg):
+        mock_get_all.return_value = [
+            {
+                "name": "UIPC-1",
+                "item": "ITEM-CAKE",
+                "branch": "Branch A",
+                "department": "Hot Kitchen",
+                "production_unit": "Main Kitchen",
+                "production_policy": "Make to Stock",
+                "bom": None,
+                "direct_retail_warehouse": "FG Warehouse - URY",
+                "controlled_by_sales_plan": 1,
+                "allow_over_plan_sale": 0,
+                "availability_mode": "Always",
+            }
+        ]
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 10}
+        mock_fg.return_value = {
+            "allocatable_qty": 4,
+            "bin_actual_qty": 12,
+            "bin_projected_qty": 4,
+        }
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertEqual(result["production_policy"], "PRE_PRODUCED")
+        self.assertEqual(result["department"], "Hot Kitchen")
+        self.assertEqual(result["warehouse"], "FG Warehouse - URY")
+        self.assertEqual(result["available_qty"], 4)
+        mock_get_all.assert_called_once()
+        # get_value is now also called to derive production_unit_disabled/
+        # department_disabled from the linked records' own `enabled` field
+        # (N2 fix), not just the company lookup -- assert the company
+        # lookup happened, not that it was the only call.
+        self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
+
+
+class TestControlledBySalesPlanPolarity(FrappeTestCase):
+    """Regression coverage for B-1: `controlled_by_sales_plan` doctype default
+    must be 1 (mandatory plan gating), and the code must keep failing closed
+    for existing/default rows when no plan is active."""
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_default_still_fails_closed_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # controlled_by_sales_plan=1 is the doctype default -- this must
+        # still produce NO_ACTIVE_PLAN with no active plan, not silently
+        # fall through to stock-based availability (the B-1 bug).
+        mock_config.return_value = _config(controlled_by_sales_plan=1)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_explicit_opt_out_skips_gate_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # controlled_by_sales_plan=0 is an explicit operator opt-out -- with
+        # no active plan, the item should fall through to stock-based
+        # availability instead of failing closed.
+        mock_config.return_value = _config(controlled_by_sales_plan=0)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_default_still_fails_closed_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=1)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_explicit_opt_out_skips_gate_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=0)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_opt_out_ignores_exhausted_plan_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # Regression for the "plan exists but is exhausted" no-op bug:
+        # controlled_by_sales_plan=0 must ignore the Sales Plan entirely, not
+        # just when no plan row exists -- an exhausted plan (plan_remaining=0)
+        # must NOT hard-block a sale that stock would otherwise allow.
+        mock_config.return_value = _config(controlled_by_sales_plan=0)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_opt_out_ignores_exhausted_plan_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=0)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 50)
+
+
+class TestAvailabilityModeOverride(FrappeTestCase):
+    """Regression coverage for B-2: the 'Always Available' override must
+    never force sellable over a structural/config error, but must be able to
+    override a purely commercial not-sellable reason (e.g. FG_OUT_OF_STOCK)."""
+
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_does_not_override_missing_bom(self, mock_config, mock_compile):
+        import frappe
+
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Always Available"
+        )
+        mock_compile.side_effect = frappe.ValidationError("no active BOM")
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "MISSING_BOM")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_overrides_fg_out_of_stock(self, mock_config, mock_fg, mock_plan):
+        mock_config.return_value = _config(
+            controlled_by_sales_plan=0, availability_mode="Always Available"
+        )
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 60, "bin_projected_qty": 0}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_does_not_override_department_disabled(self, mock_config):
+        mock_config.return_value = _config(department_disabled=1, availability_mode="Always Available")
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "DEPARTMENT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+
+class TestResolvePlanRemainingReflectsCounters(FrappeTestCase):
+    """`_resolve_plan_remaining` must read the real committed_qty/fulfilled_qty
+    counters instead of the old hardcoded committed=fulfilled=0 (which made
+    plan_remaining always equal the full plan_qty, regardless of how many
+    orders had actually been placed against the plan)."""
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_full_plan_qty_when_nothing_committed_yet(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 50, "committed_qty": 0, "fulfilled_qty": 0}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result, {"plan_qty": 50, "plan_remaining": 50})
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_plan_remaining_shrinks_as_committed_and_fulfilled_grow(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 50, "committed_qty": 20, "fulfilled_qty": 15}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        # No longer always equal to plan_qty -- this is exactly the bug fix.
+        self.assertEqual(result, {"plan_qty": 50, "plan_remaining": 15})
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_plan_remaining_can_go_to_zero_when_fully_committed(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 10, "committed_qty": 10, "fulfilled_qty": 0}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["plan_remaining"], 0)
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_sums_committed_and_fulfilled_across_matching_rows(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 30, "committed_qty": 5, "fulfilled_qty": 0},
+            {"name": "PLI-2", "parent": "PLAN-2", "qty": 20, "committed_qty": 3, "fulfilled_qty": 2},
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["plan_qty"], 50)
+        self.assertEqual(result["plan_remaining"], 40)  # 50 - (5+3) - (0+2)
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_no_matching_rows_is_no_active_plan(self, mock_rows):
+        mock_rows.return_value = []
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertIsNone(result)
+
+
+class TestGetItemAvailabilityBranchScopePermissionBoundary(FrappeTestCase):
+    """Real, un-mocked negative-permission coverage for
+    ury_availability.get_item_availability's branch-scope guard
+    (_verify_branch_scope), which the file's own module docstring admits
+    has never been run against a live bench/DB.
+
+    _verify_branch_scope() (read directly in source before writing this
+    test) raises frappe.PermissionError when the calling user is not
+    Administrator/System Manager/URY Admin and has no `URY User` row
+    assigning them to the requested branch. That check runs immediately
+    after the item_code presence check, before any config/DB lookups
+    this suite's other tests mock out -- so a roleless user with no
+    branch assignment must be rejected before reaching those mocked
+    helpers at all.
+    """
+
+    NEGATIVE_USER = "test_availability_negative@example.com"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not frappe.db.exists("User", cls.NEGATIVE_USER):
+            frappe.get_doc(
+                {
+                    "doctype": "User",
+                    "email": cls.NEGATIVE_USER,
+                    "first_name": "Availability Negative",
+                    "send_welcome_email": 0,
+                    "roles": [],
+                }
+            ).insert(ignore_permissions=True)
+
+        cls.branch = frappe.db.get_value("Branch", {}, ["name", "company"], as_dict=True)
+
+    def setUp(self):
+        frappe.set_user("Administrator")
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+
+    def test_roleless_user_with_no_branch_assignment_is_rejected(self):
+        if not self.branch:
+            self.skipTest("No Branch fixture available on this bench to test against")
+
+        # Confirm the negative user really has no URY User row on this branch.
+        self.assertFalse(
+            frappe.db.exists(
+                "URY User",
+                {
+                    "parenttype": "Branch",
+                    "parent": self.branch.name,
+                    "user": self.NEGATIVE_USER,
+                },
+            )
+        )
+
+        frappe.set_user(self.NEGATIVE_USER)
+        with self.assertRaises(frappe.PermissionError):
+            get_item_availability(
+                item_code="_Test Item Not Reached",
+                branch=self.branch.name,
+                company=self.branch.company,
+            )

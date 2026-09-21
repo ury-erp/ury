@@ -10,6 +10,14 @@ def _has_dashboard_cross_branch_access():
 	return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
 
 
+def _row_value(row, field, default=None):
+	if row is None:
+		return default
+	if hasattr(row, "get"):
+		return row.get(field, default)
+	return getattr(row, field, default)
+
+
 def _validate_comparable_history_access(branch, company):
 	if not frappe.has_permission("POS Invoice", "read"):
 		frappe.throw(_("Not permitted to read POS Invoice history"), frappe.PermissionError)
@@ -89,9 +97,9 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 	sample_dates = set()
 
 	for row in rows:
-		item_code = row["item_code"]
-		posting_date = row["posting_date"]
-		net_qty = row["net_qty"] or 0
+		item_code = _row_value(row, "item_code")
+		posting_date = _row_value(row, "posting_date")
+		net_qty = _row_value(row, "net_qty") or 0
 		sample_dates.add(str(posting_date))
 
 		entry = items_by_code.setdefault(
@@ -124,7 +132,8 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			filters={"item": ["in", item_codes], "branch": branch},
 			fields=["item", "department", "production_unit"],
 		):
-			production_config_map[cfg["item"]] = cfg
+			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
+			production_config_map[item_key] = cfg
 
 	items = []
 	for item_code, entry in items_by_code.items():
@@ -151,6 +160,120 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 		"sample_dates": sorted(sample_dates),
 		"items": items,
 	}
+
+
+@frappe.whitelist(methods=["GET"])
+def search_branch_items(branch, company=None, query="", limit=25):
+	"""Search for items available in a branch via a whitelisted catalog lookup.
+
+	This endpoint enables adding items to a Sales Plan that have no comparable
+	history (e.g., a newly launched item or a brand-new branch). Unlike the
+	sales-history endpoints that require Item read permission, this method
+	validates access scoped to the branch and performs the catalog lookup
+	internally with ignore_permissions=True, so ordinary POS/restaurant-staff
+	roles can add items without requiring broad Item read access.
+
+	Args:
+		branch: Branch name (required).
+		company: Company name (defaults to the branch's company; client-supplied
+			company is still validated against the branch, matching the
+			fail-closed server-derives-scope pattern).
+		query: Optional search string; if provided, matches item_code or item_name
+			via LIKE (case-insensitive). If empty, returns results ordered by
+			item_name only.
+		limit: Number of results to return (default 25, capped at 100 to prevent
+			abuse).
+
+	Returns:
+		List of dicts with keys: item_code, item_name, stock_uom, department,
+		production_unit (where department and production_unit come from
+		URY Item Production Configuration for the branch, falling back to None
+		when not configured).
+	"""
+	if not branch:
+		frappe.throw("branch is required", frappe.ValidationError)
+
+	if not company:
+		company = frappe.db.get_value("Branch", branch, "company")
+
+	if not company:
+		frappe.throw("Branch company is required", frappe.PermissionError)
+
+	_validate_comparable_history_access(branch, company)
+
+	# Cap limit server-side to prevent abuse; fall back to the default on
+	# non-numeric input and clamp negatives so a bad value can't slip through.
+	try:
+		limit = max(1, min(int(limit or 25), 100))
+	except (TypeError, ValueError):
+		limit = 25
+	query = (query or "").strip()
+
+	# Scope the item set to this branch via URY Item Production Configuration
+	# *before* touching the Item master, so the ignore_permissions=True query
+	# below can never leak the site-wide catalog (other companies/branches,
+	# raw materials, packaging, etc.) to a caller who only has branch-scoped
+	# access. Items with no config yet for this branch are simply not
+	# searchable here (they still appear once configured).
+	production_config_map = {}
+	for cfg in frappe.db.get_all(
+		"URY Item Production Configuration",
+		filters={"branch": branch},
+		fields=["item", "department", "production_unit"],
+	):
+		item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
+		if item_key:
+			production_config_map[item_key] = cfg
+
+	branch_item_codes = list(production_config_map.keys())
+
+	if not branch_item_codes:
+		return []
+
+	# Query items with ignore_permissions=True (see class docstring).
+	# Filter: disabled = 0, item_code restricted to this branch's configured
+	# items, and optionally query-match via or_filters (dict filter keys must
+	# be real fieldnames — "|item_code|item_name" is not valid Frappe filter
+	# syntax and 500s; or_filters is the correct OR mechanism, matching the
+	# pattern used in ury/ury_pos/api.py and ury_order.py).
+	filters = {"disabled": 0, "item_code": ["in", branch_item_codes]}
+	or_filters = None
+	if query:
+		or_filters = {
+			"item_code": ["like", f"%{query}%"],
+			"item_name": ["like", f"%{query}%"],
+		}
+
+	get_all_kwargs = dict(
+		filters=filters,
+		fields=["item_code", "item_name", "stock_uom"],
+		order_by="item_name asc",
+		limit_page_length=limit,
+		ignore_permissions=True,
+	)
+	if or_filters:
+		get_all_kwargs["or_filters"] = or_filters
+
+	items = frappe.db.get_all("Item", **get_all_kwargs)
+
+	if not items:
+		return []
+
+	# Reshape results to include production config (already fetched above,
+	# scoped to this branch).
+	result = []
+	for item in items:
+		item_code = item["item_code"]
+		config = production_config_map.get(item_code, {})
+		result.append({
+			"item_code": item_code,
+			"item_name": item.get("item_name", item_code),
+			"stock_uom": item.get("stock_uom") or "Nos",
+			"department": config.get("department"),
+			"production_unit": config.get("production_unit"),
+		})
+
+	return result
 
 
 @frappe.whitelist(methods=["GET"])

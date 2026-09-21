@@ -380,13 +380,32 @@ def get_custom_fields():
 				"fieldtype": "Column Break",
 				"insert_after": "restaurant",
 			},
-			{	
+			{
 				"fieldname": "branch",
 				"fieldtype": "Link",
 				"insert_after": "column_break_e3dky",
 				"label": "Branch",
 				"options": "Branch",
 				"reqd": 1
+			}
+		],
+
+		"POS Closing Entry": [
+			{
+				# Mirrors "POS Opening Entry-branch": stock_count_gate.py's
+				# validate_pos_closing_entry() needs doc.branch to resolve the
+				# per-branch "Stock Count Gate" Alert Rule. Standard POS Closing
+				# Entry has no branch field, which used to raise an
+				# AttributeError on any bench where this field was never
+				# created (see v3_19.add_pos_closing_entry_branch_field patch).
+				"fieldname": "branch",
+				"fieldtype": "Link",
+				"insert_after": "pos_opening_entry",
+				"label": "Branch",
+				"options": "Branch",
+				"fetch_from": "pos_profile.branch",
+				"fetch_if_empty": 1,
+				"read_only": 1,
 			}
 		],
 
@@ -418,7 +437,7 @@ def get_custom_fields():
 				"label": "Mobile Number",
 				"insert_after": "customer_name",
 				"translatable": 0,
-				"reqd": 1
+				"reqd": 0
 			},
 		],
 
@@ -441,7 +460,28 @@ def get_custom_fields():
 				"read_only": 1,
 			},
 		],
-     
+		"Stock Entry": [
+			{
+				"fieldname": "custom_ury_posting_intent",
+				"fieldtype": "Data",
+				"label": "URY Posting Intent",
+				"insert_after": "remarks",
+				"read_only": 1,
+				"search_index": 1,
+				"translatable": 0,
+			},
+			{
+				"fieldname": "custom_ury_batch_request",
+				"fieldtype": "Data",
+				"label": "URY Batch Request",
+				"description": "Idempotency key for a Start Batch/Receive Batch request posted by ury_batch_manufacture_service.py. Indexed for exact-match FOR UPDATE dedupe lookups, same pattern as custom_ury_posting_intent.",
+				"insert_after": "custom_ury_posting_intent",
+				"read_only": 1,
+				"search_index": 1,
+				"translatable": 0,
+			},
+		],
+
     }
  
 def delete_custom_fields(custom_fields):

@@ -82,8 +82,21 @@ def _seed_rules(settings_doc, branch_name):
                 "rate_type": rule["rate_type"],
                 "rate": rule.get("rate", 0),
                 "tier_mode": rule.get("tier_mode", "Marginal"),
+                # frappe._dict, not a plain dict: ury_commission_settings.py's
+                # validate() reads t.from_amount as an attribute. On some
+                # frappe versions, .append()'s dict-of-dicts form does not
+                # promote a nested table field's rows to real child Documents
+                # when appending to a row that was itself just appended in the
+                # same call (confirmed reproducing on the ury-v16-compat
+                # bench: AttributeError: 'dict' object has no attribute
+                # 'from_amount' -- and appending the tier directly onto the
+                # returned rule row afterwards doesn't help either, since that
+                # row's own _table_fieldnames cache is empty until it goes
+                # through a full load/reload). frappe._dict supports attribute
+                # access on its own keys, sidestepping the promotion issue
+                # entirely regardless of frappe version.
                 "tiers": [
-                    {"from_amount": tier["from_amount"], "rate": tier["rate"]}
+                    frappe._dict(from_amount=tier["from_amount"], rate=tier["rate"])
                     for tier in rule.get("tiers", [])
                 ],
                 "disabled": 0,

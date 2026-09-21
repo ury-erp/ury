@@ -1,0 +1,18 @@
+{
+ "doctype": "DocType",
+ "name": "URY Branch Operating Exception",
+ "module": "URY",
+ "autoname": "hash",
+ "fields": [
+  {"fieldname": "branch", "fieldtype": "Link", "label": "Branch", "options": "Branch", "reqd": 1},
+  {"fieldname": "exception_date", "fieldtype": "Date", "label": "Exception Date", "reqd": 1},
+  {"fieldname": "is_closed", "fieldtype": "Check", "label": "Closed", "default": "0"},
+  {"fieldname": "open_time", "fieldtype": "Time", "label": "Open Time"},
+  {"fieldname": "close_time", "fieldtype": "Time", "label": "Close Time"},
+  {"fieldname": "reason", "fieldtype": "Small Text", "label": "Reason"}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "URY Manager", "read": 1, "write": 1, "create": 1, "delete": 1}
+ ]
+}

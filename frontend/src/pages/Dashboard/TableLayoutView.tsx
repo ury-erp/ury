@@ -519,8 +519,8 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           className="w-full h-full relative bg-white overflow-hidden cursor-grab active:cursor-grabbing"
           style={{
             backgroundImage: `
-              linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-              linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
+              linear-gradient(to right, hsl(var(--gray-200)) 1px, transparent 1px),
+              linear-gradient(to bottom, hsl(var(--gray-200)) 1px, transparent 1px)
             `,
             backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
             backgroundPosition: `${panOffset.x}px ${panOffset.y}px`

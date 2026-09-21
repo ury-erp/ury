@@ -1,14 +1,16 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "hash",
+ "autoname": "SP-.YYYY.-#####",
  "creation": "2026-08-28 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "is_submittable": 1,
  "field_order": [
   "status",
+  "enforcement_mode",
   "branch",
   "company",
   "column_break_scope",
@@ -21,10 +23,13 @@
   "approval_snapshot_hash",
   "insight_snapshot",
   "section_break_audit",
-  "audit_log"
+  "audit_log",
+  "cancellation_reason",
+  "amended_from"
  ],
  "fields": [
   {
+   "allow_on_submit": 1,
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
@@ -32,6 +37,17 @@
    "label": "Status",
    "options": "Draft\nProposed\nSubmitted for Approval\nApproved\nLocked for Production\nSuperseded/Cancelled",
    "read_only": 1,
+   "reqd": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "default": "Hard",
+   "description": "Hard: block order placement once plan_remaining hits 0. Soft: allow the order, over-plan status is computable from committed_qty + fulfilled_qty > qty. Alert: allow the order and notify branch-scoped Production Manager/URY Manager recipients when the plan is exceeded.",
+   "fieldname": "enforcement_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Enforcement Mode",
+   "options": "Hard\nSoft\nAlert",
    "reqd": 1
   },
   {
@@ -106,22 +122,42 @@
    "label": "Audit"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "audit_log",
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "URY Sales Plan",
+   "no_copy": 1,
+   "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "cancellation_reason",
+   "fieldtype": "Small Text",
+   "label": "Reason (Return to Draft / Cancel)",
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "description": "Required input when Returning a plan to Draft or Supersede/Cancelling it; carried into that transition audit_log entry and cleared immediately after -- a transient input, not a standing display field. See the note in audit_log for the permanent record."
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-08-28 00:00:00.000000",
+ "modified": "2026-09-11 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan",
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -131,9 +167,11 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
+   "cancel": 1,
    "create": 1,
    "email": 1,
    "export": 1,
@@ -142,6 +180,7 @@
    "report": 1,
    "role": "URY Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
@@ -152,5 +191,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "is_submittable": 1
 }

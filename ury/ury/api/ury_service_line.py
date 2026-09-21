@@ -47,7 +47,13 @@ def get_service_line(branch=None):
 			# since midnight today), so both sides of the subtraction are
 			# real timedeltas.
 			now_since_midnight = now - _datetime.combine(now.date(), _datetime.min.time())
-			delta = now_since_midnight - t.latest_invoice_time
+			if isinstance(t.latest_invoice_time, _datetime):
+				latest_invoice_time = t.latest_invoice_time - _datetime.combine(
+					t.latest_invoice_time.date(), _datetime.min.time()
+				)
+			else:
+				latest_invoice_time = t.latest_invoice_time
+			delta = now_since_midnight - latest_invoice_time
 			if delta.total_seconds() < 0:
 				# Order was placed before midnight and it's now past
 				# midnight -- add a day so this still reads as "elapsed",

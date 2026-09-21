@@ -187,6 +187,35 @@
                     >
                       {{ kotitem.comments }}
                     </p>
+                    <!-- Cancellation disposition: return-to-stock vs waste -->
+                    <div
+                      v-if="Number(kotitem.cancelled_qty) > 0 && (!kotitem.disposition || kotitem.disposition === 'Pending')"
+                      class="ml-2 mt-1 flex gap-2"
+                      @click.stop
+                    >
+                      <span class="text-sm font-medium" style="color: var(--t2)">Disposition:</span>
+                      <button
+                        @click="resolveDisposition(kot, kotitem, 'return_to_stock')"
+                        class="px-2 py-1 rounded text-xs font-semibold"
+                        style="background: var(--gr); color: #fff"
+                      >
+                        Return to Stock
+                      </button>
+                      <button
+                        @click="resolveDisposition(kot, kotitem, 'waste')"
+                        class="px-2 py-1 rounded text-xs font-semibold"
+                        style="background: var(--rd); color: #fff"
+                      >
+                        Mark as Wasted
+                      </button>
+                    </div>
+                    <div
+                      v-else-if="kotitem.disposition && kotitem.disposition !== 'Pending'"
+                      class="ml-2 mt-1 text-sm font-medium"
+                      style="color: var(--t2)"
+                    >
+                      ( Disposition: {{ kotitem.disposition }} )
+                    </div>
                     <hr class="my-1 mt-2" style="border-color: var(--hair)" />
                   </div>
                 </div>
@@ -410,6 +439,56 @@ export default {
       const now = new Date();
       this.currentTime = now.toLocaleTimeString();
 
+      const genIdempotencyKey = () => {
+        if (window.crypto && window.crypto.randomUUID) {
+          return window.crypto.randomUUID();
+        }
+        // Fallback for non-secure contexts where crypto.randomUUID is
+        // unavailable: still unique enough for a single client action.
+        return `${kot.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      };
+
+      try {
+        // Drive every KOT item through the real execution-service lifecycle
+        // (READY, then SERVED) so the recipe snapshot / stock-authority
+        // trigger actually fires. Both transitions are idempotent server-side
+        // (a repeated call with a fresh idempotency_key on an item already at
+        // or past the target state is a no-op), so it's safe to call
+        // mark_item_ready unconditionally even for items a chef already
+        // marked ready via the Captain app.
+        for (const kotitem of kot.kot_items || []) {
+          await this.call.post(
+            "ury.ury.api.ury_kot_item_execution_service.mark_item_ready",
+            {
+              kot_item: kotitem.name,
+              idempotency_key: genIdempotencyKey(),
+            }
+          );
+          await this.call.post(
+            "ury.ury.api.ury_kot_item_execution_service.serve_item_execution",
+            {
+              kot_item: kotitem.name,
+              idempotency_key: genIdempotencyKey(),
+            }
+          );
+        }
+      } catch (error) {
+        console.error("Failed to serve KOT via execution service", error);
+        // Race condition: the KOT was cancelled (or partially cancelled)
+        // between load and this click. The execution service rejects the
+        // serve; surface it and remove the now-stale card instead of
+        // leaving an orphaned "Serve"-able order on screen.
+        alert(error?.message || "This KOT has been cancelled and cannot be served.");
+        kot.showDiv = true;
+        this.removeAllItemsFromLocalStorage(kot);
+        this.masonryLoading();
+        return;
+      }
+
+      // Legacy KOT-level bookkeeping (order_status/start_time_serv/
+      // production_time) kept as a compatibility shim for consumers that
+      // still read those fields directly, now that the execution service
+      // above is the source of truth for production/stock-deduction.
       this.call
         .post("ury.ury.api.ury_kot_display.serve_kot", {
           name: kot.name,
@@ -423,9 +502,35 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          // Race condition: the KOT was cancelled between load and this
+          // click. The backend rejects the serve; remove the now-stale
+          // card instead of leaving an orphaned "Serve"-able order.
+          alert(error?.message || "This KOT has been cancelled and cannot be served.");
+          kot.showDiv = true;
+          this.removeAllItemsFromLocalStorage(kot);
+          this.masonryLoading();
+        });
     },
 
+    resolveDisposition(kot, kotitem, disposition) {
+      this.call
+        .post("ury.ury.api.ury_kot_cancellation_service.resolve_cancellation_disposition", {
+          kot: kot.name,
+          item_row_name: kotitem.name,
+          disposition: disposition,
+          qty: kotitem.cancelled_qty,
+        })
+        .then((result) => {
+          kotitem.disposition = disposition === "return_to_stock" ? "Returned to Stock" : "Wasted";
+          this.masonryLoading();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert(error?.message || "Failed to resolve item disposition.");
+        });
+    },
     async orderDelayNotify(kot) {
       const now = new Date();
       this.currentTime = now.toLocaleTimeString();

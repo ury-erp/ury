@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { X, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus, UtensilsCrossed } from 'lucide-react';
 import { OrderItem, usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 import { db } from '@ury/core';
 import { t } from '../i18n';
+import { getItemAvailability, getAvailabilityMessage } from '../lib/availability-api';
 
 interface Variant {
   id: string;
@@ -37,14 +38,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   initialQuantity,
   itemToReplace
 }) => {
-  const { 
-    selectedItem, 
-    addToOrder, 
-    removeFromOrder, 
-    setSelectedItem, 
+  const {
+    selectedItem,
+    addToOrder,
+    removeFromOrder,
+    setSelectedItem,
     getItemQuantityFromCart,
     activeOrders,
-    menuItems
+    menuItems,
+    posProfile
   } = usePOSStore();
   
   // Find existing item in cart
@@ -127,11 +129,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
+  const [imageError, setImageError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const [, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
   const [addonError, setAddonError] = useState<string | null>(null);
+
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -238,11 +244,46 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     }
   };
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
     if (isNaN(numericQuantity) || numericQuantity <= 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
+
+    // Clear any previous availability errors
+    setAvailabilityError(null);
+
+    // Check availability with live/skipCache call before adding to cart
+    if (!selectedItem || !posProfile) {
+      setAvailabilityError('Unable to verify availability. Please try again.');
+      return;
+    }
+
+    try {
+      setIsCheckingAvailability(true);
+      const availability = await getItemAvailability(
+        {
+          item_code: selectedItem.item,
+          branch: posProfile.branch,
+          company: posProfile.company,
+        },
+        { skipCache: true }
+      );
+
+      if (!availability.sellable) {
+        // Item is not sellable — show user-facing error message
+        const reasonMessage = getAvailabilityMessage(availability.reason_code);
+        setAvailabilityError(reasonMessage);
+        setIsCheckingAvailability(false);
+        return;
+      }
+    } catch (error: any) {
+      setAvailabilityError(error.message || 'Failed to verify item availability');
+      setIsCheckingAvailability(false);
+      return;
+    }
+
+    setIsCheckingAvailability(false);
 
     if (editMode && itemToReplace?.uniqueId) {
       // Remove the old item first
@@ -318,26 +359,21 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       >
         {/* Left Column - Image  */}
         <div className="md:w-1/3 relative">
-          {itemDoc?.image ? (
+          {itemDoc?.image && !imageError ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
               className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
-                  placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
-                  parent.insertBefore(placeholder, target);
-                }
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
-              {itemDoc?.name.slice(0, 2).toUpperCase()}
+            <div className="w-full min-h-96 h-full bg-muted flex flex-col items-center justify-center rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+              <div className="flex flex-col items-center gap-4">
+                <UtensilsCrossed className="w-20 h-20 text-muted-foreground opacity-50" />
+                <div className="text-6xl font-bold text-muted-foreground opacity-75">
+                  {itemDoc?.name.slice(0, 1).toUpperCase()}
+                </div>
+              </div>
             </div>
           )}
           <Button
@@ -481,13 +517,22 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <span>{t('product_dialog.total')}&nbsp;</span>
               <span>{formatCurrency(total)}</span>
             </div>
+            {availabilityError && (
+              <div className="flex items-center justify-center text-destructive text-sm mt-2">
+                {availabilityError}
+              </div>
+            )}
             <Button
               onClick={handleAddToOrder}
               className="w-full mt-4"
               size="lg"
-              disabled={numericQuantity === 0}
+              disabled={numericQuantity === 0 || isCheckingAvailability}
             >
-              {editMode || existingCartItem ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
+              {isCheckingAvailability
+                ? t('product_dialog.checking_availability') || 'Checking...'
+                : editMode || existingCartItem
+                ? t('product_dialog.update_order')
+                : t('product_dialog.add_to_order')}
             </Button>
           </div>
         </div>

@@ -17,6 +17,7 @@ from ury.ury.api.ury_bom_compiler import (
     build_demand_vector,
     compile_bom_vector,
     compile_shared_component_index,
+    get_items_affected_by_component,
 )
 
 
@@ -29,16 +30,35 @@ def _row(item_code, qty_consumed_per_unit, stock_uom="Nos"):
     )
 
 
+def _explosion_only_get_all(explosion_rows):
+    """get_all side_effect: `explosion_rows` for BOM Explosion Item, [] otherwise.
+
+    Models a pure "grouping"/no-sub-assembly BOM: the pre-produced-stop-point
+    tree scan (which queries `BOM Item` for `is_sub_assembly_item=1` rows)
+    finds nothing, so the fast `BOM Explosion Item` path is used, matching
+    pre-existing single-level-BOM behavior.
+    """
+
+    def side_effect(doctype, filters=None, fields=None, **kwargs):
+        if doctype == "BOM Explosion Item":
+            return explosion_rows
+        return []
+
+    return side_effect
+
+
 class TestCompileBomVectorSingleLevel(unittest.TestCase):
     @patch(f"{MOD}.frappe.get_all")
     @patch(f"{MOD}.frappe.db.get_value")
     def test_single_level_bom_compiles_correctly(self, mock_get_value, mock_get_all):
         mock_get_value.return_value = "BOM-BURGER-001"
-        mock_get_all.return_value = [
-            _row("Bun", 1),
-            _row("Patty", 1),
-            _row("Cheese Slice", 2),
-        ]
+        mock_get_all.side_effect = _explosion_only_get_all(
+            [
+                _row("Bun", 1),
+                _row("Patty", 1),
+                _row("Cheese Slice", 2),
+            ]
+        )
 
         result = compile_bom_vector("Burger", 10, "URY Co")
 
@@ -54,7 +74,7 @@ class TestCompileBomVectorSingleLevel(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.get_value")
     def test_determinism_same_input_twice_identical_output(self, mock_get_value, mock_get_all):
         mock_get_value.return_value = "BOM-BURGER-001"
-        mock_get_all.return_value = [_row("Bun", 1), _row("Patty", 1)]
+        mock_get_all.side_effect = _explosion_only_get_all([_row("Bun", 1), _row("Patty", 1)])
 
         first = compile_bom_vector("Burger", 5, "URY Co")
         second = compile_bom_vector("Burger", 5, "URY Co")
@@ -63,13 +83,18 @@ class TestCompileBomVectorSingleLevel(unittest.TestCase):
 
 
 class TestCompileBomVectorNested(unittest.TestCase):
+    @patch(f"{MOD}.frappe.db.exists")
     @patch(f"{MOD}.frappe.get_all")
     @patch(f"{MOD}.frappe.db.get_value")
     def test_nested_bom_falls_back_to_manual_recursion_and_flattens_subassembly(
-        self, mock_get_value, mock_get_all
+        self, mock_get_value, mock_get_all, mock_exists
     ):
         # No BOM Explosion Item rows populated -> falls back to manual BOM Item
-        # recursion, exploding the sub-assembly (Patty Mix) down to raw items.
+        # recursion. Patty Mix is a pure "grouping" sub-assembly (no
+        # PRE_PRODUCED production configuration of its own), so it must still
+        # be flattened down to its raw ingredients.
+        mock_exists.return_value = False
+
         def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
             if doctype == "BOM Explosion Item":
                 return []
@@ -134,6 +159,83 @@ class TestCompileBomVectorNested(unittest.TestCase):
         self.assertEqual(by_item["Beef"]["qty"], 4 * 0.2)
         self.assertEqual(by_item["Spice Mix"]["qty"], 4 * 0.01)
 
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_preproduced_subassembly_is_a_stop_point_not_exploded(
+        self, mock_get_value, mock_get_all, mock_exists
+    ):
+        # Masala Dosa -> Masala (sub-assembly, PRE_PRODUCED, independently
+        # stocked) -> [Rice, Spices] (Masala's own ingredients). Masala must
+        # appear as a component of Masala Dosa's vector; its own ingredients
+        # must NOT appear, since Masala's own stock is checked independently
+        # at ury_availability.py's PRE_PRODUCED level, not re-derived here.
+        mock_exists.side_effect = lambda doctype, filters: filters.get("item") == "Masala"
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Explosion Item":
+                # Even if ERPNext has pre-flattened this BOM (fully exploding
+                # through Masala down to Rice/Spices), the compiler must not
+                # use this fast path once a PRE_PRODUCED stop point exists
+                # anywhere in the tree -- so return rows that would be WRONG
+                # if used, to prove the fast path was actually skipped.
+                if filters.get("parent") in ("BOM-MASALADOSA-001", "BOM-MASALA-001"):
+                    return [_row("Rice", 0.5), _row("Spices", 0.05)]
+                return []
+            if doctype == "BOM Item":
+                parent = filters["parent"]
+                if parent == "BOM-MASALADOSA-001":
+                    return [
+                        frappe._dict(
+                            item_code="Masala",
+                            stock_qty=1,
+                            stock_uom="Kg",
+                            is_sub_assembly_item=1,
+                            bom_no="BOM-MASALA-001",
+                        ),
+                        frappe._dict(
+                            item_code="Dosa Batter",
+                            stock_qty=1,
+                            stock_uom="Kg",
+                            is_sub_assembly_item=0,
+                            bom_no=None,
+                        ),
+                    ]
+                if parent == "BOM-MASALA-001":
+                    return [
+                        frappe._dict(
+                            item_code="Rice", stock_qty=0.5, stock_uom="Kg",
+                            is_sub_assembly_item=0, bom_no=None,
+                        ),
+                        frappe._dict(
+                            item_code="Spices", stock_qty=0.05, stock_uom="Kg",
+                            is_sub_assembly_item=0, bom_no=None,
+                        ),
+                    ]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and field == "quantity":
+                return 1
+            if doctype == "BOM" and isinstance(filters, dict) and filters.get("item") == "Masala Dosa":
+                return "BOM-MASALADOSA-001"
+            if doctype == "BOM":
+                return 1
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = compile_bom_vector("Masala Dosa", 3, "URY Co")
+
+        self.assertEqual(result["source"], "manual_recursion")
+        by_item = {c["component_item"]: c for c in result["components"]}
+        self.assertIn("Masala", by_item)
+        self.assertEqual(by_item["Masala"]["qty"], 3)  # stop point: Masala itself, qty per its BOM line
+        self.assertEqual(by_item["Dosa Batter"]["qty"], 3)
+        self.assertNotIn("Rice", by_item)  # Masala's own ingredients must not leak through
+        self.assertNotIn("Spices", by_item)
+
 
 class TestSharedComponentIndex(unittest.TestCase):
     @patch(f"{MOD}.frappe.get_all")
@@ -167,6 +269,140 @@ class TestSharedComponentIndex(unittest.TestCase):
         self.assertEqual(consumers["Cheese Fries"], 1)
         self.assertEqual(len(index["Bun"]), 1)
         self.assertEqual(len(index["Potato"]), 1)
+
+
+class TestSharedComponentIndexPerItemIsolation(unittest.TestCase):
+    """One item with no active BOM must not abort the whole index build.
+
+    Regression cover for a live-reproduced fragility bug: a single active
+    MADE_TO_ORDER item with no active BOM (a menu item added before its recipe
+    is finalised) made `compile_bom_vector` raise inside
+    `compile_shared_component_index`, which aborted the entire reverse-index
+    build. `publish_component_stock_fanout`'s outer try/except then swallowed
+    it, so the rich `menu_availability_update_*` realtime event silently
+    stopped firing for EVERY item in the branch, with no signal beyond an
+    error-log line.
+    """
+
+    def _mocks(self):
+        """Three valid items plus 'Broken Item', which has no active BOM."""
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            return {
+                "Burger": "BOM-BURGER-001",
+                "Cheese Fries": "BOM-FRIES-001",
+                "Milkshake": "BOM-SHAKE-001",
+            }.get(filters.get("item"))
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            return {
+                "BOM-BURGER-001": [_row("Bun", 1), _row("Cheese Slice", 2)],
+                "BOM-FRIES-001": [_row("Cheese Slice", 1), _row("Potato", 3)],
+                "BOM-SHAKE-001": [_row("Milk", 4)],
+            }.get(filters["parent"], [])
+
+        return get_value_side_effect, get_all_side_effect
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_broken_item_is_skipped_and_valid_items_still_indexed(
+        self, mock_get_value, mock_get_all
+    ):
+        get_value_side_effect, get_all_side_effect = self._mocks()
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        # "Broken Item" is deliberately placed FIRST, so a non-isolated build
+        # would raise before any valid item was ever indexed.
+        index = compile_shared_component_index(
+            ["Broken Item", "Burger", "Cheese Fries", "Milkshake"],
+            "URY Co",
+            skip_invalid_items=True,
+        )
+
+        # Does not raise, and does not return an empty index.
+        self.assertTrue(index)
+
+        # Every valid item is still fully resolved, including the shared
+        # component's per-consumer rates.
+        self.assertEqual(len(index["Cheese Slice"]), 2)
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in index["Cheese Slice"]}
+        self.assertEqual(consumers["Burger"], 2)
+        self.assertEqual(consumers["Cheese Fries"], 1)
+        self.assertEqual(len(index["Bun"]), 1)
+        self.assertEqual(len(index["Potato"]), 1)
+        self.assertEqual(len(index["Milk"]), 1)
+
+        # The broken item contributes nothing and appears nowhere.
+        indexed_items = {
+            row["top_level_item"] for rows in index.values() for row in rows
+        }
+        self.assertNotIn("Broken Item", indexed_items)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_strict_mode_remains_fail_closed_by_default(self, mock_get_value, mock_get_all):
+        """Default (skip_invalid_items=False) must still raise.
+
+        Production-planning / stock-issue callers must never silently omit an
+        item's demand, so graceful degradation is opt-in only.
+        """
+        get_value_side_effect, get_all_side_effect = self._mocks()
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        with self.assertRaises(frappe.ValidationError):
+            compile_shared_component_index(["Burger", "Broken Item"], "URY Co")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_all_items_broken_returns_empty_index_without_raising(
+        self, mock_get_value, mock_get_all
+    ):
+        mock_get_value.return_value = None
+        mock_get_all.return_value = []
+
+        index = compile_shared_component_index(
+            ["Broken One", "Broken Two"], "URY Co", skip_invalid_items=True
+        )
+
+        self.assertEqual(index, {})
+
+
+class TestGetItemsAffectedByComponentIsolatesBrokenItems(unittest.TestCase):
+    """The realtime fan-out lookup must survive one misconfigured branch item."""
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_one_item_without_bom_does_not_blind_the_whole_branch(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            return {
+                "Burger": "BOM-BURGER-001",
+                "Cheese Fries": "BOM-FRIES-001",
+            }.get(filters.get("item"))
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            # The branch's configured MADE_TO_ORDER items, one of which
+            # ("Broken Item") has no active BOM.
+            if doctype == "URY Item Production Configuration":
+                return ["Burger", "Broken Item", "Cheese Fries"]
+            return {
+                "BOM-BURGER-001": [_row("Bun", 1), _row("Cheese Slice", 2)],
+                "BOM-FRIES-001": [_row("Cheese Slice", 1), _row("Potato", 3)],
+            }.get((filters or {}).get("parent"), [])
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        affected = get_items_affected_by_component("Cheese Slice", "URY Branch", "URY Co")
+
+        # Before the fix this raised (and the caller's try/except swallowed it,
+        # silently killing the rich event branch-wide). Now both valid
+        # consumers of the shared component resolve normally.
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in affected}
+        self.assertEqual(consumers, {"Burger": 2, "Cheese Fries": 1})
 
 
 class TestNoBomFailsClosed(unittest.TestCase):
@@ -276,7 +512,7 @@ class TestBuildDemandVector(unittest.TestCase):
             f"{MOD}.frappe.db.get_value"
         ) as mock_get_value:
             mock_get_value.return_value = "BOM-BURGER-001"
-            mock_get_all.return_value = [_row("Bun", 1)]
+            mock_get_all.side_effect = _explosion_only_get_all([_row("Bun", 1)])
 
             snapshot = {
                 "company": "URY Co",
@@ -294,6 +530,132 @@ class TestBuildDemandVector(unittest.TestCase):
             first = build_demand_vector(snapshot)
             second = build_demand_vector(snapshot)
             self.assertEqual(first, second)
+
+
+class TestGetItemsAffectedByComponent(unittest.TestCase):
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_two_made_to_order_items_sharing_one_component_returns_both(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            # First call: get MADE_TO_ORDER items from URY Item Production Configuration
+            if doctype == "URY Item Production Configuration":
+                return ["Burger", "Cheese Fries"]
+            # Subsequent calls: BOM explosion lookups
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Cheese Slice", 2), _row("Bun", 1)]
+            if parent == "BOM-FRIES-001":
+                return [_row("Cheese Slice", 1), _row("Potato", 3)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            if filters.get("item") == "Cheese Fries":
+                return "BOM-FRIES-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Cheese Slice", "Delhi Branch", "URY Co")
+
+        self.assertEqual(len(result), 2)
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in result}
+        self.assertEqual(consumers["Burger"], 2)
+        self.assertEqual(consumers["Cheese Fries"], 1)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_component_used_by_single_made_to_order_item_returns_only_that_item(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return ["Burger"]
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Bun", 1), _row("Patty", 1)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Bun", "Delhi Branch", "URY Co")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["top_level_item"], "Burger")
+        self.assertEqual(result[0]["qty_per_unit"], 1)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_unused_component_returns_empty_list(self, mock_get_value, mock_get_all):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return ["Burger"]
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Bun", 1), _row("Patty", 1)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Unused Component", "Delhi Branch", "URY Co")
+
+        self.assertEqual(result, [])
+
+    @patch(f"{MOD}.frappe.get_all")
+    def test_no_made_to_order_items_returns_empty_list(self, mock_get_all):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return []
+            return []
+
+        mock_get_all.side_effect = get_all_side_effect
+
+        result = get_items_affected_by_component("Cheese Slice", "Delhi Branch", "URY Co")
+
+        self.assertEqual(result, [])
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_component_item_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("", "Delhi Branch", "URY Co")
+
+        mock_throw.assert_called()
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_branch_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("Cheese Slice", "", "URY Co")
+
+        mock_throw.assert_called()
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_company_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("Cheese Slice", "Delhi Branch", "")
+
+        mock_throw.assert_called()
 
 
 if __name__ == "__main__":

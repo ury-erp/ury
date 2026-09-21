@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import add_days, getdate
 
 from ury.ury.report_api.utils import require_manager
 
@@ -72,6 +72,38 @@ def get_close_day_checklist(branch, service_date):
 		{"branch": branch, "status": "Draft"},
 	)
 
+	fulfilment_rows = frappe.get_all(
+		"URY Fulfilment Record",
+		filters={
+			"branch": branch,
+			"company": frappe.db.get_value("Branch", branch, "company"),
+			"fulfilled_at": ["between", [service_date, add_days(service_date, 1)]],
+		},
+		fields=["name", "posted_to_erpnext", "posting_reference"],
+	)
+	unposted_fulfilment = [row for row in fulfilment_rows if not row.get("posted_to_erpnext") or not row.get("posting_reference")]
+
+	posting_intents = frappe.get_all(
+		"URY Fulfilment Posting Intent",
+		filters={
+			"branch": branch,
+			"company": frappe.db.get_value("Branch", branch, "company"),
+			"ready_at": ["between", [service_date, add_days(service_date, 1)]],
+			"status": ["in", ["PENDING", "POSTING", "FAILED"]],
+		},
+		fields=["name", "status"],
+	)
+	stale_reservations = frappe.get_all(
+		"URY Stock Reservation",
+		filters={
+			"branch": branch,
+			"company": frappe.db.get_value("Branch", branch, "company"),
+			"creation": ["<", add_days(service_date, 1)],
+			"status": "Reserved",
+		},
+		fields=["name"],
+	)
+
 	items = [
 		{
 			"key": "open_tables",
@@ -97,6 +129,20 @@ def get_close_day_checklist(branch, service_date):
 			"label": "Wastage sign-off",
 			"count": wastage_unsigned,
 			"blocking": wastage_unsigned > 0,
+		},
+		{
+			"key": "fulfilment_posting",
+			"label": "Fulfilment stock posting",
+			"count": len(unposted_fulfilment) + len(posting_intents),
+			"blocking": bool(unposted_fulfilment or posting_intents),
+			"scope_note": "V3 fulfilment records or posting intents without submitted ERPNext posting evidence",
+		},
+		{
+			"key": "stale_reservations",
+			"label": "Stale stock reservations",
+			"count": len(stale_reservations),
+			"blocking": bool(stale_reservations),
+			"scope_note": "Reserved rows created before the close date require reconciliation or expiry",
 		},
 	]
 

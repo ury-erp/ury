@@ -18,6 +18,7 @@ from datetime import date
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.permissions import add_permission, update_permission_property
 
 from ury.ury_pos.api import (
     get_checklist,
@@ -26,8 +27,9 @@ from ury.ury_pos.api import (
 )
 from ury.ury.api.ury_kot_validation import get_kot_errors
 from ury.ury.doctype.sub_pos_closing.sub_pos_closing import get_pos_invoices
+from ury.ury.tests.factories import make_branch
 
-TEST_COMPANY = "URY"
+TEST_COMPANY = "_Test Company"
 TEST_MODE_OF_PAYMENT = "Cash"
 TEST_BRANCH = "_Test E2E P0P1 Branch"
 TEST_ROOM = "_Test E2E P0P1 Room"
@@ -83,8 +85,23 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
         # roles the branch-scoping in each API function special-cases.
         if "URY Cashier" not in frappe.get_roles(user.name):
             user.add_roles("URY Cashier")
+        self._ensure_cashier_opening_permissions()
 
         return user
+
+    def _ensure_cashier_opening_permissions(self):
+        permissions = {
+            "POS Opening Entry": ("select", "read", "create", "write", "submit"),
+            "POS Invoice": ("select", "read", "write"),
+        }
+        for doctype, ptypes in permissions.items():
+            if not frappe.db.exists(
+                "Custom DocPerm",
+                {"parent": doctype, "role": "URY Cashier", "permlevel": 0},
+            ):
+                add_permission(doctype, "URY Cashier", 0)
+            for permission in ptypes:
+                update_permission_property(doctype, "URY Cashier", 0, permission, 1)
 
     def _make_branch(self):
         # Branch -> URY User is how getBranch() maps a session user to a
@@ -98,14 +115,7 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
             branch.append("user", {"user": self.cashier.name})
             branch.save(ignore_permissions=True)
         else:
-            branch = frappe.get_doc(
-                {
-                    "doctype": "Branch",
-                    "branch": TEST_BRANCH,
-                    "user": [{"user": self.cashier.name}],
-                }
-            )
-            branch.insert(ignore_permissions=True)
+            branch = make_branch(branch=TEST_BRANCH, user=[{"user": self.cashier.name}])
         return branch
 
     def _make_restaurant(self):

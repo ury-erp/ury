@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Badge, Button, DataTable, Input, Page, Panel, Select, Spinner, showToast, type DataTableColumn } from '@ury/ui';
+import { Button, DataTable, Input, Page, Panel, Spinner, showToast, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -15,8 +15,6 @@ interface ProductionDepartmentRecord {
   department_manager?: string;
   department_warehouse?: string;
   cost_center?: string;
-  issue_control_policy?: string;
-  wastage_policy?: string;
   enabled?: boolean;
 }
 
@@ -41,8 +39,6 @@ export const ProductionDepartmentPage: React.FC = () => {
     department_manager: '',
     department_warehouse: '',
     cost_center: '',
-    issue_control_policy: 'Plan Controlled',
-    wastage_policy: '',
     enabled: true
   });
 
@@ -91,8 +87,6 @@ export const ProductionDepartmentPage: React.FC = () => {
       department_manager: '',
       department_warehouse: '',
       cost_center: '',
-      issue_control_policy: 'Plan Controlled',
-      wastage_policy: '',
       enabled: true
     });
     setIsDrawerOpen(true);
@@ -114,8 +108,6 @@ export const ProductionDepartmentPage: React.FC = () => {
         department_manager: data.department_manager || '',
         department_warehouse: data.department_warehouse || '',
         cost_center: data.cost_center || '',
-        issue_control_policy: data.issue_control_policy || 'Plan Controlled',
-        wastage_policy: data.wastage_policy || '',
         enabled: data.enabled !== false
       });
     } catch (err) {
@@ -126,8 +118,6 @@ export const ProductionDepartmentPage: React.FC = () => {
         department_manager: department.department_manager || '',
         department_warehouse: department.department_warehouse || '',
         cost_center: department.cost_center || '',
-        issue_control_policy: department.issue_control_policy || 'Plan Controlled',
-        wastage_policy: department.wastage_policy || '',
         enabled: department.enabled !== false
       });
     }
@@ -150,8 +140,6 @@ export const ProductionDepartmentPage: React.FC = () => {
         department_manager: newDepartment.department_manager,
         department_warehouse: newDepartment.department_warehouse,
         cost_center: newDepartment.cost_center,
-        issue_control_policy: newDepartment.issue_control_policy,
-        wastage_policy: newDepartment.wastage_policy,
         enabled: newDepartment.enabled
       };
 
@@ -248,15 +236,6 @@ export const ProductionDepartmentPage: React.FC = () => {
                 header: 'Warehouse',
                 render: (row) => <span>{row.department_warehouse || '-'}</span>,
               },
-              {
-                key: 'issue_control_policy',
-                header: 'Policy',
-                render: (row) => (
-                  <Badge size="tag" variant="cancelled">
-                    {row.issue_control_policy || 'Plan Controlled'}
-                  </Badge>
-                ),
-              },
             ];
             return (
               <DataTable
@@ -338,27 +317,6 @@ export const ProductionDepartmentPage: React.FC = () => {
               onChange={(id, val) => setNewDepartment({ ...newDepartment, cost_center: val })}
               options={costCenters.map(cc => ({ value: cc.name, label: cc.name }))}
               placeholder="Select Cost Center"
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Issue Control Policy *</label>
-            <Select
-              value={newDepartment.issue_control_policy}
-              onChange={(e) => setNewDepartment({ ...newDepartment, issue_control_policy: e.target.value })}
-            >
-              <option value="Plan Controlled">Plan Controlled</option>
-              <option value="Plan Controlled with Override">Plan Controlled with Override</option>
-              <option value="Open Issue">Open Issue</option>
-            </Select>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Wastage Policy</label>
-            <Input
-              value={newDepartment.wastage_policy}
-              onChange={(e) => setNewDepartment({ ...newDepartment, wastage_policy: e.target.value })}
-              placeholder="Optional wastage policy notes"
             />
           </div>
 

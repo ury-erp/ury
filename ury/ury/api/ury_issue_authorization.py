@@ -25,6 +25,8 @@ import json
 import frappe
 from frappe import _
 
+from ury.ury.report_api.utils import user_has_branch_access
+
 
 ISSUE_AUTH_DOCTYPE = "URY Issue Authorization"
 SALES_PLAN_DOCTYPE = "URY Sales Plan"
@@ -132,6 +134,11 @@ def _validate_scope(plan_doc, branch, company, department):
         frappe.throw(_("Sales Plan branch and company do not match"), frappe.ValidationError)
     if not department:
         frappe.throw(_("Department is required"), frappe.ValidationError)
+    if not user_has_branch_access(frappe.session.user, branch):
+        frappe.throw(
+            _("You are not assigned to branch {0}").format(branch),
+            frappe.PermissionError,
+        )
 
 
 def frozen_component_demand(plan_doc, department, production_unit, component_item):

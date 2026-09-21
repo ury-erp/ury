@@ -124,6 +124,32 @@ INVALID_EXECUTION_TRANSITION = "INVALID_EXECUTION_TRANSITION"
 MANAGER_CONFIRMATION_REQUIRED = "MANAGER_CONFIRMATION_REQUIRED"
 ITEM_LEVEL_STATE_REQUIRED = "ITEM_LEVEL_STATE_REQUIRED"
 
+# Reason codes for resolve_cancellation_disposition (return-vs-waste, below).
+KOT_ITEM_NOT_FOUND = "KOT_ITEM_NOT_FOUND"
+INVALID_DISPOSITION = "INVALID_DISPOSITION"
+INVALID_QTY = "INVALID_QTY"
+ALREADY_RESOLVED = "ALREADY_RESOLVED"
+
+# `URY KOT Items.disposition` Select values (see doctype/ury_kot_items/ury_kot_items.json).
+DISPOSITION_PENDING = "Pending"
+DISPOSITION_RETURNED_TO_STOCK = "Returned to Stock"
+DISPOSITION_WASTED = "Wasted"
+
+# Disposition values accepted by resolve_cancellation_disposition's `disposition` arg.
+_RETURN_TO_STOCK = "return_to_stock"
+_WASTE = "waste"
+
+# `URY Issue Wastage.reason_category` Select options (see
+# doctype/ury_issue_wastage/ury_issue_wastage.json). A `reason` that does not
+# match one of these falls back to "Other".
+_WASTAGE_REASON_CATEGORIES = {
+	"Spoilage",
+	"Preparation Error",
+	"Dropped/Damaged",
+	"Expired",
+	"Other",
+}
+
 
 class CancellationError(frappe.ValidationError):
 	"""Raised for fail-closed cancellation errors; carries a stable reason_code."""
@@ -203,6 +229,12 @@ def _write_cancellation(kot, locked, target_state, actor, event, reason, branch,
 	"""
 	if locked:
 		doc = frappe.get_doc(EXECUTION_DOCTYPE, locked["name"])
+		# See ury_kot_execution_service._transition: `frappe.get_doc` here is
+		# a plain read that can be served from a snapshot pinned before
+		# `_lock_execution_row`'s `FOR UPDATE` ran. Overwrite audit_log with
+		# the value the locking read fetched so the read-modify-write append
+		# below cannot silently drop a concurrently committed entry.
+		doc.audit_log = locked.get("audit_log")
 	else:
 		doc = frappe.get_doc(
 			{
@@ -345,6 +377,31 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 	finished good. Finished-good disposition (return-to-stock via V3-32,
 	wastage via V3-33, or staff-meal) is a LATER, separate action this task
 	does not implement.
+
+	TODO (tracked, deliberate): under POS Stock Authority V2 a made-to-order
+	item that reached READY has already posted a real, submitted `Manufacture`
+	Stock Entry -- its raw materials are genuinely consumed and its finished
+	good genuinely exists in the department warehouse. Cancelling here means
+	that stock is now held against no sale: the sale-side deduction at POS
+	Closing Entry will never happen for it, so the finished good sits in the
+	warehouse indefinitely and the consumed raws are never charged anywhere.
+
+	This function deliberately does NOT try to reverse or write off that
+	entry. Reversing it would be wrong (the food really was cooked), and
+	routing it to waste, staff-meal or re-plate requires a food-waste
+	accounting model -- which account, which cost center, whose approval --
+	that this codebase does not have. Inventing one here would put
+	unreviewed entries into a real financial ledger. The safe default is to
+	leave the stock where it is, correctly recorded, and surface the
+	decision: `disposition_required` below is returned True precisely so a
+	caller/report can find these.
+
+	Recorded as gap G-08 and Phase 3 follow-up in
+	tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md.
+	The related reservation-side hazard (G-09) IS handled:
+	`ury_order_reservation_service.release_order_reservations` skips
+	already-Fulfilled groups instead of throwing, so cancelling a partly
+	produced order always completes.
 	"""
 	_require_execution_doctype()
 	_require_kot(kot)
@@ -375,7 +432,10 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 	result["disposition_note"] = (
 		"This call only marks CANCELLED_AFTER_READY. Finished-good disposition "
 		"(return-to-stock, wastage, or staff-meal) is a later, separate action "
-		"not implemented here."
+		"not implemented here. If production already posted for this item, its "
+		"raw materials are consumed and its finished good exists in the "
+		"department warehouse against no sale; routing that to waste requires a "
+		"food-waste accounting decision this app does not model yet."
 	)
 	return result
 
@@ -429,3 +489,185 @@ def cancel_partial(kot, item_states, actor=None, reason=None, manager_confirmed_
 			"across mixed started/not-started items."
 		).format(kot),
 	)
+
+
+# ---------------------------------------------------------------------------
+# Return-vs-waste disposition (item-level, on URY KOT Items rows)
+#
+# This is deliberately separate from the four KOT-level execution-state
+# cases above: `cancel_after_start` / `cancel_after_ready` each record a
+# `disposition_required: True` note that a LATER, separate disposition
+# action is needed -- this is that action. It resolves a single already
+# cancelled `URY KOT Items` row (identified by its child-table row `name`,
+# e.g. one produced by `create_cancel_kot_doc` in ury_kot_generate.py, which
+# already sets `cancelled_qty` on the row) to either "return_to_stock" or
+# "waste", exactly once.
+# ---------------------------------------------------------------------------
+
+
+def _resolve_kot_item_row(kot, item_row_name):
+	kot_doc = frappe.get_doc("URY KOT", kot)
+	for row in kot_doc.get("kot_items") or []:
+		if row.name == item_row_name:
+			return kot_doc, row
+	raise CancellationError(
+		KOT_ITEM_NOT_FOUND,
+		_("KOT Item row {0} not found on KOT {1}").format(item_row_name, kot),
+	)
+
+
+def _row_resolvable_qty(row):
+	"""The qty this row can have disposition resolved for.
+
+	Prefers `cancelled_qty` (set by `create_cancel_kot_doc` for a
+	partially-cancelled row); falls back to `quantity` when `cancelled_qty`
+	is unset (e.g. a row cancelled via the whole-KOT execution-state cases
+	above, which never set `cancelled_qty`). Both fields are Data-typed on
+	`URY KOT Items`, so parsing defensively here is required.
+	"""
+	for value in (row.get("cancelled_qty"), row.get("quantity")):
+		if value in (None, ""):
+			continue
+		try:
+			return abs(float(value))
+		except (TypeError, ValueError):
+			continue
+	return None
+
+
+@frappe.whitelist()
+def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor=None, reason=None):
+	"""Resolve one cancelled `URY KOT Items` row to "return_to_stock" or "waste".
+
+	This is the "LATER, separate disposition action" that
+	`cancel_after_start`/`cancel_after_ready` (above) explicitly defer, and
+	the disposition step for rows produced by the qty-reduction partial
+	cancel-KOT flow (`ury_pos_invoice_qty_reduction.reduce_order_item_qty`).
+
+	- `disposition="waste"`: creates a Draft `URY Issue Wastage` record
+	  (`wasted_qty=qty`, `component_item`=this row's `item`, `department`
+	  derived from the KOT's production unit, `reason_category` from
+	  `reason` when it matches one of that doctype's Select options else
+	  "Other", `captured_by`=actor). `URY Issue Wastage.issue_authorization`
+	  and `.plan` are mandatory fields on that doctype, but they exist to
+	  tie a wastage record to a pre-authorized `URY Issue Authorization`
+	  scoped to a `URY Sales Plan` (see `ury_wastage.capture_wastage`) --
+	  neither concept has any natural counterpart for an ad-hoc,
+	  cancellation-triggered waste. Rather than fabricate a fake
+	  authorization/plan, this call inserts with `ignore_mandatory=True` and
+	  leaves both blank. FUTURE WORK: wire a real Issue Authorization for
+	  cancellation-triggered wastage if/when that workflow is extended to
+	  cover this case.
+
+	- `disposition="return_to_stock"`: creates NO wastage record. It only
+	  sets `URY KOT Items.disposition = "Returned to Stock"` on this row --
+	  the signal that the item becomes available for resale. Exactly like
+	  the rest of this module (see "NO STOCK RESTORATION" in the module
+	  docstring), this NEVER touches Bin or any real stock/warehouse
+	  quantity; a real stock re-credit / department-availability integration
+	  for "available for resale" is future work, not implemented here.
+
+	Idempotent by construction: a row's `disposition` starts "Pending" and
+	is set exactly once by this call; resolving an already-resolved row
+	raises `CancellationError(ALREADY_RESOLVED)` rather than silently
+	double-processing (e.g. double-counting a wastage qty).
+	"""
+	_require_kot(kot)
+	actor = actor or frappe.session.user
+
+	if disposition not in (_RETURN_TO_STOCK, _WASTE):
+		raise CancellationError(
+			INVALID_DISPOSITION,
+			_("disposition must be one of {0}, got {1!r}").format(
+				(_RETURN_TO_STOCK, _WASTE), disposition
+			),
+		)
+
+	try:
+		qty = float(qty)
+	except (TypeError, ValueError):
+		raise CancellationError(INVALID_QTY, _("qty must be a positive number, got {0!r}").format(qty))
+	if qty <= 0:
+		raise CancellationError(INVALID_QTY, _("qty must be greater than zero, got {0}").format(qty))
+
+	kot_doc, row = _resolve_kot_item_row(kot, item_row_name)
+
+	current_disposition = row.get("disposition") or DISPOSITION_PENDING
+	if current_disposition != DISPOSITION_PENDING:
+		raise CancellationError(
+			ALREADY_RESOLVED,
+			_("KOT Item row {0} on KOT {1} is already resolved ({2})").format(
+				item_row_name, kot, current_disposition
+			),
+		)
+
+	resolvable_qty = _row_resolvable_qty(row)
+	if resolvable_qty is not None and qty > resolvable_qty:
+		raise CancellationError(
+			INVALID_QTY,
+			_("qty {0} exceeds resolvable quantity {1} for KOT Item row {2}").format(
+				qty, resolvable_qty, item_row_name
+			),
+		)
+
+	branch, company, production_unit = _kot_scope(kot)
+
+	result = {
+		"kot": kot,
+		"item_row_name": item_row_name,
+		"qty": qty,
+		"actor": actor,
+	}
+
+	if disposition == _RETURN_TO_STOCK:
+		row.disposition = DISPOSITION_RETURNED_TO_STOCK
+		kot_doc.save(ignore_permissions=False)
+		result["disposition"] = DISPOSITION_RETURNED_TO_STOCK
+		result["wastage_record"] = None
+		result["note"] = (
+			"Item marked Returned to Stock / available for resale. This only "
+			"flips URY KOT Items.disposition -- real stock/Bin re-crediting "
+			"and department-availability integration is future work, not "
+			"implemented here (see module NO STOCK RESTORATION note)."
+		)
+	else:
+		department = None
+		if production_unit:
+			department = frappe.db.get_value("URY Production Unit", production_unit, "department")
+
+		reason_category = reason if reason in _WASTAGE_REASON_CATEGORIES else "Other"
+
+		wastage_doc = frappe.get_doc(
+			{
+				"doctype": "URY Issue Wastage",
+				"branch": branch,
+				"company": company,
+				"department": department,
+				"production_unit": production_unit,
+				"component_item": row.get("item"),
+				"status": "Draft",
+				"wasted_qty": qty,
+				"reason_category": reason_category,
+				"reason_notes": reason,
+				"captured_by": actor,
+				"captured_on": frappe.utils.now(),
+			}
+		)
+		# issue_authorization/plan/stock_uom are mandatory on this doctype for
+		# its OWN capture_wastage() flow (ury_wastage.py) but have no
+		# equivalent here -- see docstring above.
+		wastage_doc.insert(ignore_permissions=False, ignore_mandatory=True)
+
+		row.disposition = DISPOSITION_WASTED
+		kot_doc.save(ignore_permissions=False)
+
+		result["disposition"] = DISPOSITION_WASTED
+		result["wastage_record"] = wastage_doc.name
+		result["note"] = (
+			"Draft URY Issue Wastage {0} created (status=Draft, does not "
+			"reduce any entitlement until separately approved via "
+			"ury_wastage.approve_wastage, per that module's own documented "
+			"Draft-vs-Authorized semantics)."
+		).format(wastage_doc.name)
+
+	return result

@@ -1,108 +1,152 @@
-# Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
+# Copyright (c) 2026, Tridz Technologies Pvt. Ltd and contributors
 # See license.txt
+"""Tests for payment_terminal.py's provider registration/switching logic
+(COVERAGE_GAP_ANALYSIS.md Table 1: `register_simulated_terminal_provider`,
+"HIGH -- cashier/payment reconciliation", had zero test reference; the
+`ury_payment_terminal` / `ury_payment_terminal_transaction` doctypes are
+also empty stubs -- Top 15 item #9).
 
-import unittest
-from unittest import mock
+Scope: this module is explicitly documented (see its module docstring) as
+an interface-only abstraction with a no-op default provider and an opt-in
+simulated provider for testing/demo. The registration/dispatch logic
+(`register_payment_terminal_provider`, `register_simulated_terminal_
+provider`, `get_payment_terminal_provider`) is pure Python state
+management -- tested directly, no mocking needed. `_SimulatedPaymentTerminal
+Provider.start_transaction()`'s real DB write (a `URY Payment Terminal
+Transaction` insert) is exercised separately below with mocked `frappe.db`/
+`frappe.new_doc` calls, matching this track's mock-for-read/write-adjacent-
+logic convention -- a real insert would need a `URY Payment Terminal`
+fixture, deferred to a follow-up IntegrationTestCase session.
+"""
+
+from unittest.mock import MagicMock, patch
 
 import frappe
+from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.payment_terminal import (
-    PaymentTerminalProvider,
-    _SimulatedPaymentTerminalProvider,
-    get_payment_terminal_provider,
-    register_payment_terminal_provider,
-)
+from ury.ury.api import payment_terminal as pt
+
+MODULE = "ury.ury.api.payment_terminal"
 
 
-class TestPaymentTerminalInterface(unittest.TestCase):
-    def tearDown(self):
-        from ury.ury.api import payment_terminal
-        payment_terminal._payment_terminal_provider = payment_terminal._NoOpPaymentTerminalProvider()
+class TestProviderRegistration(FrappeTestCase):
+	def tearDown(self):
+		# Registration mutates module-level global state; reset it after
+		# every test so this suite never leaks a provider into another test.
+		pt._payment_terminal_provider = pt._NoOpPaymentTerminalProvider()
 
-    def test_default_provider_is_honest_not_silent(self):
-        provider = get_payment_terminal_provider()
-        with self.assertRaises(frappe.ValidationError):
-            provider.start_transaction("POS-INV-100", 100, "INR")
+	def test_default_provider_is_noop(self):
+		pt._payment_terminal_provider = pt._NoOpPaymentTerminalProvider()
+		self.assertIsInstance(
+			pt.get_payment_terminal_provider(), pt._NoOpPaymentTerminalProvider
+		)
 
-    def test_register_rejects_non_conforming_provider(self):
-        with self.assertRaises(Exception):
-            register_payment_terminal_provider(object())
+	def test_register_simulated_terminal_provider_switches_active_provider(self):
+		pt.register_simulated_terminal_provider()
+		self.assertIsInstance(
+			pt.get_payment_terminal_provider(), pt._SimulatedPaymentTerminalProvider
+		)
 
-    def test_register_accepts_real_subclass(self):
-        class FakeVendorProvider(PaymentTerminalProvider):
-            def start_transaction(self, invoice_name, amount, currency):
-                return {"transaction_id": "TXN-1", "status": "Pending"}
+	def test_register_payment_terminal_provider_rejects_non_provider(self):
+		with self.assertRaises(frappe.ValidationError):
+			pt.register_payment_terminal_provider(object())
 
-            def get_transaction_status(self, transaction_id):
-                return {"status": "Approved", "reference": "REF-1"}
+	def test_register_payment_terminal_provider_accepts_valid_subclass(self):
+		class _CustomProvider(pt.PaymentTerminalProvider):
+			def start_transaction(self, invoice_name, amount, currency):
+				return {"transaction_id": "x", "status": "Approved"}
 
-            def cancel_transaction(self, transaction_id):
-                return {"status": "Cancelled"}
+			def get_transaction_status(self, transaction_id):
+				return {"status": "Approved"}
 
-        register_payment_terminal_provider(FakeVendorProvider())
-        provider = get_payment_terminal_provider()
-        result = provider.start_transaction("POS-INV-100", 100, "INR")
-        self.assertEqual(result["status"], "Pending")
+			def cancel_transaction(self, transaction_id):
+				return {"status": "Cancelled"}
+
+		custom = _CustomProvider()
+		pt.register_payment_terminal_provider(custom)
+		self.assertIs(pt.get_payment_terminal_provider(), custom)
 
 
-class TestSimulatedPaymentTerminalProvider(unittest.TestCase):
-    """Covers the demo/testing stub provider -- it must behave like a real
-    (if instant) terminal: start -> Approved, status reflects it, cancel
-    flips it to Cancelled. It is never the default provider in production."""
+class TestNoOpProvider(FrappeTestCase):
+	def test_start_transaction_throws_honest_error(self):
+		provider = pt._NoOpPaymentTerminalProvider()
+		with self.assertRaises(frappe.ValidationError):
+			provider.start_transaction("INV-0001", 100, "INR")
 
-    def setUp(self):
-        terminal_id = frappe.generate_hash(length=8)
-        self.terminal = frappe.get_doc(
-            {
-                "doctype": "URY Payment Terminal",
-                # autoname is "prompt" on this doctype -- name must be set explicitly.
-                "name": terminal_id,
-                "terminal_id": terminal_id,
-                "provider": "Simulated",
-                "status": "Idle",
-            }
-        ).insert(ignore_permissions=True)
-        register_payment_terminal_provider(_SimulatedPaymentTerminalProvider())
+	def test_get_transaction_status_throws(self):
+		provider = pt._NoOpPaymentTerminalProvider()
+		with self.assertRaises(frappe.ValidationError):
+			provider.get_transaction_status("txn-1")
 
-        # The transaction log's `invoice` field link-validates against a real
-        # POS Invoice, which is correct for production (a terminal
-        # transaction is always tied to a real invoice) but out of scope to
-        # fixture up here -- these tests only cover the terminal/transaction
-        # lifecycle itself, not invoice creation. Skip link validation for
-        # the duration of this test class rather than either weakening the
-        # field in production or dragging in an unrelated invoice fixture.
-        self._link_patch = mock.patch("frappe.model.document.Document._validate_links")
-        self._link_patch.start()
+	def test_cancel_transaction_throws(self):
+		provider = pt._NoOpPaymentTerminalProvider()
+		with self.assertRaises(frappe.ValidationError):
+			provider.cancel_transaction("txn-1")
 
-    def tearDown(self):
-        from ury.ury.api import payment_terminal
 
-        self._link_patch.stop()
-        payment_terminal._payment_terminal_provider = payment_terminal._NoOpPaymentTerminalProvider()
-        frappe.db.delete(
-            "URY Payment Terminal Transaction", {"terminal": self.terminal.name}
-        )
-        frappe.delete_doc(
-            "URY Payment Terminal", self.terminal.name, force=1, ignore_permissions=True
-        )
+class TestSimulatedProviderStartTransaction(FrappeTestCase):
+	def test_start_transaction_creates_approved_transaction(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		mock_txn = MagicMock()
+		mock_txn.transaction_id = "sim-hash-123"
+		mock_txn.status = "Approved"
 
-    def test_start_transaction_is_instantly_approved(self):
-        provider = get_payment_terminal_provider()
-        result = provider.start_transaction("POS-INV-SIM-1", 250, "INR")
-        self.assertEqual(result["status"], "Approved")
-        self.assertTrue(result["transaction_id"])
+		with patch(f"{MODULE}.frappe.db.get_value", return_value="TERM-001"), \
+			patch(f"{MODULE}.frappe.new_doc", return_value=mock_txn) as mock_new_doc, \
+			patch(f"{MODULE}.frappe.generate_hash", return_value="sim-hash-123"), \
+			patch(f"{MODULE}.frappe.db.set_value") as mock_set_value:
+			result = provider.start_transaction("INV-0001", 250.0, "INR")
 
-    def test_get_transaction_status_reflects_approval(self):
-        provider = get_payment_terminal_provider()
-        started = provider.start_transaction("POS-INV-SIM-2", 100, "INR")
-        status = provider.get_transaction_status(started["transaction_id"])
-        self.assertEqual(status["status"], "Approved")
+		mock_new_doc.assert_called_once_with("URY Payment Terminal Transaction")
+		mock_txn.insert.assert_called_once_with(ignore_permissions=True)
+		self.assertEqual(mock_txn.invoice, "INV-0001")
+		self.assertEqual(mock_txn.amount, 250.0)
+		self.assertEqual(mock_txn.status, "Approved")
+		mock_set_value.assert_called_once()
+		self.assertEqual(
+			result, {"transaction_id": "sim-hash-123", "status": "Approved"}
+		)
 
-    def test_cancel_transaction_marks_cancelled(self):
-        provider = get_payment_terminal_provider()
-        started = provider.start_transaction("POS-INV-SIM-3", 100, "INR")
-        result = provider.cancel_transaction(started["transaction_id"])
-        self.assertEqual(result["status"], "Cancelled")
+	def test_start_transaction_skips_terminal_update_when_no_terminal_found(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		mock_txn = MagicMock()
+		mock_txn.transaction_id = "sim-hash-456"
+		mock_txn.status = "Approved"
 
-        status = provider.get_transaction_status(started["transaction_id"])
-        self.assertEqual(status["status"], "Cancelled")
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None), \
+			patch(f"{MODULE}.frappe.new_doc", return_value=mock_txn), \
+			patch(f"{MODULE}.frappe.generate_hash", return_value="sim-hash-456"), \
+			patch(f"{MODULE}.frappe.db.set_value") as mock_set_value:
+			provider.start_transaction("INV-0002", 100.0, "INR")
+
+		mock_set_value.assert_not_called()
+
+
+class TestSimulatedProviderGetAndCancelTransaction(FrappeTestCase):
+	def test_get_transaction_status_returns_status(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		with patch(f"{MODULE}.frappe.db.get_value", side_effect=["TXN-0001", "Approved"]):
+			result = provider.get_transaction_status("sim-hash-123")
+		self.assertEqual(result, {"status": "Approved", "reference": "sim-hash-123"})
+
+	def test_get_transaction_status_raises_for_unknown_transaction(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None):
+			with self.assertRaises(frappe.ValidationError):
+				provider.get_transaction_status("unknown-txn")
+
+	def test_cancel_transaction_marks_cancelled(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		with patch(f"{MODULE}.frappe.db.get_value", return_value="TXN-0001"), \
+			patch(f"{MODULE}.frappe.db.set_value") as mock_set_value:
+			result = provider.cancel_transaction("sim-hash-123")
+		mock_set_value.assert_called_once_with(
+			"URY Payment Terminal Transaction", "TXN-0001", "status", "Cancelled"
+		)
+		self.assertEqual(result, {"status": "Cancelled"})
+
+	def test_cancel_transaction_raises_for_unknown_transaction(self):
+		provider = pt._SimulatedPaymentTerminalProvider()
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None):
+			with self.assertRaises(frappe.ValidationError):
+				provider.cancel_transaction("unknown-txn")

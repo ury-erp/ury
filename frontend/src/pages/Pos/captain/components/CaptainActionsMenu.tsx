@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRightLeft, Loader2, MoreVertical, Printer, Receipt, UserRound } from 'lucide-react';
+import { ArrowRightLeft, Loader2, MoreVertical, Printer, Receipt, Split, UserRound } from 'lucide-react';
 import { Button } from '@ury/ui';
 
 /**
@@ -31,6 +31,8 @@ interface CaptainActionsMenuProps {
   showPrintBill?: boolean;
   onPrintBill?: () => void;
   isPrintingBill?: boolean;
+  showSplitBill?: boolean;
+  onSplitBill?: () => void;
 }
 
 const CaptainActionsMenu = ({
@@ -46,6 +48,8 @@ const CaptainActionsMenu = ({
   showPrintBill = false,
   onPrintBill,
   isPrintingBill = false,
+  showSplitBill = false,
+  onSplitBill,
 }: CaptainActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +66,7 @@ const CaptainActionsMenu = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
-  if (!showReprintKot && !showTransferTable && !showTransferCaptain && !showPrintBill) {
+  if (!showReprintKot && !showTransferTable && !showTransferCaptain && !showPrintBill && !showSplitBill) {
     return null;
   }
 
@@ -93,6 +97,12 @@ const CaptainActionsMenu = ({
     event.stopPropagation();
     onOpenChange(false);
     onPrintBill?.();
+  };
+
+  const handleSplitBill = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onSplitBill?.();
   };
 
   return (
@@ -158,6 +168,16 @@ const CaptainActionsMenu = ({
                 <Receipt className="h-4 w-4 shrink-0" />
               )}
               Print bill
+            </Button>
+          )}
+          {showSplitBill && (
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2.5 text-sm font-normal text-muted-foreground hover:bg-muted"
+              onClick={handleSplitBill}
+            >
+              <Split className="h-4 w-4 shrink-0" />
+              Split bill
             </Button>
           )}
         </div>

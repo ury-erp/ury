@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import { cn } from '../lib/cn'
+import { Badge } from './badge'
 
 const LONG_PRESS_MS = 500
 const MOVE_SLOP_PX = 10
 const DOUBLE_CLICK_MS = 400
+
+export type MenuItemAvailabilityTag = {
+  variant: 'tagDestructive' | 'tagWarning' | 'tagSuccess'
+  text: string
+  showDot?: boolean
+}
 
 export interface MenuItemCardProps {
   name: string
@@ -16,6 +23,11 @@ export interface MenuItemCardProps {
   onConfigure?: () => void
   disabled?: boolean
   unavailableMessage?: string | null
+  /**
+   * Optional stock/availability chip (POS-style Badge). Optional so callers
+   * that only use `unavailableMessage` (e.g. serve) are unaffected.
+   */
+  availabilityTag?: MenuItemAvailabilityTag | null
   className?: string
   /** Total qty in the active order for this item (including loaded rows). */
   quantity?: number
@@ -38,6 +50,7 @@ export function MenuItemCard({
   onConfigure,
   disabled,
   unavailableMessage,
+  availabilityTag,
   className,
   quantity,
   onIncrement,
@@ -198,6 +211,16 @@ export function MenuItemCard({
             {priceLabel}
           </span>
         </div>
+        {availabilityTag ? (
+          <div className="mt-2">
+            <Badge size="tag" variant={availabilityTag.variant}>
+              {availabilityTag.showDot ? (
+                <span className="h-[5px] w-[5px] flex-none rounded-full bg-current" />
+              ) : null}
+              {availabilityTag.text}
+            </Badge>
+          </div>
+        ) : null}
         <div className="mt-auto h-11" aria-hidden />
       </div>
       {showQtyControls && (
