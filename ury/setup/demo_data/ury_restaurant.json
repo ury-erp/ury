@@ -2,6 +2,7 @@
     {
         "doctype": "URY Restaurant",
         "__newname": "Demo Restaurant",
+        "company": "__COMPANY__",
         "default_room": "Ground Floor",
         "branch": "Demo Branch",
         "invoice_series_prefix": "UDT-SA-",
