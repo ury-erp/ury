@@ -70,19 +70,17 @@ const buttonVariants = cva(
         danger:
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
       },
-      // Control height scale, shared with Input/Select so a button always
-      // lines up with the field next to it: xs 32 / sm 36 / default 44 / lg 48.
-      // `default` is 44px — the smallest comfortable touch target on a POS
-      // tablet — rather than the 40px desktop convention.
+      // Control height scale, shared with Input/Select/DatePicker so a button
+      // always lines up with the field next to it.
+      // `default` is the dashboard chrome size (Save Draft / filter toolbars).
+      // Pass `lg` for POS tablet primary actions. `compactLg` is an alias of
+      // `default` kept for existing call sites.
       size: {
-        default: "h-11 px-4",
+        default: "h-9 px-3.5 text-[13px] rounded-[7px] gap-1.5",
         sm: "h-9 px-3 rounded-md",
         lg: "h-12 px-6 text-base rounded-md",
         icon: "h-11 w-11 p-0",
         xs: "h-8 px-2.5 text-xs rounded-sm",
-        // Mockup's dense `.btn` scale (28/24/36px), additive alongside the
-        // touch-target-first defaults above — for chrome/toolbars, not
-        // primary POS actions.
         compact: "h-7 px-2.5 text-xs rounded-[7px] gap-1.5",
         compactSm: "h-6 px-2 text-[11.5px] rounded-[7px] gap-1.5",
         compactLg: "h-9 px-3.5 text-[13px] rounded-[7px] gap-1.5",
