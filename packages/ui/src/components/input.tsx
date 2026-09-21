@@ -32,6 +32,12 @@ const inputVariants = cva(
         default: "h-11 px-3.5 py-2",
         sm: "h-9 px-3 py-1.5 text-xs",
         lg: "h-12 px-4 py-3 text-base",
+        // Byte-for-byte the metrics of Button's `compactLg`, so a filter
+        // toolbar mixing Input/Select/DatePicker/Button reads as one row of
+        // controls rather than four heights. `sm` is the same 36px box but
+        // keeps text-xs and rounded-md, which sets it visibly apart from a
+        // button beside it.
+        compactLg: "h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]",
       },
     },
     defaultVariants: {

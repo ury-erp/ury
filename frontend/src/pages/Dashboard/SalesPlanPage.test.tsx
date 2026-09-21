@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { addDays, format, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarMonths, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
 import { salesPlanService } from '../../services/salesPlan';
 
@@ -137,8 +137,9 @@ describe('SalesPlanPage', () => {
 
     render(<SalesPlanPage />);
 
-    const planDate = screen.getByLabelText('Plan date') as HTMLInputElement;
-    expect(planDate.value).toBe('2026-08-29');
+    // The filter is an @ury/ui DatePicker: a <button> trigger rendering the
+    // selected date as DD-MM-YYYY, not a native input with a `.value`.
+    expect(screen.getByLabelText('Plan date')).toHaveTextContent('29-08-2026');
   });
 
   it('adds a zero-history item via catalog search and renders it in its department table', async () => {
@@ -240,6 +241,24 @@ describe('SalesPlanPage', () => {
     return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
   };
 
+  /** Pick a date through the DatePicker popup: open it, page to the target
+   *  month, then click that day's cell. The cells are keyed by `data-date`
+   *  because their visible text is a bare day number that repeats in the
+   *  adjacent months' padding. */
+  const selectPlanDate = async (target: string) => {
+    await userEvent.click(screen.getByLabelText('Plan date'));
+    const months = differenceInCalendarMonths(parseISO(target), parseISO(realToday()));
+    if (months !== 0) {
+      const nav = screen.getByLabelText(months > 0 ? 'Next month' : 'Previous month');
+      for (let i = 0; i < Math.abs(months); i += 1) {
+        await userEvent.click(nav);
+      }
+    }
+    const cell = document.querySelector<HTMLElement>(`[data-date="${target}"]`);
+    if (!cell) throw new Error(`No calendar cell for ${target}`);
+    await userEvent.click(cell);
+  };
+
   it('shows a relative "Today" label paired with the absolute date and branch name', async () => {
     render(<SalesPlanPage />);
 
@@ -255,8 +274,7 @@ describe('SalesPlanPage', () => {
     await screen.findByText('Chicken Biryani');
 
     const tomorrow = format(addDays(parseISO(realToday()), 1), 'yyyy-MM-dd');
-    const dateInput = screen.getByLabelText('Plan date') as HTMLInputElement;
-    fireEvent.change(dateInput, { target: { value: tomorrow } });
+    await selectPlanDate(tomorrow);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tomorrow');
@@ -269,8 +287,7 @@ describe('SalesPlanPage', () => {
 
     const pastDate = format(addDays(parseISO(realToday()), -10), 'yyyy-MM-dd');
     const expectedLabel = format(parseISO(pastDate), 'EEE, d MMM yyyy');
-    const dateInput = screen.getByLabelText('Plan date') as HTMLInputElement;
-    fireEvent.change(dateInput, { target: { value: pastDate } });
+    await selectPlanDate(pastDate);
 
     await waitFor(() => {
       const heading = screen.getByRole('heading', { level: 1 });

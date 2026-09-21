@@ -30,6 +30,8 @@ const selectVariants = cva(
         default: "h-11 pl-3.5 pr-10 py-2 text-sm",
         sm: "h-9 pl-3 pr-8 py-1.5 text-xs",
         lg: "h-12 pl-4 pr-11 py-3 text-base",
+        // Matches Button/Input `compactLg` — see the comment on Input's.
+        compactLg: "h-9 pl-3.5 pr-9 py-1.5 text-[13px] rounded-[7px]",
       },
     },
     defaultVariants: {

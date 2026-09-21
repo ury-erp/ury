@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
@@ -886,9 +886,16 @@ export const SalesPlanPage: React.FC = () => {
 
   const currentAction = planStatus ? NEXT_ACTION[planStatus] : undefined;
   const currentBackwardActionDef = planStatus ? BACKWARD_ACTIONS[planStatus] : undefined;
+  // Mirrors validate_plan_has_demand() in ury/ury/api/ury_sales_plan.py: the
+  // server refuses the Draft -> Proposed hop on a plan that states no
+  // quantity anywhere, so don't offer a button whose only outcome is that
+  // error. Scoped to that one hop for the same reason the backend guard is --
+  // a plan zeroed out AFTER it started circulating is a different problem,
+  // and silently disabling its Lock button is the wrong way to raise it.
+  const blockedAsEmptyPlan = currentAction?.targetState === 'Proposed' && totalPlannedQty <= 0;
   // Draft plans that have never been saved to the backend don't have a name
   // yet, so there is nothing to transition -- the manager must save first.
-  const canTransition = Boolean(currentAction && planName);
+  const canTransition = Boolean(currentAction && planName) && !blockedAsEmptyPlan;
   const canShowBackwardAction = Boolean(currentBackwardActionDef && planName && roles.includes('URY Sales Plan Controller'));
   const actionBlockedByRole = Boolean(currentAction?.managerOnly && !isManager);
   // Items (and by extension the plan's item list itself) are editable only
@@ -1053,16 +1060,14 @@ export const SalesPlanPage: React.FC = () => {
             )}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="relative block">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-              <Input
-                aria-label="Plan date"
-                type="date"
-                value={planDate}
-                onChange={(event) => setPlanDate(event.target.value)}
-                className="pl-9"
-              />
-            </label>
+            <DatePicker
+              id="plan-date"
+              aria-label="Plan date"
+              value={planDate}
+              onChange={(_id, next) => setPlanDate(next)}
+              size="compactLg"
+              className="w-[180px]"
+            />
             {isEditable && (
               <Select
                 aria-label="Enforcement Mode"
@@ -1070,6 +1075,8 @@ export const SalesPlanPage: React.FC = () => {
                 value={enforcementMode}
                 onChange={(event) => setEnforcementMode(event.target.value as 'Hard' | 'Soft' | 'Alert')}
                 disabled={loading || saving}
+                size="compactLg"
+                className="w-[130px]"
               >
                 <option value="Hard">Hard</option>
                 <option value="Soft">Soft</option>
@@ -1086,7 +1093,13 @@ export const SalesPlanPage: React.FC = () => {
               <Button
                 onClick={runTransition}
                 disabled={!canTransition || transitioning || actionBlockedByRole}
-                title={actionBlockedByRole ? 'Only managers can approve a Sales Plan.' : undefined}
+                title={
+                  actionBlockedByRole
+                    ? 'Only managers can approve a Sales Plan.'
+                    : blockedAsEmptyPlan
+                      ? 'Set a quantity on at least one item before submitting this plan for review.'
+                      : undefined
+                }
                 size="compactLg"
                 className="gap-2"
               >

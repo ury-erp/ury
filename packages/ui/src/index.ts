@@ -22,6 +22,7 @@ export * from './components/empty-state';
 export * from './components/table-cells';
 export * from './components/toast';
 export * from './components/checkbox';
+export * from './components/date-picker';
 export * from './components/tabs';
 export * from './components/alert';
 export * from './components/attention-feed';
