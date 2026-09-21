@@ -79,7 +79,6 @@ export function TimeWiseSales() {
             <Select
               value={bucketSize}
               onChange={(e) => setBucketSize(Number(e.target.value))}
-              size="compactLg"
             >
               {BUCKET_OPTIONS.map((b) => (
                 <option key={b} value={b}>
@@ -93,7 +92,6 @@ export function TimeWiseSales() {
               value={date}
               maxDate={toApiDate(new Date())}
               onChange={(_id, next) => setDate(next)}
-              size="compactLg"
               className="w-[150px]"
             />
           </>

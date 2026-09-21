@@ -129,10 +129,10 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             Remove {pendingShrink.tables.map((t) => t.name).join(' and ')}? This can't be undone.
           </p>
           <div className="flex gap-2 shrink-0">
-            <Button type="button" variant="ghost" size="sm" onClick={cancelRemove}>
+            <Button type="button" variant="ghost" onClick={cancelRemove}>
               Cancel
             </Button>
-            <Button type="button" variant="danger" size="sm" onClick={confirmRemove}>
+            <Button type="button" variant="danger" onClick={confirmRemove}>
               Remove
             </Button>
           </div>

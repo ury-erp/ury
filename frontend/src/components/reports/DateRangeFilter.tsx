@@ -11,4 +11,3 @@ export interface DateRangeFilterProps {
 export function DateRangeFilter({ value, onChange, className }: DateRangeFilterProps) {
   return <UryDateRangePicker value={value} onChange={onChange} className={className} />;
 }
-

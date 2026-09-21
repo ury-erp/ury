@@ -132,12 +132,11 @@ export function CancelledInvoices() {
             Page {pagination.page} of {pagination.total_pages}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
               <ChevronLeft className="w-4 h-4" /> Prev
             </Button>
             <Button
               variant="outline"
-              size="sm"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
             >

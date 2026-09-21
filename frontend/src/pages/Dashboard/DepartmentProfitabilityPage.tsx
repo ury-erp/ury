@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Spinner, Input, Button, Select, DataTable, type DataTableColumn } from '@ury/ui';
+import { Page, PageHeader, Section, Panel, Spinner, Input, Button, Select, DatePicker, DataTable, type DataTableColumn } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -209,36 +209,47 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
   return (
     <Page data-testid="department-profitability-page">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="text-xs text-muted-foreground">Company</label>
-          <Input value={company} disabled placeholder="Derived from branch" data-testid="profitability-company" />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Service Date / Period</label>
-          <Input value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} placeholder="YYYY-MM-DD" />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground" htmlFor="profitability-department">
-            Department (optional)
-          </label>
-          <Select
-            id="profitability-department"
-            aria-label="Department"
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            data-testid="profitability-department-select"
-          >
-            <option value="">All departments</option>
-            {departmentOptions.map((dept) => (
-              <option key={dept.name} value={dept.name}>
-                {dept.department_name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Button onClick={load} variant="chrome">Refresh</Button>
-      </div>
+      <PageHeader
+        title="Department Profitability"
+        description="Cost and plan-vs-actual for the selected branch and service date."
+        actions={
+          <>
+            <Input
+              value={company}
+              disabled
+              placeholder="Derived from branch"
+              aria-label="Company"
+              data-testid="profitability-company"
+              className="w-[180px]"
+            />
+            <DatePicker
+              id="profitability-service-date"
+              aria-label="Service date"
+              value={serviceDate}
+              onChange={(_id, next) => setServiceDate(next)}
+              className="w-[180px]"
+            />
+            <Select
+              id="profitability-department"
+              aria-label="Department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              data-testid="profitability-department-select"
+              className="w-[180px]"
+            >
+              <option value="">All departments</option>
+              {departmentOptions.map((dept) => (
+                <option key={dept.name} value={dept.name}>
+                  {dept.department_name}
+                </option>
+              ))}
+            </Select>
+            <Button onClick={load} variant="chrome">
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       {state === 'error' && (
         <Section>

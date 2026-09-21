@@ -193,7 +193,6 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
           type="number"
           min="0"
           step="any"
-          size="sm"
           value={wastedQty}
           onChange={(event) => setWastedQty(event.target.value)}
           className="mt-1"
@@ -204,7 +203,6 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         Reason
         <Select
           aria-label="Reason category"
-          size="sm"
           value={reasonCategory}
           onChange={(event) => setReasonCategory(event.target.value as WastageReasonCategory)}
           className="mt-1"
@@ -221,17 +219,16 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         <Input
           aria-label="Reason notes"
           type="text"
-          size="sm"
           value={reasonNotes}
           onChange={(event) => setReasonNotes(event.target.value)}
           className="mt-1"
         />
       </label>
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={submitting}>
+        <Button type="submit" disabled={submitting}>
           Submit Wastage
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
       </div>
@@ -300,7 +297,6 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
           type="number"
           min="0"
           step="any"
-          size="sm"
           value={outputQty}
           onChange={(event) => setOutputQty(event.target.value)}
           className="mt-1"
@@ -311,7 +307,6 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
         Check Type
         <Select
           aria-label="Check type"
-          size="sm"
           value={checkType}
           onChange={(event) => setCheckType(event.target.value)}
           className="mt-1"
@@ -324,10 +319,10 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
         </Select>
       </label>
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={submitting}>
+        <Button type="submit" disabled={submitting}>
           Log Output
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
       </div>
@@ -472,7 +467,6 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         Required Component
         <Select
           aria-label="Required component"
-          size="sm"
           value={componentItem}
           onChange={(event) => handleComponentChange(event.target.value)}
           className="mt-1"
@@ -494,7 +488,6 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
           type="number"
           min="0"
           step="any"
-          size="sm"
           value={requestedQty}
           onChange={(event) => setRequestedQty(event.target.value)}
           className="mt-1"
@@ -508,10 +501,10 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         )}
       </label>
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={submitting || !planName || !componentItem}>
+        <Button type="submit" disabled={submitting || !planName || !componentItem}>
           Request Authorization
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
       </div>
@@ -821,7 +814,6 @@ const DepartmentStockContent: React.FC = () => {
             Department
             <Select
               aria-label="Department"
-              size="compactLg"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
               className="mt-1"
@@ -841,7 +833,6 @@ const DepartmentStockContent: React.FC = () => {
               aria-label="From date"
               value={fromDate}
               onChange={(_id, next) => setFromDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>
@@ -852,7 +843,6 @@ const DepartmentStockContent: React.FC = () => {
               aria-label="To date"
               value={toDate}
               onChange={(_id, next) => setToDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>
@@ -879,7 +869,7 @@ const DepartmentStockContent: React.FC = () => {
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">Issue Authorizations</h2>
               {canCapture && !showRequestForm && (
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowRequestForm(true)}>
+                <Button type="button" variant="outline" onClick={() => setShowRequestForm(true)}>
                   Request Authorization
                 </Button>
               )}
@@ -950,10 +940,10 @@ const DepartmentStockContent: React.FC = () => {
         footer={
           selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm && !showLogYieldForm ? (
             <div className="flex gap-2">
-              <Button type="button" size="sm" onClick={() => setShowCaptureForm(true)}>
+              <Button type="button" onClick={() => setShowCaptureForm(true)}>
                 Capture Wastage
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setShowLogYieldForm(true)}>
+              <Button type="button" variant="outline" onClick={() => setShowLogYieldForm(true)}>
                 Log Usable Output
               </Button>
             </div>
@@ -1032,23 +1022,22 @@ const DepartmentStockContent: React.FC = () => {
                 </span>
                 <Button
                   type="button"
-                  size="sm"
                   variant="outline"
                   onClick={() => setWastageDrawerAction(null)}
                   disabled={wastageDrawerBusy}
                 >
                   Cancel
                 </Button>
-                <Button type="button" size="sm" onClick={handleWastageDrawerConfirm} disabled={wastageDrawerBusy}>
+                <Button type="button" onClick={handleWastageDrawerConfirm} disabled={wastageDrawerBusy}>
                   Confirm
                 </Button>
               </>
             ) : (
               <>
-                <Button type="button" size="sm" variant="outline" onClick={() => setWastageDrawerAction('reject')}>
+                <Button type="button" variant="outline" onClick={() => setWastageDrawerAction('reject')}>
                   Reject
                 </Button>
-                <Button type="button" size="sm" onClick={() => setWastageDrawerAction('approve')}>
+                <Button type="button" onClick={() => setWastageDrawerAction('approve')}>
                   Approve
                 </Button>
               </>

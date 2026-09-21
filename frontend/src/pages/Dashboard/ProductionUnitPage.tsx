@@ -350,7 +350,6 @@ export const ProductionUnitPage: React.FC = () => {
             { key: 'actions', header: 'Actions', align: 'right', render: (row) => (
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => openEditDrawer(row)}
                 className="text-gray-500 hover:text-primary"
                 title="Edit Production Unit"

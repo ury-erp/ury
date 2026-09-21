@@ -219,7 +219,6 @@ const StoreIssueContent: React.FC = () => {
               aria-label="From date"
               value={fromDate}
               onChange={(_id, next) => setFromDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>
@@ -230,7 +229,6 @@ const StoreIssueContent: React.FC = () => {
               aria-label="To date"
               value={toDate}
               onChange={(_id, next) => setToDate(next)}
-              size="compactLg"
               className="mt-1 w-[150px]"
             />
           </label>

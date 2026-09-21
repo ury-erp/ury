@@ -191,7 +191,6 @@ export const YieldVariancePage: React.FC = () => {
             Item
             <Select
               aria-label="Item"
-              size="sm"
               value={selectedItem}
               onChange={(event) => setSelectedItem(event.target.value)}
               className="mt-1"

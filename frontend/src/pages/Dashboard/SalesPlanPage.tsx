@@ -1057,7 +1057,6 @@ export const SalesPlanPage: React.FC = () => {
               aria-label="Plan date"
               value={planDate}
               onChange={(_id, next) => setPlanDate(next)}
-              size="compactLg"
               className="w-[180px]"
             />
             {isEditable && (
@@ -1067,7 +1066,6 @@ export const SalesPlanPage: React.FC = () => {
                 value={enforcementMode}
                 onChange={(event) => setEnforcementMode(event.target.value as 'Hard' | 'Soft' | 'Alert')}
                 disabled={loading || saving}
-                size="compactLg"
                 className="w-[130px]"
               >
                 <option value="Hard">Hard</option>
@@ -1076,7 +1074,7 @@ export const SalesPlanPage: React.FC = () => {
               </Select>
             )}
             {isEditable && (
-              <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
+              <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" className="gap-2">
                 <Save className="h-4 w-4" />
                 <span>{saving ? 'Saving...' : 'Save Draft'}</span>
               </Button>
@@ -1092,7 +1090,6 @@ export const SalesPlanPage: React.FC = () => {
                       ? 'Set a quantity on at least one item before submitting this plan for review.'
                       : undefined
                 }
-                size="compactLg"
                 className="gap-2"
               >
                 <currentAction.icon className="h-4 w-4" />
@@ -1104,7 +1101,6 @@ export const SalesPlanPage: React.FC = () => {
                 onClick={() => openBackwardActionModal(currentBackwardActionDef)}
                 disabled={backwardActionTransitioning}
                 variant="secondary"
-                size="compactLg"
                 className={`gap-2 ${currentBackwardActionDef.destructive ? 'text-destructive' : ''}`}
               >
                 <currentBackwardActionDef.icon className="h-4 w-4" />
@@ -1176,7 +1172,6 @@ export const SalesPlanPage: React.FC = () => {
             <div className="mt-2 flex justify-end">
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => setAttentionExpanded((current) => !current)}
                 className="gap-1"
               >
@@ -1451,7 +1446,6 @@ export const SalesPlanPage: React.FC = () => {
                       <div className="flex justify-center pt-2">
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() =>
                             setTruncationExpanded((current) => ({ ...current, [department]: !current[department] }))
                           }
@@ -1523,7 +1517,6 @@ export const SalesPlanPage: React.FC = () => {
                   variant="secondary"
                   onClick={closeBackwardActionModal}
                   disabled={backwardActionTransitioning}
-                  size="compactLg"
                 >
                   Cancel
                 </Button>
@@ -1532,7 +1525,6 @@ export const SalesPlanPage: React.FC = () => {
                   onClick={runBackwardTransition}
                   disabled={backwardActionTransitioning || backwardActionReason.trim().length === 0}
                   className={currentBackwardAction.destructive ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
-                  size="compactLg"
                 >
                   {/* Deliberately NOT reusing currentBackwardAction.label here --
                       that's also the text of the button that opened this modal,

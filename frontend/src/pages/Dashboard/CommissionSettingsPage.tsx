@@ -422,7 +422,6 @@ export const CommissionSettingsPage: React.FC = () => {
               </p>
             </div>
             <Button
-              size="sm"
               variant="outline"
               onClick={addRule}
               className="inline-flex items-center gap-1.5"
@@ -450,7 +449,6 @@ export const CommissionSettingsPage: React.FC = () => {
                       <label className="text-xs text-muted-foreground">Disabled</label>
                     </div>
                     <Button
-                      size="sm"
                       variant="outline"
                       onClick={() => removeRule(ruleIdx)}
                       className="text-destructive hover:bg-destructive/10"
@@ -613,7 +611,6 @@ export const CommissionSettingsPage: React.FC = () => {
                               />
                             </div>
                             <Button
-                              size="sm"
                               variant="outline"
                               onClick={() => removeTier(ruleIdx, tierIdx)}
                               className="text-destructive hover:bg-destructive/10 mb-0"
@@ -625,7 +622,6 @@ export const CommissionSettingsPage: React.FC = () => {
                       </div>
 
                       <Button
-                        size="sm"
                         variant="outline"
                         onClick={() => addTier(ruleIdx)}
                         className="w-full"

@@ -166,7 +166,7 @@ function RoomGroup({
               placeholder="Seats"
               className="w-20 text-sm bg-background"
             />
-            <Button type="button" variant="outline" size="sm" onClick={applyBulkSeats}>
+            <Button type="button" variant="outline" onClick={applyBulkSeats}>
               Set seats for all
             </Button>
           </div>
