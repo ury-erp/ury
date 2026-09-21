@@ -118,7 +118,7 @@ def process_masters(company):
 
     # Single DocType — cannot ride the JSON insert loop.
     frappe.db.set_single_value(
-        "URY Production Settings", "store_warehouse", get_warehouse(company)
+        "URY Production Settings", "store_warehouse", get_stores_warehouse(company)
     )
     frappe.db.commit()
 
@@ -581,6 +581,8 @@ def replace_placeholders(data, company):
                 data[key] = get_cost_center(company)
             elif value == "__WAREHOUSE__":
                 data[key] = get_warehouse(company)
+            elif value == "__DEPARTMENT_WAREHOUSE__":
+                data[key] = get_department_warehouse(company)
             elif value == "__COMPANY__":
                 data[key] = company
             elif isinstance(value, str) and value.startswith("__BOM_FOR_"):
@@ -602,6 +604,39 @@ def get_warehouse(company):
         demo_cache[key] = warehouses
     warehouses = demo_cache[key]
     return warehouses[randint(0, len(warehouses) - 1)].name
+
+
+def _named_warehouse(company, warehouse_name):
+    """A specific warehouse by name, falling back to a random one.
+
+    `get_warehouse` picks at random, which is fine where the demo only needs
+    *a* warehouse. It is not fine for the two warehouses the production
+    workflow gives distinct meanings to: the Store Warehouse materials are
+    purchased into, and the Department Warehouse they are transferred to and
+    consumed from. Picking those at random can land them on the same
+    warehouse (making Store to Department transfers no-ops) or transpose them
+    (running transfers backwards), and either way the demo silently stops
+    exercising the flow it exists to demonstrate.
+    """
+    key = f"named_warehouse_{company}_{warehouse_name}"
+    if key not in demo_cache:
+        demo_cache[key] = frappe.db.get_value(
+            "Warehouse",
+            {"company": company, "warehouse_name": warehouse_name, "is_group": 0},
+            "name",
+        )
+    return demo_cache[key] or get_warehouse(company)
+
+
+def get_stores_warehouse(company):
+    """Store Warehouse: where purchased raw materials are received and held."""
+    return _named_warehouse(company, "Stores")
+
+
+def get_department_warehouse(company):
+    """Department Warehouse: where a department consumes materials and
+    receives what it produces. Must differ from the Store Warehouse."""
+    return _named_warehouse(company, "Finished Goods")
 
 def get_supplier():
     key = "suppliers"

@@ -909,14 +909,23 @@ edited.
 7. Own the shared test fixtures: branches, departments, production units,
    warehouses, items, BOMs and configuration rows for the multi-department tree,
    the MTO-with-PRE_PRODUCED-assembly tree, and the nested-dependency tree.
-8. **Fix the demo/seed warehouse wiring before it becomes a fixture.** On
-   `ury.localhost` today, `URY Production Settings.store_warehouse` is
-   `Finished Goods - U` while the only department's `department_warehouse` is
-   `Stores - U` — the two look transposed, and a Store to Department transfer
-   under that wiring runs Finished Goods -> Stores. Confirm the intended
-   mapping, correct the seed, and make sure the shared fixtures use distinct,
-   correctly named Store and Department warehouses so transfers are actually
-   exercised rather than being no-ops or running backwards.
+8. **Demo/seed warehouse wiring: fixed.** `URY Production Settings.store_warehouse`
+   was `Finished Goods - U` while the only department's `department_warehouse`
+   was `Stores - U`, so a Store to Department transfer ran Finished Goods ->
+   Stores. Root cause was not a swap but `ury/setup/demo.py:get_warehouse()`,
+   which returns a **random** non-group warehouse; both values were assigned
+   from it independently. Random assignment can also land both on the same
+   warehouse, making transfers silent no-ops.
+
+   Fixed by giving the two warehouses deterministic, semantically named
+   resolvers (`get_stores_warehouse` -> Stores, `get_department_warehouse` ->
+   Finished Goods) and a `__DEPARTMENT_WAREHOUSE__` placeholder, and by
+   correcting the values on `ury.localhost`. `__WAREHOUSE__` keeps its
+   random behaviour everywhere it does not matter.
+
+   **Shared fixtures must follow the same rule:** the Store Warehouse and each
+   Department Warehouse must be distinct and correctly oriented, or transfer
+   tests pass while exercising nothing.
 
 ## Agent plan
 
