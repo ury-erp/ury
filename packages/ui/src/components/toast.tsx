@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Custom CSS for toast styling
 import './toast.css';
+import { sanitizeMessageHtml } from '../lib/sanitize-message';
 
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
@@ -24,9 +25,13 @@ const getToastId = (message: string): string => {
   return `toast-${Math.abs(hash)}`;
 };
 
+const toastContent = (message: string) => (
+  <span dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message) }} />
+);
+
 export const showToast = {
   success: (message: string) => {
-    toast.success(message, {
+    toast.success(toastContent(message), {
       position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
@@ -41,7 +46,7 @@ export const showToast = {
     });
   },
   error: (message: string) => {
-    toast.error(message, {
+    toast.error(toastContent(message), {
       position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
@@ -56,7 +61,7 @@ export const showToast = {
     });
   },
   warning: (message: string) => {
-    toast.warning(message, {
+    toast.warning(toastContent(message), {
       position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
@@ -71,7 +76,7 @@ export const showToast = {
     });
   },
   info: (message: string) => {
-    toast.info(message, {
+    toast.info(toastContent(message), {
       position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
