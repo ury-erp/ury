@@ -349,6 +349,8 @@ export default function OrderPage() {
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
           comment: item.comment || undefined,
+          // Same string the cart holds — never regenerate or derive from row name.
+          reservation_line_key: item.reservationLineKey || item.uniqueId,
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,

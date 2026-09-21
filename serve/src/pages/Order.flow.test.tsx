@@ -50,6 +50,7 @@ const {
       quantity: number
       uniqueId: string
       invoiceItemName?: string
+      reservationLineKey?: string
     }>,
     menuItems: [] as Array<{
       id: string
@@ -415,6 +416,7 @@ const cartItem = {
   price: 120,
   quantity: 1,
   uniqueId: 'draft|1',
+  reservationLineKey: 'draft|1',
 }
 
 const menuSoup = {
@@ -748,6 +750,61 @@ describe('Order page flow', () => {
       expect(syncOrder).toHaveBeenCalled()
     })
     expect(syncOrder).toHaveBeenCalledWith(expect.objectContaining({ comments: '' }))
+  })
+
+  it('echoes reservation_line_key on sync for existing and new lines (B02b)', async () => {
+    const user = userEvent.setup()
+    resetFixtures({
+      existingOrder: true,
+      withCart: true,
+      customer: { id: 'CUST-1', name: 'Ada', phone: '999' },
+    })
+    store.activeOrders = [
+      {
+        ...cartItem,
+        invoiceItemName: 'row-1',
+        uniqueId: 'client-key-stable-abc',
+        reservationLineKey: 'client-key-stable-abc',
+        quantity: 2,
+      },
+      {
+        id: 'ITEM-2',
+        item: 'ITEM-2',
+        name: 'Salad',
+        price: 80,
+        quantity: 1,
+        uniqueId: 'new-line-uid-xyz',
+        reservationLineKey: 'new-line-uid-xyz',
+      },
+    ]
+    store.menuItems = [
+      menuSoup,
+      { id: 'ITEM-2', item: 'ITEM-2', name: 'Salad', disabled: 0 as const, image: null },
+    ]
+    syncOrder.mockResolvedValue({ message: { name: 'INV-1', status: 'Draft' } })
+    render(<OrderPage />)
+
+    await user.click(screen.getByRole('button', { name: 'Update Order' }))
+
+    await waitFor(() => {
+      expect(syncOrder).toHaveBeenCalled()
+    })
+    expect(syncOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            item: 'ITEM-1',
+            qty: 2,
+            reservation_line_key: 'client-key-stable-abc',
+          }),
+          expect.objectContaining({
+            item: 'ITEM-2',
+            qty: 1,
+            reservation_line_key: 'new-line-uid-xyz',
+          }),
+        ],
+      })
+    )
   })
 
   it('refetches table context after a successful bill print (T6)', async () => {
