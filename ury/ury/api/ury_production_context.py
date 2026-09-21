@@ -8,7 +8,6 @@ from ury.ury.api.ury_production_validation import normalize_production_policy
 DOCTYPE = "URY Item Production Configuration"
 
 
-@frappe.whitelist()
 def resolve_production_context(item, branch, company=None, department=None):
 	"""Return one active, branch-scoped production context or ``None``."""
 	if not item or not branch:
