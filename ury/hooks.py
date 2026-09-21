@@ -54,6 +54,7 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 # include js in doctype views
 doctype_js = {
     "POS Closing Entry": "ury/public/js/pos_closing_entry_clock_integrity.js",
+    "Production Plan": "public/js/production_plan_cancel_guard.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -266,6 +267,13 @@ doc_events = {
     "BOM": {"before_validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
     "Stock Entry": {
         "validate": "ury.ury.api.ury_manufacture_enforcement.validate_manufacture_requires_work_order",
+    },
+    "Work Order": {
+        "validate": "ury.ury.api.ury_work_order_hooks.validate",
+    },
+    "Production Plan": {
+        "on_submit": "ury.ury.api.ury_production_plan_auto_work_order.maybe_create_and_submit_work_orders",
+        "before_cancel": "ury.ury.api.ury_production_plan_cancel_hooks.before_cancel",
     },
 }
 

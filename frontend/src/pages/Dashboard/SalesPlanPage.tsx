@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ChevronUp, CheckCircle2, History, ListFilter, Lock, Factory, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -14,6 +14,7 @@ import {
   ComparableHistoryResponse,
   getSalesPlanDraftQuantities,
   salesPlanService,
+  type ProductionPlanState,
   SalesPlanItem,
   saveSalesPlanDraftQuantities,
 } from '../../services/salesPlan';
@@ -501,6 +502,9 @@ export const SalesPlanPage: React.FC = () => {
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  const [ppState, setPpState] = useState<ProductionPlanState | null>(null);
+  const [ppBusy, setPpBusy] = useState(false);
+  const [ppError, setPpError] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -897,6 +901,34 @@ export const SalesPlanPage: React.FC = () => {
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
 
+  useEffect(() => {
+    setPpError(null);
+    if (!planName || (planStatus !== 'Approved' && planStatus !== 'Locked for Production')) {
+      setPpState(null);
+      return;
+    }
+    let cancelled = false;
+    salesPlanService
+      .getProductionPlanState(planName)
+      .then((state) => { if (!cancelled) setPpState(state); })
+      .catch(() => { if (!cancelled) setPpState(null); });
+    return () => { cancelled = true; };
+  }, [planName, planStatus]);
+
+  const openProductionPlan = async () => {
+    if (!planName) return;
+    setPpBusy(true);
+    setPpError(null);
+    try {
+      const result = await salesPlanService.openOrCreateProductionPlan(planName);
+      window.location.assign(`/app/production-plan/${encodeURIComponent(result.name)}`);
+    } catch (err) {
+      setPpError(describeSalesPlanApiError(err, 'Unable to open or create the Production Plan.'));
+    } finally {
+      setPpBusy(false);
+    }
+  };
+
   // Extracted so it can render in BOTH the sticky department-jump bar (the
   // normal case) and the "no comparable history items" empty state -- the
   // zero-history case is exactly what Scope §1 (catalog item-add) exists
@@ -1094,6 +1126,31 @@ export const SalesPlanPage: React.FC = () => {
                 <span>{transitioning ? 'Updating...' : currentAction.label}</span>
               </Button>
             )}
+            {ppState && ppState.state !== 'ineligible' && (ppState.can_create || ppState.can_open) && (
+              <Button
+                onClick={openProductionPlan}
+                disabled={
+                  ppBusy ||
+                  (ppState.state === 'none' && (ppState.issues?.length ?? 0) > 0) ||
+                  ppState.state === 'stale'
+                }
+                title={
+                  ppState.state === 'stale'
+                    ? 'Sales Plan changed since this Production Plan was created. Cancel it, then create a new one.'
+                    : ppState.state === 'none' && ppState.issues?.length
+                      ? ppState.issues.join(' ')
+                      : undefined
+                }
+                variant="secondary"
+                size="compactLg"
+                className="gap-2"
+              >
+                <Factory className="h-4 w-4" />
+                <span>
+                  {ppBusy ? 'Opening...' : ppState.state === 'none' ? 'Create Production Plan' : 'Open Production Plan'}
+                </span>
+              </Button>
+            )}
             {canShowBackwardAction && currentBackwardActionDef && (
               <Button
                 onClick={() => openBackwardActionModal(currentBackwardActionDef)}
@@ -1107,6 +1164,7 @@ export const SalesPlanPage: React.FC = () => {
               </Button>
             )}
           </div>
+          {ppError && <div className="mt-2 text-sm text-destructive">{ppError}</div>}
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
