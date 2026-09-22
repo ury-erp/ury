@@ -106,14 +106,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Patty Mix",
                             stock_qty=1,
                             stock_uom="Nos",
-                            ,
                             bom_no="BOM-PATTYMIX-001",
                         ),
                         frappe._dict(
                             item_code="Bun",
                             stock_qty=1,
                             stock_uom="Nos",
-                            ,
                             bom_no=None,
                         ),
                     ]
@@ -123,14 +121,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Beef",
                             stock_qty=0.2,
                             stock_uom="Kg",
-                            ,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="Spice Mix",
                             stock_qty=0.01,
                             stock_uom="Kg",
-                            ,
                             bom_no=None,
                         ),
                     ]
@@ -190,14 +186,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Masala",
                             stock_qty=1,
                             stock_uom="Kg",
-                            ,
                             bom_no="BOM-MASALA-001",
                         ),
                         frappe._dict(
                             item_code="Dosa Batter",
                             stock_qty=1,
                             stock_uom="Kg",
-                            ,
                             bom_no=None,
                         ),
                     ]

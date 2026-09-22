@@ -349,14 +349,12 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
                             item_code="BUN",
                             stock_qty=1,
                             stock_uom="Nos",
-                            ,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="SUB_PATTY",
                             stock_qty=1,
                             stock_uom="Nos",
-                            ,
                             bom_no="BOM-PATTY-001",
                         ),
                     ]
@@ -366,14 +364,12 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
                             item_code="MEAT",
                             stock_qty=0.1,
                             stock_uom="Kg",
-                            ,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="BREADING",
                             stock_qty=0.02,
                             stock_uom="Kg",
-                            ,
                             bom_no=None,
                         ),
                     ]
