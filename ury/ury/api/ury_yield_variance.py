@@ -18,6 +18,7 @@ from frappe import _
 from frappe.utils import getdate
 
 from ury.ury.report_api.utils import require_manager, user_has_branch_access
+from ury.ury.services.yield_branch_scope import branch_item_codes
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
@@ -217,23 +218,22 @@ def get_yield_check_compliance(company, branch=None):
 		"custom_yield_check_cadence": ["!=", "None"],
 	}
 
-	# F8: when a single branch is requested, scope the tracked-item set to
-	# items actually configured for production at that branch (via URY Item
-	# Production Configuration), matching yield_check_reminders.py's
-	# get_due_yield_checks and ury_dashboard.py's item search. Without this,
-	# a branch that never prepares a given item still shows 100%-of-zero or
-	# skewed compliance noise for it. When branch is None (all-branches
-	# aggregate), keep the global item set — the numbers are already summed
-	# across every branch, so per-branch scoping doesn't apply.
-	if branch:
-		branch_item_codes = frappe.get_all(
-			"URY Item Production Configuration",
-			filters={"branch": branch, "active": 1},
-			pluck="item",
-		)
-		if not branch_item_codes:
+	# F8 (corrected): when a single branch is requested, scope the
+	# tracked-item set to items actually used at that branch. IPC only has
+	# rows for sellable menu items (kitchen/bar routing) — never a raw
+	# ingredient — and yield tracking only ever applies to raw ingredients
+	# (see docs/yield-tracking.md, "Why Item, not BOM Item or IPC"), so the
+	# anchor is: active IPC rows for this branch -> their BOM -> that BOM's
+	# component items (BOM Item rows). See
+	# ury.ury.services.yield_branch_scope.branch_item_codes. When branch is
+	# None (all-branches aggregate), keep the global item set — the numbers
+	# are already summed across every branch, so per-branch scoping doesn't
+	# apply.
+	scoped_item_codes = branch_item_codes(branch)
+	if scoped_item_codes is not None:
+		if not scoped_item_codes:
 			return []
-		item_filters["name"] = ["in", branch_item_codes]
+		item_filters["name"] = ["in", list(scoped_item_codes)]
 
 	# Fetch yield-tracked items with cadence != None (scoped to branch above, if given).
 	tracked_items = frappe.get_all(

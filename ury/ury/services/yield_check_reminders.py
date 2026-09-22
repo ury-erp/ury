@@ -16,6 +16,7 @@ from frappe.utils import add_to_date, getdate, now_datetime
 
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.report_api.utils import require_manager
+from ury.ury.services.yield_branch_scope import branch_item_codes
 
 # Fixed sampling rate for Sampled cadence mode (10% of items on any given day).
 # Per-branch sampling rates deferred to future phases.
@@ -76,18 +77,15 @@ def get_due_yield_checks(branch):
 	company = frappe.db.get_value("Branch", branch, "company")
 	_require_scope(company)
 
-	# I8/F8: scope the tracked-item set to items actually configured for
-	# production at this branch (via URY Item Production Configuration),
-	# matching the pattern in ury_dashboard.py's item search. Without this,
-	# a branch that never prepares a given yield-tracked item still gets it
-	# flagged overdue, drowning the Overdue Yield Checks page in noise for
-	# multi-branch tenants.
-	branch_item_codes = frappe.get_all(
-		"URY Item Production Configuration",
-		filters={"branch": branch, "active": 1},
-		pluck="item",
-	)
-	if not branch_item_codes:
+	# F8 (corrected): scope the tracked-item set to items actually used at
+	# this branch. IPC only has rows for sellable menu items (kitchen/bar
+	# routing) — it never has a row for a raw ingredient, and yield tracking
+	# only ever applies to raw ingredients (see docs/yield-tracking.md, "Why
+	# Item, not BOM Item or IPC"). So the anchor is: active IPC rows for this
+	# branch -> their BOM -> that BOM's component items (BOM Item rows).
+	# See ury.ury.services.yield_branch_scope.branch_item_codes.
+	scoped_item_codes = branch_item_codes(branch)
+	if not scoped_item_codes:
 		return []
 
 	# Fetch yield-tracked items with cadence != None that are actually used at this branch.
@@ -96,7 +94,7 @@ def get_due_yield_checks(branch):
 		filters={
 			"custom_yield_tracked": 1,
 			"custom_yield_check_cadence": ["!=", "None"],
-			"name": ["in", branch_item_codes],
+			"name": ["in", list(scoped_item_codes)],
 		},
 		fields=[
 			"name",

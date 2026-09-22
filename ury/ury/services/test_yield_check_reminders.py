@@ -20,6 +20,7 @@ from ury.ury.services.yield_check_reminders import (
 	_evaluate_every_issue,
 	_evaluate_interval,
 	_evaluate_sampled,
+	branch_item_codes,
 )
 
 
@@ -316,17 +317,28 @@ class TestGetDueYieldChecksPermissionGating(unittest.TestCase):
 
 
 class TestGetDueYieldChecksIntegration(unittest.TestCase):
-	"""Integration tests for get_due_yield_checks."""
+	"""Integration tests for get_due_yield_checks.
+
+	get_due_yield_checks now makes two frappe.get_all-shaped calls in
+	sequence: first (indirectly, via branch_item_codes -> BOM anchor) to
+	resolve the branch-scoped item-code set, then to fetch the matching
+	tracked Items. branch_item_codes is patched directly (rather than
+	stubbing the two frappe.get_all calls it makes internally) since it
+	lives in a different module (yield_branch_scope) and its own behaviour
+	is covered separately in test_yield_branch_scope.py.
+	"""
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_returns_list_of_due_items(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""get_due_yield_checks returns a list of due items."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A", "ITEM-B"}
 		mock_get_all.return_value = [
 			_item(name="ITEM-A"),
 			_item(name="ITEM-B"),
@@ -343,13 +355,15 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_due_item_includes_cadence_and_reason(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""Due items include cadence, item name, and reason."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A"}
 		mock_get_all.return_value = [_item(name="ITEM-A", item_name="Item A")]
 		mock_evaluate.return_value = ("due for interval", {})
 
@@ -362,13 +376,15 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_extra_fields_merged_into_due_item(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""Extra fields from _evaluate_cadence are merged into the due item."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A"}
 		mock_get_all.return_value = [_item(name="ITEM-A")]
 		mock_evaluate.return_value = ("due", {"days_overdue": 3})
 
@@ -378,28 +394,32 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 
 class TestGetDueYieldChecksBranchScoping(unittest.TestCase):
-	"""F8: get_due_yield_checks scopes the tracked-item set to items actually
-	configured for production at the requested branch."""
+	"""F8 (corrected): get_due_yield_checks scopes the tracked-item set to
+	items actually used at the requested branch, anchored via active IPC
+	rows -> their BOM -> that BOM's component items (BOM Item rows) — NOT
+	via a direct IPC.item match, which per docs/yield-tracking.md can never
+	intersect with yield-tracked (raw-ingredient) items. The BOM-anchor
+	resolution itself is exercised in test_yield_branch_scope.py; here we
+	only verify get_due_yield_checks wires branch_item_codes() correctly."""
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
-	def test_items_not_configured_at_branch_are_excluded(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+	def test_items_not_used_at_branch_are_excluded(
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
-		"""An Item with no URY Item Production Configuration row at this branch
-		never reaches _evaluate_cadence, even if it is globally yield-tracked."""
+		"""An Item outside the branch's BOM-derived item set never reaches
+		_evaluate_cadence, even if it is globally yield-tracked."""
 		mock_get_value.return_value = "Test Co"
+		# Only ITEM-A resolves as a BOM component used at this branch.
+		mock_branch_items.return_value = {"ITEM-A"}
 
 		def get_all_side_effect(doctype, **kwargs):
-			if doctype == "URY Item Production Configuration":
-				# Only ITEM-A is configured for production at this branch.
-				return ["ITEM-A"]
 			if doctype == "Item":
-				# The Item filters requested (asserted below) should already
-				# have narrowed this, but simulate the DB actually honoring
-				# the name__in filter to prove the call is scoped correctly.
+				# The Item filters requested should be narrowed to the
+				# branch_item_codes() result — prove the call is scoped.
 				name_filter = kwargs.get("filters", {}).get("name")
 				assert name_filter == ["in", ["ITEM-A"]], (
 					f"expected Item query scoped to branch items, got {name_filter}"
@@ -415,16 +435,17 @@ class TestGetDueYieldChecksBranchScoping(unittest.TestCase):
 		self.assertEqual(len(result), 1)
 		self.assertEqual(result[0]["item"], "ITEM-A")
 
-	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
-	def test_no_items_configured_at_branch_returns_empty(
-		self, mock_manager, mock_get_value, mock_get_all
+	def test_no_items_used_at_branch_returns_empty(
+		self, mock_manager, mock_get_value, mock_branch_items
 	):
-		"""If the branch has no active production configuration rows at all,
-		return an empty list instead of falling through to the global item set."""
+		"""If branch_item_codes() resolves to an empty set (no active IPC rows,
+		no BOM, or no BOM components), return an empty list instead of falling
+		through to the global item set."""
 		mock_get_value.return_value = "Test Co"
-		mock_get_all.return_value = []  # No production config rows for this branch
+		mock_branch_items.return_value = set()
 
 		result = get_due_yield_checks("Test Branch")
 
