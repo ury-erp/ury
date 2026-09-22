@@ -383,6 +383,13 @@ class TestGetSalesPlanProductionStates(FrappeTestCase):
 
 		self.assertEqual(len(states["production_plans"]), 1)
 		row = states["production_plans"][0]
+		# Department must survive the enrichment remap: the Sales Plan UI
+		# keys Open/Create by department name. Dropping it (e.g. by reading
+		# custom_ury_department off the already-mapped base row) hides every
+		# Open Production Plan control after Lock for Production.
+		self.assertEqual(row["department"], "Main Kitchen")
+		self.assertEqual(row["production_plan"], "MFG-PP-0001")
+		self.assertTrue(row["can_open"])
 		# D12: both axes present and independent -- a plan can be stale AND completed.
 		self.assertEqual(row["link_state"], "stale")
 		self.assertEqual(row["execution_state"], "completed")

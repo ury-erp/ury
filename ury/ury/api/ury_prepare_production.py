@@ -545,9 +545,14 @@ def get_sales_plan_production_states(sales_plan):
 	production_plans = []
 	for row in base["production_plans"]:
 		result = results_by_name.get(row["name"])
+		# get_production_plan_states already maps custom_ury_department ->
+		# "department" and the plan name -> "name". Reading PP_DEPARTMENT_FIELD
+		# here would always be None, so the Sales Plan UI could never match a
+		# department header to its Production Plan and the Open button never
+		# appeared after Lock for Production.
 		production_plans.append(
 			{
-				"department": row.get(PP_DEPARTMENT_FIELD),
+				"department": row.get("department"),
 				"production_plan": row["name"],
 				"docstatus": row["docstatus"],
 				"link_state": row["link_state"],
