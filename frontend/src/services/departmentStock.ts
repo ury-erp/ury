@@ -29,6 +29,15 @@ export interface IssueAuthorizationRow {
   remaining_after_qty: number;
   stock_uom?: string;
   creation?: string;
+  /** True once a URY Yield Check already exists for this authorization --
+   * a Yield Check and an Issue Wastage record are mutually exclusive per
+   * authorization, so "Capture Wastage" should not be offered once this is
+   * true (mirrors the server-side guard in `ury.ury.api.ury_wastage.capture_wastage`). */
+  has_yield_check?: boolean;
+  /** True once a non-cancelled URY Issue Wastage record already exists for
+   * this authorization -- "Log Usable Output" should not be offered once
+   * this is true (mirrors `URYYieldCheck.validate_no_duplicate_wastage`). */
+  has_wastage?: boolean;
 }
 
 export interface StockMovementRow {
@@ -74,6 +83,8 @@ const normalizeIssueAuthorization = (row: any): IssueAuthorizationRow => ({
   remaining_after_qty: Number(row.remaining_after_qty ?? 0),
   stock_uom: row.stock_uom,
   creation: row.creation,
+  has_yield_check: Boolean(row.has_yield_check),
+  has_wastage: Boolean(row.has_wastage),
 });
 
 const normalizeStockMovement = (row: any): StockMovementRow => ({

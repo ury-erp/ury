@@ -5,6 +5,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_issue_authorization import (
+    _attach_yield_check_and_wastage_flags,
     create_issue_authorization,
     list_issue_authorizations,
     remaining_entitlement,
@@ -292,8 +293,13 @@ class TestListIssueAuthorizations(FrappeTestCase):
             result = list_issue_authorizations(branch="Branch A")
 
         self.assertEqual(result, rows)
-        _, kwargs = get_all.call_args
-        self.assertEqual(kwargs["filters"], {"branch": "Branch A"})
+        # First call is the main list query; the two calls after that are the
+        # batched has_yield_check/has_wastage lookups added for the F3 fix
+        # (mirror guard for wastage-after-check ordering).
+        first_call_args, first_call_kwargs = get_all.call_args_list[0]
+        self.assertEqual(first_call_args[0], "URY Issue Authorization")
+        self.assertEqual(first_call_kwargs["filters"], {"branch": "Branch A"})
+        self.assertEqual(get_all.call_count, 3)
 
     def test_missing_branch_fails_closed(self):
         with self.assertRaises(frappe.ValidationError):
@@ -337,3 +343,38 @@ class TestRemainingEntitlementFormula(FrappeTestCase):
 
     def test_formula_floors_at_zero(self):
         self.assertEqual(remaining_entitlement(10, 12, 0, 0), 0)
+
+
+class TestAttachYieldCheckAndWastageFlags(FrappeTestCase):
+    """F3 fix: each authorization row should know whether a Yield Check
+    and/or an Issue Wastage record already exists for it, so the frontend
+    can hide whichever action is no longer valid (mirrors the server-side
+    guards in `ury_yield_check.py::validate_no_duplicate_wastage` and its
+    mirror in `ury.ury.api.ury_wastage.capture_wastage`)."""
+
+    def test_flags_set_correctly_per_row(self):
+        rows = [
+            {"name": "IA-1"},
+            {"name": "IA-2"},
+            {"name": "IA-3"},
+        ]
+
+        def get_all_dispatch(doctype, *args, **kwargs):
+            if doctype == "URY Yield Check":
+                return [{"issue_authorization": "IA-1"}]
+            if doctype == "URY Issue Wastage":
+                return [{"issue_authorization": "IA-2"}]
+            raise AssertionError(f"unexpected doctype {doctype}")
+
+        with patch(f"{MODULE}.frappe.get_all", side_effect=get_all_dispatch):
+            _attach_yield_check_and_wastage_flags(rows)
+
+        self.assertEqual(
+            [(r["name"], r["has_yield_check"], r["has_wastage"]) for r in rows],
+            [("IA-1", True, False), ("IA-2", False, True), ("IA-3", False, False)],
+        )
+
+    def test_no_op_for_empty_rows(self):
+        with patch(f"{MODULE}.frappe.get_all") as get_all:
+            _attach_yield_check_and_wastage_flags([])
+        get_all.assert_not_called()

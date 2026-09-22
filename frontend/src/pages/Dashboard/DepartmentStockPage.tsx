@@ -56,6 +56,28 @@ const getDefaultFromDate = () => {
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
+/** Frappe/frappe-js-sdk error objects carry the real message inside
+ * `_server_messages` (a JSON-encoded array of JSON-encoded {message} objects)
+ * or `.exception`, not in `.message` (which is often just "417"/"400").
+ * Mirrors the identical helper in `AiAssistantSettingsPage.tsx` and
+ * `CommissionSettingsPage.tsx`. */
+function getErrorMessage(err: any, fallback: string): string {
+  try {
+    const serverMessages = err?._server_messages ? JSON.parse(err._server_messages) : null;
+    if (serverMessages?.length) {
+      const first = JSON.parse(serverMessages[0]);
+      if (first?.message) return first.message;
+    }
+  } catch {
+    // fall through to other shapes below
+  }
+  if (typeof err?.exception === 'string') {
+    const lastLine = err.exception.trim().split('\n').pop();
+    if (lastLine) return lastLine.replace(/^\w+(\.\w+)*Error:\s*/, '');
+  }
+  return err?.message || fallback;
+}
+
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
 const formatCurrency = (value: number) =>
@@ -177,8 +199,8 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         company: authorization.company,
       });
       onSuccess();
-    } catch {
-      onError('Unable to capture wastage for this issue authorization.');
+    } catch (err) {
+      onError(getErrorMessage(err, 'Unable to capture wastage for this issue authorization.'));
     } finally {
       setSubmitting(false);
     }
@@ -269,8 +291,8 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
         production_unit: authorization.production_unit,
       });
       onSuccess();
-    } catch {
-      onError('Unable to log usable output for this issue authorization.');
+    } catch (err) {
+      onError(getErrorMessage(err, 'Unable to log usable output for this issue authorization.'));
     } finally {
       setSubmitting(false);
     }
@@ -282,12 +304,13 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
         <span className="font-medium">Note:</span> This records a measurement for reporting only. It does not create or move stock.
       </p>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Input Qty (measured — edit if different from authorized amount)
+        Input Qty (authorized amount)
         <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {formatQty(authorization.authorized_qty)} {authorization.stock_uom || ''}
         </span>
         <span className="mt-1 text-xs font-normal text-text-tertiary">
-          Pre-filled from the authorized quantity. Enter the actual quantity physically issued if it differs.
+          This is the authorized quantity and is not editable here. If the actual quantity physically
+          issued differs, record it on the URY Yield Check document in the Desk.
         </span>
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
@@ -430,8 +453,8 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         branch: branch === 'all' ? undefined : branch,
       });
       onSuccess();
-    } catch {
-      onError('Unable to create issue authorization for this plan and component.');
+    } catch (err) {
+      onError(getErrorMessage(err, 'Unable to create issue authorization for this plan and component.'));
     } finally {
       setSubmitting(false);
     }
@@ -940,12 +963,22 @@ const DepartmentStockContent: React.FC = () => {
         footer={
           selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm && !showLogYieldForm ? (
             <div className="flex gap-2">
-              <Button type="button" onClick={() => setShowCaptureForm(true)}>
-                Capture Wastage
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setShowLogYieldForm(true)}>
-                Log Usable Output
-              </Button>
+              {/* A Yield Check and an Issue Wastage record are mutually exclusive
+               * per authorization (both would double-count the same shortfall).
+               * Hide each action once the other kind of record already exists,
+               * as a first line of defense in front of the server-side guards
+               * in `ury_yield_check.py::validate_no_duplicate_wastage` and its
+               * mirror in `ury.ury.api.ury_wastage.capture_wastage`. */}
+              {!selectedAuthorization.has_yield_check && (
+                <Button type="button" onClick={() => setShowCaptureForm(true)}>
+                  Capture Wastage
+                </Button>
+              )}
+              {!selectedAuthorization.has_wastage && (
+                <Button type="button" variant="outline" onClick={() => setShowLogYieldForm(true)}>
+                  Log Usable Output
+                </Button>
+              )}
             </div>
           ) : undefined
         }
