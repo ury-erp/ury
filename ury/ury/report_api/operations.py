@@ -34,7 +34,10 @@ def get_completed_work_orders(start_date, end_date):
 		FROM `tabWork Order`
 		WHERE `status` = "Completed"
 			AND `docstatus` = 1
-			AND COALESCE(`actual_end_date`, `planned_end_date`) BETWEEN %(start_date)s AND %(end_date)s
+			-- actual_end_date is a Datetime, so a bare BETWEEN against %(end_date)s
+			-- would compare it to midnight and drop everything completed later
+			-- that day. Compare on the date part only.
+			AND DATE(COALESCE(`actual_end_date`, `planned_end_date`)) BETWEEN %(start_date)s AND %(end_date)s
 		ORDER BY COALESCE(`actual_end_date`, `planned_end_date`) DESC
 		""",
 		{"start_date": start_date, "end_date": end_date},
