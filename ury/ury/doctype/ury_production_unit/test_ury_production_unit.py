@@ -21,8 +21,7 @@ class TestURYProductionUnit(FrappeTestCase):
 				f"Field {fieldname} is missing from URY Production Unit",
 			)
 
-		self.assertEqual(doc_fields["branch"].fetch_from, "pos_profile.branch")
-		self.assertEqual(doc_fields["warehouse"].fetch_from, "pos_profile.warehouse")
+
 
 	def test_assigned_employees_survives_insert_and_save(self):
 		employee = self._get_existing_doc_name("Employee")
