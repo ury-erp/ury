@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cn, buttonVariants } from '@ury/ui';
+import { cn, buttonVariants, Input } from '@ury/ui';
 import { useActiveReportContext } from './ActiveReportContext';
 import { resolveReportNavigation, navigateToReportSlug } from './reportNavigation';
 
@@ -322,7 +322,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 isDisabled && 'opacity-60'
               )}
             >
-              <input
+              <Input
                 ref={inputRef}
                 type="text"
                 value={draft}
@@ -332,7 +332,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 placeholder={
                   isDisabled ? 'Assistant unavailable' : 'Ask HUF about tonight…'
                 }
-                className="flex-1 min-w-0 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+                className="min-w-0 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-auto"
               />
               <button
                 type="button"

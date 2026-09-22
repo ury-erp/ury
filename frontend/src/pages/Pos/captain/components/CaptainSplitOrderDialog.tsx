@@ -7,9 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Button,
+  Checkbox,
+  cn,
 } from '@ury/ui';
-import { Button } from '@ury/ui';
-import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { t } from '../../i18n';
 import { CustomerPicker } from '../../components/CustomerPicker';
@@ -261,8 +262,8 @@ const CaptainSplitOrderDialog = ({
         <div className="mx-6 mb-4 space-y-3 rounded-lg border border-border p-4">
           <p className="text-sm font-medium text-foreground">{t('bill_split.customer_for_new_bill')}</p>
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
+            <Checkbox
+              size="sm"
               checked={sameAsOriginal}
               onChange={(e) => {
                 setSameAsOriginal(e.target.checked);

@@ -239,7 +239,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
         </div>
       ) : (
         <div className="relative">
-          <input
+          <Input
             type="text"
             value={searchTerm}
             disabled={disabled}
@@ -252,8 +252,8 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
             onBlur={() => setTimeout(() => setIsOpen(false), 100)}
             onKeyDown={handleKeyDown}
             placeholder={t('customer.search_placeholder')}
-            className="h-10 w-full rounded-[7px] border border-hair2 px-4 py-2 text-[12px] font-medium text-muted-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-primary outline-offset-1"
             autoComplete="off"
+            aria-label={t('customer.search_placeholder')}
           />
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           {isOpen && (

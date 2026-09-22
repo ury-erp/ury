@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable, messageToPlainText } from '@ury/ui';
+import { Page, Section, Button, Checkbox, Input, Select, SelectItem, Spinner, showToast, DataTable, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -237,12 +237,11 @@ export const YieldStandardsPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="custom_yield_tracked"
+              size="sm"
               checked={form.custom_yield_tracked}
               onChange={(e) => setForm({ ...form, custom_yield_tracked: e.target.checked })}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <label htmlFor="custom_yield_tracked" className="font-semibold text-muted-foreground">
               Track Yield
@@ -251,7 +250,7 @@ export const YieldStandardsPage: React.FC = () => {
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1">Yield %</label>
-            <input
+            <Input
               type="number"
               value={form.custom_yield_percent}
               onChange={(e) => setForm({ ...form, custom_yield_percent: parseFloat(e.target.value) || 0 })}
@@ -259,7 +258,6 @@ export const YieldStandardsPage: React.FC = () => {
               min="0"
               max="100"
               step="0.01"
-              className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-text-tertiary mt-1">Expected yield percentage (0-100).</p>
           </div>
@@ -282,14 +280,13 @@ export const YieldStandardsPage: React.FC = () => {
           {form.custom_yield_check_cadence === 'Interval' && (
             <div>
               <label className="block font-semibold text-muted-foreground mb-1">Check Interval (Days)</label>
-              <input
+              <Input
                 type="number"
                 value={form.custom_yield_check_interval_days}
                 onChange={(e) => setForm({ ...form, custom_yield_check_interval_days: parseInt(e.target.value) || 0 })}
                 placeholder="Enter interval in days"
                 min="1"
                 step="1"
-                className="w-full px-3 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-text-tertiary mt-1">Number of days between yield checks.</p>
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Badge, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
+import { Page, Section, Panel, Badge, Spinner, DataTable, Input, Select, SelectItem, Button, type DataTableColumn } from '@ury/ui';
 import {
   paymentTerminalService,
   PaymentTerminal,
@@ -148,14 +148,13 @@ const PaymentTerminalContent: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground mb-1">
                   Terminal ID <span className="text-destructive">*</span>
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.terminal_id}
                   onChange={(e) =>
                     setFormData({ ...formData, terminal_id: e.target.value })
                   }
                   placeholder="e.g., TERM-001"
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
                   disabled={createLoading}
                 />
               </div>
@@ -164,14 +163,13 @@ const PaymentTerminalContent: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground mb-1">
                   Device
                 </label>
-                <input
+                <Input
                   type="text"
                   value={formData.device}
                   onChange={(e) =>
                     setFormData({ ...formData, device: e.target.value })
                   }
                   placeholder="e.g., Ingenico iCT2X0"
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
                   disabled={createLoading}
                 />
               </div>
@@ -180,30 +178,29 @@ const PaymentTerminalContent: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground mb-1">
                   Provider
                 </label>
-                <select
+                <Select
                   value={formData.provider}
                   onChange={(e) =>
                     setFormData({ ...formData, provider: e.target.value })
                   }
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
                   disabled={createLoading}
                 >
                   {PROVIDERS.map((p) => (
-                    <option key={p} value={p}>
+                    <SelectItem key={p} value={p}>
                       {p}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="flex items-end">
-                <button
+                <Button
                   type="submit"
                   disabled={createLoading}
-                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full"
                 >
                   {createLoading ? 'Creating...' : 'Register Terminal'}
-                </button>
+                </Button>
               </div>
             </div>
 

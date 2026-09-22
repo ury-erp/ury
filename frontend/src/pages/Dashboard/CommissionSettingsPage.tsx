@@ -7,6 +7,7 @@ import {
   SelectItem,
   Card,
   Checkbox,
+  Switch,
   Page,
   Section,
   Spinner,
@@ -322,15 +323,7 @@ export const CommissionSettingsPage: React.FC = () => {
                   Turn on to activate commission calculations for all employees.
                 </span>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -368,15 +361,7 @@ export const CommissionSettingsPage: React.FC = () => {
                   <span className="text-sm font-semibold text-foreground block">Include Returns</span>
                   <span className="text-xs text-muted-foreground">Refunded sales reduce commission base (recommended).</span>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeReturns}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIncludeReturns(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
+                <Switch checked={includeReturns} onCheckedChange={setIncludeReturns} />
               </div>
 
               {/* Default Rate */}
@@ -516,19 +501,14 @@ export const CommissionSettingsPage: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <label className="text-xs font-medium text-foreground">Rate Type:</label>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={rule.rate_type === 'Tiered'}
-                          onChange={(e) =>
-                            updateRule(ruleIdx, {
-                              rate_type: e.target.checked ? 'Tiered' : 'Flat',
-                            })
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                      </label>
+                      <Switch
+                        checked={rule.rate_type === 'Tiered'}
+                        onCheckedChange={(checked) =>
+                          updateRule(ruleIdx, {
+                            rate_type: checked ? 'Tiered' : 'Flat',
+                          })
+                        }
+                      />
                       <span className="text-xs text-muted-foreground">
                         {rule.rate_type === 'Flat' ? 'Flat' : 'Tiered'}
                       </span>

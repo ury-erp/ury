@@ -10,7 +10,7 @@ import {
   X,
   Loader
 } from 'lucide-react';
-import { Badge, Button, Input, Card, Spinner, showToast, DataTable } from '@ury/ui';
+import { Badge, Button, Input, Card, Checkbox, Spinner, showToast, DataTable } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect, Option } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
@@ -436,13 +436,12 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                       <div className="flex items-end">
                         <label className="flex items-center space-x-2 cursor-pointer">
-                          <input
-                            type="checkbox"
+                          <Checkbox
+                            size="sm"
                             checked={formData.enabled}
                             onChange={(e) =>
                               setFormData({ ...formData, enabled: e.target.checked })
                             }
-                            className="w-4 h-4 rounded border-border"
                           />
                           <span className="text-sm font-medium text-muted-foreground">Enabled</span>
                         </label>
@@ -470,50 +469,46 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 {openSections.orderingModes && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_qr_table_ordering}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_qr_table_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">QR Table Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_qr_pickup_ordering}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_qr_pickup_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">QR Pickup Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_kiosk_ordering}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_kiosk_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Kiosk Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.allow_add_to_running_table}
                         onChange={(e) =>
                           setFormData({ ...formData, allow_add_to_running_table: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Allow Add to Running Table</span>
                     </label>
                   </div>
@@ -538,50 +533,46 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 {openSections.productDisplay && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_product_detail_page}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_product_detail_page: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Product Detail Page</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.show_item_images}
                         onChange={(e) =>
                           setFormData({ ...formData, show_item_images: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Show Item Images</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.show_item_descriptions}
                         onChange={(e) =>
                           setFormData({ ...formData, show_item_descriptions: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Show Item Descriptions</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_item_notes}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_item_notes: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Enable Item Notes</span>
                     </label>
                   </div>
@@ -606,50 +597,46 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 {openSections.billingPayment && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_request_bill}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_request_bill: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Enable Request Bill</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_customer_payment}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_customer_payment: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Enable Customer Payment</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_payment_link}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_payment_link: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Enable Payment Link</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={formData.enable_pay_at_counter}
                         onChange={(e) =>
                           setFormData({ ...formData, enable_pay_at_counter: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-border"
-                      />
+                        />
                       <span className="text-sm font-medium text-muted-foreground">Enable Pay at Counter</span>
                     </label>
                   </div>

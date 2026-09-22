@@ -12,6 +12,7 @@ import {
   DataTable,
   messageToPlainText,
   Autocomplete,
+  Checkbox,
   type AutocompleteOption,
 } from '@ury/ui';
 import { dashboardService } from '../../services/dashboard';
@@ -455,12 +456,11 @@ export const ItemProductionConfigPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="active"
+              size="sm"
               checked={form.active}
               onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <label htmlFor="active" className="font-semibold text-muted-foreground">
               Active
@@ -468,9 +468,9 @@ export const ItemProductionConfigPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="controlled_by_sales_plan"
+              size="sm"
               checked={form.controlled_by_sales_plan}
               onChange={(e) =>
                 setForm({
@@ -479,7 +479,6 @@ export const ItemProductionConfigPage: React.FC = () => {
                   allow_over_plan_sale: e.target.checked ? form.allow_over_plan_sale : false,
                 })
               }
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <label htmlFor="controlled_by_sales_plan" className="font-semibold text-muted-foreground">
               Controlled by Sales Plan
@@ -488,12 +487,11 @@ export const ItemProductionConfigPage: React.FC = () => {
 
           {form.controlled_by_sales_plan && (
             <div className="flex items-center gap-2 pl-6">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="allow_over_plan_sale"
+                size="sm"
                 checked={form.allow_over_plan_sale}
                 onChange={(e) => setForm({ ...form, allow_over_plan_sale: e.target.checked })}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
               />
               <label htmlFor="allow_over_plan_sale" className="font-semibold text-muted-foreground">
                 Allow Over-Plan Sale

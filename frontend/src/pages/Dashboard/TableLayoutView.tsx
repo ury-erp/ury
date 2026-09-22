@@ -1,9 +1,8 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { cn } from '@ury/ui';
+import { cn, Button, Input } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import { call } from '@ury/core';
-import { Button } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 export interface Table {
@@ -562,30 +561,23 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.table_name')}</label>
-              <input
+              <Input
                 type="text"
                 value={selectedTableData.name}
-                disabled={true}
-                className="w-full px-3 py-2 border rounded-md text-sm border-gray-200 bg-gray-50 cursor-not-allowed"
+                disabled
                 title={t('tables.table_name_title')}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.capacity')}</label>
-              <input
+              <Input
                 type="number"
                 min="0"
                 max="20"
                 value={capacityInput}
                 onChange={(e) => handleCapacityChange(e.target.value)}
                 disabled={!isEditMode}
-                className={cn(
-                  "w-full px-3 py-2 border rounded-md text-sm",
-                  isEditMode
-                    ? "border-gray-300 bg-white"
-                    : "border-gray-200 bg-gray-50 cursor-not-allowed"
-                )}
                 placeholder={t('tables.capacity_placeholder')}
               />
               <p className="text-xs text-gray-500 mt-1">{t('tables.capacity_range_hint')}</p>
