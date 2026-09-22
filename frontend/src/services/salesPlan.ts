@@ -361,6 +361,13 @@ export interface DepartmentProductionPlanState {
   production_plan?: string;
   docstatus?: number;
 
+  /**
+   * ERPNext native Production Plan.status (Not Started, Material Requested,
+   * In Process, Completed, …). Auto-updated by ERPNext as MRs / WOs / SEs
+   * progress -- the dashboard's primary manufacturing progress signal.
+   */
+  status?: string;
+
   /** Axis 1 -- does a usable plan exist for this department? */
   link_state: 'none' | 'live' | 'stale' | 'ineligible';
 
@@ -454,10 +461,11 @@ export const salesPlanService = {
   },
 
   /**
-   * Manual "Create Production Plans" action -- creates one Production Plan
-   * per non-empty department that doesn't already have a live, current one.
-   * Only usable once the Sales Plan is Locked for Production (D14). Never
-   * submits; a manually-created plan is left as a draft for review.
+   * Manual "Create Production Plans" action -- creates and submits one
+   * Production Plan per non-empty department that doesn't already have a
+   * live, current one. Only usable once the Sales Plan is Locked for
+   * Production (D14). Submitted plans are Ready for Prepare Production on
+   * the dashboard without a Desk submit step.
    */
   async createDepartmentProductionPlans(salesPlan: string): Promise<{
     sales_plan: string;
@@ -493,6 +501,40 @@ export const salesPlanService = {
       { sales_plan: salesPlan, department },
     );
     return ((res as any)?.message ?? res) as { name: string; docstatus: number; department: string };
+  },
+
+  /**
+   * Start Prepare Production for one submitted department Production Plan
+   * (same entry point the Desk form uses). Returns blocked / processing /
+   * already_processing -- callers poll getProductionPlanStates while
+   * execution_state is processing.
+   */
+  async prepareProduction(productionPlan: string): Promise<{
+    status: 'blocked' | 'processing' | 'already_processing';
+    production_plan: string;
+    state?: string;
+    blockers?: ProductionBlocker[];
+    job_id?: string;
+    attempt?: number;
+  }> {
+    const res = await call.post<{
+      status: 'blocked' | 'processing' | 'already_processing';
+      production_plan: string;
+      state?: string;
+      blockers?: ProductionBlocker[];
+      job_id?: string;
+      attempt?: number;
+    }>('ury.ury.api.ury_prepare_production.prepare_production', {
+      production_plan: productionPlan,
+    });
+    return ((res as any)?.message ?? res) as {
+      status: 'blocked' | 'processing' | 'already_processing';
+      production_plan: string;
+      state?: string;
+      blockers?: ProductionBlocker[];
+      job_id?: string;
+      attempt?: number;
+    };
   },
 
   async getPlan(name: string): Promise<Record<string, unknown>> {

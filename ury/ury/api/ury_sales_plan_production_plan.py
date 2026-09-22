@@ -80,7 +80,7 @@ def get_live_production_plans(sales_plan):
 	return frappe.get_all(
 		PRODUCTION_PLAN,
 		filters={PP_SALES_PLAN_FIELD: sales_plan, "docstatus": ["<", 2]},
-		fields=["name", "docstatus", PP_DEPARTMENT_FIELD, PP_HASH_FIELD, PP_STATE_FIELD],
+		fields=["name", "docstatus", "status", PP_DEPARTMENT_FIELD, PP_HASH_FIELD, PP_STATE_FIELD],
 		order_by="creation desc",
 	)
 
@@ -95,7 +95,7 @@ def get_department_production_plan(sales_plan, department):
 			PP_DEPARTMENT_FIELD: department,
 			"docstatus": ["<", 2],
 		},
-		fields=["name", "docstatus", PP_DEPARTMENT_FIELD, PP_HASH_FIELD, PP_STATE_FIELD],
+		fields=["name", "docstatus", "status", PP_DEPARTMENT_FIELD, PP_HASH_FIELD, PP_STATE_FIELD],
 		order_by="creation desc",
 		limit=1,
 	)
@@ -303,6 +303,7 @@ def get_production_plan_states(sales_plan):
 		            "department": "Main Kitchen",
 		            "name": "MFG-PP-2026-00001",
 		            "docstatus": 1,
+		            "status": "Not Started",
 		            "production_state": "Awaiting Materials",
 		            "link_state": "live",   # "live" | "stale"
 		            "can_open": True,
@@ -317,6 +318,8 @@ def get_production_plan_states(sales_plan):
 	since that department's plan was created. This is D12's ``link_state``
 	axis; ``production_state`` is D12's separate ``execution_state`` axis,
 	read verbatim off each plan and never merged with ``link_state``.
+	``status`` is ERPNext's own Production Plan status (auto-updated as
+	Material Requests / Work Orders / Stock Entries progress).
 	"""
 	frappe.has_permission(SALES_PLAN, "read", sales_plan, throw=True)
 	doc = frappe.get_doc(SALES_PLAN, sales_plan)
@@ -330,6 +333,7 @@ def get_production_plan_states(sales_plan):
 			"department": row.get(PP_DEPARTMENT_FIELD),
 			"name": row["name"],
 			"docstatus": row["docstatus"],
+			"status": row.get("status"),
 			"production_state": row.get(PP_STATE_FIELD),
 			"link_state": "stale" if stale else "live",
 			"can_open": frappe.has_permission(PRODUCTION_PLAN, "read", row["name"]),
@@ -352,9 +356,9 @@ def create_department_production_plans(sales_plan):
 	same transition that drives the automatic path when
 	``enable_auto_production_plan`` is on). Calls the same locked, idempotent
 	``create_or_get_department_production_plans`` the automatic path calls,
-	with ``submit=False``: a manually-created plan is left as a draft for
-	the manager to review, matching the pre-existing manual "Get Items From
-	> Sales Plan" design intent. Never submits, never double-creates.
+	with ``submit=True`` so each department plan is submitted immediately
+	and Prepare Production can run without a Desk submit step. Idempotent:
+	never double-creates for a department that already has a live current plan.
 
 	Returns the same shape as ``create_or_get_department_production_plans``
 	-- see its docstring.
@@ -364,7 +368,7 @@ def create_department_production_plans(sales_plan):
 	doc = frappe.get_doc(SALES_PLAN, sales_plan)
 	if doc.get("status") not in ELIGIBLE_STATUSES:
 		frappe.throw(_("{0} must be Locked for Production before Production Plans can be created.").format(sales_plan))
-	return create_or_get_department_production_plans(doc, submit=False)
+	return create_or_get_department_production_plans(doc, submit=True)
 
 
 @frappe.whitelist()

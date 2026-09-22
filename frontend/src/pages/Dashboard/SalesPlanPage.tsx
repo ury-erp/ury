@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -112,6 +112,21 @@ const EXECUTION_STATE_BADGE: Record<ExecutionState, 'tagWarning' | 'tagAccent' |
   completed: 'tagSuccess',
   failed: 'tagDestructive',
 };
+
+/** ERPNext Production Plan.status → badge tone for the primary manufacturing signal. */
+const ERPNEXT_STATUS_BADGE: Record<string, 'default' | 'tagAccent' | 'tagWarning' | 'tagSuccess' | 'tagDestructive'> = {
+  Draft: 'default',
+  Submitted: 'tagAccent',
+  'Not Started': 'tagAccent',
+  'Material Requested': 'tagWarning',
+  'In Process': 'tagAccent',
+  Completed: 'tagSuccess',
+  Closed: 'default',
+  Cancelled: 'tagDestructive',
+};
+
+const PREPARE_POLL_INTERVAL_MS = 4000;
+const CAN_PREPARE_EXECUTION: ExecutionState[] = ['awaiting_materials', 'ready', 'failed'];
 
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
   { key: 'draft', label: 'Draft', matches: ['Draft'] },
@@ -550,6 +565,7 @@ export const SalesPlanPage: React.FC = () => {
   const [ppStates, setPpStates] = useState<SalesPlanProductionStatesResponse | null>(null);
   const [ppCreateBusy, setPpCreateBusy] = useState(false);
   const [ppOpenBusyDepartment, setPpOpenBusyDepartment] = useState<string | null>(null);
+  const [ppPrepareBusyDepartment, setPpPrepareBusyDepartment] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -997,6 +1013,21 @@ export const SalesPlanPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [planName, planStatus]);
 
+  // Poll while any department Prepare job is Processing so ERPNext status and
+  // URY execution_state refresh without leaving the Sales Plan page.
+  const anyDepartmentProcessing = useMemo(
+    () => (ppStates?.production_plans ?? []).some((row) => row.execution_state === 'processing'),
+    [ppStates],
+  );
+
+  useEffect(() => {
+    if (!planName || !anyDepartmentProcessing) return;
+    const timer = window.setInterval(() => {
+      refreshProductionPlanStates(planName);
+    }, PREPARE_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [planName, anyDepartmentProcessing]);
+
   // D12's known backend limitation: get_sales_plan_production_states only
   // ever lists departments that already have a live Production Plan, so a
   // department present in groupedItems but absent here has no plan at all.
@@ -1059,6 +1090,40 @@ export const SalesPlanPage: React.FC = () => {
       showToast.error(describeSalesPlanApiError(err, `Unable to open the Production Plan for ${department}.`));
     } finally {
       setPpOpenBusyDepartment(null);
+    }
+  };
+
+  const prepareDepartmentProduction = async (department: string) => {
+    if (!planName) return;
+    const state = getDepartmentProductionState(department);
+    const productionPlan = state?.production_plan;
+    if (!productionPlan || state?.docstatus !== 1) return;
+
+    const confirmed = window.confirm(
+      `This will validate stock, transfer materials from Store, create Work Orders, and post ` +
+        `Manufacture Stock Entries for ${department} (${productionPlan}). Submitting a Manufacture ` +
+        `Stock Entry declares that physical production is complete. Continue?`,
+    );
+    if (!confirmed) return;
+
+    setPpPrepareBusyDepartment(department);
+    try {
+      const result = await salesPlanService.prepareProduction(productionPlan);
+      if (result.status === 'blocked') {
+        const messages = (result.blockers ?? [])
+          .map((b) => b.message || b.type || 'Blocked')
+          .join('\n');
+        showToast.error(messages || 'Prepare Production is blocked until materials are available.');
+      } else if (result.status === 'already_processing') {
+        showToast.error('Prepare Production is already running for this department.');
+      } else {
+        showToast.success('Prepare Production started.');
+      }
+      await refreshProductionPlanStates(planName);
+    } catch (err) {
+      showToast.error(describeSalesPlanApiError(err, `Unable to prepare production for ${department}.`));
+    } finally {
+      setPpPrepareBusyDepartment(null);
     }
   };
 
@@ -1557,27 +1622,64 @@ export const SalesPlanPage: React.FC = () => {
                         Production Plan:{' '}
                         {productionState.production_plan || <span className="text-text-tertiary">Not created</span>}
                       </span>
+                      {productionState.status && (
+                        <Badge
+                          size="tag"
+                          variant={ERPNEXT_STATUS_BADGE[productionState.status] ?? 'default'}
+                        >
+                          {productionState.status}
+                        </Badge>
+                      )}
                       <Badge size="tag" variant={LINK_STATE_BADGE[productionState.link_state]}>
                         {LINK_STATE_LABEL[productionState.link_state]}
                       </Badge>
-                      {productionState.execution_state && (
+                      {productionState.execution_state &&
+                        (productionState.execution_state === 'processing' ||
+                          productionState.execution_state === 'failed' ||
+                          productionState.execution_state === 'awaiting_materials') && (
                         <Badge size="tag" variant={EXECUTION_STATE_BADGE[productionState.execution_state]}>
                           {EXECUTION_STATE_LABEL[productionState.execution_state]}
                         </Badge>
                       )}
                     </div>
-                    {productionState.can_open && (
-                      <Button
-                        onClick={() => openDepartmentProductionPlan(department)}
-                        disabled={ppOpenBusyDepartment === department}
-                        variant="secondary"
-                        size="compactSm"
-                        className="gap-2"
-                      >
-                        <Factory className="h-3.5 w-3.5" />
-                        <span>{ppOpenBusyDepartment === department ? 'Opening...' : 'Open Production Plan'}</span>
-                      </Button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {productionState.docstatus === 1 &&
+                        productionState.execution_state &&
+                        CAN_PREPARE_EXECUTION.includes(productionState.execution_state) && (
+                          <Button
+                            onClick={() => prepareDepartmentProduction(department)}
+                            disabled={
+                              ppPrepareBusyDepartment === department ||
+                              productionState.execution_state === 'processing'
+                            }
+                            variant="default"
+                            size="compactSm"
+                            className="gap-2"
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                            <span>
+                              {ppPrepareBusyDepartment === department
+                                ? 'Preparing...'
+                                : 'Prepare Production'}
+                            </span>
+                          </Button>
+                        )}
+                      {productionState.execution_state === 'processing' && (
+                        <span className="text-xs text-muted-foreground">Processing…</span>
+                      )}
+                      {productionState.can_open && (
+                        <Button
+                          onClick={() => openDepartmentProductionPlan(department)}
+                          disabled={ppOpenBusyDepartment === department}
+                          variant="secondary"
+                          size="compactSm"
+                          className="gap-2"
+                        >
+                          <Factory className="h-3.5 w-3.5" />
+                          <span>{ppOpenBusyDepartment === department ? 'Opening...' : 'Open Production Plan'}</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 {productionState && (productionState.blockers?.length ?? 0) > 0 && (

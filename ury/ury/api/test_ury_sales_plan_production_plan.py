@@ -327,11 +327,11 @@ class TestCreateDepartmentProductionPlans(FrappeTestCase):
 	@patch(f"{MOD}.create_or_get_department_production_plans", return_value={"sales_plan": "SP-0001", "production_plans": [], "blockers": []})
 	@patch(f"{MOD}.frappe.has_permission", return_value=True)
 	@patch(f"{MOD}.frappe.get_doc")
-	def test_locked_delegates_without_submit(self, mock_get_doc, mock_perm, mock_create):
+	def test_locked_delegates_and_submits(self, mock_get_doc, mock_perm, mock_create):
 		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Locked for Production")
 		create_department_production_plans("SP-0001")
 		mock_create.assert_called_once()
-		self.assertEqual(mock_create.call_args.kwargs.get("submit"), False)
+		self.assertEqual(mock_create.call_args.kwargs.get("submit"), True)
 
 
 class TestOpenDepartmentProductionPlan(FrappeTestCase):
