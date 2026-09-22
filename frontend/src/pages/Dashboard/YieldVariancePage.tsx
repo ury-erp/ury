@@ -95,7 +95,7 @@ export const YieldVariancePage: React.FC = () => {
 
   // Fetch yield variance data
   useEffect(() => {
-    if (!activeBranchId || activeBranchId === 'all') {
+    if (!activeBranchId || activeBranchId === 'all' || !company) {
       setRows([]);
       return;
     }
