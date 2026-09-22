@@ -633,6 +633,41 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		).insert(ignore_permissions=True, ignore_mandatory=True)
 		return name
 
+	def _ensure_warehouse(self, warehouse_name, company):
+		if frappe.db.exists("Warehouse", {"warehouse_name": warehouse_name, "company": company}):
+			return frappe.db.get_value(
+				"Warehouse", {"warehouse_name": warehouse_name, "company": company}, "name"
+			)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Warehouse",
+				"warehouse_name": warehouse_name,
+				"company": company,
+			}
+		).insert(ignore_permissions=True)
+		return doc.name
+
+	def _ensure_item_production_configuration(self, item_code, branch, company):
+		"""get_yield_check_compliance's item query is scoped (F8) to items
+		configured for production at the given branch via URY Item
+		Production Configuration -- without an active config here, the item
+		query short-circuits to [] before this test's assertions even run."""
+		if frappe.db.exists(
+			"URY Item Production Configuration", {"item": item_code, "branch": branch, "active": 1}
+		):
+			return
+		warehouse = self._ensure_warehouse(f"{item_code} F9 Retail Store", company)
+		frappe.get_doc(
+			{
+				"doctype": "URY Item Production Configuration",
+				"active": 1,
+				"item": item_code,
+				"branch": branch,
+				"production_policy": "DIRECT_RETAIL",
+				"direct_retail_warehouse": warehouse,
+			}
+		).insert(ignore_permissions=True)
+
 	def _auth(self, plan, branch, company, department, item, qty=50.0):
 		doc = frappe.get_doc(
 			{
@@ -680,6 +715,11 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 			custom_yield_check_cadence="Interval",
 			custom_yield_check_interval_days=0,
 		)
+		# F8 branch-scopes the tracked-item query to items actually
+		# configured for production at this branch -- needs an active
+		# URY Item Production Configuration or the item never reaches the
+		# per-item required_count/compliance_percent computation at all.
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
 
 		rows = get_yield_check_compliance(company=self.company, branch=self.branch)
 		row = next((r for r in rows if r["item"] == item_code), None)
@@ -694,6 +734,7 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		aggregation query (not asserted against mocked get_all calls)."""
 		item_code = "F9-COMPLIANCE-EVERY-ISSUE-ITEM"
 		self._ensure_item(item_code, custom_yield_check_cadence="Every Issue")
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
 
 		department = self._department(self.branch, self.company)
 		plan = self._minimal_plan(self.branch, self.company)
