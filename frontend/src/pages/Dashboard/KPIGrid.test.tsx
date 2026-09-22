@@ -54,14 +54,20 @@ describe('KPIGrid', () => {
     expect(screen.getByTestId('kpi-strip')).toBeInTheDocument();
   });
 
-  it('displays formatted sales value', () => {
+  it('displays formatted sales value from shared stats builder', () => {
     render(<KPIGrid summary={mockSummary} loading={false} />);
+    expect(screen.getByText("Today's Sales")).toBeInTheDocument();
     expect(screen.getByText('Rs. 5000')).toBeInTheDocument();
   });
 
   it('displays order count', () => {
     render(<KPIGrid summary={mockSummary} loading={false} />);
     expect(screen.getByText('25')).toBeInTheDocument();
+  });
+
+  it('displays active tables as occupied / total', () => {
+    render(<KPIGrid summary={mockSummary} loading={false} />);
+    expect(screen.getByText('8 / 12')).toBeInTheDocument();
   });
 
   it('renders navigation links to POS and Mosaic', () => {
@@ -73,5 +79,7 @@ describe('KPIGrid', () => {
   it('handles null summary gracefully', () => {
     render(<KPIGrid summary={null} loading={false} />);
     expect(screen.getByTestId('kpi-strip')).toBeInTheDocument();
+    expect(screen.getByText("Today's Sales")).toBeInTheDocument();
+    expect(screen.getByText('0 / 0')).toBeInTheDocument();
   });
 });

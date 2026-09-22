@@ -136,9 +136,9 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
 
   return (
     <div className="mx-2.5 mt-0.5 mb-2.5 p-2.5 rounded-lg border border-border bg-card">
-      <div className="flex items-baseline gap-1.5">
+      <div className="flex flex-col gap-0.5">
         <span className="text-xs font-semibold text-foreground">{formatCardDate(today)}</span>
-        <span className="ml-auto flex items-center gap-1 text-[10.5px] text-muted-foreground">
+        <span className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
           <span
             className={`inline-block w-1.5 h-1.5 rounded-full ${
               loading ? 'bg-muted' : error ? 'bg-destructive' : 'bg-success-500'

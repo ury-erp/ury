@@ -219,6 +219,10 @@ class TestStartBatch(FrappeTestCase):
 				return "Company A"
 			if doctype == "URY Production Unit":
 				return "Kitchen WH"
+			# D13: the finished-goods target warehouse is the department
+			# warehouse, not `direct_retail_warehouse` ("FG WH" on this row).
+			if doctype == "URY Production Department":
+				return "Department WH"
 			raise AssertionError((doctype, args, kwargs))
 
 		# What `work_order.make_stock_entry` really returns: a plain dict
@@ -263,7 +267,7 @@ class TestStartBatch(FrappeTestCase):
 		self.assertEqual(wo_payload["bom_no"], "BOM-BIRYANI-001")
 		self.assertEqual(wo_payload["qty"], 2)
 		self.assertEqual(wo_payload["wip_warehouse"], "Kitchen WH")
-		self.assertEqual(wo_payload["fg_warehouse"], "FG WH")
+		self.assertEqual(wo_payload["fg_warehouse"], "Department WH")
 
 		# The Stock Entry was generated via work_order.make_stock_entry (which
 		# returns a raw dict), then wrapped via frappe.get_doc into a real
@@ -274,14 +278,14 @@ class TestStartBatch(FrappeTestCase):
 		component_row, finished_row = se_doc.items
 		self.assertEqual(component_row.s_warehouse, "Kitchen WH")
 		self.assertIsNone(component_row.t_warehouse)
-		self.assertEqual(finished_row.t_warehouse, "FG WH")
+		self.assertEqual(finished_row.t_warehouse, "Department WH")
 		self.assertIsNone(finished_row.s_warehouse)
 		se_doc.insert.assert_called_once()
 		se_doc.submit.assert_called_once()
 
 		self.assertEqual(result["work_order"], "WO-1")
 		self.assertEqual(result["source_warehouse"], "Kitchen WH")
-		self.assertEqual(result["target_warehouse"], "FG WH")
+		self.assertEqual(result["target_warehouse"], "Department WH")
 		self.assertFalse(result["idempotent_replay"])
 		self.assertEqual(result["stock_entry"], "SE-1")
 
@@ -293,6 +297,8 @@ class TestStartBatch(FrappeTestCase):
 				return "Company A"
 			if doctype == "URY Production Unit":
 				return "Kitchen WH"
+			if doctype == "URY Production Department":
+				return "Department WH"
 			raise AssertionError((doctype, args, kwargs))
 
 		def _sql_with_existing(query, values=None, as_dict=False, **kwargs):

@@ -22,7 +22,7 @@ from ury.ury.api.ury_sales_plan import (
 	validate_plan_items,
 )
 from ury.ury.api.ury_sales_plan_auto_production_plan import (
-	maybe_create_production_plan_on_approval,
+	create_production_plans_on_lock,
 )
 
 
@@ -97,16 +97,10 @@ class URYSalesPlan(Document):
 				# over from an earlier save.
 				flag_stale_bom_revisions(self)
 				freeze_approval_snapshot(self)
-				# Track-Item N7: never let a bug here block the plan's own
-				# approval save -- belt and suspenders on top of the
-				# module-level try/except inside the function itself.
-				try:
-					maybe_create_production_plan_on_approval(self)
-				except Exception:
-					frappe.log_error(
-						title="URY Sales Plan auto Production Plan call failed",
-						message=frappe.get_traceback(),
-					)
+				# Production Plan creation moved off the Approved transition
+				# entirely (D14) -- it now happens on Locked for Production,
+				# via before_update_after_submit() below, since that hop
+				# stays at docstatus 1 -> 1 and never reaches validate().
 			# Hook-level backstop for _guard_backward_transition(): this
 			# doctype's Workflow is also reachable from Desk's own workflow
 			# Actions button, which flips `status` directly and never calls
@@ -164,7 +158,17 @@ class URYSalesPlan(Document):
 	# no other field needs the flag.
 
 	def before_update_after_submit(self):
-		self._record_transition(self._previous_status())
+		prev_status = self._previous_status()
+		# Approved (docstatus 1) -> Locked for Production (docstatus 1) is
+		# the one hop this hook exists to catch (see the "Audit coverage"
+		# comment block above): validate() never runs for it, so it is the
+		# only correct place for D14's mandatory-on-toggle Production Plan
+		# creation. Deliberately no try/except here -- with the toggle on,
+		# a creation failure must abort this save and leave the plan
+		# Approved, never Locked-with-no-plans (D14).
+		if prev_status == "Approved" and self.status == "Locked for Production":
+			create_production_plans_on_lock(self)
+		self._record_transition(prev_status)
 
 	def before_cancel(self):
 		# Hook-level backstop for _guard_backward_transition() on the

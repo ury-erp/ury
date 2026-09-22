@@ -45,9 +45,30 @@ def validate_item_production_configuration(item, branch):
         "department": config.get("department"),
         "production_unit": config.get("production_unit"),
         "bom": config.get("bom"),
-        "warehouse": config.get("direct_retail_warehouse"),
+        "warehouse": _resolve_warehouse_for_policy(config, policy),
         "configuration": config.get("name"),
     }
+
+
+def _resolve_warehouse_for_policy(config, policy):
+    """D13: the Department Warehouse is the PRE_PRODUCED stock authority.
+
+    `direct_retail_warehouse` is for DIRECT_RETAIL goods only (bought in,
+    not prepared). A PRE_PRODUCED configuration's finished-goods warehouse
+    is its department's `department_warehouse`, matching
+    `ury_production_context.resolve_production_context`.
+
+    MADE_TO_ORDER's warehouse here is left exactly as before (always
+    `direct_retail_warehouse`, which is not populated for MTO rows in
+    practice) -- this function's contract, unlike the production-context
+    resolver's, was never MTO-aware, and D13 only requires PRE_PRODUCED to
+    stop resolving against `direct_retail_warehouse`.
+    """
+    if policy == PRE_PRODUCED:
+        return frappe.db.get_value(
+            "URY Production Department", config.get("department"), "department_warehouse"
+        )
+    return config.get("direct_retail_warehouse")
 
 
 def get_active_item_production_configuration(item, branch):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable } from '@ury/ui';
+import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -126,7 +126,7 @@ export const YieldStandardsPage: React.FC = () => {
           if (messages.length > 0) {
             const lastMessage = JSON.parse(messages[messages.length - 1]);
             if (lastMessage.message) {
-              errorMessage = lastMessage.message.replace(/<[^>]*>?/gm, '');
+              errorMessage = messageToPlainText(lastMessage.message);
             }
           }
         } catch (e) {}

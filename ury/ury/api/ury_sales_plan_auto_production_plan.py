@@ -1,55 +1,35 @@
 # Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""Track-Item N7: optionally auto-create + auto-submit a real ERPNext
-``Production Plan`` when a ``URY Sales Plan`` is approved.
+"""Auto-create every department Production Plan when a ``URY Sales Plan`` is
+locked for production.
 
 Gated behind ``ury.ury.api.ury_production_settings.auto_production_plan_enabled``
-(default off, matching the existing manual "Get Items From > Sales Plan"
-design intent -- see ``ury_production_plan_adapter.get_items_from_sales_plan``).
-When enabled, this module takes the advisory dict produced by
-``ury_production_plan_adapter.adapt_sales_plan_to_production_plan``, strips
-its ``_``-prefixed advisory keys, and turns it into a real, inserted and
-submitted ``Production Plan`` document -- linking it back onto the Sales Plan
-via the ``custom_ury_production_plan`` custom field (see
-``fixtures/custom_field.json``) so a second approval-triggering save is a
-no-op (idempotent).
+(default off). When enabled, this is called from ``URYSalesPlan``'s
+``before_update_after_submit`` hook on the ``Approved`` -> ``Locked for
+Production`` transition (D14) and shares the same locked, idempotent
+``create_or_get_department_production_plans`` the manual "Create Production
+Plans" action uses -- the two routes cannot diverge or double-create.
 
-This must never block a Sales Plan's own approval save: every failure mode
-(setting disabled, plan already linked, adapter/insert/submit failure) is
-handled without raising out of ``maybe_create_production_plan_on_approval``.
+Unlike the old (pre-D14) ``maybe_create_production_plan_on_approval``, this
+function does **not** swallow its own failures. With the toggle on, the
+manager has asked for Production Plans as part of locking the Sales Plan, so
+a creation failure must abort the Lock transition -- leaving the plan
+Approved -- rather than leave a locked, un-editable Sales Plan with no
+Production Plans and nothing on screen to explain it. The caller
+(``URYSalesPlan.before_update_after_submit``) does not catch this either.
 """
 
-import frappe
-
 from ury.ury.api.ury_production_settings import auto_production_plan_enabled
-from ury.ury.api.ury_sales_plan_production_plan import (
-	SALES_PLAN_LINK_FIELD,
-	create_or_get_production_plan,
-)
+from ury.ury.api.ury_sales_plan_production_plan import create_or_get_department_production_plans
 
 
-def maybe_create_production_plan_on_approval(sales_plan_doc):
-	"""Called from URY Sales Plan's validate() when status transitions into
-	an approved state. No-op unless auto-creation is enabled; never raises.
+def create_production_plans_on_lock(sales_plan_doc):
+	"""Called when ``sales_plan_doc`` transitions into ``Locked for
+	Production``. No-op unless auto-creation is enabled. Raises on any
+	failure -- see module docstring.
 	"""
-	try:
-		_maybe_create_production_plan_on_approval(sales_plan_doc)
-	except Exception:
-		frappe.log_error(
-			title="URY Sales Plan auto Production Plan creation failed",
-			message=frappe.get_traceback(),
-		)
-
-
-def _maybe_create_production_plan_on_approval(sales_plan_doc):
 	if not auto_production_plan_enabled():
 		return
 
-	# Shared, locked, reverse-link-idempotent path (same one the button uses).
-	name, _created = create_or_get_production_plan(sales_plan_doc, submit=True)
-
-	# Use .set() (not frappe.db.set_value) because this runs inside
-	# validate(), which is followed by this same save's own db_update() --
-	# a direct DB write here would be silently overwritten.
-	sales_plan_doc.set(SALES_PLAN_LINK_FIELD, name)
+	create_or_get_department_production_plans(sales_plan_doc, submit=True)

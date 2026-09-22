@@ -374,7 +374,15 @@ class TestGetItemAvailabilityDirectRetail(FrappeTestCase):
 class TestAvailabilityProductionContextIntegration(FrappeTestCase):
     @patch(f"{MODULE}.project_fg_allocatable")
     @patch(f"{MODULE}._resolve_plan_remaining")
-    @patch(f"{MODULE}.frappe.db.get_value", return_value="Company A")
+    @patch(
+        f"{MODULE}.frappe.db.get_value",
+        # D13: PRE_PRODUCED resolves its warehouse from the department, not
+        # direct_retail_warehouse, so the resolver's `frappe.db.get_value`
+        # call order for this row is: department_warehouse, then
+        # production_unit_disabled/department_disabled's `enabled` reads,
+        # then the branch->company lookup.
+        side_effect=["Dept Warehouse - URY", 1, 1, "Company A"],
+    )
     @patch(f"{MODULE}.frappe.get_all")
     def test_uses_canonical_production_context_resolver(self, mock_get_all, mock_get_value, mock_plan, mock_fg):
         mock_get_all.return_value = [
@@ -404,7 +412,10 @@ class TestAvailabilityProductionContextIntegration(FrappeTestCase):
         self.assertEqual(result["reason_code"], "AVAILABLE")
         self.assertEqual(result["production_policy"], "PRE_PRODUCED")
         self.assertEqual(result["department"], "Hot Kitchen")
-        self.assertEqual(result["warehouse"], "FG Warehouse - URY")
+        # D13: the Department Warehouse is the PRE_PRODUCED stock authority --
+        # `ury_availability` follows the canonical resolver's output exactly,
+        # never `direct_retail_warehouse` (still present on the row, unused).
+        self.assertEqual(result["warehouse"], "Dept Warehouse - URY")
         self.assertEqual(result["available_qty"], 4)
         mock_get_all.assert_called_once()
         # get_value is now also called to derive production_unit_disabled/
@@ -412,6 +423,10 @@ class TestAvailabilityProductionContextIntegration(FrappeTestCase):
         # (N2 fix), not just the company lookup -- assert the company
         # lookup happened, not that it was the only call.
         self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
+        self.assertIn(
+            ("URY Production Department", "Hot Kitchen", "department_warehouse"),
+            [c.args for c in mock_get_value.call_args_list],
+        )
 
 
 class TestControlledBySalesPlanPolarity(FrappeTestCase):

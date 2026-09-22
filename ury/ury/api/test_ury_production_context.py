@@ -27,7 +27,10 @@ class TestResolveProductionContext(FrappeTestCase):
 	def _patch_get_all(self, rows=None):
 		return patch("ury.ury.api.ury_production_context.frappe.get_all", return_value=self.rows if rows is None else rows)
 
-	@patch("ury.ury.api.ury_production_context.frappe.db.get_value", return_value="Test Company")
+	@patch(
+		"ury.ury.api.ury_production_context.frappe.db.get_value",
+		side_effect=["Dept Warehouse - URY", 1, 1, "Test Company"],
+	)
 	def test_resolver_normalizes_policy_and_derives_company(self, mock_get_value):
 		with self._patch_get_all():
 			result = resolve_production_context("ITEM-CAKE", "Branch A")
@@ -36,7 +39,13 @@ class TestResolveProductionContext(FrappeTestCase):
 		self.assertEqual(result.name, "UIPC-1")
 		self.assertEqual(result.production_policy, "PRE_PRODUCED")
 		self.assertEqual(result.company, "Test Company")
-		self.assertEqual(result.warehouse, "FG Warehouse - URY")
+		# D13: PRE_PRODUCED resolves to the department warehouse, not
+		# direct_retail_warehouse (which stays DIRECT_RETAIL-only).
+		self.assertEqual(result.warehouse, "Dept Warehouse - URY")
+		self.assertEqual(
+			mock_get_value.call_args_list[0].args,
+			("URY Production Department", "Hot Kitchen", "department_warehouse"),
+		)
 		self.assertEqual(result.production_unit_disabled, 0)
 		self.assertEqual(result.department_disabled, 0)
 		# get_value is now also called to derive production_unit_disabled/
@@ -44,6 +53,18 @@ class TestResolveProductionContext(FrappeTestCase):
 		# (N2 fix) -- assert the company lookup happened, not that it was
 		# the only call.
 		self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
+
+	@patch(
+		"ury.ury.api.ury_production_context.frappe.db.get_value",
+		return_value="Retail Warehouse - URY",
+	)
+	def test_direct_retail_still_uses_direct_retail_warehouse(self, mock_get_value):
+		row = dict(self.rows[0], production_policy="DIRECT_RETAIL", department=None, production_unit=None)
+		with self._patch_get_all([row]):
+			result = resolve_production_context("ITEM-CAKE", "Branch A")
+
+		self.assertEqual(result.production_policy, "DIRECT_RETAIL")
+		self.assertEqual(result.warehouse, "FG Warehouse - URY")
 
 	@patch(
 		"ury.ury.api.ury_production_context.frappe.db.get_value",

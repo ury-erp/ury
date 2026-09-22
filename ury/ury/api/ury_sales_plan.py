@@ -26,22 +26,24 @@ BACKWARD_OR_TERMINAL_TARGETS = ("Draft", "Superseded/Cancelled")
 
 
 def _check_live_production_plan(doc, target_state):
-    """Block (default) or warn when a live Production Plan is linked.
+    """Block (default) or warn when one or more live department Production
+    Plans are linked.
 
     Mode comes from URY Production Settings.sales_plan_backward_guard.
     """
     from ury.ury.api.ury_production_settings import sales_plan_backward_guard_mode
-    from ury.ury.api.ury_sales_plan_production_plan import get_live_production_plan
+    from ury.ury.api.ury_sales_plan_production_plan import get_live_production_plans
 
     if not doc.get("name"):
         return
-    live = get_live_production_plan(doc.get("name"))
+    live = get_live_production_plans(doc.get("name"))
     if not live:
         return
     action = "return to Draft" if target_state == "Draft" else "cancel"
+    plan_list = ", ".join(row["name"] for row in live)
     message = _(
-        "{0} has a live Production Plan ({1}). Cancel or delete it before you {2} this Sales Plan."
-    ).format(doc.get("name"), live["name"], action)
+        "{0} has live Production Plans ({1}). Cancel or delete them before you {2} this Sales Plan."
+    ).format(doc.get("name"), plan_list, action)
     if sales_plan_backward_guard_mode() == "Warn":
         frappe.msgprint(message, indicator="orange", alert=True)
         return

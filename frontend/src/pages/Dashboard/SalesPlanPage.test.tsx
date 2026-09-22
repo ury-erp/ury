@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addDays, differenceInCalendarMonths, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
@@ -29,6 +29,21 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
       searchBranchItems: vi.fn(),
       getPlanStatus: vi.fn(),
       transitionPlan: vi.fn(),
+    },
+  };
+});
+
+const mockShowToastError = vi.fn();
+vi.mock('@ury/ui', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@ury/ui')>();
+  return {
+    ...actual,
+    showToast: {
+      ...actual.showToast,
+      error: (...args: unknown[]) => mockShowToastError(...args),
+      success: actual.showToast.success,
+      warning: actual.showToast.warning,
+      info: actual.showToast.info,
     },
   };
 });
@@ -78,6 +93,7 @@ describe('SalesPlanPage', () => {
     window.localStorage.clear();
     mockAuthState.isManager = false;
     mockAuthState.roles = [];
+    mockShowToastError.mockClear();
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(historyResponse);
     vi.mocked(salesPlanService.searchBranchItems).mockResolvedValue([]);
     vi.mocked(salesPlanService.getPlanStatus).mockRejectedValue(new Error('not found'));
@@ -189,7 +205,7 @@ describe('SalesPlanPage', () => {
     expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus();
   });
 
-  it('collapses the attention block to 3 items by default with working expand/collapse', async () => {
+  it('collapses Needs Attention by default and expands as an accordion', async () => {
     const manyBlocked = {
       ...historyResponse,
       items: [
@@ -204,12 +220,19 @@ describe('SalesPlanPage', () => {
 
     render(<SalesPlanPage />);
 
-    await screen.findByText('Needs Attention');
-    const showAllButton = await screen.findByRole('button', { name: /Show all \(4\)/i });
-    expect(showAllButton).toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: /Needs Attention/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const panelId = toggle.getAttribute('aria-controls');
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)).toHaveAttribute('hidden');
 
-    await userEvent.click(showAllButton);
-    expect(await screen.findByRole('button', { name: 'Collapse' })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = document.getElementById(panelId!);
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(within(panel!).getByText('No PU Item')).toBeInTheDocument();
+    expect(within(panel!).getByText('Yet Another No PU Item')).toBeInTheDocument();
+    expect(within(panel!).getAllByRole('button', { name: 'View item' })).toHaveLength(4);
   });
 
   it('toggles department group collapse/expand with correct aria attributes', async () => {
@@ -491,7 +514,7 @@ describe('SalesPlanPage', () => {
       await screen.findByText('Currently: Draft · Next: Submit for Review');
     });
 
-    it('surfaces the real backend error in the Return to Draft modal on failure', async () => {
+    it('surfaces the real backend error as a toast on Return to Draft failure', async () => {
       mockAuthState.roles = ['URY Sales Plan Controller'];
       vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Approved' } as any);
       vi.mocked(salesPlanService.transitionPlan).mockRejectedValue({
@@ -508,9 +531,11 @@ describe('SalesPlanPage', () => {
       await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
       await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
-      expect(
-        await screen.findByText('Cannot cancel PLAN-1: production has already been recorded against MTPL.')
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockShowToastError).toHaveBeenCalledWith(
+          'Cannot cancel PLAN-1: production has already been recorded against MTPL.'
+        );
+      });
     });
 
     it('refuses to dismiss the modal via Escape while a transition is still in flight', async () => {
@@ -610,6 +635,24 @@ describe('describeSalesPlanApiError', () => {
     const { describeSalesPlanApiError } = await import('./SalesPlanPage');
     expect(describeSalesPlanApiError({}, 'Unable to save this Sales Plan draft.')).toBe(
       'Unable to save this Sales Plan draft.'
+    );
+  });
+
+  it('strips Frappe HTML tags from _server_messages so toasts show plain text', async () => {
+    const { describeSalesPlanApiError } = await import('./SalesPlanPage');
+    const err = {
+      exc_type: 'frappe.exceptions.ValidationError',
+      _server_messages: JSON.stringify([
+        JSON.stringify({
+          message:
+            'Field <strong>require_active_menu_for_planning</strong> does not exist on <strong>URY Production Settings</strong>',
+          title: 'Message',
+          indicator: 'red',
+        }),
+      ]),
+    };
+    expect(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.')).toBe(
+      'Field require_active_menu_for_planning does not exist on URY Production Settings'
     );
   });
 });

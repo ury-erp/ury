@@ -1,4 +1,5 @@
 import { call } from '@ury/core';
+import { messageToPlainText } from '@ury/ui';
 
 export interface POSOpeningEntryRef {
   name: string;
@@ -107,7 +108,7 @@ export const parseFrappeError = (error: unknown): string | null => {
     if (!Array.isArray(messages) || messages.length === 0) return null;
 
     const firstMessage = JSON.parse(messages[0]) as { message?: string };
-    return firstMessage.message || null;
+    return firstMessage.message ? messageToPlainText(firstMessage.message) : null;
   } catch {
     return null;
   }

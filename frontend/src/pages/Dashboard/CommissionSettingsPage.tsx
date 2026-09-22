@@ -11,6 +11,7 @@ import {
   Section,
   Spinner,
   showToast,
+  messageToPlainText,
 } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
@@ -56,7 +57,7 @@ function getErrorMessage(err: any, fallback: string): string {
     const serverMessages = err?._server_messages ? JSON.parse(err._server_messages) : null;
     if (serverMessages?.length) {
       const first = JSON.parse(serverMessages[0]);
-      if (first?.message) return first.message;
+      if (first?.message) return messageToPlainText(first.message);
     }
   } catch {
     // fall through to other shapes below
