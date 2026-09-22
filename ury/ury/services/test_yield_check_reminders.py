@@ -343,9 +343,12 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 	):
 		"""get_due_yield_checks returns a list of due items."""
 		mock_get_value.return_value = "Test Co"
-		mock_get_all.return_value = [
-			_item(name="ITEM-A"),
-			_item(name="ITEM-B"),
+		# F8: get_due_yield_checks now also calls frappe.get_all to fetch the
+		# branch-scoped item codes (URY Item Production Configuration) before
+		# fetching tracked Items; side_effect distinguishes the two calls.
+		mock_get_all.side_effect = [
+			["ITEM-A", "ITEM-B"],
+			[_item(name="ITEM-A"), _item(name="ITEM-B")],
 		]
 		mock_evaluate.side_effect = [
 			("due for interval", {}),
@@ -366,7 +369,10 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 	):
 		"""Due items include cadence, item name, and reason."""
 		mock_get_value.return_value = "Test Co"
-		mock_get_all.return_value = [_item(name="ITEM-A", item_name="Item A")]
+		mock_get_all.side_effect = [
+			["ITEM-A"],
+			[_item(name="ITEM-A", item_name="Item A")],
+		]
 		mock_evaluate.return_value = ("due for interval", {})
 
 		result = get_due_yield_checks("Test Branch")
@@ -385,7 +391,10 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 	):
 		"""Extra fields from _evaluate_cadence are merged into the due item."""
 		mock_get_value.return_value = "Test Co"
-		mock_get_all.return_value = [_item(name="ITEM-A")]
+		mock_get_all.side_effect = [
+			["ITEM-A"],
+			[_item(name="ITEM-A")],
+		]
 		mock_evaluate.return_value = ("due", {"days_overdue": 3})
 
 		result = get_due_yield_checks("Test Branch")

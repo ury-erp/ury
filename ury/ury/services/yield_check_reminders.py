@@ -17,6 +17,27 @@ from frappe.utils import add_to_date, getdate, now_datetime
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.report_api.utils import require_manager
 
+PRODUCTION_CONFIG_DOCTYPE = "URY Item Production Configuration"
+
+
+def _branch_item_codes(branch):
+	"""Return the set of item codes actually in use at `branch`, via active
+	URY Item Production Configuration rows for that branch. Mirrors
+	ury_yield_variance._branch_item_codes and the same branch-scoped
+	item-set pattern used in ury_dashboard.py / ury_manufacture_enforcement.py.
+	Used for F8 so a branch that has never configured/prepared a tracked item
+	isn't flagged as due/overdue for it.
+	"""
+	if not branch:
+		return set()
+	return set(
+		frappe.get_all(
+			PRODUCTION_CONFIG_DOCTYPE,
+			filters={"branch": branch, "active": 1},
+			pluck="item",
+		)
+	)
+
 # Fixed sampling rate for Sampled cadence mode (10% of items on any given day).
 # Per-branch sampling rates deferred to future phases.
 SAMPLING_RATE = 0.10
@@ -62,11 +83,30 @@ def get_due_yield_checks(branch):
 			},
 			...
 		]
+
+	Note (F7): gated on require_manager() + company scope only, no per-branch
+	access check (unlike record_yield_check in ury_yield_variance.py, which
+	enforces user_has_branch_access). Deliberate — see report_api/utils.py's
+	user_has_branch_access() docstring: managers may report across branches
+	they oversee even without a Branch.user row, so reporting endpoints
+	intentionally rely on require_manager() instead.
+
+	Note (F8): the tracked-item set is scoped to items actually in use at
+	`branch` (active URY Item Production Configuration rows for that branch)
+	before evaluating cadence, so an item never configured/prepared at this
+	branch is not flagged as due here. See _branch_item_codes.
 	"""
 	require_manager()
 	# Determine company from branch for scope gating (mirrors ury_yield_variance.py pattern).
 	company = frappe.db.get_value("Branch", branch, "company")
 	_require_scope(company)
+
+	# F8: restrict to items actually in use at this branch before evaluating
+	# cadence, so a branch that has never prepared an item doesn't get it
+	# flagged as due/overdue.
+	branch_item_codes = _branch_item_codes(branch)
+	if not branch_item_codes:
+		return []
 
 	# Fetch all yield-tracked items with cadence != None for this branch context.
 	tracked_items = frappe.get_all(
@@ -74,6 +114,7 @@ def get_due_yield_checks(branch):
 		filters={
 			"custom_yield_tracked": 1,
 			"custom_yield_check_cadence": ["!=", "None"],
+			"name": ["in", list(branch_item_codes)],
 		},
 		fields=[
 			"name",

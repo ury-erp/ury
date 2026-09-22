@@ -21,6 +21,30 @@ from ury.ury.report_api.utils import require_manager, user_has_branch_access
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
+PRODUCTION_CONFIG_DOCTYPE = "URY Item Production Configuration"
+
+
+def _branch_item_codes(branch):
+	"""Return the set of item codes actually in use at `branch`, via active
+	URY Item Production Configuration rows for that branch. Mirrors the
+	branch-scoped item-set pattern already used in ury_dashboard.py
+	(comparable-history item search) and ury_manufacture_enforcement.py
+	(_requires_work_order), rather than inventing a new one.
+
+	Used to scope yield-tracked-item queries (F8) so a branch that has never
+	configured/prepared a given item doesn't get it flagged in that branch's
+	report. Returns None (meaning "no branch filter") when branch is falsy,
+	so all-branches callers are unaffected.
+	"""
+	if not branch:
+		return None
+	return set(
+		frappe.get_all(
+			PRODUCTION_CONFIG_DOCTYPE,
+			filters={"branch": branch, "active": 1},
+			pluck="item",
+		)
+	)
 
 
 @frappe.whitelist()
@@ -122,6 +146,13 @@ def get_yield_variance(company, branch=None, item=None):
 			},
 			...
 		]
+
+		Note (F7): gated on require_manager() + company scope only, no
+		per-branch access check (unlike record_yield_check, which enforces
+		user_has_branch_access). Deliberate — see report_api/utils.py's
+		user_has_branch_access() docstring: managers may report across
+		branches they oversee even without a Branch.user row, so reporting
+		endpoints intentionally rely on require_manager() instead.
 	"""
 	require_manager()
 	_require_scope(company)
@@ -188,17 +219,41 @@ def get_yield_check_compliance(company, branch=None):
 			},
 			...
 		]
+
+		Note (F7): gated on require_manager() + company scope only, no
+		per-branch access check (unlike record_yield_check, which enforces
+		user_has_branch_access). Deliberate — see report_api/utils.py's
+		user_has_branch_access() docstring: managers may report across
+		branches they oversee even without a Branch.user row, so reporting
+		endpoints intentionally rely on require_manager() instead.
+
+		Note (F8): when `branch` is given, the tracked-item set is scoped to
+		items actually in use at that branch (active URY Item Production
+		Configuration rows) before computing required/completed counts, so an
+		item never configured at this branch is not included. See
+		_branch_item_codes.
 	"""
 	require_manager()
 	_require_scope(company)
 
 	# Fetch all yield-tracked items with cadence != None.
+	item_filters = {
+		"custom_yield_tracked": 1,
+		"custom_yield_check_cadence": ["!=", "None"],
+	}
+	# F8: when scoped to a single branch, restrict to items actually in use at
+	# that branch (via URY Item Production Configuration) so a branch that has
+	# never prepared an item doesn't get a required_count computed for it —
+	# see _branch_item_codes.
+	branch_item_codes = _branch_item_codes(branch)
+	if branch_item_codes is not None:
+		if not branch_item_codes:
+			return []
+		item_filters["name"] = ["in", list(branch_item_codes)]
+
 	tracked_items = frappe.get_all(
 		"Item",
-		filters={
-			"custom_yield_tracked": 1,
-			"custom_yield_check_cadence": ["!=", "None"],
-		},
+		filters=item_filters,
 		fields=[
 			"name",
 			"custom_yield_check_cadence",
