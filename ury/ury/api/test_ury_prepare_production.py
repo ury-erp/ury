@@ -125,9 +125,10 @@ class TestPrepareProductionPreflight(FrappeTestCase):
 			 patch(f"{MOD}.compute_readiness", return_value=readiness_result), \
 			 patch(f"{MOD}.get_store_warehouse", return_value="Store WH - U"), \
 			 patch(f"{MOD}.frappe.generate_hash", return_value="job-abc123"), \
-			 patch(f"{MOD}.frappe.enqueue") as mock_enqueue:
+			 patch(f"{MOD}.frappe.enqueue") as mock_enqueue, \
+			 patch(f"{MOD}._publish_live_progress") as mock_progress:
 			result = prepare_production(plan_doc.name)
-		return result, plan_doc, mock_enqueue, mock_get_value
+		return result, plan_doc, mock_enqueue, mock_get_value, mock_progress
 
 	def test_not_a_department_plan_throws(self):
 		locked_row = {"docstatus": 1, "custom_ury_sales_plan": None, "custom_ury_department": None,
@@ -144,35 +145,38 @@ class TestPrepareProductionPreflight(FrappeTestCase):
 	def test_already_processing_is_double_click_guard(self):
 		locked_row = {"docstatus": 1, "custom_ury_sales_plan": "SP-0001", "custom_ury_department": "Main Kitchen",
 					   "custom_ury_production_state": STATE_PROCESSING}
-		result, plan_doc, mock_enqueue, _ = self._run(locked_row)
+		result, plan_doc, mock_enqueue, _, mock_progress = self._run(locked_row)
 		self.assertEqual(result["status"], "already_processing")
 		mock_enqueue.assert_not_called()
 		self.assertFalse(plan_doc.saved)
+		mock_progress.assert_not_called()
 
 	def test_store_shortage_blocks_and_sets_awaiting_materials(self):
 		locked_row = {"docstatus": 1, "custom_ury_sales_plan": "SP-0001", "custom_ury_department": "Main Kitchen",
 					   "custom_ury_production_state": STATE_AWAITING_MATERIALS}
 		readiness = _readiness(rows=[_row(store_shortage=5.0)])
-		result, plan_doc, mock_enqueue, _ = self._run(locked_row, readiness_result=readiness)
+		result, plan_doc, mock_enqueue, _, mock_progress = self._run(locked_row, readiness_result=readiness)
 		self.assertEqual(result["status"], "blocked")
 		self.assertTrue(result["blockers"])
 		mock_enqueue.assert_not_called()
 		self.assertEqual(plan_doc.get("custom_ury_production_state"), STATE_AWAITING_MATERIALS)
 		self.assertTrue(plan_doc.saved)
+		mock_progress.assert_not_called()
 
 	def test_compiler_blocker_blocks(self):
 		locked_row = {"docstatus": 1, "custom_ury_sales_plan": "SP-0001", "custom_ury_department": "Main Kitchen",
 					   "custom_ury_production_state": STATE_AWAITING_MATERIALS}
 		compile_result = ({"Main Kitchen": _department()}, [{"type": "bom_cycle", "message": "cycle"}])
-		result, plan_doc, mock_enqueue, _ = self._run(locked_row, compile_result=compile_result)
+		result, plan_doc, mock_enqueue, _, mock_progress = self._run(locked_row, compile_result=compile_result)
 		self.assertEqual(result["status"], "blocked")
 		mock_enqueue.assert_not_called()
+		mock_progress.assert_not_called()
 
 	def test_clean_preflight_enqueues_and_stamps_fields(self):
 		locked_row = {"docstatus": 1, "custom_ury_sales_plan": "SP-0001", "custom_ury_department": "Main Kitchen",
 					   "custom_ury_production_state": STATE_AWAITING_MATERIALS}
 		plan_doc = _FakeProductionPlanDoc(attempt=1)
-		result, plan_doc, mock_enqueue, _ = self._run(locked_row, plan_doc=plan_doc)
+		result, plan_doc, mock_enqueue, _, mock_progress = self._run(locked_row, plan_doc=plan_doc)
 		self.assertEqual(result["status"], "processing")
 		self.assertEqual(result["job_id"], "job-abc123")
 		self.assertEqual(result["attempt"], 2)
@@ -180,6 +184,7 @@ class TestPrepareProductionPreflight(FrappeTestCase):
 		self.assertEqual(plan_doc.get("custom_ury_execution_job_id"), "job-abc123")
 		self.assertEqual(plan_doc.get("custom_ury_execution_attempt"), 2)
 		self.assertTrue(plan_doc.saved)
+		mock_progress.assert_called_once_with(plan_doc.name, 2, pp_module.STEP_QUEUED)
 		mock_enqueue.assert_called_once()
 		_, kwargs = mock_enqueue.call_args
 		self.assertEqual(kwargs["job_id"], "job-abc123")
@@ -217,27 +222,31 @@ class TestRunPrepareProductionJob(FrappeTestCase):
 			 patch(f"{MOD}.compile_production_targets", return_value=(compile_departments, compile_blockers)), \
 			 patch(f"{MOD}.execute_department_targets", side_effect=_execute_targets) as mock_targets, \
 			 patch(f"{MOD}.frappe.db.set_value") as mock_set_value, \
-			 patch(f"{MOD}.frappe.db.commit"):
+			 patch(f"{MOD}.frappe.db.commit"), \
+			 patch(f"{MOD}._publish_live_progress") as mock_progress, \
+			 patch(f"{MOD}._clear_live_progress"):
 			result = None
 			exc = None
 			try:
 				result = run_prepare_production_job(plan_doc.name, attempt)
 			except Exception as e:  # noqa: BLE001
 				exc = e
-		return result, exc, mock_transfer, mock_targets, mock_set_value
+		return result, exc, mock_transfer, mock_targets, mock_set_value, mock_progress
 
 	def test_stale_attempt_is_a_noop(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_PROCESSING, attempt=3)
-		_, _, mock_transfer, mock_targets, mock_set_value = self._run(plan_doc, attempt=2)
+		_, _, mock_transfer, mock_targets, mock_set_value, mock_progress = self._run(plan_doc, attempt=2)
 		mock_transfer.assert_not_called()
 		mock_targets.assert_not_called()
 		mock_set_value.assert_not_called()
+		mock_progress.assert_not_called()
 
 	def test_no_longer_processing_is_a_noop(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_AWAITING_MATERIALS, attempt=1)
-		_, _, mock_transfer, mock_targets, mock_set_value = self._run(plan_doc, attempt=1)
+		_, _, mock_transfer, mock_targets, mock_set_value, mock_progress = self._run(plan_doc, attempt=1)
 		mock_transfer.assert_not_called()
 		mock_targets.assert_not_called()
+		mock_progress.assert_not_called()
 
 	def test_transfer_blocker_reverts_to_awaiting_materials(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_PROCESSING, attempt=1)
@@ -245,21 +254,26 @@ class TestRunPrepareProductionJob(FrappeTestCase):
 			"production_plan": plan_doc.name, "stock_entries": [], "blockers": [{"type": "store_shortage"}],
 			"locked_bins": [("RICE", "Store WH - U")],
 		}
-		_, _, mock_transfer, mock_targets, mock_set_value = self._run(
+		_, _, mock_transfer, mock_targets, mock_set_value, mock_progress = self._run(
 			plan_doc, attempt=1, transfer_result=transfer_result
 		)
 		mock_transfer.assert_called_once()
 		mock_targets.assert_not_called()
-		self.assertTrue(mock_set_value.called)
+		mock_progress.assert_called()
+		self.assertEqual(mock_set_value.call_count, 1)
 		call_args = mock_set_value.call_args_list[-1]
 		values = call_args[0][2]
 		self.assertEqual(values["custom_ury_production_state"], STATE_AWAITING_MATERIALS)
 
 	def test_success_sets_completed_with_generated_documents(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_PROCESSING, attempt=1)
-		_, _, mock_transfer, mock_targets, mock_set_value = self._run(plan_doc, attempt=1)
+		_, _, mock_transfer, mock_targets, mock_set_value, mock_progress = self._run(plan_doc, attempt=1)
 		mock_transfer.assert_called_once()
 		mock_targets.assert_called_once()
+		# Pass plan name, not a held doc, into the WO/Manufacture executor.
+		self.assertEqual(mock_targets.call_args[0][0], plan_doc.name)
+		self.assertEqual(mock_progress.call_count, 2)
+		self.assertEqual(mock_set_value.call_count, 1)
 		call_args = mock_set_value.call_args_list[-1]
 		values = call_args[0][2]
 		self.assertEqual(values["custom_ury_production_state"], STATE_COMPLETED)
@@ -271,7 +285,7 @@ class TestRunPrepareProductionJob(FrappeTestCase):
 	def test_exception_sets_failed_and_reraises(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_PROCESSING, attempt=1)
 		boom = ValueError("boom")
-		_, exc, mock_transfer, mock_targets, mock_set_value = self._run(plan_doc, attempt=1, raise_on_targets=boom)
+		_, exc, mock_transfer, mock_targets, mock_set_value, _ = self._run(plan_doc, attempt=1, raise_on_targets=boom)
 		self.assertIs(exc, boom)
 		call_args = mock_set_value.call_args_list[-1]
 		values = call_args[0][2]
@@ -282,7 +296,7 @@ class TestRunPrepareProductionJob(FrappeTestCase):
 	def test_compile_blocker_after_transfer_reverts_to_awaiting_materials(self):
 		plan_doc = _FakeProductionPlanDoc(state=STATE_PROCESSING, attempt=1)
 		compile_result = ({"Main Kitchen": _department()}, [{"type": "cross_department_dependency"}])
-		_, _, mock_transfer, mock_targets, mock_set_value = self._run(
+		_, _, mock_transfer, mock_targets, mock_set_value, _ = self._run(
 			plan_doc, attempt=1, compile_result=compile_result
 		)
 		mock_targets.assert_not_called()
@@ -295,6 +309,7 @@ class TestGetProductionState(FrappeTestCase):
 	def _row(self, **overrides):
 		row = {
 			"docstatus": 1,
+			"status": "Not Started",
 			"custom_ury_department": "Main Kitchen",
 			"custom_ury_production_state": STATE_PROCESSING,
 			"custom_ury_production_result": json.dumps({"blockers": [{"type": "store_shortage"}]}),
@@ -312,9 +327,11 @@ class TestGetProductionState(FrappeTestCase):
 			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row()), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=True), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
 			 patch(f"{MOD}.frappe.get_roles", return_value=[]):
 			state = get_production_state("MFG-PP-0001")
 		self.assertEqual(state["execution_state"], "processing")
+		self.assertEqual(state["status"], "Not Started")
 		self.assertEqual(state["blockers"], [{"type": "store_shortage"}])
 		self.assertTrue(state["job_running"])
 		self.assertFalse(state["can_reset"])
@@ -325,6 +342,7 @@ class TestGetProductionState(FrappeTestCase):
 			 patch(f"{MOD}.frappe.db.get_value", return_value=stale_row), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=False), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
 			 patch(f"{MOD}.frappe.get_roles", return_value=["System Manager"]):
 			state = get_production_state("MFG-PP-0001")
 		self.assertTrue(state["heartbeat_stale"])
@@ -337,6 +355,7 @@ class TestGetProductionState(FrappeTestCase):
 			 patch(f"{MOD}.frappe.db.get_value", return_value=stale_row), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=True), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
 			 patch(f"{MOD}.frappe.get_roles", return_value=["System Manager"]):
 			state = get_production_state("MFG-PP-0001")
 		self.assertTrue(state["heartbeat_stale"])
@@ -349,9 +368,26 @@ class TestGetProductionState(FrappeTestCase):
 			 patch(f"{MOD}.frappe.db.get_value", return_value=stale_row), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=False), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
 			 patch(f"{MOD}.frappe.get_roles", return_value=["URY Manager"]):
 			state = get_production_state("MFG-PP-0001")
 		self.assertFalse(state["can_reset"])
+
+	def test_processing_prefers_cache_heartbeat_and_step(self):
+		fresh = str(pp_module.now_datetime())
+		with patch(f"{MOD}.frappe.has_permission", return_value=True), \
+			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row()), \
+			 patch(f"{MOD}.is_job_enqueued", return_value=True), \
+			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}.frappe.get_roles", return_value=[]), \
+			 patch(
+				f"{MOD}._read_live_progress",
+				return_value={"step": "building_work_orders", "heartbeat": fresh},
+			):
+			state = get_production_state("MFG-PP-0001")
+		self.assertEqual(state["step"], "building_work_orders")
+		self.assertEqual(state["heartbeat"], fresh)
+		self.assertFalse(state["heartbeat_stale"])
 
 
 class TestGetSalesPlanProductionStates(FrappeTestCase):
@@ -366,6 +402,7 @@ class TestGetSalesPlanProductionStates(FrappeTestCase):
 					"department": "Main Kitchen",
 					"name": "MFG-PP-0001",
 					"docstatus": 1,
+					"status": "In Process",
 					"production_state": STATE_COMPLETED,
 					"link_state": "stale",
 					"can_open": True,
@@ -389,6 +426,7 @@ class TestGetSalesPlanProductionStates(FrappeTestCase):
 		# Open Production Plan control after Lock for Production.
 		self.assertEqual(row["department"], "Main Kitchen")
 		self.assertEqual(row["production_plan"], "MFG-PP-0001")
+		self.assertEqual(row["status"], "In Process")
 		self.assertTrue(row["can_open"])
 		# D12: both axes present and independent -- a plan can be stale AND completed.
 		self.assertEqual(row["link_state"], "stale")
@@ -402,6 +440,7 @@ class TestResetStaleExecution(FrappeTestCase):
 			"custom_ury_production_state": STATE_PROCESSING,
 			"custom_ury_execution_heartbeat": "2020-01-01 00:00:00",
 			"custom_ury_execution_job_id": "job-1",
+			"custom_ury_execution_attempt": 1,
 		}
 		row.update(overrides)
 		return row
@@ -415,7 +454,8 @@ class TestResetStaleExecution(FrappeTestCase):
 		row = self._row(custom_ury_production_state=STATE_AWAITING_MATERIALS)
 		with patch(f"{MOD}.frappe.get_roles", return_value=["System Manager"]), \
 			 patch(f"{MOD}.frappe.has_permission", return_value=True), \
-			 patch(f"{MOD}.frappe.db.get_value", return_value=row):
+			 patch(f"{MOD}.frappe.db.get_value", return_value=row), \
+			 patch(f"{MOD}._read_live_progress", return_value=None):
 			with self.assertRaises(Exception):
 				reset_stale_execution("MFG-PP-0001")
 
@@ -425,7 +465,8 @@ class TestResetStaleExecution(FrappeTestCase):
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
 			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row(
 				 custom_ury_execution_heartbeat=str(pp_module.now_datetime())
-			 )):
+			 )), \
+			 patch(f"{MOD}._read_live_progress", return_value=None):
 			with self.assertRaises(Exception):
 				reset_stale_execution("MFG-PP-0001")
 
@@ -434,6 +475,7 @@ class TestResetStaleExecution(FrappeTestCase):
 			 patch(f"{MOD}.frappe.has_permission", return_value=True), \
 			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row()), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=True):
 			with self.assertRaises(Exception):
 				reset_stale_execution("MFG-PP-0001")
@@ -444,9 +486,25 @@ class TestResetStaleExecution(FrappeTestCase):
 			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row()), \
 			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
 			 patch(f"{MOD}.is_job_enqueued", return_value=False), \
+			 patch(f"{MOD}._read_live_progress", return_value=None), \
+			 patch(f"{MOD}._clear_live_progress") as mock_clear, \
 			 patch(f"{MOD}.frappe.db.set_value") as mock_set_value, \
 			 patch(f"{MOD}.frappe.session") as mock_session:
 			mock_session.user = "admin@example.com"
 			result = reset_stale_execution("MFG-PP-0001")
 		self.assertEqual(result["state"], STATE_AWAITING_MATERIALS)
 		mock_set_value.assert_called_once()
+		mock_clear.assert_called_once_with("MFG-PP-0001", 1)
+
+	def test_refuses_when_cache_heartbeat_still_fresh(self):
+		"""Live cache heartbeat wins over a stale DB heartbeat (D17)."""
+		with patch(f"{MOD}.frappe.get_roles", return_value=["System Manager"]), \
+			 patch(f"{MOD}.frappe.has_permission", return_value=True), \
+			 patch(f"{MOD}.production_job_stale_minutes", return_value=30), \
+			 patch(f"{MOD}.frappe.db.get_value", return_value=self._row()), \
+			 patch(
+				f"{MOD}._read_live_progress",
+				return_value={"step": "building_work_orders", "heartbeat": str(pp_module.now_datetime())},
+			):
+			with self.assertRaises(Exception):
+				reset_stale_execution("MFG-PP-0001")
