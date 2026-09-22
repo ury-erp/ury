@@ -55,7 +55,9 @@ function ury_refresh_state(frm) {
 		method: "ury.ury.api.ury_prepare_production.get_production_state",
 		args: { production_plan: frm.doc.name },
 		callback(r) {
-			if (!frm.doc || frm.is_dirty) return; // form navigated away/edited under us
+			// is_dirty is a method -- bare `frm.is_dirty` is always truthy and
+			// would skip rendering the Prepare Production button forever.
+			if (!frm.doc || frm.is_dirty()) return;
 			const state = r.message;
 			ury_render_status(frm, state);
 			ury_render_actions(frm, state);
