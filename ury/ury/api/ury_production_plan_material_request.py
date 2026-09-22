@@ -193,6 +193,9 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 				continue
 			allocation["production_plan"] = plan_row["name"]
 			allocations.append(allocation)
+	# Same raw material on one department plan must be one Purchase row
+	# (lemon 0.1 + 0.1 → 0.2). Cross-department rows stay separate for D8.
+	allocations = _consolidate_allocations_by_item_and_plan(allocations)
 
 	if not allocations:
 		return {"sales_plan": sales_plan, "material_request": None, "rows": [], "blockers": blockers}
@@ -253,6 +256,28 @@ def _group_rows_by_item(rows):
 	for row in rows:
 		by_item.setdefault(row["item_code"], []).append(row)
 	return by_item
+
+
+def _consolidate_allocations_by_item_and_plan(allocations):
+	"""Merge allocations that share ``(item_code, production_plan)`` by summing qty.
+
+	Defensive: readiness already aggregates within a department, but a
+	Purchase Material Request must never show two rows for the same raw
+	material on the same department plan (e.g. lemon 0.1 + 0.1 → one 0.2).
+	Rows for the same item on *different* department plans stay separate so
+	each still links back to its Production Plan (D8).
+	"""
+	merged = {}
+	order = []
+	for allocation in allocations:
+		key = (allocation["item_code"], allocation["production_plan"])
+		existing = merged.get(key)
+		if existing:
+			existing["qty"] = flt(existing["qty"]) + flt(allocation["qty"])
+			continue
+		merged[key] = dict(allocation)
+		order.append(key)
+	return [merged[key] for key in order]
 
 
 def _allocate_purchase_requirement(rows_for_item, outstanding_qty):
