@@ -231,14 +231,14 @@ def build_demand_vector(sales_plan_approval_snapshot):
 
 	`sales_plan_approval_snapshot` is a dict with an `items` list of plan
 	lines, each carrying at least: item_code, qty, department,
-	production_unit, policy, bom, bom_revision (per this task's brief; `bom`
-	and `bom_revision` are accepted but not required by this function, since
-	`compile_bom_vector` resolves the active BOM directly -- they are read
-	only for a fail-closed cross-check when present, see below). A line's
+	production_unit, production_policy, bom, bom_revision -- the exact key
+	names `ury_sales_plan.snapshot_item()` freezes onto each row (`bom` and
+	`bom_revision` are accepted but not required by this function, since
+	`compile_bom_vector` resolves the active BOM directly). A line's
 	`company` falls back to the snapshot's top-level `company`.
 
-	Lines whose `policy` is `DIRECT_RETAIL` are excluded (V3-30: direct-retail
-	lines are excluded from manufacturing demand).
+	Lines whose `production_policy` is `DIRECT_RETAIL` are excluded (V3-30:
+	direct-retail lines are excluded from manufacturing demand).
 
 	Returns a list of rows shaped exactly as V3-31's `ury_issue_authorization.py`
 	expects inside `approval_snapshot["demand_vector"]`:
@@ -258,7 +258,7 @@ def build_demand_vector(sales_plan_approval_snapshot):
 	rows_by_key = {}
 
 	for line in lines:
-		if (line.get("policy") or "").upper() == "DIRECT_RETAIL":
+		if (line.get("production_policy") or "").upper() == "DIRECT_RETAIL":
 			continue
 
 		item_code = line.get("item_code")
