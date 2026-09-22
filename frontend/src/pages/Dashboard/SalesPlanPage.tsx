@@ -14,7 +14,8 @@ import {
   ComparableHistoryResponse,
   getSalesPlanDraftQuantities,
   salesPlanService,
-  type ProductionPlanState,
+  type DepartmentProductionPlanState,
+  type SalesPlanProductionStatesResponse,
   SalesPlanItem,
   saveSalesPlanDraftQuantities,
 } from '../../services/salesPlan';
@@ -73,6 +74,42 @@ export function describeSalesPlanApiError(err: unknown, fallback: string): strin
 
   return fallback;
 }
+
+// D12 -- label/badge lookups for the two independent Production Plan state
+// axes rendered per department. Kept as flat maps (rather than a switch) so
+// a badge is one lookup, and so link_state and execution_state can never
+// accidentally be rendered from the same map.
+const LINK_STATE_LABEL: Record<DepartmentProductionPlanState['link_state'], string> = {
+  none: 'No Production Plan',
+  live: 'Production Plan',
+  stale: 'Stale (Sales Plan changed)',
+  ineligible: 'Not eligible yet',
+};
+
+const LINK_STATE_BADGE: Record<DepartmentProductionPlanState['link_state'], 'default' | 'tagAccent' | 'tagWarning'> = {
+  none: 'default',
+  live: 'tagAccent',
+  stale: 'tagWarning',
+  ineligible: 'default',
+};
+
+type ExecutionState = NonNullable<DepartmentProductionPlanState['execution_state']>;
+
+const EXECUTION_STATE_LABEL: Record<ExecutionState, string> = {
+  awaiting_materials: 'Awaiting Materials',
+  ready: 'Ready for Production',
+  processing: 'Processing',
+  completed: 'Production Completed',
+  failed: 'Production Failed',
+};
+
+const EXECUTION_STATE_BADGE: Record<ExecutionState, 'tagWarning' | 'tagAccent' | 'tagSuccess' | 'tagDestructive'> = {
+  awaiting_materials: 'tagWarning',
+  ready: 'tagAccent',
+  processing: 'tagAccent',
+  completed: 'tagSuccess',
+  failed: 'tagDestructive',
+};
 
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
   { key: 'draft', label: 'Draft', matches: ['Draft'] },
@@ -504,8 +541,13 @@ export const SalesPlanPage: React.FC = () => {
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
-  const [ppState, setPpState] = useState<ProductionPlanState | null>(null);
-  const [ppBusy, setPpBusy] = useState(false);
+  // Per-department Production Plan states (D12): the whole
+  // get_sales_plan_production_states response, plus which single
+  // department's "Open" action is currently in flight (createAll is a
+  // separate, page-level busy flag since it isn't scoped to one department).
+  const [ppStates, setPpStates] = useState<SalesPlanProductionStatesResponse | null>(null);
+  const [ppCreateBusy, setPpCreateBusy] = useState(false);
+  const [ppOpenBusyDepartment, setPpOpenBusyDepartment] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -909,29 +951,90 @@ export const SalesPlanPage: React.FC = () => {
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
 
+  const refreshProductionPlanStates = async (name: string) => {
+    try {
+      const states = await salesPlanService.getProductionPlanStates(name);
+      setPpStates(states);
+    } catch {
+      setPpStates(null);
+    }
+  };
+
   useEffect(() => {
     if (!planName || (planStatus !== 'Approved' && planStatus !== 'Locked for Production')) {
-      setPpState(null);
+      setPpStates(null);
       return;
     }
     let cancelled = false;
     salesPlanService
-      .getProductionPlanState(planName)
-      .then((state) => { if (!cancelled) setPpState(state); })
-      .catch(() => { if (!cancelled) setPpState(null); });
+      .getProductionPlanStates(planName)
+      .then((states) => { if (!cancelled) setPpStates(states); })
+      .catch(() => { if (!cancelled) setPpStates(null); });
     return () => { cancelled = true; };
   }, [planName, planStatus]);
 
-  const openProductionPlan = async () => {
+  // D12's known backend limitation: get_sales_plan_production_states only
+  // ever lists departments that already have a live Production Plan, so a
+  // department present in groupedItems but absent here has no plan at all.
+  // Derive that as link_state 'none' (or 'ineligible', from the top-level
+  // `eligible` flag) here, rather than duplicating any compiler logic --
+  // the backend explicitly hands this derivation to the frontend (see
+  // get_sales_plan_production_states's docstring).
+  const ppStatesByDepartment = useMemo(() => {
+    const map: Record<string, DepartmentProductionPlanState> = {};
+    for (const row of ppStates?.production_plans ?? []) {
+      map[row.department] = row;
+    }
+    return map;
+  }, [ppStates]);
+
+  const getDepartmentProductionState = (department: string): DepartmentProductionPlanState | null => {
+    if (!ppStates) return null;
+    const existing = ppStatesByDepartment[department];
+    if (existing) return existing;
+    return {
+      department,
+      link_state: ppStates.eligible ? 'none' : 'ineligible',
+      can_create: ppStates.eligible && ppStates.can_create,
+      can_open: false,
+      blockers: [],
+    };
+  };
+
+  // Departments (from groupedItems) that have no live Production Plan yet --
+  // used to decide whether the header-level "Create Production Plans"
+  // control has anything to do.
+  const departmentsWithoutLivePlan = useMemo(() => {
+    if (!ppStates?.eligible) return [];
+    return Object.keys(groupedItems).filter((department) => {
+      const state = ppStatesByDepartment[department];
+      return !state || state.link_state === 'none' || state.link_state === 'stale';
+    });
+  }, [groupedItems, ppStates, ppStatesByDepartment]);
+
+  const createAllProductionPlans = async () => {
     if (!planName) return;
-    setPpBusy(true);
+    setPpCreateBusy(true);
     try {
-      const result = await salesPlanService.openOrCreateProductionPlan(planName);
+      await salesPlanService.createDepartmentProductionPlans(planName);
+      await refreshProductionPlanStates(planName);
+    } catch (err) {
+      showToast.error(describeSalesPlanApiError(err, 'Unable to create Production Plans for this Sales Plan.'));
+    } finally {
+      setPpCreateBusy(false);
+    }
+  };
+
+  const openDepartmentProductionPlan = async (department: string) => {
+    if (!planName) return;
+    setPpOpenBusyDepartment(department);
+    try {
+      const result = await salesPlanService.openDepartmentProductionPlan(planName, department);
       window.location.assign(`/app/production-plan/${encodeURIComponent(result.name)}`);
     } catch (err) {
-      showToast.error(describeSalesPlanApiError(err, 'Unable to open or create the Production Plan.'));
+      showToast.error(describeSalesPlanApiError(err, `Unable to open the Production Plan for ${department}.`));
     } finally {
-      setPpBusy(false);
+      setPpOpenBusyDepartment(null);
     }
   };
 
@@ -1127,28 +1230,29 @@ export const SalesPlanPage: React.FC = () => {
                 <span>{transitioning ? 'Updating...' : currentAction.label}</span>
               </Button>
             )}
-            {ppState && ppState.state !== 'ineligible' && (ppState.can_create || ppState.can_open) && (
+            {/*
+              One Production Plan per department, not per Sales Plan (see
+              PLAN.md's "Frontend" section and D14) -- this header control
+              creates every department's plan in one call
+              (createDepartmentProductionPlans is idempotent per department),
+              and each department's own "Open Production Plan" action lives
+              in its groupedItems header below. There is no header-level
+              "Open" here any more: which plan to open is inherently a
+              per-department question once a Sales Plan can own several.
+            */}
+            {ppStates?.eligible && ppStates.can_create && departmentsWithoutLivePlan.length > 0 && (
               <Button
-                onClick={openProductionPlan}
-                disabled={
-                  ppBusy ||
-                  (ppState.state === 'none' && (ppState.issues?.length ?? 0) > 0) ||
-                  ppState.state === 'stale'
-                }
-                title={
-                  ppState.state === 'stale'
-                    ? 'Sales Plan changed since this Production Plan was created. Cancel it, then create a new one.'
-                    : ppState.state === 'none' && ppState.issues?.length
-                      ? ppState.issues.join(' ')
-                      : undefined
-                }
+                onClick={createAllProductionPlans}
+                disabled={ppCreateBusy}
                 variant="secondary"
                 size="compactLg"
                 className="gap-2"
               >
                 <Factory className="h-4 w-4" />
                 <span>
-                  {ppBusy ? 'Opening...' : ppState.state === 'none' ? 'Create Production Plan' : 'Open Production Plan'}
+                  {ppCreateBusy
+                    ? 'Creating...'
+                    : `Create Production Plans (${departmentsWithoutLivePlan.length})`}
                 </span>
               </Button>
             )}
@@ -1327,6 +1431,7 @@ export const SalesPlanPage: React.FC = () => {
               ? visibleDepartmentItems.slice(0, ROW_TRUNCATE_LIMIT)
               : visibleDepartmentItems;
             const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
+            const productionState = getDepartmentProductionState(department);
 
             // Next row (in the full filtered set) after the last currently
             // rendered row -- used to focus the newly-revealed row when
@@ -1421,6 +1526,47 @@ export const SalesPlanPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
+                {productionState && productionState.link_state !== 'ineligible' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-medium text-muted-foreground">
+                        Production Plan:{' '}
+                        {productionState.production_plan || <span className="text-text-tertiary">Not created</span>}
+                      </span>
+                      <Badge size="tag" variant={LINK_STATE_BADGE[productionState.link_state]}>
+                        {LINK_STATE_LABEL[productionState.link_state]}
+                      </Badge>
+                      {productionState.execution_state && (
+                        <Badge size="tag" variant={EXECUTION_STATE_BADGE[productionState.execution_state]}>
+                          {EXECUTION_STATE_LABEL[productionState.execution_state]}
+                        </Badge>
+                      )}
+                    </div>
+                    {productionState.can_open && (
+                      <Button
+                        onClick={() => openDepartmentProductionPlan(department)}
+                        disabled={ppOpenBusyDepartment === department}
+                        variant="secondary"
+                        size="compactSm"
+                        className="gap-2"
+                      >
+                        <Factory className="h-3.5 w-3.5" />
+                        <span>{ppOpenBusyDepartment === department ? 'Opening...' : 'Open Production Plan'}</span>
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {productionState && (productionState.blockers?.length ?? 0) > 0 && (
+                  <div className="border-b border-border bg-warning-tint px-5 py-2">
+                    <ul className="space-y-1 text-xs text-warning">
+                      {productionState.blockers!.map((blocker, index) => (
+                        <li key={`${department}-blocker-${index}`}>
+                          {blocker.message || `${blocker.type || 'Blocker'}${blocker.item_code ? `: ${blocker.item_code}` : ''}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div
                   id={`department-panel-${safeId}`}
                   hidden={isCollapsed}
