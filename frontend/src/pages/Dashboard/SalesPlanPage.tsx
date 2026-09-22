@@ -1048,12 +1048,25 @@ export const SalesPlanPage: React.FC = () => {
     setBackwardActionError(null);
     setBackwardActionTransitioning(true);
     try {
+      const cancelledPlanName = planName;
       const result = await salesPlanService.transitionPlan({
         name: planName,
         target_state: currentBackwardAction.targetState,
         reason: reasonTrimmed,
       });
-      setPlanStatus((result.status as PlanStatus) || currentBackwardAction.targetState);
+      const nextStatus = (result.status as PlanStatus) || currentBackwardAction.targetState;
+      // Superseded/Cancelled is terminal in the Workflow -- there is no Amend
+      // or reopen. Match get_plan_status after a reload: drop the dead plan
+      // and open a fresh editable Draft for the same branch+date, keeping the
+      // on-screen rows so Save Draft can create the new document from them.
+      if (nextStatus === 'Superseded/Cancelled') {
+        setPlanName(null);
+        setPlanStatus(null);
+        setSupersededPlanName(cancelledPlanName);
+        setPpStates(null);
+      } else {
+        setPlanStatus(nextStatus);
+      }
       closeBackwardActionModal();
     } catch (err) {
       const fallbackMessage = currentBackwardAction.destructive

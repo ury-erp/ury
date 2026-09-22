@@ -562,6 +562,36 @@ describe('SalesPlanPage', () => {
 
       resolveTransition({ name: 'PLAN-1', status: 'Superseded/Cancelled' });
       await waitFor(() => expect(screen.queryByRole('textbox', { name: /reason/i })).not.toBeInTheDocument());
+      // Cancel drops the dead plan and opens a fresh Draft immediately -- no
+      // reload required (same shape get_plan_status returns after a refresh).
+      expect(
+        await screen.findByText("The previous plan for this branch and date (PLAN-1) was cancelled. You're starting a new one below.")
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    });
+
+    it('after Cancel, switches to a fresh Draft instead of leaving the cancelled plan on screen', async () => {
+      mockAuthState.roles = ['URY Sales Plan Controller'];
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Approved' } as any);
+      vi.mocked(salesPlanService.transitionPlan).mockResolvedValue({
+        name: 'PLAN-1',
+        status: 'Superseded/Cancelled',
+      } as any);
+
+      render(<SalesPlanPage />);
+      await screen.findByText('Chicken Biryani');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      await userEvent.type(screen.getByRole('textbox', { name: /reason/i }), 'branch closed for the day');
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+      expect(
+        await screen.findByText("The previous plan for this branch and date (PLAN-1) was cancelled. You're starting a new one below.")
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/This plan has been superseded or cancelled/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add item' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     });
 
     it('shows the locked message with no Next for Locked for Production', async () => {
@@ -573,17 +603,6 @@ describe('SalesPlanPage', () => {
       const summary = await screen.findByText('Currently: Ready for Production · This plan is locked for production.');
       expect(summary).toBeInTheDocument();
       expect(summary).not.toHaveTextContent('Next:');
-    });
-
-    it('shows the cancelled message for Superseded/Cancelled', async () => {
-      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Superseded/Cancelled' } as any);
-
-      render(<SalesPlanPage />);
-      await screen.findByText('Chicken Biryani');
-
-      expect(
-        await screen.findByText('Currently: Superseded/Cancelled · This plan has been superseded or cancelled.')
-      ).toBeInTheDocument();
     });
 
     it('shows no summary line when status is null', async () => {
