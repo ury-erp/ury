@@ -4,9 +4,11 @@ import {
   buildSalesPlanDraft,
   buildSalesPlanDraftKey,
   getSalesPlanDraftQuantities,
+  mergeSavedPlanRows,
   normalizeHistoryResponse,
   saveSalesPlanDraftQuantities,
   type BranchItemSearchResult,
+  type SalesPlanDocRow,
   type SalesPlanItem,
 } from './salesPlan';
 
@@ -190,5 +192,90 @@ describe('addManualItemToDraft', () => {
     expect(result[0]).toBe(existingItem); // Original unchanged
     expect(result[1].item_code).toBe('ITEM-002');
     expect(items).toHaveLength(1); // Original array not mutated
+  });
+});
+
+describe('mergeSavedPlanRows', () => {
+  const historyItem = (item_code: string, planned_qty: number): SalesPlanItem => ({
+    item_code,
+    item_name: `Name ${item_code}`,
+    stock_uom: 'Nos',
+    department: 'Hot Kitchen',
+    production_unit: 'Unit A',
+    average_qty: 5,
+    sample_days: 3,
+    history: [],
+    planned_qty,
+    _rowKey: `key-${item_code}`,
+  });
+
+  it('returns the original list untouched when the plan has no rows', () => {
+    const items = [historyItem('ITEM-001', 5)];
+    expect(mergeSavedPlanRows(items, [])).toBe(items);
+  });
+
+  it("takes the plan's quantity for an item history already knows", () => {
+    const items = [historyItem('ITEM-001', 5)];
+    const rows: SalesPlanDocRow[] = [{ item_code: 'ITEM-001', qty: 12 }];
+
+    const merged = mergeSavedPlanRows(items, rows);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].planned_qty).toBe(12);
+    // History figures are the item's own and must survive the overlay.
+    expect(merged[0].average_qty).toBe(5);
+    expect(merged[0].sample_days).toBe(3);
+    expect(items[0].planned_qty).toBe(5); // original not mutated
+  });
+
+  it('appends a planned item that has no comparable history at all', () => {
+    const rows: SalesPlanDocRow[] = [
+      {
+        item_code: 'BG',
+        qty: 2,
+        stock_uom: 'Nos',
+        department: 'Demo Kitchen Department',
+        production_unit: 'Demo Kitchen',
+        production_policy: 'PRE_PRODUCED',
+        bom: 'BOM-BG-001',
+      },
+    ];
+
+    const merged = mergeSavedPlanRows([], rows);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].item_code).toBe('BG');
+    expect(merged[0].planned_qty).toBe(2);
+    expect(merged[0].department).toBe('Demo Kitchen Department');
+    expect(merged[0].production_policy).toBe('PRE_PRODUCED');
+    // Zeroed rather than invented: this item genuinely has no history.
+    expect(merged[0].average_qty).toBe(0);
+    expect(merged[0].sample_days).toBe(0);
+    expect(merged[0]._rowKey).toBeTruthy();
+  });
+
+  it('renders a whole plan whose branch has an empty history window', () => {
+    // The case that hid every department section, and with it each
+    // department's Production Plan panel.
+    const rows: SalesPlanDocRow[] = [
+      { item_code: 'BG', qty: 2, department: 'Demo Kitchen Department' },
+      { item_code: 'BR', qty: 2, department: 'Demo Kitchen Department' },
+    ];
+
+    const merged = mergeSavedPlanRows([], rows);
+
+    expect(merged.map((item) => item.item_code)).toEqual(['BG', 'BR']);
+    expect(new Set(merged.map((item) => item._rowKey)).size).toBe(2);
+  });
+
+  it('ignores a row with no item_code', () => {
+    const merged = mergeSavedPlanRows([], [{ item_code: '' }]);
+    expect(merged).toHaveLength(0);
+  });
+
+  it('keeps the existing quantity when the plan row carries no usable qty', () => {
+    const items = [historyItem('ITEM-001', 7)];
+    const merged = mergeSavedPlanRows(items, [{ item_code: 'ITEM-001' }]);
+    expect(merged[0].planned_qty).toBe(7);
   });
 });

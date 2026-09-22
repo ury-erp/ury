@@ -13,7 +13,9 @@ import {
   ComparableHistoryItem,
   ComparableHistoryResponse,
   getSalesPlanDraftQuantities,
+  mergeSavedPlanRows,
   salesPlanService,
+  type SalesPlanDocRow,
   type DepartmentProductionPlanState,
   type SalesPlanProductionStatesResponse,
   SalesPlanItem,
@@ -669,6 +671,28 @@ export const SalesPlanPage: React.FC = () => {
               setPlanStatus((status.status as PlanStatus) || null);
               setEnforcementMode((status.enforcement_mode as 'Hard' | 'Soft' | 'Alert') || 'Hard');
               setSupersededPlanName(status.superseded_plan || null);
+            }
+
+            // Once a plan exists, the plan -- not comparable history -- is
+            // what says which items are being produced and how many. History
+            // only ever supplied the suggestion. A plan can legitimately hold
+            // rows history knows nothing about, and a branch with an empty
+            // history window returns no suggestions at all while its plan is
+            // full; in both cases the grid would otherwise render empty, and
+            // with it every department section and Production Plan panel keyed
+            // off the item list.
+            if (status.name && !cancelled) {
+              try {
+                const planDoc = await salesPlanService.getPlan(status.name);
+                const planRows = (planDoc?.items as SalesPlanDocRow[] | undefined) || [];
+                if (!cancelled && planRows.length) {
+                  setItems((current) => mergeSavedPlanRows(current, planRows));
+                }
+              } catch (planErr) {
+                // Non-fatal: the history-derived view is still usable, and
+                // the plan's own status/actions have already been set above.
+                console.warn('Unable to load saved Sales Plan rows', planErr);
+              }
             }
           } catch (statusErr) {
             // A missing/unsaved plan is expected and non-fatal (the stepper

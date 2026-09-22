@@ -155,6 +155,86 @@ export const buildSalesPlanDraft = (
   };
 };
 
+/**
+ * One row of a saved `URY Sales Plan`'s own `items` child table, as
+ * `ury.ury.api.ury_sales_plan.get_plan` returns it.
+ */
+export interface SalesPlanDocRow {
+  item_code: string;
+  qty?: number;
+  stock_uom?: string;
+  department?: string;
+  production_unit?: string;
+  production_policy?: string;
+  bom?: string;
+}
+
+/**
+ * Overlay a saved plan's own rows onto the history-derived draft.
+ *
+ * The page suggests quantities from comparable weekday history, but once a
+ * plan has been saved it is the plan -- not the history -- that says what is
+ * being produced. Those two sets do not have to match: an item can be planned
+ * with no sales history behind it at all (a new dish, or a kitchen base that
+ * is never sold directly), and a branch whose history window is empty returns
+ * no suggestions while its plan is full of rows.
+ *
+ * Without this overlay such a plan renders as an empty grid, which also hides
+ * anything keyed off the item list -- the per-department sections, and with
+ * them each department's Production Plan panel.
+ *
+ * A row present in history keeps its history figures and takes the plan's
+ * quantity. A row the history does not know about is appended with zeroed
+ * history figures, which is the truth about it rather than a placeholder.
+ */
+export const mergeSavedPlanRows = (
+  items: SalesPlanItem[],
+  rows: SalesPlanDocRow[],
+): SalesPlanItem[] => {
+  if (!Array.isArray(rows) || rows.length === 0) return items;
+
+  const byItemCode = new Map<string, SalesPlanItem>();
+  items.forEach((item) => {
+    if (!byItemCode.has(item.item_code)) byItemCode.set(item.item_code, item);
+  });
+
+  const merged = items.map((item) => ({ ...item }));
+  const mergedByCode = new Map<string, SalesPlanItem>();
+  merged.forEach((item) => {
+    if (!mergedByCode.has(item.item_code)) mergedByCode.set(item.item_code, item);
+  });
+
+  rows.forEach((row) => {
+    const itemCode = String(row.item_code || '');
+    if (!itemCode) return;
+
+    const qty = Number(row.qty);
+    const existing = mergedByCode.get(itemCode);
+
+    if (existing) {
+      existing.planned_qty = Number.isFinite(qty) ? qty : existing.planned_qty;
+      return;
+    }
+
+    merged.push({
+      item_code: itemCode,
+      item_name: itemCode,
+      stock_uom: row.stock_uom || 'Nos',
+      department: row.department,
+      production_unit: row.production_unit,
+      production_policy: row.production_policy,
+      bom: row.bom,
+      average_qty: 0,
+      sample_days: 0,
+      history: [],
+      planned_qty: Number.isFinite(qty) ? qty : 0,
+      _rowKey: generateRowKey(),
+    });
+  });
+
+  return merged;
+};
+
 export const getSalesPlanDraftQuantities = (key: string | null): Record<string, number> => {
   if (!key) return {};
 
