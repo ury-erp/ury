@@ -16,6 +16,7 @@ from frappe.utils import add_to_date, getdate, now_datetime
 
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.report_api.utils import require_manager
+from ury.ury.services.yield_branch_scope import branch_item_codes
 
 # Fixed sampling rate for Sampled cadence mode (10% of items on any given day).
 # Per-branch sampling rates deferred to future phases.
@@ -63,17 +64,37 @@ def get_due_yield_checks(branch):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally relies
+	# on require_manager() only, not user_has_branch_access — same deliberate
+	# choice documented on user_has_branch_access in report_api/utils.py and
+	# on get_yield_variance/get_yield_check_compliance in ury_yield_variance.py:
+	# managers may review due/overdue checks across branches they oversee
+	# without needing a Branch.user row. user_has_branch_access remains
+	# reserved for staff-facing WRITE endpoints (record_yield_check,
+	# create_issue_authorization) that accept a caller-supplied branch.
 	require_manager()
 	# Determine company from branch for scope gating (mirrors ury_yield_variance.py pattern).
 	company = frappe.db.get_value("Branch", branch, "company")
 	_require_scope(company)
 
-	# Fetch all yield-tracked items with cadence != None for this branch context.
+	# F8 (corrected): scope the tracked-item set to items actually used at
+	# this branch. IPC only has rows for sellable menu items (kitchen/bar
+	# routing) — it never has a row for a raw ingredient, and yield tracking
+	# only ever applies to raw ingredients (see docs/yield-tracking.md, "Why
+	# Item, not BOM Item or IPC"). So the anchor is: active IPC rows for this
+	# branch -> their BOM -> that BOM's component items (BOM Item rows).
+	# See ury.ury.services.yield_branch_scope.branch_item_codes.
+	scoped_item_codes = branch_item_codes(branch)
+	if not scoped_item_codes:
+		return []
+
+	# Fetch yield-tracked items with cadence != None that are actually used at this branch.
 	tracked_items = frappe.get_all(
 		"Item",
 		filters={
 			"custom_yield_tracked": 1,
 			"custom_yield_check_cadence": ["!=", "None"],
+			"name": ["in", list(scoped_item_codes)],
 		},
 		fields=[
 			"name",

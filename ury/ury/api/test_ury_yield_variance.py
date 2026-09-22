@@ -20,6 +20,7 @@ from ury.ury.api.ury_yield_variance import (
 	get_yield_check_compliance,
 	update_yield_standards,
 	user_has_branch_access,
+	branch_item_codes,
 )
 
 
@@ -379,6 +380,63 @@ class TestGetYieldCheckCompliancePermissionGating(FrappeTestCase):
 		self.assertIsInstance(result, list)
 		self.assertTrue(len(result) >= 0)
 
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_scopes_tracked_items_to_bom_usage(
+		self, mock_manager, mock_scope, mock_getdate, mock_branch_items, mock_get_all
+	):
+		"""F8 (corrected): when branch is given, only items that resolve via
+		branch_item_codes() (active IPC rows -> their BOM -> BOM Item
+		components) are evaluated — NOT items with a direct IPC row, which
+		per docs/yield-tracking.md can never be raw ingredients. The
+		BOM-anchor resolution itself is exercised in
+		test_yield_branch_scope.py; here we only verify
+		get_yield_check_compliance wires branch_item_codes() correctly."""
+		from datetime import date
+		today = date(2026, 1, 15)
+		mock_getdate.return_value = today
+		mock_branch_items.return_value = {"ITEM-A"}
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "Item":
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [frappe._dict(
+					name="ITEM-A",
+					custom_yield_check_cadence="Interval",
+					custom_yield_check_interval_days=7,
+				)]
+			if doctype == "URY Yield Check":
+				return []  # completed_checks
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_with_no_bom_usage_returns_empty(
+		self, mock_manager, mock_scope, mock_branch_items
+	):
+		"""F8 (corrected): a branch that resolves to no BOM-usage items (no
+		active IPC rows, no BOM on those rows, or no BOM components) gets an
+		empty compliance list instead of the unscoped global item set."""
+		mock_branch_items.return_value = set()  # no BOM-usage items for this branch
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(result, [])
+
 
 class TestRequireScope(FrappeTestCase):
 	"""Test _require_scope helper function."""
@@ -648,13 +706,56 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		).insert(ignore_permissions=True)
 		return doc.name
 
+	def _ensure_bom(self, finished_item, raw_item, company):
+		existing = frappe.db.get_value(
+			"BOM", {"item": finished_item, "company": company, "docstatus": 1}, "name"
+		)
+		if existing:
+			return existing
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": finished_item,
+				"quantity": 1,
+				"company": company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 4}],  # 4 / 0.80 = 5 -- must be a whole number, "Nos" UOM enforces this
+			}
+		)
+		bom.insert(ignore_permissions=True)
+		bom.submit()
+		return bom.name
+
 	def _ensure_item_production_configuration(self, item_code, branch, company):
-		"""get_yield_check_compliance's item query is scoped (F8) to items
-		configured for production at the given branch via URY Item
-		Production Configuration -- without an active config here, the item
-		query short-circuits to [] before this test's assertions even run."""
+		"""get_yield_check_compliance's item query is branch-scoped (F8) via
+		URY Item Production Configuration (IPC) -> its BOM -> that BOM's
+		component items (BOM Item rows) -- NOT a direct IPC.item match.
+		IPC only ever has rows for sellable menu items (kitchen/bar
+		routing), never raw ingredients (see docs/yield-tracking.md), so
+		yield-tracked `item_code` (always a raw ingredient) can only be
+		reached by anchoring through a sellable item's BOM that uses it as
+		a component -- exactly like production traffic actually would.
+		"""
+		finished_item = f"{item_code} F9 Sellable"
+		if not frappe.db.exists("Item", finished_item):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": finished_item,
+					"item_name": finished_item,
+					"item_group": "All Item Groups",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+				}
+			).insert(ignore_permissions=True)
+
+		bom_name = self._ensure_bom(finished_item, item_code, company)
+
 		if frappe.db.exists(
-			"URY Item Production Configuration", {"item": item_code, "branch": branch, "active": 1}
+			"URY Item Production Configuration",
+			{"item": finished_item, "branch": branch, "active": 1},
 		):
 			return
 		warehouse = self._ensure_warehouse(f"{item_code} F9 Retail Store", company)
@@ -662,8 +763,9 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 			{
 				"doctype": "URY Item Production Configuration",
 				"active": 1,
-				"item": item_code,
+				"item": finished_item,
 				"branch": branch,
+				"bom": bom_name,
 				"production_policy": "DIRECT_RETAIL",
 				"direct_retail_warehouse": warehouse,
 			}
