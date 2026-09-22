@@ -10,7 +10,7 @@ import {
   Calculator,
   FileSpreadsheet
 } from 'lucide-react';
-import { Button, Input, Select, SelectItem, Card, Spinner, Switch, showToast } from '@ury/ui';
+import { Button, Input, Select, SelectItem, Card, Spinner, Switch, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 
@@ -43,6 +43,63 @@ interface ConsumableItem {
   id: string;
   material: string;
   cost_per_unit: number;
+}
+
+type ExpenseAmountRow = { id: string; expense: string; amount: number };
+
+function expenseAmountColumns<T extends ExpenseAmountRow>(
+  setRows: React.Dispatch<React.SetStateAction<T[]>>,
+  removeRow: (id: string) => void,
+): DataTableColumn<T>[] {
+  return [
+    {
+      key: 'expense',
+      header: 'Expense',
+      render: (row) => (
+        <Input
+          size="compact"
+          value={row.expense}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setRows((current) =>
+              current.map((item) => (item.id === row.id ? { ...item, expense: e.target.value } : item))
+            )
+          }
+        />
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount ($)',
+      render: (row) => (
+        <Input
+          size="compact"
+          type="number"
+          value={row.amount}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setRows((current) =>
+              current.map((item) =>
+                item.id === row.id ? { ...item, amount: Number(e.target.value) } : item
+              )
+            )
+          }
+        />
+      ),
+    },
+    {
+      key: 'action',
+      header: 'Action',
+      align: 'right',
+      render: (row) => (
+        <button
+          type="button"
+          onClick={() => removeRow(row.id)}
+          className="rounded-md p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      ),
+    },
+  ];
 }
 
 interface ReportSettingsData {
@@ -581,58 +638,13 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Expense</th>
-                          <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {directFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-card/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.expense}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setDirectFixedExpenses(
-                                    directFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, expense: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setDirectFixedExpenses(
-                                    directFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, amount: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setDirectFixedExpenses(directFixedExpenses.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={expenseAmountColumns(setDirectFixedExpenses, (id) =>
+                      setDirectFixedExpenses((current) => current.filter((item) => item.id !== id))
+                    )}
+                    rows={directFixedExpenses}
+                    emptyMessage="No direct fixed expenses yet."
+                  />
                 </div>
 
                 {/* 3.2 Indirect Fixed Expenses */}
@@ -647,340 +659,220 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Expense</th>
-                          <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {indirectFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.expense}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setIndirectFixedExpenses(
-                                    indirectFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, expense: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setIndirectFixedExpenses(
-                                    indirectFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, amount: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setIndirectFixedExpenses(indirectFixedExpenses.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={expenseAmountColumns(setIndirectFixedExpenses, (id) =>
+                      setIndirectFixedExpenses((current) => current.filter((item) => item.id !== id))
+                    )}
+                    rows={indirectFixedExpenses}
+                    emptyMessage="No indirect fixed expenses yet."
+                  />
                 </div>
 
                 {/* 3.3 Percentage Expenses */}
-                <div className="space-y-3 pt-4 border-t border-gray-100">
+                <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Percentage Expenses</h3>
-                      <p className="text-xs text-gray-500">Payment processor rates, delivery aggregator cuts, and royalties.</p>
+                      <h3 className="text-sm font-bold text-foreground">Percentage Expenses</h3>
+                      <p className="text-xs text-muted-foreground">Payment processor rates, delivery aggregator cuts, and royalties.</p>
                     </div>
                     <Button onClick={addPercentageExpense}>
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Expense</th>
-                          <th className="p-3.5">Percentage (%)</th>
-                          <th className="p-3.5">Percentage Type</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {percentageExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.expense}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setPercentageExpenses(
-                                    percentageExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, expense: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                step="0.1"
-                                value={row.percent}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setPercentageExpenses(
-                                    percentageExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, percent: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Select
-                                value={row.percentage_type}
-                                onValueChange={(val: string) =>
-                                  setPercentageExpenses(
-                                    percentageExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, percentage_type: val } : item
-                                    )
-                                  )
-                                }
-                              >
-                                <SelectItem value="Gross Sales">Gross Sales</SelectItem>
-                                <SelectItem value="Net Sales">Net Sales</SelectItem>
-                                <SelectItem value="Online Orders">Online Orders</SelectItem>
-                              </Select>
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setPercentageExpenses(percentageExpenses.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={[
+                      {
+                        key: 'expense',
+                        header: 'Expense',
+                        render: (row) => (
+                          <Input
+                            size="compact"
+                            value={row.expense}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setPercentageExpenses((current) =>
+                                current.map((item) =>
+                                  item.id === row.id ? { ...item, expense: e.target.value } : item
+                                )
+                              )
+                            }
+                          />
+                        ),
+                      },
+                      {
+                        key: 'percent',
+                        header: 'Percentage (%)',
+                        render: (row) => (
+                          <Input
+                            size="compact"
+                            type="number"
+                            step="0.1"
+                            value={row.percent}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setPercentageExpenses((current) =>
+                                current.map((item) =>
+                                  item.id === row.id ? { ...item, percent: Number(e.target.value) } : item
+                                )
+                              )
+                            }
+                          />
+                        ),
+                      },
+                      {
+                        key: 'percentage_type',
+                        header: 'Percentage Type',
+                        render: (row) => (
+                          <Select
+                            value={row.percentage_type}
+                            onValueChange={(val: string) =>
+                              setPercentageExpenses((current) =>
+                                current.map((item) =>
+                                  item.id === row.id ? { ...item, percentage_type: val } : item
+                                )
+                              )
+                            }
+                          >
+                            <SelectItem value="Gross Sales">Gross Sales</SelectItem>
+                            <SelectItem value="Net Sales">Net Sales</SelectItem>
+                            <SelectItem value="Online Orders">Online Orders</SelectItem>
+                          </Select>
+                        ),
+                      },
+                      {
+                        key: 'action',
+                        header: 'Action',
+                        align: 'right',
+                        render: (row) => (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPercentageExpenses((current) => current.filter((item) => item.id !== row.id))
+                            }
+                            className="rounded-md p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ),
+                      },
+                    ] satisfies DataTableColumn<PercentageExpenseItem>[]}
+                    rows={percentageExpenses}
+                    emptyMessage="No percentage expenses yet."
+                  />
                 </div>
 
                 {/* 3.4 Employee Costs */}
-                <div className="space-y-3 pt-4 border-t border-gray-100">
+                <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Employee Costs</h3>
-                      <p className="text-xs text-gray-500">Staff role monthly compensation and headcount count.</p>
+                      <h3 className="text-sm font-bold text-foreground">Employee Costs</h3>
+                      <p className="text-xs text-muted-foreground">Staff role monthly compensation and headcount count.</p>
                     </div>
                     <Button onClick={addEmployeeCost}>
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Expense</th>
-                          <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {employeeCosts.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.expense}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setEmployeeCosts(
-                                    employeeCosts.map((item) =>
-                                      item.id === row.id ? { ...item, expense: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setEmployeeCosts(
-                                    employeeCosts.map((item) =>
-                                      item.id === row.id ? { ...item, amount: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setEmployeeCosts(employeeCosts.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={expenseAmountColumns(setEmployeeCosts, (id) =>
+                      setEmployeeCosts((current) => current.filter((item) => item.id !== id))
+                    )}
+                    rows={employeeCosts}
+                    emptyMessage="No employee costs yet."
+                  />
                 </div>
 
                 {/* 3.5 Monthly Fixed Expenses */}
-                <div className="space-y-3 pt-4 border-t border-gray-100">
+                <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Monthly Fixed Expenses</h3>
-                      <p className="text-xs text-gray-500">Recurring monthly telecom, maintenance, and sanitation overheads.</p>
+                      <h3 className="text-sm font-bold text-foreground">Monthly Fixed Expenses</h3>
+                      <p className="text-xs text-muted-foreground">Recurring monthly telecom, maintenance, and sanitation overheads.</p>
                     </div>
                     <Button onClick={addMonthlyExpense}>
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Expense</th>
-                          <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {monthlyFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.expense}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setMonthlyFixedExpenses(
-                                    monthlyFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, expense: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setMonthlyFixedExpenses(
-                                    monthlyFixedExpenses.map((item) =>
-                                      item.id === row.id ? { ...item, amount: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setMonthlyFixedExpenses(monthlyFixedExpenses.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={expenseAmountColumns(setMonthlyFixedExpenses, (id) =>
+                      setMonthlyFixedExpenses((current) => current.filter((item) => item.id !== id))
+                    )}
+                    rows={monthlyFixedExpenses}
+                    emptyMessage="No monthly fixed expenses yet."
+                  />
                 </div>
 
                 {/* 3.6 Consumables */}
-                <div className="space-y-3 pt-4 border-t border-gray-100">
+                <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Consumables Budget</h3>
-                      <p className="text-xs text-gray-500">Thermal paper rolls, take-away packaging, and disposable supplies.</p>
+                      <h3 className="text-sm font-bold text-foreground">Consumables Budget</h3>
+                      <p className="text-xs text-muted-foreground">Thermal paper rolls, take-away packaging, and disposable supplies.</p>
                     </div>
                     <Button onClick={addConsumable}>
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
 
-                  <div className="overflow-hidden">
-                    <table className="w-full text-left text-sm text-muted-foreground">
-                      <thead className="bg-card text-foreground font-medium border-b border-border">
-                        <tr>
-                          <th className="p-3.5">Material</th>
-                          <th className="p-3.5">Cost Per Unit ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {consumables.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
-                            <td className="p-3.5">
-                              <Input
-                                value={row.material}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setConsumables(
-                                    consumables.map((item) =>
-                                      item.id === row.id ? { ...item, material: e.target.value } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5">
-                              <Input
-                                type="number"
-                                value={row.cost_per_unit}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                  setConsumables(
-                                    consumables.map((item) =>
-                                      item.id === row.id ? { ...item, cost_per_unit: Number(e.target.value) } : item
-                                    )
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() =>
-                                  setConsumables(consumables.filter((item) => item.id !== row.id))
-                                }
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    columns={[
+                      {
+                        key: 'material',
+                        header: 'Material',
+                        render: (row) => (
+                          <Input
+                            size="compact"
+                            value={row.material}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setConsumables((current) =>
+                                current.map((item) =>
+                                  item.id === row.id ? { ...item, material: e.target.value } : item
+                                )
+                              )
+                            }
+                          />
+                        ),
+                      },
+                      {
+                        key: 'cost_per_unit',
+                        header: 'Cost Per Unit ($)',
+                        render: (row) => (
+                          <Input
+                            size="compact"
+                            type="number"
+                            value={row.cost_per_unit}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setConsumables((current) =>
+                                current.map((item) =>
+                                  item.id === row.id
+                                    ? { ...item, cost_per_unit: Number(e.target.value) }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                        ),
+                      },
+                      {
+                        key: 'action',
+                        header: 'Action',
+                        align: 'right',
+                        render: (row) => (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConsumables((current) => current.filter((item) => item.id !== row.id))
+                            }
+                            className="rounded-md p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ),
+                      },
+                    ] satisfies DataTableColumn<ConsumableItem>[]}
+                    rows={consumables}
+                    emptyMessage="No consumables yet."
+                  />
                 </div>
 
               </div>

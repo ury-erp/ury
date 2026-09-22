@@ -6,7 +6,6 @@ import {
   DataTable,
   DataTableColumn,
   DatePicker,
-  InlineEditCell,
   KpiStrip,
   Page,
   PageHeader,
@@ -16,29 +15,36 @@ import {
 } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { departmentStockService, PlanComponentDemand } from '../../services/departmentStock';
-import { buildSalesPlanDraftKey, getSalesPlanDraftQuantities, salesPlanService, saveSalesPlanDraftQuantities } from '../../services/salesPlan';
+import { salesPlanService } from '../../services/salesPlan';
 
 /**
  * Real data used here:
  *  - `departmentStockService.getActivePlan` -> the approved/locked Sales
  *    Plan's frozen per-component demand vector (`PlanComponentDemand[]`).
  *    This is the only source for "Materials to issue" -- required quantity
- *    per component/department. There is NO stock-on-hand join anywhere in
- *    this codebase (confirmed by searching every service under
- *    `frontend/src/services/` for stock_on_hand/actual_qty/available_qty/
- *    on_hand/bin fields), so "In store", "Cover", and the KPI strip's
- *    "Covered by stock" / "Short" / "Material value" / "To purchase" figures
- *    cannot be computed. They are shown as "Not available" with an honest
- *    hint rather than fabricated numbers, and the Shortfalls feed states the
- *    limitation instead of inventing which components are short.
+ *    per component/department.
+ *  - `departmentStockService.getPlanStockOnHand` -> current stock for those
+ *    same COMPONENTS, resolved to a department warehouse (or the branch POS
+ *    Profile warehouse) by `ury_requirements_stock.get_plan_stock_on_hand`.
+ *    This feeds "In store" and the KPI strip's "Covered by stock" / "Short"
+ *    / "Material value" / "To purchase". When the backend cannot resolve a
+ *    warehouse it returns `resolved_from: null`, and those figures render as
+ *    "Not available" with an honest hint rather than a fabricated zero.
  *  - `salesPlanService.getPlan(planName)` -> the same approved plan's raw
  *    `items` child table (item_code/qty/department/production_unit/
- *    stock_uom) is used for "Production targets". Quantities are
- *    inline-editable via `InlineEditCell`, and edits are persisted with the
- *    exact same localStorage draft mechanism `SalesPlanPage.tsx` uses
- *    (`buildSalesPlanDraftKey` + `saveSalesPlanDraftQuantities` /
- *    `getSalesPlanDraftQuantities`), so a quantity tweaked here shows back up
- *    on the Sales Plan page for the same branch/date.
+ *    stock_uom) is used for "Production targets", READ-ONLY. Requirements
+ *    only ever loads a plan whose `status` is already an approved/locked
+ *    state (`getActivePlan` -- see departmentStock.ts), i.e. one that has
+ *    been submitted; a submitted Sales Plan's quantities are the
+ *    authoritative, frozen numbers production is working against, so this
+ *    page must not offer to edit them. (It previously did, via an
+ *    `InlineEditCell` that persisted to the SAME localStorage draft
+ *    mechanism `SalesPlanPage.tsx` uses for its own UNSUBMITTED drafts --
+ *    which never touched the Sales Plan document, its approval snapshot,
+ *    or any Production Plan, so it looked editable without being
+ *    authoritative. Removed rather than wired to a real update, because
+ *    there is no real update to make: change the submitted plan through
+ *    Sales Plan's own revision/supersede workflow instead.)
  */
 
 interface RawSalesPlanItem {
@@ -71,6 +77,13 @@ const getToday = () => {
   return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
 };
 
+/**
+ * Lookup key shared by the stock request, the stock map and every consumer.
+ * Must be built the same way on both sides -- a mismatch here is what made
+ * the whole page read "Not available".
+ */
+const stockKey = (itemCode: string, department?: string | null) => `${itemCode}:${department || ''}`;
+
 const formatQty = (value: number, uom?: string) => {
   const formatted = Number.isInteger(value) ? String(value) : value.toFixed(3);
   return uom ? `${formatted} ${uom}` : formatted;
@@ -83,15 +96,9 @@ export const RequirementsPage: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionTargetRow[]>([]);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<string | null>(null);
-  const [planCompany, setPlanCompany] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stockData, setStockData] = useState<Map<string, any>>(new Map());
-
-  const draftKey = useMemo(() => {
-    if (!activeBranchId || activeBranchId === 'all' || !planCompany || !requirementsDate) return null;
-    return buildSalesPlanDraftKey({ branch: activeBranchId, company: planCompany, plan_date: requirementsDate });
-  }, [activeBranchId, planCompany, requirementsDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,7 +106,6 @@ export const RequirementsPage: React.FC = () => {
     setError(null);
     setPlanName(null);
     setPlanStatus(null);
-    setPlanCompany(undefined);
     setDemandVector([]);
     setProductionItems([]);
 
@@ -132,21 +138,11 @@ export const RequirementsPage: React.FC = () => {
         const rawPlan = (await salesPlanService.getPlan(activePlan.name)) as unknown as RawSalesPlanDoc;
         if (cancelled) return;
 
-        setPlanCompany(rawPlan.company);
-
-        const savedQuantities = getSalesPlanDraftQuantities(
-          buildSalesPlanDraftKey({
-            branch: activeBranchId,
-            company: rawPlan.company,
-            plan_date: requirementsDate,
-          }),
-        );
-
         const items = Array.isArray(rawPlan.items) ? rawPlan.items : [];
         setProductionItems(
           items.map((item) => ({
             item_code: item.item_code,
-            qty: Number.isFinite(savedQuantities[item.item_code]) ? savedQuantities[item.item_code] : Number(item.qty ?? 0),
+            qty: Number(item.qty ?? 0),
             stock_uom: item.stock_uom,
             department: item.department,
             production_unit: item.production_unit,
@@ -166,29 +162,38 @@ export const RequirementsPage: React.FC = () => {
     };
   }, [activeBranchId, requirementsDate]);
 
-  // Fetch stock-on-hand data for the production items
+  // Fetch stock-on-hand for the COMPONENTS the plan requires, not for the
+  // finished goods it produces. The materials table and every KPI below key
+  // their lookups on `component_item`, so requesting stock for
+  // `productionItems` (e.g. "Chicken Biryani") could never match a demand
+  // line (e.g. "Biryani Rice") and every row rendered "Not available".
   useEffect(() => {
     let cancelled = false;
 
-    if (!activeBranchId || activeBranchId === 'all' || productionItems.length === 0) {
+    if (!activeBranchId || activeBranchId === 'all' || demandVector.length === 0) {
       setStockData(new Map());
       return;
     }
 
     (async () => {
       try {
-        const items = productionItems.map((item) => ({
-          item_code: item.item_code,
-          department: item.department,
-        }));
+        // One request per distinct component/department pair -- the demand
+        // vector can repeat a component across production units.
+        const seen = new Set<string>();
+        const items: Array<{ item_code: string; department?: string }> = [];
+        demandVector.forEach((row) => {
+          const key = stockKey(row.component_item, row.department);
+          if (seen.has(key)) return;
+          seen.add(key);
+          items.push({ item_code: row.component_item, department: row.department });
+        });
+
         const stockResults = await departmentStockService.getPlanStockOnHand(activeBranchId, items);
         if (cancelled) return;
 
-        // Build a map for quick lookup: "item_code:department" -> stock data
         const stockMap = new Map();
         stockResults.forEach((stock) => {
-          const key = `${stock.item_code}:${stock.department || ''}`;
-          stockMap.set(key, stock);
+          stockMap.set(stockKey(stock.item_code, stock.department), stock);
         });
         setStockData(stockMap);
       } catch {
@@ -200,7 +205,7 @@ export const RequirementsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, productionItems]);
+  }, [activeBranchId, demandVector]);
 
   const departmentCount = useMemo(
     () => new Set(demandVector.map((row) => row.department).filter(Boolean)).size,
@@ -217,8 +222,7 @@ export const RequirementsPage: React.FC = () => {
     let hasUnresolvedWarehouse = false;
 
     demandVector.forEach((row) => {
-      const key = `${row.component_item}:${row.department || ''}`;
-      const stock = stockData.get(key);
+      const stock = stockData.get(stockKey(row.component_item, row.department));
 
       // Material value: sum of (required_qty * valuation_rate) for all items
       if (stock && stock.resolved_from !== null && stock.valuation_rate !== null) {
@@ -253,31 +257,6 @@ export const RequirementsPage: React.FC = () => {
     };
   }, [demandVector, stockData]);
 
-  const persistProductionQuantities = (nextItems: ProductionTargetRow[]) => {
-    if (!draftKey) return;
-    saveSalesPlanDraftQuantities(
-      draftKey,
-      nextItems.map((item) => ({ item_code: item.item_code, planned_qty: item.qty })),
-    );
-  };
-
-  const updateProductionQty = (itemCode: string, rawValue: string) => {
-    const nextQty = Math.max(0, Number(rawValue) || 0);
-    setProductionItems((current) => {
-      const next = current.map((item) => (item.item_code === itemCode ? { ...item, qty: nextQty } : item));
-      return next;
-    });
-  };
-
-  const commitProductionQty = (itemCode: string, rawValue: string) => {
-    const nextQty = Math.max(0, Number(rawValue) || 0);
-    setProductionItems((current) => {
-      const next = current.map((item) => (item.item_code === itemCode ? { ...item, qty: nextQty } : item));
-      persistProductionQuantities(next);
-      return next;
-    });
-  };
-
   const materialsColumns: DataTableColumn<PlanComponentDemand>[] = [
     { key: 'component_item', header: 'Material', render: (row) => (
       <div>
@@ -297,8 +276,7 @@ export const RequirementsPage: React.FC = () => {
       header: 'In store',
       align: 'right',
       render: (row) => {
-        const key = `${row.component_item}:${row.department || ''}`;
-        const stock = stockData.get(key);
+        const stock = stockData.get(stockKey(row.component_item, row.department));
 
         // If no stock data found or resolved_from is null, warehouse couldn't be resolved
         if (!stock || stock.resolved_from === null) {
@@ -345,17 +323,10 @@ export const RequirementsPage: React.FC = () => {
       key: 'qty',
       header: 'Quantity',
       align: 'right',
-      render: (row) => (
-        <InlineEditCell
-          aria-label={`Production target quantity for ${row.item_code}`}
-          value={row.qty}
-          type="number"
-          min="0"
-          step="0.001"
-          onChange={(value) => updateProductionQty(row.item_code, value)}
-          onCommit={(value) => commitProductionQty(row.item_code, value)}
-        />
-      ),
+      // Read-only: this is a submitted Sales Plan's frozen quantity, not a
+      // draft -- see the module docstring above for why an editor was
+      // removed rather than wired to a real update.
+      render: (row) => <span className={numericCellClass}>{formatQty(row.qty, row.stock_uom)}</span>,
     },
   ];
 

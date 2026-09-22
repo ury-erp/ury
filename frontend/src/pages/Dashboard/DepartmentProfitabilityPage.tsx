@@ -9,6 +9,7 @@ import {
   ProfitabilityRow,
 } from '../../services/departmentProfitability';
 import { departmentStockService, DepartmentOption } from '../../services/departmentStock';
+import { describeProfitabilityReason } from '../../lib/profitabilityReasons';
 
 /**
  * Additive, unwired reporting page (V3-80): department profitability and
@@ -270,70 +271,76 @@ export const DepartmentProfitabilityPage: React.FC = () => {
       )}
 
       {state === 'populated' && profitability && (
-        <Section>
-          <Panel pad data-testid="profitability-table">
-            <h3 className="text-sm font-semibold mb-2">Department Profitability</h3>
-            {profitability.reason && (
-              <p className="text-xs text-warning mb-2" data-testid="profitability-reason">
-                {profitability.reason}
-              </p>
-            )}
-            {(() => {
-              const baseProfitColumns: DataTableColumn<ProfitabilityRow>[] = [
-                { key: 'department', header: 'Department' },
-                { key: 'item_or_component', header: 'Item' },
-                { key: 'net_revenue', header: 'Net Revenue', render: (row) => formatCurrency(row.net_revenue) },
-              ];
-              const costColumns: DataTableColumn<ProfitabilityRow>[] = canSeeCost
-                ? [
-                    { key: 'posted_cost', header: 'Posted Cost', render: (row) => formatCurrency(row.posted_cost) },
-                    { key: 'theoretical_cost', header: 'Theoretical Cost', render: (row) => formatCurrency(row.theoretical_cost) },
-                    {
-                      key: 'posted_gross_profit',
-                      header: 'Posted GP',
-                      render: (row) => formatCurrency(row.posted_gross_profit),
-                    },
-                    {
-                      key: 'theoretical_gross_profit',
-                      header: 'Theoretical GP',
-                      render: (row) => formatCurrency(row.theoretical_gross_profit),
-                    },
-                    { key: 'variance', header: 'Variance', render: (row) => formatCurrency(row.variance) },
-                  ]
-                : [];
-              return (
-                <DataTable
-                  columns={[...baseProfitColumns, ...costColumns]}
-                  rows={profitability.rows}
-                  emptyMessage="No profitability data found."
-                />
-              );
-            })()}
-          </Panel>
+        <Section data-testid="profitability-table">
+          <h3 className="mb-2 text-sm font-semibold">Department Profitability</h3>
+          {profitability.reason && (
+            <p className="mb-2 text-xs text-warning" data-testid="profitability-reason">
+              {describeProfitabilityReason(profitability.reason)}
+            </p>
+          )}
+          {(() => {
+            const baseProfitColumns: DataTableColumn<ProfitabilityRow>[] = [
+              { key: 'department', header: 'Department' },
+              { key: 'item_or_component', header: 'Item' },
+              { key: 'net_revenue', header: 'Net Revenue', render: (row) => formatCurrency(row.net_revenue) },
+            ];
+            // A row's own reason (e.g. UNATTRIBUTED_COST) can differ from
+            // the report-level banner above -- shown per row too so a mix
+            // of costed and provisional rows in the same table is legible.
+            if (profitability.rows.some((row) => row.reason)) {
+              baseProfitColumns.push({
+                key: 'reason',
+                header: 'Reason',
+                render: (row) => (row.reason ? describeProfitabilityReason(row.reason) : '—'),
+              });
+            }
+            const costColumns: DataTableColumn<ProfitabilityRow>[] = canSeeCost
+              ? [
+                  { key: 'posted_cost', header: 'Posted Cost', render: (row) => formatCurrency(row.posted_cost) },
+                  { key: 'theoretical_cost', header: 'Theoretical Cost', render: (row) => formatCurrency(row.theoretical_cost) },
+                  {
+                    key: 'posted_gross_profit',
+                    header: 'Posted GP',
+                    render: (row) => formatCurrency(row.posted_gross_profit),
+                  },
+                  {
+                    key: 'theoretical_gross_profit',
+                    header: 'Theoretical GP',
+                    render: (row) => formatCurrency(row.theoretical_gross_profit),
+                  },
+                  { key: 'variance', header: 'Variance', render: (row) => formatCurrency(row.variance) },
+                ]
+              : [];
+            return (
+              <DataTable
+                columns={[...baseProfitColumns, ...costColumns]}
+                rows={profitability.rows}
+                emptyMessage="No profitability data found."
+              />
+            );
+          })()}
         </Section>
       )}
 
       {state === 'populated' && planVsActual && (
-        <Section>
-          <Panel pad data-testid="plan-vs-actual-table">
-            <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
-            {(() => {
-              const planVsActualColumns: DataTableColumn<(typeof planVsActual.rows)[0]>[] = [
-                { key: 'department', header: 'Department' },
-                { key: 'item_or_component', header: 'Item' },
-                { key: 'planned_qty', header: 'Planned Qty' },
-                { key: 'actual_qty', header: 'Actual Qty' },
-                { key: 'qty_variance', header: 'Variance' },
-              ];
-              return (
-                <DataTable
-                  columns={planVsActualColumns}
-                  rows={planVsActual.rows}
-                  emptyMessage="No plan vs actual data found."
-                />
-              );
-            })()}
-          </Panel>
+        <Section data-testid="plan-vs-actual-table">
+          <h3 className="mb-2 text-sm font-semibold">Plan vs Actual</h3>
+          {(() => {
+            const planVsActualColumns: DataTableColumn<(typeof planVsActual.rows)[0]>[] = [
+              { key: 'department', header: 'Department' },
+              { key: 'item_or_component', header: 'Item' },
+              { key: 'planned_qty', header: 'Planned Qty' },
+              { key: 'actual_qty', header: 'Actual Qty' },
+              { key: 'qty_variance', header: 'Variance' },
+            ];
+            return (
+              <DataTable
+                columns={planVsActualColumns}
+                rows={planVsActual.rows}
+                emptyMessage="No plan vs actual data found."
+              />
+            );
+          })()}
         </Section>
       )}
     </Page>

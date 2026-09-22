@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
-import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
@@ -30,8 +29,13 @@ const columns: DataTableColumn<PurchaseItemRow>[] = [
   { key: 'supplier_count', header: '# Suppliers', align: 'right' },
 ];
 
+/**
+ * Purchase Invoice has no `branch` field (the same data-model fact that
+ * makes Completed Work Orders company-wide), so this report is inherently
+ * company-wide: no branch is sent and the header says so rather than
+ * letting the global branch selector imply a scope that does not exist.
+ */
 export function ItemWisePurchaseHistory() {
-  const { activeBranchId } = useBranchContext();
   const [range, setRange] = useState<DateRangeValue>(() => ({
     from: startOfMonth(new Date()),
     to: endOfDay(new Date()),
@@ -44,10 +48,9 @@ export function ItemWisePurchaseHistory() {
     setIsLoading(true);
     try {
       setError(null);
-      const branch = activeBranchId === 'all' ? undefined : activeBranchId;
       const res = await call<{ message: ItemWisePurchaseHistoryData }>(
         'ury.ury.report_api.items.get_item_wise_purchase_history',
-        { branch, start_date: toApiDate(range.from), end_date: toApiDate(range.to) },
+        { start_date: toApiDate(range.from), end_date: toApiDate(range.to) },
       );
       setData(res.message ?? (res as unknown as ItemWisePurchaseHistoryData));
     } catch (err) {
@@ -55,7 +58,7 @@ export function ItemWisePurchaseHistory() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeBranchId, range]);
+  }, [range]);
 
   useEffect(() => {
     fetchData();
@@ -65,7 +68,7 @@ export function ItemWisePurchaseHistory() {
     <div className="space-y-6">
       <PageHeader
         title="Item-wise Purchase History"
-        description={`Procurement by item ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        description="Procurement by item · Company-wide (Purchase Invoice has no branch field)"
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 

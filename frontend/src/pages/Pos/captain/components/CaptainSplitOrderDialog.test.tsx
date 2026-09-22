@@ -76,6 +76,10 @@ vi.mock('@ury/ui', () => ({
       {children}
     </button>
   ),
+  // Real Checkbox is a native `<input type="checkbox">` under the hood
+  // (see packages/ui/src/components/checkbox.tsx) -- this stub keeps that
+  // contract (role="checkbox", checked/onChange/disabled) without pulling in
+  // the real component's lucide-react Check icon dependency.
   Checkbox: (props: any) => <input type="checkbox" {...props} />,
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));

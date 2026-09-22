@@ -151,7 +151,7 @@ export function EditableDataTable<T>({
       return (
         <Input
           type="number"
-          size="sm"
+          size="compact"
           min={editableColumn.min}
           step={editableColumn.step ?? 1}
           value={editableColumn.getValue(row)}

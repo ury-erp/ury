@@ -38,3 +38,27 @@ class TestRequireManagerGate(FrappeTestCase):
 		frappe.set_user(TEST_NON_MANAGER)
 		with self.assertRaises(frappe.PermissionError):
 			items.get_item_wise_purchase_history("2026-01-01", "2026-01-31")
+
+
+class TestPurchaseHistoryBranchScope(FrappeTestCase):
+	"""Purchase Invoice has no `branch` field. Passing one must not reach SQL
+	as a filter -- it used to, raising OperationalError 1054 ("Unknown column
+	'a.branch'") on every branch-scoped call, which is every call the
+	frontend makes unless the user is on "All branches".
+	"""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+
+	def test_branch_is_accepted_and_ignored_not_a_sql_error(self):
+		with_branch = items.get_item_wise_purchase_history("2026-01-01", "2026-01-31", branch="_Nonexistent Branch")
+		without_branch = items.get_item_wise_purchase_history("2026-01-01", "2026-01-31")
+
+		self.assertEqual(with_branch["items"], without_branch["items"])
+		self.assertEqual(with_branch["summary"], without_branch["summary"])
+
+	def test_response_reports_company_scope_rather_than_a_branch(self):
+		result = items.get_item_wise_purchase_history("2026-01-01", "2026-01-31", branch="URY")
+
+		self.assertIsNone(result["branch"], "must not echo back a branch it did not filter on")
+		self.assertEqual(result["branch_scope"], "company")

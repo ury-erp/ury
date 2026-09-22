@@ -18,6 +18,7 @@ from ury.ury.api.ury_department_profitability import (
     DEPARTMENT_SCOPE_MISMATCH,
     MISSING_APPROVED_PLAN,
     MISSING_COST_ATTRIBUTION,
+    UNATTRIBUTED_COST,
     UNATTRIBUTED_REVENUE,
     get_department_profitability,
     get_plan_vs_actual,
@@ -190,6 +191,85 @@ class TestPermissionTiers(unittest.TestCase):
         self.assertEqual(row["posted_cost"], 100.0)
         self.assertEqual(row["posted_gross_profit"], 500.0 - 100.0)
         self.assertEqual(row["variance"], 0.0)
+
+    @patch(f"{MOD}.compute_variance")
+    def test_unposted_cost_yields_theoretical_only_not_a_crash(self, mock_variance):
+        """The real V3-74 contract: posted_cost is None until a fulfilment
+        Stock Entry is posted. That must produce a theoretical-only row
+        flagged UNATTRIBUTED_COST, never a TypeError on `float - None`.
+        """
+        mock_variance.return_value = {
+            "item_code": "Burger",
+            "qty": 5,
+            "company": "URY Co",
+            "theoretical_cost": 100.0,
+            "posted_cost": None,
+            "reason": "FULFILMENT_POSTING_REQUIRED",
+        }
+        patches = _base_patches()
+        _start_all(patches)
+        try:
+            with _RolesPatch(["Finance"]):
+                result = get_department_profitability("URY Co", "URY Branch", "2026-08-28")
+        finally:
+            _stop_all(patches)
+
+        row = result["rows"][0]
+        self.assertEqual(row["theoretical_cost"], 100.0)
+        self.assertEqual(row["theoretical_gross_profit"], 500.0 - 100.0)
+        self.assertEqual(row["reason"], UNATTRIBUTED_COST)
+        self.assertTrue(row["provisional"])
+        for field in ("posted_cost", "posted_gross_profit", "variance"):
+            self.assertNotIn(field, row, f"{field} must be absent, not zeroed, when nothing is posted")
+
+        # Every row uncosted -> report-level reason so the blank Posted Cost
+        # column is explained rather than read as zero.
+        self.assertTrue(result["provisional"])
+        self.assertEqual(result["reason"], UNATTRIBUTED_COST)
+
+    @patch(f"{MOD}.compute_variance")
+    def test_unposted_cost_still_strips_every_cost_field_for_chef(self, mock_variance):
+        mock_variance.return_value = {
+            "item_code": "Burger",
+            "qty": 5,
+            "company": "URY Co",
+            "theoretical_cost": 100.0,
+            "posted_cost": None,
+        }
+        patches = _base_patches()
+        _start_all(patches)
+        try:
+            with _RolesPatch(["Chef"]):
+                result = get_department_profitability("URY Co", "URY Branch", "2026-08-28")
+        finally:
+            _stop_all(patches)
+
+        row = result["rows"][0]
+        for field in ("posted_cost", "theoretical_cost", "posted_gross_profit", "theoretical_gross_profit", "variance"):
+            self.assertNotIn(field, row)
+        self.assertEqual(row["net_revenue"], 500.0)
+
+    @patch(f"{MOD}.compute_variance")
+    def test_missing_theoretical_cost_falls_back_to_missing_cost_attribution(self, mock_variance):
+        mock_variance.return_value = {
+            "item_code": "Burger",
+            "qty": 5,
+            "company": "URY Co",
+            "theoretical_cost": None,
+            "posted_cost": None,
+        }
+        patches = _base_patches()
+        _start_all(patches)
+        try:
+            with _RolesPatch(["Finance"]):
+                result = get_department_profitability("URY Co", "URY Branch", "2026-08-28")
+        finally:
+            _stop_all(patches)
+
+        row = result["rows"][0]
+        self.assertEqual(row["reason"], MISSING_COST_ATTRIBUTION)
+        self.assertTrue(row["provisional"])
+        self.assertNotIn("theoretical_cost", row)
 
 
 class TestBranchAndCompanyScope(unittest.TestCase):

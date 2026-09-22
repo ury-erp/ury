@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Page,
   Section,
   DataTable,
   DataTableColumn,
   Card,
-  Select,
+  Autocomplete,
+  type AutocompleteOption,
   numericCellClass,
 } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
+import { menuAvailabilityService } from '../../services/menuAvailability';
 
 interface ComplianceRow {
   item: string;
@@ -22,6 +25,8 @@ interface ComplianceRow {
   attached_count: number;
 }
 
+const ALL_BRANCHES_OPTION: AutocompleteOption = { value: '', label: 'All branches' };
+
 const getComplianceColor = (percent: number | null): string => {
   if (percent === null || percent === undefined) return 'text-muted-foreground';
   if (percent >= 80) return 'text-green-600';
@@ -32,80 +37,108 @@ const getComplianceColor = (percent: number | null): string => {
 const formatCompliance = (percent: number | null): string =>
   percent === null || percent === undefined ? 'N/A' : `${percent.toFixed(1)}%`;
 
+async function companyForBranch(branch: string): Promise<string> {
+  const res = await call<{ message?: { company?: string }; company?: string }>(
+    'frappe.client.get_value',
+    {
+      doctype: 'Branch',
+      filters: branch,
+      fieldname: 'company',
+    }
+  );
+  return res?.message?.company ?? res?.company ?? '';
+}
+
 export const YieldCheckCompliancePage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [rows, setRows] = useState<ComplianceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [branches, setBranches] = useState<{ name: string }[]>([]);
-  const [company, setCompany] = useState<string>('');
+  // null = not yet seeded from header context; '' = explicit "All branches"
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [branchOptions, setBranchOptions] = useState<AutocompleteOption[]>([ALL_BRANCHES_OPTION]);
+  const [branchSearching, setBranchSearching] = useState(false);
+  const [company, setCompany] = useState<string | null>(null);
 
-  // Fetch branches for selector
+  // Seed once from the header branch picker
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await call<any>('frappe.client.get_list', {
-          doctype: 'Branch',
-          fields: ['name'],
-          limit_page_length: 0,
-          order_by: 'name asc',
-        });
-        const data = (res as any)?.message || res || [];
-        if (!cancelled) {
-          setBranches(Array.isArray(data) ? data : []);
-        }
-      } catch {
-        if (!cancelled) setBranches([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Set initial branch when context updates
-  useEffect(() => {
-    if (activeBranchId && activeBranchId !== 'all' && !selectedBranch) {
-      setSelectedBranch(activeBranchId);
-    }
+    if (selectedBranch !== null) return;
+    if (!activeBranchId) return;
+    setSelectedBranch(activeBranchId === 'all' ? '' : activeBranchId);
   }, [activeBranchId, selectedBranch]);
 
-  // Fetch company from selected branch
-  useEffect(() => {
-    let cancelled = false;
-    const branch = selectedBranch || activeBranchId;
+  const branchFilter = selectedBranch ?? '';
+  const branchReady = selectedBranch !== null;
 
-    if (!branch || branch === 'all') {
-      setCompany('');
-      return;
-    }
+  // Keep the committed branch visible before the first search runs
+  useEffect(() => {
+    if (!branchReady) return;
+    setBranchOptions((prev) => withSelectedOption(prev, branchFilter));
+  }, [branchFilter, branchReady]);
+
+  // Resolve company: selected branch → default company (for all-branches / missing branch.company)
+  useEffect(() => {
+    if (!branchReady) return;
+
+    let cancelled = false;
+    setCompany(null);
 
     (async () => {
       try {
-        const res = await call<any>('frappe.client.get', {
-          doctype: 'Branch',
-          name: branch,
-        });
-        const branchData = (res as any)?.message || res;
-        if (!cancelled && branchData?.company) {
-          setCompany(branchData.company);
-        } else if (!cancelled) {
-          setCompany('');
+        if (branchFilter) {
+          const value = await companyForBranch(branchFilter);
+          if (value) {
+            if (!cancelled) setCompany(value);
+            return;
+          }
         }
+        const fallback = await menuAvailabilityService.resolveDefaultCompany();
+        if (!cancelled) setCompany(fallback || '');
       } catch {
         if (!cancelled) setCompany('');
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [selectedBranch, activeBranchId]);
+  }, [branchFilter, branchReady]);
 
-  // Fetch compliance data
+  const searchBranches = useCallback(
+    async (query: string) => {
+      setBranchSearching(true);
+      try {
+        const options = await searchLinkOptions({
+          doctype: 'Branch',
+          query,
+        });
+        setBranchOptions(
+          withSelectedOption([ALL_BRANCHES_OPTION, ...options], branchFilter)
+        );
+      } catch {
+        setBranchOptions(withSelectedOption([ALL_BRANCHES_OPTION], branchFilter));
+      } finally {
+        setBranchSearching(false);
+      }
+    },
+    [branchFilter]
+  );
+
+  // Fetch compliance data — wait for company so we never flash a scope error
   useEffect(() => {
-    const branch = selectedBranch || activeBranchId;
+    if (!branchReady || company === null) {
+      setRows([]);
+      setError(null);
+      setLoading(true);
+      return;
+    }
+
+    if (!company) {
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     if (!company) {
       setRows([]);
@@ -119,8 +152,8 @@ export const YieldCheckCompliancePage: React.FC = () => {
     (async () => {
       try {
         const res = await call<any>('ury.ury.api.ury_yield_variance.get_yield_check_compliance', {
-          company: company,
-          branch: branch && branch !== 'all' ? branch : undefined,
+          company,
+          branch: branchFilter || undefined,
         });
         const data = (res as any)?.message || res || [];
         if (!cancelled) {
@@ -139,7 +172,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, selectedBranch, company]);
+  }, [branchFilter, branchReady, company]);
 
   const columns: DataTableColumn<ComplianceRow>[] = [
     {
@@ -206,21 +239,18 @@ export const YieldCheckCompliancePage: React.FC = () => {
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex flex-col text-xs font-medium text-muted-foreground">
+          <label className="flex w-full max-w-sm flex-col text-xs font-medium text-muted-foreground">
             Branch (Optional)
-            <Select
-              aria-label="Branch"
-              value={selectedBranch}
-              onChange={(event) => setSelectedBranch(event.target.value)}
+            <Autocomplete
+              id="yield-compliance-branch"
+              value={branchFilter}
+              onChange={setSelectedBranch}
+              onSearch={searchBranches}
+              options={branchOptions}
+              searching={branchSearching}
+              placeholder="All branches"
               className="mt-1"
-            >
-              <option value="">All branches</option>
-              {branches.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}
-                </option>
-              ))}
-            </Select>
+            />
           </label>
         </div>
       </div>

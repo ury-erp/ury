@@ -31,10 +31,32 @@ interface CustomerDataResult {
   };
 }
 
+// Real per-customer rows from `get_daywise_customer_details`, grouped on
+// POS Invoice's `customer` link field -- not the denormalized `customer_name`
+// text that search_customers matches on, so two customers sharing a display
+// name (real data on the demo site: "fairooz" and "Fairooz BZ") stay
+// distinct rows here.
+interface CustomerListingRow {
+  customer_id: string;
+  customer_name: string;
+  mobile_number: string | null;
+  visit_count: number;
+  first_visit: string;
+  last_visit: string;
+}
+
 const columns: DataTableColumn<InvoiceRow>[] = [
   { key: 'date', header: 'Date' },
   { key: 'invoice', header: 'Invoice' },
   { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+];
+
+const listingColumns: DataTableColumn<CustomerListingRow>[] = [
+  { key: 'customer_name', header: 'Customer' },
+  { key: 'mobile_number', header: 'Mobile', render: (r) => r.mobile_number || '—' },
+  { key: 'visit_count', header: 'Visits', align: 'right' },
+  { key: 'first_visit', header: 'First Visit' },
+  { key: 'last_visit', header: 'Last Visit' },
 ];
 
 export function CustomerData() {
@@ -49,6 +71,10 @@ export function CustomerData() {
   const [data, setData] = useState<CustomerDataResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [listingRows, setListingRows] = useState<CustomerListingRow[]>([]);
+  const [listingLoading, setListingLoading] = useState(true);
+  const [listingError, setListingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -67,6 +93,40 @@ export function CustomerData() {
     }, 250);
     return () => clearTimeout(timeout);
   }, [query]);
+
+  // Default listing: every customer who actually visited in the selected
+  // range, so the page opens on a real table instead of an empty "search
+  // and select" prompt. Sorted by visit count so the most frequent
+  // customers surface first -- the backend itself orders by name.
+  useEffect(() => {
+    let cancelled = false;
+    setListingLoading(true);
+    setListingError(null);
+
+    (async () => {
+      try {
+        const branch = activeBranchId === 'all' ? undefined : activeBranchId;
+        const res = await call<{ message: { customers: CustomerListingRow[] } }>(
+          'ury.ury.report_api.customers.get_daywise_customer_details',
+          { branch, start_date: toApiDate(range.from), end_date: toApiDate(range.to) },
+        );
+        if (cancelled) return;
+        const rows = res.message?.customers ?? [];
+        setListingRows([...rows].sort((a, b) => b.visit_count - a.visit_count));
+      } catch (err) {
+        if (!cancelled) {
+          setListingRows([]);
+          setListingError(err instanceof Error ? err.message : 'Unable to load the customer list.');
+        }
+      } finally {
+        if (!cancelled) setListingLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId, range]);
 
   const fetchData = useCallback(async () => {
     if (!selectedCustomer) return;
@@ -142,10 +202,6 @@ export function CustomerData() {
         </div>
       )}
 
-      {!selectedCustomer && !error && (
-        <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
-      )}
-
       {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
       {data && !isLoading && (
@@ -158,6 +214,26 @@ export function CustomerData() {
             ] satisfies KpiItemProps[]}
           />
           <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
+        </>
+      )}
+
+      {!selectedCustomer && !error && (
+        <>
+          {listingError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {listingError}
+            </div>
+          )}
+          <DataTable
+            columns={listingColumns}
+            rows={listingRows}
+            isLoading={listingLoading}
+            emptyMessage="No customers visited in this range."
+            onRowClick={(row) => {
+              setSelectedCustomer(row.customer_name);
+              setQuery(row.customer_name);
+            }}
+          />
         </>
       )}
     </div>

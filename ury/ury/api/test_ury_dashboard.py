@@ -4,6 +4,7 @@ from frappe.utils import get_datetime
 from unittest.mock import patch, MagicMock
 from ury.ury.api.ury_dashboard import (
     get_dashboard_stats,
+    get_department_activity,
     get_needs_attention,
     get_shift_metrics,
     get_baseline,
@@ -251,6 +252,133 @@ class TestGetShiftMetrics(FrappeTestCase):
 
         self.assertEqual(result["covers"], 0)
         self.assertEqual(result["avg_per_cover"], 0)
+
+
+class TestGetDepartmentActivity(FrappeTestCase):
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    def test_cache_hit_returns_immediately(self, mock_cache_obj):
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        cached_activity = {"branch": "URY Branch", "as_of": "now", "rows": []}
+        mock_cache_instance.get_value.return_value = cached_activity
+
+        result = get_department_activity(branch="URY Branch")
+
+        self.assertEqual(result, cached_activity)
+        mock_cache_instance.get_value.assert_called_once()
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.get_value")
+    def test_combines_kot_and_work_order_rows_for_the_same_department(
+        self, mock_get_value, mock_sql, mock_cache_obj
+    ):
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+        mock_get_value.return_value = None
+
+        mock_sql.side_effect = [
+            [frappe._dict({"department": "Kitchen", "tickets_fired": 10, "tickets_served": 6})],
+            [frappe._dict({"department": "Kitchen", "work_orders_completed": 12, "qty_produced": 108.0})],
+        ]
+
+        result = get_department_activity(branch="URY Branch")
+
+        self.assertEqual(len(result["rows"]), 1)
+        row = result["rows"][0]
+        self.assertEqual(row["department"], "Kitchen")
+        self.assertEqual(row["tickets_fired"], 10)
+        self.assertEqual(row["tickets_served"], 6)
+        self.assertEqual(row["work_orders_completed"], 12)
+        self.assertEqual(row["qty_produced"], 108.0)
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.get_value")
+    def test_department_with_only_kot_activity_has_zeroed_production_fields(
+        self, mock_get_value, mock_sql, mock_cache_obj
+    ):
+        """A department can fire/serve KOTs without a Work Order ever
+        completing in the window (e.g. a DIRECT_RETAIL department) -- that
+        must render as zero, not be dropped or crash on a missing key."""
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+        mock_get_value.return_value = None
+
+        mock_sql.side_effect = [
+            [frappe._dict({"department": "Bar", "tickets_fired": 3, "tickets_served": 1})],
+            [],
+        ]
+
+        result = get_department_activity(branch="URY Branch")
+
+        row = result["rows"][0]
+        self.assertEqual(row["department"], "Bar")
+        self.assertEqual(row["tickets_fired"], 3)
+        self.assertEqual(row["work_orders_completed"], 0)
+        self.assertEqual(row["qty_produced"], 0)
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.get_value")
+    def test_department_with_only_production_has_zeroed_kot_fields(self, mock_get_value, mock_sql, mock_cache_obj):
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+        mock_get_value.return_value = None
+
+        mock_sql.side_effect = [
+            [],
+            [frappe._dict({"department": "Salad", "work_orders_completed": 4, "qty_produced": 40.0})],
+        ]
+
+        result = get_department_activity(branch="URY Branch")
+
+        row = result["rows"][0]
+        self.assertEqual(row["department"], "Salad")
+        self.assertEqual(row["tickets_fired"], 0)
+        self.assertEqual(row["tickets_served"], 0)
+        self.assertEqual(row["work_orders_completed"], 4)
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.get_value")
+    def test_no_activity_returns_empty_rows_not_an_error(self, mock_get_value, mock_sql, mock_cache_obj):
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+        mock_get_value.return_value = None
+
+        mock_sql.side_effect = [[], []]
+
+        result = get_department_activity(branch="URY Branch")
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["branch"], "URY Branch")
+
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.get_value")
+    def test_rows_are_sorted_by_department(self, mock_get_value, mock_sql, mock_cache_obj):
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+        mock_get_value.return_value = None
+
+        mock_sql.side_effect = [
+            [
+                frappe._dict({"department": "Salad", "tickets_fired": 1, "tickets_served": 1}),
+                frappe._dict({"department": "Bar", "tickets_fired": 2, "tickets_served": 2}),
+            ],
+            [],
+        ]
+
+        result = get_department_activity(branch="URY Branch")
+
+        self.assertEqual([row["department"] for row in result["rows"]], ["Bar", "Salad"])
 
 
 class TestGetBaseline(FrappeTestCase):

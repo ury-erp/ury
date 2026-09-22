@@ -2,11 +2,18 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import ReportSettingsPage from './ReportSettingsPage';
 
+// A stable object, not a literal returned fresh from the mock factory on
+// every call: ReportSettingsPage's data-fetch effect depends on `activeBranch`
+// by reference, and a new object identity on every render re-triggers the
+// fetch forever, so `loading` never settles and every test here times out
+// waiting on a heading that never appears.
+const mockBranchContext = {
+  activeBranchId: 'Kozhikode',
+  activeBranch: { name: 'Kozhikode' },
+};
+
 vi.mock('../../context/BranchContext', () => ({
-  useBranchContext: () => ({
-    activeBranchId: 'Kozhikode',
-    activeBranch: { name: 'Kozhikode' },
-  }),
+  useBranchContext: () => mockBranchContext,
 }));
 
 vi.mock('@ury/core', async (importOriginal) => {

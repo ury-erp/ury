@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Page,
   Section,
   DataTable,
   DataTableColumn,
   Card,
-  Select,
+  Autocomplete,
+  type AutocompleteOption,
   numericCellClass,
 } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
+import { menuAvailabilityService } from '../../services/menuAvailability';
 
 interface YieldVarianceRow {
   name: string;
@@ -20,6 +23,8 @@ interface YieldVarianceRow {
   variance_percent: number;
   checked_on: string;
 }
+
+const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: 'All items' };
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -36,29 +41,36 @@ export const YieldVariancePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState('');
-  const [itemOptions, setItemOptions] = useState<{ name: string; item_name?: string }[]>([]);
-  const [company, setCompany] = useState<string>('');
+  const [itemOptions, setItemOptions] = useState<AutocompleteOption[]>([ALL_ITEMS_OPTION]);
+  const [itemSearching, setItemSearching] = useState(false);
+  const [company, setCompany] = useState<string | null>(null);
 
-  // Fetch company from branch
+  // Fetch company from branch (fall back to default company if Branch.company is empty)
   useEffect(() => {
     let cancelled = false;
     if (!activeBranchId || activeBranchId === 'all') {
-      setCompany('');
+      setCompany(null);
       return;
     }
 
+    setCompany(null);
     (async () => {
       try {
-        const res = await call<any>('frappe.client.get', {
-          doctype: 'Branch',
-          name: activeBranchId,
-        });
-        const branchData = (res as any)?.message || res;
-        if (!cancelled && branchData?.company) {
-          setCompany(branchData.company);
-        } else if (!cancelled) {
-          setCompany('');
+        const res = await call<{ message?: { company?: string }; company?: string }>(
+          'frappe.client.get_value',
+          {
+            doctype: 'Branch',
+            filters: activeBranchId,
+            fieldname: 'company',
+          }
+        );
+        const value = res?.message?.company ?? res?.company ?? '';
+        if (value) {
+          if (!cancelled) setCompany(value);
+          return;
         }
+        const fallback = await menuAvailabilityService.resolveDefaultCompany();
+        if (!cancelled) setCompany(fallback || '');
       } catch {
         if (!cancelled) setCompany('');
       }
@@ -68,35 +80,51 @@ export const YieldVariancePage: React.FC = () => {
     };
   }, [activeBranchId]);
 
-  // Fetch available items for filtering
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const searchItems = useCallback(
+    async (query: string) => {
+      setItemSearching(true);
       try {
-        const res = await call<any>('frappe.client.get_list', {
+        const options = await searchLinkOptions({
           doctype: 'Item',
+          query,
           fields: ['name', 'item_name'],
+          labelField: 'item_name',
           filters: [['is_stock_item', '=', 1]],
-          limit_page_length: 500,
-          order_by: 'item_name asc',
         });
-        const data = (res as any)?.message || res || [];
-        if (!cancelled) {
-          setItemOptions(Array.isArray(data) ? data : []);
-        }
+        setItemOptions(
+          withSelectedOption([ALL_ITEMS_OPTION, ...options], selectedItem)
+        );
       } catch {
-        if (!cancelled) setItemOptions([]);
+        setItemOptions(withSelectedOption([ALL_ITEMS_OPTION], selectedItem));
+      } finally {
+        setItemSearching(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    },
+    [selectedItem]
+  );
 
-  // Fetch yield variance data
+  // Fetch yield variance data — wait for company so we never flash a scope error
   useEffect(() => {
     if (!activeBranchId || activeBranchId === 'all' || !company) {
       setRows([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    // Company still resolving
+    if (company === null) {
+      setRows([]);
+      setError(null);
+      setLoading(true);
+      return;
+    }
+
+    // Resolved but missing — show empty, not an error flash
+    if (!company) {
+      setRows([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -107,7 +135,7 @@ export const YieldVariancePage: React.FC = () => {
     (async () => {
       try {
         const res = await call<any>('ury.ury.api.ury_yield_variance.get_yield_variance', {
-          company: company,
+          company,
           branch: activeBranchId,
           item: selectedItem || undefined,
         });
@@ -187,21 +215,18 @@ export const YieldVariancePage: React.FC = () => {
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex flex-col text-xs font-medium text-muted-foreground">
+          <label className="flex w-full max-w-sm flex-col text-xs font-medium text-muted-foreground">
             Item
-            <Select
-              aria-label="Item"
+            <Autocomplete
+              id="yield-variance-item"
               value={selectedItem}
-              onChange={(event) => setSelectedItem(event.target.value)}
+              onChange={setSelectedItem}
+              onSearch={searchItems}
+              options={itemOptions}
+              searching={itemSearching}
+              placeholder="All items"
               className="mt-1"
-            >
-              <option value="">All items</option>
-              {itemOptions.map((item) => (
-                <option key={item.name} value={item.name}>
-                  {item.item_name || item.name}
-                </option>
-              ))}
-            </Select>
+            />
           </label>
         </div>
       </div>

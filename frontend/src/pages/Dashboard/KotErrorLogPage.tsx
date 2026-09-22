@@ -159,8 +159,8 @@ export const KotErrorLogPage: React.FC = () => {
         </Card>
       )}
 
-      <Card className="p-4">
-        <h3 className="text-sm font-semibold mb-4">KOT Error Logs</h3>
+      <div>
+        <h3 className="mb-4 text-sm font-semibold">KOT Error Logs</h3>
         {state === "loading" ? (
           <div className="flex items-center justify-center p-8">
             <Spinner />
@@ -174,7 +174,7 @@ export const KotErrorLogPage: React.FC = () => {
             description="No duplicate or failed Kitchen Order Ticket events have been recorded for this POS Profile yet."
           />
         )}
-      </Card>
+      </div>
     </div>
   );
 };
