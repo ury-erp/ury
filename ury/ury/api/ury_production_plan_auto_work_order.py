@@ -50,6 +50,38 @@ def _create_and_submit_work_orders(production_plan_doc):
 	for name in wo_list:
 		wo = frappe.get_doc("Work Order", name)
 		if wo.docstatus == 0:
+			# If the user has mapped MADE_TO_ORDER items into the Production
+			# Plan (e.g. to cap daily sales via the plan_qty), ERPNext's
+			# batch Work Order creator will still blindly generate draft
+			# Work Orders for them here. We MUST delete them instead of
+			# submitting them, otherwise their MTO capacity is fully consumed
+			# by this batch Work Order, breaking the per-KOT Work Order
+			# creation later in the day.
+			policy = frappe.db.get_value(
+				"URY Item Production Configuration",
+				{"item": wo.production_item, "active": 1},
+				"production_policy"
+			)
+			if policy == "MADE_TO_ORDER":
+				frappe.delete_doc("Work Order", wo.name, force=True)
+				continue
+
+			# make_work_order_for_finished_goods copies `warehouse` from the
+			# Production Plan Item to `fg_warehouse`, but if no global default
+			# `wip_warehouse` is set in Manufacturing Settings, the draft WO
+			# is created without one. In URY's single-tier models, the
+			# With skip_transfer = 1, ERPNext no longer requires a wip_warehouse
+			# to submit the Work Order.
+			needs_save = False
+			if not wo.skip_transfer:
+				wo.skip_transfer = 1
+				needs_save = True
+			if not wo.source_warehouse:
+				wo.source_warehouse = wo.fg_warehouse
+				needs_save = True
+
+			if needs_save:
+				wo.save(ignore_permissions=True)
 			wo.submit()
 
 
