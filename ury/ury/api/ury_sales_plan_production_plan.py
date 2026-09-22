@@ -216,7 +216,75 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 			"created": True,
 		})
 
-	return {"sales_plan": sales_plan_doc.name, "production_plans": results, "blockers": blockers}
+	material_requests = _generate_material_requests(sales_plan_doc.name, results)
+
+	return {
+		"sales_plan": sales_plan_doc.name,
+		"production_plans": results,
+		"blockers": blockers,
+		"material_requests": material_requests,
+	}
+
+
+def _generate_material_requests(sales_plan, results):
+	"""Raise the Purchase and Transfer requests for the plans just created.
+
+	Without this the workflow has no procurement step at all: plans exist,
+	nothing requests materials, and Prepare Production later finds no
+	submitted Transfer request to map, so it transfers nothing and reports no
+	blocker while doing it.
+
+	Generation belongs here rather than inside Prepare Production because the
+	manager is meant to review these requests and finish procurement *before*
+	reaching for the production button, not after being turned away by it.
+
+	Both generators are idempotent (D15): a repeat call nets the current
+	picture against what is already requested and creates only the delta, so
+	running this on every creation call cannot pile up duplicates.
+
+	Failures here never abort plan creation. The plans are already correct and
+	useful on their own, and a request can be regenerated; losing the lock
+	transition over a procurement hiccup would be a worse trade. Anything that
+	goes wrong is returned to the caller and logged.
+	"""
+	from ury.ury.api.ury_production_plan_material_request import (
+		generate_purchase_material_request_for_sales_plan,
+	)
+	from ury.ury.api.ury_production_transfer import (
+		generate_transfer_material_request_for_production_plan,
+	)
+
+	generated = {"purchase": None, "transfers": [], "errors": []}
+
+	for row in results:
+		try:
+			transfer = generate_transfer_material_request_for_production_plan(row["production_plan"])
+		except Exception as exc:
+			frappe.log_error(
+				title="URY transfer Material Request generation failed",
+				message=frappe.get_traceback(),
+			)
+			generated["errors"].append(
+				{"department": row["department"], "type": "transfer", "message": str(exc)}
+			)
+			continue
+		if transfer.get("material_request"):
+			generated["transfers"].append(
+				{"department": row["department"], "material_request": transfer["material_request"]}
+			)
+
+	try:
+		purchase = generate_purchase_material_request_for_sales_plan(sales_plan)
+	except Exception as exc:
+		frappe.log_error(
+			title="URY purchase Material Request generation failed",
+			message=frappe.get_traceback(),
+		)
+		generated["errors"].append({"type": "purchase", "message": str(exc)})
+	else:
+		generated["purchase"] = purchase.get("material_request")
+
+	return generated
 
 
 @frappe.whitelist()

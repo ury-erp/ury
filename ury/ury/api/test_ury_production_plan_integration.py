@@ -971,31 +971,15 @@ class TestCancelGuardsRealRecords(FrappeTestCase):
 		NOT block cancellation -- only a warning is expected
 		(``frappe.msgprint``), and the plan should cancel.
 
-		**Defect found here, not fixed (per Agent 10's remit).**
-		``before_cancel`` only ever adds ``"URY Sales Plan"`` to
-		``doc.ignore_linked_doctypes``:
-
-		    existing = doc.get("ignore_linked_doctypes") or ()
-		    doc.ignore_linked_doctypes = tuple(set(existing) | {"URY Sales Plan"})
-
-		It never adds ``"Work Order"``, even in the "allowed, just warn"
-		branch of ``_guard_posted_production``. Frappe's own generic
-		``Document.check_no_back_links_exist`` -> ``check_if_doc_is_linked``
-		runs independently of that guard and refuses the cancel outright
-		the moment ANY submitted Work Order (produced or not) is still
-		linked via `Work Order.production_plan` -- with
-		``frappe.exceptions.LinkExistsError: Cannot delete or cancel
-		because Production Plan ... is linked with Work Order ...``, not
-		the guard's own `frappe.ValidationError`.
-
-		So the acceptance criterion "allowed with only unstarted Work
-		Orders" cannot currently be reached: cancelling a Production Plan
-		with *any* submitted Work Order linked to it always throws,
-		regardless of ``produced_qty``. This test asserts the actual,
-		current (defective) behaviour rather than papering over it with a
-		looser assertion -- see the report for the recommended fix (add
-		``"Work Order"`` to ``ignore_linked_doctypes`` in the allowed
-		branch)."""
+		Change 2 fixed the defect this test used to document (and used to
+		assert the defective behaviour of): ``_guard_posted_production``'s
+		"allowed, only warn" branch now also adds ``"Work Order"`` to
+		``doc.ignore_linked_doctypes``, so Frappe's own
+		``check_no_back_links_exist`` -> ``check_if_doc_is_linked`` -- which
+		runs after the hook and previously refused the cancel outright the
+		moment any submitted Work Order was still linked, regardless of what
+		the guard decided -- no longer treats an unstarted submitted Work
+		Order as a blocking back-link. Cancelling now succeeds."""
 		plan, targets = self._plan(qty=2, stock=0)
 		# No stock at all -> Work Order gets created (execute_department_targets
 		# does not itself require raw-material stock; Manufacture Stock
@@ -1009,18 +993,8 @@ class TestCancelGuardsRealRecords(FrappeTestCase):
 		self.assertEqual(flt(work_order.produced_qty), 0.0)
 
 		plan.reload()
-		with self.assertRaises(frappe.LinkExistsError):
-			plan.cancel()
-		# Frappe's own `_save()` writes `docstatus = 2` to the row *before*
-		# `run_post_save_methods()` runs `check_no_back_links_exist()` --
-		# so even though the cancel is refused (the exception above is
-		# real and propagates to the caller), this transaction's row is
-		# left showing docstatus 2, not rolled back to 1. A second,
-		# separate `cancel()` call against this same half-cancelled state
-		# would then hit `_refuse_if_processing`/native docstatus-transition
-		# guards rather than a clean retry. Documented here as part of the
-		# same defect (see this test's docstring); not something this
-		# suite works around.
+		plan.cancel()
+
 		plan.reload()
 		self.assertEqual(plan.docstatus, 2)
 
@@ -1067,17 +1041,33 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		return doc, frappe.get_doc("Production Plan", result["production_plans"][0]["production_plan"])
 
 	def test_purchase_and_transfer_material_requests_are_submitted_not_draft(self):
-		"""Scenario 28 (D15)."""
+		"""Scenario 28 (D15).
+
+		Change 1: ``_locked_plan`` (``create_or_get_department_production_plans``,
+		``submit=True``) now generates both requests itself as part of plan
+		creation, so calling the generators again here would find nothing left
+		owed (D15) and create nothing. This asserts against what creation
+		already produced, then proves a repeat call is genuinely a no-op."""
 		sales_plan, plan = self._locked_plan(qty=4)
 
-		purchase_result = generate_purchase_material_request_for_sales_plan(sales_plan.name)
-		self.assertIsNotNone(purchase_result["material_request"])
-		purchase_mr = frappe.get_doc("Material Request", purchase_result["material_request"])
-		self.assertEqual(purchase_mr.docstatus, 1)
+		linked = frappe.db.sql(
+			"""
+			select mri.parent as name, mr.material_request_type as material_request_type, mr.docstatus as docstatus
+			from `tabMaterial Request Item` mri
+			inner join `tabMaterial Request` mr on mr.name = mri.parent
+			where mri.production_plan = %s and mr.docstatus = 1
+			""",
+			(plan.name,),
+			as_dict=True,
+		)
+		purchase_mrs = {row.name for row in linked if row.material_request_type == "Purchase"}
+		transfer_mrs = {row.name for row in linked if row.material_request_type == "Material Transfer"}
+		self.assertEqual(len(purchase_mrs), 1)
+		self.assertEqual(len(transfer_mrs), 1)
 
-		transfer_result = generate_transfer_material_request_for_production_plan(plan.name)
-		self.assertIsNotNone(transfer_result["material_request"])
-		transfer_mr = frappe.get_doc("Material Request", transfer_result["material_request"])
+		purchase_mr = frappe.get_doc("Material Request", next(iter(purchase_mrs)))
+		self.assertEqual(purchase_mr.docstatus, 1)
+		transfer_mr = frappe.get_doc("Material Request", next(iter(transfer_mrs)))
 		self.assertEqual(transfer_mr.docstatus, 1)
 
 		# D8: every row resolves back to this department plan through
@@ -1085,14 +1075,37 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		for row in transfer_mr.items:
 			self.assertEqual(row.production_plan, plan.name)
 
+		# Generation already ran once at plan-creation time (D15): a fresh
+		# call finds nothing new owed and creates nothing.
+		self.assertIsNone(
+			generate_purchase_material_request_for_sales_plan(sales_plan.name)["material_request"]
+		)
+		self.assertIsNone(
+			generate_transfer_material_request_for_production_plan(plan.name)["material_request"]
+		)
+
 	def test_raised_requirement_creates_supplementary_request_not_amendment(self):
 		"""Scenario 28's second half: a second, larger call after the first
 		submitted MR never amends it -- it creates a new supplementary MR
-		for the delta only, and the first MR is untouched."""
+		for the delta only, and the first MR is untouched.
+
+		Change 1: the first Transfer MR already exists by the time
+		``_locked_plan`` returns (plan creation generates it), so this reads
+		it back rather than generating it a second time here."""
 		sales_plan, plan = self._locked_plan(qty=4)
-		first = generate_transfer_material_request_for_production_plan(plan.name)
-		first_mr_name = first["material_request"]
-		first_qty = first["rows"][0]["qty"]
+
+		first_mr_name = frappe.db.sql(
+			"""
+			select mri.parent
+			from `tabMaterial Request Item` mri
+			inner join `tabMaterial Request` mr on mr.name = mri.parent
+			where mri.production_plan = %s
+			  and mr.material_request_type = 'Material Transfer'
+			  and mr.docstatus = 1
+			""",
+			(plan.name,),
+		)[0][0]
+		first_qty = flt(frappe.get_doc("Material Request", first_mr_name).items[0].qty)
 		self.assertEqual(first_qty, 20.0)  # 5 Kg/unit * 4
 
 		# A repeated call with nothing new owed creates nothing.
@@ -1140,6 +1153,61 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		original = frappe.get_doc("Material Request", first_mr_name)
 		self.assertEqual(original.docstatus, 1)
 		self.assertEqual(flt(original.items[0].qty), 20.0)
+
+	def test_creating_department_plan_generates_submitted_requests_once(self):
+		"""Change 1: ``create_or_get_department_production_plans`` now raises
+		the Purchase and Transfer Material Requests itself, as part of plan
+		creation -- a submitted Transfer request per department plus one
+		consolidated Purchase request -- without anything else calling either
+		generator. A second call for the same (unchanged) picture must not
+		duplicate either request (D15's supplementary logic makes the repeat
+		safe, layered under D14's own idempotent plan creation)."""
+		doc = make_real_sales_plan(
+			[{"item_code": self.item, "qty": 4, "production_policy": "PRE_PRODUCED", "department": self.department, "bom": self.bom}]
+		)
+		doc = advance_plan_to_approved(doc)
+
+		first = create_or_get_department_production_plans(doc, submit=True)
+		plan_name = first["production_plans"][0]["production_plan"]
+
+		self.assertEqual(first["material_requests"]["errors"], [])
+		self.assertIsNotNone(first["material_requests"]["purchase"])
+		self.assertEqual(len(first["material_requests"]["transfers"]), 1)
+		self.assertEqual(first["material_requests"]["transfers"][0]["department"], self.department)
+
+		purchase_mr = frappe.get_doc("Material Request", first["material_requests"]["purchase"])
+		self.assertEqual(purchase_mr.docstatus, 1)
+		self.assertEqual(purchase_mr.material_request_type, "Purchase")
+
+		transfer_mr = frappe.get_doc(
+			"Material Request", first["material_requests"]["transfers"][0]["material_request"]
+		)
+		self.assertEqual(transfer_mr.docstatus, 1)
+		self.assertEqual(transfer_mr.material_request_type, "Material Transfer")
+
+		# A second call for the same picture creates neither department plan
+		# nor request again.
+		second = create_or_get_department_production_plans(doc, submit=True)
+		self.assertFalse(second["production_plans"][0]["created"])
+		self.assertIsNone(second["material_requests"]["purchase"])
+		self.assertEqual(second["material_requests"]["transfers"], [])
+		self.assertEqual(second["material_requests"]["errors"], [])
+
+		linked = frappe.db.sql(
+			"""
+			select mr.material_request_type as material_request_type,
+			       count(distinct mri.parent) as request_count
+			from `tabMaterial Request Item` mri
+			inner join `tabMaterial Request` mr on mr.name = mri.parent
+			where mri.production_plan = %s and mr.docstatus = 1
+			group by mr.material_request_type
+			""",
+			(plan_name,),
+			as_dict=True,
+		)
+		counts = {row.material_request_type: row.request_count for row in linked}
+		self.assertEqual(counts.get("Purchase"), 1)
+		self.assertEqual(counts.get("Material Transfer"), 1)
 
 
 # ---------------------------------------------------------------------------

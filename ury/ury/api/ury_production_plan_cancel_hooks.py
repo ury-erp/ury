@@ -112,6 +112,18 @@ def _guard_posted_production(doc):
 			frappe.ValidationError,
 		)
 
+	# Frappe's own `check_if_doc_is_linked` runs after this hook and refuses
+	# the cancel outright while any submitted Work Order links back to this
+	# plan, regardless of what this function decided. Without adding
+	# "Work Order" here the branch below is unreachable: the msgprint would
+	# never be seen, because LinkExistsError is raised first. D6 deliberately
+	# allows this case -- unstarted Work Orders are a loose end for the
+	# manager to tidy, not posted production -- so the link check has to be
+	# waived for it. Manufacture entries are refused above, before this point,
+	# so nothing that already produced stock can reach here.
+	existing = doc.get("ignore_linked_doctypes") or ()
+	doc.ignore_linked_doctypes = tuple(set(existing) | {WORK_ORDER_DOCTYPE})
+
 	frappe.msgprint(
 		_(
 			"{0} has submitted Work Orders with nothing produced yet ({1}); they may need "
