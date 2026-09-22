@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DataTable,
   type DataTableColumn,
+  messageToPlainText,
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
@@ -60,7 +61,7 @@ function extractServerErrorMessage(error: unknown, fallback: string): string {
       try {
         const messages = JSON.parse(raw);
         const first = JSON.parse(messages[0]);
-        if (first?.message) return first.message as string;
+        if (first?.message) return messageToPlainText(first.message as string);
       } catch {
         // fall through to other extraction strategies
       }

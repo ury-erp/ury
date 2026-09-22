@@ -1,4 +1,5 @@
 export { cn } from './lib/cn';
+export { sanitizeMessageHtml, messageToPlainText } from './lib/sanitize-message';
 
 export * from './chart-colors';
 

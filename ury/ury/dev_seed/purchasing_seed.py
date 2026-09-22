@@ -293,12 +293,14 @@ def _resolve_stray_item_warehouse(item_code, branch_name):
 	"""Resolve the exact warehouse ``get_item_availability`` will read stock
 	from for this item, via the single authoritative resolver
 	(``ury.ury.api.ury_production_context.resolve_production_context``)
-	rather than re-deriving its PRE_PRODUCED/DIRECT_RETAIL ->
-	``direct_retail_warehouse`` vs. MADE_TO_ORDER -> production unit's
-	warehouse (department warehouse fallback) logic here. Returns
-	``(warehouse, production_policy)``, both ``None`` if the item has no
-	resolvable production config yet (e.g. operations.seed() hasn't run, or
-	an unmapped item_group left it without a production_unit/department).
+	rather than re-deriving its policy-by-policy warehouse rule here: as of
+	D13 (the Department Warehouse is the PRE_PRODUCED stock authority),
+	that resolver is PRE_PRODUCED -> department warehouse, DIRECT_RETAIL ->
+	``direct_retail_warehouse``, MADE_TO_ORDER -> production unit's
+	warehouse (department warehouse fallback). Returns ``(warehouse,
+	production_policy)``, both ``None`` if the item has no resolvable
+	production config yet (e.g. operations.seed() hasn't run, or an
+	unmapped item_group left it without a production_unit/department).
 	"""
 	from ury.ury.api.ury_production_context import resolve_production_context
 

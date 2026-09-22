@@ -1,225 +1,448 @@
-"""Unit tests for Material Request generation from a Production Plan
-(Track-Items N5 "Department stock check" + N6 "Material Request generation").
+# Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
 
-No live bench/Frappe site is available in this environment, so these tests
-mock ``frappe.db.get_value``, ``frappe.get_doc`` and the BOM compiler rather
-than hitting a real DB, following the same style as
-``test_ury_production_plan_adapter.py`` / ``test_ury_requirements_stock.py``.
+"""Unit tests for the consolidated Purchase Material Request.
 
-Validated with ``python3 -m py_compile`` only (no pytest/bench run performed
--- no bench available in this worktree).
+Same mocking style as ``test_ury_sales_plan_production_plan.py``:
+``FrappeTestCase`` for the test-runner site context, with every frappe call
+(``get_doc``, ``get_all``/``db.sql``, document ``insert``/``submit``/``save``)
+patched rather than requiring real Sales Plan / Production Plan / Material
+Request fixtures.
 """
 
-import unittest
-from unittest import mock
+from unittest.mock import patch
+
+import frappe
+from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api import ury_production_plan_material_request as mr_module
+from ury.ury.api.ury_production_plan_material_request import (
+	_allocate_purchase_requirement,
+	generate_purchase_material_request_for_sales_plan,
+)
+
+MOD = "ury.ury.api.ury_production_plan_material_request"
 
 
-def make_plan(po_items):
-    return {"company": "URY Test Co", "po_items": po_items}
+def _readiness_row(item_code, department, department_shortage, store_shortage,
+                    department_warehouse="DEPT-WH", stock_uom="Kg"):
+	return {
+		"item_code": item_code,
+		"department": department,
+		"department_warehouse": department_warehouse,
+		"stock_uom": stock_uom,
+		"required_qty": department_shortage,
+		"department_available": 0.0,
+		"department_shortage": department_shortage,
+		"store_available": 0.0,
+		"store_shortage": store_shortage,
+	}
 
 
-class FakeInsertedDoc:
-    """Stand-in for a Frappe document returned by frappe.get_doc({...})."""
+class _FakeChildRow:
+	_counter = 0
 
-    _counter = 0
-
-    def __init__(self, fields):
-        self.fields = fields
-        FakeInsertedDoc._counter += 1
-        self.name = "MR-{0:04d}".format(FakeInsertedDoc._counter)
-
-    def insert(self, ignore_permissions=False):
-        pass
+	def __init__(self, fields):
+		self.fields = fields
+		_FakeChildRow._counter += 1
+		self.name = f"mri-row-{_FakeChildRow._counter:04d}"
 
 
-class GenerateMaterialRequestsTests(unittest.TestCase):
-    def setUp(self):
-        FakeInsertedDoc._counter = 0
-        self.created_docs = []
+class _FakeProductionPlanDoc:
+	def __init__(self, name):
+		self.name = name
+		self.flags = frappe._dict()
+		self.mr_items = []
+		self.saved = False
 
-    def _fake_get_doc(self, fields):
-        doc = FakeInsertedDoc(fields)
-        self.created_docs.append(doc)
-        return doc
+	def append(self, tablefield, fields):
+		assert tablefield == "mr_items"
+		row = _FakeChildRow(fields)
+		self.mr_items.append(row)
+		return row
 
-    def _run(self, plan, bin_qty_by_key, min_order_qty_by_item=None, store_warehouse="Store WH - U"):
-        """bin_qty_by_key: {(item_code, warehouse): actual_qty}"""
-        min_order_qty_by_item = min_order_qty_by_item or {}
+	def save(self, ignore_permissions=False):
+		self.saved = True
 
-        def fake_get_value(doctype, filters, fieldname=None):
-            if doctype == "Bin":
-                key = (filters.get("item_code"), filters.get("warehouse"))
-                return bin_qty_by_key.get(key, 0.0)
-            if doctype == "Item":
-                return min_order_qty_by_item.get(filters)
-            raise AssertionError("Unexpected frappe.db.get_value call: {0} {1}".format(doctype, filters))
 
-        with mock.patch.object(mr_module, "get_store_warehouse", return_value=store_warehouse), \
-                mock.patch.object(mr_module.frappe.db, "get_value", side_effect=fake_get_value), \
-                mock.patch.object(mr_module.frappe, "get_doc", side_effect=self._fake_get_doc), \
-                mock.patch.object(mr_module.frappe.utils, "nowdate", return_value="2026-09-16"):
-            return mr_module.generate_material_requests_for_production_plan(plan)
+class _FakeMaterialRequestDoc:
+	_created = []
 
-    def test_short_stock_produces_both_purchase_and_transfer(self):
-        # BOM: 1 x FINISHED-A needs 2 x RAW-1 (mocked via compile_bom_vector)
-        plan = make_plan(
-            [
-                {
-                    "item_code": "FINISHED-A",
-                    "bom_no": "BOM-A",
-                    "planned_qty": 10,
-                    "warehouse": "Kitchen WH - U",
-                    "custom_ury_department": "Kitchen",
-                }
-            ]
-        )
-        vector = {
-            "components": [
-                {"component_item": "RAW-1", "qty": 20.0, "stock_uom": "Kg"},
-            ]
-        }
-        # Department has 5 in stock, needs 20 -> net need 15.
-        # Store has 5 in stock, aggregate requirement 15 -> purchase 10.
-        bin_qty = {
-            ("RAW-1", "Kitchen WH - U"): 5.0,
-            ("RAW-1", "Store WH - U"): 5.0,
-        }
-        with mock.patch.object(mr_module, "compile_bom_vector", return_value=vector):
-            result = self._run(plan, bin_qty)
+	def __init__(self, fields):
+		self.fields = fields
+		self.name = f"MAT-MR-{len(_FakeMaterialRequestDoc._created) + 1:04d}"
+		self.inserted = False
+		self.submitted = False
+		_FakeMaterialRequestDoc._created.append(self)
 
-        self.assertEqual(len(result["purchase_material_requests"]), 1)
-        self.assertEqual(len(result["transfer_material_requests"]), 1)
-        self.assertEqual(result["skipped_sufficient_stock"], [])
-        self.assertEqual(result["department_stock_used"][("Kitchen", "RAW-1")], 5.0)
+	def insert(self, ignore_permissions=False):
+		self.inserted = True
 
-        purchase_doc = self.created_docs[0]
-        self.assertEqual(purchase_doc.fields["material_request_type"], "Purchase")
-        self.assertEqual(purchase_doc.fields["items"][0]["qty"], 10.0)
-        self.assertEqual(purchase_doc.fields["items"][0]["warehouse"], "Store WH - U")
+	def submit(self):
+		self.submitted = True
 
-        transfer_doc = self.created_docs[1]
-        self.assertEqual(transfer_doc.fields["material_request_type"], "Material Transfer")
-        self.assertEqual(transfer_doc.fields["items"][0]["qty"], 15.0)
-        self.assertEqual(transfer_doc.fields["items"][0]["warehouse"], "Kitchen WH - U")
-        self.assertEqual(transfer_doc.fields["items"][0]["from_warehouse"], "Store WH - U")
 
-    def test_sufficient_department_stock_skips_both_legs(self):
-        plan = make_plan(
-            [
-                {
-                    "item_code": "FINISHED-A",
-                    "bom_no": "BOM-A",
-                    "planned_qty": 10,
-                    "warehouse": "Kitchen WH - U",
-                    "custom_ury_department": "Kitchen",
-                }
-            ]
-        )
-        vector = {
-            "components": [
-                {"component_item": "RAW-1", "qty": 20.0, "stock_uom": "Kg"},
-            ]
-        }
-        # Department already has enough (>= required).
-        bin_qty = {
-            ("RAW-1", "Kitchen WH - U"): 25.0,
-            ("RAW-1", "Store WH - U"): 0.0,
-        }
-        with mock.patch.object(mr_module, "compile_bom_vector", return_value=vector):
-            result = self._run(plan, bin_qty)
+class TestAllocatePurchaseRequirement(FrappeTestCase):
+	"""Pure allocation math -- no frappe calls at all."""
 
-        self.assertEqual(result["purchase_material_requests"], [])
-        self.assertEqual(result["transfer_material_requests"], [])
-        self.assertEqual(
-            result["skipped_sufficient_stock"],
-            [{"department": "Kitchen", "item_code": "RAW-1"}],
-        )
-        # Stock actually consumed is recorded even when it's more than
-        # enough to fully cover the requirement (min(required, current) =
-        # min(20, 25) = 20) -- consistent with the partial-shortage case
-        # above, which records the same field for the qty actually drawn.
-        self.assertEqual(result["department_stock_used"], {("Kitchen", "RAW-1"): 20.0})
+	def test_zero_requirement_after_outstanding_allocates_nothing(self):
+		rows = [_readiness_row("RICE", "Main Kitchen", department_shortage=10.0, store_shortage=5.0)]
+		self.assertEqual(_allocate_purchase_requirement(rows, outstanding_qty=5.0), [])
 
-    def test_sufficient_store_stock_only_produces_transfer(self):
-        plan = make_plan(
-            [
-                {
-                    "item_code": "FINISHED-A",
-                    "bom_no": "BOM-A",
-                    "planned_qty": 10,
-                    "warehouse": "Kitchen WH - U",
-                    "custom_ury_department": "Kitchen",
-                }
-            ]
-        )
-        vector = {
-            "components": [
-                {"component_item": "RAW-1", "qty": 20.0, "stock_uom": "Kg"},
-            ]
-        }
-        # Department is short (has 0, needs 20 -> net need 20).
-        # Store has plenty (50) to cover it -> no Purchase MR.
-        bin_qty = {
-            ("RAW-1", "Kitchen WH - U"): 0.0,
-            ("RAW-1", "Store WH - U"): 50.0,
-        }
-        with mock.patch.object(mr_module, "compile_bom_vector", return_value=vector):
-            result = self._run(plan, bin_qty)
+	def test_over_covered_by_outstanding_allocates_nothing(self):
+		rows = [_readiness_row("RICE", "Main Kitchen", department_shortage=10.0, store_shortage=5.0)]
+		self.assertEqual(_allocate_purchase_requirement(rows, outstanding_qty=50.0), [])
 
-        self.assertEqual(result["purchase_material_requests"], [])
-        self.assertEqual(len(result["transfer_material_requests"]), 1)
-        transfer_doc = self.created_docs[0]
-        self.assertEqual(transfer_doc.fields["items"][0]["qty"], 20.0)
-        self.assertEqual(result["skipped_sufficient_stock"], [])
+	def test_single_department_gets_full_requirement(self):
+		rows = [_readiness_row("RICE", "Main Kitchen", department_shortage=10.0, store_shortage=5.0)]
+		allocations = _allocate_purchase_requirement(rows, outstanding_qty=0.0)
+		self.assertEqual(len(allocations), 1)
+		self.assertEqual(allocations[0]["department"], "Main Kitchen")
+		self.assertEqual(allocations[0]["qty"], 5.0)
 
-    def test_unset_store_warehouse_raises_clear_error(self):
-        plan = make_plan(
-            [
-                {
-                    "item_code": "FINISHED-A",
-                    "bom_no": "BOM-A",
-                    "planned_qty": 10,
-                    "warehouse": "Kitchen WH - U",
-                    "custom_ury_department": "Kitchen",
-                }
-            ]
-        )
-        with mock.patch.object(mr_module, "compile_bom_vector"):
-            with self.assertRaises(mr_module.frappe.ValidationError):
-                self._run(plan, {}, store_warehouse=None)
+	def test_two_departments_split_proportionally_and_sum_exactly(self):
+		# Main Kitchen contributed 15 of the 20 total department_shortage,
+		# Tandoor contributed 5. Store shortage (shared) is 12.
+		rows = [
+			_readiness_row("RICE", "Main Kitchen", department_shortage=15.0, store_shortage=12.0),
+			_readiness_row("RICE", "Tandoor", department_shortage=5.0, store_shortage=12.0),
+		]
+		allocations = _allocate_purchase_requirement(rows, outstanding_qty=0.0)
+		self.assertEqual(len(allocations), 2)
+		total = sum(a["qty"] for a in allocations)
+		self.assertEqual(total, 12.0)
+		by_department = {a["department"]: a["qty"] for a in allocations}
+		self.assertAlmostEqual(by_department["Main Kitchen"], 9.0)
+		self.assertAlmostEqual(by_department["Tandoor"], 3.0)
 
-    def test_min_order_qty_bumps_purchase_quantity(self):
-        plan = make_plan(
-            [
-                {
-                    "item_code": "FINISHED-A",
-                    "bom_no": "BOM-A",
-                    "planned_qty": 1,
-                    "warehouse": "Kitchen WH - U",
-                    "custom_ury_department": "Kitchen",
-                }
-            ]
-        )
-        vector = {
-            "components": [
-                {"component_item": "RAW-1", "qty": 2.0, "stock_uom": "Kg"},
-            ]
-        }
-        # Department short by 2, store has 0 -> raw purchase need = 2, but
-        # min_order_qty is 50, so purchase qty should be bumped to 50.
-        bin_qty = {
-            ("RAW-1", "Kitchen WH - U"): 0.0,
-            ("RAW-1", "Store WH - U"): 0.0,
-        }
-        with mock.patch.object(mr_module, "compile_bom_vector", return_value=vector):
-            result = self._run(plan, bin_qty, min_order_qty_by_item={"RAW-1": 50.0})
 
-        purchase_doc = self.created_docs[0]
-        self.assertEqual(purchase_doc.fields["items"][0]["qty"], 50.0)
-        self.assertEqual(len(result["purchase_material_requests"]), 1)
+class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
+	def setUp(self):
+		_FakeMaterialRequestDoc._created = []
+		self.plan_docs = {}
+
+	def _run(self, departments, plan_by_department, outstanding_by_item=None, store_warehouse="Store WH - U"):
+		outstanding_by_item = outstanding_by_item or {}
+
+		def fake_get_doc(doctype, name=None):
+			if doctype == "URY Sales Plan":
+				return frappe._dict(
+					name=name,
+					branch="Branch A",
+					company="URY Co",
+					approval_snapshot="{}",
+					approval_snapshot_hash="hash-1",
+				)
+			if doctype == "Production Plan":
+				return self.plan_docs.setdefault(name, _FakeProductionPlanDoc(name))
+			raise AssertionError(f"Unexpected frappe.get_doc(doctype) call: {doctype}")
+
+		def fake_get_doc_dispatch(*args):
+			if len(args) == 1 and isinstance(args[0], dict):
+				return _FakeMaterialRequestDoc(args[0])
+			return fake_get_doc(*args)
+
+		live_plans = [
+			{"name": row["name"], mr_module.PP_DEPARTMENT_FIELD: department}
+			for department, row in plan_by_department.items()
+		]
+
+		with patch(f"{MOD}.frappe.has_permission", return_value=True), \
+				patch(f"{MOD}.frappe.get_doc", side_effect=fake_get_doc_dispatch), \
+				patch(f"{MOD}.compile_production_targets", return_value=(departments, [])), \
+				patch(f"{MOD}.get_live_production_plans", return_value=live_plans), \
+				patch(f"{MOD}.get_store_warehouse", return_value=store_warehouse), \
+				patch(f"{MOD}._existing_purchase_qty_by_item", return_value=outstanding_by_item):
+			return generate_purchase_material_request_for_sales_plan("SP-0001")
+
+	def test_department_stock_reduces_requirement_end_to_end(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "BIRYANI-BASE",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 20.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+
+		bin_qty = {("RICE", "Main Kitchen - WH"): 5.0, ("RICE", "Store WH - U"): 0.0}
+
+		def fake_bin_get_value(doctype, filters, fieldname=None):
+			return bin_qty.get((filters.get("item_code"), filters.get("warehouse")), 0.0)
+
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", side_effect=fake_bin_get_value):
+			result = self._run(departments, plan_by_department)
+
+		self.assertEqual(len(result["rows"]), 1)
+		# 20 required - 5 department stock - 0 store stock - 0 outstanding = 15.
+		self.assertEqual(result["rows"][0]["qty"], 15.0)
+		self.assertIsNotNone(result["material_request"])
+
+	def test_two_department_plans_never_duplicate_one_store_shortage(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			},
+			"Tandoor": {
+				"department": "Tandoor",
+				"warehouse": "Tandoor - WH",
+				"targets": [
+					{
+						"item_code": "Y",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			},
+		}
+		plan_by_department = {
+			"Main Kitchen": {"name": "MFG-PP-MK"},
+			"Tandoor": {"name": "MFG-PP-TD"},
+		}
+		bin_qty = {
+			("RICE", "Main Kitchen - WH"): 0.0,
+			("RICE", "Tandoor - WH"): 0.0,
+			("RICE", "Store WH - U"): 15.0,
+		}
+
+		def fake_bin_get_value(doctype, filters, fieldname=None):
+			return bin_qty.get((filters.get("item_code"), filters.get("warehouse")), 0.0)
+
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", side_effect=fake_bin_get_value):
+			result = self._run(departments, plan_by_department)
+
+		# Total demand 20, store has 15 -> shared shortfall is 5, split across
+		# both departments -- never 5 each / 10 total.
+		total_qty = sum(row["qty"] for row in result["rows"])
+		self.assertEqual(total_qty, 5.0)
+		self.assertEqual({row["production_plan"] for row in result["rows"]}, {"MFG-PP-MK", "MFG-PP-TD"})
+
+	def test_every_row_resolves_back_to_a_department_plan(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department)
+
+		self.assertTrue(result["rows"])
+		for row in result["rows"]:
+			self.assertEqual(row["production_plan"], "MFG-PP-0001")
+
+		mr_doc = _FakeMaterialRequestDoc._created[0]
+		self.assertTrue(mr_doc.submitted)
+		for item in mr_doc.fields["items"]:
+			self.assertEqual(item["production_plan"], "MFG-PP-0001")
+			self.assertTrue(item["material_request_plan_item"])
+
+		plan_doc = self.plan_docs["MFG-PP-0001"]
+		self.assertTrue(plan_doc.saved)
+		self.assertTrue(plan_doc.mr_items)
+
+	def test_mr_items_warehouse_is_store_not_department(self):
+		"""ERPNext's native Production Plan.make_material_request reads
+		mr_items.warehouse straight onto the Material Request Item it
+		generates (`"warehouse": item.warehouse`). If this row carried the
+		department warehouse instead, that native (currently unwired) button
+		would generate a Purchase MR receiving into the department warehouse,
+		inverting the Store-to-Department model. The department warehouse
+		used here is deliberately different from the store warehouse so this
+		test cannot pass by accident."""
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			self._run(departments, plan_by_department, store_warehouse="Store WH - U")
+
+		plan_doc = self.plan_docs["MFG-PP-0001"]
+		self.assertTrue(plan_doc.mr_items)
+		for row in plan_doc.mr_items:
+			self.assertEqual(row.fields["warehouse"], "Store WH - U")
+			self.assertNotEqual(row.fields["warehouse"], "Main Kitchen - WH")
+
+		mr_doc = _FakeMaterialRequestDoc._created[0]
+		for item in mr_doc.fields["items"]:
+			self.assertEqual(item["warehouse"], "Store WH - U")
+
+	def test_repeated_call_creates_no_duplicates(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+		# Outstanding already equals the full requirement -- as it would
+		# after a first successful call.
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department, outstanding_by_item={"RICE": 10.0})
+
+		self.assertEqual(result["rows"], [])
+		self.assertIsNone(result["material_request"])
+		self.assertEqual(_FakeMaterialRequestDoc._created, [])
+
+	def test_raised_requirement_creates_supplementary_request(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 30.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+		# Requirement is now 30; only 10 was previously requested -> a fresh
+		# supplementary MR for the delta of 20, never touching the earlier one.
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department, outstanding_by_item={"RICE": 10.0})
+
+		self.assertEqual(len(result["rows"]), 1)
+		self.assertEqual(result["rows"][0]["qty"], 20.0)
+		self.assertEqual(len(_FakeMaterialRequestDoc._created), 1)
+
+	def test_generated_material_request_is_submitted_not_draft(self):
+		departments = {
+			"Bakery": {
+				"department": "Bakery",
+				"warehouse": "Bakery - WH",
+				"targets": [
+					{
+						"item_code": "BREAD",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "FLOUR", "required_qty": 5.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Bakery": {"name": "MFG-PP-BAKERY"}}
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			self._run(departments, plan_by_department)
+
+		mr_doc = _FakeMaterialRequestDoc._created[0]
+		self.assertTrue(mr_doc.inserted)
+		self.assertTrue(mr_doc.submitted)
+		self.assertEqual(mr_doc.fields["material_request_type"], "Purchase")
+
+	def test_external_receipt_demand_appears_in_purchase_requirement(self):
+		"""D19: an EXTERNAL_RECEIPT target has no component_vector at all --
+		its own demand must still reach the Purchase requirement here."""
+		departments = {
+			"Bakery": {
+				"department": "Bakery",
+				"warehouse": "Bakery - WH",
+				"targets": [],
+				"external_receipt_targets": [
+					{"item_code": "IMPORTED-CHEESE", "required_qty": 8.0, "stock_uom": "Kg"}
+				],
+			}
+		}
+		plan_by_department = {"Bakery": {"name": "MFG-PP-BAKERY"}}
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department)
+
+		self.assertEqual(len(result["rows"]), 1)
+		self.assertEqual(result["rows"][0]["item_code"], "IMPORTED-CHEESE")
+		self.assertEqual(result["rows"][0]["qty"], 8.0)
+		self.assertIsNotNone(result["material_request"])
+
+	def test_missing_department_plan_is_reported_not_silently_dropped(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "X",
+						"stock_uom": "Kg",
+						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		# No live Production Plan exists for Main Kitchen.
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department={})
+
+		self.assertIsNone(result["material_request"])
+		self.assertTrue(
+			any(b["type"] == "department_plan_missing_for_purchase_request" for b in result["blockers"])
+		)
+
+
+class TestExistingPurchaseQtyByItem(FrappeTestCase):
+	def test_empty_plan_list_short_circuits_without_a_query(self):
+		with patch(f"{MOD}.frappe.db.sql") as mock_sql:
+			self.assertEqual(mr_module._existing_purchase_qty_by_item([]), {})
+			mock_sql.assert_not_called()
+
+	def test_restricted_to_purchase_type_and_submitted_only(self):
+		with patch(f"{MOD}.frappe.db.sql", return_value=[{"item_code": "RICE", "qty": 12.0}]) as mock_sql:
+			result = mr_module._existing_purchase_qty_by_item(["MFG-PP-0001"])
+		self.assertEqual(result, {"RICE": 12.0})
+		sql_text = mock_sql.call_args[0][0]
+		self.assertIn("material_request_type", sql_text)
+		self.assertIn("docstatus = 1", sql_text)
+		params = mock_sql.call_args[0][1]
+		self.assertEqual(params["material_request_type"], "Purchase")
 
 
 if __name__ == "__main__":
-    unittest.main()
+	import unittest
+
+	unittest.main()

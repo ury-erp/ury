@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionFeed, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, type DataTableColumn } from '@ury/ui';
-import { call } from '@ury/core';
+import { AttentionItem, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
+import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
 import {
   addManualItemToDraft,
   BranchItemSearchResult,
@@ -13,8 +13,11 @@ import {
   ComparableHistoryItem,
   ComparableHistoryResponse,
   getSalesPlanDraftQuantities,
+  mergeSavedPlanRows,
   salesPlanService,
-  type ProductionPlanState,
+  type SalesPlanDocRow,
+  type DepartmentProductionPlanState,
+  type SalesPlanProductionStatesResponse,
   SalesPlanItem,
   saveSalesPlanDraftQuantities,
 } from '../../services/salesPlan';
@@ -61,7 +64,9 @@ export function describeSalesPlanApiError(err: unknown, fallback: string): strin
       const messages = JSON.parse(anyErr._server_messages) as string[];
       const first = JSON.parse(messages[0]) as { message?: string };
       if (first?.message) {
-        return first.message;
+        // Frappe wraps field/doctype names in <strong>; strip to plain text
+        // for toast and any remaining inline setState paths.
+        return messageToPlainText(first.message);
       }
     } catch {
       // Malformed/unexpected shape -- fall through to the generic message
@@ -71,6 +76,57 @@ export function describeSalesPlanApiError(err: unknown, fallback: string): strin
 
   return fallback;
 }
+
+// D12 -- label/badge lookups for the two independent Production Plan state
+// axes rendered per department. Kept as flat maps (rather than a switch) so
+// a badge is one lookup, and so link_state and execution_state can never
+// accidentally be rendered from the same map.
+const LINK_STATE_LABEL: Record<DepartmentProductionPlanState['link_state'], string> = {
+  none: 'No Production Plan',
+  live: 'Production Plan',
+  stale: 'Stale (Sales Plan changed)',
+  ineligible: 'Not eligible yet',
+};
+
+const LINK_STATE_BADGE: Record<DepartmentProductionPlanState['link_state'], 'default' | 'tagAccent' | 'tagWarning'> = {
+  none: 'default',
+  live: 'tagAccent',
+  stale: 'tagWarning',
+  ineligible: 'default',
+};
+
+type ExecutionState = NonNullable<DepartmentProductionPlanState['execution_state']>;
+
+const EXECUTION_STATE_LABEL: Record<ExecutionState, string> = {
+  awaiting_materials: 'Awaiting Materials',
+  ready: 'Ready for Production',
+  processing: 'Processing',
+  completed: 'Production Completed',
+  failed: 'Production Failed',
+};
+
+const EXECUTION_STATE_BADGE: Record<ExecutionState, 'tagWarning' | 'tagAccent' | 'tagSuccess' | 'tagDestructive'> = {
+  awaiting_materials: 'tagWarning',
+  ready: 'tagAccent',
+  processing: 'tagAccent',
+  completed: 'tagSuccess',
+  failed: 'tagDestructive',
+};
+
+/** ERPNext Production Plan.status → badge tone for the primary manufacturing signal. */
+const ERPNEXT_STATUS_BADGE: Record<string, 'default' | 'tagAccent' | 'tagWarning' | 'tagSuccess' | 'tagDestructive'> = {
+  Draft: 'default',
+  Submitted: 'tagAccent',
+  'Not Started': 'tagAccent',
+  'Material Requested': 'tagWarning',
+  'In Process': 'tagAccent',
+  Completed: 'tagSuccess',
+  Closed: 'default',
+  Cancelled: 'tagDestructive',
+};
+
+const PREPARE_POLL_INTERVAL_MS = 4000;
+const CAN_PREPARE_EXECUTION: ExecutionState[] = ['awaiting_materials', 'ready', 'failed'];
 
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
   { key: 'draft', label: 'Draft', matches: ['Draft'] },
@@ -180,208 +236,6 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
               ];
               return <DataTable columns={historyColumns} rows={item.history} emptyMessage="No history found." />;
             })()
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-interface BomItemRow {
-  item_code: string;
-  item_name?: string;
-  qty?: number;
-  uom?: string;
-}
-
-interface ItemDetailDoc {
-  item_code: string;
-  item_name?: string;
-  item_group?: string;
-  stock_uom?: string;
-  description?: string;
-}
-
-interface ItemDetailModalProps {
-  itemCode: string | null;
-  onClose: () => void;
-}
-
-const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [item, setItem] = useState<ItemDetailDoc | null>(null);
-  const [bomName, setBomName] = useState<string | null>(null);
-  const [bomItems, setBomItems] = useState<BomItemRow[]>([]);
-  const [bomChecked, setBomChecked] = useState(false);
-  const [bomError, setBomError] = useState(false);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    if (itemCode) window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [itemCode, onClose]);
-
-  useEffect(() => {
-    if (!itemCode) {
-      setItem(null);
-      setError(null);
-      setBomName(null);
-      setBomItems([]);
-      setBomChecked(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setItem(null);
-    setBomName(null);
-    setBomItems([]);
-    setBomChecked(false);
-
-    (async () => {
-      try {
-        const itemRes = await call<any>('frappe.client.get', {
-          doctype: 'Item',
-          name: itemCode,
-        });
-        const itemDoc = itemRes?.message || itemRes;
-        if (cancelled) return;
-        setItem({
-          item_code: itemDoc?.item_code || itemCode,
-          item_name: itemDoc?.item_name,
-          item_group: itemDoc?.item_group,
-          stock_uom: itemDoc?.stock_uom,
-          description: itemDoc?.description,
-        });
-      } catch (err) {
-        if (!cancelled) setError('Unable to load item details.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-
-      try {
-        const bomListRes = await call<any>('frappe.client.get_list', {
-          doctype: 'BOM',
-          filters: [['item', '=', itemCode], ['docstatus', '=', 1], ['is_active', '=', 1]],
-          fields: ['name', 'is_active', 'is_default'],
-          order_by: 'is_default desc, is_active desc, modified desc',
-          limit_page_length: 1,
-        });
-        if (cancelled) return;
-        const boms = Array.isArray(bomListRes?.message) ? bomListRes.message : (Array.isArray(bomListRes) ? bomListRes : []);
-        const bestBom = boms[0];
-        if (!bestBom?.name) {
-          setBomChecked(true);
-          return;
-        }
-
-        try {
-          const bomDocRes = await call<any>('frappe.client.get', {
-            doctype: 'BOM',
-            name: bestBom.name,
-          });
-          if (cancelled) return;
-          const bomDoc = bomDocRes?.message || bomDocRes;
-          setBomName(bomDoc?.name || bestBom.name);
-          const rows: BomItemRow[] = Array.isArray(bomDoc?.items)
-            ? bomDoc.items.map((row: any) => ({
-                item_code: row.item_code || '',
-                item_name: row.item_name,
-                qty: row.qty !== undefined ? Number(row.qty) : undefined,
-                uom: row.uom || row.stock_uom,
-              }))
-            : [];
-          setBomItems(rows);
-          setBomChecked(true);
-        } catch (err) {
-          if (cancelled) return;
-          setBomName(bestBom.name);
-          setBomError(true);
-          setBomChecked(true);
-        }
-      } catch (err) {
-        if (!cancelled) setBomChecked(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [itemCode]);
-
-  if (!itemCode) return null;
-
-  const bomColumns: DataTableColumn<BomItemRow>[] = [
-    { key: 'item_code', header: 'Item Code', render: (row) => row.item_code },
-    { key: 'item_name', header: 'Item Name', render: (row) => row.item_name || '-' },
-    { key: 'qty', header: 'Qty', align: 'right', render: (row) => (row.qty !== undefined ? formatQty(row.qty) : '-') },
-    { key: 'uom', header: 'UOM', render: (row) => row.uom || '-' },
-  ];
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="item-detail-modal-title">
-      <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close item detail" onClick={onClose} />
-      <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-lg bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border bg-muted px-6 py-4">
-          <div>
-            <h2 id="item-detail-modal-title" className="text-lg font-semibold text-foreground">
-              {item?.item_name || itemCode}
-            </h2>
-            <p className="mt-1 text-sm text-text-tertiary">Item detail and recipe (BOM)</p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close item details">
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <Spinner className="h-6 w-6 text-primary" />
-            </div>
-          ) : error ? (
-            <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{error}</div>
-          ) : (
-            <>
-              <div className="mb-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Item Code</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">{item?.item_code || itemCode}</p>
-                </div>
-                <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Item Group</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">{item?.item_group || 'Unassigned'}</p>
-                </div>
-                <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Stock UOM</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">{item?.stock_uom || '-'}</p>
-                </div>
-              </div>
-
-              <h3 className="mb-2 text-sm font-semibold text-foreground">Recipe (BOM){bomName ? ` — ${bomName}` : ''}</h3>
-              {!bomChecked ? (
-                <div className="flex items-center justify-center py-6">
-                  <Spinner className="h-5 w-5 text-primary" />
-                </div>
-              ) : !bomName ? (
-                <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
-                  No BOM configured for this item.
-                </div>
-              ) : bomError ? (
-                <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
-                  Unable to load the recipe for this item.
-                </div>
-              ) : bomItems.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
-                  This BOM has no ingredient lines.
-                </div>
-              ) : (
-                <DataTable columns={bomColumns} rows={bomItems} emptyMessage="No BOM ingredients found." />
-              )}
-            </>
           )}
         </div>
       </div>
@@ -502,9 +356,14 @@ export const SalesPlanPage: React.FC = () => {
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
-  const [ppState, setPpState] = useState<ProductionPlanState | null>(null);
-  const [ppBusy, setPpBusy] = useState(false);
-  const [ppError, setPpError] = useState<string | null>(null);
+  // Per-department Production Plan states (D12): the whole
+  // get_sales_plan_production_states response, plus which single
+  // department's "Open" action is currently in flight (createAll is a
+  // separate, page-level busy flag since it isn't scoped to one department).
+  const [ppStates, setPpStates] = useState<SalesPlanProductionStatesResponse | null>(null);
+  const [ppCreateBusy, setPpCreateBusy] = useState(false);
+  const [ppOpenBusyDepartment, setPpOpenBusyDepartment] = useState<string | null>(null);
+  const [ppPrepareBusyDepartment, setPpPrepareBusyDepartment] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -536,7 +395,7 @@ export const SalesPlanPage: React.FC = () => {
   const addItemButtonRef = useRef<HTMLButtonElement | null>(null);
   const addItemInputRef = useRef<HTMLInputElement | null>(null);
 
-  // "Needs Attention" collapse-by-default state.
+  // "Needs Attention" accordion — collapsed by default.
   const [attentionExpanded, setAttentionExpanded] = useState(false);
 
   // Per-department inline filter + collapse state, keyed by department name.
@@ -627,6 +486,28 @@ export const SalesPlanPage: React.FC = () => {
               setEnforcementMode((status.enforcement_mode as 'Hard' | 'Soft' | 'Alert') || 'Hard');
               setSupersededPlanName(status.superseded_plan || null);
             }
+
+            // Once a plan exists, the plan -- not comparable history -- is
+            // what says which items are being produced and how many. History
+            // only ever supplied the suggestion. A plan can legitimately hold
+            // rows history knows nothing about, and a branch with an empty
+            // history window returns no suggestions at all while its plan is
+            // full; in both cases the grid would otherwise render empty, and
+            // with it every department section and Production Plan panel keyed
+            // off the item list.
+            if (status.name && !cancelled) {
+              try {
+                const planDoc = await salesPlanService.getPlan(status.name);
+                const planRows = (planDoc?.items as SalesPlanDocRow[] | undefined) || [];
+                if (!cancelled && planRows.length) {
+                  setItems((current) => mergeSavedPlanRows(current, planRows));
+                }
+              } catch (planErr) {
+                // Non-fatal: the history-derived view is still usable, and
+                // the plan's own status/actions have already been set above.
+                console.warn('Unable to load saved Sales Plan rows', planErr);
+              }
+            }
           } catch (statusErr) {
             // A missing/unsaved plan is expected and non-fatal (the stepper
             // simply defaults to Draft). A permission error is not, and must
@@ -684,15 +565,13 @@ export const SalesPlanPage: React.FC = () => {
     const blocked = items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
     // Blocking-severity items (missing production unit) surface before
     // warning-severity ones (no comparable history) so the most actionable
-    // gaps show up first in the collapsed 3-item preview.
+    // gaps show up first when the accordion opens.
     return [...blocked].sort((a, b) => {
       const aBlocking = a.production_unit === 'Unassigned' ? 0 : 1;
       const bBlocking = b.production_unit === 'Unassigned' ? 0 : 1;
       return aBlocking - bBlocking;
     });
   }, [items]);
-
-  const visibleBlockedItems = attentionExpanded ? blockedItems : blockedItems.slice(0, 3);
 
   // Debounced catalog search -- searches ANY item for this branch, regardless
   // of whether it has comparable history, so zero-history items can be added.
@@ -825,7 +704,7 @@ export const SalesPlanPage: React.FC = () => {
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
     } catch (err) {
-      setError(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
+      showToast.error(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
     } finally {
       setSaving(false);
     }
@@ -908,31 +787,139 @@ export const SalesPlanPage: React.FC = () => {
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
 
+  const refreshProductionPlanStates = async (name: string) => {
+    try {
+      const states = await salesPlanService.getProductionPlanStates(name);
+      setPpStates(states);
+    } catch {
+      setPpStates(null);
+    }
+  };
+
   useEffect(() => {
-    setPpError(null);
     if (!planName || (planStatus !== 'Approved' && planStatus !== 'Locked for Production')) {
-      setPpState(null);
+      setPpStates(null);
       return;
     }
     let cancelled = false;
     salesPlanService
-      .getProductionPlanState(planName)
-      .then((state) => { if (!cancelled) setPpState(state); })
-      .catch(() => { if (!cancelled) setPpState(null); });
+      .getProductionPlanStates(planName)
+      .then((states) => { if (!cancelled) setPpStates(states); })
+      .catch(() => { if (!cancelled) setPpStates(null); });
     return () => { cancelled = true; };
   }, [planName, planStatus]);
 
-  const openProductionPlan = async () => {
+  // Poll while any department Prepare job is Processing so ERPNext status and
+  // URY execution_state refresh without leaving the Sales Plan page.
+  const anyDepartmentProcessing = useMemo(
+    () => (ppStates?.production_plans ?? []).some((row) => row.execution_state === 'processing'),
+    [ppStates],
+  );
+
+  useEffect(() => {
+    if (!planName || !anyDepartmentProcessing) return;
+    const timer = window.setInterval(() => {
+      refreshProductionPlanStates(planName);
+    }, PREPARE_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [planName, anyDepartmentProcessing]);
+
+  // D12's known backend limitation: get_sales_plan_production_states only
+  // ever lists departments that already have a live Production Plan, so a
+  // department present in groupedItems but absent here has no plan at all.
+  // Derive that as link_state 'none' (or 'ineligible', from the top-level
+  // `eligible` flag) here, rather than duplicating any compiler logic --
+  // the backend explicitly hands this derivation to the frontend (see
+  // get_sales_plan_production_states's docstring).
+  const ppStatesByDepartment = useMemo(() => {
+    const map: Record<string, DepartmentProductionPlanState> = {};
+    for (const row of ppStates?.production_plans ?? []) {
+      map[row.department] = row;
+    }
+    return map;
+  }, [ppStates]);
+
+  const getDepartmentProductionState = (department: string): DepartmentProductionPlanState | null => {
+    if (!ppStates) return null;
+    const existing = ppStatesByDepartment[department];
+    if (existing) return existing;
+    return {
+      department,
+      link_state: ppStates.eligible ? 'none' : 'ineligible',
+      can_create: ppStates.eligible && ppStates.can_create,
+      can_open: false,
+      blockers: [],
+    };
+  };
+
+  // Departments (from groupedItems) that have no live Production Plan yet --
+  // used to decide whether the header-level "Create Production Plans"
+  // control has anything to do.
+  const departmentsWithoutLivePlan = useMemo(() => {
+    if (!ppStates?.eligible) return [];
+    return Object.keys(groupedItems).filter((department) => {
+      const state = ppStatesByDepartment[department];
+      return !state || state.link_state === 'none' || state.link_state === 'stale';
+    });
+  }, [groupedItems, ppStates, ppStatesByDepartment]);
+
+  const createAllProductionPlans = async () => {
     if (!planName) return;
-    setPpBusy(true);
-    setPpError(null);
+    setPpCreateBusy(true);
     try {
-      const result = await salesPlanService.openOrCreateProductionPlan(planName);
+      await salesPlanService.createDepartmentProductionPlans(planName);
+      await refreshProductionPlanStates(planName);
+    } catch (err) {
+      showToast.error(describeSalesPlanApiError(err, 'Unable to create Production Plans for this Sales Plan.'));
+    } finally {
+      setPpCreateBusy(false);
+    }
+  };
+
+  const openDepartmentProductionPlan = async (department: string) => {
+    if (!planName) return;
+    setPpOpenBusyDepartment(department);
+    try {
+      const result = await salesPlanService.openDepartmentProductionPlan(planName, department);
       window.location.assign(`/app/production-plan/${encodeURIComponent(result.name)}`);
     } catch (err) {
-      setPpError(describeSalesPlanApiError(err, 'Unable to open or create the Production Plan.'));
+      showToast.error(describeSalesPlanApiError(err, `Unable to open the Production Plan for ${department}.`));
     } finally {
-      setPpBusy(false);
+      setPpOpenBusyDepartment(null);
+    }
+  };
+
+  const prepareDepartmentProduction = async (department: string) => {
+    if (!planName) return;
+    const state = getDepartmentProductionState(department);
+    const productionPlan = state?.production_plan;
+    if (!productionPlan || state?.docstatus !== 1) return;
+
+    const confirmed = window.confirm(
+      `This will validate stock, transfer materials from Store, create Work Orders, and post ` +
+        `Manufacture Stock Entries for ${department} (${productionPlan}). Submitting a Manufacture ` +
+        `Stock Entry declares that physical production is complete. Continue?`,
+    );
+    if (!confirmed) return;
+
+    setPpPrepareBusyDepartment(department);
+    try {
+      const result = await salesPlanService.prepareProduction(productionPlan);
+      if (result.status === 'blocked') {
+        const messages = (result.blockers ?? [])
+          .map((b) => b.message || b.type || 'Blocked')
+          .join('\n');
+        showToast.error(messages || 'Prepare Production is blocked until materials are available.');
+      } else if (result.status === 'already_processing') {
+        showToast.error('Prepare Production is already running for this department.');
+      } else {
+        showToast.success('Prepare Production started.');
+      }
+      await refreshProductionPlanStates(planName);
+    } catch (err) {
+      showToast.error(describeSalesPlanApiError(err, `Unable to prepare production for ${department}.`));
+    } finally {
+      setPpPrepareBusyDepartment(null);
     }
   };
 
@@ -1015,7 +1002,7 @@ export const SalesPlanPage: React.FC = () => {
       });
       setPlanStatus((result.status as PlanStatus) || currentAction.targetState);
     } catch (err) {
-      setTransitionError(
+      showToast.error(
         describeSalesPlanApiError(err, 'Unable to update this Sales Plan. Please try again.')
       );
     } finally {
@@ -1065,7 +1052,7 @@ export const SalesPlanPage: React.FC = () => {
       const fallbackMessage = currentBackwardAction.destructive
         ? `Unable to cancel this Sales Plan. Please try again.`
         : `Unable to return this Sales Plan to Draft. Please try again.`;
-      setBackwardActionError(describeSalesPlanApiError(err, fallbackMessage));
+      showToast.error(describeSalesPlanApiError(err, fallbackMessage));
     } finally {
       setBackwardActionTransitioning(false);
     }
@@ -1128,28 +1115,29 @@ export const SalesPlanPage: React.FC = () => {
                 <span>{transitioning ? 'Updating...' : currentAction.label}</span>
               </Button>
             )}
-            {ppState && ppState.state !== 'ineligible' && (ppState.can_create || ppState.can_open) && (
+            {/*
+              One Production Plan per department, not per Sales Plan (see
+              PLAN.md's "Frontend" section and D14) -- this header control
+              creates every department's plan in one call
+              (createDepartmentProductionPlans is idempotent per department),
+              and each department's own "Open Production Plan" action lives
+              in its groupedItems header below. There is no header-level
+              "Open" here any more: which plan to open is inherently a
+              per-department question once a Sales Plan can own several.
+            */}
+            {ppStates?.eligible && ppStates.can_create && departmentsWithoutLivePlan.length > 0 && (
               <Button
-                onClick={openProductionPlan}
-                disabled={
-                  ppBusy ||
-                  (ppState.state === 'none' && (ppState.issues?.length ?? 0) > 0) ||
-                  ppState.state === 'stale'
-                }
-                title={
-                  ppState.state === 'stale'
-                    ? 'Sales Plan changed since this Production Plan was created. Cancel it, then create a new one.'
-                    : ppState.state === 'none' && ppState.issues?.length
-                      ? ppState.issues.join(' ')
-                      : undefined
-                }
+                onClick={createAllProductionPlans}
+                disabled={ppCreateBusy}
                 variant="secondary"
                 size="compactLg"
                 className="gap-2"
               >
                 <Factory className="h-4 w-4" />
                 <span>
-                  {ppBusy ? 'Opening...' : ppState.state === 'none' ? 'Create Production Plan' : 'Open Production Plan'}
+                  {ppCreateBusy
+                    ? 'Creating...'
+                    : `Create Production Plans (${departmentsWithoutLivePlan.length})`}
                 </span>
               </Button>
             )}
@@ -1168,7 +1156,6 @@ export const SalesPlanPage: React.FC = () => {
         }
         footer={
           <>
-            {ppError && <div className="mt-2 text-sm text-destructive">{ppError}</div>}
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <LifecycleStepper status={planStatus} />
               {actionBlockedByRole && (
@@ -1207,46 +1194,48 @@ export const SalesPlanPage: React.FC = () => {
 
       {!loading && !error && blockedItems.length > 0 && (
         <Section>
-          <AttentionFeed
-          title="Needs Attention"
-          items={visibleBlockedItems.map((item) => {
-            const missingProductionUnit = item.production_unit === 'Unassigned';
-            return {
-              severity: missingProductionUnit ? 'blocking' : 'warning',
-              title: item.item_name || item.item_code,
-              detail: missingProductionUnit
-                ? 'No production unit assigned'
-                : 'No comparable sales history for this weekday',
-              action: {
-                label: 'View item',
-                onClick: () => {
-                  setSelectedItemDetailCode(item.item_code);
-                },
-              },
-            };
-          })}
-          />
-          {blockedItems.length > 3 && (
-            <div className="mt-2 flex justify-end">
-              <Button
-                variant="ghost"
-                onClick={() => setAttentionExpanded((current) => !current)}
-                className="gap-1"
-              >
-                {attentionExpanded ? (
-                  <>
-                    <ChevronUp className="h-4 w-4" />
-                    <span>Collapse</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4" />
-                    <span>{`Show all (${blockedItems.length})`}</span>
-                  </>
-                )}
-              </Button>
+          <Card padding="none" variant="outlined" className="overflow-hidden rounded-[9px] border shadow-none">
+            <button
+              type="button"
+              onClick={() => setAttentionExpanded((current) => !current)}
+              aria-expanded={attentionExpanded}
+              aria-controls="needs-attention-panel"
+              className="flex w-full items-center justify-between gap-2 px-3 py-[9px] text-left hover:bg-muted/60"
+            >
+              <span className="flex items-center gap-2">
+                {attentionExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                <span className="text-[12.5px] font-semibold text-foreground">Needs Attention</span>
+                <Badge variant="secondary" size="sm">
+                  {blockedItems.length}
+                </Badge>
+              </span>
+            </button>
+            <div id="needs-attention-panel" hidden={!attentionExpanded}>
+              <div className="divide-y divide-border border-t border-border">
+                {blockedItems.map((item) => {
+                  const missingProductionUnit = item.production_unit === 'Unassigned';
+                  return (
+                    <AttentionItem
+                      key={item.item_code}
+                      severity={missingProductionUnit ? 'blocking' : 'warning'}
+                      title={item.item_name || item.item_code}
+                      detail={
+                        missingProductionUnit
+                          ? 'No production unit assigned'
+                          : 'No comparable sales history for this weekday'
+                      }
+                      action={{
+                        label: 'View item',
+                        onClick: () => {
+                          setSelectedItemDetailCode(item.item_code);
+                        },
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          )}
+          </Card>
         </Section>
       )}
 
@@ -1329,6 +1318,7 @@ export const SalesPlanPage: React.FC = () => {
               ? visibleDepartmentItems.slice(0, ROW_TRUNCATE_LIMIT)
               : visibleDepartmentItems;
             const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
+            const productionState = getDepartmentProductionState(department);
 
             // Next row (in the full filtered set) after the last currently
             // rendered row -- used to focus the newly-revealed row when
@@ -1345,10 +1335,15 @@ export const SalesPlanPage: React.FC = () => {
                 key: 'item_code',
                 header: 'Item',
                 render: (row) => (
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemDetailCode(row.item_code)}
+                    className="rounded-md px-1 py-0.5 text-left hover:bg-primary-tint"
+                    aria-label={`View details for ${row.item_name || row.item_code}`}
+                  >
                     <p className="font-semibold text-foreground">{row.item_name || row.item_code}</p>
                     <p className="mt-0.5 text-xs text-text-tertiary">{row.item_code}</p>
-                  </div>
+                  </button>
                 ),
               },
               {
@@ -1423,6 +1418,84 @@ export const SalesPlanPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
+                {productionState && productionState.link_state !== 'ineligible' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-medium text-muted-foreground">
+                        Production Plan:{' '}
+                        {productionState.production_plan || <span className="text-text-tertiary">Not created</span>}
+                      </span>
+                      {productionState.status && (
+                        <Badge
+                          size="tag"
+                          variant={ERPNEXT_STATUS_BADGE[productionState.status] ?? 'default'}
+                        >
+                          {productionState.status}
+                        </Badge>
+                      )}
+                      <Badge size="tag" variant={LINK_STATE_BADGE[productionState.link_state]}>
+                        {LINK_STATE_LABEL[productionState.link_state]}
+                      </Badge>
+                      {productionState.execution_state &&
+                        (productionState.execution_state === 'processing' ||
+                          productionState.execution_state === 'failed' ||
+                          productionState.execution_state === 'awaiting_materials') && (
+                        <Badge size="tag" variant={EXECUTION_STATE_BADGE[productionState.execution_state]}>
+                          {EXECUTION_STATE_LABEL[productionState.execution_state]}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {productionState.docstatus === 1 &&
+                        productionState.execution_state &&
+                        CAN_PREPARE_EXECUTION.includes(productionState.execution_state) && (
+                          <Button
+                            onClick={() => prepareDepartmentProduction(department)}
+                            disabled={
+                              ppPrepareBusyDepartment === department ||
+                              productionState.execution_state === 'processing'
+                            }
+                            variant="default"
+                            size="compactSm"
+                            className="gap-2"
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                            <span>
+                              {ppPrepareBusyDepartment === department
+                                ? 'Preparing...'
+                                : 'Prepare Production'}
+                            </span>
+                          </Button>
+                        )}
+                      {productionState.execution_state === 'processing' && (
+                        <span className="text-xs text-muted-foreground">Processing…</span>
+                      )}
+                      {productionState.can_open && (
+                        <Button
+                          onClick={() => openDepartmentProductionPlan(department)}
+                          disabled={ppOpenBusyDepartment === department}
+                          variant="secondary"
+                          size="compactSm"
+                          className="gap-2"
+                        >
+                          <Factory className="h-3.5 w-3.5" />
+                          <span>{ppOpenBusyDepartment === department ? 'Opening...' : 'Open Production Plan'}</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {productionState && (productionState.blockers?.length ?? 0) > 0 && (
+                  <div className="border-b border-border bg-warning-tint px-5 py-2">
+                    <ul className="space-y-1 text-xs text-warning">
+                      {productionState.blockers!.map((blocker, index) => (
+                        <li key={`${department}-blocker-${index}`}>
+                          {blocker.message || `${blocker.type || 'Blocker'}${blocker.item_code ? `: ${blocker.item_code}` : ''}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div
                   id={`department-panel-${safeId}`}
                   hidden={isCollapsed}

@@ -1,3 +1,5 @@
+import { messageToPlainText } from '@ury/ui'
+
 export function apiErrorMessage(error: unknown, fallback: string): string {
   if (!error || typeof error !== 'object') return fallback
   const value = error as { _server_messages?: string; message?: string; exception?: string }
@@ -5,7 +7,7 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
     try {
       const messages = JSON.parse(value._server_messages) as string[]
       const message = JSON.parse(messages[0]).message
-      if (typeof message === 'string') return message.replace(/<[^>]*>/g, '')
+      if (typeof message === 'string') return messageToPlainText(message)
     } catch {
       // Malformed server messages must not hide the original error.
     }

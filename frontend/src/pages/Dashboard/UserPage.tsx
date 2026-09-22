@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
@@ -196,7 +196,7 @@ export const UserPage: React.FC = () => {
           if (messages.length > 0) {
             const lastMessage = JSON.parse(messages[messages.length - 1]);
             if (lastMessage.message) {
-              errorMessage = lastMessage.message.replace(/<[^>]*>?/gm, '');
+              errorMessage = messageToPlainText(lastMessage.message);
             }
           }
         } catch (e) {}

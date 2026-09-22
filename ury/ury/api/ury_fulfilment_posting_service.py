@@ -592,9 +592,11 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 	#   PRE_PRODUCED  -- its Manufacture entry was already posted, ahead of
 	#                    time, by the batch path (ury_batch_manufacture_service
 	#                    start_batch / bulk_production), into the same
-	#                    direct_retail_warehouse the sale later deducts from.
-	#                    READY here is a plating milestone with no stock
-	#                    semantics.
+	#                    department warehouse the sale later deducts from
+	#                    (D13: the Department Warehouse is the PRE_PRODUCED
+	#                    stock authority, not direct_retail_warehouse, which
+	#                    is for DIRECT_RETAIL goods only). READY here is a
+	#                    plating milestone with no stock semantics.
 	#   DIRECT_RETAIL -- there is no production at all, by definition.
 	#
 	# Posting for those policies was the double-deduction bug: the entry

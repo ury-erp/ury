@@ -1,8 +1,9 @@
 [
  {
+  "docstatus": 0,
   "doctype": "Workflow Action Master",
+  "modified": "2026-09-21 22:54:55.799647",
   "name": "Return to Draft",
-  "workflow_action_name": "Return to Draft",
-  "docstatus": 0
+  "workflow_action_name": "Return to Draft"
  }
 ]

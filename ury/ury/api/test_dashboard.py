@@ -28,14 +28,21 @@ class TestGetDashboardSummary(FrappeTestCase):
 
     def test_summary_returns_required_fields(self):
         """Dashboard summary response includes all required metric fields."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": 1200,
+                "orders_today": 8,
+                "avg_order_value": 150,
+                "active_tables": 2,
+                "total_tables": 10,
+            }
             mock_count.return_value = 5
             mock_exists.return_value = True
 
             result = get_dashboard_summary()
 
-            # Verify all expected keys exist in response
             expected_keys = {
                 "today_sales",
                 "today_orders",
@@ -47,17 +54,29 @@ class TestGetDashboardSummary(FrappeTestCase):
                 "total_menu_items",
             }
             self.assertEqual(set(result.keys()), expected_keys)
+            self.assertEqual(result["today_sales"], 1200)
+            self.assertEqual(result["today_orders"], 8)
+            self.assertEqual(result["occupied_tables"], 2)
+            self.assertEqual(result["total_tables"], 10)
+            self.assertEqual(result["avg_order_value"], 150)
 
     def test_summary_counts_ury_table_doctype(self):
-        """Summary counts URY Table records when DocType exists."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        """Summary falls back to URY Table count when stats omit total_tables."""
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": 0,
+                "orders_today": 0,
+                "avg_order_value": 0,
+                "active_tables": 0,
+                "total_tables": None,
+            }
             mock_exists.return_value = True
             mock_count.return_value = 12
 
             result = get_dashboard_summary()
 
-            # Verify frappe.db.count was called for "URY Table"
             calls = mock_count.call_args_list
             self.assertTrue(
                 any(call[0][0] == "URY Table" for call in calls),
@@ -67,15 +86,25 @@ class TestGetDashboardSummary(FrappeTestCase):
 
     def test_summary_handles_missing_ury_table_doctype(self):
         """Summary returns 0 for table count when URY Table DocType doesn't exist."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
-            # URY Table doesn't exist, Item does
+            mock_stats.return_value = {
+                "todays_sales": 0,
+                "orders_today": 0,
+                "avg_order_value": 0,
+                "active_tables": 0,
+                "total_tables": None,
+            }
+
             def exists_side_effect(doctype, name=None):
                 return name == "Item"
+
             def count_side_effect(doctype, filters=None):
                 if doctype == "Item":
                     return 100
                 return 0
+
             mock_exists.side_effect = exists_side_effect
             mock_count.side_effect = count_side_effect
 
@@ -86,15 +115,25 @@ class TestGetDashboardSummary(FrappeTestCase):
 
     def test_summary_handles_missing_item_doctype(self):
         """Summary returns 0 for item count when Item DocType doesn't exist."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
-            # Item doesn't exist, URY Table does
+            mock_stats.return_value = {
+                "todays_sales": 0,
+                "orders_today": 0,
+                "avg_order_value": 0,
+                "active_tables": 0,
+                "total_tables": 8,
+            }
+
             def exists_side_effect(doctype, name=None):
                 return name == "URY Table"
+
             def count_side_effect(doctype, filters=None):
                 if doctype == "URY Table":
                     return 8
                 return 0
+
             mock_exists.side_effect = exists_side_effect
             mock_count.side_effect = count_side_effect
 
@@ -105,14 +144,23 @@ class TestGetDashboardSummary(FrappeTestCase):
 
     def test_summary_counts_active_users(self):
         """Summary counts enabled User records."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": 0,
+                "orders_today": 0,
+                "avg_order_value": 0,
+                "active_tables": 0,
+                "total_tables": 0,
+            }
             mock_exists.return_value = True
-            # Mock count to return different values for different doctypes
+
             def count_side_effect(doctype, filters=None):
                 if doctype == "User" and filters == {"enabled": 1}:
                     return 3
                 return 0
+
             mock_count.side_effect = count_side_effect
 
             result = get_dashboard_summary()
@@ -120,24 +168,41 @@ class TestGetDashboardSummary(FrappeTestCase):
             self.assertEqual(result["active_cashiers"], 3)
 
     def test_summary_with_branch_parameter_accepted(self):
-        """Summary accepts branch parameter (currently ignored)."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        """Summary forwards branch to get_dashboard_stats."""
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": 50,
+                "orders_today": 1,
+                "avg_order_value": 50,
+                "active_tables": 1,
+                "total_tables": 4,
+            }
             mock_count.return_value = 5
             mock_exists.return_value = True
 
-            # Should not raise error with branch parameter
             result = get_dashboard_summary(branch="Main Branch")
-            self.assertIsInstance(result, dict)
+            mock_stats.assert_called_once_with("Main Branch")
+            self.assertEqual(result["today_sales"], 50)
 
     def test_summary_with_all_branch_parameter(self):
-        """Summary handles branch='all' (no filtering)."""
-        with patch(f"{MODULE}.frappe.db.count") as mock_count, \
+        """Summary treats branch='all' as unscoped stats."""
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
              patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": 0,
+                "orders_today": 0,
+                "avg_order_value": 0,
+                "active_tables": 0,
+                "total_tables": 0,
+            }
             mock_count.return_value = 5
             mock_exists.return_value = True
 
             result = get_dashboard_summary(branch="all")
+            mock_stats.assert_called_once_with(None)
             self.assertIsInstance(result, dict)
 
 
@@ -353,7 +418,7 @@ class TestGetRecentTransactions(FrappeTestCase):
             self.assertEqual(called_kwargs.get("order_by"), "creation desc")
 
     def test_transactions_with_branch_parameter_accepted(self):
-        """Transactions accepts branch parameter (currently ignored)."""
+        """Transactions filters POS Invoice by branch when provided."""
         with patch(f"{MODULE}.frappe.db.exists") as mock_exists, \
              patch(f"{MODULE}.frappe.get_all") as mock_get_all:
             mock_exists.return_value = True
@@ -361,6 +426,8 @@ class TestGetRecentTransactions(FrappeTestCase):
 
             result = get_recent_transactions(branch="Main Branch")
             self.assertIsInstance(result, list)
+            called_filters = mock_get_all.call_args.kwargs.get("filters") or {}
+            self.assertEqual(called_filters.get("branch"), "Main Branch")
 
 
 class TestGetModuleRecords(FrappeTestCase):

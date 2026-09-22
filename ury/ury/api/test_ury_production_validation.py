@@ -20,7 +20,12 @@ class TestURYProductionValidation(FrappeTestCase):
         self.link_values = {
             ("Branch", "Test Branch"): "Test Company",
             ("URY Production Department", "Hot Kitchen"): frappe._dict(
-                {"branch": "Test Branch", "company": "Test Company", "enabled": 1}
+                {
+                    "branch": "Test Branch",
+                    "company": "Test Company",
+                    "enabled": 1,
+                    "department_warehouse": "Hot Kitchen WH",
+                }
             ),
             ("URY Production Department", "Beverage"): frappe._dict(
                 {"branch": "Test Branch", "company": "Test Company", "enabled": 1}
@@ -35,7 +40,7 @@ class TestURYProductionValidation(FrappeTestCase):
         }
         self.get_value_patch = patch(
             "ury.ury.api.ury_production_validation.frappe.db.get_value",
-            side_effect=lambda doctype, name, fields=None, *args, **kwargs: self.link_values.get((doctype, name)),
+            side_effect=self._get_value,
         )
         self.has_permission_patch = patch(
             "ury.ury.api.ury_production_validation.frappe.has_permission",
@@ -43,6 +48,17 @@ class TestURYProductionValidation(FrappeTestCase):
         )
         self.get_value_patch.start()
         self.has_permission_patch.start()
+
+    def _get_value(self, doctype, name, fields=None, *args, **kwargs):
+        value = self.link_values.get((doctype, name))
+        # A single fieldname (e.g. "department_warehouse") wants just that
+        # field's value out of the fixture dict below; a list of fields with
+        # as_dict=True (e.g. _validate_department's own lookup) wants the
+        # whole dict back, matching real frappe.db.get_value semantics
+        # closely enough for these tests.
+        if isinstance(value, dict) and isinstance(fields, str):
+            return value.get(fields)
+        return value
 
     def tearDown(self):
         self.has_permission_patch.stop()
@@ -100,6 +116,23 @@ class TestURYProductionValidation(FrappeTestCase):
             result = validate_item_production_configuration("Test Item", "Test Branch")
 
         self.assertEqual(result["production_policy"], PRE_PRODUCED)
+
+    def test_pre_produced_resolves_department_warehouse_not_direct_retail(self):
+        """D13: the Department Warehouse is the PRE_PRODUCED stock authority --
+        `direct_retail_warehouse` must not be read for a PRE_PRODUCED
+        configuration, even when it happens to be populated."""
+        with self._patch_configs(
+            [
+                self._config(
+                    production_policy="PRE_PRODUCED",
+                    direct_retail_warehouse="Should Not Be Used WH",
+                )
+            ]
+        ):
+            result = validate_item_production_configuration("Test Item", "Test Branch")
+
+        self.assertEqual(result["production_policy"], PRE_PRODUCED)
+        self.assertEqual(result["warehouse"], "Hot Kitchen WH")
 
     def test_manufactured_item_rejects_missing_bom(self):
         with self._patch_configs([self._config(bom=None)]):

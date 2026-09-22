@@ -5,7 +5,7 @@ import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useDeskPermission } from '../DeskLink';
 import uryLogo from '../../../Public/URY-bg.png';
-import { buttonVariants } from '@ury/ui';
+import { buttonVariants, messageToPlainText } from '@ury/ui';
 import AskBar from '../chat/AskBar';
 import {
   Bell,
@@ -39,8 +39,7 @@ interface NotificationItem {
  * dangerouslySetInnerHTML on system-generated content.
  */
 function stripHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+  return messageToPlainText(html).replace(/\s+/g, ' ').trim();
 }
 
 
