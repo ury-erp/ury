@@ -64,10 +64,14 @@ vi.mock("@ury/ui", async (importOriginal) => {
   };
 });
 
-vi.mock("@ury/core", () => ({
-  formatCurrency: (amount: number) => `Rs. ${amount}`,
-  call: vi.fn().mockResolvedValue({}),
-}));
+vi.mock("@ury/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ury/core")>();
+  return {
+    ...actual,
+    formatCurrency: (amount: number) => `Rs. ${amount}`,
+    call: vi.fn().mockResolvedValue({}),
+  };
+});
 
 vi.mock("../components/CaptainMenu", () => ({
   default: () => <div data-testid="captain-menu">Menu</div>,

@@ -5,9 +5,13 @@ import CaptainTableCard from "./CaptainTableCard";
 import type { Table } from "../../lib/table-api";
 import type { ActiveTableOrder } from "../lib/captain-table-api";
 
-vi.mock("@ury/core", () => ({
-  formatCurrency: (amount: number) => `Rs. ${amount}`,
-}));
+vi.mock("@ury/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ury/core")>();
+  return {
+    ...actual,
+    formatCurrency: (amount: number) => `Rs. ${amount}`,
+  };
+});
 
 vi.mock("@ury/ui", () => ({
   cn: (...args: any[]) => args.filter(Boolean).join(" "),
