@@ -447,7 +447,7 @@ class TestBuildDemandVector(unittest.TestCase):
                     "qty": 10,
                     "department": "Kitchen",
                     "production_unit": "Main Kitchen",
-                    "policy": "MADE_TO_ORDER",
+                    "production_policy": "MADE_TO_ORDER",
                     "bom": "BOM-BURGER-001",
                     "bom_revision": 1,
                     "control_mode": "HARD",
@@ -457,7 +457,7 @@ class TestBuildDemandVector(unittest.TestCase):
                     "qty": 5,
                     "department": "Kitchen",
                     "production_unit": "Main Kitchen",
-                    "policy": "MADE_TO_ORDER",
+                    "production_policy": "MADE_TO_ORDER",
                     "bom": "BOM-FRIES-001",
                     "bom_revision": 1,
                     "control_mode": "HARD",
@@ -490,7 +490,7 @@ class TestBuildDemandVector(unittest.TestCase):
                     "qty": 20,
                     "department": "Retail",
                     "production_unit": None,
-                    "policy": "DIRECT_RETAIL",
+                    "production_policy": "DIRECT_RETAIL",
                 }
             ],
         }
@@ -516,7 +516,7 @@ class TestBuildDemandVector(unittest.TestCase):
                         "qty": 3,
                         "department": "Kitchen",
                         "production_unit": "Main Kitchen",
-                        "policy": "MADE_TO_ORDER",
+                        "production_policy": "MADE_TO_ORDER",
                     }
                 ],
             }
