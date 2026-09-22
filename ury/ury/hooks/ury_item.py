@@ -95,3 +95,55 @@ def validate_yield_tracking(doc, method):
 					"Item {0}: Yield Percent must be greater than 0 and at most 100 when Yield Tracked is enabled."
 				).format(doc.name or doc.item_code)
 			)
+
+def on_update(doc, method=None):
+	before = doc.get_doc_before_save()
+	if not before:
+		return
+		
+	yield_changed = (
+		doc.custom_yield_percent != before.custom_yield_percent
+		or doc.custom_yield_tracked != before.custom_yield_tracked
+	)
+	
+	if yield_changed:
+		frappe.enqueue(
+			"ury.ury.hooks.ury_item.update_boms_with_yield",
+			item_code=doc.name,
+			queue="long",
+			timeout=1500
+		)
+
+def update_boms_with_yield(item_code):
+	item = frappe.get_cached_doc("Item", item_code)
+	is_yield_tracked = item.custom_yield_tracked
+	yield_percent = item.custom_yield_percent
+
+	boms = frappe.get_all(
+		"BOM Item",
+		filters={"item_code": item_code, "parenttype": "BOM"},
+		fields=["parent"],
+		distinct=True
+	)
+	
+	for bom in boms:
+		try:
+			bom_doc = frappe.get_doc("BOM", bom.parent)
+			dirty = False
+			for row in bom_doc.items:
+				if row.item_code == item_code:
+					if row.custom_yield_percent != yield_percent:
+						if is_yield_tracked:
+							row.custom_yield_percent = yield_percent
+							row.custom_yield_qty = (row.qty or 0.0) * (yield_percent / 100.0)
+						else:
+							row.custom_yield_percent = 0
+							row.custom_yield_qty = 0
+						dirty = True
+			
+			if dirty:
+				bom_doc.flags.ignore_validate_update_after_submit = True
+				bom_doc.flags.ignore_permissions = True
+				bom_doc.save()
+		except Exception as e:
+			frappe.log_error("Yield Update Error", f"Failed to update BOM {bom.parent} for item {item_code}: {e}")

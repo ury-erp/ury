@@ -140,6 +140,11 @@ export const YieldCheckCompliancePage: React.FC = () => {
       return;
     }
 
+    if (!company) {
+      setRows([]);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);

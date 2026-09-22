@@ -249,7 +249,10 @@ doc_events = {
         ],
         "on_cancel": "ury.ury.hooks.ury_sales_invoice.journal_entry_cancel",
         },
-    "Item": {"validate": "ury.ury.hooks.ury_item.validate"},
+    "Item": {
+        "validate": "ury.ury.hooks.ury_item.validate",
+        "on_update": "ury.ury.hooks.ury_item.on_update"
+    },
     "POS Opening Entry": {
         "validate":[
             "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
