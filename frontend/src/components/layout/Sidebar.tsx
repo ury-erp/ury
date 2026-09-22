@@ -76,6 +76,25 @@ export interface NavGroup {
  * has been redistributed here. All four turned out to be one-time/rare
  * configuration screens, so they moved into Setup rather than a lifecycle
  * group.
+ *
+ * The rail groups by *stage of the user's workflow*, never by feature/module.
+ * That rule is load-bearing: no feature in this app owns a top-level group,
+ * however large it is. Commission tracking, for example, is split between a
+ * Setup row (`/commission-settings`) and a Reports entry
+ * (`employee-commission`) rather than getting a "Commission" group. A
+ * "Yield" group briefly existed as the one exception — it was created in the
+ * same commit that added the three yield report pages, and in doing so it
+ * pulled `/yield-standards` back out of Setup where the previous commit had
+ * deliberately filed it. That was a bundling convenience, not an IA decision,
+ * so the four yield pages are filed by the nature of the task instead:
+ *
+ *   - Yield Standards  -> Setup   (configured once per ingredient, like Item Config)
+ *   - Yield Checks     -> Control (a daily "what's due" action list, like KOT Errors)
+ *   - Yield Variance   -> Observe (manager-gated review of how it actually went)
+ *   - Yield Compliance -> Observe (manager-gated review of how it actually went)
+ *
+ * Yield rows keep the word "Yield" in their labels because, unlike the Yield
+ * group header, Control/Observe/Setup do not supply that context themselves.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -96,6 +115,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Observe',
     items: [
       { label: 'Profitability', path: '/department-profitability', icon: TrendingUp },
+      { label: 'Yield Variance', path: '/yield-variance', icon: Percent },
+      { label: 'Yield Compliance', path: '/yield-compliance', icon: Gauge },
       { label: 'Close Day', path: '/close-day', icon: Lock }
     ]
   },
@@ -105,18 +126,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Stock', path: '/department-stock', icon: Boxes },
       { label: 'Store Issue', path: '/store-issue', icon: ArrowRightLeft },
       { label: 'Wastage', path: '/wastage', icon: Trash2 },
+      { label: 'Yield Checks', path: '/overdue-yield-checks', icon: ClipboardCheck },
       { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
       { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle },
       { label: 'Sellability', path: '/menu-routing', icon: Ban }
-    ]
-  },
-  {
-    label: 'Yield',
-    items: [
-      { label: 'Standards', path: '/yield-standards', icon: Target },
-      { label: 'Variance', path: '/yield-variance', icon: TrendingUp },
-      { label: 'Overdue Checks', path: '/overdue-yield-checks', icon: AlertCircle },
-      { label: 'Compliance', path: '/yield-compliance', icon: Gauge }
     ]
   }
 ];
@@ -144,7 +157,8 @@ export const SETUP_ITEMS: NavItem[] = [
   { label: 'Commission', path: '/commission-settings', icon: Percent },
   { label: 'Production Units', path: '/production-unit', icon: Factory },
   { label: 'Departments', path: '/production-department', icon: Network },
-  { label: 'Item Config', path: '/item-production-config', icon: Package }
+  { label: 'Item Config', path: '/item-production-config', icon: Package },
+  { label: 'Yield Standards', path: '/yield-standards', icon: Target }
 ];
 
 /**
@@ -176,14 +190,13 @@ const reportGroupEntries = Object.entries(reportGroups);
 const REPORTS_PATH_PREFIX = '/reports';
 
 /** Every collapse/expand key this rail tracks, persisted together as one JSON blob. */
-type GroupKey = 'Plan' | 'Operate' | 'Observe' | 'Control' | 'Yield' | 'Reports' | 'Setup';
+type GroupKey = 'Plan' | 'Operate' | 'Observe' | 'Control' | 'Reports' | 'Setup';
 
 const DEFAULT_GROUP_STATE: Record<GroupKey, boolean> = {
   Plan: true,
   Operate: true,
   Observe: true,
   Control: true,
-  Yield: true,
   Reports: false,
   Setup: false
 };
