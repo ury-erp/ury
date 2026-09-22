@@ -287,16 +287,14 @@ export const DayClosePage: React.FC = () => {
       )}
 
       {state === 'populated' && planVsActual && (
-        <Section>
-          <Panel pad data-testid="close-day-plan-vs-actual">
-            <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
-            {planVsActual.reason && (
-              <p className="text-xs text-warning mb-2" data-testid="close-day-plan-vs-actual-reason">
-                {planVsActual.reason}
-              </p>
-            )}
-            <DataTable columns={planVsActualColumns} rows={planVsActual.rows} emptyMessage="No plan-vs-actual rows for this scope." />
-          </Panel>
+        <Section data-testid="close-day-plan-vs-actual">
+          <h3 className="mb-2 text-sm font-semibold">Plan vs Actual</h3>
+          {planVsActual.reason && (
+            <p className="mb-2 text-xs text-warning" data-testid="close-day-plan-vs-actual-reason">
+              {planVsActual.reason}
+            </p>
+          )}
+          <DataTable columns={planVsActualColumns} rows={planVsActual.rows} emptyMessage="No plan-vs-actual rows for this scope." />
         </Section>
       )}
 

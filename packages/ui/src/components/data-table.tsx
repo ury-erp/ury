@@ -1,6 +1,18 @@
 import * as React from "react";
 import { cn } from "../lib/cn";
 
+/**
+ * Visual contract (URY Menu list view):
+ * - Shell: `rounded-lg border` only — no `bg-card`, no shadow.
+ * - Header: `bg-muted/50`, 11px labels, compact padding.
+ * - Cells: 12.5px body, `border-hair` rows.
+ *
+ * Page wrappers must not re-skin the grid. Prefer a bare `<DataTable />`.
+ * If a Card/Panel must own the section frame, flatten with
+ * `className="rounded-none border-0"`. Editable grids compose this same shell
+ * via `EditableDataTable` — only cell content differs.
+ */
+
 export interface DataTableColumn<T> {
   key: string;
   header: string;

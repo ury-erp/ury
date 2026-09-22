@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { formatCurrency } from '@ury/core';
-import { Card, DataTable, DataTableColumn, Badge, Spinner, numericCellClass } from '@ury/ui';
+import { DataTable, DataTableColumn, Badge, Spinner, numericCellClass } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { TransactionRecord } from '../../services/dashboard';
 
@@ -74,20 +74,17 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
         </p>
       </div>
 
-      <Card className="p-4">
-        {loading ? (
-          <div className="py-12 flex items-center justify-center">
-            <Spinner className="w-6 h-6 text-primary" />
-          </div>
-        ) : (
-          <DataTable
-            className="rounded-none border-0"
-            columns={columns}
-            rows={recentTransactions}
-            emptyMessage="No transactions recorded yet today."
-          />
-        )}
-      </Card>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Spinner className="h-6 w-6 text-primary" />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={recentTransactions}
+          emptyMessage="No transactions recorded yet today."
+        />
+      )}
     </div>
   );
 };

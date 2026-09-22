@@ -28,10 +28,12 @@ const inputVariants = cva(
       },
       // Shared control height scale. `default` is the dashboard chrome size
       // (same metrics as Button/Select/DatePicker). `sm` is the same 36px box
-      // with text-xs. `compactLg` is an alias of `default` for existing call sites.
+      // with text-xs. `compact` is for DataTable / EditableDataTable cells so
+      // editable rows match Menu list row height. `compactLg` aliases `default`.
       size: {
         default: "h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]",
         sm: "h-9 px-3 py-1.5 text-xs",
+        compact: "h-7 px-2 py-0.5 text-[12.5px] rounded-md shadow-none",
         lg: "h-12 px-4 py-3 text-base",
         compactLg: "h-9 px-3.5 py-1.5 text-[13px] rounded-[7px]",
       },

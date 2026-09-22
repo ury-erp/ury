@@ -1408,9 +1408,9 @@ export const SalesPlanPage: React.FC = () => {
                 ref={(el) => {
                   departmentGroupRefs.current[department] = el;
                 }}
-                className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+                className="overflow-hidden rounded-lg border"
               >
-                <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
+                <div className="flex items-center justify-between border-b border-hair bg-muted/50 px-[14px] py-[7px]">
                   <button
                     type="button"
                     ref={(el) => {
@@ -1419,10 +1419,10 @@ export const SalesPlanPage: React.FC = () => {
                     onClick={() => toggleDepartmentCollapsed(department)}
                     aria-expanded={!isCollapsed}
                     aria-controls={`department-panel-${safeId}`}
-                    className="flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground"
+                    className="flex items-center gap-2 text-[11px] font-medium tracking-wide text-muted-foreground"
                   >
                     {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                    <span>{department}</span>
+                    <span className="text-sm font-semibold text-foreground">{department}</span>
                   </button>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-text-tertiary">
@@ -1439,7 +1439,7 @@ export const SalesPlanPage: React.FC = () => {
                   </div>
                 </div>
                 {productionState && productionState.link_state !== 'ineligible' && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hair px-[14px] py-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-medium text-muted-foreground">
                         Production Plan:{' '}
@@ -1506,7 +1506,7 @@ export const SalesPlanPage: React.FC = () => {
                   </div>
                 )}
                 {productionState && (productionState.blockers?.length ?? 0) > 0 && (
-                  <div className="border-b border-border bg-warning-tint px-5 py-2">
+                  <div className="border-b border-hair bg-warning-tint px-[14px] py-2">
                     <ul className="space-y-1 text-xs text-warning">
                       {productionState.blockers!.map((blocker, index) => (
                         <li key={`${department}-blocker-${index}`}>
@@ -1523,13 +1523,14 @@ export const SalesPlanPage: React.FC = () => {
                     departmentContainerRefs.current[department] = el;
                   }}
                 >
-                  <div className="px-5 py-3">
+                  <div className="space-y-2 px-[14px] py-2">
                     {csvImportWarning && (
-                      <p className="mb-2 rounded-md border border-warning-tint-border bg-warning-tint px-3 py-2 text-sm text-warning" role="alert">
+                      <p className="rounded-md border border-warning-tint-border bg-warning-tint px-3 py-2 text-sm text-warning" role="alert">
                         {csvImportWarning}
                       </p>
                     )}
                     <EditableDataTable
+                      className="rounded-none border-0"
                       toolbarLeft={
                         <Input
                           aria-label={`Filter items in ${department}`}
@@ -1538,7 +1539,8 @@ export const SalesPlanPage: React.FC = () => {
                           onChange={(event) =>
                             setDepartmentFilters((current) => ({ ...current, [department]: event.target.value }))
                           }
-                          className="h-8 max-w-xs text-sm"
+                          size="compact"
+                          className="max-w-xs"
                         />
                       }
                       columns={departmentColumns}

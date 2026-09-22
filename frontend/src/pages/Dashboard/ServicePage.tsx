@@ -387,39 +387,33 @@ export const ServicePage: React.FC = () => {
         <AttentionFeed title="Needs Attention" items={needsAttention} />
       </Section>
 
-      <Section>
-        <Card className="p-4" data-testid="service-departments-table">
-        <h3 className="text-sm font-semibold mb-2">Revenue by Department</h3>
+      <Section data-testid="service-departments-table">
+        <h3 className="mb-2 text-sm font-semibold">Revenue by Department</h3>
         {departmentRevenueError && (
           <p className="mb-2 text-xs text-destructive" data-testid="service-departments-error">
             {departmentRevenueError}
           </p>
         )}
         <DataTable
-          className="rounded-none border-0"
           columns={departmentColumns}
           rows={departmentRows}
           emptyMessage="No revenue attributed to a department for today yet."
           onRowClick={setSelectedDepartment}
         />
-        </Card>
       </Section>
 
-      <Section>
-        <Card className="p-4" data-testid="service-department-activity-table">
-        <h3 className="text-sm font-semibold mb-2">Activity by Department</h3>
+      <Section data-testid="service-department-activity-table">
+        <h3 className="mb-2 text-sm font-semibold">Activity by Department</h3>
         {departmentActivityError && (
           <p className="mb-2 text-xs text-destructive" data-testid="service-department-activity-error">
             {departmentActivityError}
           </p>
         )}
         <DataTable
-          className="rounded-none border-0"
           columns={activityColumns}
           rows={activityRows}
           emptyMessage="No KOT tickets or completed production for today yet."
         />
-        </Card>
       </Section>
 
       <Drawer

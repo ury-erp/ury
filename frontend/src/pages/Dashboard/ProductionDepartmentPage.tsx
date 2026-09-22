@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Button, Checkbox, DataTable, Input, Page, Panel, Spinner, showToast, type DataTableColumn, messageToPlainText } from '@ury/ui';
+import { Button, Checkbox, DataTable, Input, Page, Spinner, showToast, type DataTableColumn, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -213,7 +213,7 @@ export const ProductionDepartmentPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <Panel className="mt-section">
+        <div className="mt-section">
           {(() => {
             const departmentColumns: DataTableColumn<ProductionDepartmentRecord>[] = [
               {
@@ -246,7 +246,7 @@ export const ProductionDepartmentPage: React.FC = () => {
               />
             );
           })()}
-        </Panel>
+        </div>
       )}
 
       {/* Add/Edit SideDrawer */}
