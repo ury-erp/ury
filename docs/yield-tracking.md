@@ -14,15 +14,16 @@ This document has two parts: **using it** (for restaurant ops / kitchen manageme
 
 ### Where to find it
 
-Everything lives under a **"Yield"** section in the left sidebar, alongside the other
-Dashboard sections (Plan, Operate, Observe, Control, Reports, Setup). It has four pages:
+There is no "Yield" section in the left sidebar. The rail groups screens by stage of your
+workflow (Plan, Operate, Observe, Control, Reports, Setup), not by feature, so the four yield
+pages sit in the group that matches what you're doing:
 
-| Page | URL | What it's for |
-|---|---|---|
-| Standards | `/yield-standards` | Set the expected yield % per ingredient |
-| Variance | `/yield-variance` | See actual vs standard yield per item/branch |
-| Overdue Checks | `/overdue-yield-checks` | See which items are due for a yield check |
-| Compliance | `/yield-compliance` | See how consistently checks are actually happening |
+| Page | Sidebar location | URL | What it's for |
+|---|---|---|---|
+| Yield Standards | Setup | `/yield-standards` | Set the expected yield % per ingredient (done once per ingredient) |
+| Yield Checks | Control | `/overdue-yield-checks` | See which items are due for a yield check right now |
+| Yield Variance | Observe | `/yield-variance` | See actual vs standard yield per item/branch (manager only) |
+| Yield Compliance | Observe | `/yield-compliance` | See how consistently checks are actually happening (manager only) |
 
 There's also a **"Log Usable Output"** action on the existing **Stock** page
 (`/department-stock`), inside the drawer for an authorized raw-material issue — this is where
@@ -30,7 +31,7 @@ you optionally record what you actually got, right where you're already working.
 
 ### Setting up a standard yield (do this first)
 
-1. Go to **Yield → Standards** (`/yield-standards`).
+1. Go to **Setup → Yield Standards** (`/yield-standards`).
 2. Find the raw ingredient (e.g. "Chicken Boneless Breast", "Onion") in the list. This page
    only shows stock items.
 3. Click the row to open the edit drawer.
@@ -94,7 +95,7 @@ future, that is a separate, larger feature not yet built.
 
 ### Seeing what's due
 
-**Yield → Overdue Checks** (`/overdue-yield-checks`) lists items that are due for a check right
+**Control → Yield Checks** (`/overdue-yield-checks`) lists items that are due for a check right
 now, based on each item's cadence policy, with a reason (e.g. "an issue happened and nobody
 logged output yet", or "N days since the last check, interval is M days"). This is a reminder
 list only — nothing is blocked or enforced. A branch with overdue items also gets a daily
@@ -102,11 +103,11 @@ notification summarizing them.
 
 ### Seeing the numbers
 
-**Yield → Variance** (`/yield-variance`) — for each item/branch: the standard %, the most
+**Observe → Yield Variance** (`/yield-variance`) — for each item/branch: the standard %, the most
 recent actual %, the gap between them, and when it was last checked. Use this to spot
 ingredients where reality has drifted from what recipes/costing assume.
 
-**Yield → Compliance** (`/yield-compliance`) — for each tracked item: how many checks were
+**Observe → Yield Compliance** (`/yield-compliance`) — for each tracked item: how many checks were
 *required* by its cadence policy over the last 30 days vs how many were *actually* done, as a
 percentage, plus how many of those were logged against a real issue vs standalone. Use this to
 see which branches/items are actually keeping up with checks vs which are being ignored.
