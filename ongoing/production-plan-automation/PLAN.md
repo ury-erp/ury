@@ -1558,6 +1558,13 @@ only.
   Production returns actionable errors, and the background job records failure in
   `custom_ury_production_result` and sets `Production Failed`.
 - Test idempotency at every layer, not only at the orchestrator.
+- **Never mock `frappe.msgprint` as a bare `MagicMock`.** `frappe.throw` is
+  implemented as `msgprint(msg, raise_exception=exc, ...)`, so a bare mock
+  silently swallows every `frappe.throw` in the code under test and a test
+  asserting that something fails closed will pass while nothing raises. Give
+  the mock a `side_effect` that still raises when called with
+  `raise_exception=`. Found while writing the cancel-hook tests; only that
+  module was affected, and it is fixed there.
 - Treat rollback as a safety net, not the idempotency mechanism.
 - Do not modify normal ERPNext Work Order behaviour outside URY-linked
   Production Plans, and change no site-wide Manufacturing Setting.
