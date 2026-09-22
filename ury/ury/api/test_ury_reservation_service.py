@@ -216,8 +216,8 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
         def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
             if doctype == "BOM Item":
                 return [
-                    frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-                    frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+                    frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", bom_no=None),
+                    frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", bom_no=None),
                 ]
             return []  # no pre-existing active reservations
 
@@ -263,8 +263,8 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
         def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
             if doctype == "BOM Item":
                 return [
-                    frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
-                    frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+                    frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", bom_no=None),
+                    frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", bom_no=None),
                 ]
             return []
 
@@ -349,14 +349,12 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
                             item_code="BUN",
                             stock_qty=1,
                             stock_uom="Nos",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="SUB_PATTY",
                             stock_qty=1,
                             stock_uom="Nos",
-                            is_sub_assembly_item=1,
                             bom_no="BOM-PATTY-001",
                         ),
                     ]
@@ -366,14 +364,12 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
                             item_code="MEAT",
                             stock_qty=0.1,
                             stock_uom="Kg",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="BREADING",
                             stock_qty=0.02,
                             stock_uom="Kg",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                     ]

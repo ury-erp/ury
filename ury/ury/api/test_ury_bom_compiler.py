@@ -34,7 +34,7 @@ def _explosion_only_get_all(explosion_rows):
     """get_all side_effect: `explosion_rows` for BOM Explosion Item, [] otherwise.
 
     Models a pure "grouping"/no-sub-assembly BOM: the pre-produced-stop-point
-    tree scan (which queries `BOM Item` for `is_sub_assembly_item=1` rows)
+    tree scan (which queries `BOM Item` for `` rows)
     finds nothing, so the fast `BOM Explosion Item` path is used, matching
     pre-existing single-level-BOM behavior.
     """
@@ -106,14 +106,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Patty Mix",
                             stock_qty=1,
                             stock_uom="Nos",
-                            is_sub_assembly_item=1,
                             bom_no="BOM-PATTYMIX-001",
                         ),
                         frappe._dict(
                             item_code="Bun",
                             stock_qty=1,
                             stock_uom="Nos",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                     ]
@@ -123,14 +121,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Beef",
                             stock_qty=0.2,
                             stock_uom="Kg",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                         frappe._dict(
                             item_code="Spice Mix",
                             stock_qty=0.01,
                             stock_uom="Kg",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                     ]
@@ -190,14 +186,12 @@ class TestCompileBomVectorNested(unittest.TestCase):
                             item_code="Masala",
                             stock_qty=1,
                             stock_uom="Kg",
-                            is_sub_assembly_item=1,
                             bom_no="BOM-MASALA-001",
                         ),
                         frappe._dict(
                             item_code="Dosa Batter",
                             stock_qty=1,
                             stock_uom="Kg",
-                            is_sub_assembly_item=0,
                             bom_no=None,
                         ),
                     ]
@@ -205,11 +199,11 @@ class TestCompileBomVectorNested(unittest.TestCase):
                     return [
                         frappe._dict(
                             item_code="Rice", stock_qty=0.5, stock_uom="Kg",
-                            is_sub_assembly_item=0, bom_no=None,
+                            bom_no=None,
                         ),
                         frappe._dict(
                             item_code="Spices", stock_qty=0.05, stock_uom="Kg",
-                            is_sub_assembly_item=0, bom_no=None,
+                            bom_no=None,
                         ),
                     ]
             return []
