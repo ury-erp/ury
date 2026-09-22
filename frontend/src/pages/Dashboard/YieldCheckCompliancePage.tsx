@@ -16,15 +16,21 @@ interface ComplianceRow {
   cadence: string;
   required_count: number;
   completed_count: number;
-  compliance_percent: number;
+  // null when required_count === 0: no checks were required in the window, so
+  // compliance is NOT MEASURABLE (rendered "N/A", excluded from any average).
+  compliance_percent: number | null;
   attached_count: number;
 }
 
-const getComplianceColor = (percent: number): string => {
+const getComplianceColor = (percent: number | null): string => {
+  if (percent === null || percent === undefined) return 'text-muted-foreground';
   if (percent >= 80) return 'text-green-600';
   if (percent >= 50) return 'text-yellow-600';
   return 'text-red-600';
 };
+
+const formatCompliance = (percent: number | null): string =>
+  percent === null || percent === undefined ? 'N/A' : `${percent.toFixed(1)}%`;
 
 export const YieldCheckCompliancePage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
@@ -158,8 +164,15 @@ export const YieldCheckCompliancePage: React.FC = () => {
       header: 'Compliance %',
       align: 'right',
       render: (row) => (
-        <span className={`${numericCellClass} ${getComplianceColor(row.compliance_percent)}`}>
-          {row.compliance_percent.toFixed(1)}%
+        <span
+          className={`${numericCellClass} ${getComplianceColor(row.compliance_percent)}`}
+          title={
+            row.compliance_percent === null || row.compliance_percent === undefined
+              ? 'No checks were required for this item in the last 30 days, so compliance is not measurable.'
+              : undefined
+          }
+        >
+          {formatCompliance(row.compliance_percent)}
         </span>
       ),
     },
@@ -181,6 +194,10 @@ export const YieldCheckCompliancePage: React.FC = () => {
         <h1 className="text-xl font-semibold text-foreground">Yield Check Compliance</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Monitor compliance with yield check cadence requirements. Last 30 days of data.
+        </p>
+        <p className="mt-1 text-xs text-text-tertiary">
+          Items with no checks required in this window show <span className="font-medium">N/A</span>{' '}
+          rather than 100% — nothing was due, so compliance is not measurable.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">

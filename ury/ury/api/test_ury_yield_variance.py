@@ -799,18 +799,20 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		self._ensure_company(self.company, "F9CC")
 		self._ensure_branch(self.branch, self.company)
 
-	def test_real_compliance_reports_100_percent_for_zero_required_count(self):
-		"""Documents CURRENT behavior: an Interval-cadence item with
-		interval_days<=0 (skipped by the engine, so required_count == 0)
-		reports compliance_percent == 100.0 -- a flattering default that
-		looks like an accidental `x/0 -> 100` fallback rather than a
-		documented product decision (see TRACK.md F9/Opus review). This
-		test does NOT assert that 100% is the *correct* semantics, only
-		that it is the semantics actually shipped today, against a real
-		inserted Item and a real (unmocked) call to
-		get_yield_check_compliance -- so a future intentional change to
-		this default will show up here as a deliberate test update, not a
-		silent behavior change.
+	def test_real_compliance_is_null_for_zero_required_count(self):
+		"""DECIDED (TRACK.md F9): required_count == 0 means NOT MEASURABLE,
+		so compliance_percent is None (JSON null), NOT a flattering 100%.
+
+		An Interval-cadence item with interval_days<=0 is skipped by the
+		cadence engine, so nothing was ever due -- reporting 100% would
+		render the most common row type on the Compliance dashboard as a
+		green "fully compliant" for an item that was never checked at all,
+		inverting the purpose of the page. None lets the dashboard show
+		"N/A" and keeps the row out of any average.
+
+		Real inserted Item + real (unmocked) call to
+		get_yield_check_compliance, so any regression back to the old
+		`x/0 -> 100` fallback fails here.
 		"""
 		item_code = "F9-COMPLIANCE-ZERO-REQ-ITEM"
 		self._ensure_item(
@@ -828,7 +830,13 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		row = next((r for r in rows if r["item"] == item_code), None)
 		self.assertIsNotNone(row, "expected the real inserted item to appear in compliance rows")
 		self.assertEqual(row["required_count"], 0)
-		self.assertEqual(row["compliance_percent"], 100.0)
+		self.assertIsNone(
+			row["compliance_percent"],
+			"required_count == 0 must report None (not measurable), not 100%",
+		)
+		# The key must still be present so the frontend can distinguish
+		# "not measurable" from "field missing / API shape changed".
+		self.assertIn("compliance_percent", row)
 
 	def test_real_compliance_computes_from_real_authorizations_and_checks(self):
 		"""Every Issue cadence: 2 real Authorized Issue Authorizations, only
