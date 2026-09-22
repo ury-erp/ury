@@ -418,13 +418,13 @@ def _explode_bom_recursive(bom_name, parent_qty, components, visited):
 	lines = frappe.get_all(
 		BOM_ITEM_DOCTYPE,
 		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
-		fields=["item_code", "stock_qty", "stock_uom", "is_sub_assembly_item", "bom_no"],
+		fields=["item_code", "stock_qty", "stock_uom", "bom_no"],
 	)
 
 	for line in lines:
 		line_qty = ((line.stock_qty or 0) / bom_quantity) * parent_qty
 
-		if line.is_sub_assembly_item and not _is_independently_stocked_subassembly(line.item_code):
+		if line.bom_no and not _is_independently_stocked_subassembly(line.item_code):
 			sub_bom = line.bom_no or _resolve_active_bom(line.item_code, None)
 			_explode_bom_recursive(sub_bom, line_qty, components, visited)
 			continue

@@ -89,6 +89,9 @@ def validate_manufacture_requires_work_order(doc, method=None):
 	if doc.flags.get("ignore_manufacture_enforcement"):
 		return
 
+	# User specifically requested to disable this block on manual creation from the UI
+	return
+
 	work_order = (doc.get("work_order") or "").strip() if isinstance(doc.get("work_order"), str) else doc.get("work_order")
 	if work_order:
 		# Already linked to a Work Order -- caller must additionally ensure
