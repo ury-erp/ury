@@ -118,6 +118,71 @@ class TestYieldCheckValidateInputQty(FrappeTestCase):
 		mock_throw.assert_not_called()
 
 
+class TestYieldCheckValidateOutputQty(FrappeTestCase):
+	"""Test Check 2b: validate_output_qty (F1)"""
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_zero(self, mock_throw):
+		"""Output quantity of 0 fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=0))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("Output quantity must be greater than zero", call_args[0])
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_negative(self, mock_throw):
+		"""Negative output quantity fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=-5))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("Output quantity must be greater than zero", call_args[0])
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_none(self, mock_throw):
+		"""None output quantity fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=None))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_passes_without_warning_when_output_within_input(self, mock_throw, mock_msgprint):
+		"""Output <= input passes validation with no warning."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=100, output_qty=85))
+		doc.validate_output_qty()
+
+		mock_throw.assert_not_called()
+		mock_msgprint.assert_not_called()
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_warns_but_does_not_block_when_output_exceeds_input(self, mock_throw, mock_msgprint):
+		"""Output > input does not hard-block, but raises a warning (soft-flag)."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=100, output_qty=120))
+		doc.validate_output_qty()
+
+		mock_throw.assert_not_called()
+		mock_msgprint.assert_called_once()
+		call_kwargs = mock_msgprint.call_args[1]
+		call_args = mock_msgprint.call_args[0]
+		self.assertIn("greater than input quantity", call_args[0])
+		self.assertEqual(call_kwargs.get("indicator"), "orange")
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_no_warning_when_input_qty_missing(self, mock_throw, mock_msgprint):
+		"""No output>input warning is attempted when input_qty is falsy (avoids false positives)."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=0, output_qty=10))
+		doc.validate_output_qty()
+
+		mock_msgprint.assert_not_called()
+
+
 class TestYieldCheckCaptureStandardYieldSnapshot(FrappeTestCase):
 	"""Test Check 3: capture_standard_yield_snapshot"""
 
