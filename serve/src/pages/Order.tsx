@@ -302,7 +302,7 @@ export default function OrderPage() {
         showToast.error('Select a customer first.')
         return
       }
-      if (!isTakeaway && (!Number.isInteger(noOfPax) || noOfPax < 1)) {
+      if (!isTakeaway && (!Number.isInteger(Number(noOfPax)) || Number(noOfPax) < 1)) {
         showToast.error('Enter number of guests.')
         return
       }
@@ -353,7 +353,7 @@ export default function OrderPage() {
           // Same string the cart holds — never regenerate or derive from row name.
           reservation_line_key: item.reservationLineKey || item.uniqueId,
         })),
-        no_of_pax: noOfPax,
+        no_of_pax: Number(noOfPax),
         pos_profile: posProfile.name,
         order_type: isTakeaway ? selectedOrderType || TAKEAWAY : DINE_IN,
         table: isTakeaway ? undefined : table,
@@ -472,7 +472,7 @@ export default function OrderPage() {
           <span className="text-xs font-medium text-gray-600">Pax</span>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => setNoOfPax(Math.max(1, noOfPax - 1))}
+              onClick={() => setNoOfPax(Number(noOfPax) - 1)}
               variant="outline"
               size="icon"
               className="h-9 w-9 rounded-full"
@@ -483,7 +483,7 @@ export default function OrderPage() {
             </Button>
             <span className="min-w-6 text-center text-sm font-medium tabular-nums">{noOfPax}</span>
             <Button
-              onClick={() => setNoOfPax(Math.min(50, noOfPax + 1))}
+              onClick={() => setNoOfPax(Number(noOfPax) + 1)}
               variant="outline"
               size="icon"
               className="h-9 w-9 rounded-full"

@@ -631,6 +631,24 @@ describe('Order page flow', () => {
     expect(syncOrder).not.toHaveBeenCalled()
   })
 
+  it('allows sync when pax is a numeric string from a reloaded order', async () => {
+    const user = userEvent.setup()
+    resetFixtures({
+      existingOrder: true,
+      withCart: true,
+      customer: { id: 'CUST-1', name: 'Ada', phone: '999' },
+      noOfPax: '2' as unknown as number,
+    })
+    syncOrder.mockResolvedValue({ message: { name: 'INV-1', status: 'Draft' } })
+    render(<OrderPage />)
+
+    await user.click(screen.getByRole('button', { name: 'Update Order' }))
+
+    expect(showToastError).not.toHaveBeenCalledWith('Enter number of guests.')
+    expect(syncOrder).toHaveBeenCalled()
+    expect(syncOrder.mock.calls[0][0].no_of_pax).toBe(2)
+  })
+
   it('passes table quantity role flags into ServeMenu', () => {
     resetFixtures({
       existingOrder: false,
