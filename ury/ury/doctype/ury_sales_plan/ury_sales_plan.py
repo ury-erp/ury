@@ -82,6 +82,20 @@ class URYSalesPlan(Document):
 				validate_items_on_active_menu(self, strict=True)
 				validate_plan_items(self)
 				validate_no_overlapping_plan_scope(self)
+				# Track-Item F6: re-run the (warn-only, never-blocking) staleness
+				# check one last time right before the snapshot freeze. A
+				# component's custom_yield_percent -- and therefore its BOM's
+				# custom_bom_revision -- can change between the last Draft/
+				# Proposed save (the only status this function otherwise runs
+				# on, see the guard above) and this Approved click, so each
+				# row's bom_revision_stale flag can already be out of date by
+				# the time the plan is locked. This does not block approval --
+				# flag_stale_bom_revisions never raises, by design (see its
+				# docstring) -- it just ensures the row-level stale flag that
+				# gets saved alongside the frozen approval_snapshot reflects
+				# the most current read rather than a possibly-stale one left
+				# over from an earlier save.
+				flag_stale_bom_revisions(self)
 				freeze_approval_snapshot(self)
 				# Track-Item N7: never let a bug here block the plan's own
 				# approval save -- belt and suspenders on top of the
