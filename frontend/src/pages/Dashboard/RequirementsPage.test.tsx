@@ -21,9 +21,6 @@ vi.mock("../../services/salesPlan", () => ({
   salesPlanService: {
     getPlan: vi.fn(),
   },
-  buildSalesPlanDraftKey: vi.fn(),
-  getSalesPlanDraftQuantities: vi.fn().mockReturnValue({}),
-  saveSalesPlanDraftQuantities: vi.fn(),
 }));
 
 describe("RequirementsPage", () => {
@@ -173,6 +170,29 @@ describe("RequirementsPage", () => {
         { item_code: "EG", department: "Kitchen" },
         { item_code: "EG", department: "Salad" },
       ]);
+    });
+  });
+
+  describe("production target quantities are read-only", () => {
+    // getActivePlan only ever returns a plan in an approved/locked state
+    // (see departmentStock.ts) -- i.e. one that has been submitted, so its
+    // quantities are frozen and must not be presented as editable.
+    beforeEach(() => {
+      vi.mocked(salesPlanService.getPlan).mockResolvedValue({
+        name: "PLAN-001",
+        company: "Main",
+        items: [{ item_code: "Chicken Biryani", qty: 10, department: "Kitchen", stock_uom: "Nos" }],
+      } as any);
+    });
+
+    it("renders the quantity as plain text, not an editable control", async () => {
+      render(<RequirementsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("10 Nos")).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: /production target quantity/i })).not.toBeInTheDocument();
     });
   });
 });

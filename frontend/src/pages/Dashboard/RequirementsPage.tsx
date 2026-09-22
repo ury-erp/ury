@@ -6,7 +6,6 @@ import {
   DataTable,
   DataTableColumn,
   DatePicker,
-  InlineEditCell,
   KpiStrip,
   Page,
   PageHeader,
@@ -16,7 +15,7 @@ import {
 } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { departmentStockService, PlanComponentDemand } from '../../services/departmentStock';
-import { buildSalesPlanDraftKey, getSalesPlanDraftQuantities, salesPlanService, saveSalesPlanDraftQuantities } from '../../services/salesPlan';
+import { salesPlanService } from '../../services/salesPlan';
 
 /**
  * Real data used here:
@@ -33,12 +32,19 @@ import { buildSalesPlanDraftKey, getSalesPlanDraftQuantities, salesPlanService, 
  *    "Not available" with an honest hint rather than a fabricated zero.
  *  - `salesPlanService.getPlan(planName)` -> the same approved plan's raw
  *    `items` child table (item_code/qty/department/production_unit/
- *    stock_uom) is used for "Production targets". Quantities are
- *    inline-editable via `InlineEditCell`, and edits are persisted with the
- *    exact same localStorage draft mechanism `SalesPlanPage.tsx` uses
- *    (`buildSalesPlanDraftKey` + `saveSalesPlanDraftQuantities` /
- *    `getSalesPlanDraftQuantities`), so a quantity tweaked here shows back up
- *    on the Sales Plan page for the same branch/date.
+ *    stock_uom) is used for "Production targets", READ-ONLY. Requirements
+ *    only ever loads a plan whose `status` is already an approved/locked
+ *    state (`getActivePlan` -- see departmentStock.ts), i.e. one that has
+ *    been submitted; a submitted Sales Plan's quantities are the
+ *    authoritative, frozen numbers production is working against, so this
+ *    page must not offer to edit them. (It previously did, via an
+ *    `InlineEditCell` that persisted to the SAME localStorage draft
+ *    mechanism `SalesPlanPage.tsx` uses for its own UNSUBMITTED drafts --
+ *    which never touched the Sales Plan document, its approval snapshot,
+ *    or any Production Plan, so it looked editable without being
+ *    authoritative. Removed rather than wired to a real update, because
+ *    there is no real update to make: change the submitted plan through
+ *    Sales Plan's own revision/supersede workflow instead.)
  */
 
 interface RawSalesPlanItem {
@@ -90,15 +96,9 @@ export const RequirementsPage: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionTargetRow[]>([]);
   const [planName, setPlanName] = useState<string | null>(null);
   const [planStatus, setPlanStatus] = useState<string | null>(null);
-  const [planCompany, setPlanCompany] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stockData, setStockData] = useState<Map<string, any>>(new Map());
-
-  const draftKey = useMemo(() => {
-    if (!activeBranchId || activeBranchId === 'all' || !planCompany || !requirementsDate) return null;
-    return buildSalesPlanDraftKey({ branch: activeBranchId, company: planCompany, plan_date: requirementsDate });
-  }, [activeBranchId, planCompany, requirementsDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +106,6 @@ export const RequirementsPage: React.FC = () => {
     setError(null);
     setPlanName(null);
     setPlanStatus(null);
-    setPlanCompany(undefined);
     setDemandVector([]);
     setProductionItems([]);
 
@@ -139,21 +138,11 @@ export const RequirementsPage: React.FC = () => {
         const rawPlan = (await salesPlanService.getPlan(activePlan.name)) as unknown as RawSalesPlanDoc;
         if (cancelled) return;
 
-        setPlanCompany(rawPlan.company);
-
-        const savedQuantities = getSalesPlanDraftQuantities(
-          buildSalesPlanDraftKey({
-            branch: activeBranchId,
-            company: rawPlan.company,
-            plan_date: requirementsDate,
-          }),
-        );
-
         const items = Array.isArray(rawPlan.items) ? rawPlan.items : [];
         setProductionItems(
           items.map((item) => ({
             item_code: item.item_code,
-            qty: Number.isFinite(savedQuantities[item.item_code]) ? savedQuantities[item.item_code] : Number(item.qty ?? 0),
+            qty: Number(item.qty ?? 0),
             stock_uom: item.stock_uom,
             department: item.department,
             production_unit: item.production_unit,
@@ -268,31 +257,6 @@ export const RequirementsPage: React.FC = () => {
     };
   }, [demandVector, stockData]);
 
-  const persistProductionQuantities = (nextItems: ProductionTargetRow[]) => {
-    if (!draftKey) return;
-    saveSalesPlanDraftQuantities(
-      draftKey,
-      nextItems.map((item) => ({ item_code: item.item_code, planned_qty: item.qty })),
-    );
-  };
-
-  const updateProductionQty = (itemCode: string, rawValue: string) => {
-    const nextQty = Math.max(0, Number(rawValue) || 0);
-    setProductionItems((current) => {
-      const next = current.map((item) => (item.item_code === itemCode ? { ...item, qty: nextQty } : item));
-      return next;
-    });
-  };
-
-  const commitProductionQty = (itemCode: string, rawValue: string) => {
-    const nextQty = Math.max(0, Number(rawValue) || 0);
-    setProductionItems((current) => {
-      const next = current.map((item) => (item.item_code === itemCode ? { ...item, qty: nextQty } : item));
-      persistProductionQuantities(next);
-      return next;
-    });
-  };
-
   const materialsColumns: DataTableColumn<PlanComponentDemand>[] = [
     { key: 'component_item', header: 'Material', render: (row) => (
       <div>
@@ -359,17 +323,10 @@ export const RequirementsPage: React.FC = () => {
       key: 'qty',
       header: 'Quantity',
       align: 'right',
-      render: (row) => (
-        <InlineEditCell
-          aria-label={`Production target quantity for ${row.item_code}`}
-          value={row.qty}
-          type="number"
-          min="0"
-          step="0.001"
-          onChange={(value) => updateProductionQty(row.item_code, value)}
-          onCommit={(value) => commitProductionQty(row.item_code, value)}
-        />
-      ),
+      // Read-only: this is a submitted Sales Plan's frozen quantity, not a
+      // draft -- see the module docstring above for why an editor was
+      // removed rather than wired to a real update.
+      render: (row) => <span className={numericCellClass}>{formatQty(row.qty, row.stock_uom)}</span>,
     },
   ];
 
