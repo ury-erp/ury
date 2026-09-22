@@ -209,9 +209,11 @@ class TestURYOrder(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_cached_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice):
+    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_roles, mock_get_doc, mock_get_cached_doc, mock_get_value, mock_has_permission, mock_get_order_invoice):
         # Setup new invoice
         mock_invoice = MagicMock()
         mock_invoice.name = None # New invoice
@@ -223,14 +225,24 @@ class TestURYOrder(FrappeTestCase):
         
         mock_get_order_invoice.return_value = mock_invoice
         
-        mock_pos_profile = MagicMock()
-        mock_pos_profile.custom_enable_multiple_cashier = 0
+        # _make_pos_profile() initializes role_restricted_for_table_order and
+        # friends to real lists; a bare MagicMock() leaves those unconfigured
+        # so _has_role()'s `for row in role_permitted_rows` raises a TypeError.
+        mock_pos_profile = _make_pos_profile(custom_enable_multiple_cashier=0)
         mock_pos_profile.applicable_for_users = []
         mock_get_doc.return_value = mock_pos_profile
+        # resolve_order_performer() looks the profile up via get_cached_doc, not
+        # get_doc; unmocked, it hits the real Redis cache with a MagicMock.
+        mock_get_cached_doc.return_value = mock_pos_profile
         
         mock_session.user = "newuser@example.com"
+        mock_get_roles.return_value = ["URY Cashier"]
         
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql") as mock_sql:
+        # _require_open_cashier_session() (fail-closed POS-open check) isn't
+        # mocked otherwise, so it throws "POS is closed" before the
+        # cashier/waiter assignment this test targets is ever reached.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql") as mock_sql, \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True):
             try:
                 sync_order(
                     items="[]",
@@ -769,10 +781,11 @@ class TestURYOrder(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_cached_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_allocates_new_invoice_ref_before_reservation(self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile):
+    def test_sync_order_allocates_new_invoice_ref_before_reservation(self, mock_session, mock_get_roles, mock_get_doc, mock_get_cached_doc, mock_get_value, mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile):
         events = []
         mock_invoice = MagicMock()
         mock_invoice.name = None
@@ -792,11 +805,15 @@ class TestURYOrder(FrappeTestCase):
 
         mock_get_order_invoice.return_value = mock_invoice
         mock_price_items.return_value = [{"item_code": "ITEM-1", "qty": 1}]
-        mock_get_doc.return_value = _make_pos_profile(
+        mock_pos_profile = _make_pos_profile(
             transfer_role_permissions=("URY Manager",),
             role_allowed_for_billing=("URY Manager",),
             remove_items=1,
         )
+        mock_get_doc.return_value = mock_pos_profile
+        # resolve_order_performer() looks the profile up via get_cached_doc, not
+        # get_doc; unmocked, it hits the real Redis cache with a MagicMock.
+        mock_get_cached_doc.return_value = mock_pos_profile
         mock_get_roles.return_value = ["URY Manager"]
         mock_session.user = "manager@example.com"
         # A single blanket return_value would also answer the new-items-on-
@@ -913,11 +930,12 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_cached_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
-        self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
+        self, mock_session, mock_get_roles, mock_get_doc, mock_get_cached_doc, mock_get_value, mock_has_permission,
         mock_price_items, mock_get_order_invoice, mock_kot_execute, mock_reconcile,
     ):
         mock_invoice = MagicMock()
@@ -940,7 +958,11 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         mock_pos_profile.custom_enable_multiple_cashier = 0
         mock_pos_profile.applicable_for_users = []
         mock_pos_profile.role_allowed_for_billing = [billing_role]
+        mock_pos_profile.get.return_value = None
         mock_get_doc.return_value = mock_pos_profile
+        # resolve_order_performer() looks the profile up via get_cached_doc, not
+        # get_doc; unmocked, it hits the real Redis cache with a MagicMock.
+        mock_get_cached_doc.return_value = mock_pos_profile
 
         mock_session.user = "authorized@example.com"
         mock_has_permission.return_value = True
@@ -1444,6 +1466,7 @@ class TestSyncOrderHardening(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_cached_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
@@ -1452,6 +1475,7 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_session,
         mock_get_roles,
         mock_get_doc,
+        mock_get_cached_doc,
         mock_db_get_value,
         mock_has_permission,
         mock_get_order_invoice,
@@ -1478,6 +1502,9 @@ class TestSyncOrderHardening(FrappeTestCase):
 
         mock_pos_profile = _make_pos_profile(remove_items=0)
         mock_get_doc.return_value = mock_pos_profile
+        # resolve_order_performer() looks the profile up via get_cached_doc, not
+        # get_doc; unmocked, it hits the real Redis cache with a MagicMock.
+        mock_get_cached_doc.return_value = mock_pos_profile
 
         mock_get_roles.return_value = ["URY Captain"]
         mock_session.user = "captain@example.com"  # is_mine True: ownership check passes
