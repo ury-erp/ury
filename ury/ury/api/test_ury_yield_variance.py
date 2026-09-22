@@ -18,6 +18,7 @@ from ury.ury.api.ury_yield_variance import (
 	record_yield_check,
 	get_yield_variance,
 	get_yield_check_compliance,
+	update_yield_standards,
 	user_has_branch_access,
 	branch_item_codes,
 )
@@ -861,6 +862,236 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 		self.assertEqual(row["required_count"], 2)
 		self.assertEqual(row["completed_count"], 1)
 		self.assertEqual(row["compliance_percent"], 50.0)
+
+
+class TestUpdateYieldStandardsPermissionGating(FrappeTestCase):
+	"""F2: update_yield_standards must be manager-gated -- these are
+	costing-grade fields (drive BOM back-calculation and Yield Check variance
+	baselines) that were previously writable by anyone with plain Item write
+	permission via a raw frappe.client.set_value call from the frontend."""
+
+	@patch(f"{MOD}.require_manager")
+	def test_require_manager_called_and_enforced(self, mock_manager):
+		"""A non-manager caller is rejected before anything else runs."""
+		mock_manager.side_effect = frappe.PermissionError
+
+		with self.assertRaises(frappe.PermissionError):
+			update_yield_standards(
+				item="TEST-ITEM",
+				custom_yield_tracked=1,
+				custom_yield_percent=85,
+				custom_yield_check_cadence="Every Issue",
+				custom_yield_check_interval_days=0,
+			)
+
+		mock_manager.assert_called_once()
+
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_manager_write_succeeds_and_saves_fields(self, mock_manager, mock_exists, mock_get_doc):
+		"""A manager caller passes the gate and the four fields are set + saved."""
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+		mock_doc = MagicMock()
+		mock_doc.name = "TEST-ITEM"
+		mock_doc.custom_yield_tracked = 1
+		mock_doc.custom_yield_percent = 85.0
+		mock_doc.custom_yield_check_cadence = "Every Issue"
+		mock_doc.custom_yield_check_interval_days = 0
+		mock_get_doc.return_value = mock_doc
+
+		result = update_yield_standards(
+			item="TEST-ITEM",
+			custom_yield_tracked=1,
+			custom_yield_percent=85,
+			custom_yield_check_cadence="Every Issue",
+			custom_yield_check_interval_days=0,
+		)
+
+		mock_manager.assert_called_once()
+		mock_doc.set.assert_any_call("custom_yield_tracked", 1)
+		mock_doc.set.assert_any_call("custom_yield_percent", 85.0)
+		mock_doc.set.assert_any_call("custom_yield_check_cadence", "Every Issue")
+		mock_doc.set.assert_any_call("custom_yield_check_interval_days", 0)
+		mock_doc.save.assert_called_once_with(ignore_permissions=False)
+		self.assertEqual(result["item"], "TEST-ITEM")
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_missing_item(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item=None, custom_yield_percent=85)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_out_of_range_percent(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_percent=150)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_invalid_cadence(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_check_cadence="Bogus")
+
+
+class TestYieldStandardFieldsRawWritePathBlocked(FrappeTestCase):
+	"""F2 follow-up (PR #435 adversarial review): the permission-gating tests
+	above only prove that update_yield_standards() calls require_manager() --
+	they patch require_manager() itself, so they cannot detect whether the
+	underlying fields are still writable by any other path. That was exactly
+	the bug: the four yield-standard fields were permlevel: 0, so a plain
+	Item-write role (no URY Manager / System Manager) could still call
+	frappe.client.set_value directly -- or just doc.save() -- and bypass
+	update_yield_standards() entirely.
+
+	These tests exercise the REAL permission system (real frappe.set_user,
+	real Item Manager role, no mocking of require_manager or of Frappe's
+	permission/permlevel machinery) against the raw low-level write paths,
+	not the update_yield_standards() wrapper. They must fail before the
+	permlevel: 1 fix (fixtures/custom_field.json + patches/v3_26) and pass
+	after it.
+	"""
+
+	YIELD_STANDARD_FIELDS = (
+		"custom_yield_percent",
+		"custom_yield_tracked",
+		"custom_yield_check_cadence",
+		"custom_yield_check_interval_days",
+	)
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+
+		cls.item_code = "_TEST-F2-YIELD-STANDARD-ITEM"
+		if not frappe.db.exists("Item", cls.item_code):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			doc = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": cls.item_code,
+				"item_name": cls.item_code,
+				"item_group": item_group,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"custom_yield_percent": 40,
+				"custom_yield_tracked": 0,
+			})
+			doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+		# A user with plain Item write permission (Item Manager is a core
+		# ERPNext role with read/write/create on Item at permlevel 0) but
+		# NEITHER URY Manager NOR System Manager -- this is the exact
+		# attacker profile from the F2 finding.
+		cls.nonmanager_user = "_test-f2-yield-nonmanager@example.com"
+		if not frappe.db.exists("User", cls.nonmanager_user):
+			frappe.get_doc({
+				"doctype": "User",
+				"email": cls.nonmanager_user,
+				"first_name": "F2NonManager",
+				"send_welcome_email": 0,
+				"roles": [{"role": "Item Manager"}],
+			}).insert(ignore_permissions=True)
+
+		cls.manager_user = "_test-f2-yield-manager@example.com"
+		if not frappe.db.exists("User", cls.manager_user):
+			frappe.get_doc({
+				"doctype": "User",
+				"email": cls.manager_user,
+				"first_name": "F2Manager",
+				"send_welcome_email": 0,
+				"roles": [{"role": "URY Manager"}],
+			}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Item", self.item_code, "custom_yield_percent", 40)
+		frappe.db.commit()
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_nonmanager_cannot_raw_set_value_yield_percent(self):
+		"""A non-manager with plain Item write permission cannot change
+		custom_yield_percent via the raw frappe.client.set_value endpoint --
+		the same call the frontend used to make before #435, and that any
+		curl/devtools caller can still make directly against the API."""
+		from frappe.client import set_value
+
+		self.assertNotIn("URY Manager", frappe.get_roles(self.nonmanager_user))
+		self.assertNotIn("System Manager", frappe.get_roles(self.nonmanager_user))
+
+		frappe.set_user(self.nonmanager_user)
+		try:
+			set_value("Item", self.item_code, "custom_yield_percent", 99)
+		except frappe.PermissionError:
+			pass  # also an acceptable outcome
+		finally:
+			frappe.db.rollback()
+			frappe.set_user("Administrator")
+
+		# The real assertion: regardless of whether an exception was raised,
+		# the value must NOT have been persisted for a non-manager.
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			40.0,
+			"custom_yield_percent was written by a non-manager via the raw "
+			"set_value path -- the F2 permission hole is still open.",
+		)
+
+	def test_nonmanager_cannot_raw_doc_save_yield_percent(self):
+		"""Same as above but via frappe.get_doc(...).save() directly --
+		confirms the block is a real permission boundary (permlevel /
+		validate hook), not just something wired into the set_value RPC
+		wrapper specifically."""
+		frappe.set_user(self.nonmanager_user)
+		try:
+			doc = frappe.get_doc("Item", self.item_code)
+			doc.custom_yield_percent = 88
+			doc.save()
+		except frappe.PermissionError:
+			pass
+		finally:
+			frappe.db.rollback()
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			40.0,
+			"custom_yield_percent was written by a non-manager via doc.save() "
+			"directly -- the F2 permission hole is still open.",
+		)
+
+	def test_manager_can_still_update_via_update_yield_standards(self):
+		"""Regression check: the intended, manager-gated path must keep
+		working after the permlevel change -- managers still need to be able
+		to set these fields through update_yield_standards()."""
+		frappe.set_user(self.manager_user)
+		try:
+			result = update_yield_standards(
+				item=self.item_code,
+				custom_yield_percent=77,
+			)
+			self.assertEqual(result["custom_yield_percent"], 77.0)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			77.0,
+		)
 
 
 if __name__ == "__main__":

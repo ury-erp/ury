@@ -6,6 +6,7 @@ def validate(doc, method):
 	update_menu_item(doc, method)
 	update_variants_add_on(doc, method)
 	validate_yield_tracking(doc, method)
+	validate_yield_standard_permission(doc, method)
 
 
 def update_menu_item(doc, event):
@@ -23,6 +24,57 @@ def update_variants_add_on(doc, event):
 		for row in doc.custom_pos_item_variants:
 			if not frappe.db.exists("URY Menu Item", {"item": row.item}):
 				frappe.throw(f"Item '{row.item}' in POS Item Variants is not in URY Menu")
+
+
+YIELD_STANDARD_FIELDS = (
+	"custom_yield_percent",
+	"custom_yield_tracked",
+	"custom_yield_check_cadence",
+	"custom_yield_check_interval_days",
+)
+
+
+def validate_yield_standard_permission(doc, method):
+	"""Defense-in-depth: reject changes to the four yield-standard fields
+	from anyone but a manager, no matter how the write reaches Item.save().
+
+	F2 follow-up (PR #435 adversarial review): permlevel: 1 on these fields
+	(see fixtures/custom_field.json + patches/v3_26) is the primary
+	permission boundary now, but Item is a shared core doctype and permlevel
+	handling has historically been easy to get wrong (e.g. silently
+	dropping disallowed fields instead of raising, or a future fixture
+	regression resetting permlevel back to 0). This hook is a second,
+	code-level backstop: it runs on every save -- Desk, REST, the raw
+	frappe.client.set_value path, and update_yield_standards() alike -- and
+	throws instead of silently no-op'ing, so a permlevel misconfiguration
+	degrades to "blocked with a clear error" rather than "silently open".
+	"""
+	if _is_yield_standard_manager():
+		return
+
+	before = doc.get_doc_before_save()
+	for fieldname in YIELD_STANDARD_FIELDS:
+		current = doc.get(fieldname)
+		previous = before.get(fieldname) if before else None
+		if current == previous:
+			continue
+		if not current and not previous:
+			# Both falsy (None/0/"" vs None/0/"") -- not a meaningful change.
+			continue
+		frappe.throw(
+			_(
+				"Only a manager can change {0}. Use the Yield Standards page, "
+				"which is manager-gated."
+			).format(_(doc.meta.get_label(fieldname) or fieldname)),
+			frappe.PermissionError,
+		)
+
+
+def _is_yield_standard_manager():
+	if frappe.session.user == "Administrator":
+		return True
+	allowed_roles = {"URY Manager", "System Manager"}
+	return bool(allowed_roles & set(frappe.get_roles()))
 
 
 def validate_yield_tracking(doc, method):
