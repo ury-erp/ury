@@ -132,6 +132,13 @@ def get_item_wise_purchase_history(start_date, end_date, branch=None, page=1, pa
 	those standard doctypes rather than POS Invoice. No extended-hours
 	boundary logic applies here — that's specific to URY's POS Invoice
 	business-day handling, not standard ERPNext purchasing.
+
+	`branch` is accepted but NOT applied: Purchase Invoice has no `branch`
+	field (same data-model fact as Work Order in operations.py), so there is
+	nothing to filter on. Filtering by it previously raised a raw SQL error
+	on every branch-scoped call. The response reports `branch: None` and
+	`branch_scope: "company"` so the frontend can label the figures
+	company-wide instead of implying they are branch-specific.
 	"""
 	require_manager()
 	validate_date_range(start_date, end_date)
@@ -141,17 +148,12 @@ def get_item_wise_purchase_history(start_date, end_date, branch=None, page=1, pa
 	offset = (page - 1) * page_size
 
 	params = {"start_date": start_date, "end_date": end_date, "limit": page_size, "offset": offset}
-	branch_filter = ""
-	if branch:
-		params["branch"] = branch
-		branch_filter = "AND a.`branch` = %(branch)s"
 
-	base_sql = f"""
+	base_sql = """
 		FROM `tabPurchase Invoice` a
 		INNER JOIN `tabPurchase Invoice Item` b ON a.`name` = b.`parent`
 		WHERE a.`docstatus` = 1
 			AND a.`posting_date` BETWEEN %(start_date)s AND %(end_date)s
-			{branch_filter}
 		GROUP BY b.`item_code`
 	"""
 
@@ -190,7 +192,8 @@ def get_item_wise_purchase_history(start_date, end_date, branch=None, page=1, pa
 		r["amount"] = r["amount"] or 0
 
 	return {
-		"branch": branch,
+		"branch": None,
+		"branch_scope": "company",
 		"start_date": str(start_date),
 		"end_date": str(end_date),
 		"items": rows,
