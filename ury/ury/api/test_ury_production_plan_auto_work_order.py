@@ -212,12 +212,25 @@ def _wire_fake_frappe(store):
 	patch(f"{MODULE}.frappe.db.get_value", side_effect=_get_value).start()
 
 
-def _production_plan(name="PP-KITCHEN-1", company="Company A", department_warehouse=DEPARTMENT_WAREHOUSE):
+def _production_plan(
+	name="PP-KITCHEN-1",
+	company="Company A",
+	department_warehouse=DEPARTMENT_WAREHOUSE,
+	assembly_items=None,
+):
+	"""``assembly_items`` is ``[(item_code, bom_no), ...]`` for ``po_items`` --
+	needed so Work Orders can set ``production_plan_item`` the way ERPNext does."""
+	if assembly_items is None:
+		assembly_items = [("BIRYANI-BASE", "BOM-BIRYANI-BASE-001")]
 	return frappe._dict(
 		{
 			"name": name,
 			"company": company,
 			"custom_ury_department_warehouse": department_warehouse,
+			"po_items": [
+				_Row(name=f"ppi-{item_code}", item_code=item_code, bom_no=bom_no)
+				for item_code, bom_no in assembly_items
+			],
 		}
 	)
 
@@ -341,6 +354,7 @@ class TestGetOrCreateWorkOrder(FrappeTestCase):
 
 		self.assertTrue(created)
 		self.assertEqual(work_order.production_plan, production_plan.name)
+		self.assertEqual(work_order.production_plan_item, "ppi-BIRYANI-BASE")
 		self.assertEqual(work_order.production_item, "BIRYANI-BASE")
 		self.assertEqual(work_order.bom_no, "BOM-BIRYANI-BASE-001")
 		self.assertEqual(work_order.qty, 20.0)
@@ -444,6 +458,19 @@ class TestCreateManufactureEntry(FrappeTestCase):
 # --- execute_department_targets -----------------------------------------------
 
 
+def _assembly_items_for(*targets):
+	seen = []
+	for target in targets:
+		key = (target["item_code"], target["bom_no"])
+		if key not in seen:
+			seen.append(key)
+	return seen
+
+
+def _plan_for(*targets):
+	return _production_plan(assembly_items=_assembly_items_for(*targets) or None)
+
+
 class TestExecuteDepartmentTargets(FrappeTestCase):
 	def setUp(self):
 		self.store = _FakeWorkOrderStore()
@@ -452,8 +479,8 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 		self.addCleanup(patch.stopall)
 
 	def test_each_target_gets_one_work_order_and_one_manufacture_entry(self):
-		production_plan = _production_plan()
 		targets = [_target(item_code="RICE-BASE", bom_no="BOM-RICE-BASE", required_qty=10.0)]
+		production_plan = _plan_for(*targets)
 
 		results = execute_department_targets(production_plan, targets)
 
@@ -467,7 +494,6 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 		self.assertEqual(result["remaining_qty"], 0.0)
 
 	def test_dependencies_are_produced_before_their_consumers(self):
-		production_plan = _production_plan()
 		dependency = _target(item_code="PREP-MIX", bom_no="BOM-PREP-MIX", required_qty=5.0)
 		consumer = _target(
 			item_code="BIRYANI-BASE",
@@ -475,6 +501,7 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 			required_qty=20.0,
 			depends_on=["PREP-MIX"],
 		)
+		production_plan = _plan_for(dependency, consumer)
 
 		results = execute_department_targets(production_plan, [dependency, consumer])
 
@@ -483,7 +510,6 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 			self.assertEqual(result["remaining_qty"], 0.0)
 
 	def test_rejects_a_consumer_submitted_before_its_dependency(self):
-		production_plan = _production_plan()
 		dependency = _target(item_code="PREP-MIX", bom_no="BOM-PREP-MIX", required_qty=5.0)
 		consumer = _target(
 			item_code="BIRYANI-BASE",
@@ -491,12 +517,12 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 			required_qty=20.0,
 			depends_on=["PREP-MIX"],
 		)
+		production_plan = _plan_for(dependency, consumer)
 
 		with self.assertRaises(WorkOrderExecutionError):
 			execute_department_targets(production_plan, [consumer, dependency])
 
 	def test_a_dependency_already_fully_produced_by_an_earlier_call_satisfies_the_consumer(self):
-		production_plan = _production_plan()
 		dependency_target = _target(item_code="PREP-MIX", bom_no="BOM-PREP-MIX", required_qty=5.0)
 		consumer = _target(
 			item_code="BIRYANI-BASE",
@@ -504,6 +530,7 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 			required_qty=20.0,
 			depends_on=["PREP-MIX"],
 		)
+		production_plan = _plan_for(dependency_target, consumer)
 		# Simulate an earlier, already-completed call for the dependency alone.
 		execute_department_targets(production_plan, [dependency_target])
 
@@ -518,8 +545,8 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 			execute_department_targets(production_plan, targets)
 
 	def test_repeated_execution_never_manufactures_twice(self):
-		production_plan = _production_plan()
 		targets = [_target(item_code="RICE-BASE", bom_no="BOM-RICE-BASE", required_qty=10.0)]
+		production_plan = _plan_for(*targets)
 
 		first = execute_department_targets(production_plan, targets)
 		second = execute_department_targets(production_plan, targets)
@@ -531,8 +558,8 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 		self.assertEqual(first[0]["work_order"], second[0]["work_order"])
 
 	def test_partial_production_resumes_from_the_remaining_quantity(self):
-		production_plan = _production_plan()
 		target = _target(item_code="RICE-BASE", bom_no="BOM-RICE-BASE", required_qty=10.0)
+		production_plan = _plan_for(target)
 
 		first = execute_department_targets(production_plan, [target])
 		work_order_name = first[0]["work_order"]
