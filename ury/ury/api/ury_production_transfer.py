@@ -179,6 +179,9 @@ def generate_transfer_material_request_for_production_plan(production_plan):
 			"stock_uom": row["stock_uom"],
 			"qty": requirement,
 		})
+	# Same raw material shared by multiple finished goods in this department
+	# must become one Transfer MR row with summed qty (e.g. lemon 0.1 + 0.1 → 0.2).
+	allocations = _consolidate_allocations_by_item_code(allocations)
 
 	if not allocations:
 		return {"production_plan": production_plan, "material_request": None, "rows": [], "blockers": blockers}
@@ -247,6 +250,27 @@ def _existing_transfer_qty_by_item(production_plan_names):
 		as_dict=True,
 	)
 	return {row["item_code"]: flt(row["qty"]) for row in rows}
+
+
+def _consolidate_allocations_by_item_code(allocations):
+	"""Merge allocations that share ``item_code`` by summing ``qty``.
+
+	Readiness already aggregates by ``(department, item_code)``; this is a
+	defensive last step so a Transfer Material Request never carries two
+	rows for the same raw material (e.g. lemon 0.1 kg from two finished
+	goods) instead of one row at the combined quantity.
+	"""
+	merged = {}
+	order = []
+	for allocation in allocations:
+		item_code = allocation["item_code"]
+		existing = merged.get(item_code)
+		if existing:
+			existing["qty"] = flt(existing["qty"]) + flt(allocation["qty"])
+			continue
+		merged[item_code] = dict(allocation)
+		order.append(item_code)
+	return [merged[item_code] for item_code in order]
 
 
 def _append_mr_items_and_assign_names(plan_doc, allocations, department_warehouse):

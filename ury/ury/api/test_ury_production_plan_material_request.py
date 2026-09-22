@@ -185,6 +185,37 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		self.assertEqual(result["rows"][0]["qty"], 15.0)
 		self.assertIsNotNone(result["material_request"])
 
+	def test_shared_raw_material_across_two_targets_is_one_row(self):
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "LEMONADE",
+						"stock_uom": "Nos",
+						"component_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
+					},
+					{
+						"item_code": "LEMON-CAKE",
+						"stock_uom": "Nos",
+						"component_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
+					},
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
+		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
+			result = self._run(departments, plan_by_department)
+
+		self.assertEqual(len(result["rows"]), 1)
+		self.assertEqual(result["rows"][0]["item_code"], "LEMON")
+		self.assertEqual(result["rows"][0]["qty"], 0.2)
+		mr_doc = _FakeMaterialRequestDoc._created[0]
+		self.assertEqual(len(mr_doc.fields["items"]), 1)
+		self.assertEqual(mr_doc.fields["items"][0]["qty"], 0.2)
+
 	def test_two_department_plans_never_duplicate_one_store_shortage(self):
 		departments = {
 			"Main Kitchen": {

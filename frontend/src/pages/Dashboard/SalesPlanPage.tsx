@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionItem, Badge, Button, Card, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
+import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
@@ -364,6 +364,8 @@ export const SalesPlanPage: React.FC = () => {
   const [ppCreateBusy, setPpCreateBusy] = useState(false);
   const [ppOpenBusyDepartment, setPpOpenBusyDepartment] = useState<string | null>(null);
   const [ppPrepareBusyDepartment, setPpPrepareBusyDepartment] = useState<string | null>(null);
+  // Prepare Production confirmation — ConfirmDialog instead of window.confirm.
+  const [prepareConfirmDepartment, setPrepareConfirmDepartment] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -889,18 +891,22 @@ export const SalesPlanPage: React.FC = () => {
     }
   };
 
-  const prepareDepartmentProduction = async (department: string) => {
+  const requestPrepareDepartmentProduction = (department: string) => {
     if (!planName) return;
     const state = getDepartmentProductionState(department);
-    const productionPlan = state?.production_plan;
-    if (!productionPlan || state?.docstatus !== 1) return;
+    if (!state?.production_plan || state.docstatus !== 1) return;
+    setPrepareConfirmDepartment(department);
+  };
 
-    const confirmed = window.confirm(
-      `This will validate stock, transfer materials from Store, create Work Orders, and post ` +
-        `Manufacture Stock Entries for ${department} (${productionPlan}). Submitting a Manufacture ` +
-        `Stock Entry declares that physical production is complete. Continue?`,
-    );
-    if (!confirmed) return;
+  const confirmPrepareDepartmentProduction = async () => {
+    if (!planName || !prepareConfirmDepartment) return;
+    const department = prepareConfirmDepartment;
+    const state = getDepartmentProductionState(department);
+    const productionPlan = state?.production_plan;
+    if (!productionPlan || state?.docstatus !== 1) {
+      setPrepareConfirmDepartment(null);
+      return;
+    }
 
     setPpPrepareBusyDepartment(department);
     try {
@@ -915,6 +921,7 @@ export const SalesPlanPage: React.FC = () => {
       } else {
         showToast.success('Prepare Production started.');
       }
+      setPrepareConfirmDepartment(null);
       await refreshProductionPlanStates(planName);
     } catch (err) {
       showToast.error(describeSalesPlanApiError(err, `Unable to prepare production for ${department}.`));
@@ -1450,7 +1457,7 @@ export const SalesPlanPage: React.FC = () => {
                         productionState.execution_state &&
                         CAN_PREPARE_EXECUTION.includes(productionState.execution_state) && (
                           <Button
-                            onClick={() => prepareDepartmentProduction(department)}
+                            onClick={() => requestPrepareDepartmentProduction(department)}
                             disabled={
                               ppPrepareBusyDepartment === department ||
                               productionState.execution_state === 'processing'
@@ -1670,6 +1677,29 @@ export const SalesPlanPage: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={prepareConfirmDepartment !== null}
+        onOpenChange={(open) => {
+          if (!open && !ppPrepareBusyDepartment) setPrepareConfirmDepartment(null);
+        }}
+        title="Prepare Production?"
+        description={(() => {
+          if (!prepareConfirmDepartment) return '';
+          const plan = getDepartmentProductionState(prepareConfirmDepartment)?.production_plan;
+          const planSuffix = plan ? ` (${plan})` : '';
+          return (
+            `This will validate stock, transfer materials from Store, create Work Orders, and post ` +
+            `Manufacture Stock Entries for ${prepareConfirmDepartment}${planSuffix}. Submitting a Manufacture ` +
+            `Stock Entry declares that physical production is complete. Continue?`
+          );
+        })()}
+        cancelLabel="Cancel"
+        confirmLabel="Prepare Production"
+        loadingLabel="Preparing…"
+        isSubmitting={ppPrepareBusyDepartment === prepareConfirmDepartment && prepareConfirmDepartment !== null}
+        onConfirm={confirmPrepareDepartmentProduction}
+      />
     </Page>
   );
 };

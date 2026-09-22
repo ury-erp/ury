@@ -213,6 +213,33 @@ class TestSingleDepartmentScope(FrappeTestCase):
 		self.assertEqual(result["rows"][0]["department"], "Bakery")
 
 
+class TestSharedRawMaterialAcrossTargets(FrappeTestCase):
+	def test_two_targets_sharing_one_raw_material_sum_into_one_row(self):
+		# Lemon 0.1 kg on dish A + lemon 0.1 kg on dish B (same department)
+		# must become one demand row of 0.2 kg — never two rows of 0.1.
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{"item_code": "LEMONADE", "stock_uom": "Nos", "component_vector": [_component("LEMON", 0.1)]},
+					{"item_code": "LEMON-CAKE", "stock_uom": "Nos", "component_vector": [_component("LEMON", 0.1)]},
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		bin_qty = {("LEMON", "Main Kitchen - WH"): 0.0, ("LEMON", "Store - WH"): 0.0}
+		with patch(f"{MOD}.frappe.db.get_value", side_effect=_bin_fake(bin_qty)):
+			result = compute_readiness(departments, store_warehouse="Store - WH")
+
+		self.assertEqual(len(result["rows"]), 1)
+		row = result["rows"][0]
+		self.assertEqual(row["item_code"], "LEMON")
+		self.assertEqual(row["required_qty"], 0.2)
+		self.assertEqual(row["department_shortage"], 0.2)
+		self.assertEqual(row["store_shortage"], 0.2)
+
+
 class TestNoWrites(FrappeTestCase):
 	"""Structural guard: the readiness engine performs zero writes. Grepping
 	the module's own source is the same approach Agent 1 used for the BOM

@@ -195,6 +195,24 @@ class TestGenerateTransferMaterialRequest(FrappeTestCase):
 		self.assertEqual(item["production_plan"], "MFG-PP-0001")
 		self.assertTrue(item["material_request_plan_item"])
 
+	def test_shared_raw_material_across_two_targets_is_one_row(self):
+		departments = {
+			"Main Kitchen": _department(
+				"Main Kitchen", "Main Kitchen - WH",
+				targets=[
+					_target("LEMONADE", [_component("LEMON", 0.1)]),
+					_target("LEMON-CAKE", [_component("LEMON", 0.1)]),
+				],
+			)
+		}
+		result = self._run(departments)
+		self.assertEqual(len(result["rows"]), 1)
+		self.assertEqual(result["rows"][0]["item_code"], "LEMON")
+		self.assertEqual(result["rows"][0]["qty"], 0.2)
+		mr_doc = _FakeMaterialRequestDoc._created[0]
+		self.assertEqual(len(mr_doc.fields["items"]), 1)
+		self.assertEqual(mr_doc.fields["items"][0]["qty"], 0.2)
+
 	def test_repeated_call_creates_no_duplicates(self):
 		departments = {
 			"Main Kitchen": _department(
