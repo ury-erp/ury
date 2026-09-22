@@ -369,12 +369,12 @@ def _bom_tree_has_independently_stocked_subassembly(bom_name, visited=None):
 
 	lines = frappe.get_all(
 		BOM_ITEM_DOCTYPE,
-		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2), "is_sub_assembly_item": 1},
-		fields=["item_code", "bom_no", "is_sub_assembly_item"],
+		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
+		fields=["item_code", "bom_no"],
 	)
 
 	for line in lines:
-		if not line.is_sub_assembly_item:
+		if not line.bom_no:
 			continue
 		if _is_independently_stocked_subassembly(line.item_code):
 			return True
