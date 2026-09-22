@@ -483,14 +483,40 @@ def get_custom_fields():
 		],
 
 		"Production Plan": [
+			# Main tab -- compact 2-column URY identity section after company.
+			# Do NOT put a Tab Break here: that would pull po_items / mr_items
+			# onto the URY tab. The URY tab is appended after amended_from.
+			{
+				"fieldname": "custom_ury_section",
+				"fieldtype": "Section Break",
+				"label": "URY",
+				"insert_after": "company",
+				"collapsible": 1,
+			},
+			{
+				"fieldname": "custom_ury_sales_plan",
+				"fieldtype": "Link",
+				"options": "URY Sales Plan",
+				"label": "URY Sales Plan",
+				"description": "Reverse link to the URY Sales Plan this Production Plan was created from. Source of truth for open-or-create.",
+				"insert_after": "custom_ury_section",
+				"read_only": 1,
+				"allow_on_submit": 1,
+				"search_index": 1,
+			},
 			{
 				"fieldname": "custom_ury_department",
 				"fieldtype": "Link",
 				"options": "URY Production Department",
 				"label": "URY Production Department",
 				"description": "The plan's one department (Wave 0 / one-Production-Plan-per-department).",
-				"insert_after": "custom_ury_snapshot_hash",
+				"insert_after": "custom_ury_sales_plan",
 				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_column_break",
+				"fieldtype": "Column Break",
+				"insert_after": "custom_ury_department",
 			},
 			{
 				"fieldname": "custom_ury_department_warehouse",
@@ -498,7 +524,7 @@ def get_custom_fields():
 				"options": "Warehouse",
 				"label": "URY Department Warehouse",
 				"description": "The plan's one Department Warehouse. Source and target for the Store-to-Department transfer, and the fg_warehouse for this plan's Work Orders (D13).",
-				"insert_after": "custom_ury_department",
+				"insert_after": "custom_ury_column_break",
 				"read_only": 1,
 			},
 			{
@@ -511,27 +537,62 @@ def get_custom_fields():
 				"read_only": 1,
 			},
 			{
-				"fieldname": "custom_ury_production_result",
-				"fieldtype": "Long Text",
-				"label": "URY Production Result",
-				"description": "JSON: blockers, generated documents, and timings from the most recent Prepare Production attempt.",
-				"insert_after": "custom_ury_production_state",
-				"read_only": 1,
-			},
-			{
 				"fieldname": "custom_ury_production_started_at",
 				"fieldtype": "Datetime",
 				"label": "URY Production Started At",
 				"description": "When the current or most recent Prepare Production attempt started.",
-				"insert_after": "custom_ury_production_result",
+				"insert_after": "custom_ury_production_state",
 				"read_only": 1,
+			},
+			# URY tab -- after the last ERPNext field so assembly / MR tables stay
+			# on the main tab. Sections + columns instead of a single stack.
+			{
+				"fieldname": "custom_ury_tab",
+				"fieldtype": "Tab Break",
+				"label": "URY",
+				"insert_after": "amended_from",
+			},
+			{
+				"fieldname": "custom_ury_snapshot_section",
+				"fieldtype": "Section Break",
+				"label": "Sales Plan Snapshot",
+				"insert_after": "custom_ury_tab",
+			},
+			{
+				"fieldname": "custom_ury_snapshot_hash",
+				"fieldtype": "Data",
+				"label": "Sales Plan Snapshot Hash",
+				"description": "Approval snapshot hash of the Sales Plan at creation; a mismatch means the Sales Plan changed since.",
+				"insert_after": "custom_ury_snapshot_section",
+				"read_only": 1,
+				"allow_on_submit": 1,
+			},
+			{
+				"fieldname": "custom_ury_result_section",
+				"fieldtype": "Section Break",
+				"label": "Prepare Result",
+				"insert_after": "custom_ury_snapshot_hash",
+			},
+			{
+				"fieldname": "custom_ury_production_result",
+				"fieldtype": "Long Text",
+				"label": "URY Production Result",
+				"description": "JSON: blockers, generated documents, and timings from the most recent Prepare Production attempt.",
+				"insert_after": "custom_ury_result_section",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_ury_execution_section",
+				"fieldtype": "Section Break",
+				"label": "Job Execution",
+				"insert_after": "custom_ury_production_result",
 			},
 			{
 				"fieldname": "custom_ury_execution_job_id",
 				"fieldtype": "Data",
 				"label": "URY Execution Job ID",
 				"description": "The background (RQ) job handle for the current or most recent execution attempt (D17).",
-				"insert_after": "custom_ury_production_started_at",
+				"insert_after": "custom_ury_execution_section",
 				"read_only": 1,
 			},
 			{
@@ -543,11 +604,16 @@ def get_custom_fields():
 				"read_only": 1,
 			},
 			{
+				"fieldname": "custom_ury_execution_column",
+				"fieldtype": "Column Break",
+				"insert_after": "custom_ury_execution_attempt",
+			},
+			{
 				"fieldname": "custom_ury_execution_heartbeat",
 				"fieldtype": "Datetime",
 				"label": "URY Execution Heartbeat",
 				"description": "Updated by the running job as it progresses. Used with production_job_stale_minutes to decide whether an attempt is recoverable (D17).",
-				"insert_after": "custom_ury_execution_attempt",
+				"insert_after": "custom_ury_execution_column",
 				"read_only": 1,
 			},
 			{

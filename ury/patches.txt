@@ -22,3 +22,5 @@ ury.patches.v3_24.backfill_branch_company
 ury.patches.v3_25.add_stock_reservation_availability_index
 ury.patches.v3_26.add_production_plan_department_execution_fields
 ury.patches.v3_26.report_pre_produced_direct_retail_warehouse_mismatch
+ury.patches.v3_27.reorder_production_plan_ury_tab
+ury.patches.v3_28.layout_production_plan_ury_fields
