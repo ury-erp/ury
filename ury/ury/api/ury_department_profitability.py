@@ -39,6 +39,12 @@ Snapshot` row when explicitly asked to (this module never passes
     DEPARTMENT_SCOPE_MISMATCH, UNATTRIBUTED_COST, UNATTRIBUTED_REVENUE,
     MISSING_APPROVED_PLAN, MISSING_COST_ATTRIBUTION
 
+``UNATTRIBUTED_COST`` is the row-level code for "revenue attributed, cost
+not". V3-74's `compute_variance` returns ``posted_cost=None`` until a
+fulfilment Stock Entry is posted to ERPNext, so such a row carries
+theoretical cost/GP plus this code, and OMITS posted_cost /
+posted_gross_profit / variance. It is never a zero.
+
 ## Permission tiers
 
     Cashier / Captain           -> denied outright (frappe.PermissionError).
@@ -146,15 +152,38 @@ def get_department_profitability(company, branch, service_date_or_period, depart
 
         posted_cost = variance["posted_cost"]
         theoretical_cost = variance["theoretical_cost"]
+
+        if theoretical_cost is None:
+            row["reason"] = MISSING_COST_ATTRIBUTION
+            row["provisional"] = True
+            rows.append(_strip_cost_fields(row) if quantity_only else row)
+            continue
+
         row.update(
             {
-                "posted_cost": posted_cost,
                 "theoretical_cost": theoretical_cost,
-                "posted_gross_profit": line["net_revenue"] - posted_cost,
                 "theoretical_gross_profit": line["net_revenue"] - theoretical_cost,
-                "variance": posted_cost - theoretical_cost,
             }
         )
+
+        if posted_cost is None:
+            # V3-74 returns posted_cost=None whenever no fulfilment Stock
+            # Entry has been posted for this item/qty grain -- which, until
+            # the issue/fulfilment chain posts to ERPNext, is ALWAYS. Omit
+            # the posted keys entirely (same convention as the quantity-only
+            # tier: absent, not zero, not null) and flag the row provisional
+            # rather than arithmetic on None.
+            row["reason"] = UNATTRIBUTED_COST
+            row["provisional"] = True
+        else:
+            row.update(
+                {
+                    "posted_cost": posted_cost,
+                    "posted_gross_profit": line["net_revenue"] - posted_cost,
+                    "variance": posted_cost - theoretical_cost,
+                }
+            )
+
         rows.append(_strip_cost_fields(row) if quantity_only else row)
 
     result = {
@@ -165,6 +194,16 @@ def get_department_profitability(company, branch, service_date_or_period, depart
         "rows": rows,
         "as_of": frappe.utils.now(),
     }
+
+    # Surface a report-level reason when any row could not be costed, so a
+    # blank Posted Cost column is explained rather than looking like zero.
+    provisional_reasons = [row["reason"] for row in rows if row.get("provisional") and row.get("reason")]
+    if provisional_reasons and len(provisional_reasons) == len(rows):
+        result["provisional"] = True
+        result["reason"] = provisional_reasons[0]
+    elif provisional_reasons:
+        result["provisional"] = True
+
     if unattributed_revenue:
         result["unattributed_revenue"] = [
             {
