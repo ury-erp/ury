@@ -18,8 +18,9 @@ One entry point:
 ``departments`` is exactly the dict shape returned by
 ``ury_production_target_compiler.compile_production_targets`` -- keyed by
 department name, each bucket carrying ``warehouse`` (the Department
-Warehouse, D13), ``targets`` (each with a ``component_vector`` to explode)
-and ``external_receipt_targets`` (D19).
+Warehouse, D13), ``targets`` (each with a ``component_vector`` to explode),
+``external_receipt_targets`` (D19), and ``raw_material_demand`` (a
+MADE_TO_ORDER row's own raw materials that never became a target).
 
 This module never traverses a BOM and never decides production policy (see
 PLAN.md, section C): the component vector for every target already arrived
@@ -42,6 +43,17 @@ exactly as if it were a raw material in someone else's component vector).
 That is the only path by which EXTERNAL_RECEIPT demand reaches the Purchase
 requirement; if this module silently skipped ``external_receipt_targets``,
 that demand would vanish from the whole system.
+
+## MADE_TO_ORDER raw materials are never lost either
+
+The same failure mode applies to ``raw_material_demand``: a MADE_TO_ORDER
+row's own raw materials never become a target (an MTO item is produced only
+from the actual order, never in advance), so the only way they reach the
+Purchase/Transfer requirement is for this module to fold each
+``raw_material_demand`` row into department/Store demand exactly like a
+target's ``component_vector`` row. Skipping it here would silently discard
+the entire raw-material requirement for any MADE_TO_ORDER item whose BOM
+contains no PRE_PRODUCED stop point at all.
 
 ## Return shape
 
@@ -185,6 +197,15 @@ def _collect_department_demand(departments):
 				item_code=target.get("item_code"),
 				qty=target.get("required_qty"),
 				stock_uom=target.get("stock_uom"),
+			)
+		for component in bucket.get("raw_material_demand") or []:
+			# A MADE_TO_ORDER row's own raw materials, folded in exactly like
+			# a target's component_vector row (see module docstring).
+			_add_demand(
+				demand, department, department_warehouse,
+				item_code=component.get("item_code"),
+				qty=component.get("required_qty"),
+				stock_uom=component.get("stock_uom"),
 			)
 	return demand
 
