@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Spinner, Input, Button, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
+import { Page, Section, Panel, Spinner, Input, Button, DatePicker, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -252,7 +252,13 @@ export const DayClosePage: React.FC = () => {
         </div>
         <div>
           <label className="text-xs text-muted-foreground">Service Date</label>
-          <Input value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} placeholder="YYYY-MM-DD" />
+          <DatePicker
+            id="close-day-service-date"
+            aria-label="Service date"
+            value={serviceDate}
+            onChange={(_id, next) => setServiceDate(next)}
+            className="w-[180px]"
+          />
         </div>
         <Button onClick={load} variant="chrome">Refresh</Button>
       </div>

@@ -1293,7 +1293,7 @@ export const SalesPlanPage: React.FC = () => {
       ) : (
         <Section>
           {(Object.keys(groupedItems).length > 1 || isEditable) && (
-            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+            <div className="sticky top-0 z-20 -mx-6 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-6 pb-2 backdrop-blur">
               <div className="flex flex-wrap items-center gap-2">
                 {Object.keys(groupedItems).length > 1 && (
                   <>
