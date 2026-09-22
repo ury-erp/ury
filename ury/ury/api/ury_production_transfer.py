@@ -108,7 +108,7 @@ from erpnext.stock.doctype.material_request.material_request import (
 	make_stock_entry as erpnext_make_stock_entry,
 )
 
-from ury.ury.api.ury_production_readiness import compute_readiness
+from ury.ury.api.ury_production_readiness import compute_readiness, store_shortage_blocker
 from ury.ury.api.ury_production_settings import get_store_warehouse
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
 from ury.ury.api.ury_sales_plan_production_plan import (
@@ -398,7 +398,7 @@ def execute_store_to_department_transfer(production_plan):
 		return {
 			"production_plan": production_plan,
 			"stock_entries": [],
-			"blockers": blockers + [_store_shortage_blocker(row) for row in shortage_rows],
+			"blockers": blockers + [store_shortage_blocker(row) for row in shortage_rows],
 			"locked_bins": [],
 		}
 
@@ -417,7 +417,7 @@ def execute_store_to_department_transfer(production_plan):
 		return {
 			"production_plan": production_plan,
 			"stock_entries": [],
-			"blockers": blockers + [_store_shortage_blocker(row) for row in shortage_rows],
+			"blockers": blockers + [store_shortage_blocker(row) for row in shortage_rows],
 			"locked_bins": locked_bins,
 		}
 
@@ -536,18 +536,6 @@ def _store_warehouse_not_configured_blocker():
 		"message": _(
 			"URY Production Settings: Store Warehouse is not configured. Store stock cannot be "
 			"read or transferred until it is."
-		),
-	}
-
-
-def _store_shortage_blocker(row):
-	return {
-		"type": "store_shortage",
-		"item_code": row["item_code"],
-		"department": row["department"],
-		"shortage": row["store_shortage"],
-		"message": _("Insufficient Store stock for {0}: short by {1} {2}.").format(
-			row["item_code"], row["store_shortage"], row.get("stock_uom") or ""
 		),
 	}
 
