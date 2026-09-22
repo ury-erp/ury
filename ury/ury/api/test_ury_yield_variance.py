@@ -720,7 +720,7 @@ class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
 				"is_active": 1,
 				"is_default": 1,
 				"with_operations": 0,
-				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 1}],
+				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 4}],  # 4 / 0.80 = 5 -- must be a whole number, "Nos" UOM enforces this
 			}
 		)
 		bom.insert(ignore_permissions=True)
