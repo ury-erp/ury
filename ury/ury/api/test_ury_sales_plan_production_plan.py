@@ -74,11 +74,21 @@ def _sales_plan_doc(**overrides):
 
 
 class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
+	"""Material Request generation (``_generate_material_requests``) is
+	patched out in every test here whose subject is plan creation itself --
+	it now runs for real at the end of ``create_or_get_department_production_plans``
+	(see that function and its module docstring), and these are mocked unit
+	tests that never set up fake Material Request machinery. Generation is
+	exercised on its own in ``test_ury_production_plan_material_request.py``
+	/ ``test_ury_production_transfer.py``, and against real records in
+	``test_ury_production_plan_integration.py``."""
+
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_creates_one_plan_per_department(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+	def test_creates_one_plan_per_department(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
 		created_docs = []
 
 		def _make_doc(plan_dict):
@@ -103,10 +113,16 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		# Row lock is taken before anything else.
 		mock_lock.assert_called_once_with("URY Sales Plan", "SP-0001", "name", for_update=True)
 
+		# Material Request generation runs once, over the just-created results,
+		# and its return value is surfaced on the response.
+		mock_generate_mr.assert_called_once_with("SP-0001", result["production_plans"])
+		self.assertEqual(result["material_requests"], {"purchase": None, "transfers": [], "errors": []})
+
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_idempotent_skips_department_with_matching_hash(self, mock_lock, mock_compile, mock_get_doc):
+	def test_idempotent_skips_department_with_matching_hash(self, mock_lock, mock_compile, mock_get_doc, mock_generate_mr):
 		# Main Kitchen already has a live plan at the current hash; Bakery does not.
 		with patch(
 			f"{MOD}.frappe.get_all",
@@ -137,6 +153,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			create_or_get_department_production_plans(doc, submit=False)
 
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(
 		f"{MOD}.compile_production_targets",
@@ -154,17 +171,22 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 	)
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_empty_department_produces_no_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+	def test_empty_department_produces_no_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
 		doc = _sales_plan_doc()
 		result = create_or_get_department_production_plans(doc, submit=False)
 		self.assertEqual(result["production_plans"], [])
 		mock_get_doc.assert_not_called()
+		# Generation still runs (over an empty results list) even when no
+		# department plan was created -- the consolidated Purchase request is
+		# sales-plan-wide, not per-department.
+		mock_generate_mr.assert_called_once_with("SP-0001", [])
 
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_include_exploded_items_survives_onto_po_items(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+	def test_include_exploded_items_survives_onto_po_items(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
 		"""D2 / the wiring point Agent 2 flagged: include_exploded_items must
 		reach every Production Plan Item row, or ERPNext silently explodes
 		pre-produced sub-assemblies into raw materials."""
@@ -188,11 +210,12 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 			for row in plan_dict["po_items"]:
 				self.assertEqual(row["include_exploded_items"], 0)
 
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_submit_true_submits_every_created_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+	def test_submit_true_submits_every_created_plan(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
 		docs = []
 
 		def _make_doc(plan_dict):
@@ -208,11 +231,12 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		create_or_get_department_production_plans(doc, submit=True)
 		self.assertEqual(len(docs), 2)
 
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
-	def test_never_writes_deprecated_sales_plan_link_field(self, mock_lock, mock_get_all, mock_compile, mock_get_doc):
+	def test_never_writes_deprecated_sales_plan_link_field(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
 		"""D11: URY Sales Plan.custom_ury_production_plan is no longer written."""
 		mock_get_doc.side_effect = lambda plan_dict: frappe._dict(
 			dict(plan_dict, name="MFG-PP-1", insert=lambda: None, submit=lambda: None)
