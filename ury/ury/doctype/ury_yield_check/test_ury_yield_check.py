@@ -118,6 +118,71 @@ class TestYieldCheckValidateInputQty(FrappeTestCase):
 		mock_throw.assert_not_called()
 
 
+class TestYieldCheckValidateOutputQty(FrappeTestCase):
+	"""Test Check 2b: validate_output_qty (F1)"""
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_zero(self, mock_throw):
+		"""Output quantity of 0 fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=0))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("Output quantity must be greater than zero", call_args[0])
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_negative(self, mock_throw):
+		"""Negative output quantity fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=-5))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("Output quantity must be greater than zero", call_args[0])
+
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_output_qty_is_none(self, mock_throw):
+		"""None output quantity fails validation."""
+		doc = URYYieldCheck(_create_yield_check(output_qty=None))
+		doc.validate_output_qty()
+
+		mock_throw.assert_called_once()
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_passes_without_warning_when_output_within_input(self, mock_throw, mock_msgprint):
+		"""Output <= input passes validation with no warning."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=100, output_qty=85))
+		doc.validate_output_qty()
+
+		mock_throw.assert_not_called()
+		mock_msgprint.assert_not_called()
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_warns_but_does_not_block_when_output_exceeds_input(self, mock_throw, mock_msgprint):
+		"""Output > input does not hard-block, but raises a warning (soft-flag)."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=100, output_qty=120))
+		doc.validate_output_qty()
+
+		mock_throw.assert_not_called()
+		mock_msgprint.assert_called_once()
+		call_kwargs = mock_msgprint.call_args[1]
+		call_args = mock_msgprint.call_args[0]
+		self.assertIn("greater than input quantity", call_args[0])
+		self.assertEqual(call_kwargs.get("indicator"), "orange")
+
+	@patch(f"{MODULE}.frappe.msgprint")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_no_warning_when_input_qty_missing(self, mock_throw, mock_msgprint):
+		"""No output>input warning is attempted when input_qty is falsy (avoids false positives)."""
+		doc = URYYieldCheck(_create_yield_check(input_qty=0, output_qty=10))
+		doc.validate_output_qty()
+
+		mock_msgprint.assert_not_called()
+
+
 class TestYieldCheckCaptureStandardYieldSnapshot(FrappeTestCase):
 	"""Test Check 3: capture_standard_yield_snapshot"""
 
@@ -585,6 +650,189 @@ class TestYieldCheckIntegrationFullValidate(FrappeTestCase):
 
 		# All checks should pass
 		mock_throw.assert_not_called()
+
+
+class TestYieldCheckRealDocumentIntegration(FrappeTestCase):
+	"""F9: real-document coverage (no mocks) for output_qty bounds
+	(validate_output_qty, F1) and the Yield-Check/Wastage mutual-exclusion
+	guard's reverse direction (F3) -- every prior test in this file patches
+	frappe.db.get_value/get_all instead of actually inserting a document, so
+	none of them could have caught a regression in the real validate()
+	chain, frappe's own mandatory/link checks, or the real capture_wastage
+	API. These insert real Company/Branch/Item/URY Production Department/
+	URY Sales Plan/URY Issue Authorization/URY Yield Check records and call
+	the real whitelisted APIs.
+	"""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_branch(self, branch_name, company):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code):
+		if frappe.db.exists("Item", item_code):
+			return
+		frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"item_group": "All Item Groups",
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"custom_yield_tracked": 1,
+				"custom_yield_percent": 80.0,
+			}
+		).insert(ignore_permissions=True)
+
+	def _minimal_plan(self, branch, company):
+		"""A minimal, insert-only URY Sales Plan to satisfy URY Issue
+		Authorization's mandatory `plan` link. validate() is skipped
+		(ignore_validate) -- this test is not exercising the sales-plan
+		lifecycle, only that a real `plan` link exists for the
+		Authorization/Wastage chain below."""
+		plan = frappe.get_doc(
+			{
+				"doctype": "URY Sales Plan",
+				"status": "Draft",
+				"enforcement_mode": "Soft",
+				"branch": branch,
+				"company": company,
+				"plan_date": "2026-09-01",
+			}
+		)
+		plan.flags.ignore_mandatory = True
+		plan.flags.ignore_validate = True
+		plan.insert(ignore_permissions=True)
+		return plan.name
+
+	def _department(self, branch, company):
+		name = f"{branch} F9 Dept"
+		if frappe.db.exists("URY Production Department", name):
+			return name
+		frappe.get_doc(
+			{
+				"doctype": "URY Production Department",
+				"department_name": name,
+				"branch": branch,
+				"company": company,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True, ignore_mandatory=True)
+		return name
+
+	def _auth(self, plan, branch, company, department, item, qty=50.0):
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Issue Authorization",
+				"plan": plan,
+				"plan_approval_hash": "f9-real-doc-test",
+				"branch": branch,
+				"company": company,
+				"department": department,
+				"component_item": item,
+				"stock_uom": "Nos",
+				"control_mode": "SOFT",
+				"status": "Authorized",
+				"required_qty": qty,
+				"authorized_qty": qty,
+				"remaining_before_qty": qty,
+				"remaining_after_qty": 0,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	def setUp(self):
+		self.company = "F9 Yield Test Co"
+		self.branch = "F9 Yield Test Branch"
+		self.item = "F9-YIELD-ITEM"
+		self._ensure_company(self.company, "F9YC")
+		self._ensure_branch(self.branch, self.company)
+		self._ensure_item(self.item)
+
+	def _base_doc(self, **overrides):
+		fields = {
+			"doctype": "URY Yield Check",
+			"item": self.item,
+			"branch": self.branch,
+			"company": self.company,
+			"input_qty": 100,
+			"output_qty": 80,
+			"stock_uom": "Nos",
+			"check_type": "Routine",
+			"checked_by": "Administrator",
+			"checked_on": "2026-09-01 10:00:00",
+		}
+		fields.update(overrides)
+		return frappe.get_doc(fields)
+
+	def test_real_insert_rejects_zero_output_qty(self):
+		"""F1: a real .insert() with output_qty=0 must fail closed."""
+		with self.assertRaises(frappe.ValidationError):
+			self._base_doc(output_qty=0).insert(ignore_permissions=True)
+
+	def test_real_insert_rejects_negative_output_qty(self):
+		"""F1: a real .insert() with a negative output_qty must fail closed."""
+		with self.assertRaises(frappe.ValidationError):
+			self._base_doc(output_qty=-5).insert(ignore_permissions=True)
+
+	def test_real_insert_allows_output_exceeding_input_with_warning_not_block(self):
+		"""F1: output_qty > input_qty is a soft warning (msgprint), not a
+		hard block -- the real insert must succeed."""
+		doc = self._base_doc(input_qty=100, output_qty=120)
+		doc.insert(ignore_permissions=True)
+		self.assertTrue(frappe.db.exists("URY Yield Check", doc.name))
+		self.assertAlmostEqual(doc.actual_yield_percent, 120.0)
+
+	def test_real_insert_succeeds_with_valid_bounds(self):
+		doc = self._base_doc(input_qty=100, output_qty=80)
+		doc.insert(ignore_permissions=True)
+		self.assertTrue(frappe.db.exists("URY Yield Check", doc.name))
+		self.assertAlmostEqual(doc.actual_yield_percent, 80.0)
+		self.assertAlmostEqual(doc.variance_percent, 0.0)
+
+	def test_real_wastage_capture_blocked_after_real_yield_check_exists(self):
+		"""F3 reverse guard: with a real Issue Authorization and a real
+		Yield Check already inserted against it, a real (unmocked) call to
+		ury.ury.api.ury_wastage.capture_wastage for the same authorization
+		must fail closed -- otherwise the same shortfall would be
+		double-counted regardless of which record was created first."""
+		from ury.ury.api.ury_wastage import capture_wastage
+
+		department = self._department(self.branch, self.company)
+		plan = self._minimal_plan(self.branch, self.company)
+		auth_name = self._auth(plan, self.branch, self.company, department, self.item)
+
+		yc = self._base_doc(issue_authorization=auth_name)
+		yc.insert(ignore_permissions=True)
+		self.assertTrue(frappe.db.exists("URY Yield Check", yc.name))
+
+		with self.assertRaises(frappe.ValidationError):
+			capture_wastage(
+				issue_authorization=auth_name,
+				wasted_qty=1,
+				reason_category="Spoilage",
+				branch=self.branch,
+				company=self.company,
+			)
 
 
 if __name__ == "__main__":

@@ -142,7 +142,6 @@ export const OverdueYieldChecksPage: React.FC = () => {
             Branch
             <Select
               aria-label="Branch"
-              size="sm"
               value={currentBranch || ''}
               onChange={(event) => setSelectedBranch(event.target.value)}
               className="mt-1"

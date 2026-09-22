@@ -39,20 +39,16 @@
    "options": "POS Profile"
   },
   {
-   "fetch_from": "pos_profile.branch",
    "fieldname": "branch",
    "fieldtype": "Link",
    "label": "Branch",
-   "options": "Branch",
-   "read_only": 1
+   "options": "Branch"
   },
   {
-   "fetch_from": "pos_profile.warehouse",
    "fieldname": "warehouse",
    "fieldtype": "Link",
    "label": "Warehouse",
-   "options": "Warehouse",
-   "read_only": 1
+   "options": "Warehouse"
   },
   {
    "fieldname": "item_groups",

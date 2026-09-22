@@ -5,9 +5,9 @@ import {
   Card,
   DataTable,
   DataTableColumn,
+  DatePicker,
   Drawer,
   DrawerSectionLabel,
-  Input,
   KeyValueRow,
   KpiItemProps,
   KpiStrip,
@@ -336,7 +336,6 @@ const WastageContent: React.FC = () => {
             Department
             <Select
               aria-label="Department"
-              size="sm"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
               className="mt-1"
@@ -351,24 +350,22 @@ const WastageContent: React.FC = () => {
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
-            <Input
+            <DatePicker
+              id="from-date"
               aria-label="From date"
-              type="date"
-              size="sm"
               value={fromDate}
-              onChange={(event) => setFromDate(event.target.value)}
-              className="mt-1"
+              onChange={(_id, next) => setFromDate(next)}
+              className="mt-1 w-[150px]"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
-            <Input
+            <DatePicker
+              id="to-date"
               aria-label="To date"
-              type="date"
-              size="sm"
               value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-              className="mt-1"
+              onChange={(_id, next) => setToDate(next)}
+              className="mt-1 w-[150px]"
             />
           </label>
         </div>
@@ -409,19 +406,19 @@ const WastageContent: React.FC = () => {
                 <span className="mr-auto self-center text-xs text-muted-foreground">
                   {drawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
                 </span>
-                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>
+                <Button type="button" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>
                   Cancel
                 </Button>
-                <Button type="button" size="sm" onClick={handleDrawerConfirm} disabled={drawerActionBusy}>
+                <Button type="button" onClick={handleDrawerConfirm} disabled={drawerActionBusy}>
                   Confirm
                 </Button>
               </>
             ) : (
               <>
-                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction('reject')}>
+                <Button type="button" variant="outline" onClick={() => setDrawerAction('reject')}>
                   Reject
                 </Button>
-                <Button type="button" size="sm" onClick={() => setDrawerAction('approve')}>
+                <Button type="button" onClick={() => setDrawerAction('approve')}>
                   Approve
                 </Button>
               </>

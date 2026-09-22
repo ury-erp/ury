@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
 import { DollarSign, ChevronUp } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -139,15 +139,11 @@ export function EmployeeCommission() {
   if (data && !data.settings.enabled) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Employee Commission</h1>
-            <p className="text-sm text-muted-foreground">
-              Commission tracking {activeBranchId === 'all' ? '· All Branches' : ''}
-            </p>
-          </div>
-          <DateRangeFilter value={range} onChange={setRange} />
-        </div>
+        <PageHeader
+          title="Employee Commission"
+          description={`Commission tracking ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+          actions={<DateRangeFilter value={range} onChange={setRange} />}
+        />
 
         <div className="flex flex-col items-center justify-center py-16 px-4 rounded-lg border border-dashed border-gray-300 bg-gray-50">
           <DollarSign className="w-12 h-12 text-gray-400 mb-4" />
@@ -168,15 +164,11 @@ export function EmployeeCommission() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Employee Commission</h1>
-          <p className="text-sm text-muted-foreground">
-            Commission breakdown by employee {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <DateRangeFilter value={range} onChange={setRange} />
-      </div>
+      <PageHeader
+        title="Employee Commission"
+        description={`Commission breakdown by employee ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={<DateRangeFilter value={range} onChange={setRange} />}
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

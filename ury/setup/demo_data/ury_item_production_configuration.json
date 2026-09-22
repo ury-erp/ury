@@ -1,0 +1,93 @@
+[
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "MOM",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_MOM__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "WNG",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_WNG__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "GR",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_GR__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "MR",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_MR__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "BR",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_BR__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "CG",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_CG__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    },
+    {
+        "doctype": "URY Item Production Configuration",
+        "active": 1,
+        "item": "BG",
+        "branch": "Demo Branch",
+        "department": "Demo Kitchen Department",
+        "production_unit": "Demo Kitchen",
+        "production_policy": "PRE_PRODUCED",
+        "sourcing_mode": "IN_HOUSE",
+        "bom": "__BOM_FOR_BG__",
+        "controlled_by_sales_plan": 1,
+        "availability_mode": "Plan Available"
+    }
+]

@@ -2,6 +2,7 @@
     {
         "doctype": "Branch",
         "branch": "Demo Branch",
+        "company": "__COMPANY__",
         "user": [
             {
                 "user": "Administrator"

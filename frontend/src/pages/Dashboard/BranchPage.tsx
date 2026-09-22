@@ -536,7 +536,6 @@ export const BranchPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              size="sm"
               onClick={() => setSelectedBranch(null)}
               className="text-foreground hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
@@ -776,7 +775,7 @@ export const BranchPage: React.FC = () => {
                             <DataTable columns={columns} rows={rows} />
                             {isEditMode && (
                               <div className="mt-2">
-                                <Button type="button" variant="ghost" size="sm" className="text-primary text-xs" onClick={() => {
+                                <Button type="button" variant="ghost" className="text-primary text-xs" onClick={() => {
                                   setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
                                 }}>+ Add Row</Button>
                               </div>
@@ -856,7 +855,7 @@ export const BranchPage: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <p className="text-sm text-muted-foreground">This branch has no room yet.</p>
                           {isEditMode && (
-                            <Button type="button" variant="outline" size="sm" onClick={handleCreateDefaultRoom} disabled={saving}>
+                            <Button type="button" variant="outline" onClick={handleCreateDefaultRoom} disabled={saving}>
                               Create Default Room
                             </Button>
                           )}
@@ -926,7 +925,7 @@ export const BranchPage: React.FC = () => {
                             <DataTable columns={columns} rows={rows} />
                             {isEditMode && (
                               <div className="mt-2">
-                                <Button type="button" variant="ghost" size="sm" className="text-primary text-xs" onClick={() => {
+                                <Button type="button" variant="ghost" className="text-primary text-xs" onClick={() => {
                                   setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
                                 }}>+ Add Row</Button>
                               </div>
@@ -1003,7 +1002,6 @@ export const BranchPage: React.FC = () => {
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() => handleBranchView(row)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                           title="View Branch"
@@ -1012,7 +1010,6 @@ export const BranchPage: React.FC = () => {
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() => handleBranchEdit(row)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                           title="Edit Branch"

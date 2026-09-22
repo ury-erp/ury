@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, type KpiItemProps } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, type KpiItemProps, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -67,20 +67,18 @@ export function EmployeeSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Employee Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            Staff leaderboard {activeBranchId === 'all' ? '· All Branches' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <a href="/reports/employee-commission" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            View Commission →
-          </a>
-          <DateRangeFilter value={range} onChange={setRange} />
-        </div>
-      </div>
+      <PageHeader
+        title="Employee Sales"
+        description={`Staff leaderboard ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        actions={
+          <>
+            <a href="/reports/employee-commission" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              View Commission →
+            </a>
+            <DateRangeFilter value={range} onChange={setRange} />
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

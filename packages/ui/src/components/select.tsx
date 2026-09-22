@@ -27,9 +27,11 @@ const selectVariants = cva(
       // `pr-8` was being clobbered by each size's `px-*` (later class wins in
       // tailwind-merge), so the chevron sat on top of long option text.
       size: {
-        default: "h-11 pl-3.5 pr-10 py-2 text-sm",
+        default: "h-9 pl-3.5 pr-9 py-1.5 text-[13px] rounded-[7px]",
         sm: "h-9 pl-3 pr-8 py-1.5 text-xs",
         lg: "h-12 pl-4 pr-11 py-3 text-base",
+        // Alias of `default` — see Input.
+        compactLg: "h-9 pl-3.5 pr-9 py-1.5 text-[13px] rounded-[7px]",
       },
     },
     defaultVariants: {
@@ -58,12 +60,15 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     };
 
     return (
-      <div className="relative w-full">
+      // className lands on the wrapper (same as DatePicker) so width utilities
+      // like w-[130px] actually size the control in a filter toolbar. The
+      // <select> keeps w-full from selectVariants and fills the wrapper.
+      <div className={cn("relative w-full", className)}>
         <select
           ref={ref}
           value={value}
           onChange={handleChange}
-          className={cn(selectVariants({ variant: selectVariant, size, className }))}
+          className={cn(selectVariants({ variant: selectVariant, size }))}
           {...props}
         >
           {placeholder && (

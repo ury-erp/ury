@@ -11,6 +11,7 @@ from ury.ury.api.ury_sales_plan import (
     freeze_approval_snapshot,
     populate_item_production_context,
     validate_no_overlapping_plan_scope,
+    validate_plan_has_demand,
     validate_plan_items,
     validate_items_on_active_menu,
     flag_stale_bom_revisions,
@@ -76,14 +77,91 @@ class TestURYSalesPlanContract(FrappeTestCase):
             validate_plan_items(doc)
         validate.assert_called_once_with("MTPL", "Branch A")
 
+    def test_plan_with_no_rows_cannot_leave_draft(self):
+        """The complement to the test above: skipping qty-0 rows one by one
+        left nothing checking that the plan as a whole plans SOMETHING, so an
+        empty plan walked the entire path to Locked for Production."""
+        with self.assertRaises(frappe.ValidationError):
+            validate_plan_has_demand(self._doc(items=[]))
+
+    def test_plan_with_only_zero_qty_rows_cannot_leave_draft(self):
+        """A plan carrying the full history-suggested catalog, every row still
+        at its default qty 0, plans exactly as much as an empty one."""
+        doc = self._doc(
+            items=[
+                {"item_code": "MTPL", "qty": 0},
+                {"item_code": "OTHER", "qty": 0},
+            ]
+        )
+        with self.assertRaises(frappe.ValidationError):
+            validate_plan_has_demand(doc)
+
+    def test_plan_with_one_nonzero_row_can_leave_draft(self):
+        doc = self._doc(
+            items=[
+                {"item_code": "MTPL", "qty": 0},
+                {"item_code": "OTHER", "qty": 3},
+            ]
+        )
+        validate_plan_has_demand(doc)
+
     def test_snapshot_is_immutable_once_created(self):
         doc = self._doc()
-        first = freeze_approval_snapshot(doc)
-        # doc is a frappe._dict (a dict subclass), so "doc.items" resolves to
-        # the built-in dict.items() bound method rather than the "items"
-        # field -- use item access to reach the actual field instead.
-        doc["items"][0]["qty"] = 99
-        self.assertEqual(freeze_approval_snapshot(doc), first)
+        # build_demand_vector() BOM-explodes each item against real BOM data
+        # (compile_bom_vector -> frappe.db/frappe.get_all) -- irrelevant to
+        # what this test actually checks (hash/JSON immutability), so it's
+        # stubbed to a fixed value here rather than standing up a real BOM.
+        with patch(
+            "ury.ury.api.ury_sales_plan.build_demand_vector",
+            return_value=[{"component_item": "FLOUR", "required_qty": 2}],
+        ):
+            first = freeze_approval_snapshot(doc)
+            # doc is a frappe._dict (a dict subclass), so "doc.items" resolves to
+            # the built-in dict.items() bound method rather than the "items"
+            # field -- use item access to reach the actual field instead.
+            doc["items"][0]["qty"] = 99
+            self.assertEqual(freeze_approval_snapshot(doc), first)
+
+    def test_freeze_approval_snapshot_populates_demand_vector(self):
+        """The actual bug this task fixes: approval_snapshot["demand_vector"]
+        must be populated at approval time, not left absent -- absence is
+        exactly what made frozen_component_demand() in
+        ury_issue_authorization.py fail closed for every real approval."""
+        doc = self._doc(
+            items=[
+                {
+                    "item_code": "MTPL",
+                    "qty": 2,
+                    "department": "Kitchen",
+                    "production_unit": "Main Kitchen",
+                    "production_policy": "PRE_PRODUCED",
+                    "bom": "BOM-1",
+                }
+            ]
+        )
+        demand_rows = [
+            {
+                "component_item": "FLOUR",
+                "department": "Kitchen",
+                "production_unit": "Main Kitchen",
+                "required_qty": 4.0,
+                "stock_uom": "Kg",
+                "control_mode": "SOFT",
+            }
+        ]
+        with patch(
+            "ury.ury.api.ury_sales_plan.build_demand_vector", return_value=demand_rows
+        ) as build_demand_vector_mock:
+            encoded = freeze_approval_snapshot(doc)
+        payload = json.loads(encoded)
+        self.assertEqual(payload["demand_vector"], demand_rows)
+        build_demand_vector_mock.assert_called_once()
+        # build_demand_vector() must see the same items/company this
+        # snapshot freezes -- not the live doc -- so it explodes exactly
+        # what got frozen, never a value that could drift from it later.
+        called_with = build_demand_vector_mock.call_args[0][0]
+        self.assertEqual(called_with["items"], payload["items"])
+        self.assertEqual(called_with["company"], payload["company"])
 
 
 class TestGuardBackwardTransition(FrappeTestCase):
@@ -1486,3 +1564,162 @@ class TestBackfillSalesPlanDocstatusPatch(TestSalesPlanWorkflowTransitions):
 
         self.assertEqual(result["status"], "Superseded/Cancelled")
         self.assertEqual(frappe.db.get_value("URY Sales Plan", name, "docstatus"), 2)
+
+
+class TestApprovalFreezesDemandVectorForIssueAuthorization(TestSalesPlanWorkflowTransitions):
+    """End-to-end regression coverage for the live bug this task fixes.
+
+    Before this fix, `freeze_approval_snapshot()` never populated
+    `approval_snapshot["demand_vector"]`, so `frozen_component_demand()` in
+    `ury.ury.api.ury_issue_authorization` always raised "No frozen demand
+    found" for a component -- for EVERY plan approved through the real
+    product (Desk workflow or the React app calling `save_draft` ->
+    `transition_plan`), because nothing upstream of it ever wrote that key.
+    This walks the exact same path a real user hits: save_draft ->
+    transition_plan all the way to Approved -> create_issue_authorization,
+    against a real manufactured item with a real submitted BOM -- not the
+    dev_seed shortcut that spliced demand_vector in by hand.
+    """
+
+    def _ensure_department(self, department_name, branch, company):
+        if frappe.db.exists("URY Production Department", department_name):
+            return department_name
+        cost_center = frappe.db.get_value("Company", company, "cost_center")
+        warehouse = self._ensure_warehouse(f"{department_name} Store", company)
+        frappe.get_doc(
+            {
+                "doctype": "URY Production Department",
+                "department_name": department_name,
+                "branch": branch,
+                "company": company,
+                "enabled": 1,
+                "department_warehouse": warehouse,
+                "cost_center": cost_center,
+            }
+        ).insert(ignore_permissions=True)
+        return department_name
+
+    def _ensure_production_unit(self, production_unit_name, department, branch):
+        if frappe.db.exists("URY Production Unit", production_unit_name):
+            return production_unit_name
+        frappe.get_doc(
+            {
+                "doctype": "URY Production Unit",
+                "production": production_unit_name,
+                "department": department,
+                "branch": branch,
+                "enabled": 1,
+            }
+        ).insert(ignore_permissions=True)
+        return production_unit_name
+
+    def _ensure_bom(self, finished_item, raw_item, company, qty_per_unit):
+        existing = frappe.db.get_value(
+            "BOM", {"item": finished_item, "company": company, "docstatus": 1}, "name"
+        )
+        if existing:
+            return existing
+        bom = frappe.get_doc(
+            {
+                "doctype": "BOM",
+                "item": finished_item,
+                "quantity": 1,
+                "company": company,
+                "is_active": 1,
+                "is_default": 1,
+                "with_operations": 0,
+                "items": [{"item_code": raw_item, "qty": qty_per_unit, "uom": "Nos"}],
+            }
+        )
+        bom.insert(ignore_permissions=True)
+        bom.submit()
+        return bom.name
+
+    def setUp(self):
+        super().setUp()
+        self.raw_item = "MTPL Raw Flour"
+        self.finished_item = "MTPL Manufactured Bun"
+        self.department = "MTPL Kitchen Dept"
+        self.production_unit = "MTPL Main Kitchen Unit"
+        self._ensure_item(self.raw_item)
+        self._ensure_item(self.finished_item)
+        self._ensure_department(self.department, self.branch, self.company)
+        self._ensure_production_unit(self.production_unit, self.department, self.branch)
+        self.qty_per_unit = 2
+        self.bom_name = self._ensure_bom(
+            self.finished_item, self.raw_item, self.company, self.qty_per_unit
+        )
+        if not frappe.db.exists(
+            "URY Item Production Configuration",
+            {"item": self.finished_item, "branch": self.branch, "active": 1},
+        ):
+            frappe.get_doc(
+                {
+                    "doctype": "URY Item Production Configuration",
+                    "active": 1,
+                    "item": self.finished_item,
+                    "branch": self.branch,
+                    "production_policy": "MADE_TO_ORDER",
+                    "department": self.department,
+                    "production_unit": self.production_unit,
+                    "bom": self.bom_name,
+                }
+            ).insert(ignore_permissions=True)
+        self._ensure_menu(self.finished_item, self.branch)
+        frappe.db.delete(
+            "URY Sales Plan",
+            {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+        )
+
+    def test_full_approval_freezes_demand_vector_and_issue_authorization_succeeds(self):
+        from ury.ury.api.ury_sales_plan import save_draft, transition_plan
+        from ury.ury.api.ury_issue_authorization import create_issue_authorization
+
+        planned_qty = 5
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": self.finished_item, "qty": planned_qty}],
+        )
+        name = created["name"]
+
+        frappe.set_user(TEST_SALES_PLAN_MANAGER)
+        try:
+            transition_plan(name=name, target_state="Proposed")
+            transition_plan(name=name, target_state="Submitted for Approval")
+            result = transition_plan(name=name, target_state="Approved")
+        finally:
+            frappe.set_user("Administrator")
+
+        self.assertEqual(result["status"], "Approved")
+
+        snapshot = json.loads(frappe.db.get_value("URY Sales Plan", name, "approval_snapshot"))
+        demand_vector = snapshot.get("demand_vector")
+        self.assertTrue(demand_vector, "approval_snapshot must carry a non-empty demand_vector")
+
+        row = next(r for r in demand_vector if r["component_item"] == self.raw_item)
+        self.assertEqual(row["department"], self.department)
+        self.assertEqual(row["production_unit"], self.production_unit)
+        self.assertEqual(row["required_qty"], planned_qty * self.qty_per_unit)
+
+        # The actual regression: this used to fail closed with "No frozen
+        # demand found for component ... " for every real approval, because
+        # frozen_component_demand() read an approval_snapshot["demand_vector"]
+        # that freeze_approval_snapshot() never populated. Administrator
+        # (System Manager) has create rights on URY Issue Authorization and
+        # bypasses the branch-assignment check -- what's under test here is
+        # the frozen-demand read, not this doctype's own permission matrix.
+        doc = create_issue_authorization(
+            plan=name,
+            department=self.department,
+            component_item=self.raw_item,
+            requested_qty=row["required_qty"],
+            branch=self.branch,
+            company=self.company,
+            production_unit=self.production_unit,
+        )
+
+        self.assertEqual(doc.status, "Authorized")
+        self.assertEqual(doc.authorized_qty, row["required_qty"])
+        self.assertEqual(doc.remaining_after_qty, 0)

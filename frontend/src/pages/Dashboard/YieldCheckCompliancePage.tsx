@@ -188,7 +188,6 @@ export const YieldCheckCompliancePage: React.FC = () => {
             Branch (Optional)
             <Select
               aria-label="Branch"
-              size="sm"
               value={selectedBranch}
               onChange={(event) => setSelectedBranch(event.target.value)}
               className="mt-1"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, Input, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DatePicker, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -152,29 +152,27 @@ export function TodaysSales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Today's Sales</h1>
-          <p className="text-sm text-muted-foreground">
-            {data ? `${data.day_of_week}, ${data.query_date}` : 'Live sales snapshot'}
-            {activeBranchId === 'all' ? ' · All Branches' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Input
-            type="date"
-            value={date}
-            max={toApiDate(new Date())}
-            onChange={(e) => setDate(e.target.value)}
-            size="sm"
-          />
-          {data && (
-            <span className="text-xs text-muted-foreground">
-              Updated {new Date(data.last_updated_at).toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Today's Sales"
+        description={`${data ? `${data.day_of_week}, ${data.query_date}` : 'Live sales snapshot'}${activeBranchId === 'all' ? ' · All Branches' : ''}`}
+        actions={
+          <>
+            <DatePicker
+              id="report-date"
+              aria-label="Report date"
+              value={date}
+              maxDate={toApiDate(new Date())}
+              onChange={(_id, next) => setDate(next)}
+              className="w-[150px]"
+            />
+            {data && (
+              <span className="text-xs text-muted-foreground">
+                Updated {new Date(data.last_updated_at).toLocaleTimeString()}
+              </span>
+            )}
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

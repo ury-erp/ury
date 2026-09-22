@@ -353,7 +353,6 @@ export const AggregatorPage: React.FC = () => {
                       return (
                         <Button
                           variant="ghost"
-                          size="sm"
                           onClick={() => handleEditAggregator(row, idx)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                           title="Edit Aggregator"

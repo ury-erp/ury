@@ -3,6 +3,7 @@
         "doctype": "Item",
         "item_group": "STARTERS",
         "item_code": "MOM",
+        "stock_uom": "Nos",
         "item_name": "Momo",
         "valuation_rate": 40.0,
         "is_stock_item": "1",
@@ -14,6 +15,7 @@
         "doctype": "Item",
         "item_group": "STARTERS",
         "item_code": "WNG",
+        "stock_uom": "Nos",
         "item_name": "Wings",
         "valuation_rate": 99.0,
         "is_stock_item": "1",
@@ -97,6 +99,7 @@
         "doctype": "Item",
         "item_group": "COMBOS",
         "item_code": "TDC",
+        "stock_uom": "Nos",
         "item_name": "Takeaway And Delivery Combo",
         "is_stock_item": "0",
         "image": "https://placehold.co/600x400/A7C7E7/000000.png?text=Combo"

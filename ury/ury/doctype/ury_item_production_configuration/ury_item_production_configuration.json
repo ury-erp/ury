@@ -104,6 +104,7 @@
    "options": "Plan Available\nAlways Available"
   },
   {
+   "depends_on": "eval:doc.production_policy==\"DIRECT_RETAIL\"",
    "fieldname": "direct_retail_warehouse",
    "fieldtype": "Link",
    "label": "Direct Retail Warehouse",

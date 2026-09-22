@@ -163,7 +163,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
             onClick={onCancel}
             disabled={loading}
             variant="outline"
-            size="sm"
           >
             Cancel
           </Button>
@@ -171,7 +170,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
             onClick={handleConfirm}
             disabled={loading}
             variant="default"
-            size="sm"
           >
             {loading ? 'Processing...' : action}
           </Button>
