@@ -145,6 +145,14 @@ def _default_mop_account(name, company_name):
         account = frappe.db.get_value(
             "Account", {"company": company_name, "account_type": "Cash", "is_group": 0}, "name"
         )
+    if not account:
+        abbr = frappe.db.get_value("Company", company_name, "abbr")
+        if abbr:
+            fallback = f"Cash - {abbr}"
+            if frappe.db.exists("Account", fallback):
+                frappe.db.set_value("Account", fallback, "account_type", "Cash")
+                frappe.db.commit()
+                account = fallback
     return account
 
 

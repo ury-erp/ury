@@ -132,10 +132,18 @@ export const PosProfilePage: React.FC = () => {
 
   const handleAddProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const hasDefaultPayment = addForm.payments.some(p => p.mode_of_payment && p.default);
+    if (!hasDefaultPayment) {
+      showToast.error('Please select a default mode of payment');
+      return;
+    }
+
     setSaving(true);
     try {
       let defaultCurrency = '';
       let defaultCostCenter = '';
+      let writeOffAccount = '';
       if (addForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -144,26 +152,11 @@ export const PosProfilePage: React.FC = () => {
           });
           const comp = compDoc.message || compDoc;
           defaultCurrency = comp.default_currency || '';
-          defaultCostCenter = comp.default_cost_center || '';
+          const abbr = comp.abbr || '';
+          defaultCostCenter = comp.default_cost_center || (abbr ? `Main - ${abbr}` : '');
+          writeOffAccount = abbr ? `Write Off - ${abbr}` : '';
         } catch (e) {
           console.error("Failed to fetch company details", e);
-        }
-
-        if (!defaultCostCenter) {
-          try {
-            const ccList = await call<any>('frappe.client.get_list', {
-              doctype: 'Cost Center',
-              filters: [['company', '=', addForm.company], ['is_group', '=', 0]],
-              fields: ['name'],
-              limit: 1
-            });
-            const records = ccList.message || ccList || [];
-            if (records.length > 0) {
-              defaultCostCenter = records[0].name;
-            }
-          } catch (e) {
-            console.error("Failed to fetch cost center list", e);
-          }
         }
       }
 
@@ -190,6 +183,8 @@ export const PosProfilePage: React.FC = () => {
           selling_price_list: addForm.selling_price_list || 'Standard Selling',
           currency: defaultCurrency || undefined,
           cost_center: defaultCostCenter || undefined,
+          write_off_account: writeOffAccount || undefined,
+          write_off_cost_center: defaultCostCenter || undefined,
           print_format: addForm.print_format || undefined,
           custom_kot_naming_series: addForm.custom_kot_naming_series || undefined,
           applicable_for_users: addForm.applicable_for_users.filter(u => u.user).map(u => ({ user: u.user, default: u.default })),
@@ -305,6 +300,12 @@ export const PosProfilePage: React.FC = () => {
     if (e) e.preventDefault();
     if (!selectedProfile) return;
 
+    const hasDefaultPayment = (profileForm.payments || []).some((p: any) => p.mode_of_payment && p.default);
+    if (!hasDefaultPayment) {
+      showToast.error('Please select a default mode of payment');
+      return;
+    }
+
     const getNormalizedProfileData = (form: Record<string, any>) => {
       return {
         company: form.company || '',
@@ -338,6 +339,23 @@ export const PosProfilePage: React.FC = () => {
 
     setSaving(true);
     try {
+      let defaultCostCenter = '';
+      let writeOffAccount = '';
+      if (profileForm.company) {
+        try {
+          const compDoc = await call<any>('frappe.client.get', {
+            doctype: 'Company',
+            name: profileForm.company
+          });
+          const comp = compDoc.message || compDoc;
+          const abbr = comp.abbr || '';
+          defaultCostCenter = `Main - ${abbr}`;
+          writeOffAccount = `Write Off - ${abbr}`;
+        } catch (e) {
+          console.error("Failed to fetch company details", e);
+        }
+      }
+
       // Same account-mapping guard as create: any payment mode without a
       // company-scoped default account crashes ERPNext's own POS Profile
       // validation on save.
@@ -367,6 +385,8 @@ export const PosProfilePage: React.FC = () => {
           paid_limit: profileForm.paid_limit,
           table_attention_time: profileForm.table_attention_time,
           custom_reset_order_number_daily: profileForm.custom_reset_order_number_daily,
+          write_off_account: writeOffAccount || undefined,
+          write_off_cost_center: defaultCostCenter || undefined,
         },
       });
 
@@ -449,27 +469,24 @@ export const PosProfilePage: React.FC = () => {
         <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
           <button
             onClick={() => setActiveDetailTab('details')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'details' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDetailTab === 'details' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
+              }`}
           >
             <Settings2 className="w-4 h-4" />
             <span>Details</span>
           </button>
           <button
             onClick={() => setActiveDetailTab('print_settings')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'print_settings' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDetailTab === 'print_settings' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
+              }`}
           >
             <Printer className="w-4 h-4" />
             <span>Print Settings</span>
           </button>
           <button
             onClick={() => setActiveDetailTab('users_payments')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'users_payments' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDetailTab === 'users_payments' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
+              }`}
           >
             <Shield className="w-4 h-4" />
             <span>Users & Payments</span>
@@ -650,7 +667,7 @@ export const PosProfilePage: React.FC = () => {
                             onChange={(_, val) => {
                               const newRows = [...(profileForm.applicable_for_users || [])];
                               newRows[idx].user = val;
-                              setProfileForm({...profileForm, applicable_for_users: newRows});
+                              setProfileForm({ ...profileForm, applicable_for_users: newRows });
                             }}
                             options={[
                               { value: '', label: 'Select User' },
@@ -666,7 +683,7 @@ export const PosProfilePage: React.FC = () => {
                             onCheckedChange={checked => {
                               const newRows = [...(profileForm.applicable_for_users || [])];
                               newRows[idx].default = checked ? 1 : 0;
-                              setProfileForm({...profileForm, applicable_for_users: newRows});
+                              setProfileForm({ ...profileForm, applicable_for_users: newRows });
                             }}
                           />
                           <span>Default</span>
@@ -674,7 +691,7 @@ export const PosProfilePage: React.FC = () => {
                         {isEditMode && (
                           <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                             const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
-                            setProfileForm({...profileForm, applicable_for_users: newRows});
+                            setProfileForm({ ...profileForm, applicable_for_users: newRows });
                           }}>
                             <X className="w-4 h-4" />
                           </button>
@@ -687,7 +704,7 @@ export const PosProfilePage: React.FC = () => {
                       type="button"
                       variant="outline"
                       className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
-                      onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}
+                      onClick={() => setProfileForm({ ...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), { user: '', default: 0 }] })}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add User</span>
@@ -714,7 +731,7 @@ export const PosProfilePage: React.FC = () => {
                               onChange={(_, val) => {
                                 const newRows = [...(profileForm.payments || [])];
                                 newRows[idx].mode_of_payment = val;
-                                setProfileForm({...profileForm, payments: newRows});
+                                setProfileForm({ ...profileForm, payments: newRows });
                               }}
                               options={[
                                 { value: '', label: 'Select Payment Mode' },
@@ -736,7 +753,7 @@ export const PosProfilePage: React.FC = () => {
                               onCheckedChange={checked => {
                                 const newRows = [...(profileForm.payments || [])];
                                 newRows[idx].default = checked ? 1 : 0;
-                                setProfileForm({...profileForm, payments: newRows});
+                                setProfileForm({ ...profileForm, payments: newRows });
                               }}
                             />
                             <span>Default</span>
@@ -744,7 +761,7 @@ export const PosProfilePage: React.FC = () => {
                           {isEditMode && (
                             <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                               const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
-                              setProfileForm({...profileForm, payments: newRows});
+                              setProfileForm({ ...profileForm, payments: newRows });
                             }}>
                               <X className="w-4 h-4" />
                             </button>
@@ -758,7 +775,7 @@ export const PosProfilePage: React.FC = () => {
                       type="button"
                       variant="outline"
                       className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
-                      onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}
+                      onClick={() => setProfileForm({ ...profileForm, payments: [...(profileForm.payments || []), { mode_of_payment: '', default: 0 }] })}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Payment</span>
@@ -869,7 +886,7 @@ export const PosProfilePage: React.FC = () => {
         <form onSubmit={handleAddProfile} className="space-y-6 text-sm">
           <div>
             <label className="block font-semibold text-foreground mb-1.5">Profile Name <span className="text-red-500">*</span></label>
-            <Input required value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} />
+            <Input required value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -877,7 +894,7 @@ export const PosProfilePage: React.FC = () => {
               <SearchableSelect
                 id="add_profile_company"
                 value={addForm.company}
-                onChange={(_, val) => setAddForm({...addForm, company: val})}
+                onChange={(_, val) => setAddForm({ ...addForm, company: val })}
                 options={[
                   { value: '', label: 'Select Company' },
                   ...options.companies.map((c: any) => ({ value: c.name, label: c.name }))
@@ -891,7 +908,7 @@ export const PosProfilePage: React.FC = () => {
                 <SearchableSelect
                   id="add_profile_branch"
                   value={addForm.branch}
-                  onChange={(_, val) => setAddForm({...addForm, branch: val})}
+                  onChange={(_, val) => setAddForm({ ...addForm, branch: val })}
                   options={[
                     { value: '', label: 'Select Branch' },
                     ...branches.map((b: any) => ({ value: b.name, label: b.name }))
@@ -909,7 +926,7 @@ export const PosProfilePage: React.FC = () => {
               <SearchableSelect
                 id="add_profile_warehouse"
                 value={addForm.warehouse}
-                onChange={(_, val) => setAddForm({...addForm, warehouse: val})}
+                onChange={(_, val) => setAddForm({ ...addForm, warehouse: val })}
                 options={[
                   { value: '', label: 'Select Warehouse' },
                   ...options.warehouses.map((w: any) => ({ value: w.name, label: w.name }))
@@ -919,17 +936,17 @@ export const PosProfilePage: React.FC = () => {
             </div>
             <div>
               <label className="block font-semibold text-foreground mb-1.5">KOT Naming Series</label>
-              <Input value={addForm.custom_kot_naming_series} onChange={e => setAddForm({...addForm, custom_kot_naming_series: e.target.value})} placeholder="e.g. KOT-.YYYY.-" />
+              <Input value={addForm.custom_kot_naming_series} onChange={e => setAddForm({ ...addForm, custom_kot_naming_series: e.target.value })} placeholder="e.g. KOT-.YYYY.-" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-semibold text-foreground mb-1.5">Price List</label>
-              <Input value={addForm.selling_price_list} onChange={e => setAddForm({...addForm, selling_price_list: e.target.value})} placeholder="Standard Selling" />
+              <Input value={addForm.selling_price_list} onChange={e => setAddForm({ ...addForm, selling_price_list: e.target.value })} placeholder="Standard Selling" />
             </div>
             <div>
               <label className="block font-semibold text-foreground mb-1.5">Print Format</label>
-              <Input value={addForm.print_format} onChange={e => setAddForm({...addForm, print_format: e.target.value})} placeholder="Default" />
+              <Input value={addForm.print_format} onChange={e => setAddForm({ ...addForm, print_format: e.target.value })} placeholder="Default" />
             </div>
           </div>
 
@@ -947,7 +964,7 @@ export const PosProfilePage: React.FC = () => {
                       onChange={(_, val) => {
                         const newRows = [...addForm.applicable_for_users];
                         newRows[idx].user = val;
-                        setAddForm({...addForm, applicable_for_users: newRows});
+                        setAddForm({ ...addForm, applicable_for_users: newRows });
                       }}
                       options={[
                         { value: '', label: 'Select User' },
@@ -962,14 +979,14 @@ export const PosProfilePage: React.FC = () => {
                       onCheckedChange={checked => {
                         const newRows = [...addForm.applicable_for_users];
                         newRows[idx].default = checked ? 1 : 0;
-                        setAddForm({...addForm, applicable_for_users: newRows});
+                        setAddForm({ ...addForm, applicable_for_users: newRows });
                       }}
                     />
                     <span>Default</span>
                   </div>
                   <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
-                    setAddForm({...addForm, applicable_for_users: newRows});
+                    setAddForm({ ...addForm, applicable_for_users: newRows });
                   }}><X className="w-4 h-4" /></button>
                 </div>
               ))}
@@ -978,7 +995,7 @@ export const PosProfilePage: React.FC = () => {
               type="button"
               variant="outline"
               className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
-              onClick={() => setAddForm({...addForm, applicable_for_users: [...addForm.applicable_for_users, {user:'', default:0}]})}
+              onClick={() => setAddForm({ ...addForm, applicable_for_users: [...addForm.applicable_for_users, { user: '', default: 0 }] })}
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add User</span>
@@ -999,7 +1016,7 @@ export const PosProfilePage: React.FC = () => {
                       onChange={(_, val) => {
                         const newRows = [...addForm.payments];
                         newRows[idx].mode_of_payment = val;
-                        setAddForm({...addForm, payments: newRows});
+                        setAddForm({ ...addForm, payments: newRows });
                       }}
                       options={[
                         { value: '', label: 'Select Payment Mode' },
@@ -1014,14 +1031,14 @@ export const PosProfilePage: React.FC = () => {
                       onCheckedChange={checked => {
                         const newRows = [...addForm.payments];
                         newRows[idx].default = checked ? 1 : 0;
-                        setAddForm({...addForm, payments: newRows});
+                        setAddForm({ ...addForm, payments: newRows });
                       }}
                     />
                     <span>Default</span>
                   </div>
                   <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
-                    setAddForm({...addForm, payments: newRows});
+                    setAddForm({ ...addForm, payments: newRows });
                   }}><X className="w-4 h-4" /></button>
                 </div>
               ))}
@@ -1030,7 +1047,7 @@ export const PosProfilePage: React.FC = () => {
               type="button"
               variant="outline"
               className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
-              onClick={() => setAddForm({...addForm, payments: [...addForm.payments, {mode_of_payment:'', default:0}]})}
+              onClick={() => setAddForm({ ...addForm, payments: [...addForm.payments, { mode_of_payment: '', default: 0 }] })}
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Payment</span>
