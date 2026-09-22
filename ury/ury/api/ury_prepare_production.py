@@ -67,6 +67,20 @@ reports the job as neither queued nor started. Elapsed heartbeat time alone
 is never sufficient (D17): both conditions -- heartbeat stale beyond
 ``production_job_stale_minutes`` *and* the job confirmed dead -- must hold.
 
+## Live progress must not touch ``tabProduction Plan`` mid-job
+
+While the job runs, ERPNext Work Order / Manufacture Stock Entry submit
+also updates the same Production Plan row (``ordered_qty``,
+``produced_qty``, ``status``). Mid-job ``db.set_value`` + ``db.commit`` on
+that row for URY step/heartbeat races those updates under MariaDB
+``innodb_snapshot_isolation`` and fails with error 1020.
+
+So D17 live ``step`` / ``heartbeat`` while ``Processing`` are published to
+``frappe.cache`` (keyed by plan + attempt). ``get_production_state`` and
+stale-reset read the cache first. The Production Plan row is written for
+progress only at enqueue (``prepare_production``) and at terminal
+``_finish_*`` -- never between transfer start and WO/SE completion.
+
 ## Blocked vs. failed
 
 A blocker discovered by the job (Store stock consumed by a concurrent
@@ -144,6 +158,10 @@ STEP_COMPLETED = "completed"
 STEP_BLOCKED = "blocked"
 STEP_FAILED = "failed"
 STEP_RESET = "reset"
+
+#: Cache key for live step/heartbeat while Processing. Must not share the
+#: Production Plan row with ERPNext's WO/Manufacture updates (see module docstring).
+PROGRESS_CACHE_KEY_PREFIX = "ury:pp:exec"
 
 
 # --- 1. Synchronous preflight + enqueue (D5) ----------------------------------
@@ -227,6 +245,7 @@ def prepare_production(production_plan):
 	# own custom fields.
 	plan_doc.flags.ignore_validate_update_after_submit = True
 	plan_doc.save(ignore_permissions=True)
+	_publish_live_progress(production_plan, attempt, STEP_QUEUED)
 
 	frappe.enqueue(
 		JOB_METHOD,
@@ -306,54 +325,80 @@ def run_prepare_production_job(production_plan, attempt):
 	   :func:`ury_production_plan_auto_work_order.execute_department_targets`.
 	4. Persist a result summary and the terminal state.
 
+	Live step/heartbeat while running go to :func:`_publish_live_progress`
+	(cache only) -- never mid-job writes/commits on the Production Plan row.
+	See module docstring.
+
 	Any exception raised by step 2 or 3 is recorded to
 	``custom_ury_production_result`` with state ``Production Failed`` and
 	then re-raised, so it still surfaces in the worker's own error log.
 	"""
+	attempt = cint(attempt)
 	plan_doc = frappe.get_doc(PRODUCTION_PLAN_DOCTYPE, production_plan)
 
-	if cint(plan_doc.get(FIELD_ATTEMPT)) != cint(attempt) or plan_doc.get(FIELD_STATE) != STATE_PROCESSING:
+	if cint(plan_doc.get(FIELD_ATTEMPT)) != attempt or plan_doc.get(FIELD_STATE) != STATE_PROCESSING:
 		# Stale job: a newer attempt or a reset has already moved this plan
 		# on. Doing nothing here is the point (see module docstring).
 		return
 
+	sales_plan = plan_doc.get(PP_SALES_PLAN_FIELD)
+	department = plan_doc.get(PP_DEPARTMENT_FIELD)
+
 	try:
-		_update_progress(plan_doc.name, STEP_TRANSFERRING_STOCK)
+		_publish_live_progress(production_plan, attempt, STEP_TRANSFERRING_STOCK)
 		transfer_result = execute_store_to_department_transfer(production_plan)
 		if transfer_result["blockers"]:
-			_finish_blocked(plan_doc.name, transfer_result["blockers"], stage="transfer")
+			_finish_blocked(production_plan, transfer_result["blockers"], stage="transfer", attempt=attempt)
 			return
 
-		_update_progress(plan_doc.name, STEP_BUILDING_WORK_ORDERS)
-		sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, plan_doc.get(PP_SALES_PLAN_FIELD))
-		bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, plan_doc.get(PP_DEPARTMENT_FIELD))
+		_publish_live_progress(production_plan, attempt, STEP_BUILDING_WORK_ORDERS)
+		sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, sales_plan)
+		bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department)
 		if compile_blockers:
-			_finish_blocked(plan_doc.name, compile_blockers, stage="compile")
+			_finish_blocked(production_plan, compile_blockers, stage="compile", attempt=attempt)
 			return
 
-		target_results = execute_department_targets(plan_doc, bucket["targets"])
+		# Pass the plan name, not a doc held across the mutation phase --
+		# execute_department_targets reloads what it needs.
+		target_results = execute_department_targets(production_plan, bucket["targets"])
 
-		_finish_completed(plan_doc.name, transfer_result, target_results)
+		_finish_completed(production_plan, transfer_result, target_results, attempt=attempt)
 	except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring
-		_finish_failed(plan_doc.name, exc)
+		_finish_failed(production_plan, exc, attempt=attempt)
 		raise
 
 
-def _update_progress(production_plan, step):
-	frappe.db.set_value(
-		PRODUCTION_PLAN_DOCTYPE,
-		production_plan,
-		{FIELD_STEP: step, FIELD_HEARTBEAT: now_datetime()},
-		update_modified=False,
+def _progress_cache_key(production_plan, attempt):
+	return f"{PROGRESS_CACHE_KEY_PREFIX}:{production_plan}:{cint(attempt)}"
+
+
+def _progress_cache_ttl_seconds():
+	# Keep live progress at least as long as the stale threshold, with headroom.
+	return max(cint(production_job_stale_minutes()) * 60 * 2, 3600)
+
+
+def _publish_live_progress(production_plan, attempt, step):
+	"""D17 live step/heartbeat for UI polling -- cache only, never the PP row."""
+	frappe.cache.set_value(
+		_progress_cache_key(production_plan, attempt),
+		{"step": step, "heartbeat": str(now_datetime())},
+		expires_in_sec=_progress_cache_ttl_seconds(),
 	)
-	# Publish the heartbeat immediately -- a reader on another connection
-	# (the UI's polling, or a System Manager's staleness check) must be able
-	# to see progress while this job is still running, not only once it
-	# finishes.
-	frappe.db.commit()
 
 
-def _finish_blocked(production_plan, blockers, stage):
+def _read_live_progress(production_plan, attempt):
+	if attempt is None:
+		return None
+	return frappe.cache.get_value(_progress_cache_key(production_plan, attempt))
+
+
+def _clear_live_progress(production_plan, attempt):
+	if attempt is None:
+		return
+	frappe.cache.delete_value(_progress_cache_key(production_plan, attempt))
+
+
+def _finish_blocked(production_plan, blockers, stage, attempt=None):
 	result = {"status": "blocked", "stage": stage, "blockers": blockers, "finished_at": str(now_datetime())}
 	frappe.db.set_value(
 		PRODUCTION_PLAN_DOCTYPE,
@@ -366,10 +411,11 @@ def _finish_blocked(production_plan, blockers, stage):
 		},
 		update_modified=False,
 	)
+	_clear_live_progress(production_plan, attempt if attempt is not None else _db_attempt(production_plan))
 	frappe.db.commit()
 
 
-def _finish_completed(production_plan, transfer_result, target_results):
+def _finish_completed(production_plan, transfer_result, target_results, attempt=None):
 	result = {
 		"status": "completed",
 		"stock_entries": transfer_result.get("stock_entries", []),
@@ -391,10 +437,11 @@ def _finish_completed(production_plan, transfer_result, target_results):
 		},
 		update_modified=False,
 	)
+	_clear_live_progress(production_plan, attempt if attempt is not None else _db_attempt(production_plan))
 	frappe.db.commit()
 
 
-def _finish_failed(production_plan, exc):
+def _finish_failed(production_plan, exc, attempt=None):
 	result = {"status": "failed", "error": str(exc), "finished_at": str(now_datetime())}
 	frappe.db.set_value(
 		PRODUCTION_PLAN_DOCTYPE,
@@ -407,7 +454,12 @@ def _finish_failed(production_plan, exc):
 		},
 		update_modified=False,
 	)
+	_clear_live_progress(production_plan, attempt if attempt is not None else _db_attempt(production_plan))
 	frappe.db.commit()
+
+
+def _db_attempt(production_plan):
+	return frappe.db.get_value(PRODUCTION_PLAN_DOCTYPE, production_plan, FIELD_ATTEMPT)
 
 
 # --- 3. Read-only state API (D12) -----------------------------------------------
@@ -442,6 +494,7 @@ def get_production_state(production_plan):
 		production_plan,
 		[
 			"docstatus",
+			"status",
 			PP_DEPARTMENT_FIELD,
 			FIELD_STATE,
 			FIELD_RESULT,
@@ -457,7 +510,16 @@ def get_production_state(production_plan):
 		frappe.throw(_("{0} does not exist.").format(production_plan), frappe.DoesNotExistError)
 
 	result = _decode_result(row.get(FIELD_RESULT))
-	heartbeat_stale = _is_heartbeat_stale(row.get(FIELD_HEARTBEAT))
+	heartbeat = row.get(FIELD_HEARTBEAT)
+	step = row.get(FIELD_STEP)
+	# While Processing, live progress is cache-backed (see module docstring).
+	if row.get(FIELD_STATE) == STATE_PROCESSING:
+		live = _read_live_progress(production_plan, row.get(FIELD_ATTEMPT))
+		if live:
+			heartbeat = live.get("heartbeat") or heartbeat
+			step = live.get("step") or step
+
+	heartbeat_stale = _is_heartbeat_stale(heartbeat)
 	job_running = bool(row.get(FIELD_JOB_ID)) and is_job_enqueued(row[FIELD_JOB_ID])
 	can_reset = (
 		row.get(FIELD_STATE) == STATE_PROCESSING
@@ -470,13 +532,14 @@ def get_production_state(production_plan):
 		"production_plan": production_plan,
 		"department": row.get(PP_DEPARTMENT_FIELD),
 		"docstatus": row.get("docstatus"),
+		"status": row.get("status"),
 		"production_state": row.get(FIELD_STATE),
 		"execution_state": EXECUTION_STATE_BY_PRODUCTION_STATE.get(row.get(FIELD_STATE), "awaiting_materials"),
 		"blockers": (result or {}).get("blockers", []),
 		"result": result,
 		"started_at": row.get(FIELD_STARTED_AT),
-		"heartbeat": row.get(FIELD_HEARTBEAT),
-		"step": row.get(FIELD_STEP),
+		"heartbeat": heartbeat,
+		"step": step,
 		"attempt": row.get(FIELD_ATTEMPT),
 		"job_id": row.get(FIELD_JOB_ID),
 		"heartbeat_stale": heartbeat_stale,
@@ -508,6 +571,7 @@ def get_sales_plan_production_states(sales_plan):
 		            "department": "Main Kitchen",
 		            "production_plan": "MFG-PP-2026-00001",
 		            "docstatus": 1,
+		            "status": "Not Started",          # ERPNext Production Plan.status
 		            "link_state": "live",             # "live" | "stale" (D12 axis 1 -- see note below)
 		            "execution_state": "processing",  # D12 axis 2
 		            "can_open": True,
@@ -555,6 +619,7 @@ def get_sales_plan_production_states(sales_plan):
 				"department": row.get("department"),
 				"production_plan": row["name"],
 				"docstatus": row["docstatus"],
+				"status": row.get("status"),
 				"link_state": row["link_state"],
 				"execution_state": EXECUTION_STATE_BY_PRODUCTION_STATE.get(
 					row.get("production_state"), "awaiting_materials"
@@ -613,7 +678,7 @@ def reset_stale_execution(production_plan):
 	row = frappe.db.get_value(
 		PRODUCTION_PLAN_DOCTYPE,
 		production_plan,
-		[FIELD_STATE, FIELD_HEARTBEAT, FIELD_JOB_ID],
+		[FIELD_STATE, FIELD_HEARTBEAT, FIELD_JOB_ID, FIELD_ATTEMPT],
 		for_update=True,
 		as_dict=True,
 	)
@@ -621,7 +686,13 @@ def reset_stale_execution(production_plan):
 		frappe.throw(_("{0} does not exist.").format(production_plan), frappe.DoesNotExistError)
 	if row.get(FIELD_STATE) != STATE_PROCESSING:
 		frappe.throw(_("{0} is not Processing; there is nothing to reset.").format(production_plan))
-	if not _is_heartbeat_stale(row.get(FIELD_HEARTBEAT)):
+
+	heartbeat = row.get(FIELD_HEARTBEAT)
+	live = _read_live_progress(production_plan, row.get(FIELD_ATTEMPT))
+	if live and live.get("heartbeat"):
+		heartbeat = live["heartbeat"]
+
+	if not _is_heartbeat_stale(heartbeat):
 		frappe.throw(
 			_("{0}'s heartbeat is not yet stale; the job may still be alive. Wait before resetting.").format(
 				production_plan
@@ -651,4 +722,5 @@ def reset_stale_execution(production_plan):
 			FIELD_RESULT: json.dumps(result, default=str),
 		},
 	)
+	_clear_live_progress(production_plan, row.get(FIELD_ATTEMPT))
 	return {"production_plan": production_plan, "state": STATE_AWAITING_MATERIALS}
