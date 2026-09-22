@@ -83,6 +83,30 @@ const populatedProfitabilityNoCost = {
 
 const emptyPlan = { company: 'URY Co', branch: 'URY Branch', service_date_or_period: '2026-08-28', rows: [] };
 
+// The real-world shape today: no fulfilment Stock Entry has ever been
+// posted, so `compute_variance` returns `posted_cost=None` for every row,
+// and every row carries `reason: "UNATTRIBUTED_COST"`.
+const provisionalProfitability = {
+  ...populatedProfitability,
+  reason: 'UNATTRIBUTED_COST',
+  provisional: true,
+  rows: [
+    {
+      company: 'URY Co',
+      branch: 'URY Branch',
+      service_date_or_period: '2026-08-28',
+      department: 'Kitchen',
+      item_or_component: 'Burger',
+      source_document: 'POS-INV-001',
+      net_revenue: 500,
+      theoretical_cost: 90,
+      theoretical_gross_profit: 410,
+      reason: 'UNATTRIBUTED_COST',
+      provisional: true,
+    },
+  ],
+};
+
 afterEach(cleanup);
 
 beforeEach(() => {
@@ -143,6 +167,64 @@ describe('DepartmentProfitabilityPage', () => {
     expect(table.queryByText('Posted GP')).not.toBeInTheDocument();
     expect(table.queryByText('Theoretical GP')).not.toBeInTheDocument();
     expect(table.queryByText('Variance')).not.toBeInTheDocument();
+  });
+
+  it('translates the report-level reason code instead of showing it raw', async () => {
+    mockedGetLoggedUser.mockResolvedValue('finance@ury.test');
+    mockedGetUserRoles.mockResolvedValue({ roles: ['Finance'], full_name: 'Finance User' });
+    mockedGetProfitability.mockResolvedValue(provisionalProfitability);
+    mockedGetPlanVsActual.mockResolvedValue(emptyPlan);
+
+    render(<DepartmentProfitabilityPage />);
+
+    await waitFor(() => expect(screen.getByTestId('profitability-reason')).toBeInTheDocument());
+    expect(screen.getByTestId('profitability-reason')).toHaveTextContent(
+      'Theoretical cost only — no stock has been posted to ERPNext for this item yet.',
+    );
+    expect(screen.queryByText('UNATTRIBUTED_COST')).not.toBeInTheDocument();
+  });
+
+  it('shows a translated per-row Reason column when a row carries one', async () => {
+    mockedGetLoggedUser.mockResolvedValue('finance@ury.test');
+    mockedGetUserRoles.mockResolvedValue({ roles: ['Finance'], full_name: 'Finance User' });
+    mockedGetProfitability.mockResolvedValue(provisionalProfitability);
+    mockedGetPlanVsActual.mockResolvedValue(emptyPlan);
+
+    render(<DepartmentProfitabilityPage />);
+
+    await waitFor(() => expect(screen.getByTestId('profitability-table')).toBeInTheDocument());
+    const table = within(screen.getByTestId('profitability-table'));
+    expect(table.getByText('Reason')).toBeInTheDocument();
+    // The translated sentence appears twice in this fixture: once in the
+    // report-level banner (every row shares the same reason) and once in
+    // the row's own Reason cell -- both are expected, not a duplicate bug.
+    expect(
+      table.getAllByText('Theoretical cost only — no stock has been posted to ERPNext for this item yet.'),
+    ).toHaveLength(2);
+  });
+
+  it('omits the Reason column entirely when no row carries one', async () => {
+    mockedGetLoggedUser.mockResolvedValue('finance@ury.test');
+    mockedGetUserRoles.mockResolvedValue({ roles: ['Finance'], full_name: 'Finance User' });
+    mockedGetProfitability.mockResolvedValue(populatedProfitability);
+    mockedGetPlanVsActual.mockResolvedValue(emptyPlan);
+
+    render(<DepartmentProfitabilityPage />);
+
+    await waitFor(() => expect(screen.getByTestId('profitability-table')).toBeInTheDocument());
+    expect(within(screen.getByTestId('profitability-table')).queryByText('Reason')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the raw code for a reason not in the translation map', async () => {
+    mockedGetLoggedUser.mockResolvedValue('finance@ury.test');
+    mockedGetUserRoles.mockResolvedValue({ roles: ['Finance'], full_name: 'Finance User' });
+    mockedGetProfitability.mockResolvedValue({ ...populatedProfitability, reason: 'SOME_FUTURE_CODE' });
+    mockedGetPlanVsActual.mockResolvedValue(emptyPlan);
+
+    render(<DepartmentProfitabilityPage />);
+
+    await waitFor(() => expect(screen.getByTestId('profitability-reason')).toBeInTheDocument());
+    expect(screen.getByTestId('profitability-reason')).toHaveTextContent('SOME_FUTURE_CODE');
   });
 
   it('denies access outright for Cashier/Captain roles without calling the backend', async () => {

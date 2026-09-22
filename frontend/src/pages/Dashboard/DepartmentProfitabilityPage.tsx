@@ -9,6 +9,7 @@ import {
   ProfitabilityRow,
 } from '../../services/departmentProfitability';
 import { departmentStockService, DepartmentOption } from '../../services/departmentStock';
+import { describeProfitabilityReason } from '../../lib/profitabilityReasons';
 
 /**
  * Additive, unwired reporting page (V3-80): department profitability and
@@ -275,7 +276,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
             <h3 className="text-sm font-semibold mb-2">Department Profitability</h3>
             {profitability.reason && (
               <p className="text-xs text-warning mb-2" data-testid="profitability-reason">
-                {profitability.reason}
+                {describeProfitabilityReason(profitability.reason)}
               </p>
             )}
             {(() => {
@@ -284,6 +285,16 @@ export const DepartmentProfitabilityPage: React.FC = () => {
                 { key: 'item_or_component', header: 'Item' },
                 { key: 'net_revenue', header: 'Net Revenue', render: (row) => formatCurrency(row.net_revenue) },
               ];
+              // A row's own reason (e.g. UNATTRIBUTED_COST) can differ from
+              // the report-level banner above -- shown per row too so a mix
+              // of costed and provisional rows in the same table is legible.
+              if (profitability.rows.some((row) => row.reason)) {
+                baseProfitColumns.push({
+                  key: 'reason',
+                  header: 'Reason',
+                  render: (row) => (row.reason ? describeProfitabilityReason(row.reason) : '—'),
+                });
+              }
               const costColumns: DataTableColumn<ProfitabilityRow>[] = canSeeCost
                 ? [
                     { key: 'posted_cost', header: 'Posted Cost', render: (row) => formatCurrency(row.posted_cost) },
