@@ -82,6 +82,7 @@ def capture_wastage(
 
     auth_doc = frappe.get_doc(ISSUE_AUTH_DOCTYPE, issue_authorization)
     _validate_authorization_scope(auth_doc, branch, company)
+    _validate_no_duplicate_yield_check(auth_doc)
 
     held_qty = held_quantity(auth_doc)
     if wasted_qty > held_qty:
@@ -233,6 +234,32 @@ def _sum_live_if_exists(doctype, filters, fieldname):
         return 0
     rows = frappe.get_all(doctype, filters=filters, pluck=fieldname)
     return sum(row or 0 for row in rows)
+
+
+def _validate_no_duplicate_yield_check(auth_doc):
+    """Mirror of `URYYieldCheck.validate_no_duplicate_wastage`.
+
+    That guard blocks logging a Yield Check once an Issue Wastage already
+    exists for the same authorization, but was one-directional — it never
+    blocked the reverse order (capturing wastage once a Yield Check already
+    exists). Both records would otherwise double-count the same shortfall
+    for one authorization, regardless of which one was recorded first.
+    """
+    existing_checks = frappe.get_all(
+        "URY Yield Check",
+        filters={"issue_authorization": auth_doc.get("name")},
+        fields=["name"],
+    )
+    if existing_checks:
+        frappe.throw(
+            _(
+                "Issue Authorization {0} already has a Yield Check recorded ({1}). "
+                "Routine/expected trim loss should be logged as a Yield Check, "
+                "exceptional loss (spoilage, damage, expiry, prep error) as Issue Wastage. "
+                "The same authorization cannot have both, as it would double-count the same shortfall."
+            ).format(auth_doc.get("name"), existing_checks[0].get("name")),
+            frappe.ValidationError,
+        )
 
 
 def _validate_authorization_scope(auth_doc, branch, company):

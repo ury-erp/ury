@@ -18,7 +18,9 @@ from ury.ury.api.ury_yield_variance import (
 	record_yield_check,
 	get_yield_variance,
 	get_yield_check_compliance,
+	update_yield_standards,
 	user_has_branch_access,
+	branch_item_codes,
 )
 
 
@@ -378,6 +380,63 @@ class TestGetYieldCheckCompliancePermissionGating(FrappeTestCase):
 		self.assertIsInstance(result, list)
 		self.assertTrue(len(result) >= 0)
 
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_scopes_tracked_items_to_bom_usage(
+		self, mock_manager, mock_scope, mock_getdate, mock_branch_items, mock_get_all
+	):
+		"""F8 (corrected): when branch is given, only items that resolve via
+		branch_item_codes() (active IPC rows -> their BOM -> BOM Item
+		components) are evaluated — NOT items with a direct IPC row, which
+		per docs/yield-tracking.md can never be raw ingredients. The
+		BOM-anchor resolution itself is exercised in
+		test_yield_branch_scope.py; here we only verify
+		get_yield_check_compliance wires branch_item_codes() correctly."""
+		from datetime import date
+		today = date(2026, 1, 15)
+		mock_getdate.return_value = today
+		mock_branch_items.return_value = {"ITEM-A"}
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "Item":
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [frappe._dict(
+					name="ITEM-A",
+					custom_yield_check_cadence="Interval",
+					custom_yield_check_interval_days=7,
+				)]
+			if doctype == "URY Yield Check":
+				return []  # completed_checks
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_with_no_bom_usage_returns_empty(
+		self, mock_manager, mock_scope, mock_branch_items
+	):
+		"""F8 (corrected): a branch that resolves to no BOM-usage items (no
+		active IPC rows, no BOM on those rows, or no BOM components) gets an
+		empty compliance list instead of the unscoped global item set."""
+		mock_branch_items.return_value = set()  # no BOM-usage items for this branch
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(result, [])
+
 
 class TestRequireScope(FrappeTestCase):
 	"""Test _require_scope helper function."""
@@ -554,6 +613,485 @@ class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
 				stock_uom="Nos",
 				check_type="Routine",
 			)
+
+
+class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
+	"""F9: real-document coverage for get_yield_check_compliance -- every
+	other test in this file mocks frappe.get_all/get_value, so none of them
+	inserted an actual Item/URY Issue Authorization/URY Yield Check and ran
+	the real aggregation query. These do, via frappe.get_doc(...).insert()
+	and the real record_yield_check() whitelisted API.
+	"""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_branch(self, branch_name, company):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code, **overrides):
+		if frappe.db.exists("Item", item_code):
+			return
+		fields = {
+			"doctype": "Item",
+			"item_code": item_code,
+			"item_name": item_code,
+			"item_group": "All Item Groups",
+			"stock_uom": "Nos",
+			"is_stock_item": 1,
+			"custom_yield_tracked": 1,
+			"custom_yield_percent": 80.0,
+		}
+		fields.update(overrides)
+		frappe.get_doc(fields).insert(ignore_permissions=True)
+
+	def _minimal_plan(self, branch, company):
+		plan = frappe.get_doc(
+			{
+				"doctype": "URY Sales Plan",
+				"status": "Draft",
+				"enforcement_mode": "Soft",
+				"branch": branch,
+				"company": company,
+				"plan_date": "2026-09-01",
+			}
+		)
+		plan.flags.ignore_mandatory = True
+		plan.flags.ignore_validate = True
+		plan.insert(ignore_permissions=True)
+		return plan.name
+
+	def _department(self, branch, company):
+		name = f"{branch} F9 Compliance Dept"
+		if frappe.db.exists("URY Production Department", name):
+			return name
+		frappe.get_doc(
+			{
+				"doctype": "URY Production Department",
+				"department_name": name,
+				"branch": branch,
+				"company": company,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True, ignore_mandatory=True)
+		return name
+
+	def _ensure_warehouse(self, warehouse_name, company):
+		if frappe.db.exists("Warehouse", {"warehouse_name": warehouse_name, "company": company}):
+			return frappe.db.get_value(
+				"Warehouse", {"warehouse_name": warehouse_name, "company": company}, "name"
+			)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Warehouse",
+				"warehouse_name": warehouse_name,
+				"company": company,
+			}
+		).insert(ignore_permissions=True)
+		return doc.name
+
+	def _ensure_bom(self, finished_item, raw_item, company):
+		existing = frappe.db.get_value(
+			"BOM", {"item": finished_item, "company": company, "docstatus": 1}, "name"
+		)
+		if existing:
+			return existing
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": finished_item,
+				"quantity": 1,
+				"company": company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 4}],  # 4 / 0.80 = 5 -- must be a whole number, "Nos" UOM enforces this
+			}
+		)
+		bom.insert(ignore_permissions=True)
+		bom.submit()
+		return bom.name
+
+	def _ensure_item_production_configuration(self, item_code, branch, company):
+		"""get_yield_check_compliance's item query is branch-scoped (F8) via
+		URY Item Production Configuration (IPC) -> its BOM -> that BOM's
+		component items (BOM Item rows) -- NOT a direct IPC.item match.
+		IPC only ever has rows for sellable menu items (kitchen/bar
+		routing), never raw ingredients (see docs/yield-tracking.md), so
+		yield-tracked `item_code` (always a raw ingredient) can only be
+		reached by anchoring through a sellable item's BOM that uses it as
+		a component -- exactly like production traffic actually would.
+		"""
+		finished_item = f"{item_code} F9 Sellable"
+		if not frappe.db.exists("Item", finished_item):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": finished_item,
+					"item_name": finished_item,
+					"item_group": "All Item Groups",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+				}
+			).insert(ignore_permissions=True)
+
+		bom_name = self._ensure_bom(finished_item, item_code, company)
+
+		if frappe.db.exists(
+			"URY Item Production Configuration",
+			{"item": finished_item, "branch": branch, "active": 1},
+		):
+			return
+		warehouse = self._ensure_warehouse(f"{item_code} F9 Retail Store", company)
+		frappe.get_doc(
+			{
+				"doctype": "URY Item Production Configuration",
+				"active": 1,
+				"item": finished_item,
+				"branch": branch,
+				"bom": bom_name,
+				"production_policy": "DIRECT_RETAIL",
+				"direct_retail_warehouse": warehouse,
+			}
+		).insert(ignore_permissions=True)
+
+	def _auth(self, plan, branch, company, department, item, qty=50.0):
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Issue Authorization",
+				"plan": plan,
+				"plan_approval_hash": "f9-real-doc-test",
+				"branch": branch,
+				"company": company,
+				"department": department,
+				"component_item": item,
+				"stock_uom": "Nos",
+				"control_mode": "SOFT",
+				"status": "Authorized",
+				"required_qty": qty,
+				"authorized_qty": qty,
+				"remaining_before_qty": qty,
+				"remaining_after_qty": 0,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	def setUp(self):
+		self.company = "F9 Compliance Test Co"
+		self.branch = "F9 Compliance Test Branch"
+		self._ensure_company(self.company, "F9CC")
+		self._ensure_branch(self.branch, self.company)
+
+	def test_real_compliance_reports_100_percent_for_zero_required_count(self):
+		"""Documents CURRENT behavior: an Interval-cadence item with
+		interval_days<=0 (skipped by the engine, so required_count == 0)
+		reports compliance_percent == 100.0 -- a flattering default that
+		looks like an accidental `x/0 -> 100` fallback rather than a
+		documented product decision (see TRACK.md F9/Opus review). This
+		test does NOT assert that 100% is the *correct* semantics, only
+		that it is the semantics actually shipped today, against a real
+		inserted Item and a real (unmocked) call to
+		get_yield_check_compliance -- so a future intentional change to
+		this default will show up here as a deliberate test update, not a
+		silent behavior change.
+		"""
+		item_code = "F9-COMPLIANCE-ZERO-REQ-ITEM"
+		self._ensure_item(
+			item_code,
+			custom_yield_check_cadence="Interval",
+			custom_yield_check_interval_days=0,
+		)
+		# F8 branch-scopes the tracked-item query to items actually
+		# configured for production at this branch -- needs an active
+		# URY Item Production Configuration or the item never reaches the
+		# per-item required_count/compliance_percent computation at all.
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
+
+		rows = get_yield_check_compliance(company=self.company, branch=self.branch)
+		row = next((r for r in rows if r["item"] == item_code), None)
+		self.assertIsNotNone(row, "expected the real inserted item to appear in compliance rows")
+		self.assertEqual(row["required_count"], 0)
+		self.assertEqual(row["compliance_percent"], 100.0)
+
+	def test_real_compliance_computes_from_real_authorizations_and_checks(self):
+		"""Every Issue cadence: 2 real Authorized Issue Authorizations, only
+		1 with a real Yield Check recorded against it -> required_count=2,
+		completed_count=1, compliance_percent=50.0, computed by the real
+		aggregation query (not asserted against mocked get_all calls)."""
+		item_code = "F9-COMPLIANCE-EVERY-ISSUE-ITEM"
+		self._ensure_item(item_code, custom_yield_check_cadence="Every Issue")
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
+
+		department = self._department(self.branch, self.company)
+		plan = self._minimal_plan(self.branch, self.company)
+		auth_with_check = self._auth(plan, self.branch, self.company, department, item_code)
+		self._auth(plan, self.branch, self.company, department, item_code)
+
+		frappe.set_user("Administrator")
+		record_yield_check(
+			item=item_code,
+			branch=self.branch,
+			company=self.company,
+			input_qty=100,
+			output_qty=80,
+			stock_uom="Nos",
+			check_type="Routine",
+			issue_authorization=auth_with_check,
+		)
+
+		rows = get_yield_check_compliance(company=self.company, branch=self.branch)
+		row = next((r for r in rows if r["item"] == item_code), None)
+		self.assertIsNotNone(row)
+		self.assertEqual(row["required_count"], 2)
+		self.assertEqual(row["completed_count"], 1)
+		self.assertEqual(row["compliance_percent"], 50.0)
+
+
+class TestUpdateYieldStandardsPermissionGating(FrappeTestCase):
+	"""F2: update_yield_standards must be manager-gated -- these are
+	costing-grade fields (drive BOM back-calculation and Yield Check variance
+	baselines) that were previously writable by anyone with plain Item write
+	permission via a raw frappe.client.set_value call from the frontend."""
+
+	@patch(f"{MOD}.require_manager")
+	def test_require_manager_called_and_enforced(self, mock_manager):
+		"""A non-manager caller is rejected before anything else runs."""
+		mock_manager.side_effect = frappe.PermissionError
+
+		with self.assertRaises(frappe.PermissionError):
+			update_yield_standards(
+				item="TEST-ITEM",
+				custom_yield_tracked=1,
+				custom_yield_percent=85,
+				custom_yield_check_cadence="Every Issue",
+				custom_yield_check_interval_days=0,
+			)
+
+		mock_manager.assert_called_once()
+
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_manager_write_succeeds_and_saves_fields(self, mock_manager, mock_exists, mock_get_doc):
+		"""A manager caller passes the gate and the four fields are set + saved."""
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+		mock_doc = MagicMock()
+		mock_doc.name = "TEST-ITEM"
+		mock_doc.custom_yield_tracked = 1
+		mock_doc.custom_yield_percent = 85.0
+		mock_doc.custom_yield_check_cadence = "Every Issue"
+		mock_doc.custom_yield_check_interval_days = 0
+		mock_get_doc.return_value = mock_doc
+
+		result = update_yield_standards(
+			item="TEST-ITEM",
+			custom_yield_tracked=1,
+			custom_yield_percent=85,
+			custom_yield_check_cadence="Every Issue",
+			custom_yield_check_interval_days=0,
+		)
+
+		mock_manager.assert_called_once()
+		mock_doc.set.assert_any_call("custom_yield_tracked", 1)
+		mock_doc.set.assert_any_call("custom_yield_percent", 85.0)
+		mock_doc.set.assert_any_call("custom_yield_check_cadence", "Every Issue")
+		mock_doc.set.assert_any_call("custom_yield_check_interval_days", 0)
+		mock_doc.save.assert_called_once_with(ignore_permissions=False)
+		self.assertEqual(result["item"], "TEST-ITEM")
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_missing_item(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item=None, custom_yield_percent=85)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_out_of_range_percent(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_percent=150)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_invalid_cadence(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_check_cadence="Bogus")
+
+
+class TestYieldStandardFieldsRawWritePathBlocked(FrappeTestCase):
+	"""F2 follow-up (PR #435 adversarial review): the permission-gating tests
+	above only prove that update_yield_standards() calls require_manager() --
+	they patch require_manager() itself, so they cannot detect whether the
+	underlying fields are still writable by any other path. That was exactly
+	the bug: the four yield-standard fields were permlevel: 0, so a plain
+	Item-write role (no URY Manager / System Manager) could still call
+	frappe.client.set_value directly -- or just doc.save() -- and bypass
+	update_yield_standards() entirely.
+
+	These tests exercise the REAL permission system (real frappe.set_user,
+	real Item Manager role, no mocking of require_manager or of Frappe's
+	permission/permlevel machinery) against the raw low-level write paths,
+	not the update_yield_standards() wrapper. They must fail before the
+	permlevel: 1 fix (fixtures/custom_field.json + patches/v3_26) and pass
+	after it.
+	"""
+
+	YIELD_STANDARD_FIELDS = (
+		"custom_yield_percent",
+		"custom_yield_tracked",
+		"custom_yield_check_cadence",
+		"custom_yield_check_interval_days",
+	)
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+
+		cls.item_code = "_TEST-F2-YIELD-STANDARD-ITEM"
+		if not frappe.db.exists("Item", cls.item_code):
+			item_group = frappe.db.get_value("Item Group", {}, "name") or "All Item Groups"
+			doc = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": cls.item_code,
+				"item_name": cls.item_code,
+				"item_group": item_group,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"custom_yield_percent": 40,
+				"custom_yield_tracked": 0,
+			})
+			doc.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+		# A user with plain Item write permission (Item Manager is a core
+		# ERPNext role with read/write/create on Item at permlevel 0) but
+		# NEITHER URY Manager NOR System Manager -- this is the exact
+		# attacker profile from the F2 finding.
+		cls.nonmanager_user = "_test-f2-yield-nonmanager@example.com"
+		if not frappe.db.exists("User", cls.nonmanager_user):
+			frappe.get_doc({
+				"doctype": "User",
+				"email": cls.nonmanager_user,
+				"first_name": "F2NonManager",
+				"send_welcome_email": 0,
+				"roles": [{"role": "Item Manager"}],
+			}).insert(ignore_permissions=True)
+
+		cls.manager_user = "_test-f2-yield-manager@example.com"
+		if not frappe.db.exists("User", cls.manager_user):
+			frappe.get_doc({
+				"doctype": "User",
+				"email": cls.manager_user,
+				"first_name": "F2Manager",
+				"send_welcome_email": 0,
+				"roles": [{"role": "URY Manager"}],
+			}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Item", self.item_code, "custom_yield_percent", 40)
+		frappe.db.commit()
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_nonmanager_cannot_raw_set_value_yield_percent(self):
+		"""A non-manager with plain Item write permission cannot change
+		custom_yield_percent via the raw frappe.client.set_value endpoint --
+		the same call the frontend used to make before #435, and that any
+		curl/devtools caller can still make directly against the API."""
+		from frappe.client import set_value
+
+		self.assertNotIn("URY Manager", frappe.get_roles(self.nonmanager_user))
+		self.assertNotIn("System Manager", frappe.get_roles(self.nonmanager_user))
+
+		frappe.set_user(self.nonmanager_user)
+		try:
+			set_value("Item", self.item_code, "custom_yield_percent", 99)
+		except frappe.PermissionError:
+			pass  # also an acceptable outcome
+		finally:
+			frappe.db.rollback()
+			frappe.set_user("Administrator")
+
+		# The real assertion: regardless of whether an exception was raised,
+		# the value must NOT have been persisted for a non-manager.
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			40.0,
+			"custom_yield_percent was written by a non-manager via the raw "
+			"set_value path -- the F2 permission hole is still open.",
+		)
+
+	def test_nonmanager_cannot_raw_doc_save_yield_percent(self):
+		"""Same as above but via frappe.get_doc(...).save() directly --
+		confirms the block is a real permission boundary (permlevel /
+		validate hook), not just something wired into the set_value RPC
+		wrapper specifically."""
+		frappe.set_user(self.nonmanager_user)
+		try:
+			doc = frappe.get_doc("Item", self.item_code)
+			doc.custom_yield_percent = 88
+			doc.save()
+		except frappe.PermissionError:
+			pass
+		finally:
+			frappe.db.rollback()
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			40.0,
+			"custom_yield_percent was written by a non-manager via doc.save() "
+			"directly -- the F2 permission hole is still open.",
+		)
+
+	def test_manager_can_still_update_via_update_yield_standards(self):
+		"""Regression check: the intended, manager-gated path must keep
+		working after the permlevel change -- managers still need to be able
+		to set these fields through update_yield_standards()."""
+		frappe.set_user(self.manager_user)
+		try:
+			result = update_yield_standards(
+				item=self.item_code,
+				custom_yield_percent=77,
+			)
+			self.assertEqual(result["custom_yield_percent"], 77.0)
+		finally:
+			frappe.set_user("Administrator")
+
+		self.assertEqual(
+			frappe.db.get_value("Item", self.item_code, "custom_yield_percent"),
+			77.0,
+		)
 
 
 if __name__ == "__main__":

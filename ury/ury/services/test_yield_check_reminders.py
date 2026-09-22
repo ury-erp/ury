@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, date, timedelta
 
 import frappe
+from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.services.yield_check_reminders import (
 	get_due_yield_checks,
@@ -20,6 +21,7 @@ from ury.ury.services.yield_check_reminders import (
 	_evaluate_every_issue,
 	_evaluate_interval,
 	_evaluate_sampled,
+	branch_item_codes,
 )
 
 
@@ -332,17 +334,28 @@ class TestGetDueYieldChecksPermissionGating(unittest.TestCase):
 
 
 class TestGetDueYieldChecksIntegration(unittest.TestCase):
-	"""Integration tests for get_due_yield_checks."""
+	"""Integration tests for get_due_yield_checks.
+
+	get_due_yield_checks now makes two frappe.get_all-shaped calls in
+	sequence: first (indirectly, via branch_item_codes -> BOM anchor) to
+	resolve the branch-scoped item-code set, then to fetch the matching
+	tracked Items. branch_item_codes is patched directly (rather than
+	stubbing the two frappe.get_all calls it makes internally) since it
+	lives in a different module (yield_branch_scope) and its own behaviour
+	is covered separately in test_yield_branch_scope.py.
+	"""
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_returns_list_of_due_items(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""get_due_yield_checks returns a list of due items."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A", "ITEM-B"}
 		mock_get_all.return_value = [
 			_item(name="ITEM-A"),
 			_item(name="ITEM-B"),
@@ -359,13 +372,15 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_due_item_includes_cadence_and_reason(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""Due items include cadence, item name, and reason."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A"}
 		mock_get_all.return_value = [_item(name="ITEM-A", item_name="Item A")]
 		mock_evaluate.return_value = ("due for interval", {})
 
@@ -378,19 +393,80 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 
 	@patch(f"{MOD}._evaluate_cadence")
 	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
 	@patch(f"{MOD}.frappe.db.get_value")
 	@patch(f"{MOD}.require_manager")
 	def test_extra_fields_merged_into_due_item(
-		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
 	):
 		"""Extra fields from _evaluate_cadence are merged into the due item."""
 		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = {"ITEM-A"}
 		mock_get_all.return_value = [_item(name="ITEM-A")]
 		mock_evaluate.return_value = ("due", {"days_overdue": 3})
 
 		result = get_due_yield_checks("Test Branch")
 
 		self.assertEqual(result[0]["days_overdue"], 3)
+
+
+class TestGetDueYieldChecksBranchScoping(unittest.TestCase):
+	"""F8 (corrected): get_due_yield_checks scopes the tracked-item set to
+	items actually used at the requested branch, anchored via active IPC
+	rows -> their BOM -> that BOM's component items (BOM Item rows) — NOT
+	via a direct IPC.item match, which per docs/yield-tracking.md can never
+	intersect with yield-tracked (raw-ingredient) items. The BOM-anchor
+	resolution itself is exercised in test_yield_branch_scope.py; here we
+	only verify get_due_yield_checks wires branch_item_codes() correctly."""
+
+	@patch(f"{MOD}._evaluate_cadence")
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}.frappe.db.get_value")
+	@patch(f"{MOD}.require_manager")
+	def test_items_not_used_at_branch_are_excluded(
+		self, mock_manager, mock_get_value, mock_branch_items, mock_get_all, mock_evaluate
+	):
+		"""An Item outside the branch's BOM-derived item set never reaches
+		_evaluate_cadence, even if it is globally yield-tracked."""
+		mock_get_value.return_value = "Test Co"
+		# Only ITEM-A resolves as a BOM component used at this branch.
+		mock_branch_items.return_value = {"ITEM-A"}
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "Item":
+				# The Item filters requested should be narrowed to the
+				# branch_item_codes() result — prove the call is scoped.
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [_item(name="ITEM-A")]
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+		mock_evaluate.return_value = ("due", {})
+
+		result = get_due_yield_checks("Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}.frappe.db.get_value")
+	@patch(f"{MOD}.require_manager")
+	def test_no_items_used_at_branch_returns_empty(
+		self, mock_manager, mock_get_value, mock_branch_items
+	):
+		"""If branch_item_codes() resolves to an empty set (no active IPC rows,
+		no BOM, or no BOM components), return an empty list instead of falling
+		through to the global item set."""
+		mock_get_value.return_value = "Test Co"
+		mock_branch_items.return_value = set()
+
+		result = get_due_yield_checks("Test Branch")
+
+		self.assertEqual(result, [])
 
 
 class TestBOMHookYieldBackCalculation(unittest.TestCase):
@@ -495,6 +571,229 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 			apply_yield_back_calculation(bom_doc, None)
 
 		mock_throw.assert_called_once()
+
+
+class TestGetDueYieldChecksRealDocumentIntegration(FrappeTestCase):
+	"""F9: real-document coverage for get_due_yield_checks -- every other
+	test in this file mocks frappe.get_all/db.exists directly, so none of
+	them inserted an actual Item/URY Issue Authorization/URY Yield Check and
+	ran the real cadence engine against them."""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_branch(self, branch_name, company):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code, **overrides):
+		if frappe.db.exists("Item", item_code):
+			return
+		fields = {
+			"doctype": "Item",
+			"item_code": item_code,
+			"item_name": item_code,
+			"item_group": "All Item Groups",
+			"stock_uom": "Nos",
+			"is_stock_item": 1,
+			"custom_yield_tracked": 1,
+			"custom_yield_percent": 80.0,
+		}
+		fields.update(overrides)
+		frappe.get_doc(fields).insert(ignore_permissions=True)
+
+	def _minimal_plan(self, branch, company):
+		plan = frappe.get_doc(
+			{
+				"doctype": "URY Sales Plan",
+				"status": "Draft",
+				"enforcement_mode": "Soft",
+				"branch": branch,
+				"company": company,
+				"plan_date": "2026-09-01",
+			}
+		)
+		plan.flags.ignore_mandatory = True
+		plan.flags.ignore_validate = True
+		plan.insert(ignore_permissions=True)
+		return plan.name
+
+	def _department(self, branch, company):
+		name = f"{branch} F9 Reminder Dept"
+		if frappe.db.exists("URY Production Department", name):
+			return name
+		frappe.get_doc(
+			{
+				"doctype": "URY Production Department",
+				"department_name": name,
+				"branch": branch,
+				"company": company,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True, ignore_mandatory=True)
+		return name
+
+	def _auth(self, plan, branch, company, department, item, qty=50.0):
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Issue Authorization",
+				"plan": plan,
+				"plan_approval_hash": "f9-real-doc-test",
+				"branch": branch,
+				"company": company,
+				"department": department,
+				"component_item": item,
+				"stock_uom": "Nos",
+				"control_mode": "SOFT",
+				"status": "Authorized",
+				"required_qty": qty,
+				"authorized_qty": qty,
+				"remaining_before_qty": qty,
+				"remaining_after_qty": 0,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	def _ensure_warehouse(self, warehouse_name, company):
+		if frappe.db.exists("Warehouse", {"warehouse_name": warehouse_name, "company": company}):
+			return frappe.db.get_value(
+				"Warehouse", {"warehouse_name": warehouse_name, "company": company}, "name"
+			)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Warehouse",
+				"warehouse_name": warehouse_name,
+				"company": company,
+			}
+		).insert(ignore_permissions=True)
+		return doc.name
+
+	def _ensure_bom(self, finished_item, raw_item, company):
+		existing = frappe.db.get_value(
+			"BOM", {"item": finished_item, "company": company, "docstatus": 1}, "name"
+		)
+		if existing:
+			return existing
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": finished_item,
+				"quantity": 1,
+				"company": company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 4}],  # 4 / 0.80 = 5 -- must be a whole number, "Nos" UOM enforces this
+			}
+		)
+		bom.insert(ignore_permissions=True)
+		bom.submit()
+		return bom.name
+
+	def _ensure_item_production_configuration(self, item_code, branch, company):
+		"""F8 branch-scopes the cadence engine's tracked-item query via URY
+		Item Production Configuration (IPC) -> its BOM -> that BOM's
+		component items (BOM Item rows) -- NOT a direct IPC.item match. IPC
+		only ever has rows for sellable menu items (kitchen/bar routing),
+		never raw ingredients (see docs/yield-tracking.md), so a
+		yield-tracked `item_code` (always a raw ingredient) can only be
+		reached by anchoring through a sellable item's BOM that uses it as
+		a component -- exactly like production traffic actually would.
+		"""
+		finished_item = f"{item_code} F9 Sellable"
+		if not frappe.db.exists("Item", finished_item):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": finished_item,
+					"item_name": finished_item,
+					"item_group": "All Item Groups",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+				}
+			).insert(ignore_permissions=True)
+
+		bom_name = self._ensure_bom(finished_item, item_code, company)
+
+		if frappe.db.exists(
+			"URY Item Production Configuration",
+			{"item": finished_item, "branch": branch, "active": 1},
+		):
+			return
+		warehouse = self._ensure_warehouse(f"{item_code} F9 Retail Store", company)
+		frappe.get_doc(
+			{
+				"doctype": "URY Item Production Configuration",
+				"active": 1,
+				"item": finished_item,
+				"branch": branch,
+				"bom": bom_name,
+				"production_policy": "DIRECT_RETAIL",
+				"direct_retail_warehouse": warehouse,
+			}
+		).insert(ignore_permissions=True)
+
+	def setUp(self):
+		self.company = "F9 Reminder Test Co"
+		self.branch = "F9 Reminder Test Branch"
+		self._ensure_company(self.company, "F9RC")
+		self._ensure_branch(self.branch, self.company)
+
+	def test_real_authorized_issue_without_yield_check_is_due(self):
+		from ury.ury.services.yield_check_reminders import get_due_yield_checks
+
+		item_code = "F9-REMINDER-EVERY-ISSUE-ITEM"
+		self._ensure_item(item_code, custom_yield_check_cadence="Every Issue")
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
+		department = self._department(self.branch, self.company)
+		plan = self._minimal_plan(self.branch, self.company)
+		self._auth(plan, self.branch, self.company, department, item_code)
+
+		due_items = get_due_yield_checks(self.branch)
+		due_item_names = [d["item"] for d in due_items]
+		self.assertIn(item_code, due_item_names)
+
+	def test_real_authorized_issue_with_yield_check_is_not_due(self):
+		from ury.ury.services.yield_check_reminders import get_due_yield_checks
+		from ury.ury.api.ury_yield_variance import record_yield_check
+
+		item_code = "F9-REMINDER-CHECKED-ITEM"
+		self._ensure_item(item_code, custom_yield_check_cadence="Every Issue")
+		self._ensure_item_production_configuration(item_code, self.branch, self.company)
+		department = self._department(self.branch, self.company)
+		plan = self._minimal_plan(self.branch, self.company)
+		auth_name = self._auth(plan, self.branch, self.company, department, item_code)
+
+		record_yield_check(
+			item=item_code,
+			branch=self.branch,
+			company=self.company,
+			input_qty=100,
+			output_qty=80,
+			stock_uom="Nos",
+			check_type="Routine",
+			issue_authorization=auth_name,
+		)
+
+		due_items = get_due_yield_checks(self.branch)
+		due_item_names = [d["item"] for d in due_items]
+		self.assertNotIn(item_code, due_item_names)
 
 
 if __name__ == "__main__":

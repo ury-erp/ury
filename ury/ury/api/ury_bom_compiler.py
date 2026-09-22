@@ -231,14 +231,14 @@ def build_demand_vector(sales_plan_approval_snapshot):
 
 	`sales_plan_approval_snapshot` is a dict with an `items` list of plan
 	lines, each carrying at least: item_code, qty, department,
-	production_unit, policy, bom, bom_revision (per this task's brief; `bom`
-	and `bom_revision` are accepted but not required by this function, since
-	`compile_bom_vector` resolves the active BOM directly -- they are read
-	only for a fail-closed cross-check when present, see below). A line's
+	production_unit, production_policy, bom, bom_revision -- the exact key
+	names `ury_sales_plan.snapshot_item()` freezes onto each row (`bom` and
+	`bom_revision` are accepted but not required by this function, since
+	`compile_bom_vector` resolves the active BOM directly). A line's
 	`company` falls back to the snapshot's top-level `company`.
 
-	Lines whose `policy` is `DIRECT_RETAIL` are excluded (V3-30: direct-retail
-	lines are excluded from manufacturing demand).
+	Lines whose `production_policy` is `DIRECT_RETAIL` are excluded (V3-30:
+	direct-retail lines are excluded from manufacturing demand).
 
 	Returns a list of rows shaped exactly as V3-31's `ury_issue_authorization.py`
 	expects inside `approval_snapshot["demand_vector"]`:
@@ -258,7 +258,7 @@ def build_demand_vector(sales_plan_approval_snapshot):
 	rows_by_key = {}
 
 	for line in lines:
-		if (line.get("policy") or "").upper() == "DIRECT_RETAIL":
+		if (line.get("production_policy") or "").upper() == "DIRECT_RETAIL":
 			continue
 
 		item_code = line.get("item_code")
@@ -369,12 +369,12 @@ def _bom_tree_has_independently_stocked_subassembly(bom_name, visited=None):
 
 	lines = frappe.get_all(
 		BOM_ITEM_DOCTYPE,
-		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2), "is_sub_assembly_item": 1},
-		fields=["item_code", "bom_no", "is_sub_assembly_item"],
+		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
+		fields=["item_code", "bom_no"],
 	)
 
 	for line in lines:
-		if not line.is_sub_assembly_item:
+		if not line.bom_no:
 			continue
 		if _is_independently_stocked_subassembly(line.item_code):
 			return True
@@ -418,13 +418,13 @@ def _explode_bom_recursive(bom_name, parent_qty, components, visited):
 	lines = frappe.get_all(
 		BOM_ITEM_DOCTYPE,
 		filters={"parent": bom_name, "parenttype": BOM_DOCTYPE, "docstatus": ("<", 2)},
-		fields=["item_code", "stock_qty", "stock_uom", "is_sub_assembly_item", "bom_no"],
+		fields=["item_code", "stock_qty", "stock_uom", "bom_no"],
 	)
 
 	for line in lines:
 		line_qty = ((line.stock_qty or 0) / bom_quantity) * parent_qty
 
-		if line.is_sub_assembly_item and not _is_independently_stocked_subassembly(line.item_code):
+		if line.bom_no and not _is_independently_stocked_subassembly(line.item_code):
 			sub_bom = line.bom_no or _resolve_active_bom(line.item_code, None)
 			_explode_bom_recursive(sub_bom, line_qty, components, visited)
 			continue
