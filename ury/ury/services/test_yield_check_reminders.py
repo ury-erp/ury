@@ -684,13 +684,56 @@ class TestGetDueYieldChecksRealDocumentIntegration(FrappeTestCase):
 		).insert(ignore_permissions=True)
 		return doc.name
 
+	def _ensure_bom(self, finished_item, raw_item, company):
+		existing = frappe.db.get_value(
+			"BOM", {"item": finished_item, "company": company, "docstatus": 1}, "name"
+		)
+		if existing:
+			return existing
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": finished_item,
+				"quantity": 1,
+				"company": company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [{"item_code": raw_item, "qty": 1, "uom": "Nos", "custom_yield_qty": 1}],
+			}
+		)
+		bom.insert(ignore_permissions=True)
+		bom.submit()
+		return bom.name
+
 	def _ensure_item_production_configuration(self, item_code, branch, company):
-		"""F8 branch-scopes the cadence engine's tracked-item query to items
-		actually configured for production at the given branch (via URY
-		Item Production Configuration) -- without an active config here,
-		the item never reaches _evaluate_cadence at all."""
+		"""F8 branch-scopes the cadence engine's tracked-item query via URY
+		Item Production Configuration (IPC) -> its BOM -> that BOM's
+		component items (BOM Item rows) -- NOT a direct IPC.item match. IPC
+		only ever has rows for sellable menu items (kitchen/bar routing),
+		never raw ingredients (see docs/yield-tracking.md), so a
+		yield-tracked `item_code` (always a raw ingredient) can only be
+		reached by anchoring through a sellable item's BOM that uses it as
+		a component -- exactly like production traffic actually would.
+		"""
+		finished_item = f"{item_code} F9 Sellable"
+		if not frappe.db.exists("Item", finished_item):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": finished_item,
+					"item_name": finished_item,
+					"item_group": "All Item Groups",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+				}
+			).insert(ignore_permissions=True)
+
+		bom_name = self._ensure_bom(finished_item, item_code, company)
+
 		if frappe.db.exists(
-			"URY Item Production Configuration", {"item": item_code, "branch": branch, "active": 1}
+			"URY Item Production Configuration",
+			{"item": finished_item, "branch": branch, "active": 1},
 		):
 			return
 		warehouse = self._ensure_warehouse(f"{item_code} F9 Retail Store", company)
@@ -698,8 +741,9 @@ class TestGetDueYieldChecksRealDocumentIntegration(FrappeTestCase):
 			{
 				"doctype": "URY Item Production Configuration",
 				"active": 1,
-				"item": item_code,
+				"item": finished_item,
 				"branch": branch,
+				"bom": bom_name,
 				"production_policy": "DIRECT_RETAIL",
 				"direct_retail_warehouse": warehouse,
 			}
