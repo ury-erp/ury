@@ -48,9 +48,10 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "waiter",
-					"fieldtype": "Data",
+					"fieldtype": "Link",
+					"options": "User",
 					"label": "Waiter",
-					"read_only": 0,
+					"read_only": 1,
 					"insert_after": "order_type",
 					"translatable": 0
 				},
@@ -69,10 +70,11 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "cashier",
-					"fieldtype": "Data",
+					"fieldtype": "Link",
+					"options": "User",
 					"label": "Cashier",
 					"insert_after": "no_of_pax",
-					"read_only": 0,
+					"read_only": 1,
 					"translatable": 0
 				},
 				{
@@ -263,9 +265,10 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "waiter",
-					"fieldtype": "Data",
+					"fieldtype": "Link",
+					"options": "User",
 					"label": "Waiter",
-					"read_only": 0,
+					"read_only": 1,
 					"insert_after": "order_type",
 					"translatable": 0
 				},
@@ -284,10 +287,11 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "cashier",
-					"fieldtype": "Data",
+					"fieldtype": "Link",
+					"options": "User",
 					"label": "Cashier",
 					"insert_after": "no_of_pax",
-					"read_only": 0,
+					"read_only": 1,
 					"translatable": 0
 				},
 				{

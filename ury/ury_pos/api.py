@@ -936,6 +936,16 @@ def getPosProfileFull(pos_profile):
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
         "custom_allow_order_without_customer": profile.get("custom_allow_order_without_customer"),
+        "custom_enable_order_on_behalf": profile.get("custom_enable_order_on_behalf"),
+        "custom_roles_allowed_to_order_on_behalf": [
+            row.as_dict() for row in profile.get("custom_roles_allowed_to_order_on_behalf") or []
+        ],
+        "custom_require_performer_on_order": profile.get("custom_require_performer_on_order"),
+        "custom_enable_credit_settlement": profile.get("custom_enable_credit_settlement"),
+        "custom_roles_allowed_for_credit": [
+            row.as_dict() for row in profile.get("custom_roles_allowed_for_credit") or []
+        ],
+        "custom_credit_mode_of_payment": profile.get("custom_credit_mode_of_payment"),
     }
 
 
