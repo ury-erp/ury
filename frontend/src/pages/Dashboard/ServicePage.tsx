@@ -17,7 +17,7 @@ import {
 } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
-import { ShiftMetrics, uryDashboardService } from '../../services/dashboard';
+import { DepartmentActivityRow, ShiftMetrics, uryDashboardService } from '../../services/dashboard';
 import {
   departmentProfitabilityService,
   ProfitabilityRow,
@@ -93,7 +93,11 @@ export const ServicePage: React.FC = () => {
   const [needsAttention, setNeedsAttention] = useState<AttentionItemProps[]>([]);
   const [departmentRows, setDepartmentRows] = useState<DepartmentRow[]>([]);
   const [hasCostData, setHasCostData] = useState(false);
+  const [departmentRevenueError, setDepartmentRevenueError] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentRow | null>(null);
+
+  const [activityRows, setActivityRows] = useState<DepartmentActivityRow[]>([]);
+  const [departmentActivityError, setDepartmentActivityError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,13 +203,18 @@ export const ServicePage: React.FC = () => {
     };
   }, [activeBranchId, navigate]);
 
-  // Departments table: live per-department profitability for today, scoped
-  // to the branch/company once company has been resolved.
+  // Revenue by department: live per-department profitability for today,
+  // scoped to the branch/company once company has been resolved. A failed
+  // fetch surfaces as a message rather than a silently empty table -- this
+  // is the exact endpoint that used to crash with a TypeError on every
+  // non-empty call (see ury_department_profitability.py), and that crash
+  // was invisible here until someone thought to check the network tab.
   useEffect(() => {
     let cancelled = false;
     if (!branch || !company) {
       setDepartmentRows([]);
       setHasCostData(false);
+      setDepartmentRevenueError(null);
       return () => {
         cancelled = true;
       };
@@ -222,10 +231,47 @@ export const ServicePage: React.FC = () => {
         const rows = result.rows || [];
         setDepartmentRows(aggregateDepartments(rows));
         setHasCostData(rows.some((row) => row.posted_cost !== undefined));
-      } catch {
+        setDepartmentRevenueError(null);
+      } catch (err) {
         if (!cancelled) {
           setDepartmentRows([]);
           setHasCostData(false);
+          setDepartmentRevenueError(err instanceof Error ? err.message : 'Unable to load revenue by department.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [branch, company]);
+
+  // Activity by department: KOT tickets fired/served and units completed
+  // for today, from ury_dashboard.get_department_activity. This is the
+  // operational counterpart to the revenue table above -- it reports what
+  // happened on the floor (KOT Execution, Work Order) rather than what was
+  // attributed to a department through the approved Sales Plan, so it can
+  // show a department with zero revenue rows but real ticket activity.
+  useEffect(() => {
+    let cancelled = false;
+    if (!branch) {
+      setActivityRows([]);
+      setDepartmentActivityError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    (async () => {
+      try {
+        const result = await uryDashboardService.getDepartmentActivity(branch, company || undefined);
+        if (cancelled) return;
+        setActivityRows(result.rows || []);
+        setDepartmentActivityError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setActivityRows([]);
+          setDepartmentActivityError(err instanceof Error ? err.message : 'Unable to load activity by department.');
         }
       }
     })();
@@ -282,6 +328,37 @@ export const ServicePage: React.FC = () => {
     return columns;
   }, [hasCostData]);
 
+  const activityColumns: DataTableColumn<DepartmentActivityRow>[] = useMemo(
+    () => [
+      { key: 'department', header: 'Department' },
+      {
+        key: 'tickets_fired',
+        header: 'Tickets Fired',
+        align: 'right',
+        render: (row) => <span className={numericCellClass}>{row.tickets_fired.toLocaleString()}</span>,
+      },
+      {
+        key: 'tickets_served',
+        header: 'Tickets Served',
+        align: 'right',
+        render: (row) => <span className={numericCellClass}>{row.tickets_served.toLocaleString()}</span>,
+      },
+      {
+        key: 'work_orders_completed',
+        header: 'Work Orders Completed',
+        align: 'right',
+        render: (row) => <span className={numericCellClass}>{row.work_orders_completed.toLocaleString()}</span>,
+      },
+      {
+        key: 'qty_produced',
+        header: 'Qty Produced',
+        align: 'right',
+        render: (row) => <span className={numericCellClass}>{row.qty_produced.toLocaleString()}</span>,
+      },
+    ],
+    [],
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12" data-testid="service-loading">
@@ -312,13 +389,35 @@ export const ServicePage: React.FC = () => {
 
       <Section>
         <Card className="p-4" data-testid="service-departments-table">
-        <h3 className="text-sm font-semibold mb-2">Departments</h3>
+        <h3 className="text-sm font-semibold mb-2">Revenue by Department</h3>
+        {departmentRevenueError && (
+          <p className="mb-2 text-xs text-destructive" data-testid="service-departments-error">
+            {departmentRevenueError}
+          </p>
+        )}
         <DataTable
           className="rounded-none border-0"
           columns={departmentColumns}
           rows={departmentRows}
-          emptyMessage="No department activity for today yet."
+          emptyMessage="No revenue attributed to a department for today yet."
           onRowClick={setSelectedDepartment}
+        />
+        </Card>
+      </Section>
+
+      <Section>
+        <Card className="p-4" data-testid="service-department-activity-table">
+        <h3 className="text-sm font-semibold mb-2">Activity by Department</h3>
+        {departmentActivityError && (
+          <p className="mb-2 text-xs text-destructive" data-testid="service-department-activity-error">
+            {departmentActivityError}
+          </p>
+        )}
+        <DataTable
+          className="rounded-none border-0"
+          columns={activityColumns}
+          rows={activityRows}
+          emptyMessage="No KOT tickets or completed production for today yet."
         />
         </Card>
       </Section>

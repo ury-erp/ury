@@ -187,6 +187,20 @@ export interface ShiftMetrics {
   avg_ticket_minutes: number;
 }
 
+export interface DepartmentActivityRow {
+  department: string;
+  tickets_fired: number;
+  tickets_served: number;
+  work_orders_completed: number;
+  qty_produced: number;
+}
+
+export interface DepartmentActivity {
+  branch: string | null;
+  as_of: string;
+  rows: DepartmentActivityRow[];
+}
+
 export interface DailyPnlSummaryField {
   key: string;
   label: string;
@@ -256,6 +270,14 @@ export const uryDashboardService = {
   async getShiftMetrics(branch?: string): Promise<ShiftMetrics> {
     const res = await call.get<ShiftMetrics>('ury.ury.api.ury_dashboard.get_shift_metrics', { branch });
     return unwrap<ShiftMetrics>(res);
+  },
+
+  async getDepartmentActivity(branch?: string, company?: string): Promise<DepartmentActivity> {
+    const res = await call.get<DepartmentActivity>('ury.ury.api.ury_dashboard.get_department_activity', {
+      branch,
+      company,
+    });
+    return unwrap<DepartmentActivity>(res);
   },
 
   async getPlanStatus(branch: string, planDate: string): Promise<PlanStatus> {

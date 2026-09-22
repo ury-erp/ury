@@ -551,6 +551,116 @@ def get_shift_metrics(branch=None):
 
 
 @frappe.whitelist(methods=["GET"])
+def get_department_activity(branch=None, company=None):
+	"""Per-department OPERATIONAL activity for the current business day --
+	the counterpart to `ury_department_profitability.get_department_profitability`,
+	which reports revenue/cost attribution. That endpoint can only ever cover
+	items that are on an approved Sales Plan; this one reports what actually
+	happened on the floor, from the doctypes that record it directly:
+
+	- KOT tickets fired/served: `URY KOT Execution`, one row per KOT per
+	  production unit, joined to its department via
+	  `URY Production Unit.department`. `state = 'SERVED'` counts as served;
+	  every other state (QUEUED/IN_PREPARATION/READY/CANCELLED_*) counts
+	  toward "fired" but not "served".
+	- Units completed: `Work Order`, joined to a department via
+	  `URY Item Production Configuration` (item + branch -> department).
+	  Work Order itself has no `branch` field (same limitation already
+	  documented on `ury.ury.report_api.operations.get_completed_work_orders`),
+	  so branch scoping happens through the item configuration instead. If
+	  `branch` is omitted, an item configured differently across branches can
+	  be double-counted under more than one department -- acceptable for a
+	  single-branch dashboard tile, called out here for anyone reusing this
+	  for a company-wide view.
+
+	Quantities across departments can mix stock UOMs when summed (same
+	precedent as `get_completed_work_orders`'s `total_qty_produced`).
+	"""
+	cache_key = f"ury_dashboard_department_activity:{branch}:{company}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
+
+	start, end = _business_day_bounds(branch)
+
+	kot_conditions = "pu.`department` IS NOT NULL AND k.`creation` BETWEEN %(start)s AND %(end)s"
+	kot_params = {"start": start, "end": end}
+	if branch:
+		kot_conditions += " AND k.`branch` = %(branch)s"
+		kot_params["branch"] = branch
+
+	kot_rows = frappe.db.sql(
+		f"""
+		SELECT
+			pu.`department` AS department,
+			COUNT(k.`name`) AS tickets_fired,
+			SUM(CASE WHEN k.`state` = 'SERVED' THEN 1 ELSE 0 END) AS tickets_served
+		FROM `tabURY KOT Execution` k
+		INNER JOIN `tabURY Production Unit` pu ON pu.`name` = k.`production_unit`
+		WHERE {kot_conditions}
+		GROUP BY pu.`department`
+		""",
+		kot_params,
+		as_dict=True,
+	)
+
+	wo_conditions = (
+		"ipc.`department` IS NOT NULL AND ipc.`active` = 1 AND wo.`status` = 'Completed'"
+		" AND wo.`docstatus` = 1"
+		" AND COALESCE(wo.`actual_end_date`, wo.`planned_end_date`) BETWEEN %(start)s AND %(end)s"
+	)
+	wo_params = {"start": start, "end": end}
+	if branch:
+		wo_conditions += " AND ipc.`branch` = %(branch)s"
+		wo_params["branch"] = branch
+	if company:
+		wo_conditions += " AND wo.`company` = %(company)s"
+		wo_params["company"] = company
+
+	wo_rows = frappe.db.sql(
+		f"""
+		SELECT
+			ipc.`department` AS department,
+			COUNT(DISTINCT wo.`name`) AS work_orders_completed,
+			SUM(wo.`produced_qty`) AS qty_produced
+		FROM `tabWork Order` wo
+		INNER JOIN `tabURY Item Production Configuration` ipc ON ipc.`item` = wo.`production_item`
+		WHERE {wo_conditions}
+		GROUP BY ipc.`department`
+		""",
+		wo_params,
+		as_dict=True,
+	)
+
+	by_department = {}
+	for row in kot_rows:
+		entry = by_department.setdefault(row["department"], {})
+		entry["tickets_fired"] = int(row["tickets_fired"] or 0)
+		entry["tickets_served"] = int(row["tickets_served"] or 0)
+	for row in wo_rows:
+		entry = by_department.setdefault(row["department"], {})
+		entry["work_orders_completed"] = row["work_orders_completed"] or 0
+		entry["qty_produced"] = float(row["qty_produced"] or 0)
+
+	rows = [
+		{
+			"department": department,
+			"tickets_fired": values.get("tickets_fired", 0),
+			"tickets_served": values.get("tickets_served", 0),
+			"work_orders_completed": values.get("work_orders_completed", 0),
+			"qty_produced": round(values.get("qty_produced", 0), 2),
+		}
+		for department, values in by_department.items()
+	]
+	rows.sort(key=lambda row: row["department"] or "")
+
+	result = {"branch": branch, "as_of": frappe.utils.now(), "rows": rows}
+
+	frappe.cache().set_value(cache_key, result, expires_in_sec=60)
+	return result
+
+
+@frappe.whitelist(methods=["GET"])
 def get_baseline(branch=None, weeks=6):
 	weekday = get_datetime().weekday()
 	hour = get_datetime().hour

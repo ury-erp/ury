@@ -27,6 +27,13 @@ vi.mock('../../services/dashboard', () => ({
       avg_ticket_minutes: 15,
     }),
     getNeedsAttention: vi.fn().mockResolvedValue([]),
+    getDepartmentActivity: vi.fn().mockResolvedValue({
+      branch: 'branch1',
+      as_of: '2026-09-22 00:00:00',
+      rows: [
+        { department: 'Kitchen', tickets_fired: 10, tickets_served: 6, work_orders_completed: 12, qty_produced: 108 },
+      ],
+    }),
   },
 }));
 
@@ -83,6 +90,65 @@ describe('ServicePage', () => {
     await waitFor(() => {
       const page = screen.getByTestId('service-page');
       expect(page).toBeInTheDocument();
+    });
+  });
+
+  describe('department tiles show both revenue and genuine activity', () => {
+    it('loads department activity once the branch company is resolved', async () => {
+      render(<ServicePage />);
+      await waitFor(() => {
+        expect(uryDashboardService.getDepartmentActivity).toHaveBeenCalledWith('branch1', 'Test Company');
+      });
+    });
+
+    it('renders the revenue table and the activity table as separate tiles', async () => {
+      render(<ServicePage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('service-departments-table')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Revenue by Department')).toBeInTheDocument();
+      expect(screen.getByTestId('service-department-activity-table')).toBeInTheDocument();
+      expect(screen.getByText('Activity by Department')).toBeInTheDocument();
+    });
+
+    it('renders KOT and production activity for a department with no revenue rows', async () => {
+      vi.mocked(departmentProfitabilityService.getDepartmentProfitability).mockResolvedValueOnce({
+        rows: [],
+      } as any);
+
+      render(<ServicePage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('service-department-activity-table')).toHaveTextContent('Kitchen');
+      });
+      expect(screen.getByTestId('service-department-activity-table')).toHaveTextContent('12'); // work_orders_completed
+      expect(screen.getByText('No revenue attributed to a department for today yet.')).toBeInTheDocument();
+    });
+
+    it('surfaces a revenue-table error instead of silently rendering it empty', async () => {
+      vi.mocked(departmentProfitabilityService.getDepartmentProfitability).mockRejectedValueOnce(
+        new Error('Department profitability failed'),
+      );
+
+      render(<ServicePage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('service-departments-error')).toHaveTextContent('Department profitability failed');
+      });
+    });
+
+    it('surfaces an activity-table error instead of silently rendering it empty', async () => {
+      vi.mocked(uryDashboardService.getDepartmentActivity).mockRejectedValueOnce(
+        new Error('Department activity failed'),
+      );
+
+      render(<ServicePage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('service-department-activity-error')).toHaveTextContent(
+          'Department activity failed',
+        );
+      });
     });
   });
 });
