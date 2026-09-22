@@ -24,7 +24,7 @@ and ``external_receipt_targets`` (D19).
 This module never traverses a BOM and never decides production policy (see
 PLAN.md, section C): the component vector for every target already arrived
 pre-exploded from the target compiler. A caller may pass the full dict for a
-whole Sales Plan (what the consolidated Purchase MR needs) or a single
+whole Sales Plan (what Purchase MR generation needs) or a single
 department's bucket wrapped in a one-entry dict (what Agent 5/8 need when
 revalidating one department under Bin locks, D17) -- this module has no
 notion of a Sales Plan or a persisted Production Plan document at all; it
