@@ -176,11 +176,11 @@ class URYItemProductionConfiguration(Document):
         lines = frappe.get_all(
             "BOM Item",
             filters={"parent": bom_name, "parenttype": "BOM", "docstatus": ("<", 2)},
-            fields=["item_code", "is_sub_assembly_item", "bom_no"],
+            fields=["item_code", "bom_no"],
         )
 
         for line in lines:
-            if line.is_sub_assembly_item:
+            if line.bom_no:
                 # Recursively explode sub-assembly
                 sub_bom = line.bom_no or self._resolve_active_bom_for_item(line.item_code)
                 if sub_bom:
