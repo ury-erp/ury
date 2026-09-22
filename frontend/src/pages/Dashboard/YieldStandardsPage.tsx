@@ -106,17 +106,12 @@ export const YieldStandardsPage: React.FC = () => {
     }
     setSaving(true);
     try {
-      const payload: Record<string, any> = {
+      await call('ury.ury.api.ury_yield_variance.update_yield_standards', {
+        item: form.item,
         custom_yield_tracked: form.custom_yield_tracked ? 1 : 0,
         custom_yield_percent: form.custom_yield_percent || 0,
         custom_yield_check_cadence: form.custom_yield_check_cadence || 'None',
         custom_yield_check_interval_days: form.custom_yield_check_cadence === 'Interval' ? (form.custom_yield_check_interval_days || 0) : 0,
-      };
-
-      await call('frappe.client.set_value', {
-        doctype: 'Item',
-        name: form.item,
-        fieldname: payload,
       });
 
       fetchItems();

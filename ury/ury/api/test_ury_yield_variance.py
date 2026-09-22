@@ -18,6 +18,7 @@ from ury.ury.api.ury_yield_variance import (
 	record_yield_check,
 	get_yield_variance,
 	get_yield_check_compliance,
+	update_yield_standards,
 	user_has_branch_access,
 )
 
@@ -554,6 +555,86 @@ class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
 				stock_uom="Nos",
 				check_type="Routine",
 			)
+
+
+class TestUpdateYieldStandardsPermissionGating(FrappeTestCase):
+	"""F2: update_yield_standards must be manager-gated -- these are
+	costing-grade fields (drive BOM back-calculation and Yield Check variance
+	baselines) that were previously writable by anyone with plain Item write
+	permission via a raw frappe.client.set_value call from the frontend."""
+
+	@patch(f"{MOD}.require_manager")
+	def test_require_manager_called_and_enforced(self, mock_manager):
+		"""A non-manager caller is rejected before anything else runs."""
+		mock_manager.side_effect = frappe.PermissionError
+
+		with self.assertRaises(frappe.PermissionError):
+			update_yield_standards(
+				item="TEST-ITEM",
+				custom_yield_tracked=1,
+				custom_yield_percent=85,
+				custom_yield_check_cadence="Every Issue",
+				custom_yield_check_interval_days=0,
+			)
+
+		mock_manager.assert_called_once()
+
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_manager_write_succeeds_and_saves_fields(self, mock_manager, mock_exists, mock_get_doc):
+		"""A manager caller passes the gate and the four fields are set + saved."""
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+		mock_doc = MagicMock()
+		mock_doc.name = "TEST-ITEM"
+		mock_doc.custom_yield_tracked = 1
+		mock_doc.custom_yield_percent = 85.0
+		mock_doc.custom_yield_check_cadence = "Every Issue"
+		mock_doc.custom_yield_check_interval_days = 0
+		mock_get_doc.return_value = mock_doc
+
+		result = update_yield_standards(
+			item="TEST-ITEM",
+			custom_yield_tracked=1,
+			custom_yield_percent=85,
+			custom_yield_check_cadence="Every Issue",
+			custom_yield_check_interval_days=0,
+		)
+
+		mock_manager.assert_called_once()
+		mock_doc.set.assert_any_call("custom_yield_tracked", 1)
+		mock_doc.set.assert_any_call("custom_yield_percent", 85.0)
+		mock_doc.set.assert_any_call("custom_yield_check_cadence", "Every Issue")
+		mock_doc.set.assert_any_call("custom_yield_check_interval_days", 0)
+		mock_doc.save.assert_called_once_with(ignore_permissions=False)
+		self.assertEqual(result["item"], "TEST-ITEM")
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_missing_item(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item=None, custom_yield_percent=85)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_out_of_range_percent(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_percent=150)
+
+	@patch(f"{MOD}.frappe.db.exists")
+	@patch(f"{MOD}.require_manager")
+	def test_rejects_invalid_cadence(self, mock_manager, mock_exists):
+		mock_manager.return_value = None
+		mock_exists.return_value = True
+
+		with self.assertRaises(frappe.ValidationError):
+			update_yield_standards(item="TEST-ITEM", custom_yield_check_cadence="Bogus")
 
 
 if __name__ == "__main__":
