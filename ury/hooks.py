@@ -163,7 +163,12 @@ ury_demo_transaction_doctypes = [
 # ------------
 
 # before_install = "ury.install.before_install"
-# after_install = "ury.install.after_install"
+# Required, not optional: frappe's installer marks every patch an app ships as
+# already-completed at install time without running it, and URY's entire role
+# permission model lives in patches -- so without this hook a freshly created
+# site (every CI run) gets URY's Custom Field fixtures but none of its
+# DocPerms. See ury.install.ensure_role_permissions for the full write-up.
+after_install = "ury.install.after_install"
 
 # Uninstallation
 # ------------
