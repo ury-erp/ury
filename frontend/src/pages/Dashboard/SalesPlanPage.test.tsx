@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addDays, differenceInCalendarMonths, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
@@ -205,7 +205,7 @@ describe('SalesPlanPage', () => {
     expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus();
   });
 
-  it('collapses the attention block to 3 items by default with working expand/collapse', async () => {
+  it('collapses Needs Attention by default and expands as an accordion', async () => {
     const manyBlocked = {
       ...historyResponse,
       items: [
@@ -220,12 +220,19 @@ describe('SalesPlanPage', () => {
 
     render(<SalesPlanPage />);
 
-    await screen.findByText('Needs Attention');
-    const showAllButton = await screen.findByRole('button', { name: /Show all \(4\)/i });
-    expect(showAllButton).toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: /Needs Attention/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const panelId = toggle.getAttribute('aria-controls');
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)).toHaveAttribute('hidden');
 
-    await userEvent.click(showAllButton);
-    expect(await screen.findByRole('button', { name: 'Collapse' })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = document.getElementById(panelId!);
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(within(panel!).getByText('No PU Item')).toBeInTheDocument();
+    expect(within(panel!).getByText('Yet Another No PU Item')).toBeInTheDocument();
+    expect(within(panel!).getAllByRole('button', { name: 'View item' })).toHaveLength(4);
   });
 
   it('toggles department group collapse/expand with correct aria attributes', async () => {
