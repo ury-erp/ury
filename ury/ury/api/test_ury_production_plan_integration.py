@@ -20,10 +20,12 @@ the test class tears down (``frappe.tests.utils.FrappeTestCase`` rolls back
 the whole class's work in one shot at ``addClassCleanup``), so that job would
 never actually run inside a test -- the after-commit callback is never
 triggered. Calling ``run_prepare_production_job`` directly instead *would*
-run it, but it calls ``frappe.db.commit()`` itself (for cross-connection
-heartbeat visibility), which would permanently write to this shared dev site
-and defeat the class-level rollback for everything created earlier in the
-same test class.
+run it, but terminal ``_finish_*`` helpers call ``frappe.db.commit()``
+(to persist the final Production Plan state), which would permanently write
+to this shared dev site and defeat the class-level rollback for everything
+created earlier in the same test class. Mid-job step/heartbeat no longer
+commits on the Production Plan row -- those live in ``frappe.cache`` -- but
+the terminal commit remains.
 
 So: most tests here call the same real, non-committing functions the job
 calls (``execute_store_to_department_transfer``,
