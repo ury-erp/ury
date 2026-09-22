@@ -165,8 +165,12 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 	Idempotent per department on ``(sales_plan, department, snapshot hash)``:
 	a department whose live plan already carries the Sales Plan's current
 	``approval_snapshot_hash`` is left alone and reported with
-	``created: False``. A department with no compiled targets at all (an
-	"empty department") gets no plan.
+	``created: False``. A department with no compiled targets, no
+	EXTERNAL_RECEIPT demand and no raw_material_demand at all (nothing to
+	produce, receive or buy for it) gets no plan. A department whose only
+	demand is a MADE_TO_ORDER item's raw materials still gets one, with no
+	po_items, purely so that demand has a Production Plan to attach its
+	Material Request rows to (D8).
 	"""
 	# Read a real column with FOR UPDATE (not get_doc, which is cached).
 	frappe.db.get_value(SALES_PLAN, sales_plan_doc.name, "name", for_update=True)
@@ -189,9 +193,18 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 
 	results = []
 	for department, bucket in departments.items():
-		if not (bucket.get("targets") or bucket.get("external_receipt_targets")):
-			# Empty department (defensive -- compile_production_targets only
-			# ever creates a bucket that has at least one target).
+		if not (
+			bucket.get("targets")
+			or bucket.get("external_receipt_targets")
+			or bucket.get("raw_material_demand")
+		):
+			# Genuinely empty -- nothing to produce, receive or buy for this
+			# department. A department is NOT empty just because it has no
+			# target: one whose menu items are all MADE_TO_ORDER with no
+			# PRE_PRODUCED stop point anywhere still has raw_material_demand,
+			# and that demand needs this department's own plan to attach its
+			# Purchase/Transfer Material Request rows to (D8) even though the
+			# plan itself will carry no po_items and never run a Work Order.
 			continue
 
 		existing = existing_by_department.get(department)

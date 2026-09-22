@@ -220,7 +220,12 @@ def _compile_department_bucket(sales_plan_doc, department):
 	branch = sales_plan_doc.get("branch")
 	company = sales_plan_doc.get("company")
 	departments, blockers = compile_production_targets(snapshot, branch, company)
-	bucket = departments.get(department) or {"warehouse": None, "targets": [], "external_receipt_targets": []}
+	bucket = departments.get(department) or {
+		"warehouse": None,
+		"targets": [],
+		"external_receipt_targets": [],
+		"raw_material_demand": [],
+	}
 	return bucket, blockers
 
 

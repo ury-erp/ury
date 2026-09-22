@@ -278,6 +278,137 @@ class MtoAssemblyTests(unittest.TestCase):
         cv = {row["item_code"]: row["required_qty"] for row in target["component_vector"]}
         self.assertEqual(cv["Flour"], 5.0)
 
+    def test_mto_item_with_no_pre_produced_stop_point_raises_raw_material_demand(self):
+        # ORANGE-JUICE is MADE_TO_ORDER and its BOM is pure raw materials --
+        # no PRE_PRODUCED assembly anywhere. It correctly never becomes a
+        # target, but its raw materials must still surface as demand, or an
+        # MTO item like this would have its entire ingredient requirement
+        # silently discarded (nothing else in the pipeline would ever see it).
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={
+                "BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3), _bom_row("Sugar", 0.05)],
+            },
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE"},
+            department_warehouses={"Beverage": "Beverage - WH"},
+        )
+        snapshot = _snapshot(
+            [
+                _row(
+                    "ORANGE-JUICE", 20, department="Beverage", production_policy="MADE_TO_ORDER",
+                    bom="BOM-ORANGE-JUICE",
+                )
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        self.assertNotIn("ORANGE-JUICE", _all_item_codes(departments))
+        beverage = departments["Beverage"]
+        # No target at all -- not even an empty placeholder -- since nothing
+        # here is ever manufactured through a Work Order.
+        self.assertEqual(beverage["targets"], [])
+        self.assertEqual(beverage["external_receipt_targets"], [])
+        self.assertEqual(beverage["warehouse"], "Beverage - WH")
+        demand = {row["item_code"]: row["required_qty"] for row in beverage["raw_material_demand"]}
+        self.assertEqual(demand["Orange"], 6.0)  # 20 * 0.3
+        self.assertEqual(demand["Sugar"], 1.0)  # 20 * 0.05
+
+    def test_two_mto_rows_in_one_department_sum_shared_raw_material_demand(self):
+        # ORANGE-JUICE and LEMONADE are both MADE_TO_ORDER, both in Beverage,
+        # and both use Sugar -- raw_material_demand must sum across rows the
+        # same way target demand sums across menu items elsewhere.
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={
+                "BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3), _bom_row("Sugar", 0.05)],
+                "BOM-LEMONADE": [_bom_row("Lemon", 0.2), _bom_row("Sugar", 0.04)],
+            },
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE", "BOM-LEMONADE": "LEMONADE"},
+            department_warehouses={"Beverage": "Beverage - WH"},
+        )
+        snapshot = _snapshot(
+            [
+                _row("ORANGE-JUICE", 20, department="Beverage", production_policy="MADE_TO_ORDER",
+                     bom="BOM-ORANGE-JUICE"),
+                _row("LEMONADE", 10, department="Beverage", production_policy="MADE_TO_ORDER",
+                     bom="BOM-LEMONADE"),
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        demand = {row["item_code"]: row["required_qty"] for row in departments["Beverage"]["raw_material_demand"]}
+        self.assertAlmostEqual(demand["Sugar"], 1.4)  # 20*0.05 + 10*0.04
+        self.assertEqual(demand["Orange"], 6.0)
+        self.assertEqual(demand["Lemon"], 2.0)
+
+    def test_mto_own_direct_retail_component_is_raw_material_demand(self):
+        # A bottled, bought-in component of an MTO dish (e.g. a sauce) is
+        # DIRECT_RETAIL, not a raw material leaf, but it must still surface
+        # here: it is bought, not manufactured, exactly like a true raw
+        # material.
+        fixture = _Fixture(
+            configs={
+                "BOTTLED-SAUCE": _config(
+                    "BOTTLED-SAUCE", department="Main Kitchen", production_policy="DIRECT_RETAIL",
+                    warehouse="Retail - WH",
+                ),
+            },
+            bom_catalog={"BOM-WRAP": [_bom_row("BOTTLED-SAUCE", 1), _bom_row("Tortilla", 1)]},
+            root_items={"BOM-WRAP": "WRAP"},
+            department_warehouses={"Main Kitchen": "Main Kitchen - WH"},
+        )
+        snapshot = _snapshot(
+            [_row("WRAP", 5, department="Main Kitchen", production_policy="MADE_TO_ORDER", bom="BOM-WRAP")]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        demand = {row["item_code"]: row["required_qty"] for row in departments["Main Kitchen"]["raw_material_demand"]}
+        self.assertEqual(demand["BOTTLED-SAUCE"], 5.0)
+        self.assertEqual(demand["Tortilla"], 5.0)
+
+    def test_mto_own_nested_pre_produced_item_never_double_counted_as_raw_material(self):
+        # BIRYANI-BASE is a real nested target here (D1) -- it must appear
+        # in main["targets"], and it must NOT also appear in
+        # raw_material_demand, or the readiness engine would ask Store/the
+        # department to hold it as if it were a plain purchasable ingredient,
+        # on top of it correctly being produced through its own Work Order.
+        fixture = _Fixture(
+            configs={
+                "BIRYANI-BASE": _config(
+                    "BIRYANI-BASE", department="Main Kitchen", bom="BOM-BIRYANI-BASE",
+                    warehouse="Main Kitchen - WH",
+                ),
+            },
+            bom_catalog={
+                "BOM-CHICKEN-BIRYANI": [
+                    _bom_row("BIRYANI-BASE", 0.2, bom_no="BOM-BIRYANI-BASE"),
+                    _bom_row("Salt", 0.01),
+                ],
+                "BOM-BIRYANI-BASE": [_bom_row("Rice", 0.05)],
+            },
+            root_items={"BOM-CHICKEN-BIRYANI": "CHICKEN-BIRYANI", "BOM-BIRYANI-BASE": "BIRYANI-BASE"},
+            department_warehouses={"Main Kitchen": "Main Kitchen - WH"},
+        )
+        snapshot = _snapshot(
+            [_row("CHICKEN-BIRYANI", 100, department="Main Kitchen", production_policy="MADE_TO_ORDER",
+                  bom="BOM-CHICKEN-BIRYANI")]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        main = departments["Main Kitchen"]
+        self.assertEqual({t["item_code"] for t in main["targets"]}, {"BIRYANI-BASE"})
+        demand_items = {row["item_code"] for row in main["raw_material_demand"]}
+        self.assertNotIn("BIRYANI-BASE", demand_items)
+        self.assertIn("Salt", demand_items)
+
 
 class DirectPreProducedTests(unittest.TestCase):
     def test_direct_pre_produced_row_becomes_a_target_with_its_own_component_vector(self):

@@ -35,6 +35,7 @@ own docstring for why that is the only safe source of a "pinned" BOM.
             "warehouse": "Main Kitchen - WH",          # the Department Warehouse (D13)
             "targets": [ ... ],                          # IN_HOUSE targets, Work Order will be built for these
             "external_receipt_targets": [ ... ],          # sourcing_mode == EXTERNAL_RECEIPT; NEVER build a Work Order for these
+            "raw_material_demand": [ ... ],               # see "MADE_TO_ORDER raw materials" below; never a target
         },
         ...
     }
@@ -66,6 +67,35 @@ dependency appears before the target that consumes it -- see
             {"parent_item": None, "required_qty": 20.0, "source_type": "direct_plan_row"},
         ],
     }
+
+## MADE_TO_ORDER raw materials
+
+A MADE_TO_ORDER row is itself excluded from the Production Plan (see
+"Production target rules" in PLAN.md), and so is every plain raw material in
+its BOM -- neither ever becomes a target. But the demand for those raw
+materials is real, and PLAN.md says plainly that it must be "handled through
+Material Requests and Work Order requirements", not discarded.
+
+When an MTO row's own BOM contains no PRE_PRODUCED stop point at all -- a
+plain made-to-order drink mixed straight from raw ingredients, say, with no
+pre-produced base underneath it -- there is no target anywhere to carry that
+demand. Every raw material the row consumes directly, aggregated per
+department, is therefore returned as its own list on each department's
+bucket:
+
+    "raw_material_demand": [
+        {"item_code": "Orange", "required_qty": 6.0, "stock_uom": "Kg"},
+        {"item_code": "Sugar", "required_qty": 1.2, "stock_uom": "Kg"},
+    ]
+
+Rows here are never targets, never get a Work Order, and never appear in
+``targets``/``external_receipt_targets``. The readiness engine folds them into
+its department/Store demand exactly like a target's ``component_vector`` (see
+``ury_production_readiness``'s docstring). A department whose *only* demand is
+raw material demand -- no PRE_PRODUCED item anywhere in it -- still appears as
+a bucket with empty ``targets``, so ``ury_sales_plan_production_plan`` creates
+a Production Plan for it (with no ``po_items``) purely so the raw-material
+Purchase/Transfer Material Requests have a department plan to link to (D8).
 
 ``blockers`` is a flat list of dicts, each shaped:
 
@@ -271,10 +301,26 @@ def _seed_from_snapshot_row(row, branch, company, graph, blockers):
         except frappe.ValidationError as exc:
             blockers.append(_traversal_error_blocker(item_code, bom_no, exc))
             return
-        component_vector, nested, sub_blockers = _classify_walk(
+        _component_vector, raw_material_vector, nested, sub_blockers = _classify_walk(
             nodes, branch, company, consuming_department=department, consuming_item=item_code
         )
         blockers.extend(sub_blockers)
+        # The raw materials and DIRECT_RETAIL components this MTO row
+        # consumes directly never become a target -- an MTO item is produced
+        # only from the actual order, not in advance -- but the demand is
+        # real and must still reach the readiness engine and the
+        # Purchase/Transfer Material Requests. Without this, an MTO item
+        # whose BOM contains no PRE_PRODUCED stop point at all has its entire
+        # raw-material demand silently discarded: nothing else in this
+        # module, or in any of its callers, ever sees it again.
+        #
+        # ``raw_material_vector``, not ``component_vector``: the latter also
+        # carries every PRE_PRODUCED node this row's BOM touched, including
+        # one blocked as a cross-department misconfiguration (D7) and never
+        # given a target at all. Feeding that into raw-material demand would
+        # turn a blocking misconfiguration into a spurious Purchase/Transfer
+        # request for an item nobody intends Store to hold.
+        graph.add_raw_material_demand(department, _department_warehouse(department), raw_material_vector)
         for candidate in nested:
             child_key = graph.key(
                 candidate["department"], candidate["item_code"], candidate["bom_no"], candidate["warehouse"]
@@ -311,6 +357,11 @@ class _TargetGraph:
         self._incoming = {}  # child_key -> {parent_key: {"qty":..., "parent_item":..., "source_type":...}}
         self._outgoing_keys = {}  # parent_key -> set(child_key) this parent currently emits an edge to
         self._dirty = set()
+        # Demand from MADE_TO_ORDER rows' own direct raw-material consumption
+        # -- never a target, but real demand a department bucket must carry
+        # (see the module docstring's "MADE_TO_ORDER raw materials" section).
+        self._raw_material_demand = {}  # (department, item_code) -> {"required_qty":, "stock_uom":}
+        self._raw_material_departments = {}  # department -> warehouse, for a department with no target at all
 
     @staticmethod
     def key(department, item_code, bom_no, warehouse):
@@ -333,6 +384,30 @@ class _TargetGraph:
             }
         self._dirty.add(key)
         return key
+
+    def add_raw_material_demand(self, department, department_warehouse, component_vector):
+        """Fold a MADE_TO_ORDER row's own direct-consumption ``component_vector``
+        into this department's raw-material demand.
+
+        Two MTO rows in the same department that both consume the same raw
+        material (e.g. two different drinks both using Sugar) are summed, the
+        same way a shared target's demand is summed elsewhere in this class.
+        """
+        self._raw_material_departments[department] = department_warehouse
+        for component in component_vector or []:
+            item_code = component.get("item_code")
+            if not item_code:
+                continue
+            key = (department, item_code)
+            qty = flt(component.get("required_qty"))
+            existing = self._raw_material_demand.get(key)
+            if existing:
+                existing["required_qty"] += qty
+            else:
+                self._raw_material_demand[key] = {
+                    "required_qty": qty,
+                    "stock_uom": component.get("stock_uom"),
+                }
 
     def add_edge(self, parent_key, child_key, qty, parent_item, source_type):
         self._incoming.setdefault(child_key, {})[parent_key] = {
@@ -406,10 +481,15 @@ class _TargetGraph:
             target["component_vector"] = []
             return
 
-        component_vector, nested, sub_blockers = _classify_walk(
+        component_vector, _raw_material_vector, nested, sub_blockers = _classify_walk(
             nodes, branch, company, consuming_department=target["department"], consuming_item=target["item_code"]
         )
         blockers.extend(sub_blockers)
+        # D1: a target's own Work Order required_items wants the unfiltered
+        # vector -- PRE_PRODUCED sub-assemblies included as items -- so the
+        # raw-material-only subset _classify_walk also returns is not used
+        # here; that subset exists only for a MADE_TO_ORDER row with no
+        # target of its own (see _seed_from_snapshot_row).
         target["component_vector"] = component_vector
 
         depends_on = []
@@ -430,20 +510,25 @@ class _TargetGraph:
 
     def build_department_collections(self):
         departments = {}
+
+        def _bucket_for(department, warehouse):
+            return departments.setdefault(
+                department,
+                {
+                    "department": department,
+                    "warehouse": warehouse,
+                    "targets": [],
+                    "external_receipt_targets": [],
+                    "raw_material_demand": [],
+                },
+            )
+
         for key, target in self._targets.items():
             required_qty = self.required_qty(key)
             if required_qty <= 0:
                 continue
             department = target["department"]
-            bucket = departments.setdefault(
-                department,
-                {
-                    "department": department,
-                    "warehouse": target["warehouse"],
-                    "targets": [],
-                    "external_receipt_targets": [],
-                },
-            )
+            bucket = _bucket_for(department, target["warehouse"])
             row = dict(target)
             row["required_qty"] = required_qty
             row["sources"] = self.sources(key)
@@ -453,6 +538,23 @@ class _TargetGraph:
                 else bucket["external_receipt_targets"]
             )
             dest.append(row)
+
+        # A department that has raw-material demand but not one single
+        # target (every menu item routed through it is MADE_TO_ORDER with no
+        # PRE_PRODUCED stop point anywhere in its BOM) still needs a bucket:
+        # without one, that demand has nowhere to attach and disappears the
+        # same way it used to before this method existed.
+        for (department, item_code), demand in self._raw_material_demand.items():
+            if flt(demand["required_qty"]) <= 0:
+                continue
+            bucket = _bucket_for(department, self._raw_material_departments.get(department))
+            bucket["raw_material_demand"].append(
+                {
+                    "item_code": item_code,
+                    "required_qty": demand["required_qty"],
+                    "stock_uom": demand["stock_uom"],
+                }
+            )
 
         for bucket in departments.values():
             bucket["targets"] = _order_by_dependency(bucket["targets"])
@@ -466,13 +568,23 @@ class _TargetGraph:
 def _classify_walk(nodes, branch, company, consuming_department, consuming_item):
     """Classify every node of one flat ``walk_bom_tree`` result.
 
-    Returns ``(component_vector, nested_targets, blockers)``:
+    Returns ``(component_vector, raw_material_vector, nested_targets, blockers)``:
 
     - ``component_vector``: the rows that belong directly in the consuming
       target's/row's own ``required_items`` -- raw materials, DIRECT_RETAIL
       components, and PRE_PRODUCED nodes themselves (D1: a PRE_PRODUCED
       sub-assembly appears as an item; an unstocked intermediate never does,
       only its own descendants do, once classified in turn).
+    - ``raw_material_vector``: the strict subset of ``component_vector`` that
+      is NOT a PRE_PRODUCED node -- true raw materials and DIRECT_RETAIL
+      components only. A PRE_PRODUCED node is excluded here even when it was
+      blocked as a cross-department misconfiguration (D7) and never became a
+      target at all: its own target or its own blocker already accounts for
+      it, and it must never additionally surface as something to purchase or
+      transfer. Used only for a MADE_TO_ORDER row's own raw-material demand
+      (``_TargetGraph.add_raw_material_demand``) -- a target's own
+      ``component_vector`` (Work Order ``required_items``) always wants the
+      unfiltered vector, never this one.
     - ``nested_targets``: PRE_PRODUCED nodes found in ``consuming_department``
       (candidates for ``_TargetGraph.ensure_target``/``add_edge``), each a
       dict with item_code/department/bom_no/warehouse/qty/stock_uom/
@@ -499,7 +611,7 @@ def _classify_walk(nodes, branch, company, consuming_department, consuming_item)
 
         if policy == POLICY_PRE_PRODUCED:
             stopped_prefixes.append(path)
-            _accumulate_component(component_vector_by_item, node)
+            _accumulate_component(component_vector_by_item, node, is_pre_produced=True)
 
             department = context.get("department")
             if department != consuming_department:
@@ -548,20 +660,42 @@ def _classify_walk(nodes, branch, company, consuming_department, consuming_item)
         # present later in this same flat node list and are classified in
         # their own right.
 
-    component_vector = list(component_vector_by_item.values())
-    return component_vector, nested_targets, blockers
+    component_vector = [
+        {"item_code": row["item_code"], "required_qty": row["required_qty"], "stock_uom": row["stock_uom"]}
+        for row in component_vector_by_item.values()
+    ]
+    raw_material_vector = [
+        {"item_code": row["item_code"], "required_qty": row["required_qty"], "stock_uom": row["stock_uom"]}
+        for row in component_vector_by_item.values()
+        if not row["is_pre_produced"]
+    ]
+    return component_vector, raw_material_vector, nested_targets, blockers
 
 
-def _accumulate_component(component_vector_by_item, node):
+def _accumulate_component(component_vector_by_item, node, is_pre_produced=False):
+    """Fold ``node`` into ``component_vector_by_item``, keyed by (item_code, uom).
+
+    ``is_pre_produced`` marks a PRE_PRODUCED node -- whether it went on to
+    become its own nested target, or was blocked as a cross-department
+    misconfiguration (D7) and became neither. Either way its own production
+    or its own blocker already accounts for it entirely; it must never also
+    be counted as a plain raw material or DIRECT_RETAIL component by
+    whichever caller wants only those (see ``_classify_walk``'s
+    ``raw_material_vector`` return value). A component's own Work Order
+    ``required_items`` (D1) still wants it, hence the flag is carried but
+    never used to exclude anything from ``component_vector`` itself.
+    """
     key = (node["item_code"], node["stock_uom"])
     existing = component_vector_by_item.get(key)
     if existing:
         existing["required_qty"] = flt(existing["required_qty"]) + flt(node["required_qty"])
+        existing["is_pre_produced"] = existing["is_pre_produced"] or is_pre_produced
     else:
         component_vector_by_item[key] = {
             "item_code": node["item_code"],
             "required_qty": node["required_qty"],
             "stock_uom": node["stock_uom"],
+            "is_pre_produced": is_pre_produced,
         }
 
 

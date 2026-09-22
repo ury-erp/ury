@@ -162,6 +162,64 @@ class TestExternalReceiptDemandIsNotLost(FrappeTestCase):
 		self.assertEqual(row["store_shortage"], 6.0)
 
 
+class TestMadeToOrderRawMaterialDemandIsNotLost(FrappeTestCase):
+	def test_raw_material_demand_row_becomes_a_demand_row(self):
+		# A MADE_TO_ORDER row's own raw materials (Orange Juice's Orange and
+		# Sugar, say) never become a target -- see
+		# ury_production_target_compiler's "MADE_TO_ORDER raw materials"
+		# section -- but the demand is real and must reach the same place a
+		# target's component_vector row would.
+		departments = {
+			"Beverage": {
+				"department": "Beverage",
+				"warehouse": "Beverage - WH",
+				"targets": [],
+				"external_receipt_targets": [],
+				"raw_material_demand": [
+					{"item_code": "Orange", "required_qty": 6.0, "stock_uom": "Kg"},
+				],
+			}
+		}
+		bin_qty = {("Orange", "Beverage - WH"): 1.0, ("Orange", "Store - WH"): 2.0}
+		with patch(f"{MOD}.frappe.db.get_value", side_effect=_bin_fake(bin_qty)):
+			result = compute_readiness(departments, store_warehouse="Store - WH")
+
+		self.assertEqual(len(result["rows"]), 1)
+		row = result["rows"][0]
+		self.assertEqual(row["item_code"], "Orange")
+		self.assertEqual(row["required_qty"], 6.0)
+		self.assertEqual(row["department_available"], 1.0)
+		self.assertEqual(row["department_shortage"], 5.0)
+		self.assertEqual(row["store_shortage"], 3.0)  # 5.0 shortage - 2.0 Store stock
+
+	def test_raw_material_demand_sums_with_a_targets_component_vector_for_the_same_item(self):
+		# Rice needed by a target's own component_vector, and Rice needed
+		# directly by a MADE_TO_ORDER row in the same department, are two
+		# different sources of the exact same physical requirement -- they
+		# must sum into one row, not report as two separate, understated
+		# shortages.
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{
+						"item_code": "BIRYANI-BASE",
+						"component_vector": [{"item_code": "Rice", "required_qty": 4.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+				"raw_material_demand": [{"item_code": "Rice", "required_qty": 3.0, "stock_uom": "Kg"}],
+			}
+		}
+		bin_qty = {("Rice", "Main Kitchen - WH"): 0.0, ("Rice", "Store - WH"): 0.0}
+		with patch(f"{MOD}.frappe.db.get_value", side_effect=_bin_fake(bin_qty)):
+			result = compute_readiness(departments, store_warehouse="Store - WH")
+
+		self.assertEqual(len(result["rows"]), 1)
+		self.assertEqual(result["rows"][0]["required_qty"], 7.0)  # 4.0 + 3.0
+
+
 class TestStoreWarehouseBlocker(FrappeTestCase):
 	def test_missing_store_warehouse_is_a_blocker_not_an_exception(self):
 		departments = {

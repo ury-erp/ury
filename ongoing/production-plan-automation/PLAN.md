@@ -989,6 +989,65 @@ holds it is checked at execution time under Bin locks (D9, D17). The Purchase
 path nets against `store_shortage` instead. The two differ deliberately and
 are not an inconsistency.
 
+### D21 — A MADE_TO_ORDER row's own raw materials are demand, never a target
+
+Confirmed missing, then fixed, after implementation: an MTO item excludes
+itself from the Production Plan and traverses its BOM for PRE_PRODUCED
+assemblies (the production target rules), but when that traversal finds
+none — a plain made-to-order drink mixed from raw ingredients, with no
+pre-produced base anywhere underneath it — every raw material the row
+consumes was computed by the target compiler and then discarded. Nothing
+downstream ever saw it again: not the readiness engine, not the Purchase
+Material Request, not the Transfer Material Request. The item's entire
+ingredient demand vanished from the system with no blocker and no error.
+
+Each department bucket the compiler returns now also carries
+`raw_material_demand`: a list of `{item_code, required_qty, stock_uom}` rows,
+aggregated across every MADE_TO_ORDER row in that department, for exactly the
+raw materials and DIRECT_RETAIL components those rows consume directly. A
+row here is never a target and never gets a Work Order.
+
+**The naive version of this fix is wrong, and the target compiler's own test
+suite caught it.** A MADE_TO_ORDER row's BOM can also contain a PRE_PRODUCED
+node that gets *blocked* rather than turned into a target — the D7
+cross-department case. `_classify_walk`'s `component_vector` accumulates
+that blocked node's own item_code unconditionally, before the department
+check that blocks it. Feeding the whole `component_vector` into
+`raw_material_demand` would have turned a blocking misconfiguration into a
+spurious Purchase or Transfer request for an item nobody intends the Store to
+hold — the opposite of what the blocker is telling the manager. The same
+problem applies to a PRE_PRODUCED node that becomes a real nested target: its
+own item_code is also in `component_vector`, and it must not additionally be
+requested as a raw material on top of being correctly manufactured through
+its own Work Order.
+
+`_classify_walk` therefore tags each accumulated row as PRE_PRODUCED or not,
+and returns a second, filtered `raw_material_vector` alongside the
+unfiltered `component_vector` — the latter is unchanged and still feeds a
+target's own Work Order `required_items` (D1), which legitimately wants
+PRE_PRODUCED sub-assemblies listed as items. Only the filtered vector feeds
+`raw_material_demand`.
+
+A department whose *only* demand is `raw_material_demand` — every menu item
+routed through it is MADE_TO_ORDER with no PRE_PRODUCED stop point at all —
+still needs a Production Plan, with no `po_items`, purely so the resulting
+Purchase/Transfer Material Request rows have a department plan to link to
+(D8). The "empty department" gate in `ury_sales_plan_production_plan.py`
+(originally: no plan at all without at least one target) is corrected to
+treat `raw_material_demand` as non-empty too.
+
+The readiness engine folds `raw_material_demand` into department and Store
+demand exactly like a target's `component_vector` row (the same pattern D19
+already established for `external_receipt_targets`), so it sums correctly
+against the same item required elsewhere in the same department, and nets
+against department and Store stock the same way.
+
+Owner: the target compiler (`ury_production_target_compiler.py`), the
+readiness engine (`ury_production_readiness.py`), and the empty-department
+gate in `ury_sales_plan_production_plan.py`. Agent 5's fallback bucket
+default in `ury_production_transfer.py` gained the key too, for shape
+consistency.
+
 ## Wave 0 — Integration owner
 
 Owned solely by the integration owner. Blocks every other wave.
