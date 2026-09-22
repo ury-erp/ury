@@ -457,6 +457,21 @@ fixtures = [
                     "POS Invoice-restaurant_table",
                     "POS Invoice-custom_merged_tables",
                     "Production Plan Item-custom_ury_department",
+                    # Present on site and in the shipped fixture, but absent
+                    # from this filter, so every `bench export-fixtures` dropped
+                    # them from custom_field.json. Listed here so the export is
+                    # complete rather than lossy.
+                    "BOM-custom_bom_revision",
+                    "Item-custom_opportunity_costs",
+                    "POS Invoice-custom_split_from",
+                    "POS Invoice-custom_split_group",
+                    "Stock Entry-custom_ury_batch_request",
+                    "URY Production Unit-company",
+                    "URY Production Unit-disable",
+                    "URY Restaurant-tax_id",
+                    "URY Room-print_format",
+                    "URY Room-room_name",
+                    "URY Table-table_name",
                     "Production Plan-custom_ury_sales_plan",
                     "Production Plan-custom_ury_snapshot_hash",
                     "Production Plan-custom_ury_department",
