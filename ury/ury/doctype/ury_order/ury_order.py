@@ -22,6 +22,13 @@ from ury.ury.api.ury_order_reservation_service import (
 from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
+from ury.ury.api.ury_order_attribution import (
+    check_credit_limit,
+    get_credit_mode_of_payment,
+    resolve_credit_account,
+    resolve_line_performers,
+    resolve_order_performer,
+)
 
 from frappe import cache
 
@@ -1010,7 +1017,7 @@ def _department_warehouse_for_item(item_code, branch, company):
     return _warehouse_for_context(context)
 
 
-def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
+def price_items_for_invoice(items, price_list, pos_profile, branch, menu, default_performer=None):
     """Resolve course and price for each item and build the invoice item dicts.
 
     Returns a list of dicts in the same shape previously passed directly to
@@ -1057,6 +1064,8 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
 
         else:
             department_warehouse = _department_warehouse_for_item(d.get("item"), branch, company)
+            # Credited employee for this line: per-line override, else the order's performer.
+            line_performer = d.get("performed_by") or default_performer
             priced_items.append(
                 dict(
                     item_code=d.get("item"),
@@ -1065,6 +1074,7 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
                     reservation_line_key=d.get("reservation_line_key"),
                     **({"custom_course": course} if course else {}),
                     **({"warehouse": department_warehouse} if department_warehouse else {}),
+                    **({"custom_entered_by_employee": line_performer} if line_performer else {}),
                     comment=d.get("comment"),
                     rate = item_prices[0].price_list_rate,
                     price_list_rate = item_prices[0].price_list_rate,
@@ -1851,7 +1861,8 @@ def sync_order(
     order_type=None,
     aggregator_id=None,
     room=None,
-    merged_tables=None
+    merged_tables=None,
+    performed_by=None
 ):
     
     user_role = frappe.get_roles()
@@ -2050,6 +2061,19 @@ def sync_order(
     if not invoice.waiter:
         invoice.waiter = frappe.session.user
 
+    # `waiter` stays the operator so ownership and room scoping keep working;
+    # the employee actually credited for the order rides custom_waiter_employee,
+    # which is what the sales and commission reports read.
+    performer = resolve_order_performer(
+        pos_profile,
+        invoice.branch,
+        performed_by,
+        existing=invoice.get("custom_waiter_employee"),
+    )
+    if performer:
+        invoice.custom_waiter_employee = performer
+        invoice.custom_order_on_behalf = 1
+
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room = room
     if not invoice.restaurant_table:
@@ -2133,7 +2157,16 @@ def sync_order(
 
     menu = _resolve_menu_for_sync(invoice.branch, table=table or invoice.restaurant_table, room=opening_room or room, order_type=effective_order_type) or frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
 
-    priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
+    resolve_line_performers(pos_profile, invoice.branch, items)
+
+    priced_items = price_items_for_invoice(
+        items,
+        price_list,
+        pos_profile,
+        invoice.branch,
+        menu,
+        default_performer=performer or invoice.get("custom_waiter_employee"),
+    )
 
     _sync_order_company = invoice.company or getattr(posprofile, "company", None) or frappe.db.get_value("Branch", invoice.branch, "company")
     if get_branch_stock_policy(branch=invoice.branch, company=_sync_order_company).reservation_control_enabled:
@@ -2613,7 +2646,7 @@ def _validate_additional_discount(additional_discount, pos_profile):
 
 # Method for URY POS
 @frappe.whitelist()
-def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None, credit_account=None):
     additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
 
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
@@ -2625,6 +2658,17 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile
+
+    credit_mode = get_credit_mode_of_payment(pos_profile)
+    is_credit = bool(credit_mode) and any(d["mode_of_payment"] == credit_mode for d in payments)
+    credit_party = None
+
+    if is_credit:
+        if invoice.custom_merged_pos_invoice:
+            frappe.throw(_("A merged bill cannot be settled on credit."))
+        # Bill to the credit holder so the debt lands on their receivable ledger.
+        credit_party = resolve_credit_account(pos_profile, invoice.branch, credit_account)
+        invoice.customer = credit_party.customer
     
     if additionalDiscount:
         discount_val = frappe.utils.flt(additionalDiscount)
@@ -2646,9 +2690,27 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         
     invoice.calculate_taxes_and_totals()
 
+    invoice_total = flt(invoice.rounded_total) or flt(invoice.grand_total)
+
+    if is_credit:
+        check_credit_limit(credit_party, invoice_total)
+    else:
+        # ERPNext stops enforcing this once `allow_partial_payment` is on for credit,
+        # so an ordinary settlement is held to the full amount here instead.
+        precision = invoice.precision("grand_total")
+        tendered = sum(flt(d["amount"]) for d in payments) + flt(invoice.write_off_amount)
+        if flt(tendered, precision) < flt(invoice_total, precision):
+            frappe.throw(_("Payments do not cover the bill total."))
+
     invoice.set("payments", [])
 
-    if invoice.custom_merged_pos_invoice:
+    if is_credit:
+        # Zero-value row: ERPNext requires at least one mode of payment, then strips
+        # unallocated rows on submit, leaving the full amount outstanding.
+        invoice.append("payments", dict(mode_of_payment=credit_mode, amount=0))
+        invoice.custom_credit_account = credit_party.name
+        invoice.custom_settlement_stage = "Transferred On Credit"
+    elif invoice.custom_merged_pos_invoice:
         target = frappe.get_doc("POS Invoice", invoice.custom_merged_pos_invoice)
         target.calculate_taxes_and_totals()
         

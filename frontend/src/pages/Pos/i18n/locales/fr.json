@@ -58,6 +58,9 @@
     "insufficient_capacity": "Capacité insuffisante pour ajouter cet article"
   },
   "order": {
+    "performed_by": "Réalisé par",
+    "select_performer": "Sélectionner un employé",
+    "no_performer": "Non précisé",
     "select_to_view": "Sélectionnez une commande pour voir les détails",
     "items_title": "Articles de la commande",
     "taxes_charges": "Taxes et frais",
@@ -124,6 +127,7 @@
     "failed_load_tables": "Échec du chargement des tables",
     "select_aggregator": "Veuillez sélectionner un agrégateur avant de continuer",
     "select_customer": "Veuillez sélectionner un client avant de continuer",
+    "select_performer": "Veuillez sélectionner l'employé concerné par cette commande",
     "select_table": "Veuillez sélectionner une table pour les commandes {{order_type}}",
     "failed_logout": "Échec de la déconnexion. Veuillez réessayer.",
     "failed_cancel_order": "Échec de l'annulation de la commande",

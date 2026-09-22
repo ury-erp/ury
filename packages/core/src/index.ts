@@ -1,6 +1,12 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
-export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+export {
+  isUserRestrictedFromTableOrders,
+  canCaptainTransfer,
+  canOrderOnBehalf,
+  canSettleOnCredit,
+  derivePOSCapabilities,
+} from './frappe/roles';
 export {
   buildDeskUrl,
   withReturnContext,

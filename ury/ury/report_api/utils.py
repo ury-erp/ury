@@ -1,5 +1,28 @@
 import frappe
 
+# A credit bill is submitted unpaid, so it sits at "Unpaid"/"Overdue" until the
+# day-close merge log consolidates it. Intraday queries must count it anyway or
+# same-day credit sales disappear from live dashboards.
+SETTLED_OR_ON_CREDIT = (
+	"({prefix}.`status` IN ('Consolidated', 'Paid')"
+	" OR {prefix}.`custom_settlement_stage` = 'Transferred On Credit')"
+)
+
+
+def settled_status_condition(prefix="b"):
+	"""SQL predicate for "this invoice counts as revenue"."""
+	return SETTLED_OR_ON_CREDIT.format(prefix=prefix)
+
+
+def attributed_employee_join(prefix="b", alias="e", how="INNER"):
+	"""Join the employee credited with the invoice.
+
+	Attribution follows `custom_waiter_employee`, not `waiter`. `waiter` is the
+	user who operated the terminal, which is a different person whenever an
+	order is recorded on behalf of someone who cannot reach the POS.
+	"""
+	return f"{how} JOIN `tabEmployee` {alias} ON ({alias}.`name` = {prefix}.`custom_waiter_employee`)"
+
 
 def require_manager():
 	"""Raise frappe.PermissionError unless the current user is a URY Manager,

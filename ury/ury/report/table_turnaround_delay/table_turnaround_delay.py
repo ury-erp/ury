@@ -43,10 +43,11 @@ def execute(filters=None):
 			pi.posting_time AS "posting_time",
 			pi.creation AS "creation",
 			pi.restaurant_table AS "restaurant_table",
-			pi.waiter AS "waiter",
+			COALESCE(emp.employee_name, pi.waiter) AS "waiter",
 			pi.grand_total AS "grand_total",
 			EXTRACT(EPOCH FROM (NOW() - pi.creation)) / 60 AS "elapsed_minutes"
 		FROM `tabPOS Invoice` pi
+		LEFT JOIN `tabEmployee` emp ON emp.name = pi.custom_waiter_employee
 		WHERE
 			pi.docstatus = 0
 			AND pi.invoice_printed = 0

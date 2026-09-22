@@ -45,6 +45,8 @@ export interface POSInvoice {
   custom_merged_pos_invoice?: string | null;
   custom_merged_total?: number | null;
   waiter?: string;
+  /** Employee credited with the order; differs from `waiter` on an on-behalf order. */
+  custom_waiter_employee?: string | null;
   invoice_printed?: number;
   docstatus?: number;
   no_of_pax?: number;
@@ -89,6 +91,8 @@ export interface SyncOrderRequest {
      * context/occurrence matching, which cannot survive a comment edit.
      */
     reservation_line_key?: string;
+    /** Employee credited with this line, overriding the order-level performer. */
+    performed_by?: string;
   }>;
   no_of_pax: number;
   mode_of_payment?: string;
@@ -103,6 +107,8 @@ export interface SyncOrderRequest {
   last_modified_time?: string;
   comments?: string | null;
   room?: string;
+  /** Employee the order is recorded for. `waiter` stays the operator. */
+  performed_by?: string;
 }
 
 /**

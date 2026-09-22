@@ -124,6 +124,8 @@ interface POSState {
   selectedRoom: string | null;
   searchQuery: string;
   selectedCustomer: Customer | null;
+  /** Employee this order is credited to when keyed on their behalf. */
+  selectedPerformer: string | null;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
   selectedItem: MenuItem | null;
@@ -169,6 +171,7 @@ interface POSStore extends POSState {
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
   setSelectedCustomer: (customer: Customer | null) => void;
+  setSelectedPerformer: (employee: string | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
@@ -229,6 +232,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   selectedRoom: null,
   searchQuery: '',
   selectedCustomer: null,
+  selectedPerformer: null,
   selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
   quickFilter: "all",
   selectedItem: null,
@@ -514,6 +518,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+
+  setSelectedPerformer: (employee) => set({ selectedPerformer: employee }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
     if (table ) {
@@ -697,6 +703,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             name: order.customer_name,
             phone: order.mobile_number,
           } : null,
+          selectedPerformer: order.custom_waiter_employee || null,
           isUpdatingOrder: true,
           orderId: order.name,
           noOfPax: order.no_of_pax || 1,
@@ -708,6 +715,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           tableOrder: null,
           activeOrders: [],
           selectedCustomer: null,
+          selectedPerformer: null,
           isUpdatingOrder: false,
           orderId: null,
           noOfPax: 1,
@@ -721,6 +729,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         tableOrder: null,
         activeOrders: [],
         selectedCustomer: null,
+        selectedPerformer: null,
         isUpdatingOrder: false,
         orderId: null,
         noOfPax: 1,
@@ -737,6 +746,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       tableOrder: null,
       activeOrders: [],
       selectedCustomer: null,
+      selectedPerformer: null,
       isUpdatingOrder: false,
       orderId: null,
       noOfPax: 1,
@@ -757,6 +767,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     
     set({
       selectedCustomer: null,
+      selectedPerformer: null,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,

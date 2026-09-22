@@ -31,6 +31,38 @@ export const canCaptainTransfer = (
 };
 
 /**
+ * True if the user may record an order for another employee. UX gate only --
+ * `ury_order_attribution.resolve_order_performer` re-checks this server-side.
+ */
+export const canOrderOnBehalf = (
+  user: User | null,
+  posProfile: PosProfileCombined | null
+): boolean => {
+  if (!user?.roles || !posProfile?.custom_enable_order_on_behalf) {
+    return false;
+  }
+
+  const allowed = (posProfile.custom_roles_allowed_to_order_on_behalf ?? []).map((row) => row.role);
+  return user.roles.some((role) => allowed.includes(role));
+};
+
+/**
+ * True if the user may close a bill against a credit account. UX gate only --
+ * `ury_order_attribution.resolve_credit_account` re-checks this server-side.
+ */
+export const canSettleOnCredit = (
+  user: User | null,
+  posProfile: PosProfileCombined | null
+): boolean => {
+  if (!user?.roles || !posProfile?.custom_enable_credit_settlement) {
+    return false;
+  }
+
+  const allowed = (posProfile.custom_roles_allowed_for_credit ?? []).map((row) => row.role);
+  return user.roles.some((role) => allowed.includes(role));
+};
+
+/**
  * True if the user holds any role in the POS profile's `role_allowed_for_billing`
  * table (the "cashier" role check, mirrors `urypos/src/stores/Auth.js:121-126`'s
  * `billingRoles`/`this.cashier` derivation).
