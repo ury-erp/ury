@@ -123,6 +123,15 @@ def get_yield_variance(company, branch=None, item=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch.
 	require_manager()
 	_require_scope(company)
 
@@ -189,16 +198,47 @@ def get_yield_check_compliance(company, branch=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch. F8 below is a separate,
+	# unrelated concern: it scopes the tracked-item SET to the items
+	# configured for production at the given branch.
 	require_manager()
 	_require_scope(company)
 
-	# Fetch all yield-tracked items with cadence != None.
+	item_filters = {
+		"custom_yield_tracked": 1,
+		"custom_yield_check_cadence": ["!=", "None"],
+	}
+
+	# F8: when a single branch is requested, scope the tracked-item set to
+	# items actually configured for production at that branch (via URY Item
+	# Production Configuration), matching yield_check_reminders.py's
+	# get_due_yield_checks and ury_dashboard.py's item search. Without this,
+	# a branch that never prepares a given item still shows 100%-of-zero or
+	# skewed compliance noise for it. When branch is None (all-branches
+	# aggregate), keep the global item set — the numbers are already summed
+	# across every branch, so per-branch scoping doesn't apply.
+	if branch:
+		branch_item_codes = frappe.get_all(
+			"URY Item Production Configuration",
+			filters={"branch": branch, "active": 1},
+			pluck="item",
+		)
+		if not branch_item_codes:
+			return []
+		item_filters["name"] = ["in", branch_item_codes]
+
+	# Fetch yield-tracked items with cadence != None (scoped to branch above, if given).
 	tracked_items = frappe.get_all(
 		"Item",
-		filters={
-			"custom_yield_tracked": 1,
-			"custom_yield_check_cadence": ["!=", "None"],
-		},
+		filters=item_filters,
 		fields=[
 			"name",
 			"custom_yield_check_cadence",

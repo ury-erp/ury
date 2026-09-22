@@ -367,6 +367,58 @@ class TestGetYieldCheckCompliancePermissionGating(FrappeTestCase):
 		self.assertIsInstance(result, list)
 		self.assertTrue(len(result) >= 0)
 
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_scopes_tracked_items_to_production_configuration(
+		self, mock_manager, mock_scope, mock_getdate, mock_get_all
+	):
+		"""F8: when branch is given, only items with an active URY Item
+		Production Configuration row at that branch are evaluated."""
+		from datetime import date
+		today = date(2026, 1, 15)
+		mock_getdate.return_value = today
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "URY Item Production Configuration":
+				assert kwargs.get("filters") == {"branch": "Test Branch", "active": 1}
+				return ["ITEM-A"]
+			if doctype == "Item":
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [frappe._dict(
+					name="ITEM-A",
+					custom_yield_check_cadence="Interval",
+					custom_yield_check_interval_days=7,
+				)]
+			if doctype == "URY Yield Check":
+				return []  # completed_checks
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_with_no_configured_items_returns_empty(
+		self, mock_manager, mock_scope, mock_get_all
+	):
+		"""F8: a branch with no active production configuration rows gets an
+		empty compliance list instead of the unscoped global item set."""
+		mock_get_all.return_value = []  # no URY Item Production Configuration rows
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(result, [])
+
 
 class TestRequireScope(FrappeTestCase):
 	"""Test _require_scope helper function."""

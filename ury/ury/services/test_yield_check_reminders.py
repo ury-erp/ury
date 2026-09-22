@@ -377,6 +377,60 @@ class TestGetDueYieldChecksIntegration(unittest.TestCase):
 		self.assertEqual(result[0]["days_overdue"], 3)
 
 
+class TestGetDueYieldChecksBranchScoping(unittest.TestCase):
+	"""F8: get_due_yield_checks scopes the tracked-item set to items actually
+	configured for production at the requested branch."""
+
+	@patch(f"{MOD}._evaluate_cadence")
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.frappe.db.get_value")
+	@patch(f"{MOD}.require_manager")
+	def test_items_not_configured_at_branch_are_excluded(
+		self, mock_manager, mock_get_value, mock_get_all, mock_evaluate
+	):
+		"""An Item with no URY Item Production Configuration row at this branch
+		never reaches _evaluate_cadence, even if it is globally yield-tracked."""
+		mock_get_value.return_value = "Test Co"
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "URY Item Production Configuration":
+				# Only ITEM-A is configured for production at this branch.
+				return ["ITEM-A"]
+			if doctype == "Item":
+				# The Item filters requested (asserted below) should already
+				# have narrowed this, but simulate the DB actually honoring
+				# the name__in filter to prove the call is scoped correctly.
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [_item(name="ITEM-A")]
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+		mock_evaluate.return_value = ("due", {})
+
+		result = get_due_yield_checks("Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.frappe.db.get_value")
+	@patch(f"{MOD}.require_manager")
+	def test_no_items_configured_at_branch_returns_empty(
+		self, mock_manager, mock_get_value, mock_get_all
+	):
+		"""If the branch has no active production configuration rows at all,
+		return an empty list instead of falling through to the global item set."""
+		mock_get_value.return_value = "Test Co"
+		mock_get_all.return_value = []  # No production config rows for this branch
+
+		result = get_due_yield_checks("Test Branch")
+
+		self.assertEqual(result, [])
+
+
 class TestBOMHookYieldBackCalculation(unittest.TestCase):
 	"""Test BOM Item yield back-calculation hook."""
 

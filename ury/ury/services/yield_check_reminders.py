@@ -63,17 +63,40 @@ def get_due_yield_checks(branch):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally relies
+	# on require_manager() only, not user_has_branch_access — same deliberate
+	# choice documented on user_has_branch_access in report_api/utils.py and
+	# on get_yield_variance/get_yield_check_compliance in ury_yield_variance.py:
+	# managers may review due/overdue checks across branches they oversee
+	# without needing a Branch.user row. user_has_branch_access remains
+	# reserved for staff-facing WRITE endpoints (record_yield_check,
+	# create_issue_authorization) that accept a caller-supplied branch.
 	require_manager()
 	# Determine company from branch for scope gating (mirrors ury_yield_variance.py pattern).
 	company = frappe.db.get_value("Branch", branch, "company")
 	_require_scope(company)
 
-	# Fetch all yield-tracked items with cadence != None for this branch context.
+	# I8/F8: scope the tracked-item set to items actually configured for
+	# production at this branch (via URY Item Production Configuration),
+	# matching the pattern in ury_dashboard.py's item search. Without this,
+	# a branch that never prepares a given yield-tracked item still gets it
+	# flagged overdue, drowning the Overdue Yield Checks page in noise for
+	# multi-branch tenants.
+	branch_item_codes = frappe.get_all(
+		"URY Item Production Configuration",
+		filters={"branch": branch, "active": 1},
+		pluck="item",
+	)
+	if not branch_item_codes:
+		return []
+
+	# Fetch yield-tracked items with cadence != None that are actually used at this branch.
 	tracked_items = frappe.get_all(
 		"Item",
 		filters={
 			"custom_yield_tracked": 1,
 			"custom_yield_check_cadence": ["!=", "None"],
+			"name": ["in", branch_item_codes],
 		},
 		fields=[
 			"name",
