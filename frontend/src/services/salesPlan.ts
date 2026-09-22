@@ -246,14 +246,68 @@ export interface SearchBranchItemsParams {
   limit?: number;
 }
 
-export type ProductionPlanState = {
-  state: 'none' | 'live' | 'stale' | 'ineligible';
-  name?: string;
-  docstatus?: number;
-  can_open?: boolean;
-  can_create?: boolean;
-  issues?: string[];
+/**
+ * Readiness blocker shape returned by the target compiler / readiness
+ * engine (ury_production_target_compiler.py, ury_production_readiness.py)
+ * and echoed back verbatim by ury_prepare_production.get_sales_plan_production_states.
+ * Kept loose -- the backend emits several blocker "types" (store_shortage,
+ * compiler blockers, cross-department config errors, etc.) that don't share
+ * a fixed field set beyond `message`.
+ */
+export type ProductionBlocker = {
+  type?: string;
+  item_code?: string;
+  department?: string;
+  message?: string;
+  [key: string]: unknown;
 };
+
+/**
+ * D12 -- the two state axes for one department's Production Plan, kept
+ * strictly separate. Never collapse these into one `state` field:
+ *
+ * - `link_state` answers "does a current plan exist for this department?"
+ *   (carries forward the old singular `ProductionPlanState.state` semantics,
+ *   including the `custom_ury_snapshot_hash` staleness comparison).
+ * - `execution_state` answers "how far has this department's production
+ *   got?" and is independent -- a department can be `link_state: 'stale'`
+ *   while `execution_state: 'completed'` (the Sales Plan changed after that
+ *   department finished producing against the old snapshot).
+ *
+ * See ongoing/production-plan-automation/PLAN.md, decision D12.
+ */
+export interface DepartmentProductionPlanState {
+  department: string;
+  production_plan?: string;
+  docstatus?: number;
+
+  /** Axis 1 -- does a usable plan exist for this department? */
+  link_state: 'none' | 'live' | 'stale' | 'ineligible';
+
+  /**
+   * Axis 2 -- how far has execution got? Absent while `link_state` is
+   * `'none'` or `'ineligible'` (there is nothing to execute yet).
+   */
+  execution_state?: 'awaiting_materials' | 'ready' | 'processing' | 'completed' | 'failed';
+
+  can_create?: boolean;
+  can_open?: boolean;
+
+  /** Pre-flight creation blockers (no BOM, no plannable items, ...). */
+  issues?: string[];
+  /** Readiness-engine blockers (stock shortages, misconfiguration, ...). */
+  blockers?: ProductionBlocker[];
+}
+
+export interface SalesPlanProductionStatesResponse {
+  sales_plan: string;
+  status: string | null;
+  /** Whether Production Plans can exist at all for this Sales Plan's current status. */
+  eligible: boolean;
+  /** Current user's create permission on Production Plan. */
+  can_create: boolean;
+  production_plans: DepartmentProductionPlanState[];
+}
 
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
@@ -299,20 +353,66 @@ export const salesPlanService = {
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
   },
 
-  async getProductionPlanState(name: string): Promise<ProductionPlanState> {
-    const res = await call.get<ProductionPlanState>(
-      'ury.ury.api.ury_sales_plan_production_plan.get_production_plan_state',
-      { sales_plan: name },
+  /**
+   * Per-department Production Plan states for `salesPlan` (D12): both the
+   * `link_state` and `execution_state` axes, plus the most recent readiness
+   * blockers per department. Built on top of Agent 8's
+   * `get_sales_plan_production_states`, which only ever lists departments
+   * that already have a live (non-cancelled) Production Plan -- see that
+   * function's docstring. A department present in the Sales Plan's own
+   * `groupedItems` but absent from `production_plans` here has no plan yet:
+   * the caller derives `link_state: 'none'` (or `'ineligible'` from the
+   * top-level `eligible` flag) itself, rather than this method inventing
+   * rows the backend didn't return.
+   */
+  async getProductionPlanStates(salesPlan: string): Promise<SalesPlanProductionStatesResponse> {
+    const res = await call.get<SalesPlanProductionStatesResponse>(
+      'ury.ury.api.ury_prepare_production.get_sales_plan_production_states',
+      { sales_plan: salesPlan },
     );
-    return ((res as any)?.message ?? res) as ProductionPlanState;
+    return ((res as any)?.message ?? res) as SalesPlanProductionStatesResponse;
   },
 
-  async openOrCreateProductionPlan(name: string): Promise<{ name: string; created: boolean; docstatus: number }> {
-    const res = await call.post<{ name: string; created: boolean; docstatus: number }>(
-      'ury.ury.api.ury_sales_plan_production_plan.open_or_create_production_plan',
-      { sales_plan: name },
+  /**
+   * Manual "Create Production Plans" action -- creates one Production Plan
+   * per non-empty department that doesn't already have a live, current one.
+   * Only usable once the Sales Plan is Locked for Production (D14). Never
+   * submits; a manually-created plan is left as a draft for review.
+   */
+  async createDepartmentProductionPlans(salesPlan: string): Promise<{
+    sales_plan: string;
+    production_plans: { department: string; production_plan: string; state: string; created: boolean }[];
+    blockers?: ProductionBlocker[];
+  }> {
+    const res = await call.post<{
+      sales_plan: string;
+      production_plans: { department: string; production_plan: string; state: string; created: boolean }[];
+      blockers?: ProductionBlocker[];
+    }>(
+      'ury.ury.api.ury_sales_plan_production_plan.create_department_production_plans',
+      { sales_plan: salesPlan },
     );
-    return ((res as any)?.message ?? res) as { name: string; created: boolean; docstatus: number };
+    return ((res as any)?.message ?? res) as {
+      sales_plan: string;
+      production_plans: { department: string; production_plan: string; state: string; created: boolean }[];
+      blockers?: ProductionBlocker[];
+    };
+  },
+
+  /**
+   * Look up the live Production Plan for one department, for the UI's
+   * per-department "Open" link. Never creates -- call
+   * `createDepartmentProductionPlans` first.
+   */
+  async openDepartmentProductionPlan(
+    salesPlan: string,
+    department: string,
+  ): Promise<{ name: string; docstatus: number; department: string }> {
+    const res = await call.get<{ name: string; docstatus: number; department: string }>(
+      'ury.ury.api.ury_sales_plan_production_plan.open_department_production_plan',
+      { sales_plan: salesPlan, department },
+    );
+    return ((res as any)?.message ?? res) as { name: string; docstatus: number; department: string };
   },
 
   async getPlan(name: string): Promise<Record<string, unknown>> {
