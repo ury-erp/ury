@@ -257,6 +257,20 @@ def get_yield_check_compliance(company, branch=None):
 	scope here — until that lands, treat these numbers as an upper bound on
 	true non-compliance, not an exact measure.
 
+	IMPORTANT — `required_count == 0` means NOT MEASURABLE, not compliant.
+	`compliance_percent` is `None` (JSON `null`) for those rows, and callers
+	must render them as "N/A" and EXCLUDE them from any average/aggregate
+	compliance score. `required_count == 0` is a normal, common state, not a
+	rare edge case: an "Interval" item with no `interval_days` set, an "Every
+	Issue" item with zero authorized issues in the last 30 days (i.e. the
+	ingredient simply wasn't used), and a "Sampled" item the deterministic
+	sampler didn't pick this month all land here. Reporting 100% for those
+	rows (the behavior shipped before TRACK.md F9's decision) rendered the
+	single most common row on the Compliance dashboard as a green "fully
+	compliant" even though nothing was ever checked — inverting the whole
+	purpose of the page, which is to make gaps in checking visible. Only rows
+	with `required_count > 0` carry a meaningful percentage.
+
 	Args:
 		company: Company name (required, scoped)
 		branch: Branch name (optional filter; if None, aggregates all branches)
@@ -269,7 +283,7 @@ def get_yield_check_compliance(company, branch=None):
 				"cadence": "Every Issue" | "Interval" | "Sampled",
 				"required_count": <int>,
 				"completed_count": <int>,
-				"compliance_percent": <float>,
+				"compliance_percent": <float> | None,  # None when required_count == 0
 				"attached_count": <int>,  # checks with issue_authorization set
 				"compliance_basis": "authorization",  # see docstring above
 			},
@@ -385,10 +399,14 @@ def get_yield_check_compliance(company, branch=None):
 			# Count days in the last 30 where the deterministic hash picked this item.
 			required_count = _count_sampled_days(start_date, today, branch, item_code)
 
+		# TRACK.md F9 decision: nothing was required, so compliance is NOT
+		# MEASURABLE for this row -- not 100%. Emitting None (JSON null)
+		# keeps these rows out of any average and lets the dashboard render
+		# an honest "N/A" instead of a reassuring green 100%.
 		compliance_percent = (
-			(completed_count / required_count * 100)
+			round(completed_count / required_count * 100, 2)
 			if required_count > 0
-			else 100.0
+			else None
 		)
 
 		compliance_data.append({
@@ -396,7 +414,7 @@ def get_yield_check_compliance(company, branch=None):
 			"cadence": cadence,
 			"required_count": required_count,
 			"completed_count": completed_count,
-			"compliance_percent": round(compliance_percent, 2),
+			"compliance_percent": compliance_percent,
 			"attached_count": attached_count,
 			"compliance_basis": "authorization",
 		})
