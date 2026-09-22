@@ -18,6 +18,7 @@ from frappe import _
 from frappe.utils import getdate
 
 from ury.ury.report_api.utils import require_manager, user_has_branch_access
+from ury.ury.services.yield_branch_scope import branch_item_codes
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
@@ -123,6 +124,15 @@ def get_yield_variance(company, branch=None, item=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch.
 	require_manager()
 	_require_scope(company)
 
@@ -189,16 +199,46 @@ def get_yield_check_compliance(company, branch=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch. F8 below is a separate,
+	# unrelated concern: it scopes the tracked-item SET to the items
+	# configured for production at the given branch.
 	require_manager()
 	_require_scope(company)
 
-	# Fetch all yield-tracked items with cadence != None.
+	item_filters = {
+		"custom_yield_tracked": 1,
+		"custom_yield_check_cadence": ["!=", "None"],
+	}
+
+	# F8 (corrected): when a single branch is requested, scope the
+	# tracked-item set to items actually used at that branch. IPC only has
+	# rows for sellable menu items (kitchen/bar routing) — never a raw
+	# ingredient — and yield tracking only ever applies to raw ingredients
+	# (see docs/yield-tracking.md, "Why Item, not BOM Item or IPC"), so the
+	# anchor is: active IPC rows for this branch -> their BOM -> that BOM's
+	# component items (BOM Item rows). See
+	# ury.ury.services.yield_branch_scope.branch_item_codes. When branch is
+	# None (all-branches aggregate), keep the global item set — the numbers
+	# are already summed across every branch, so per-branch scoping doesn't
+	# apply.
+	scoped_item_codes = branch_item_codes(branch)
+	if scoped_item_codes is not None:
+		if not scoped_item_codes:
+			return []
+		item_filters["name"] = ["in", list(scoped_item_codes)]
+
+	# Fetch yield-tracked items with cadence != None (scoped to branch above, if given).
 	tracked_items = frappe.get_all(
 		"Item",
-		filters={
-			"custom_yield_tracked": 1,
-			"custom_yield_check_cadence": ["!=", "None"],
-		},
+		filters=item_filters,
 		fields=[
 			"name",
 			"custom_yield_check_cadence",

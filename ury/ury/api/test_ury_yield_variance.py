@@ -19,6 +19,7 @@ from ury.ury.api.ury_yield_variance import (
 	get_yield_variance,
 	get_yield_check_compliance,
 	user_has_branch_access,
+	branch_item_codes,
 )
 
 
@@ -377,6 +378,63 @@ class TestGetYieldCheckCompliancePermissionGating(FrappeTestCase):
 
 		self.assertIsInstance(result, list)
 		self.assertTrue(len(result) >= 0)
+
+	@patch(f"{MOD}.frappe.get_all")
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}.frappe.utils.getdate")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_scopes_tracked_items_to_bom_usage(
+		self, mock_manager, mock_scope, mock_getdate, mock_branch_items, mock_get_all
+	):
+		"""F8 (corrected): when branch is given, only items that resolve via
+		branch_item_codes() (active IPC rows -> their BOM -> BOM Item
+		components) are evaluated — NOT items with a direct IPC row, which
+		per docs/yield-tracking.md can never be raw ingredients. The
+		BOM-anchor resolution itself is exercised in
+		test_yield_branch_scope.py; here we only verify
+		get_yield_check_compliance wires branch_item_codes() correctly."""
+		from datetime import date
+		today = date(2026, 1, 15)
+		mock_getdate.return_value = today
+		mock_branch_items.return_value = {"ITEM-A"}
+
+		def get_all_side_effect(doctype, **kwargs):
+			if doctype == "Item":
+				name_filter = kwargs.get("filters", {}).get("name")
+				assert name_filter == ["in", ["ITEM-A"]], (
+					f"expected Item query scoped to branch items, got {name_filter}"
+				)
+				return [frappe._dict(
+					name="ITEM-A",
+					custom_yield_check_cadence="Interval",
+					custom_yield_check_interval_days=7,
+				)]
+			if doctype == "URY Yield Check":
+				return []  # completed_checks
+			raise AssertionError(f"unexpected get_all doctype: {doctype}")
+
+		mock_get_all.side_effect = get_all_side_effect
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["item"], "ITEM-A")
+
+	@patch(f"{MOD}.branch_item_codes")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.require_manager")
+	def test_branch_with_no_bom_usage_returns_empty(
+		self, mock_manager, mock_scope, mock_branch_items
+	):
+		"""F8 (corrected): a branch that resolves to no BOM-usage items (no
+		active IPC rows, no BOM on those rows, or no BOM components) gets an
+		empty compliance list instead of the unscoped global item set."""
+		mock_branch_items.return_value = set()  # no BOM-usage items for this branch
+
+		result = get_yield_check_compliance(company="Test Co", branch="Test Branch")
+
+		self.assertEqual(result, [])
 
 
 class TestRequireScope(FrappeTestCase):
