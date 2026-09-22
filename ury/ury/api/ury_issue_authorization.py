@@ -260,7 +260,7 @@ def list_issue_authorizations(branch, department=None, company=None, from_date=N
     elif to_date:
         filters["creation"] = ["<=", to_date]
 
-    return frappe.get_all(
+    rows = frappe.get_all(
         ISSUE_AUTH_DOCTYPE,
         filters=filters,
         fields=[
@@ -280,3 +280,51 @@ def list_issue_authorizations(branch, department=None, company=None, from_date=N
         ],
         order_by="creation desc",
     )
+
+    _attach_yield_check_and_wastage_flags(rows)
+    return rows
+
+
+def _attach_yield_check_and_wastage_flags(rows):
+    """Attach `has_yield_check`/`has_wastage` so the UI can hide whichever of
+    "Capture Wastage" / "Log Usable Output" is no longer valid once the
+    other one has already been recorded for an authorization (a Yield Check
+    and an Issue Wastage record are mutually exclusive per authorization --
+    see `URYYieldCheck.validate_no_duplicate_wastage` and its mirror guard
+    in `ury.ury.api.ury_wastage.capture_wastage`). Batched to avoid N+1
+    queries.
+    """
+    names = [row["name"] for row in rows]
+    if not names:
+        return
+
+    checked_names = _pluck_issue_authorization(
+        frappe.get_all(
+            "URY Yield Check",
+            filters={"issue_authorization": ["in", names]},
+            fields=["issue_authorization"],
+        )
+    )
+    wasted_names = _pluck_issue_authorization(
+        frappe.get_all(
+            "URY Issue Wastage",
+            filters={"issue_authorization": ["in", names], "docstatus": ["!=", 2]},
+            fields=["issue_authorization"],
+        )
+    )
+
+    for row in rows:
+        row["has_yield_check"] = row["name"] in checked_names
+        row["has_wastage"] = row["name"] in wasted_names
+
+
+def _pluck_issue_authorization(rows):
+    """Defensively extract the `issue_authorization` value from each row,
+    whether it comes back as a dict (the normal `frappe.get_all` shape) or
+    already as a plain value."""
+    names = set()
+    for row in rows:
+        value = row.get("issue_authorization") if isinstance(row, dict) else row
+        if value:
+            names.add(value)
+    return names
