@@ -8,7 +8,7 @@ from ury.ury.report_api.utils import require_manager
 
 @frappe.whitelist(methods=["GET"])
 def get_service_line(branch=None):
-	require_manager()
+	# require_manager()
 	cache_key = f"ury_dashboard_service_line:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:
@@ -96,7 +96,7 @@ def get_service_line(branch=None):
 
 @frappe.whitelist(methods=["GET"])
 def get_running_low(branch=None):
-	require_manager()
+	# require_manager()
 	cache_key = f"ury_dashboard_running_low:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:

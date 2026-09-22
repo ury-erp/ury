@@ -1,8 +1,7 @@
 {
  "actions": [],
- "allow_rename": 0,
  "autoname": "hash",
- "creation": "2026-08-28 00:00:00.000000",
+ "creation": "2026-08-28 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -166,9 +165,8 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 0,
  "links": [],
- "modified": "2026-09-22 00:00:00.000000",
+ "modified": "2026-09-22 19:29:17.417470",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Stock Reservation",
@@ -206,7 +204,8 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Stock Manager"
+   "role": "Stock Manager",
+   "write": 1
   },
   {
    "create": 1,
@@ -227,6 +226,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
