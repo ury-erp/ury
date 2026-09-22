@@ -10,6 +10,7 @@ class URYYieldCheck(Document):
 	def validate(self):
 		self.validate_item_yield_tracking_enabled()
 		self.validate_input_qty()
+		self.validate_output_qty()
 		self.capture_standard_yield_snapshot()
 		self.compute_yield_and_variance()
 		self.validate_branch_company_consistency()
@@ -32,6 +33,42 @@ class URYYieldCheck(Document):
 			frappe.throw(
 				_("Input quantity must be greater than zero."),
 				frappe.ValidationError
+			)
+
+	def validate_output_qty(self):
+		"""Check 2b: Output quantity must be a positive number.
+
+		A negative or zero output_qty would produce a negative/undefined
+		actual_yield_percent and corrupt every downstream variance report,
+		so it is hard-blocked like input_qty.
+
+		output_qty > input_qty (an apparent >100% yield) is NOT hard-blocked:
+		trimmed/processed weight can occasionally exceed input in edge
+		units-of-measure cases (e.g. water absorption during soaking/brining,
+		or a UOM conversion mismatch), so this only raises a non-blocking
+		warning -- mirroring the existing "surface, never block" convention
+		used by `flag_stale_bom_revisions` in
+		`ury/ury/api/ury_sales_plan.py`, which favors warning over hard
+		blocking for the same reason. Picked the more conservative option
+		since there is no explicit product decision on record for this case.
+		"""
+		if self.output_qty is None or self.output_qty <= 0:
+			frappe.throw(
+				_("Output quantity must be greater than zero."),
+				frappe.ValidationError
+			)
+			return
+
+		if self.input_qty and self.output_qty > self.input_qty:
+			frappe.msgprint(
+				_("Output quantity ({0}) is greater than input quantity ({1}). "
+				  "This implies a yield of over 100%, which is unusual outside "
+				  "specific units-of-measure cases (e.g. water absorption) -- "
+				  "please double-check the recorded quantities.").format(
+					self.output_qty, self.input_qty
+				),
+				indicator="orange",
+				alert=True,
 			)
 
 	def capture_standard_yield_snapshot(self):
