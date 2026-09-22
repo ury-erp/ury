@@ -46,6 +46,11 @@ vi.mock('@ury/ui', () => ({
   Button: ({ onClick, disabled, children, variant }: any) => (
     <button onClick={onClick} disabled={disabled} data-testid={`button-${variant || 'primary'}`}>{children}</button>
   ),
+  // Real Input is a native `<input>` under the hood
+  // (see packages/ui/src/components/input.tsx) -- this stub spreads every
+  // prop straight through so placeholder/aria-label/value/onChange/disabled
+  // all behave the same as the native element the component used to render.
+  Input: (props: any) => <input {...props} />,
   Spinner: ({ message }: any) => <div data-testid="spinner">{message}</div>,
   cn: (...args: any[]) => args.filter(Boolean).join(' '),
   showToast: { success: vi.fn(), error: vi.fn() },
