@@ -240,6 +240,44 @@ class TestSharedRawMaterialAcrossTargets(FrappeTestCase):
 		self.assertEqual(row["store_shortage"], 0.2)
 
 
+class TestFloatResidueIsNotAShortage(FrappeTestCase):
+	def test_near_zero_store_shortfall_rounds_to_zero(self):
+		# required == available aside from binary float noise must not report
+		# a store_shortage (and must not surface "2.77e-17" in blocker copy).
+		departments = {
+			"Main Kitchen": {
+				"department": "Main Kitchen",
+				"warehouse": "Main Kitchen - WH",
+				"targets": [
+					{"item_code": "X", "stock_uom": "Kg", "component_vector": [_component("LMN", 0.3)]}
+				],
+				"external_receipt_targets": [],
+			}
+		}
+		# 0.1 + 0.2 is the classic float that is not exactly 0.3 in binary.
+		bin_qty = {
+			("LMN", "Main Kitchen - WH"): 0.0,
+			("LMN", "Store - WH"): 0.1 + 0.2,
+		}
+		with patch(f"{MOD}.frappe.db.get_value", side_effect=_bin_fake(bin_qty)):
+			result = compute_readiness(departments, store_warehouse="Store - WH")
+
+		row = result["rows"][0]
+		self.assertEqual(row["store_shortage"], 0.0)
+
+	def test_store_shortage_blocker_message_is_human_readable(self):
+		from ury.ury.api.ury_production_readiness import store_shortage_blocker
+
+		blocker = store_shortage_blocker({
+			"item_code": "LMN",
+			"department": "Main Kitchen",
+			"store_shortage": 1.5,
+			"stock_uom": "Kg",
+		})
+		self.assertIn("short by 1.5 Kg", blocker["message"])
+		self.assertNotIn("e-", blocker["message"])
+
+
 class TestNoWrites(FrappeTestCase):
 	"""Structural guard: the readiness engine performs zero writes. Grepping
 	the module's own source is the same approach Agent 1 used for the BOM
