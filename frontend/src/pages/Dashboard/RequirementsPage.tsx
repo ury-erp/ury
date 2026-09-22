@@ -23,14 +23,14 @@ import { buildSalesPlanDraftKey, getSalesPlanDraftQuantities, salesPlanService, 
  *  - `departmentStockService.getActivePlan` -> the approved/locked Sales
  *    Plan's frozen per-component demand vector (`PlanComponentDemand[]`).
  *    This is the only source for "Materials to issue" -- required quantity
- *    per component/department. There is NO stock-on-hand join anywhere in
- *    this codebase (confirmed by searching every service under
- *    `frontend/src/services/` for stock_on_hand/actual_qty/available_qty/
- *    on_hand/bin fields), so "In store", "Cover", and the KPI strip's
- *    "Covered by stock" / "Short" / "Material value" / "To purchase" figures
- *    cannot be computed. They are shown as "Not available" with an honest
- *    hint rather than fabricated numbers, and the Shortfalls feed states the
- *    limitation instead of inventing which components are short.
+ *    per component/department.
+ *  - `departmentStockService.getPlanStockOnHand` -> current stock for those
+ *    same COMPONENTS, resolved to a department warehouse (or the branch POS
+ *    Profile warehouse) by `ury_requirements_stock.get_plan_stock_on_hand`.
+ *    This feeds "In store" and the KPI strip's "Covered by stock" / "Short"
+ *    / "Material value" / "To purchase". When the backend cannot resolve a
+ *    warehouse it returns `resolved_from: null`, and those figures render as
+ *    "Not available" with an honest hint rather than a fabricated zero.
  *  - `salesPlanService.getPlan(planName)` -> the same approved plan's raw
  *    `items` child table (item_code/qty/department/production_unit/
  *    stock_uom) is used for "Production targets". Quantities are
@@ -70,6 +70,13 @@ const getToday = () => {
   const timezoneOffsetMs = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
 };
+
+/**
+ * Lookup key shared by the stock request, the stock map and every consumer.
+ * Must be built the same way on both sides -- a mismatch here is what made
+ * the whole page read "Not available".
+ */
+const stockKey = (itemCode: string, department?: string | null) => `${itemCode}:${department || ''}`;
 
 const formatQty = (value: number, uom?: string) => {
   const formatted = Number.isInteger(value) ? String(value) : value.toFixed(3);
@@ -166,29 +173,38 @@ export const RequirementsPage: React.FC = () => {
     };
   }, [activeBranchId, requirementsDate]);
 
-  // Fetch stock-on-hand data for the production items
+  // Fetch stock-on-hand for the COMPONENTS the plan requires, not for the
+  // finished goods it produces. The materials table and every KPI below key
+  // their lookups on `component_item`, so requesting stock for
+  // `productionItems` (e.g. "Chicken Biryani") could never match a demand
+  // line (e.g. "Biryani Rice") and every row rendered "Not available".
   useEffect(() => {
     let cancelled = false;
 
-    if (!activeBranchId || activeBranchId === 'all' || productionItems.length === 0) {
+    if (!activeBranchId || activeBranchId === 'all' || demandVector.length === 0) {
       setStockData(new Map());
       return;
     }
 
     (async () => {
       try {
-        const items = productionItems.map((item) => ({
-          item_code: item.item_code,
-          department: item.department,
-        }));
+        // One request per distinct component/department pair -- the demand
+        // vector can repeat a component across production units.
+        const seen = new Set<string>();
+        const items: Array<{ item_code: string; department?: string }> = [];
+        demandVector.forEach((row) => {
+          const key = stockKey(row.component_item, row.department);
+          if (seen.has(key)) return;
+          seen.add(key);
+          items.push({ item_code: row.component_item, department: row.department });
+        });
+
         const stockResults = await departmentStockService.getPlanStockOnHand(activeBranchId, items);
         if (cancelled) return;
 
-        // Build a map for quick lookup: "item_code:department" -> stock data
         const stockMap = new Map();
         stockResults.forEach((stock) => {
-          const key = `${stock.item_code}:${stock.department || ''}`;
-          stockMap.set(key, stock);
+          stockMap.set(stockKey(stock.item_code, stock.department), stock);
         });
         setStockData(stockMap);
       } catch {
@@ -200,7 +216,7 @@ export const RequirementsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, productionItems]);
+  }, [activeBranchId, demandVector]);
 
   const departmentCount = useMemo(
     () => new Set(demandVector.map((row) => row.department).filter(Boolean)).size,
@@ -217,8 +233,7 @@ export const RequirementsPage: React.FC = () => {
     let hasUnresolvedWarehouse = false;
 
     demandVector.forEach((row) => {
-      const key = `${row.component_item}:${row.department || ''}`;
-      const stock = stockData.get(key);
+      const stock = stockData.get(stockKey(row.component_item, row.department));
 
       // Material value: sum of (required_qty * valuation_rate) for all items
       if (stock && stock.resolved_from !== null && stock.valuation_rate !== null) {
@@ -297,8 +312,7 @@ export const RequirementsPage: React.FC = () => {
       header: 'In store',
       align: 'right',
       render: (row) => {
-        const key = `${row.component_item}:${row.department || ''}`;
-        const stock = stockData.get(key);
+        const stock = stockData.get(stockKey(row.component_item, row.department));
 
         // If no stock data found or resolved_from is null, warehouse couldn't be resolved
         if (!stock || stock.resolved_from === null) {
