@@ -4,6 +4,7 @@ import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { CustomerSelect } from './CustomerSelect';
+import { PerformerSelect } from './PerformerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
@@ -32,6 +33,7 @@ const OrderPanel = () => {
     selectedTable,
     selectedRoom,
     selectedCustomer,
+    selectedPerformer,
     selectedAggregator,
     resetOrderState,
     paymentModes,
@@ -109,6 +111,11 @@ const OrderPanel = () => {
         return;
       }
 
+      if (posProfile.custom_require_performer_on_order && !selectedPerformer) {
+        showToast.error(t('errors.select_performer'));
+        return;
+      }
+
       setIsSubmitting(true);
       
       const orderData = {
@@ -135,6 +142,7 @@ const OrderPanel = () => {
         last_modified_time: isUpdatingOrder ? (lastModifiedTime || undefined) : undefined,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
+        performed_by: selectedPerformer || undefined,
         comments: orderComment || undefined
       };
 
@@ -219,6 +227,7 @@ const OrderPanel = () => {
       <div className="p-4 border-b border-border flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
+        <div className="mt-3"><PerformerSelect disabled={isInteractionDisabled} /></div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">{t('cart.pax')}</span>
           <div className="flex items-center gap-2">

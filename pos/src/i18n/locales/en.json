@@ -62,6 +62,9 @@
     "insufficient_capacity": "Insufficient capacity to add more of this item"
   },
   "order": {
+    "performed_by": "Performed by",
+    "select_performer": "Select employee",
+    "no_performer": "Not specified",
     "select_to_view": "Select an order to view details",
     "items_title": "Order Items",
     "taxes_charges": "Taxes & Charges",
@@ -192,6 +195,7 @@
     "failed_load_tables": "Failed to load tables",
     "select_aggregator": "Please select an aggregator before proceeding",
     "select_customer": "Please select a customer before proceeding",
+    "select_performer": "Please select the employee this order is for",
     "select_table": "Please select a table for {{order_type}} orders",
     "failed_logout": "Failed to logout. Please try again.",
     "failed_cancel_order": "Failed to cancel order",

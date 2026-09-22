@@ -64,6 +64,9 @@
     "pax": "عدد الأشخاص"
   },
   "order": {
+    "performed_by": "نفّذها",
+    "select_performer": "اختر موظفًا",
+    "no_performer": "غير محدد",
     "select_to_view": "حدد طلبًا لعرض التفاصيل",
     "items_title": "عناصر الطلب",
     "taxes_charges": "الضرائب والرسوم",
@@ -130,6 +133,7 @@
     "failed_load_tables": "فشل في تحميل الطاولات",
     "select_aggregator": "يرجى تحديد منصة التجميع (aggregator) قبل المتابعة",
     "select_customer": "يرجى تحديد عميل قبل المتابعة",
+    "select_performer": "يرجى تحديد الموظف المعني بهذا الطلب",
     "select_table": "يرجى تحديد طاولة للطلبات من نوع {{order_type}}",
     "failed_logout": "فشل في تسجيل الخروج. يرجى المحاولة مرة أخرى.",
     "failed_cancel_order": "فشل في إلغاء الطلب",

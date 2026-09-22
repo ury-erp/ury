@@ -21,3 +21,4 @@ ury.patches.v3_23.ensure_erpnext_address_contact_custom_fields
 ury.patches.v3_24.backfill_branch_company
 ury.patches.v3_25.add_stock_reservation_availability_index
 ury.patches.v3_26.add_pos_profile_allow_order_without_customer
+ury.patches.v3_27.add_order_on_behalf_and_credit_fields

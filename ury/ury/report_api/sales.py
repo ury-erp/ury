@@ -6,6 +6,7 @@ from ury.ury.report_api.utils import (
 	get_business_day_range_condition,
 	report_settings_join,
 	require_manager,
+	settled_status_condition,
 	validate_date_range,
 )
 
@@ -47,13 +48,14 @@ def get_today_sales(branch=None, date=None):
 			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS total_taxes_and_charges,
 			ROUND(SUM(b.`grand_total`), 2) AS grand_total,
 			ROUND(SUM(b.`grand_total` - b.`rounded_total`), 2) AS round_off,
-			ROUND(SUM(b.`rounded_total` - b.`paid_amount` + b.`change_amount`), 2) AS cash_discounts
+			ROUND(SUM(CASE WHEN b.`custom_settlement_stage` = 'Transferred On Credit' THEN 0
+				ELSE b.`rounded_total` - b.`paid_amount` + b.`change_amount` END), 2) AS cash_discounts
 		FROM `tabPOS Invoice` b
 		{join}
 		WHERE
 			{branch_filter}
 			b.`docstatus` = 1
-			AND b.`status` IN ("Consolidated", "Paid")
+			AND {settled_status_condition()}
 			AND {condition}
 		""",
 		params,
@@ -99,12 +101,12 @@ def get_daywise_sales(start_date, end_date, branch=None):
 		condition = get_business_day_condition(date_expr="date_list.`date`")
 		join = report_settings_join()
 		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
-		invoice_join = "b.`branch` = %(branch)s AND b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+		invoice_join = f"b.`branch` = %(branch)s AND {settled_status_condition()} AND b.`docstatus` = 1"
 	else:
 		condition = "b.`posting_date` = date_list.`date`"
 		join = ""
 		params = {"start_date": start_date, "end_date": end_date}
-		invoice_join = "b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+		invoice_join = f"{settled_status_condition()} AND b.`docstatus` = 1"
 
 	rows = frappe.db.sql(
 		f"""
@@ -115,7 +117,8 @@ def get_daywise_sales(start_date, end_date, branch=None):
 			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS total_taxes,
 			ROUND(SUM(b.`grand_total`), 2) AS grand_total,
 			ROUND(SUM(b.`grand_total` - b.`rounded_total`), 2) AS round_off,
-			ROUND(SUM(b.`rounded_total` - b.`paid_amount` + b.`change_amount`), 2) AS cash_discount
+			ROUND(SUM(CASE WHEN b.`custom_settlement_stage` = 'Transferred On Credit' THEN 0
+				ELSE b.`rounded_total` - b.`paid_amount` + b.`change_amount` END), 2) AS cash_discount
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
 		{join}

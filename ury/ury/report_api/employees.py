@@ -1,10 +1,12 @@
 import frappe
 
 from ury.ury.report_api.utils import (
+	attributed_employee_join,
 	date_list_cte,
 	get_business_day_condition,
 	report_settings_join,
 	require_manager,
+	settled_status_condition,
 	validate_date_range,
 )
 
@@ -12,7 +14,11 @@ from ury.ury.report_api.utils import (
 @frappe.whitelist()
 def search_employees(query, limit=10):
 	"""Autocomplete search backing Employee Item Wise Sales' employee picker
-	(analogous to customers.search_customers)."""
+	(analogous to customers.search_customers).
+
+	Searches Employee, not User: staff who are credited for orders recorded on
+	their behalf have no login at all.
+	"""
 	require_manager()
 
 	if not query or len(query) < 2:
@@ -21,11 +27,14 @@ def search_employees(query, limit=10):
 	limit = min(int(limit), 25)
 
 	return frappe.get_list(
-		"User",
-		filters=[["full_name", "like", f"%{query}%"]],
-		fields=["name", "full_name"],
+		"Employee",
+		or_filters={
+			"employee_name": ["like", f"%{query}%"],
+			"name": ["like", f"%{query}%"],
+		},
+		fields=["name", "employee_name as full_name"],
 		limit=limit,
-		order_by="full_name asc",
+		order_by="employee_name asc",
 	)
 
 
@@ -37,8 +46,9 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 	per-employee-per-date table into a per-employee leaderboard (summed
 	across the whole range) per the research brief — managers think in
 	terms of "who's on top this month," not a flat date x employee grid.
-	`waiter` is the field on POS Invoice identifying staff (joined to
-	tabUser for full_name), matching the original report exactly.
+	Attribution follows `custom_waiter_employee`, the employee credited with
+	the order, which is not the operator when the order was recorded on their
+	behalf.
 	"""
 	require_manager()
 	validate_date_range(start_date, end_date)
@@ -46,29 +56,30 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 		sort_by = "sales_amount"
 
 	date_list = date_list_cte()
+	settled = settled_status_condition(prefix="b")
 
 	if branch:
 		condition = get_business_day_condition(date_expr="date_list.`date`")
 		join = report_settings_join()
 		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
-		invoice_join = "b.`branch` = %(branch)s AND b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+		invoice_join = f"b.`branch` = %(branch)s AND {settled} AND b.`docstatus` = 1"
 	else:
 		condition = "b.`posting_date` = date_list.`date`"
 		join = ""
 		params = {"start_date": start_date, "end_date": end_date}
-		invoice_join = "b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+		invoice_join = f"{settled} AND b.`docstatus` = 1"
 
 	rows = frappe.db.sql(
 		f"""
 		SELECT
 			e.`name` AS employee_id,
-			e.`full_name` AS employee_name,
+			e.`employee_name` AS employee_name,
 			COUNT(b.`name`) AS total_invoices,
 			ROUND(SUM(b.`grand_total`), 2) AS sales_amount,
 			ROUND(SUM(b.`net_total`), 2) AS net_sales_amount
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
-		INNER JOIN `tabUser` e ON (e.`name` = b.`waiter`)
+		{attributed_employee_join()}
 		{join}
 		WHERE {condition}
 		GROUP BY e.`name`
@@ -83,7 +94,7 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 		SELECT COUNT(b.`name`) AS invoices, ROUND(SUM(b.`grand_total`), 2) AS sales
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
-		LEFT JOIN `tabUser` e ON (e.`name` = b.`waiter`)
+		{attributed_employee_join(how="LEFT")}
 		{join}
 		WHERE {condition} AND e.`name` IS NULL
 		""",
@@ -115,14 +126,13 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 
 @frappe.whitelist()
 def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
-	"""Item-level sales breakdown for a single employee ("waiter") over a
-	date range — a drill-down, same pattern as get_customer_data.
+	"""Item-level sales breakdown for a single employee over a date range — a
+	drill-down, same pattern as get_customer_data.
 
-	Mirrors the existing "Employee Item Wise Sales" Query Report. Soft-
-	depends on get_employee_sales sharing the same `waiter`-join convention
-	(the employee picker here reuses search_employees above, and the
-	returned employee_id is what a leaderboard row in get_employee_sales
-	would link out to).
+	Mirrors the existing "Employee Item Wise Sales" Query Report. Lines are
+	attributed by `POS Invoice Item.custom_entered_by_employee` where present,
+	falling back to the invoice's credited employee, so a per-line performer
+	override is honoured.
 	"""
 	require_manager()
 	validate_date_range(start_date, end_date)
@@ -131,17 +141,19 @@ def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
 		frappe.throw("employee is required.")
 
 	date_list = date_list_cte()
+	settled = settled_status_condition(prefix="a")
+	attributed = "COALESCE(b.`custom_entered_by_employee`, a.`custom_waiter_employee`) = %(employee)s"
 
 	if branch:
 		condition = get_business_day_condition(date_expr="date_list.`date`", prefix="a")
 		join = report_settings_join(prefix="a")
 		params = {"branch": branch, "employee": employee, "start_date": start_date, "end_date": end_date}
-		invoice_join = "a.`branch` = %(branch)s AND a.`status` IN (\"Consolidated\", \"Paid\") AND a.`docstatus` = 1 AND a.`waiter` = %(employee)s"
+		invoice_join = f"a.`branch` = %(branch)s AND {settled} AND a.`docstatus` = 1"
 	else:
 		condition = "a.`posting_date` = date_list.`date`"
 		join = ""
 		params = {"employee": employee, "start_date": start_date, "end_date": end_date}
-		invoice_join = "a.`status` IN (\"Consolidated\", \"Paid\") AND a.`docstatus` = 1 AND a.`waiter` = %(employee)s"
+		invoice_join = f"{settled} AND a.`docstatus` = 1"
 
 	rows = frappe.db.sql(
 		f"""
@@ -153,7 +165,7 @@ def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
 			ROUND(SUM(b.`amount`), 2) AS amount
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` a ON ({invoice_join})
-		INNER JOIN `tabPOS Invoice Item` b ON (a.`name` = b.`parent`)
+		INNER JOIN `tabPOS Invoice Item` b ON (a.`name` = b.`parent` AND {attributed})
 		LEFT JOIN `tabItem` i ON (b.`item_code` = i.`item_code`)
 		{join}
 		WHERE {condition}
@@ -167,7 +179,7 @@ def get_employee_item_wise_sales(employee, start_date, end_date, branch=None):
 		r["qty"] = r["qty"] or 0
 		r["amount"] = r["amount"] or 0
 
-	employee_name = frappe.db.get_value("User", employee, "full_name") or employee
+	employee_name = frappe.db.get_value("Employee", employee, "employee_name") or employee
 
 	return {
 		"employee": employee,

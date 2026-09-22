@@ -53,6 +53,10 @@ vi.mock("./CustomerSelect", () => ({
   CustomerSelect: () => <div>Customer Select</div>,
 }));
 
+vi.mock("./PerformerSelect", () => ({
+  PerformerSelect: () => <div>Performer Select</div>,
+}));
+
 vi.mock("./OrderTypeSelect", () => ({
   default: () => <div>Order Type Select</div>,
 }));

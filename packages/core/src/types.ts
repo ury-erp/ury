@@ -58,4 +58,11 @@ export interface PosProfileCombined {
   remove_items?: number;
   show_image?: number;
   custom_enable_kot_reprint?: number;
+  custom_allow_order_without_customer?: number;
+  custom_enable_order_on_behalf?: number;
+  custom_roles_allowed_to_order_on_behalf?: RolePermission[];
+  custom_require_performer_on_order?: number;
+  custom_enable_credit_settlement?: number;
+  custom_roles_allowed_for_credit?: RolePermission[];
+  custom_credit_mode_of_payment?: string | null;
 }

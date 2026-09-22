@@ -596,7 +596,12 @@ def get_floor_load(branch=None):
 	if cached:
 		return cached
 
-	conditions = "t.`occupied` = 1 AND i.`waiter` IS NOT NULL AND i.`waiter` != ''"
+	# Credit the employee the order is for, not the operator who keyed it.
+	attributed = "COALESCE(e.`employee_name`, i.`waiter`)"
+	conditions = (
+		"t.`occupied` = 1 AND "
+		"(IFNULL(i.`custom_waiter_employee`, '') != '' OR IFNULL(i.`waiter`, '') != '')"
+	)
 	params = {}
 	if branch:
 		conditions += " AND t.`branch` = %(branch)s"
@@ -604,7 +609,7 @@ def get_floor_load(branch=None):
 
 	rows = frappe.db.sql(
 		f"""
-		SELECT i.`waiter` AS waiter, COUNT(DISTINCT t.`name`) AS table_count
+		SELECT {attributed} AS waiter, COUNT(DISTINCT t.`name`) AS table_count
 		FROM `tabURY Table` t
 		JOIN `tabPOS Invoice` i ON (
 			i.`restaurant_table` = t.`name`
@@ -614,8 +619,9 @@ def get_floor_load(branch=None):
 				WHERE i2.`restaurant_table` = t.`name` AND i2.`docstatus` = 0
 			)
 		)
+		LEFT JOIN `tabEmployee` e ON (e.`name` = i.`custom_waiter_employee`)
 		WHERE {conditions}
-		GROUP BY i.`waiter`
+		GROUP BY {attributed}
 		ORDER BY table_count DESC
 		""",
 		params,
