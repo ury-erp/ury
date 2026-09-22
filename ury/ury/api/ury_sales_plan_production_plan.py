@@ -254,7 +254,7 @@ def _generate_material_requests(sales_plan, results):
 		generate_transfer_material_request_for_production_plan,
 	)
 
-	generated = {"purchase": None, "transfers": [], "errors": []}
+	generated = {"purchases": [], "transfers": [], "errors": []}
 
 	for row in results:
 		try:
@@ -282,7 +282,7 @@ def _generate_material_requests(sales_plan, results):
 		)
 		generated["errors"].append({"type": "purchase", "message": str(exc)})
 	else:
-		generated["purchase"] = purchase.get("material_request")
+		generated["purchases"] = list(purchase.get("material_requests") or [])
 
 	return generated
 

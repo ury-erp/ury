@@ -1,11 +1,10 @@
 # Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""Unit tests for the consolidated Purchase Material Request.
+"""Unit tests for per-Production-Plan Purchase Material Requests.
 
 Same mocking style as ``test_ury_sales_plan_production_plan.py``:
 ``FrappeTestCase`` for the test-runner site context, with every frappe call
-(``get_doc``, ``get_all``/``db.sql``, document ``insert``/``submit``/``save``)
 patched rather than requiring real Sales Plan / Production Plan / Material
 Request fixtures.
 """
@@ -119,6 +118,7 @@ class TestAllocatePurchaseRequirement(FrappeTestCase):
 class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 	def setUp(self):
 		_FakeMaterialRequestDoc._created = []
+		_FakeChildRow._counter = 0
 		self.plan_docs = {}
 
 	def _run(self, departments, plan_by_department, outstanding_by_item=None, store_warehouse="Store WH - U"):
@@ -183,7 +183,8 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		self.assertEqual(len(result["rows"]), 1)
 		# 20 required - 5 department stock - 0 store stock - 0 outstanding = 15.
 		self.assertEqual(result["rows"][0]["qty"], 15.0)
-		self.assertIsNotNone(result["material_request"])
+		self.assertEqual(len(result["material_requests"]), 1)
+		self.assertEqual(result["material_requests"][0]["production_plan"], "MFG-PP-0001")
 
 	def test_shared_raw_material_across_two_targets_is_one_row(self):
 		departments = {
@@ -212,11 +213,12 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		self.assertEqual(len(result["rows"]), 1)
 		self.assertEqual(result["rows"][0]["item_code"], "LEMON")
 		self.assertEqual(result["rows"][0]["qty"], 0.2)
+		self.assertEqual(len(result["material_requests"]), 1)
 		mr_doc = _FakeMaterialRequestDoc._created[0]
 		self.assertEqual(len(mr_doc.fields["items"]), 1)
 		self.assertEqual(mr_doc.fields["items"][0]["qty"], 0.2)
 
-	def test_two_department_plans_never_duplicate_one_store_shortage(self):
+	def test_two_department_plans_get_separate_purchase_mrs_without_duplicating_store_shortage(self):
 		departments = {
 			"Main Kitchen": {
 				"department": "Main Kitchen",
@@ -265,6 +267,19 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		self.assertEqual(total_qty, 5.0)
 		self.assertEqual({row["production_plan"] for row in result["rows"]}, {"MFG-PP-MK", "MFG-PP-TD"})
 
+		# One Purchase MR document per department plan.
+		self.assertEqual(len(result["material_requests"]), 2)
+		self.assertEqual(
+			{entry["production_plan"] for entry in result["material_requests"]},
+			{"MFG-PP-MK", "MFG-PP-TD"},
+		)
+		self.assertEqual(len(_FakeMaterialRequestDoc._created), 2)
+		for mr_doc in _FakeMaterialRequestDoc._created:
+			plans = {item["production_plan"] for item in mr_doc.fields["items"]}
+			self.assertEqual(len(plans), 1)
+			self.assertEqual(len(mr_doc.fields["items"]), 1)
+			self.assertEqual(mr_doc.fields["items"][0]["item_code"], "RICE")
+
 	def test_every_row_resolves_back_to_a_department_plan(self):
 		departments = {
 			"Main Kitchen": {
@@ -288,6 +303,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		for row in result["rows"]:
 			self.assertEqual(row["production_plan"], "MFG-PP-0001")
 
+		self.assertEqual(len(result["material_requests"]), 1)
 		mr_doc = _FakeMaterialRequestDoc._created[0]
 		self.assertTrue(mr_doc.submitted)
 		for item in mr_doc.fields["items"]:
@@ -301,12 +317,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 	def test_mr_items_warehouse_is_store_not_department(self):
 		"""ERPNext's native Production Plan.make_material_request reads
 		mr_items.warehouse straight onto the Material Request Item it
-		generates (`"warehouse": item.warehouse`). If this row carried the
-		department warehouse instead, that native (currently unwired) button
-		would generate a Purchase MR receiving into the department warehouse,
-		inverting the Store-to-Department model. The department warehouse
-		used here is deliberately different from the store warehouse so this
-		test cannot pass by accident."""
+		generates. Purchase receive location must stay Store."""
 		departments = {
 			"Main Kitchen": {
 				"department": "Main Kitchen",
@@ -351,13 +362,11 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 			}
 		}
 		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
-		# Outstanding already equals the full requirement -- as it would
-		# after a first successful call.
 		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
 			result = self._run(departments, plan_by_department, outstanding_by_item={"RICE": 10.0})
 
 		self.assertEqual(result["rows"], [])
-		self.assertIsNone(result["material_request"])
+		self.assertEqual(result["material_requests"], [])
 		self.assertEqual(_FakeMaterialRequestDoc._created, [])
 
 	def test_raised_requirement_creates_supplementary_request(self):
@@ -376,13 +385,12 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 			}
 		}
 		plan_by_department = {"Main Kitchen": {"name": "MFG-PP-0001"}}
-		# Requirement is now 30; only 10 was previously requested -> a fresh
-		# supplementary MR for the delta of 20, never touching the earlier one.
 		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
 			result = self._run(departments, plan_by_department, outstanding_by_item={"RICE": 10.0})
 
 		self.assertEqual(len(result["rows"]), 1)
 		self.assertEqual(result["rows"][0]["qty"], 20.0)
+		self.assertEqual(len(result["material_requests"]), 1)
 		self.assertEqual(len(_FakeMaterialRequestDoc._created), 1)
 
 	def test_generated_material_request_is_submitted_not_draft(self):
@@ -429,7 +437,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 		self.assertEqual(len(result["rows"]), 1)
 		self.assertEqual(result["rows"][0]["item_code"], "IMPORTED-CHEESE")
 		self.assertEqual(result["rows"][0]["qty"], 8.0)
-		self.assertIsNotNone(result["material_request"])
+		self.assertEqual(len(result["material_requests"]), 1)
 
 	def test_missing_department_plan_is_reported_not_silently_dropped(self):
 		departments = {
@@ -446,11 +454,10 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 				"external_receipt_targets": [],
 			}
 		}
-		# No live Production Plan exists for Main Kitchen.
 		with patch("ury.ury.api.ury_production_readiness.frappe.db.get_value", return_value=0.0):
 			result = self._run(departments, plan_by_department={})
 
-		self.assertIsNone(result["material_request"])
+		self.assertEqual(result["material_requests"], [])
 		self.assertTrue(
 			any(b["type"] == "department_plan_missing_for_purchase_request" for b in result["blockers"])
 		)

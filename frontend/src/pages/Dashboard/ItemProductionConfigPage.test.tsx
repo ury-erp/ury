@@ -9,8 +9,7 @@ vi.mock('../../context/BranchContext', () => ({
 
 vi.mock('../../services/dashboard', () => ({
   dashboardService: {
-    getModuleRecords: vi.fn((doctype, branch) => {
-      if (doctype === 'Branch') return Promise.resolve([{ name: 'branch1' }]);
+    getModuleRecords: vi.fn((doctype) => {
       if (doctype === 'URY Item Production Configuration') {
         return Promise.resolve([
           {
@@ -26,25 +25,40 @@ vi.mock('../../services/dashboard', () => ({
   },
 }));
 
-vi.mock('@ury/core', () => ({
-  call: vi.fn((method, params) => Promise.resolve({ message: [] })),
-  showToast: { success: vi.fn(), error: vi.fn() },
+vi.mock('../../services/linkSearch', () => ({
+  searchLinkOptions: vi.fn(() => Promise.resolve([])),
+  withSelectedOption: (options: unknown[], value: string) =>
+    value ? [{ value, label: value }, ...(options as { value: string }[])] : options,
 }));
 
-vi.mock('../../components/common/SearchableSelect', () => ({
-  SearchableSelect: ({ value, options, placeholder, onChange }: any) => (
-    <select value={value} onChange={(e) => onChange(null, e.target.value)}>
-      <option value="">{placeholder}</option>
-      {options.map((opt: any) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
-  ),
+vi.mock('@ury/core', () => ({
+  call: vi.fn(() => Promise.resolve({ message: [] })),
 }));
+
+vi.mock('@ury/ui', async () => {
+  const actual = await vi.importActual<typeof import('@ury/ui')>('@ury/ui');
+  return {
+    ...actual,
+    Autocomplete: ({ value, placeholder, onChange, disabled }: any) => (
+      <input
+        data-testid="autocomplete"
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    ),
+    showToast: { success: vi.fn(), error: vi.fn() },
+  };
+});
 
 vi.mock('../../components/layout/SideDrawer', () => ({
   default: ({ isOpen, children, title }: any) =>
-    isOpen ? <div role="dialog" aria-label={title}>{children}</div> : null,
+    isOpen ? (
+      <div role="dialog" aria-label={title}>
+        {children}
+      </div>
+    ) : null,
 }));
 
 describe('ItemProductionConfigPage', () => {
@@ -56,8 +70,7 @@ describe('ItemProductionConfigPage', () => {
   it('renders Item Production Config page', async () => {
     render(<ItemProductionConfigPage />);
     await waitFor(() => {
-      const page = document.body;
-      expect(page).toBeInTheDocument();
+      expect(document.body).toBeInTheDocument();
     });
   });
 
@@ -82,6 +95,19 @@ describe('ItemProductionConfigPage', () => {
     await waitFor(() => {
       const tables = document.querySelectorAll('table, [role="table"]');
       expect(tables.length > 0).toBe(true);
+    });
+  });
+
+  it('opens drawer with autocomplete fields including BOM', async () => {
+    render(<ItemProductionConfigPage />);
+    const addBtn = await screen.findByRole('button', { name: /Add Item Production Configuration/i });
+    addBtn.click();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Select an Item first')).toBeDisabled();
+      expect(screen.getByPlaceholderText('Search Branch')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search Department (optional)')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search Production Unit (optional)')).toBeInTheDocument();
     });
   });
 });

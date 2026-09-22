@@ -30,10 +30,10 @@ revalidating one department under Bin locks" (D17).
 
 The Transfer MR quantity for an item is that department's
 ``department_shortage`` (demand after netting the department's own stock),
-never ``store_shortage`` -- unlike the consolidated Purchase MR, a Transfer
-MR is a request to move stock that Store is assumed to have; whether Store
-actually has it is a question for *execution* time (Bin locks + revalidation
-below), not creation time.
+never ``store_shortage`` -- unlike Purchase MRs (which net against shared
+Store shortfall), a Transfer MR is a request to move stock that Store is
+assumed to have; whether Store actually has it is a question for
+*execution* time (Bin locks + revalidation below), not creation time.
 
 ## D8 -- native per-row traceability
 

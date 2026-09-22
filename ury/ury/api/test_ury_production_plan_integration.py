@@ -1079,8 +1079,9 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 
 		# Generation already ran once at plan-creation time (D15): a fresh
 		# call finds nothing new owed and creates nothing.
-		self.assertIsNone(
-			generate_purchase_material_request_for_sales_plan(sales_plan.name)["material_request"]
+		self.assertEqual(
+			generate_purchase_material_request_for_sales_plan(sales_plan.name)["material_requests"],
+			[],
 		)
 		self.assertIsNone(
 			generate_transfer_material_request_for_production_plan(plan.name)["material_request"]
@@ -1160,10 +1161,10 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		"""Change 1: ``create_or_get_department_production_plans`` now raises
 		the Purchase and Transfer Material Requests itself, as part of plan
 		creation -- a submitted Transfer request per department plus one
-		consolidated Purchase request -- without anything else calling either
-		generator. A second call for the same (unchanged) picture must not
-		duplicate either request (D15's supplementary logic makes the repeat
-		safe, layered under D14's own idempotent plan creation)."""
+		Purchase request per department plan -- without anything else calling
+		either generator. A second call for the same (unchanged) picture must
+		not duplicate either request (D15's supplementary logic makes the
+		repeat safe, layered under D14's own idempotent plan creation)."""
 		doc = make_real_sales_plan(
 			[{"item_code": self.item, "qty": 4, "production_policy": "PRE_PRODUCED", "department": self.department, "bom": self.bom}]
 		)
@@ -1173,13 +1174,19 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		plan_name = first["production_plans"][0]["production_plan"]
 
 		self.assertEqual(first["material_requests"]["errors"], [])
-		self.assertIsNotNone(first["material_requests"]["purchase"])
+		self.assertEqual(len(first["material_requests"]["purchases"]), 1)
+		self.assertEqual(first["material_requests"]["purchases"][0]["department"], self.department)
+		self.assertEqual(first["material_requests"]["purchases"][0]["production_plan"], plan_name)
 		self.assertEqual(len(first["material_requests"]["transfers"]), 1)
 		self.assertEqual(first["material_requests"]["transfers"][0]["department"], self.department)
 
-		purchase_mr = frappe.get_doc("Material Request", first["material_requests"]["purchase"])
+		purchase_mr = frappe.get_doc(
+			"Material Request", first["material_requests"]["purchases"][0]["material_request"]
+		)
 		self.assertEqual(purchase_mr.docstatus, 1)
 		self.assertEqual(purchase_mr.material_request_type, "Purchase")
+		for row in purchase_mr.items:
+			self.assertEqual(row.production_plan, plan_name)
 
 		transfer_mr = frappe.get_doc(
 			"Material Request", first["material_requests"]["transfers"][0]["material_request"]
@@ -1191,7 +1198,7 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		# nor request again.
 		second = create_or_get_department_production_plans(doc, submit=True)
 		self.assertFalse(second["production_plans"][0]["created"])
-		self.assertIsNone(second["material_requests"]["purchase"])
+		self.assertEqual(second["material_requests"]["purchases"], [])
 		self.assertEqual(second["material_requests"]["transfers"], [])
 		self.assertEqual(second["material_requests"]["errors"], [])
 

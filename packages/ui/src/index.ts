@@ -10,6 +10,7 @@ export * from './components/input';
 export * from './components/inline-edit-cell';
 export * from './components/textarea';
 export * from './components/select';
+export * from './components/autocomplete';
 export * from './components/badge';
 export * from './components/spinner';
 export * from './components/loader';

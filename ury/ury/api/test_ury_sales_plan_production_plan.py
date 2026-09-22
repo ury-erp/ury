@@ -83,7 +83,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 	/ ``test_ury_production_transfer.py``, and against real records in
 	``test_ury_production_plan_integration.py``."""
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
@@ -116,9 +116,9 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		# Material Request generation runs once, over the just-created results,
 		# and its return value is surfaced on the response.
 		mock_generate_mr.assert_called_once_with("SP-0001", result["production_plans"])
-		self.assertEqual(result["material_requests"], {"purchase": None, "transfers": [], "errors": []})
+		self.assertEqual(result["material_requests"], {"purchases": [], "transfers": [], "errors": []})
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
@@ -153,7 +153,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			create_or_get_department_production_plans(doc, submit=False)
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(
 		f"{MOD}.compile_production_targets",
@@ -177,11 +177,11 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		self.assertEqual(result["production_plans"], [])
 		mock_get_doc.assert_not_called()
 		# Generation still runs (over an empty results list) even when no
-		# department plan was created -- the consolidated Purchase request is
-		# sales-plan-wide, not per-department.
+		# department plan was created -- Purchase MRs are per plan, so an
+		# empty results list yields nothing to purchase against.
 		mock_generate_mr.assert_called_once_with("SP-0001", [])
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
@@ -210,7 +210,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 			for row in plan_dict["po_items"]:
 				self.assertEqual(row["include_exploded_items"], 0)
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])
@@ -231,7 +231,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		create_or_get_department_production_plans(doc, submit=True)
 		self.assertEqual(len(docs), 2)
 
-	@patch(f"{MOD}._generate_material_requests", return_value={"purchase": None, "transfers": [], "errors": []})
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
 	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
 	@patch(f"{MOD}.frappe.get_all", return_value=[])

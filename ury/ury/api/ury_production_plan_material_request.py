@@ -1,29 +1,22 @@
 # Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""Consolidated Purchase Material Request for a URY Sales Plan.
+"""Purchase Material Requests for a URY Sales Plan's department Production Plans.
 
-Rewrite. The previous version of this module re-derived BOM requirements
-itself (``compile_bom_vector``) and produced both a Purchase and a Transfer
-Material Request per Production Plan. Per
-``ongoing/production-plan-automation/PLAN.md`` ("Material Requests", "Agent
-4"), that duplication is gone:
-
-- Requirements come from ``ury_production_target_compiler`` (already-compiled
-  department targets, never re-derived here) and
-  ``ury_production_readiness`` (already-computed stock shortages, never
-  re-derived here either -- this module invents no requirement calculation
-  of its own, per the coordination rules).
-- This module owns exactly one document: the **consolidated Purchase
-  Material Request, at Sales Plan level**. The per-department Transfer
-  Material Request (Store -> Department Warehouse) is a different agent's
-  file (Agent 5) and is not touched here.
+Requirements come from ``ury_production_target_compiler`` (already-compiled
+department targets) and ``ury_production_readiness`` (already-computed stock
+shortages). This module invents no requirement calculation of its own.
 
 ## Entry point
 
     generate_purchase_material_request_for_sales_plan(sales_plan)
 
-## Purchase requirement formula (PLAN.md, "Material Requests")
+Creates **one Purchase Material Request per live department Production Plan**
+that still owes Store replenishment -- the same per-plan document shape as
+Transfer MRs. The Transfer Material Request path (Store -> Department
+Warehouse) lives in ``ury_production_transfer`` and is not touched here.
+
+## Purchase requirement formula
 
     Total department demand
     - Current department stock
@@ -31,89 +24,50 @@ Material Request per Production Plan. Per
     - Outstanding incoming supply
     = Purchase requirement
 
-The first three terms are exactly ``ury_production_readiness.compute_readiness``'s
-``department_shortage`` (demand after department stock) and ``store_shortage``
-(after department AND store stock, shared across every department
-contributing to one item -- see that module's docstring for why duplicate
-Store shortage reporting across departments cannot happen). The fourth term,
-"Outstanding incoming supply", is netted off *here*: it is the sum of
-``qty`` already sitting on non-cancelled linked Purchase Material Request
-rows for that item (see ``_existing_purchase_qty_by_item``) -- i.e. demand
-this Sales Plan has already asked to be purchased, whether or not a
-Purchase Order has been raised against it yet.
+The first three terms are ``ury_production_readiness.compute_readiness``'s
+``department_shortage`` and ``store_shortage``. Outstanding incoming supply
+is netted here: the sum of ``qty`` on non-cancelled linked Purchase Material
+Request rows for that item (see ``_existing_purchase_qty_by_item``).
 
-## One consolidated Purchase MR (D8, "Shared Store contention")
+## Shared Store shortfall, separate documents
 
-Per item, once Store-wide demand exceeds Store's own stock and outstanding
-supply, the delta is split across every department that contributed to that
-item's demand, proportional to each department's own ``department_shortage``
-share (see ``_allocate_purchase_requirement``). Each department's share
-becomes its own row on the **same** consolidated Material Request document,
-carrying that department's ``production_plan`` link. The sum of every
-department's rows for an item is exactly the shared Store shortfall for that
-item -- never each department's full, unshared need -- which is what stops
-two department plans from ever raising duplicate Purchase rows against one
-Store shortage.
+Per item, once Store-wide demand exceeds Store stock and outstanding supply,
+the delta is split across every contributing department proportional to each
+department's ``department_shortage`` (see ``_allocate_purchase_requirement``).
+Each department's share becomes rows on **that department's own** Purchase
+Material Request. The sum of every plan's rows for an item is exactly the
+shared Store shortfall -- never each department's full, unshared need --
+which stops two department plans from purchasing the same shortage twice.
 
 ## Native per-row traceability (D8)
 
-Every Purchase MR row sets ``Material Request Item.production_plan`` (the
-originating department Production Plan) and ``material_request_plan_item``
-(the row name of a ``Material Request Plan Item`` this module appends onto
-that same Production Plan's own ``mr_items`` table, *before* the Material
-Request is created). Both are native ERPNext fields; no new link field is
-invented. Populating ``mr_items`` before creating the linking Material
-Request is deliberate: ERPNext's own ``Material Request.on_submit`` ->
-``update_requested_qty_in_production_plan`` reads exactly those two fields
-back off the just-submitted Material Request Item rows and writes
-``requested_qty`` onto the ``mr_items`` row itself, and recomputes the
-Production Plan's native ``status`` (-> "Material Requested") for free --
-this module never sets ``requested_qty`` or ``status`` itself.
+Every Purchase MR row sets ``Material Request Item.production_plan`` and
+``material_request_plan_item``. A ``Material Request Plan Item`` row is
+appended onto that Production Plan's ``mr_items`` *before* the Material
+Request is created, so ERPNext's ``Material Request.on_submit`` ->
+``update_requested_qty_in_production_plan`` credits ``requested_qty`` and
+status for free.
 
-Appending to ``mr_items`` on an already-submitted Production Plan (D14: a
-department plan is submitted immediately when
-``enable_auto_production_plan`` is on) uses
-``doc.flags.ignore_validate_update_after_submit = True`` before ``save()``,
-the same sanctioned Frappe pattern used throughout ERPNext itself (e.g.
-``erpnext/manufacturing/doctype/bom/bom.py``,
-``erpnext/accounts/doctype/sales_invoice/sales_invoice.py``) for a
-controlled, known-safe table update on a submitted document; it is not a
-permission bypass, only the "no field changes after submit" guard for this
-one call.
+Appending to ``mr_items`` on an already-submitted Production Plan (D14) uses
+``doc.flags.ignore_validate_update_after_submit = True`` before ``save()``.
 
-Every ``mr_items`` row this module appends carries the **Store** Warehouse
-in its own ``warehouse`` field, not the department warehouse -- see
-``_append_mr_items_and_assign_names`` for why: ERPNext's native
-``Production Plan.make_material_request`` reads that field straight onto
-the Material Request Item it generates, so the field means "where the
-requested material is received", which is Store, exactly like the Purchase
-MR Item row's own ``warehouse``. The department destination is carried
-entirely through ``production_plan``, never through this field.
+Every ``mr_items`` row carries the **Store** Warehouse in ``warehouse`` (where
+goods are received for a Purchase). The department destination is carried
+through ``production_plan``, never through that field.
 
 ## Idempotency (D15)
 
-The consolidated Purchase MR is inserted **and submitted** on creation --
-never a draft. A submitted Material Request cannot take new rows, so a
-recalculation that finds the requirement has grown creates a
-**supplementary** Material Request for the delta, linked to the same
-department plans, and never amends or cancels the earlier one. This falls
-out naturally from the formula above: "Outstanding incoming supply" already
-counts every previously-submitted linked Purchase MR row for that item, so
-a repeated call with an unchanged picture computes a zero delta (nothing
-created), and a call after the requirement rose computes exactly the delta
-(a new, additional MR). Over-coverage (outstanding supply already exceeds
-the freshly computed requirement) is left alone -- this module never
-touches an existing Material Request.
+Each Purchase MR is inserted **and submitted** on creation -- never a draft.
+A recalculation that finds the requirement has grown creates a
+**supplementary** Material Request for the delta on the affected plan(s),
+and never amends or cancels an earlier one. Outstanding supply already
+counts every previously-submitted linked Purchase MR row, so an unchanged
+picture yields nothing new.
 
 ## D19 -- EXTERNAL_RECEIPT demand
 
-``ury_production_readiness`` already folds every ``external_receipt_targets``
-entry into its demand rows (see that module's docstring); this module reads
-its rows exactly like any other demand row and never special-cases
-``sourcing_mode``. EXTERNAL_RECEIPT demand therefore reaches the Purchase
-requirement the same way every other shortage does, with no extra code here
--- see ``test_ury_production_plan_material_request.py`` for a scenario that
-asserts this explicitly.
+``ury_production_readiness`` already folds ``external_receipt_targets`` into
+its demand rows; this module never special-cases ``sourcing_mode``.
 """
 
 import frappe
@@ -137,21 +91,26 @@ MATERIAL_REQUEST_TYPE_PURCHASE = "Purchase"
 @frappe.whitelist(methods=["POST"])
 def generate_purchase_material_request_for_sales_plan(sales_plan):
 	"""Compute and, if anything is owed, create+submit one supplementary
-	Purchase Material Request covering the not-yet-requested portion of
-	``sales_plan``'s aggregate raw-material shortfall.
+	Purchase Material Request **per** department Production Plan for the
+	not-yet-requested portion of ``sales_plan``'s Store shortfall.
 
 	Returns:
 
 		{
 		    "sales_plan": "SP-2026-00001",
-		    "material_request": "MAT-MR-2026-00001",   # or None if fully covered already
+		    "material_requests": [
+		        {
+		            "department": "Main Kitchen",
+		            "production_plan": "MFG-PP-2026-00001",
+		            "material_request": "MAT-MR-2026-00001",
+		        },
+		        ...
+		    ],
 		    "rows": [
 		        {"item_code": ..., "department": ..., "production_plan": ..., "qty": ...},
 		        ...
 		    ],
-		    "blockers": [...],   # target-compiler + readiness-engine blockers,
-		                          # plus this module's own (missing department
-		                          # plan for an allocated item)
+		    "blockers": [...],
 		}
 
 	Safe to call repeatedly (see module docstring, "Idempotency").
@@ -194,11 +153,11 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 			allocation["production_plan"] = plan_row["name"]
 			allocations.append(allocation)
 	# Same raw material on one department plan must be one Purchase row
-	# (lemon 0.1 + 0.1 → 0.2). Cross-department rows stay separate for D8.
+	# (lemon 0.1 + 0.1 → 0.2).
 	allocations = _consolidate_allocations_by_item_and_plan(allocations)
 
 	if not allocations:
-		return {"sales_plan": sales_plan, "material_request": None, "rows": [], "blockers": blockers}
+		return {"sales_plan": sales_plan, "material_requests": [], "rows": [], "blockers": blockers}
 
 	if not store_warehouse:
 		blockers.append(
@@ -210,12 +169,22 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 				),
 			}
 		)
-		return {"sales_plan": sales_plan, "material_request": None, "rows": [], "blockers": blockers}
+		return {"sales_plan": sales_plan, "material_requests": [], "rows": [], "blockers": blockers}
 
 	_append_mr_items_and_assign_names(allocations, store_warehouse)
-	mr_name = _create_and_submit_purchase_material_request(
-		company=company, store_warehouse=store_warehouse, allocations=allocations
-	)
+
+	material_requests = []
+	for plan_name, plan_allocations in _group_allocations_by_plan(allocations).items():
+		mr_name = _create_and_submit_purchase_material_request(
+			company=company, store_warehouse=store_warehouse, allocations=plan_allocations
+		)
+		material_requests.append(
+			{
+				"department": plan_allocations[0]["department"],
+				"production_plan": plan_name,
+				"material_request": mr_name,
+			}
+		)
 
 	rows = [
 		{
@@ -226,7 +195,12 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 		}
 		for allocation in allocations
 	]
-	return {"sales_plan": sales_plan, "material_request": mr_name, "rows": rows, "blockers": blockers}
+	return {
+		"sales_plan": sales_plan,
+		"material_requests": material_requests,
+		"rows": rows,
+		"blockers": blockers,
+	}
 
 
 # --- department plan resolution ----------------------------------------------
@@ -235,10 +209,7 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 def _live_plan_by_department(sales_plan):
 	"""The newest non-cancelled Production Plan per department for
 	``sales_plan``, keyed by department. ``get_live_production_plans`` is
-	already newest-first (see ``ury_sales_plan_production_plan``), so the
-	first row seen per department is kept and any older, superseded
-	generation for the same department is ignored -- a Purchase MR row is
-	only ever linked to the live plan for its department.
+	already newest-first, so the first row seen per department is kept.
 	"""
 	plan_by_department = {}
 	for row in get_live_production_plans(sales_plan):
@@ -258,14 +229,19 @@ def _group_rows_by_item(rows):
 	return by_item
 
 
+def _group_allocations_by_plan(allocations):
+	by_plan = {}
+	for allocation in allocations:
+		by_plan.setdefault(allocation["production_plan"], []).append(allocation)
+	return by_plan
+
+
 def _consolidate_allocations_by_item_and_plan(allocations):
 	"""Merge allocations that share ``(item_code, production_plan)`` by summing qty.
 
 	Defensive: readiness already aggregates within a department, but a
 	Purchase Material Request must never show two rows for the same raw
 	material on the same department plan (e.g. lemon 0.1 + 0.1 → one 0.2).
-	Rows for the same item on *different* department plans stay separate so
-	each still links back to its Production Plan (D8).
 	"""
 	merged = {}
 	order = []
@@ -286,33 +262,14 @@ def _allocate_purchase_requirement(rows_for_item, outstanding_qty):
 
 	``rows_for_item`` are ``ury_production_readiness`` rows for one
 	``item_code`` (one per contributing department); every row carries the
-	same ``store_shortage`` (see that module's docstring). The requirement is
+	same ``store_shortage``. The requirement is
 
 	    max(0, store_shortage - outstanding_qty)
 
-	Zero contributing departments, or a requirement of zero or less
-	(fully covered by existing linked Purchase MR rows -- D15's
-	"over-coverage is left alone"), yields no allocation at all.
-
 	Otherwise the requirement is split proportional to each department's own
-	``department_shortage`` -- its share of what actually drove the Store
-	shortfall for this item -- with the last contributing department
-	absorbing any float remainder so the allocations always sum to exactly
-	the requirement (never more, which is what stops duplicate Purchase rows
-	against one Store shortage; never less, which would silently under-count
-	part of the requirement).
-
-	This split exists **only** for D8 per-row traceability -- crediting the
-	right department Production Plan's ``requested_qty`` with the right
-	share. It has no physical consequence: every allocation's goods land in
-	the same Store Warehouse regardless of which department it is credited
-	to (see ``_append_mr_items_and_assign_names`` and
-	``_create_and_submit_purchase_material_request``, both of which use the
-	Store Warehouse, never a department warehouse, for the actual
-	``warehouse`` field). Proportional-to-``department_shortage`` is a
-	recorded decision, not merely an assumption, but it is a traceability
-	policy, not a stock-allocation policy -- nobody should read a physical
-	"this department gets first claim on Store stock" meaning into it.
+	``department_shortage``, with the last contributing department absorbing
+	any float remainder so the allocations always sum to exactly the
+	requirement. Each department's share lands on that plan's own Purchase MR.
 	"""
 	if not rows_for_item:
 		return []
@@ -359,11 +316,8 @@ def _existing_purchase_qty_by_item(department_plan_names):
 	Request rows linked (via ``production_plan``) to any of
 	``department_plan_names``, grouped by ``item_code``.
 
-	Deliberately restricted to ``material_request_type = 'Purchase'`` --
-	``production_plan`` is also set by Agent 5's Transfer Material Request
-	rows on the very same Production Plans, and netting those off here would
-	silently under-request Purchase quantity by whatever Agent 5 already
-	requested for an unrelated purpose.
+	Restricted to ``material_request_type = 'Purchase'`` -- Transfer MR rows
+	on the same plans must not net off Purchase quantity.
 	"""
 	if not department_plan_names:
 		return {}
@@ -384,46 +338,18 @@ def _existing_purchase_qty_by_item(department_plan_names):
 	return {row["item_code"]: flt(row["qty"]) for row in rows}
 
 
-# --- writes: mr_items + the consolidated Purchase MR --------------------------
+# --- writes: mr_items + one Purchase MR per plan ------------------------------
 
 
 def _append_mr_items_and_assign_names(allocations, store_warehouse):
 	"""Append one ``Material Request Plan Item`` row per allocation onto its
-	department Production Plan's own ``mr_items`` table, and write the
-	assigned child row name back onto the allocation dict as
-	``material_request_plan_item`` for the Purchase MR row that references it.
+	department Production Plan's ``mr_items``, and write the assigned child
+	row name back onto the allocation as ``material_request_plan_item``.
 
-	``mr_items.warehouse`` is set to ``store_warehouse``, never the
-	department warehouse, even though physically it is the *department* that
-	ultimately needs the material. This is not a modelling choice this
-	module is free to make: ERPNext's own
-	``erpnext.manufacturing.doctype.production_plan.production_plan.Production
-	Plan.make_material_request`` -- the native "Create Material Request"
-	button -- reads ``mr_items.warehouse`` straight onto the generated
-	Material Request Item's own ``warehouse``::
-
-	    "warehouse": item.warehouse,
-
-	If this row said the department warehouse instead, that native button
-	(unwired today, but reading the same field) would generate a Purchase MR
-	that receives goods into the department warehouse, bypassing Store
-	entirely and inverting the Store-to-Department model this whole feature
-	is built on. Setting it to Store here keeps the field meaning the same
-	thing to native ERPNext code and to URY code reading the same row. The
-	department destination is not lost -- it is still recoverable through
-	this row's parent Production Plan (the ``production_plan`` link on the
-	Purchase MR Item row it corresponds to), which is what that field exists
-	for.
-
-	One save per Production Plan touched, even when it receives several
-	allocations (several raw materials, or several supplementary rows in one
-	call) -- never one save per row.
+	``mr_items.warehouse`` is the Store Warehouse (Purchase receive location).
+	One save per Production Plan touched.
 	"""
-	allocations_by_plan = {}
-	for allocation in allocations:
-		allocations_by_plan.setdefault(allocation["production_plan"], []).append(allocation)
-
-	for plan_name, plan_allocations in allocations_by_plan.items():
+	for plan_name, plan_allocations in _group_allocations_by_plan(allocations).items():
 		plan_doc = frappe.get_doc(PRODUCTION_PLAN_DOCTYPE, plan_name)
 		child_rows = [
 			plan_doc.append(
@@ -439,9 +365,7 @@ def _append_mr_items_and_assign_names(allocations, store_warehouse):
 			)
 			for allocation in plan_allocations
 		]
-		# D14: a department plan may already be submitted. Appending a row to
-		# mr_items on a submitted document needs this flag -- see module
-		# docstring for why that is safe here and precedented in ERPNext.
+		# D14: a department plan may already be submitted.
 		plan_doc.flags.ignore_validate_update_after_submit = True
 		plan_doc.save(ignore_permissions=True)
 		for allocation, child_row in zip(plan_allocations, child_rows):
@@ -449,6 +373,7 @@ def _append_mr_items_and_assign_names(allocations, store_warehouse):
 
 
 def _create_and_submit_purchase_material_request(company, store_warehouse, allocations):
+	"""Create+submit one Purchase MR for a single Production Plan's allocations."""
 	items = [
 		{
 			"item_code": allocation["item_code"],
