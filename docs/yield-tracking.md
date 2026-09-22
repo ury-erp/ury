@@ -111,6 +111,13 @@ ingredients where reality has drifted from what recipes/costing assume.
 percentage, plus how many of those were logged against a real issue vs standalone. Use this to
 see which branches/items are actually keeping up with checks vs which are being ignored.
 
+Items where **nothing was required** in the window show **N/A**, not 100%. That's a normal,
+common state — an Interval item with no interval configured, an Every Issue item whose
+ingredient simply wasn't used in the last 30 days, or a Sampled item the sampler didn't pick
+this month. Compliance is *not measurable* for those rows (the API returns `null` for
+`compliance_percent`), and they must be excluded from any average compliance score rather than
+counted as perfect.
+
 ### What this is *not*
 
 - It does **not** replace **Wastage** tracking. Wastage (the existing "Capture Wastage" action)
