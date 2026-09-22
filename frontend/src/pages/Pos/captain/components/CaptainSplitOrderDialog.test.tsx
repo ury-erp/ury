@@ -76,6 +76,7 @@ vi.mock('@ury/ui', () => ({
       {children}
     </button>
   ),
+  Checkbox: (props: any) => <input type="checkbox" {...props} />,
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
@@ -90,7 +91,7 @@ const mockItems: CaptainSplitOrderItem[] = [
   { name: 'LINE-002', item_name: 'Butter Naan', qty: 1, rate: 50, amount: 50 },
 ];
 
-const mockCustomer = { id: 'CUST-001', name: 'John Doe' };
+const mockCustomer = { id: 'CUST-001', name: 'John Doe', phone: '1234567890' };
 
 function getButtonByText(text: string) {
   const buttons = screen.getAllByTestId('button');
