@@ -107,6 +107,11 @@ export const YieldCheckCompliancePage: React.FC = () => {
   useEffect(() => {
     const branch = selectedBranch || activeBranchId;
 
+    if (!company) {
+      setRows([]);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
