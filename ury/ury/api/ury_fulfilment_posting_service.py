@@ -808,6 +808,39 @@ def _stock_entry_items(payload):
 	return items
 
 
+def _resolve_work_order_for_item(payload):
+	"""Return (work_order_name, bom_no) for the KOT item row, or (None, None).
+
+	`custom_ury_work_order` is written onto `URY KOT Items` by
+	`ury_mto_work_order_service.create_work_orders_for_kot` at KOT submit
+	time -- always before the posting intent is enqueued, so there is no
+	race between the write and this read.
+
+	Also reads the Work Order's `bom_no` so the Stock Entry can carry both
+	links, which lets ERPNext's `mark_finished_and_scrap_items()` correctly
+	auto-infer `is_finished_item` without needing the explicit flag.
+
+	Returns (None, None) when the field does not exist on this site
+	(pre-migration) or when no Work Order was created for the row (e.g. no
+	active BOM). Never raises: the Stock Entry is still submitted without
+	the links rather than blocking the posting worker.
+	"""
+	kot_item = payload.get("kot_item")
+	if not kot_item:
+		return None, None
+	try:
+		meta = frappe.get_meta("URY KOT Items")
+		if not meta.has_field("custom_ury_work_order"):
+			return None, None
+		wo_name = frappe.db.get_value("URY KOT Items", kot_item, "custom_ury_work_order") or None
+		if not wo_name:
+			return None, None
+		bom_no = frappe.db.get_value("Work Order", wo_name, "bom_no") or None
+		return wo_name, bom_no
+	except Exception:
+		return None, None
+
+
 def _submit_stock_entry(intent, payload):
 	existing = intent.get("erpnext_stock_entry") or _find_existing_stock_entry(intent.name)
 	if existing:
@@ -829,6 +862,7 @@ def _submit_stock_entry(intent, payload):
 			).format(payload.get("production_policy") or "unconfigured"),
 		)
 	stock_entry_type = "Manufacture"
+	wo_name, wo_bom_no = _resolve_work_order_for_item(payload)
 	doc = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
@@ -838,6 +872,31 @@ def _submit_stock_entry(intent, payload):
 			"items": _stock_entry_items(payload),
 			"remarks": "URY Fulfilment Posting Intent: {0}".format(intent.name),
 			"custom_ury_posting_intent": intent.name,
+			# Link to the Work Order created at KOT submit time (if any).
+			# Read from the KOT item row rather than the frozen payload so
+			# existing PENDING intents (whose JSON pre-dates this field) are
+			# handled correctly without a payload migration.
+			"work_order": wo_name,
+			# bom_no from the Work Order lets ERPNext's
+			# mark_finished_and_scrap_items() auto-infer is_finished_item
+			# (matching the Work Order's production_item), so the
+			# explicit is_finished_item=1 in _stock_entry_items acts as a
+			# belt-and-suspenders guard for replays of pre-migration intents
+			# that carry no Work Order link.
+			"bom_no": wo_bom_no,
+			# Standard ERPNext header fields for Manufacture entries
+			"from_bom": 1 if wo_bom_no else 0,
+			"from_warehouse": payload.get("fg_warehouse"),
+			"to_warehouse": payload.get("fg_warehouse"),
+			# ERPNext's validate_work_order() strictly requires
+			# fg_completed_qty to be set on the header if work_order is linked
+			# on a Manufacture SE. Without this, it throws "For Quantity
+			# (Manufactured Qty) is mandatory", aborting the transaction and
+			# preventing the reservation from being fulfilled.
+			"fg_completed_qty": payload.get("accepted_qty") or 1,
+			# Explicitly carry use_multi_level_bom = 0 to the Stock Entry just
+			# in case ERPNext's getters attempt to re-evaluate the BOM.
+			"use_multi_level_bom": 0,
 		}
 	)
 	with _service_mutation():
