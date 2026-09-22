@@ -8,6 +8,7 @@ measure and track efficiency/losses.
 Permission gating varies by endpoint:
 - record_yield_check: requires frappe.has_permission("create") + _require_scope (staff-facing)
 - get_yield_variance, get_yield_check_compliance: require_manager() + _require_scope (reporting)
+- update_yield_standards: require_manager() (costing-grade control, manager-only write)
 """
 
 import hashlib
@@ -15,9 +16,10 @@ from datetime import datetime, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import cint, flt, getdate
 
 from ury.ury.report_api.utils import require_manager, user_has_branch_access
+from ury.ury.services.yield_branch_scope import branch_item_codes
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
@@ -95,6 +97,82 @@ def record_yield_check(item, branch, company, input_qty, output_qty, stock_uom,
 	}
 
 
+YIELD_STANDARD_CADENCE_OPTIONS = {"None", "Every Issue", "Interval", "Sampled"}
+
+
+@frappe.whitelist()
+def update_yield_standards(item, custom_yield_tracked=None, custom_yield_percent=None,
+							custom_yield_check_cadence=None, custom_yield_check_interval_days=None):
+	"""Update an Item's yield-standard fields (manager-gated).
+
+	These four fields drive costing-grade behaviour -- changing them
+	silently re-back-calculates every BOM that uses the item on its next
+	save, and shifts every future Yield Check's variance baseline -- so
+	this is a real permission boundary, not just a UI nicety. The fields
+	are `permlevel: 0` in the fixture (any Item-write role can edit them
+	directly), so the frontend must never call frappe.client.set_value
+	for them; it must go through this whitelisted, require_manager()-gated
+	setter instead.
+
+	Args:
+		item: Item code (Link -> Item, required)
+		custom_yield_tracked: 0/1, whether yield is tracked for this item
+		custom_yield_percent: standard yield percent (0-100)
+		custom_yield_check_cadence: "None" | "Every Issue" | "Interval" | "Sampled"
+		custom_yield_check_interval_days: interval in days, only meaningful
+			when cadence == "Interval"
+
+	Returns:
+		dict with the item and the fields as saved
+
+	Raises:
+		frappe.PermissionError if the caller is not a manager
+		frappe.ValidationError if item is missing/invalid or field values are out of range
+	"""
+	require_manager()
+
+	if not item:
+		frappe.throw(_("Item is required"), frappe.ValidationError)
+	if not frappe.db.exists("Item", item):
+		frappe.throw(_("Item {0} does not exist").format(item), frappe.ValidationError)
+
+	values = {}
+
+	if custom_yield_tracked is not None:
+		values["custom_yield_tracked"] = 1 if cint(custom_yield_tracked) else 0
+
+	if custom_yield_percent is not None:
+		percent = flt(custom_yield_percent)
+		if percent < 0 or percent > 100:
+			frappe.throw(_("Yield Percent must be between 0 and 100"), frappe.ValidationError)
+		values["custom_yield_percent"] = percent
+
+	if custom_yield_check_cadence is not None:
+		if custom_yield_check_cadence not in YIELD_STANDARD_CADENCE_OPTIONS:
+			frappe.throw(_("Invalid Yield Check Cadence: {0}").format(custom_yield_check_cadence),
+						 frappe.ValidationError)
+		values["custom_yield_check_cadence"] = custom_yield_check_cadence
+
+	if custom_yield_check_interval_days is not None:
+		values["custom_yield_check_interval_days"] = cint(custom_yield_check_interval_days)
+
+	if not values:
+		frappe.throw(_("No yield standard fields provided to update"), frappe.ValidationError)
+
+	doc = frappe.get_doc("Item", item)
+	for fieldname, value in values.items():
+		doc.set(fieldname, value)
+	doc.save(ignore_permissions=False)
+
+	return {
+		"item": doc.name,
+		"custom_yield_tracked": doc.custom_yield_tracked,
+		"custom_yield_percent": doc.custom_yield_percent,
+		"custom_yield_check_cadence": doc.custom_yield_check_cadence,
+		"custom_yield_check_interval_days": doc.custom_yield_check_interval_days,
+	}
+
+
 @frappe.whitelist()
 def get_yield_variance(company, branch=None, item=None):
 	"""Retrieve yield check records with variance data.
@@ -123,6 +201,15 @@ def get_yield_variance(company, branch=None, item=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch.
 	require_manager()
 	_require_scope(company)
 
@@ -189,16 +276,46 @@ def get_yield_check_compliance(company, branch=None):
 			...
 		]
 	"""
+	# F7: this is a manager-gated reporting endpoint. It intentionally
+	# relies on require_manager() + _require_scope(company) only, not
+	# user_has_branch_access -- same deliberate choice documented on
+	# user_has_branch_access in report_api/utils.py and on
+	# get_due_yield_checks in yield_check_reminders.py: managers may
+	# report across branches they oversee even without a Branch.user row.
+	# user_has_branch_access remains reserved for staff-facing WRITE
+	# endpoints (record_yield_check above, create_issue_authorization)
+	# that accept a caller-supplied branch. F8 below is a separate,
+	# unrelated concern: it scopes the tracked-item SET to the items
+	# configured for production at the given branch.
 	require_manager()
 	_require_scope(company)
 
-	# Fetch all yield-tracked items with cadence != None.
+	item_filters = {
+		"custom_yield_tracked": 1,
+		"custom_yield_check_cadence": ["!=", "None"],
+	}
+
+	# F8 (corrected): when a single branch is requested, scope the
+	# tracked-item set to items actually used at that branch. IPC only has
+	# rows for sellable menu items (kitchen/bar routing) — never a raw
+	# ingredient — and yield tracking only ever applies to raw ingredients
+	# (see docs/yield-tracking.md, "Why Item, not BOM Item or IPC"), so the
+	# anchor is: active IPC rows for this branch -> their BOM -> that BOM's
+	# component items (BOM Item rows). See
+	# ury.ury.services.yield_branch_scope.branch_item_codes. When branch is
+	# None (all-branches aggregate), keep the global item set — the numbers
+	# are already summed across every branch, so per-branch scoping doesn't
+	# apply.
+	scoped_item_codes = branch_item_codes(branch)
+	if scoped_item_codes is not None:
+		if not scoped_item_codes:
+			return []
+		item_filters["name"] = ["in", list(scoped_item_codes)]
+
+	# Fetch yield-tracked items with cadence != None (scoped to branch above, if given).
 	tracked_items = frappe.get_all(
 		"Item",
-		filters={
-			"custom_yield_tracked": 1,
-			"custom_yield_check_cadence": ["!=", "None"],
-		},
+		filters=item_filters,
 		fields=[
 			"name",
 			"custom_yield_check_cadence",

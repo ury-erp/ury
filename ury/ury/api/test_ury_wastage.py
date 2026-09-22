@@ -118,6 +118,35 @@ class TestCaptureWastage(FrappeTestCase):
                     company="Company A",
                 )
 
+    def test_capture_rejected_when_yield_check_already_exists(self):
+        """Mirror of `URYYieldCheck.validate_no_duplicate_wastage`, in the
+        reverse order: once a Yield Check already exists for this
+        authorization, capturing wastage against it must fail closed too --
+        otherwise the same shortfall gets double-counted regardless of which
+        record was created first."""
+        auth_doc = _auth_doc()
+
+        def get_all_dispatch(doctype, *args, **kwargs):
+            if doctype == "URY Yield Check":
+                return [{"name": "YC-1"}]
+            return []
+
+        with patch(f"{MODULE}.frappe.get_roles", return_value=["Production Manager"]), patch(
+            f"{MODULE}.frappe.has_permission", return_value=True
+        ), patch(f"{MODULE}.frappe.get_doc", return_value=auth_doc), patch(
+            f"{MODULE}.frappe.db.get_value", return_value="Company A"
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_dispatch
+        ):
+            with self.assertRaises(frappe.ValidationError):
+                capture_wastage(
+                    issue_authorization="AUTH-1",
+                    wasted_qty=1,
+                    reason_category="Spoilage",
+                    branch="Branch A",
+                    company="Company A",
+                )
+
     def test_branch_mismatch_fails_closed(self):
         auth_doc = _auth_doc()
         with patch(f"{MODULE}.frappe.get_roles", return_value=["Production Manager"]), patch(

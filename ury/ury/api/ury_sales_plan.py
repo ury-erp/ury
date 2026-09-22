@@ -13,6 +13,7 @@ from frappe.model.workflow import (
     is_transition_condition_satisfied,
 )
 
+from ury.ury.api.ury_bom_compiler import build_demand_vector
 from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_production_validation import validate_item_production_configuration
 
@@ -440,7 +441,21 @@ def flag_stale_bom_revisions(doc):
 
 
 def freeze_approval_snapshot(doc):
-    """Freeze approved demand and mapping inputs into a deterministic snapshot."""
+    """Freeze approved demand and mapping inputs into a deterministic snapshot.
+
+    Also BOM-explodes the frozen items into a component-level `demand_vector`
+    (see `ury.ury.api.ury_bom_compiler.build_demand_vector`) and freezes that
+    alongside them. This runs here, once, at approval time -- matching every
+    other input this function locks in -- rather than lazily on first
+    `create_issue_authorization` call or at Production Plan creation time,
+    because `ury.ury.api.ury_issue_authorization.frozen_component_demand()`
+    reads `demand_vector` as a purely frozen historical record and must never
+    recompute against a live (and by then possibly-changed) BOM. By the time
+    this runs, every row on `doc` has already passed `validate_plan_items()`
+    (called just before this, on the same "Approved" transition), which
+    requires a valid active BOM for any manufactured row -- so BOM
+    resolution here is not expected to fail under the normal approval path.
+    """
     if doc.get("approval_snapshot"):
         return doc.approval_snapshot
     payload = {
@@ -451,6 +466,7 @@ def freeze_approval_snapshot(doc):
         "items": [snapshot_item(row) for row in (doc.get("items") or [])],
         "insight_snapshot": doc.get("insight_snapshot") or {},
     }
+    payload["demand_vector"] = build_demand_vector(payload)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     doc.approval_snapshot = encoded
     doc.approval_snapshot_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()

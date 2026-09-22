@@ -32,12 +32,15 @@ implement. This is the lowest-blast-radius choice available:
   records without requiring any change to the already-reviewed reservation/
   fulfilment contract.
 
-This module never touches `ury_batch_manufacture_service.py`,
+This module reads `URY KOT`, `URY Item Production Configuration` (via
+`ury_production_context`'s existing resolver), `BOM`, and (for production
+plan linking) `URY Sales Plan Item`, `URY Sales Plan`, and
+`Production Plan Item` -- all read-only. It creates/submits `Work Order`
+documents and writes back `custom_ury_work_order` onto the KOT item row.
+It never touches `ury_batch_manufacture_service.py`,
 `ury_fulfilment_posting_service.py`, `ury_production_plan_adapter.py`,
 `ury_sales_plan.py`, `ury_reservation_service.py`, or
-`ury_mto_fulfilment_service.py` -- it only reads `URY KOT`,
-`URY Item Production Configuration` (via `ury_production_context`'s
-existing resolver) and `BOM`, and creates/submits `Work Order` documents.
+`ury_mto_fulfilment_service.py`.
 
 Idempotency: the created Work Order's name is written back onto the KOT
 item row's `custom_ury_work_order` field (see
@@ -89,6 +92,56 @@ def _resolve_bom(item_code, configured_bom=None):
             BOM_DOCTYPE, {"item": item_code, "is_active": 1, "docstatus": 1}, "name"
         )
     return bom_no
+
+
+def _resolve_production_plan_link(item_code, branch, company):
+    """Return (production_plan_name, production_plan_item_name) or (None, None).
+
+    Finds the submitted Production Plan for today that contains `item_code` by
+    querying `Production Plan Item` directly -- joined to its parent plan so we
+    can filter by ``docstatus = 1`` and ``company`` in one pass.
+
+    Using `planned_start_date = today` (the date the URY Sales Plan adapter
+    stamps on every ``po_items`` row from the Sales Plan's ``plan_date``) as
+    the date anchor correctly handles multiple Production Plans on the same day:
+    we pick the plan that actually carries this item, not just any plan for the
+    branch.
+
+    Returns ``(None, None)`` if no matching submitted plan is found, or if any
+    exception occurs.  The Work Order is still created without the links rather
+    than blocking the Mosaic serve flow.
+    """
+    from frappe.query_builder import DocType
+    from frappe.utils import getdate
+
+    try:
+        today = getdate()
+
+        PP = DocType("Production Plan")
+        PPI = DocType("Production Plan Item")
+
+        rows = (
+            frappe.qb.from_(PPI)
+            .join(PP).on(PP.name == PPI.parent)
+            .select(PPI.name.as_("pp_item_name"), PPI.parent.as_("pp_name"))
+            .where(PPI.item_code == item_code)
+            .where(PPI.planned_start_date == today)
+            .where(PP.docstatus == 1)
+            .where(PP.company == company)
+            .limit(1)
+            .run(as_dict=True)
+        )
+
+        if not rows:
+            return None, None
+
+        return rows[0]["pp_name"], rows[0]["pp_item_name"]
+    except Exception:
+        frappe.log_error(
+            title="ury_mto_work_order_service._resolve_production_plan_link",
+            message=frappe.get_traceback(),
+        )
+        return None, None
 
 
 @frappe.whitelist()
@@ -149,6 +202,10 @@ def create_work_orders_for_kot(kot_name):
 
             qty = frappe.utils.flt(row.get("quantity")) or 1
 
+            pp_name, pp_item_name = _resolve_production_plan_link(
+                item_code, branch, context.get("company")
+            )
+
             wo_doc = frappe.get_doc(
                 {
                     "doctype": WORK_ORDER_DOCTYPE,
@@ -156,10 +213,34 @@ def create_work_orders_for_kot(kot_name):
                     "bom_no": bom_no,
                     "qty": qty,
                     "company": context.get("company"),
-                    "wip_warehouse": context.get("warehouse"),
                     "fg_warehouse": context.get("warehouse"),
+                    "source_warehouse": context.get("warehouse"),
+                    # skip_transfer = 1: ERPNext's validate_work_order() (in
+                    # Stock Entry) requires the Work Order to be "In Process"
+                    # before accepting a Manufacture SE. Without this flag the
+                    # Work Order stays "Not Started" after submit (because no
+                    # Material Transfer is ever done in the Mosaic serve path)
+                    # and ERPNext blocks the Manufacture SE entirely. With it,
+                    # ERPNext skips the transfer-completion check and allows the
+                    # Manufacture SE to move the Work Order directly from
+                    # "Not Started" → "In Process" → "Completed".
+                    "skip_transfer": 1,
+                    # use_multi_level_bom = 0: only consume the direct BOM
+                    # components of this item. Sub-assembly explosion is handled
+                    # separately by the reservation/BOM-compiler layer; having
+                    # ERPNext recurse into sub-assemblies here would produce a
+                    # duplicate component deduction on top of what the
+                    # reservation snapshot already accounts for.
+                    "use_multi_level_bom": 0,
+                    # Link to the day's Production Plan and the specific
+                    # Production Plan Item row for this item. Both are None
+                    # when no submitted Production Plan exists today -- the
+                    # Work Order is still created and submitted without them.
+                    "production_plan": pp_name,
+                    "production_plan_item": pp_item_name,
                 }
             )
+
             wo_doc.insert()
             wo_doc.submit()
 

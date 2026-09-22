@@ -4,6 +4,41 @@ import frappe
 from ury.setup_customizations import after_install as setup
 
 
+def ensure_role_permissions():
+	"""Apply URY's role-permission baseline on a freshly installed site.
+
+	Frappe's installer calls `set_all_patches_as_completed(app)` at the end of
+	`install_app()` (frappe/installer.py) -- every patch an app ships is
+	written straight into Patch Log *without ever being executed*, on the
+	assumption that a brand-new site already reflects their end state. That
+	assumption does not hold for URY: this app's permission model lives
+	entirely inside patches (`patches/v2_0/default_permissions` for the
+	permlevel-0 baseline of URY Captain/Cashier/Manager, and
+	`patches/v3_26/grant_item_yield_standard_permlevel` for the permlevel-1
+	grant that compensates the yield-standard fields' `permlevel: 1` raise).
+	Custom Field *fixtures*, by contrast, DO sync on install.
+
+	The result on any byte-fresh site (i.e. every CI run) was:
+	  * Item.custom_yield_* correctly raised to permlevel 1 (fixture synced),
+	  * and URY Manager holding **no Item DocPerm at all** -- not permlevel 1,
+	    not even permlevel 0 -- because neither patch ever ran.
+
+	So `update_yield_standards()` blew up for a legitimate URY Manager at the
+	*base* `check_permission("write")`, long before permlevel came into it.
+	Long-lived dev benches never showed this: they installed URY before these
+	patches existed, so `bench migrate` ran them for real.
+
+	Re-running both patch bodies here (they are idempotent) gives a fresh
+	install the same permission state a migrated one has.
+	"""
+	from ury.patches.v2_0 import default_permissions
+	from ury.patches.v3_26 import grant_item_yield_standard_permlevel
+
+	default_permissions.execute()
+	grant_item_yield_standard_permlevel.execute()
+	frappe.db.commit()
+
+
 def after_install():
     try:
         print("Setting up URY...")
@@ -14,6 +49,11 @@ def after_install():
 
     except:
         pass
+
+    # Deliberately OUTSIDE the bare-except above: a silently skipped
+    # permission baseline is exactly the failure mode this function exists to
+    # prevent, so it must fail loudly rather than leave the site half-set-up.
+    ensure_role_permissions()
 
 
 def before_tests():

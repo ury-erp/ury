@@ -391,5 +391,104 @@ class TestSetBomRevision(FrappeTestCase):
 		self.assertEqual(doc1.custom_bom_revision, doc2.custom_bom_revision)
 
 
+class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
+	"""F9: real-document coverage for apply_yield_back_calculation /
+	set_bom_revision -- every other test in this file drives the hook
+	function directly against a MagicMock "doc", so none of them ever
+	inserted a real BOM and let frappe's own `before_validate` hook wiring
+	(ury/hooks.py: {"BOM": {"before_validate": ...}}) invoke it end to end.
+	"""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code, **overrides):
+		if frappe.db.exists("Item", item_code):
+			return
+		fields = {
+			"doctype": "Item",
+			"item_code": item_code,
+			"item_name": item_code,
+			"item_group": "All Item Groups",
+			"stock_uom": "Nos",
+			"is_stock_item": 1,
+		}
+		fields.update(overrides)
+		frappe.get_doc(fields).insert(ignore_permissions=True)
+
+	def setUp(self):
+		self.company = "F9 BOM Test Co"
+		self._ensure_company(self.company, "F9BC")
+		self.finished_item = "F9-BOM-FINISHED-ITEM"
+		self.raw_item = "F9-BOM-RAW-YIELD-ITEM"
+		self._ensure_item(self.finished_item)
+		self._ensure_item(self.raw_item, custom_yield_tracked=1, custom_yield_percent=50.0)
+
+	def test_real_bom_insert_back_calculates_qty_and_sets_revision(self):
+		"""A real BOM insert against a yield-tracked component runs the real
+		before_validate hook: qty is back-calculated from
+		custom_yield_qty / (custom_yield_percent / 100), and
+		custom_bom_revision is populated (not left blank)."""
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": self.finished_item,
+				"quantity": 1,
+				"company": self.company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [
+					{
+						"item_code": self.raw_item,
+						"uom": "Nos",
+						"custom_yield_qty": 5,
+						"custom_yield_percent": 50,
+					}
+				],
+			}
+		)
+		bom.insert(ignore_permissions=True)
+
+		self.assertAlmostEqual(bom.items[0].qty, 10.0)
+		self.assertTrue(bom.custom_bom_revision)
+		self.assertEqual(len(bom.custom_bom_revision), 16)
+
+	def test_real_bom_insert_rejects_yield_tracked_row_missing_yield_qty(self):
+		"""A real BOM insert for a yield-tracked component with no
+		custom_yield_qty set must fail closed (real ValidationError, not a
+		silent qty=0)."""
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": self.finished_item,
+				"quantity": 1,
+				"company": self.company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [
+					{
+						"item_code": self.raw_item,
+						"uom": "Nos",
+						"qty": 1,
+						"custom_yield_qty": None,
+						"custom_yield_percent": 50,
+					}
+				],
+			}
+		)
+		with self.assertRaises(frappe.ValidationError):
+			bom.insert(ignore_permissions=True)
+
+
 if __name__ == "__main__":
 	unittest.main()
