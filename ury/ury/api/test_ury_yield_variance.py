@@ -556,5 +556,169 @@ class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
 			)
 
 
+class TestYieldCheckComplianceRealDocumentIntegration(FrappeTestCase):
+	"""F9: real-document coverage for get_yield_check_compliance -- every
+	other test in this file mocks frappe.get_all/get_value, so none of them
+	inserted an actual Item/URY Issue Authorization/URY Yield Check and ran
+	the real aggregation query. These do, via frappe.get_doc(...).insert()
+	and the real record_yield_check() whitelisted API.
+	"""
+
+	def _ensure_company(self, company_name, abbr):
+		if not frappe.db.exists("Company", company_name):
+			frappe.get_doc(
+				{
+					"doctype": "Company",
+					"company_name": company_name,
+					"default_currency": "INR",
+					"abbr": abbr,
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_branch(self, branch_name, company):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+
+	def _ensure_item(self, item_code, **overrides):
+		if frappe.db.exists("Item", item_code):
+			return
+		fields = {
+			"doctype": "Item",
+			"item_code": item_code,
+			"item_name": item_code,
+			"item_group": "All Item Groups",
+			"stock_uom": "Nos",
+			"is_stock_item": 1,
+			"custom_yield_tracked": 1,
+			"custom_yield_percent": 80.0,
+		}
+		fields.update(overrides)
+		frappe.get_doc(fields).insert(ignore_permissions=True)
+
+	def _minimal_plan(self, branch, company):
+		plan = frappe.get_doc(
+			{
+				"doctype": "URY Sales Plan",
+				"status": "Draft",
+				"enforcement_mode": "Soft",
+				"branch": branch,
+				"company": company,
+				"plan_date": "2026-09-01",
+			}
+		)
+		plan.flags.ignore_mandatory = True
+		plan.flags.ignore_validate = True
+		plan.insert(ignore_permissions=True)
+		return plan.name
+
+	def _department(self, branch, company):
+		name = f"{branch} F9 Compliance Dept"
+		if frappe.db.exists("URY Production Department", name):
+			return name
+		frappe.get_doc(
+			{
+				"doctype": "URY Production Department",
+				"department_name": name,
+				"branch": branch,
+				"company": company,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True, ignore_mandatory=True)
+		return name
+
+	def _auth(self, plan, branch, company, department, item, qty=50.0):
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Issue Authorization",
+				"plan": plan,
+				"plan_approval_hash": "f9-real-doc-test",
+				"branch": branch,
+				"company": company,
+				"department": department,
+				"component_item": item,
+				"stock_uom": "Nos",
+				"control_mode": "SOFT",
+				"status": "Authorized",
+				"required_qty": qty,
+				"authorized_qty": qty,
+				"remaining_before_qty": qty,
+				"remaining_after_qty": 0,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	def setUp(self):
+		self.company = "F9 Compliance Test Co"
+		self.branch = "F9 Compliance Test Branch"
+		self._ensure_company(self.company, "F9CC")
+		self._ensure_branch(self.branch, self.company)
+
+	def test_real_compliance_reports_100_percent_for_zero_required_count(self):
+		"""Documents CURRENT behavior: an Interval-cadence item with
+		interval_days<=0 (skipped by the engine, so required_count == 0)
+		reports compliance_percent == 100.0 -- a flattering default that
+		looks like an accidental `x/0 -> 100` fallback rather than a
+		documented product decision (see TRACK.md F9/Opus review). This
+		test does NOT assert that 100% is the *correct* semantics, only
+		that it is the semantics actually shipped today, against a real
+		inserted Item and a real (unmocked) call to
+		get_yield_check_compliance -- so a future intentional change to
+		this default will show up here as a deliberate test update, not a
+		silent behavior change.
+		"""
+		item_code = "F9-COMPLIANCE-ZERO-REQ-ITEM"
+		self._ensure_item(
+			item_code,
+			custom_yield_check_cadence="Interval",
+			custom_yield_check_interval_days=0,
+		)
+
+		rows = get_yield_check_compliance(company=self.company, branch=self.branch)
+		row = next((r for r in rows if r["item"] == item_code), None)
+		self.assertIsNotNone(row, "expected the real inserted item to appear in compliance rows")
+		self.assertEqual(row["required_count"], 0)
+		self.assertEqual(row["compliance_percent"], 100.0)
+
+	def test_real_compliance_computes_from_real_authorizations_and_checks(self):
+		"""Every Issue cadence: 2 real Authorized Issue Authorizations, only
+		1 with a real Yield Check recorded against it -> required_count=2,
+		completed_count=1, compliance_percent=50.0, computed by the real
+		aggregation query (not asserted against mocked get_all calls)."""
+		item_code = "F9-COMPLIANCE-EVERY-ISSUE-ITEM"
+		self._ensure_item(item_code, custom_yield_check_cadence="Every Issue")
+
+		department = self._department(self.branch, self.company)
+		plan = self._minimal_plan(self.branch, self.company)
+		auth_with_check = self._auth(plan, self.branch, self.company, department, item_code)
+		self._auth(plan, self.branch, self.company, department, item_code)
+
+		frappe.set_user("Administrator")
+		record_yield_check(
+			item=item_code,
+			branch=self.branch,
+			company=self.company,
+			input_qty=100,
+			output_qty=80,
+			stock_uom="Nos",
+			check_type="Routine",
+			issue_authorization=auth_with_check,
+		)
+
+		rows = get_yield_check_compliance(company=self.company, branch=self.branch)
+		row = next((r for r in rows if r["item"] == item_code), None)
+		self.assertIsNotNone(row)
+		self.assertEqual(row["required_count"], 2)
+		self.assertEqual(row["completed_count"], 1)
+		self.assertEqual(row["compliance_percent"], 50.0)
+
+
 if __name__ == "__main__":
 	unittest.main()
