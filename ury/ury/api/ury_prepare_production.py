@@ -107,7 +107,7 @@ from frappe.utils import cint, get_datetime, now_datetime, time_diff_in_seconds
 from frappe.utils.background_jobs import is_job_enqueued
 
 from ury.ury.api.ury_production_plan_auto_work_order import execute_department_targets
-from ury.ury.api.ury_production_readiness import compute_readiness
+from ury.ury.api.ury_production_readiness import compute_readiness, store_shortage_blocker
 from ury.ury.api.ury_production_settings import get_store_warehouse, production_job_stale_minutes
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
 from ury.ury.api.ury_production_transfer import execute_store_to_department_transfer
@@ -220,7 +220,7 @@ def prepare_production(production_plan):
 	readiness = compute_readiness({department: bucket}, store_warehouse=get_store_warehouse())
 
 	blockers = list(compile_blockers) + list(readiness["blockers"])
-	blockers += [_store_shortage_blocker(row) for row in readiness["rows"] if row["store_shortage"] > 0]
+	blockers += [store_shortage_blocker(row) for row in readiness["rows"] if row["store_shortage"] > 0]
 
 	if blockers:
 		_write_blocked_state(plan_doc, blockers, stage="preflight")
@@ -292,18 +292,6 @@ def _write_blocked_state(plan_doc, blockers, stage):
 	plan_doc.set(FIELD_STEP, STEP_BLOCKED)
 	plan_doc.flags.ignore_validate_update_after_submit = True
 	plan_doc.save(ignore_permissions=True)
-
-
-def _store_shortage_blocker(row):
-	return {
-		"type": "store_shortage",
-		"item_code": row["item_code"],
-		"department": row["department"],
-		"shortage": row["store_shortage"],
-		"message": _("Insufficient Store stock for {0}: short by {1} {2}.").format(
-			row["item_code"], row["store_shortage"], row.get("stock_uom") or ""
-		),
-	}
 
 
 # --- 2. Background job (D17) ---------------------------------------------------

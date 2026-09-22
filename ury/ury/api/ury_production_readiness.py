@@ -106,11 +106,34 @@ BOM tree service.
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from ury.ury.api.ury_production_settings import get_store_warehouse
 
 BIN_DOCTYPE = "Bin"
+
+
+def _float_precision():
+	return cint(frappe.db.get_default("float_precision")) or 6
+
+
+def _stock_qty(value):
+	"""Round stock quantities to system float precision.
+
+	Bin/BOM arithmetic routinely leaves residues like ``2.77e-17``; treating
+	those as shortages would both block Prepare Production incorrectly and
+	render unreadable messages. Rounding here is the single choke point for
+	every readiness consumer (Transfer MR, Purchase MR, Prepare Production).
+	"""
+	return flt(value, _float_precision())
+
+
+def format_stock_qty_for_message(qty):
+	"""Human-readable stock qty for blocker / toast copy (no scientific notation)."""
+	precision = _float_precision()
+	rounded = flt(qty, precision)
+	text = f"{rounded:.{precision}f}".rstrip("0").rstrip(".")
+	return text if text else "0"
 
 
 def compute_readiness(departments, store_warehouse=None):
@@ -137,14 +160,14 @@ def compute_readiness(departments, store_warehouse=None):
 	rows = []
 	for (department, item_code), demand in demand_rows.items():
 		department_available = _bin_actual_qty(item_code, demand["department_warehouse"])
-		department_shortage = max(0.0, demand["required_qty"] - department_available)
+		department_shortage = _stock_qty(max(0.0, demand["required_qty"] - department_available))
 		rows.append({
 			"item_code": item_code,
 			"department": department,
 			"department_warehouse": demand["department_warehouse"],
-			"required_qty": demand["required_qty"],
+			"required_qty": _stock_qty(demand["required_qty"]),
 			"stock_uom": demand["stock_uom"],
-			"department_available": department_available,
+			"department_available": _stock_qty(department_available),
 			"department_shortage": department_shortage,
 		})
 
@@ -226,8 +249,10 @@ def _apply_store_shortage(rows, store_warehouse):
 	for row in rows:
 		item_code = row["item_code"]
 		store_available = store_available_by_item.get(item_code, 0.0)
-		row["store_available"] = store_available
-		row["store_shortage"] = max(0.0, total_shortage_by_item.get(item_code, 0.0) - store_available)
+		row["store_available"] = _stock_qty(store_available)
+		row["store_shortage"] = _stock_qty(
+			max(0.0, total_shortage_by_item.get(item_code, 0.0) - store_available)
+		)
 
 
 # --- stock reads (the only frappe calls in this module) ----------------------
@@ -241,6 +266,22 @@ def _bin_actual_qty(item_code, warehouse):
 
 
 # --- blockers -----------------------------------------------------------------
+
+
+def store_shortage_blocker(row):
+	"""Blocker dict for a readiness row with ``store_shortage`` > 0."""
+	shortage = _stock_qty(row["store_shortage"])
+	return {
+		"type": "store_shortage",
+		"item_code": row["item_code"],
+		"department": row["department"],
+		"shortage": shortage,
+		"message": _("Insufficient Store stock for {0}: short by {1} {2}.").format(
+			row["item_code"],
+			format_stock_qty_for_message(shortage),
+			row.get("stock_uom") or "",
+		),
+	}
 
 
 def _store_warehouse_not_configured_blocker():
