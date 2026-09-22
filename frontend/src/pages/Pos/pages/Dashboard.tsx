@@ -5,7 +5,7 @@ import {
   ArrowRight,
   CircleAlert,
 } from 'lucide-react';
-import { Badge, Card, CardContent, KpiStrip, cn } from '@ury/ui';
+import { Badge, Card, CardContent, KpiStrip, cn, type KpiItemProps } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
@@ -14,7 +14,8 @@ import {
   getBranchOperationalState,
   type BranchOperationalState,
 } from '../lib/branch-operational-state-api';
-
+import { uryDashboardService } from '../../../services/dashboard';
+import { buildDashboardStatsKpiItems } from '../../../lib/dashboardStatsKpis';
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
   const now = new Date();
@@ -253,7 +254,7 @@ function BranchOperationalStatePanel({
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
   const [operationalState, setOperationalState] = useState<BranchOperationalState | null>(null);
-  const [stats, setStats] = useState<any[]>([]);
+  const [stats, setStats] = useState<KpiItemProps[]>([]);
   const [serviceLine, setServiceLine] = useState<any[]>([]);
   const [shiftMetrics, setShiftMetrics] = useState<any>(null);
   const [baseline, setBaseline] = useState<any>(null);
@@ -300,40 +301,12 @@ export default function Dashboard() {
 
       const { call } = await import('@ury/core');
 
-      // Fetch dashboard stats
+      // Fetch dashboard stats (shared API + KPI builder with Service Board)
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const statsRes = await call.get('ury.ury.api.ury_dashboard.get_dashboard_stats', {
-          branch: posProfile.branch
-        });
-        const statsData = statsRes.message;
-        const occupancy = statsData.total_tables
-          ? statsData.active_tables / statsData.total_tables
-          : 0;
-        setStats([
-          {
-            label: "Today's Sales",
-            value: formatCurrency(statsData.todays_sales),
-            tone: 'success'
-          },
-          {
-            label: 'Orders Today',
-            value: String(statsData.orders_today)
-          },
-          {
-            label: 'Avg. Order Value',
-            value: formatCurrency(statsData.avg_order_value)
-          },
-          {
-            label: 'Active Tables',
-            value: `${statsData.active_tables} / ${statsData.total_tables}`,
-            // A near-full floor is the one stat on this row that is actionable,
-            // so it earns warning tone only when it actually matters.
-            tone: occupancy >= 0.85 ? 'warning' : undefined,
-            hint: occupancy >= 0.85 ? 'Floor nearly full' : undefined
-          }
-        ]);
+        const statsData = await uryDashboardService.getDashboardStats(posProfile.branch);
+        setStats(buildDashboardStatsKpiItems(statsData));
       } catch (err) {
         setStatsError('Failed to load stats');
         console.error('Error fetching stats:', err);

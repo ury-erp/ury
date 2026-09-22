@@ -1,5 +1,7 @@
 import { call } from '@ury/core';
 
+const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
+
 export interface DashboardSummary {
   today_sales: number;
   today_orders: number;
@@ -71,19 +73,27 @@ export interface TransactionRecord {
 }
 
 export const dashboardService = {
+  /**
+   * Management summary for Service Board. Delegates to the backend summary
+   * endpoint, which itself reuses ``get_dashboard_stats`` for live sales/table
+   * numbers (same source as the POS dashboard).
+   */
   async getSummary(branch?: string): Promise<DashboardSummary> {
+    const branchArg = !branch || branch === 'all' ? undefined : branch;
     try {
-      let res = await call<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', { branch });
-      res = (res as any)?.message || res;
-      return res || {
-        today_sales: 0,
-        today_orders: 0,
-        occupied_tables: 0,
-        total_tables: 0,
-        avg_order_value: 0,
-        active_cashiers: 0,
-        pending_kitchen_orders: 0,
-        total_menu_items: 0,
+      const res = await call.get<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', {
+        branch: branchArg,
+      });
+      const summary = unwrap<DashboardSummary>(res);
+      return {
+        today_sales: summary?.today_sales ?? 0,
+        today_orders: summary?.today_orders ?? 0,
+        occupied_tables: summary?.occupied_tables ?? 0,
+        total_tables: summary?.total_tables ?? 0,
+        avg_order_value: summary?.avg_order_value ?? 0,
+        active_cashiers: summary?.active_cashiers ?? 0,
+        pending_kitchen_orders: summary?.pending_kitchen_orders ?? 0,
+        total_menu_items: summary?.total_menu_items ?? 0,
       };
     } catch {
       return {
@@ -195,8 +205,6 @@ export interface PlanStatus {
   name: string | null;
   status: string | null;
 }
-
-const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
 
 export interface CloseDayChecklistItem {
   key: string;
