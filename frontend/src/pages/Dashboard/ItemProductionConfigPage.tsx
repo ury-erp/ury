@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable, messageToPlainText } from '@ury/ui';
-import { SearchableSelect } from '../../components/common/SearchableSelect';
+import {
+  Page,
+  Section,
+  Button,
+  Select,
+  SelectItem,
+  Spinner,
+  showToast,
+  DataTable,
+  messageToPlainText,
+  Autocomplete,
+  type AutocompleteOption,
+} from '@ury/ui';
 import { dashboardService } from '../../services/dashboard';
+import { searchLinkOptions, withSelectedOption, type LinkFilter } from '../../services/linkSearch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 
@@ -39,6 +51,17 @@ const emptyForm = {
   direct_retail_warehouse: '',
 };
 
+type LinkFieldKey = 'item' | 'branch' | 'department' | 'production_unit' | 'bom' | 'direct_retail_warehouse';
+
+const EMPTY_OPTIONS: Record<LinkFieldKey, AutocompleteOption[]> = {
+  item: [],
+  branch: [],
+  department: [],
+  production_unit: [],
+  bom: [],
+  direct_retail_warehouse: [],
+};
+
 export const ItemProductionConfigPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [configs, setConfigs] = useState<ItemProductionConfigRecord[]>([]);
@@ -47,70 +70,79 @@ export const ItemProductionConfigPage: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<ItemProductionConfigRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
-  const [branches, setBranches] = useState<{ name: string }[]>([]);
-  const [items, setItems] = useState<{ name: string; item_name?: string }[]>([]);
-  const [departments, setDepartments] = useState<{ name: string; branch?: string }[]>([]);
-  const [units, setUnits] = useState<{ name: string; branch?: string }[]>([]);
-  const [warehouses, setWarehouses] = useState<{ name: string }[]>([]);
-
   const [form, setForm] = useState(emptyForm);
+  const [linkOptions, setLinkOptions] = useState(EMPTY_OPTIONS);
+  const [linkSearching, setLinkSearching] = useState<Partial<Record<LinkFieldKey, boolean>>>({});
 
-  const fetchBranches = async () => {
-    try {
-      const res = await dashboardService.getModuleRecords<{ name: string }>('Branch', 'all');
-      setBranches(res || []);
-    } catch {
-      setBranches([]);
-    }
+  const setFieldOptions = (field: LinkFieldKey, options: AutocompleteOption[], committed: string) => {
+    setLinkOptions((prev) => ({
+      ...prev,
+      [field]: withSelectedOption(options, committed),
+    }));
   };
 
-  const fetchItems = async () => {
-    try {
-      const res = await call<any>('frappe.client.get_list', {
-        doctype: 'Item',
-        fields: ['name', 'item_name'],
-        limit_page_length: 500,
-        order_by: 'item_name asc',
-      });
-      const data = (res as any)?.message || res || [];
-      setItems(Array.isArray(data) ? data : []);
-    } catch {
-      setItems([]);
-    }
-  };
-
-  const fetchDepartments = async () => {
-    try {
-      const res = await dashboardService.getModuleRecords<{ name: string; branch?: string }>('URY Production Department', 'all');
-      setDepartments(res || []);
-    } catch {
-      setDepartments([]);
-    }
-  };
-
-  const fetchUnits = async () => {
-    try {
-      const res = await dashboardService.getModuleRecords<{ name: string; branch?: string }>('URY Production Unit', 'all');
-      setUnits(res || []);
-    } catch {
-      setUnits([]);
-    }
-  };
-
-  const fetchWarehouses = async () => {
-    try {
-      const res = await call<any>('frappe.client.get_list', {
-        doctype: 'Warehouse',
-        fields: ['name'],
-        limit_page_length: 200,
-        order_by: 'name asc',
-      });
-      const data = (res as any)?.message || res || [];
-      setWarehouses(Array.isArray(data) ? data : []);
-    } catch {
-      setWarehouses([]);
-    }
-  };
+  const runLinkSearch = useCallback(
+    async (field: LinkFieldKey, query: string, formSnapshot: typeof emptyForm) => {
+      setLinkSearching((prev) => ({ ...prev, [field]: true }));
+      try {
+        let options: AutocompleteOption[] = [];
+        if (field === 'item') {
+          options = await searchLinkOptions({
+            doctype: 'Item',
+            query,
+            fields: ['name', 'item_name'],
+            labelField: 'item_name',
+            filters: [['disabled', '=', 0]],
+          });
+        } else if (field === 'branch') {
+          options = await searchLinkOptions({ doctype: 'Branch', query });
+        } else if (field === 'department') {
+          options = await searchLinkOptions({
+            doctype: 'URY Production Department',
+            query,
+            fields: ['name', 'branch'],
+            descriptionField: 'branch',
+            filters: formSnapshot.branch ? [['branch', '=', formSnapshot.branch]] : [],
+          });
+        } else if (field === 'production_unit') {
+          options = await searchLinkOptions({
+            doctype: 'URY Production Unit',
+            query,
+            fields: ['name', 'branch'],
+            descriptionField: 'branch',
+            filters: formSnapshot.branch ? [['branch', '=', formSnapshot.branch]] : [],
+          });
+        } else if (field === 'bom') {
+          const bomFilters: LinkFilter[] = [
+            ['docstatus', '=', 1],
+            ['is_active', '=', 1],
+          ];
+          if (formSnapshot.item) {
+            bomFilters.unshift(['item', '=', formSnapshot.item]);
+          }
+          options = await searchLinkOptions({
+            doctype: 'BOM',
+            query,
+            fields: ['name', 'item'],
+            descriptionField: 'item',
+            filters: bomFilters,
+          });
+        } else if (field === 'direct_retail_warehouse') {
+          options = await searchLinkOptions({
+            doctype: 'Warehouse',
+            query,
+            filters: [['disabled', '=', 0]],
+          });
+        }
+        setFieldOptions(field, options, formSnapshot[field]);
+      } catch {
+        setFieldOptions(field, [], formSnapshot[field]);
+      } finally {
+        setLinkSearching((prev) => ({ ...prev, [field]: false }));
+      }
+    },
+    []
+  );
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -128,32 +160,23 @@ export const ItemProductionConfigPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchBranches();
-    fetchItems();
-    fetchDepartments();
-    fetchUnits();
-    fetchWarehouses();
-  }, []);
-
-  useEffect(() => {
     fetchConfigs();
   }, [activeBranchId]);
 
-  const departmentsForBranch = departments.filter((d) => !form.branch || d.branch === form.branch);
-  const unitsForBranch = units.filter((u) => !form.branch || u.branch === form.branch);
-
   const openAddDrawer = () => {
     setEditingConfig(null);
-    setForm({
-      ...emptyForm,
-      branch: activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || ''),
+    const branch = activeBranchId !== 'all' ? activeBranchId : '';
+    setForm({ ...emptyForm, branch });
+    setLinkOptions({
+      ...EMPTY_OPTIONS,
+      ...(branch ? { branch: [{ value: branch, label: branch }] } : {}),
     });
     setIsDrawerOpen(true);
   };
 
   const openEditDrawer = (config: ItemProductionConfigRecord) => {
     setEditingConfig(config);
-    setForm({
+    const nextForm = {
       active: config.active !== 0,
       item: config.item || '',
       branch: config.branch || '',
@@ -165,6 +188,19 @@ export const ItemProductionConfigPage: React.FC = () => {
       allow_over_plan_sale: !!config.allow_over_plan_sale,
       availability_mode: config.availability_mode || '',
       direct_retail_warehouse: config.direct_retail_warehouse || '',
+    };
+    setForm(nextForm);
+    setLinkOptions({
+      item: nextForm.item ? [{ value: nextForm.item, label: nextForm.item }] : [],
+      branch: nextForm.branch ? [{ value: nextForm.branch, label: nextForm.branch }] : [],
+      department: nextForm.department ? [{ value: nextForm.department, label: nextForm.department }] : [],
+      production_unit: nextForm.production_unit
+        ? [{ value: nextForm.production_unit, label: nextForm.production_unit }]
+        : [],
+      bom: nextForm.bom ? [{ value: nextForm.bom, label: nextForm.bom }] : [],
+      direct_retail_warehouse: nextForm.direct_retail_warehouse
+        ? [{ value: nextForm.direct_retail_warehouse, label: nextForm.direct_retail_warehouse }]
+        : [],
     });
     setIsDrawerOpen(true);
   };
@@ -174,7 +210,7 @@ export const ItemProductionConfigPage: React.FC = () => {
     if (!form.item || !form.branch) return;
     setSaving(true);
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         active: form.active ? 1 : 0,
         item: form.item,
         branch: form.branch,
@@ -217,7 +253,9 @@ export const ItemProductionConfigPage: React.FC = () => {
               errorMessage = messageToPlainText(lastMessage.message);
             }
           }
-        } catch (e) {}
+        } catch {
+          // keep default
+        }
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -265,7 +303,7 @@ export const ItemProductionConfigPage: React.FC = () => {
               { key: 'department', header: 'Department', render: (row) => row.department || '-' },
               { key: 'production_unit', header: 'Production Unit', render: (row) => row.production_unit || '-' },
               { key: 'production_policy', header: 'Policy', render: (row) => row.production_policy || '-' },
-              { key: 'active', header: 'Active', align: 'right', render: (row) => row.active ? 'Yes' : 'No' },
+              { key: 'active', header: 'Active', align: 'right', render: (row) => (row.active ? 'Yes' : 'No') },
             ]}
             rows={configs}
             onRowClick={openEditDrawer}
@@ -280,50 +318,77 @@ export const ItemProductionConfigPage: React.FC = () => {
       >
         <form onSubmit={handleSave} className="space-y-4 text-sm">
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Item</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="item">
+              Item
+            </label>
+            <Autocomplete
               id="item"
               value={form.item}
-              onChange={(_, val) => setForm({ ...form, item: val })}
-              options={items.map((i) => ({ value: i.name, label: i.item_name || i.name }))}
-              placeholder="Select Item"
-              strict
+              onChange={(val) => {
+                setForm((prev) => ({
+                  ...prev,
+                  item: val,
+                  bom: '',
+                }));
+                setLinkOptions((prev) => ({ ...prev, bom: [] }));
+              }}
+              onSearch={(query) => runLinkSearch('item', query, form)}
+              options={linkOptions.item}
+              searching={!!linkSearching.item}
+              placeholder="Search Item"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Branch</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="branch">
+              Branch
+            </label>
+            <Autocomplete
               id="branch"
               value={form.branch}
-              onChange={(_, val) => setForm({ ...form, branch: val, department: '', production_unit: '' })}
-              options={branches.map((b) => ({ value: b.name, label: b.name }))}
-              placeholder="Select Branch"
-              strict
+              onChange={(val) => {
+                setForm((prev) => ({
+                  ...prev,
+                  branch: val,
+                  department: '',
+                  production_unit: '',
+                }));
+                setLinkOptions((prev) => ({ ...prev, department: [], production_unit: [] }));
+              }}
+              onSearch={(query) => runLinkSearch('branch', query, form)}
+              options={linkOptions.branch}
+              searching={!!linkSearching.branch}
+              placeholder="Search Branch"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Department</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="department">
+              Department
+            </label>
+            <Autocomplete
               id="department"
               value={form.department}
-              onChange={(_, val) => setForm({ ...form, department: val })}
-              options={departmentsForBranch.map((d) => ({ value: d.name, label: d.name }))}
-              placeholder="Select Department (optional)"
-              strict
+              onChange={(val) => setForm((prev) => ({ ...prev, department: val }))}
+              onSearch={(query) => runLinkSearch('department', query, form)}
+              options={linkOptions.department}
+              searching={!!linkSearching.department}
+              placeholder="Search Department (optional)"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Production Unit</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="production_unit">
+              Production Unit
+            </label>
+            <Autocomplete
               id="production_unit"
               value={form.production_unit}
-              onChange={(_, val) => setForm({ ...form, production_unit: val })}
-              options={unitsForBranch.map((u) => ({ value: u.name, label: u.name }))}
-              placeholder="Select Production Unit (optional)"
-              strict
+              onChange={(val) => setForm((prev) => ({ ...prev, production_unit: val }))}
+              onSearch={(query) => runLinkSearch('production_unit', query, form)}
+              options={linkOptions.production_unit}
+              searching={!!linkSearching.production_unit}
+              placeholder="Search Production Unit (optional)"
             />
           </div>
 
@@ -335,23 +400,28 @@ export const ItemProductionConfigPage: React.FC = () => {
               placeholder="Select Policy (optional)"
             >
               {PRODUCTION_POLICY_OPTIONS.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
               ))}
             </Select>
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">BOM</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="bom">
+              BOM
+            </label>
+            <Autocomplete
               id="bom"
               value={form.bom}
-              onChange={(_, val) => setForm({ ...form, bom: val })}
-              options={form.bom ? [{ value: form.bom, label: form.bom }] : []}
-              placeholder="Enter BOM name (optional)"
+              onChange={(val) => setForm((prev) => ({ ...prev, bom: val }))}
+              onSearch={(query) => runLinkSearch('bom', query, form)}
+              options={linkOptions.bom}
+              searching={!!linkSearching.bom}
+              placeholder={form.item ? 'Search BOM' : 'Select an Item first'}
+              disabled={!form.item}
             />
-            <p className="text-xs text-text-tertiary mt-1">
-              BOM must belong to the selected Item.
-            </p>
+            <p className="text-xs text-text-tertiary mt-1">BOM must belong to the selected Item.</p>
           </div>
 
           <div>
@@ -362,20 +432,25 @@ export const ItemProductionConfigPage: React.FC = () => {
               placeholder="Select Availability Mode (optional)"
             >
               {AVAILABILITY_MODE_OPTIONS.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
               ))}
             </Select>
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Direct Retail Warehouse</label>
-            <SearchableSelect
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="direct_retail_warehouse">
+              Direct Retail Warehouse
+            </label>
+            <Autocomplete
               id="direct_retail_warehouse"
               value={form.direct_retail_warehouse}
-              onChange={(_, val) => setForm({ ...form, direct_retail_warehouse: val })}
-              options={warehouses.map((w) => ({ value: w.name, label: w.name }))}
-              placeholder="Select Warehouse (optional)"
-              strict
+              onChange={(val) => setForm((prev) => ({ ...prev, direct_retail_warehouse: val }))}
+              onSearch={(query) => runLinkSearch('direct_retail_warehouse', query, form)}
+              options={linkOptions.direct_retail_warehouse}
+              searching={!!linkSearching.direct_retail_warehouse}
+              placeholder="Search Warehouse (optional)"
             />
           </div>
 
@@ -387,7 +462,9 @@ export const ItemProductionConfigPage: React.FC = () => {
               onChange={(e) => setForm({ ...form, active: e.target.checked })}
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
-            <label htmlFor="active" className="font-semibold text-muted-foreground">Active</label>
+            <label htmlFor="active" className="font-semibold text-muted-foreground">
+              Active
+            </label>
           </div>
 
           <div className="flex items-center gap-2">
@@ -434,8 +511,8 @@ export const ItemProductionConfigPage: React.FC = () => {
               disabled={saving}
             >
               <div className="flex items-center gap-2">
-                {saving && <Spinner className="w-4 h-4" />}
-                <span>{saving ? 'Saving...' : (editingConfig ? 'Save Changes' : 'Save Configuration')}</span>
+                {saving && <Spinner className="w-4 h-4" hideMessage />}
+                <span>{saving ? 'Saving...' : editingConfig ? 'Save Changes' : 'Save Configuration'}</span>
               </div>
             </Button>
           </div>
