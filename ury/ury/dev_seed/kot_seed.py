@@ -622,6 +622,25 @@ def seed():
 		print("dev_seed.kot_seed: no POS Profile found -- run profiles.seed() first. Skipping.")
 		return {}
 
+	# The POS Profile is the single source of every accounting link ERPNext
+	# copies onto the draft POS Invoices this module creates (cost_center,
+	# income/expense account, warehouse, change-amount account), so the
+	# invoice's own `company` MUST be the profile's company or ERPNext
+	# rejects the insert outright with "Cost Center: <X> does not belong to
+	# the Company: <Y>". On a site with more than one Company,
+	# `_get_branch_and_company()` above (Branch.company) and the POS
+	# Profile's own `company` can legitimately disagree -- same reconciliation
+	# `historical_sales.py::seed()` performs for the identical reason.
+	profile_company = frappe.db.get_value("POS Profile", pos_profile_name, "company")
+	if profile_company and profile_company != company_name:
+		print(
+			f"dev_seed.kot_seed: Branch '{branch_name}' is linked to Company "
+			f"'{company_name}' but POS Profile '{pos_profile_name}' belongs to "
+			f"'{profile_company}' -- seeding against the POS Profile's company, "
+			"which owns the cost centre/accounts these invoices must use."
+		)
+		company_name = profile_company
+
 	naming_series = frappe.db.get_value("POS Profile", pos_profile_name, "custom_kot_naming_series") or "KOT-URY-"
 	price_list = _get_price_list()
 	customer = _get_customer()
