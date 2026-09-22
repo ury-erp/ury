@@ -258,6 +258,7 @@ def get_or_create_work_order(production_plan_doc, target):
 
 	# docstatus == 0: a stray draft left behind by an interrupted earlier
 	# attempt. Finish building it exactly as a brand new one would be.
+	_link_work_order_to_plan_item(work_order, production_plan_doc, target)
 	_apply_ury_policy_and_vector(work_order, production_plan_doc, target)
 	work_order.save()
 	_verify_component_vector(work_order, target["component_vector"])
@@ -282,6 +283,10 @@ def _create_work_order(production_plan_doc, target):
 	# from the Work Order's own perspective (a nested PRE_PRODUCED
 	# sub-assembly already appears as its own item, never exploded further).
 	work_order.use_multi_level_bom = 0
+	# ERPNext only rolls ordered_qty / produced_qty / status onto the
+	# Production Plan when production_plan_item is set (see Work Order
+	# update_ordered_qty / update_production_plan_status).
+	_link_work_order_to_plan_item(work_order, production_plan_doc, target)
 
 	_apply_ury_policy_and_vector(work_order, production_plan_doc, target)
 	work_order.insert(ignore_permissions=False)
@@ -291,10 +296,40 @@ def _create_work_order(production_plan_doc, target):
 	return work_order
 
 
+def _link_work_order_to_plan_item(work_order, production_plan_doc, target):
+	"""Point the Work Order at the matching ``po_items`` row (ERPNext's
+	``production_plan_item``). Without this, Desk keeps showing the plan as
+	Not Started even after Manufacture Stock Entries complete."""
+	if work_order.get("production_plan_item"):
+		return
+	work_order.production_plan_item = _resolve_production_plan_item(production_plan_doc, target)
+
+
+def _resolve_production_plan_item(production_plan_doc, target):
+	"""Return the Production Plan Item name for ``target``, matching ERPNext's
+	``get_production_items`` → ``production_plan_item: d.name`` wiring."""
+	item_code = target["item_code"]
+	bom_no = target.get("bom_no")
+	rows = list(production_plan_doc.get("po_items") or [])
+	matches = [row for row in rows if row.item_code == item_code]
+	if bom_no:
+		exact = [row for row in matches if row.get("bom_no") == bom_no]
+		if exact:
+			matches = exact
+	if len(matches) == 1:
+		return matches[0].name
+	frappe.throw(
+		_(
+			"Cannot link Work Order for {0} to Production Plan {1}: expected exactly one "
+			"Assembly Item row matching item/BOM, found {2}."
+		).format(item_code, production_plan_doc.name, len(matches)),
+		exc=WorkOrderExecutionError,
+	)
+
+
 def _apply_ury_policy_and_vector(work_order, production_plan_doc, target):
 	apply_ury_warehouse_policy(work_order, production_plan_doc)
 	apply_ury_required_items(work_order, target["component_vector"])
-
 
 def _verify_component_vector(work_order, component_vector):
 	"""Fail loudly if ``work_order.required_items``, as actually persisted,
