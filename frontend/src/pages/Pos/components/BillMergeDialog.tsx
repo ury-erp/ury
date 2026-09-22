@@ -6,13 +6,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Button,
+  Input,
+  Spinner,
+  cn,
+  showToast,
 } from '@ury/ui';
-import { Button } from '@ury/ui';
-import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { t } from '../i18n';
-import { showToast } from '@ury/ui';
-import { Spinner } from '@ury/ui';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import {
   getLinkedMergeSecondaries,
@@ -264,13 +265,13 @@ const BillMergeDialog = ({
         </DialogHeader>
 
         <div className="shrink-0 px-6">
-          <input
+          <Input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('header.search_placeholder_orders')}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={isSubmitting}
+            aria-label={t('header.search_placeholder_orders')}
           />
         </div>
 

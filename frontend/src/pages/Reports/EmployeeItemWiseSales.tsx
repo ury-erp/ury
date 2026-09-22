@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, Input, PageHeader } from '@ury/ui';
 import { Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -95,9 +95,9 @@ export function EmployeeItemWiseSales() {
       />
 
       <div className="relative max-w-sm">
-        <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
+        <div className="flex items-center border border-input rounded-md px-3 gap-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
+          <Input
             type="text"
             placeholder="Search employee by name..."
             value={query}
@@ -106,7 +106,8 @@ export function EmployeeItemWiseSales() {
               setSelectedEmployee(null);
               setData(null);
             }}
-            className="flex-1 text-sm outline-none"
+            className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
+            aria-label="Search employee by name"
           />
         </div>
         {suggestions.length > 0 && !selectedEmployee && (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
-import { Button } from '@ury/ui';
+import { Button, Textarea } from '@ury/ui';
 import { t } from '../i18n';
 
 interface CommentDialogProps {
@@ -49,12 +49,12 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
           <label htmlFor="comment" className="block text-sm font-medium text-muted-foreground mb-2">
             {t('comment.label')}
           </label>
-          <textarea
+          <Textarea
             id="comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t('comment.placeholder')}
-            className="w-full h-32 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+            className="h-32 resize-none"
             autoFocus
           />
         </div>

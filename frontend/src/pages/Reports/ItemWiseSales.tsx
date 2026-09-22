@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Button, PageHeader } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Button, Input, PageHeader } from '@ury/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -84,12 +84,13 @@ export function ItemWiseSales() {
         description={`Best-selling items ${activeBranchId === 'all' ? '· All Branches' : ''}`}
         actions={
           <>
-            <input
+            <Input
               type="text"
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm w-40"
+              className="w-40"
+              aria-label="Search items"
             />
             <DateRangeFilter value={range} onChange={setRange} />
           </>

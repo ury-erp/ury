@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
+import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
@@ -1293,7 +1293,7 @@ export const SalesPlanPage: React.FC = () => {
       ) : (
         <Section>
           {(Object.keys(groupedItems).length > 1 || isEditable) && (
-            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-1 py-2 backdrop-blur">
+            <div className="sticky top-0 z-20 -mx-6 mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-6 pb-2 backdrop-blur">
               <div className="flex flex-wrap items-center gap-2">
                 {Object.keys(groupedItems).length > 1 && (
                   <>
@@ -1648,12 +1648,12 @@ export const SalesPlanPage: React.FC = () => {
                 <label htmlFor="backward-action-reason" className="mb-2 block text-sm font-medium text-foreground">
                   Reason for {currentBackwardAction.label.toLowerCase()}
                 </label>
-                <textarea
+                <Textarea
                   id="backward-action-reason"
                   value={backwardActionReason}
                   onChange={(event) => setBackwardActionReason(event.target.value)}
                   placeholder="Please explain why you are performing this action..."
-                  className="h-24 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-foreground placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-24 resize-none"
                   disabled={backwardActionTransitioning}
                 />
                 {backwardActionError && (

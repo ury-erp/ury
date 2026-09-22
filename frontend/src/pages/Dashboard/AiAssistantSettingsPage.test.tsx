@@ -60,8 +60,8 @@ describe('AiAssistantSettingsPage', () => {
   it('renders enable toggle and configuration section', async () => {
     render(<AiAssistantSettingsPage />);
     await waitFor(() => {
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      expect(checkboxes.length > 0).toBe(true);
+      expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
+      expect(screen.getByText(/Enable AI Assistant/i)).toBeInTheDocument();
     });
   });
 

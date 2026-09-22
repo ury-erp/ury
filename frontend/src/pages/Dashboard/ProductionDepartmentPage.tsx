@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Button, DataTable, Input, Page, Panel, Spinner, showToast, type DataTableColumn, messageToPlainText } from '@ury/ui';
+import { Button, Checkbox, DataTable, Input, Page, Panel, Spinner, showToast, type DataTableColumn, messageToPlainText } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -321,12 +321,11 @@ export const ProductionDepartmentPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="enabled"
+              size="sm"
               checked={newDepartment.enabled}
               onChange={(e) => setNewDepartment({ ...newDepartment, enabled: e.target.checked })}
-              className="rounded border-border"
             />
             <label htmlFor="enabled" className="font-semibold text-muted-foreground">Enabled</label>
           </div>

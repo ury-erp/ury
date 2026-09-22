@@ -10,7 +10,7 @@ import {
   Calculator,
   FileSpreadsheet
 } from 'lucide-react';
-import { Button, Input, Select, SelectItem, Card, Spinner, showToast } from '@ury/ui';
+import { Button, Input, Select, SelectItem, Card, Spinner, Switch, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 
@@ -459,15 +459,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <span className="text-sm font-semibold text-foreground block">Extended Hours</span>
                       <span className="text-xs text-muted-foreground">Enable shift calculation beyond midnight (00:00).</span>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={extendedHours}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExtendedHours(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
+                    <Switch checked={extendedHours} onCheckedChange={setExtendedHours} />
                   </Card>
 
                   <div>
