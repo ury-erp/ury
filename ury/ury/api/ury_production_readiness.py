@@ -55,20 +55,6 @@ target's ``component_vector`` row. Skipping it here would silently discard
 the entire raw-material requirement for any MADE_TO_ORDER item whose BOM
 contains no PRE_PRODUCED stop point at all.
 
-Each ``raw_material_demand`` row carries its own warehouse, which is not
-always the department's: the target compiler resolves it the same way
-``ury_production_context.resolve_production_context`` does for
-MADE_TO_ORDER, Production Unit warehouse first, department warehouse only as
-a fallback. This module's demand aggregation is therefore keyed by
-``(department, item_code, warehouse)``, not just ``(department, item_code)``
--- a real, live site has at least one department whose Production Unit
-warehouse differs from its own department warehouse, and merging demand for
-the same item across two different physical warehouses under one warehouse
-would silently misreport stock and shortage for whichever one lost. In the
-common case, where every demand source in a department shares the
-department's own warehouse, this key collapses to exactly the same single
-row per (department, item_code) as before.
-
 ## Return shape
 
     {"rows": [...], "blockers": [...]}
@@ -184,7 +170,7 @@ def compute_readiness(departments, store_warehouse=None):
 		blockers.append(_store_warehouse_not_configured_blocker())
 
 	rows = []
-	for (department, item_code, _department_warehouse), demand in demand_rows.items():
+	for (department, item_code), demand in demand_rows.items():
 		department_available = _bin_actual_qty(item_code, demand["department_warehouse"])
 		department_shortage = _stock_qty(max(0.0, demand["required_qty"] - department_available))
 		rows.append({
@@ -208,25 +194,11 @@ def compute_readiness(departments, store_warehouse=None):
 def _collect_department_demand(departments):
 	"""Aggregate raw-material demand (from every target's ``component_vector``)
 	and EXTERNAL_RECEIPT demand (D19 -- the target itself) into one dict keyed
-	by ``(department, item_code, department_warehouse)``.
+	by ``(department, item_code)``.
 
-	The warehouse is part of the key, not just the department, because a
-	MADE_TO_ORDER row's own raw materials (``raw_material_demand``) can carry
-	their own warehouse distinct from the department's -- a Production Unit's
-	warehouse, when it has one (see
-	``ury_production_target_compiler._made_to_order_raw_material_warehouse``).
-	Two rows needing the same item in the same department but different
-	warehouses are two separate physical requirements; merging them under one
-	warehouse would silently misreport stock and shortage for whichever one
-	lost. In the common case -- every demand source in a department shares
-	the department's own warehouse, which is always true for targets and
-	EXTERNAL_RECEIPT (D13/D19) and true for raw material demand whenever the
-	Production Unit has no warehouse of its own -- this key collapses to
-	exactly the same one row per (department, item_code) as before.
-
-	Two demand rows that DO share a key (e.g. two different targets that both
-	consume Rice into the same warehouse) are summed together, the same way
-	the target compiler itself sums repeated demand for one target.
+	Two component-vector rows for the same item in the same department (e.g.
+	two different targets that both consume Rice) are summed together, the
+	same way the target compiler itself sums repeated demand for one target.
 	"""
 	demand = {}
 	for department, bucket in (departments or {}).items():
@@ -251,13 +223,9 @@ def _collect_department_demand(departments):
 			)
 		for component in bucket.get("raw_material_demand") or []:
 			# A MADE_TO_ORDER row's own raw materials, folded in exactly like
-			# a target's component_vector row (see module docstring) -- but
-			# using THIS row's own warehouse, which the target compiler may
-			# have resolved to a Production Unit's warehouse rather than the
-			# department's. Falling back to the bucket's own warehouse only
-			# covers an older/malformed row that never set one.
+			# a target's component_vector row (see module docstring).
 			_add_demand(
-				demand, department, component.get("department_warehouse") or department_warehouse,
+				demand, department, department_warehouse,
 				item_code=component.get("item_code"),
 				qty=component.get("required_qty"),
 				stock_uom=component.get("stock_uom"),
@@ -268,7 +236,7 @@ def _collect_department_demand(departments):
 def _add_demand(demand, department, department_warehouse, item_code, qty, stock_uom):
 	if not item_code:
 		return
-	key = (department, item_code, department_warehouse)
+	key = (department, item_code)
 	existing = demand.get(key)
 	if existing:
 		existing["required_qty"] = flt(existing["required_qty"]) + flt(qty)

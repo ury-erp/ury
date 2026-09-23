@@ -198,7 +198,6 @@ from ury.ury.api.ury_production_context import resolve_production_context
 
 CONFIG_DOCTYPE = "URY Item Production Configuration"
 DEPARTMENT_DOCTYPE = "URY Production Department"
-PRODUCTION_UNIT_DOCTYPE = "URY Production Unit"
 
 POLICY_PRE_PRODUCED = "PRE_PRODUCED"
 POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
@@ -321,8 +320,7 @@ def _seed_from_snapshot_row(row, branch, company, graph, blockers):
         # given a target at all. Feeding that into raw-material demand would
         # turn a blocking misconfiguration into a spurious Purchase/Transfer
         # request for an item nobody intends Store to hold.
-        raw_material_warehouse = _made_to_order_raw_material_warehouse(department, row.get("production_unit"))
-        graph.add_raw_material_demand(department, raw_material_warehouse, raw_material_vector)
+        graph.add_raw_material_demand(department, _department_warehouse(department), raw_material_vector)
         for candidate in nested:
             child_key = graph.key(
                 candidate["department"], candidate["item_code"], candidate["bom_no"], candidate["warehouse"]
@@ -391,30 +389,16 @@ class _TargetGraph:
         """Fold a MADE_TO_ORDER row's own direct-consumption ``component_vector``
         into this department's raw-material demand.
 
-        Keyed by ``(department, item_code, department_warehouse)``, not just
-        ``(department, item_code)``: a MADE_TO_ORDER row's own raw materials
-        land in its Production Unit's warehouse when it has one, which is not
-        always the same warehouse as the department's (see
-        ``_made_to_order_raw_material_warehouse``). Two MTO rows in the same
-        department that both consume the same raw material into the *same*
-        warehouse are summed, the same way a shared target's demand is summed
-        elsewhere in this class; two that need it in *different* warehouses
-        become two separate rows, because they are two separate physical
-        requirements and merging them under one warehouse would silently
-        misreport stock and shortage for whichever warehouse lost.
-
-        ``department_warehouse`` here also becomes this department's bucket
-        fallback (``self._raw_material_departments``), used only when a
-        department's bucket would otherwise have no ``warehouse`` at all
-        (every target-less, raw-material-only department, D21).
+        Two MTO rows in the same department that both consume the same raw
+        material (e.g. two different drinks both using Sugar) are summed, the
+        same way a shared target's demand is summed elsewhere in this class.
         """
-        if department not in self._raw_material_departments or not self._raw_material_departments.get(department):
-            self._raw_material_departments[department] = department_warehouse
+        self._raw_material_departments[department] = department_warehouse
         for component in component_vector or []:
             item_code = component.get("item_code")
             if not item_code:
                 continue
-            key = (department, item_code, department_warehouse)
+            key = (department, item_code)
             qty = flt(component.get("required_qty"))
             existing = self._raw_material_demand.get(key)
             if existing:
@@ -560,7 +544,7 @@ class _TargetGraph:
         # PRE_PRODUCED stop point anywhere in its BOM) still needs a bucket:
         # without one, that demand has nowhere to attach and disappears the
         # same way it used to before this method existed.
-        for (department, item_code, warehouse), demand in self._raw_material_demand.items():
+        for (department, item_code), demand in self._raw_material_demand.items():
             if flt(demand["required_qty"]) <= 0:
                 continue
             bucket = _bucket_for(department, self._raw_material_departments.get(department))
@@ -569,12 +553,6 @@ class _TargetGraph:
                     "item_code": item_code,
                     "required_qty": demand["required_qty"],
                     "stock_uom": demand["stock_uom"],
-                    # This row's own warehouse -- a Production Unit's, when
-                    # it has one, not necessarily the department's (see
-                    # _made_to_order_raw_material_warehouse). The readiness
-                    # engine reads this per row rather than assuming every
-                    # demand source in a department shares one warehouse.
-                    "department_warehouse": warehouse,
                 }
             )
 
@@ -773,34 +751,6 @@ def _department_warehouse(department):
     if not department:
         return None
     return frappe.db.get_value(DEPARTMENT_DOCTYPE, department, "department_warehouse")
-
-
-def _made_to_order_raw_material_warehouse(department, production_unit):
-    """Where a MADE_TO_ORDER row's own raw materials must land to be usable.
-
-    Mirrors ``ury_production_context.resolve_production_context``'s
-    MADE_TO_ORDER branch exactly: the item's Production Unit warehouse takes
-    priority, the Department Warehouse is only a fallback for a unit with
-    none configured. That resolver's output is what
-    ``ury_fulfilment_posting_service`` actually consumes raw materials from
-    when it posts the order's Manufacture Stock Entry (frozen into the
-    reservation at order-accept time via
-    ``ury_order_reservation_service._warehouse_for_context``) -- unlike
-    ``_department_warehouse`` above, which is correct for PRE_PRODUCED (D13)
-    but not for MADE_TO_ORDER.
-
-    The two warehouses are not always the same: a Production Unit can, and
-    on at least one real site does, have its own warehouse distinct from its
-    department's. Resolving raw-material demand to the Department Warehouse
-    unconditionally would replenish a warehouse the order's own Manufacture
-    Stock Entry never reads from, leaving that Work Order unable to
-    complete despite the Purchase/Transfer Material Request having done
-    exactly what it was asked to do.
-    """
-    unit_warehouse = None
-    if production_unit:
-        unit_warehouse = frappe.db.get_value(PRODUCTION_UNIT_DOCTYPE, production_unit, "warehouse")
-    return unit_warehouse or _department_warehouse(department)
 
 
 # --- dependency ordering ------------------------------------------------------
