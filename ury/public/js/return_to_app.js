@@ -98,17 +98,17 @@
 		}
 
 		const stored = readSession(STORAGE_KEY);
-		if (!stored) return null;
+		if (!stored) return { path: "/ury", label: "URY" };
 		try {
 			const context = JSON.parse(stored);
 			if (!isAllowedReturnPath(context && context.path)) {
 				writeSession(STORAGE_KEY, null);
-				return null;
+				return { path: "/ury", label: "URY" };
 			}
 			return { path: context.path, label: sanitizeLabel(context.label) };
 		} catch (e) {
 			writeSession(STORAGE_KEY, null);
-			return null;
+			return { path: "/ury", label: "URY" };
 		}
 	};
 
@@ -128,8 +128,8 @@
 			"z-index:1050",
 			"display:flex",
 			"align-items:center",
-			"gap:2px",
-			"padding:4px 4px 4px 12px",
+			"gap:6px",
+			"padding:6px 10px 6px 14px",
 			"border-radius:999px",
 			"background:var(--bg-color, #fff)",
 			"border:1px solid var(--border-color, #d8dfe7)",
@@ -149,7 +149,7 @@
 			"white-space:nowrap",
 			"overflow:hidden",
 			"text-overflow:ellipsis",
-			"padding:4px 4px",
+			"padding:0",
 		].join(";");
 		link.addEventListener("click", () => writeSession(STORAGE_KEY, null));
 
@@ -164,7 +164,7 @@
 			"color:var(--text-muted, #7a8592)",
 			"font-size:15px",
 			"line-height:1",
-			"padding:5px 8px",
+			"padding:0 ",
 			"border-radius:999px",
 		].join(";");
 		dismiss.addEventListener("click", () => {

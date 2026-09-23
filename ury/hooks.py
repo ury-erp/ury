@@ -16,7 +16,7 @@ add_to_apps_screen = [
     "name": "ury",
     "logo": "/assets/ury/Images/ury.png",
     "title": "URY",
-    "route": "/app/ury",
+    "route": "/ury",
     "has_permission": "ury.permission.check_app_permission"
   }
 ]
