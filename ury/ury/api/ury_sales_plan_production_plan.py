@@ -48,6 +48,11 @@ PP_HASH_FIELD = "custom_ury_snapshot_hash"
 PP_DEPARTMENT_FIELD = "custom_ury_department"
 PP_DEPARTMENT_WAREHOUSE_FIELD = "custom_ury_department_warehouse"
 PP_STATE_FIELD = "custom_ury_production_state"
+#: Production Plan Item (child) field, not Production Plan (parent) --
+#: advisory marker only, written for a MADE_TO_ORDER row's own target.
+#: ury_work_order_hooks is the actual server-side guard; see its module
+#: docstring.
+PP_ITEM_NO_WORK_ORDER_FIELD = "custom_ury_no_work_order"
 
 #: Only "Locked for Production" carries live department Production Plans
 #: (D14) -- creation moved off the "Approved" transition, so an Approved plan
@@ -114,6 +119,13 @@ def _target_to_production_plan_item(target, plan_date):
 	# exploded, selective vector -- see the compiler's docstring) fails
 	# silently.
 	row["include_exploded_items"] = 0
+	# A MADE_TO_ORDER row's own target (see the target compiler's
+	# "MADE_TO_ORDER items" section): a real po_items row exists so ERPNext's
+	# mandatory po_items constraint is satisfied, but this row must never get
+	# a Work Order. Setting the flag here is advisory only, matching the
+	# executor's own skip -- ury_work_order_hooks is what actually refuses a
+	# Work Order for it, server side, regardless of who tries to create one.
+	row[PP_ITEM_NO_WORK_ORDER_FIELD] = 1 if target.get("skip_work_order") else 0
 	return row
 
 
@@ -165,8 +177,14 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 	Idempotent per department on ``(sales_plan, department, snapshot hash)``:
 	a department whose live plan already carries the Sales Plan's current
 	``approval_snapshot_hash`` is left alone and reported with
-	``created: False``. A department with no compiled targets at all (an
-	"empty department") gets no plan.
+	``created: False``. A department with no compiled targets and no
+	EXTERNAL_RECEIPT demand at all (nothing to produce, receive or buy for
+	it) gets no plan. A MADE_TO_ORDER item is itself a target now (see the
+	target compiler's "MADE_TO_ORDER items" section), so a department whose
+	only content is MADE_TO_ORDER rows still gets a plan, with a real
+	po_items row for each -- never left empty, which ERPNext's own
+	Production Plan doctype would refuse to insert at all (``po_items`` is a
+	mandatory child table).
 	"""
 	# Read a real column with FOR UPDATE (not get_doc, which is cached).
 	frappe.db.get_value(SALES_PLAN, sales_plan_doc.name, "name", for_update=True)
@@ -190,8 +208,8 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 	results = []
 	for department, bucket in departments.items():
 		if not (bucket.get("targets") or bucket.get("external_receipt_targets")):
-			# Empty department (defensive -- compile_production_targets only
-			# ever creates a bucket that has at least one target).
+			# Genuinely empty -- nothing to produce, receive or buy for this
+			# department.
 			continue
 
 		existing = existing_by_department.get(department)

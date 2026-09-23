@@ -165,7 +165,10 @@ def _all_item_codes(departments, key="targets"):
 
 
 class MtoAssemblyTests(unittest.TestCase):
-    def test_mto_excluded_but_pre_produced_assembly_included_at_scaled_qty(self):
+    def test_mto_row_is_its_own_target_and_pre_produced_assembly_is_a_separate_one(self):
+        # CHICKEN-BIRYANI (MTO) is now a real target too -- skip_work_order
+        # True, a real po_items row, its own (empty here) raw_material_vector
+        # -- alongside BIRYANI-BASE, discovered and scaled exactly as before.
         fixture = _Fixture(
             configs={
                 "BIRYANI-BASE": _config(
@@ -192,17 +195,33 @@ class MtoAssemblyTests(unittest.TestCase):
         departments, blockers = fixture.compile(snapshot)
 
         self.assertEqual(blockers, [])
-        self.assertNotIn("CHICKEN-BIRYANI", _all_item_codes(departments))
         main = departments["Main Kitchen"]
         self.assertEqual(main["warehouse"], "Main Kitchen - WH")
-        self.assertEqual(len(main["targets"]), 1)
-        target = main["targets"][0]
-        self.assertEqual(target["item_code"], "BIRYANI-BASE")
-        self.assertEqual(target["bom_no"], "BOM-BIRYANI-BASE")
-        self.assertEqual(target["required_qty"], 20)
-        cv = {row["item_code"]: row["required_qty"] for row in target["component_vector"]}
+        self.assertEqual(len(main["targets"]), 2)
+        by_item = {t["item_code"]: t for t in main["targets"]}
+
+        mto = by_item["CHICKEN-BIRYANI"]
+        self.assertTrue(mto["skip_work_order"])
+        self.assertEqual(mto["required_qty"], 100)
+        # BIRYANI-BASE is a PRE_PRODUCED node in CHICKEN-BIRYANI's own BOM:
+        # present in component_vector (D1, for a Work Order this row will
+        # never get), excluded from raw_material_vector (it is its own
+        # separate target, not something to purchase or transfer).
+        self.assertEqual(
+            {row["item_code"] for row in mto["component_vector"]}, {"BIRYANI-BASE"}
+        )
+        self.assertEqual(mto["raw_material_vector"], [])
+
+        base = by_item["BIRYANI-BASE"]
+        self.assertFalse(base["skip_work_order"])
+        self.assertEqual(base["bom_no"], "BOM-BIRYANI-BASE")
+        self.assertEqual(base["required_qty"], 20)
+        cv = {row["item_code"]: row["required_qty"] for row in base["component_vector"]}
         self.assertEqual(cv["Rice"], 1.0)
         self.assertEqual(cv["Masala"], 0.2)
+        # BIRYANI-BASE's own ingredients are true raw materials -- its
+        # raw_material_vector matches its component_vector exactly.
+        self.assertEqual(base["component_vector"], base["raw_material_vector"])
 
     def test_shared_assembly_demand_aggregated_once_within_department(self):
         fixture = _Fixture(
@@ -237,10 +256,12 @@ class MtoAssemblyTests(unittest.TestCase):
 
         self.assertEqual(blockers, [])
         main = departments["Main Kitchen"]
-        self.assertEqual(len(main["targets"]), 1)
-        target = main["targets"][0]
-        self.assertEqual(target["required_qty"], 25)  # 100*0.2 + 50*0.1
-        self.assertEqual(len(target["sources"]), 2)
+        # CHICKEN-BIRYANI, VEG-BIRYANI (each skip_work_order) and the one
+        # shared BIRYANI-BASE target its two MTO rows aggregate into.
+        self.assertEqual(len(main["targets"]), 3)
+        base = next(t for t in main["targets"] if t["item_code"] == "BIRYANI-BASE")
+        self.assertEqual(base["required_qty"], 25)  # 100*0.2 + 50*0.1
+        self.assertEqual(len(base["sources"]), 2)
 
     def test_other_branch_configuration_does_not_stop_traversal(self):
         # SEMI has an active configuration, but for a different branch -- it
@@ -271,12 +292,161 @@ class MtoAssemblyTests(unittest.TestCase):
         self.assertEqual(blockers, [])
         self.assertNotIn("SEMI", _all_item_codes(departments))
         main = departments["Main Kitchen"]
-        self.assertEqual(len(main["targets"]), 1)
-        target = main["targets"][0]
-        self.assertEqual(target["item_code"], "DEEP-PP")
+        self.assertEqual({t["item_code"] for t in main["targets"]}, {"ROOT-MTO", "DEEP-PP"})
+        target = next(t for t in main["targets"] if t["item_code"] == "DEEP-PP")
         self.assertEqual(target["required_qty"], 10)
         cv = {row["item_code"]: row["required_qty"] for row in target["component_vector"]}
         self.assertEqual(cv["Flour"], 5.0)
+
+    def test_mto_item_with_no_pre_produced_stop_point_is_its_own_target(self):
+        # ORANGE-JUICE is MADE_TO_ORDER and its BOM is pure raw materials --
+        # no PRE_PRODUCED assembly anywhere. It is still a real target
+        # (skip_work_order=True): a real po_items row so ERPNext's own
+        # mandatory po_items constraint is satisfied, and its raw materials
+        # reach readiness through raw_material_vector, not a separate
+        # mechanism.
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={
+                "BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3), _bom_row("Sugar", 0.05)],
+            },
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE"},
+            department_warehouses={"Beverage": "Beverage - WH"},
+        )
+        snapshot = _snapshot(
+            [
+                _row(
+                    "ORANGE-JUICE", 20, department="Beverage", production_policy="MADE_TO_ORDER",
+                    bom="BOM-ORANGE-JUICE",
+                )
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        beverage = departments["Beverage"]
+        self.assertEqual(len(beverage["targets"]), 1)
+        self.assertEqual(beverage["external_receipt_targets"], [])
+        self.assertEqual(beverage["warehouse"], "Beverage - WH")
+
+        target = beverage["targets"][0]
+        self.assertEqual(target["item_code"], "ORANGE-JUICE")
+        self.assertTrue(target["skip_work_order"])
+        self.assertEqual(target["required_qty"], 20)
+        demand = {row["item_code"]: row["required_qty"] for row in target["raw_material_vector"]}
+        self.assertEqual(demand["Orange"], 6.0)  # 20 * 0.3
+        self.assertEqual(demand["Sugar"], 1.0)  # 20 * 0.05
+        # No PRE_PRODUCED node touched this BOM, so nothing is filtered out.
+        self.assertEqual(target["component_vector"], target["raw_material_vector"])
+
+    def test_two_mto_rows_each_get_their_own_target_and_raw_material_vector(self):
+        # ORANGE-JUICE and LEMONADE are both MADE_TO_ORDER, both in Beverage,
+        # and both use Sugar. Each is its own target with its own
+        # raw_material_vector -- the compiler does not merge demand across
+        # different top-level rows; that summing is the READINESS engine's
+        # job (see test_ury_production_readiness), one level up.
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={
+                "BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3), _bom_row("Sugar", 0.05)],
+                "BOM-LEMONADE": [_bom_row("Lemon", 0.2), _bom_row("Sugar", 0.04)],
+            },
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE", "BOM-LEMONADE": "LEMONADE"},
+            department_warehouses={"Beverage": "Beverage - WH"},
+        )
+        snapshot = _snapshot(
+            [
+                _row("ORANGE-JUICE", 20, department="Beverage", production_policy="MADE_TO_ORDER",
+                     bom="BOM-ORANGE-JUICE"),
+                _row("LEMONADE", 10, department="Beverage", production_policy="MADE_TO_ORDER",
+                     bom="BOM-LEMONADE"),
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        by_item = {t["item_code"]: t for t in departments["Beverage"]["targets"]}
+        self.assertEqual(set(by_item), {"ORANGE-JUICE", "LEMONADE"})
+
+        oj_demand = {r["item_code"]: r["required_qty"] for r in by_item["ORANGE-JUICE"]["raw_material_vector"]}
+        self.assertEqual(oj_demand, {"Orange": 6.0, "Sugar": 1.0})
+
+        lem_demand = {r["item_code"]: r["required_qty"] for r in by_item["LEMONADE"]["raw_material_vector"]}
+        self.assertEqual(lem_demand, {"Lemon": 2.0, "Sugar": 0.4})
+
+    def test_mto_own_direct_retail_component_is_in_the_raw_material_vector(self):
+        # A bottled, bought-in component of an MTO dish (e.g. a sauce) is
+        # DIRECT_RETAIL, not a raw material leaf, but it must still surface
+        # in raw_material_vector: it is bought, not manufactured, and is not
+        # a PRE_PRODUCED node, so nothing filters it out.
+        fixture = _Fixture(
+            configs={
+                "BOTTLED-SAUCE": _config(
+                    "BOTTLED-SAUCE", department="Main Kitchen", production_policy="DIRECT_RETAIL",
+                    warehouse="Retail - WH",
+                ),
+            },
+            bom_catalog={"BOM-WRAP": [_bom_row("BOTTLED-SAUCE", 1), _bom_row("Tortilla", 1)]},
+            root_items={"BOM-WRAP": "WRAP"},
+            department_warehouses={"Main Kitchen": "Main Kitchen - WH"},
+        )
+        snapshot = _snapshot(
+            [_row("WRAP", 5, department="Main Kitchen", production_policy="MADE_TO_ORDER", bom="BOM-WRAP")]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        target = departments["Main Kitchen"]["targets"][0]
+        self.assertEqual(target["item_code"], "WRAP")
+        demand = {row["item_code"]: row["required_qty"] for row in target["raw_material_vector"]}
+        self.assertEqual(demand["BOTTLED-SAUCE"], 5.0)
+        self.assertEqual(demand["Tortilla"], 5.0)
+
+    def test_mto_own_nested_pre_produced_item_never_in_its_own_raw_material_vector(self):
+        # BIRYANI-BASE is a real nested target here (D1) -- it must appear
+        # in main["targets"] as its own entry, and it must NOT appear in
+        # CHICKEN-BIRYANI's raw_material_vector, or the readiness engine
+        # would ask Store/the department to hold it as if it were a plain
+        # purchasable ingredient, on top of it correctly being produced
+        # through its own Work Order.
+        fixture = _Fixture(
+            configs={
+                "BIRYANI-BASE": _config(
+                    "BIRYANI-BASE", department="Main Kitchen", bom="BOM-BIRYANI-BASE",
+                    warehouse="Main Kitchen - WH",
+                ),
+            },
+            bom_catalog={
+                "BOM-CHICKEN-BIRYANI": [
+                    _bom_row("BIRYANI-BASE", 0.2, bom_no="BOM-BIRYANI-BASE"),
+                    _bom_row("Salt", 0.01),
+                ],
+                "BOM-BIRYANI-BASE": [_bom_row("Rice", 0.05)],
+            },
+            root_items={"BOM-CHICKEN-BIRYANI": "CHICKEN-BIRYANI", "BOM-BIRYANI-BASE": "BIRYANI-BASE"},
+            department_warehouses={"Main Kitchen": "Main Kitchen - WH"},
+        )
+        snapshot = _snapshot(
+            [_row("CHICKEN-BIRYANI", 100, department="Main Kitchen", production_policy="MADE_TO_ORDER",
+                  bom="BOM-CHICKEN-BIRYANI")]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        main = departments["Main Kitchen"]
+        self.assertEqual({t["item_code"] for t in main["targets"]}, {"CHICKEN-BIRYANI", "BIRYANI-BASE"})
+        mto = next(t for t in main["targets"] if t["item_code"] == "CHICKEN-BIRYANI")
+        self.assertTrue(mto["skip_work_order"])
+        raw_material_items = {row["item_code"] for row in mto["raw_material_vector"]}
+        self.assertNotIn("BIRYANI-BASE", raw_material_items)
+        self.assertIn("Salt", raw_material_items)
+        # But it IS in the unfiltered component_vector -- D1, for a Work
+        # Order this row will never actually get, since skip_work_order.
+        self.assertIn("BIRYANI-BASE", {row["item_code"] for row in mto["component_vector"]})
 
 
 class DirectPreProducedTests(unittest.TestCase):
@@ -423,7 +593,16 @@ class CrossDepartmentBlockerTests(unittest.TestCase):
 
         departments, blockers = fixture.compile(snapshot)
 
-        self.assertEqual(departments, {})
+        # SANDWICH is still a real target (skip_work_order=True): an MTO
+        # item's own po_items row exists regardless of a blocked dependency
+        # underneath it -- it never gets a Work Order either way, and the
+        # blocker is what actually tells the manager BREAD is misconfigured.
+        main = departments["Main Kitchen"]
+        self.assertEqual({t["item_code"] for t in main["targets"]}, {"SANDWICH"})
+        sandwich = main["targets"][0]
+        self.assertTrue(sandwich["skip_work_order"])
+        self.assertNotIn("BREAD", {row["item_code"] for row in sandwich["raw_material_vector"]})
+
         self.assertEqual(len(blockers), 1)
         blocker = blockers[0]
         self.assertEqual(blocker["type"], "cross_department_dependency")
@@ -478,7 +657,14 @@ class AmbiguousConfigurationTests(unittest.TestCase):
 
         departments, blockers = fixture.compile(snapshot)
 
-        self.assertEqual(departments, {})
+        # ROOT2 is still a real target (skip_work_order=True) even though its
+        # own BOM has a blocked node underneath it -- same reasoning as the
+        # cross-department case: the MTO item's own po_items row is harmless
+        # to have, and the blocker is what surfaces the real problem.
+        main = departments["Main Kitchen"]
+        self.assertEqual({t["item_code"] for t in main["targets"]}, {"ROOT2"})
+        self.assertTrue(main["targets"][0]["skip_work_order"])
+
         self.assertEqual(len(blockers), 1)
         self.assertEqual(blockers[0]["type"], "ambiguous_configuration")
         self.assertEqual(blockers[0]["item_code"], "CONFUSED")

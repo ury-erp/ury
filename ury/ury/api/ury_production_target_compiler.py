@@ -33,7 +33,7 @@ own docstring for why that is the only safe source of a "pinned" BOM.
         "Main Kitchen": {
             "department": "Main Kitchen",
             "warehouse": "Main Kitchen - WH",          # the Department Warehouse (D13)
-            "targets": [ ... ],                          # IN_HOUSE targets, Work Order will be built for these
+            "targets": [ ... ],                          # everything with a real Production Plan Item row
             "external_receipt_targets": [ ... ],          # sourcing_mode == EXTERNAL_RECEIPT; NEVER build a Work Order for these
         },
         ...
@@ -53,10 +53,16 @@ dependency appears before the target that consumes it -- see
         "warehouse": "Main Kitchen - WH",     # Department Warehouse, D13
         "production_unit": "Main Kitchen Unit",
         "sourcing_mode": "IN_HOUSE",          # or "EXTERNAL_RECEIPT"
+        "skip_work_order": False,              # True only for a MADE_TO_ORDER row's own
+                                                 # target -- see "MADE_TO_ORDER items" below
         "component_vector": [                  # D1: exactly what the Work Order's
             {"item_code": "Rice", "required_qty": 4.0, "stock_uom": "Kg"},
             {"item_code": "Masala", "required_qty": 0.8, "stock_uom": "Kg"},
         ],                                      # required_items must contain, verbatim
+        "raw_material_vector": [                # what the READINESS engine wants instead
+            {"item_code": "Rice", "required_qty": 4.0, "stock_uom": "Kg"},
+        ],                                      # component_vector minus any PRE_PRODUCED
+                                                 # node -- see "Two vectors, two purposes"
         "depends_on": ["OTHER-PRE-PRODUCED-ITEM"],  # nested PRE_PRODUCED items (same
                                                       # department) this target's own
                                                       # component vector produces as a
@@ -66,6 +72,72 @@ dependency appears before the target that consumes it -- see
             {"parent_item": None, "required_qty": 20.0, "source_type": "direct_plan_row"},
         ],
     }
+
+## Two vectors, two purposes
+
+A target's BOM walk produces two vectors, not one, and they are read by two
+different consumers for two different reasons.
+
+``component_vector`` is unfiltered: raw materials, DIRECT_RETAIL components,
+and any PRE_PRODUCED node the walk touched, as an item in its own right (D1).
+This is exactly what the target's own Work Order ``required_items`` must
+contain, because that Work Order genuinely consumes a PRE_PRODUCED
+sub-assembly as an input.
+
+``raw_material_vector`` excludes every PRE_PRODUCED node -- whether it went on
+to become its own nested target, or was blocked as a cross-department
+misconfiguration (D7) and became neither. This is what the READINESS ENGINE
+must read instead: a PRE_PRODUCED sub-assembly is already its own separate
+target with its own separate demand, Store never stocks it directly (it is an
+in-house-manufactured intermediate, not a purchasable raw material), and
+counting it again here would generate a Purchase Material Request asking a
+supplier for something nobody sells. This is a real, confirmed defect if
+``component_vector`` is used for readiness instead -- verified directly: a
+target whose BOM contains a nested PRE_PRODUCED sub-assembly produces a
+spurious Store/Purchase shortage for that sub-assembly's own item code unless
+the readiness engine reads ``raw_material_vector``.
+
+## MADE_TO_ORDER items
+
+A MADE_TO_ORDER row IS a target (unlike an earlier revision of this module,
+which excluded it from ``targets`` and routed its raw materials through a
+separate mechanism -- reverted; see below). It gets a real Production Plan
+Item row, so ERPNext's own mandatory ``po_items`` constraint is satisfied
+without inventing a placeholder row, and its own raw materials reach the
+readiness engine and the Purchase/Transfer Material Requests through the
+exact same ``raw_material_vector`` path every other target already uses --
+no separate concept needed.
+
+``skip_work_order`` is what keeps this safe: the executor
+(``ury_production_plan_auto_work_order.execute_department_targets``) never
+builds a Work Order for a target with this flag set, and
+``ury_work_order_hooks`` refuses one server-side for any Work Order whose
+Production Plan Item row carries the corresponding
+``custom_ury_no_work_order`` flag -- regardless of who tries to create it,
+including ERPNext's own native "Create Work Order" button, which has no
+knowledge of this module's rules and would otherwise happily offer to build
+one. An MTO item is produced only from the actual order, never in advance;
+this is the invariant the whole target-selection design exists to hold, so it
+is enforced at the Work Order layer itself, not only by omission from a list.
+
+A nested PRE_PRODUCED dependency under an MTO row (e.g. Biryani Base under
+Chicken Biryani) is discovered and ordered exactly the same way it is under a
+direct PRE_PRODUCED row -- the MTO row's own ``_expand()`` call is now the
+same code path, not a special case.
+
+**Superseded design, kept here as a pointer for anyone re-deriving this:**
+an earlier revision gave MADE_TO_ORDER rows a separate ``raw_material_demand``
+bucket key, since they were not targets and had no ``po_items`` row to attach
+to. That failed against ERPNext directly: ``Production Plan.po_items`` is a
+mandatory child table (``reqd: 1``), so a department whose only demand was
+raw materials could never actually insert a Production Plan, aborting the
+Lock transition for the whole Sales Plan the moment any department had no
+PRE_PRODUCED item at all. Confirmed by inserting one directly:
+``MandatoryError: [Production Plan, ...]: po_items``. Making the MTO row
+itself a real target sidesteps this because it always gives ``po_items`` a
+row when the department has any content at all. ``EXTERNAL_RECEIPT``-only
+departments still have this exact problem, unresolved -- ``external_receipt_targets``
+still never reaches ``po_items`` either -- and are not fixed by this change.
 
 ``blockers`` is a flat list of dicts, each shaped:
 
@@ -266,27 +338,41 @@ def _seed_from_snapshot_row(row, branch, company, graph, blockers):
                 _("Sales Plan row for item {0} is MADE_TO_ORDER but has no pinned BOM").format(item_code),
                 frappe.ValidationError,
             )
-        try:
-            nodes = walk_bom_tree(bom_no, flt(row.get("qty")), company)
-        except frappe.ValidationError as exc:
-            blockers.append(_traversal_error_blocker(item_code, bom_no, exc))
-            return
-        component_vector, nested, sub_blockers = _classify_walk(
-            nodes, branch, company, consuming_department=department, consuming_item=item_code
+        if not department:
+            frappe.throw(
+                _("Sales Plan row for item {0} is MADE_TO_ORDER but has no department").format(item_code),
+                frappe.ValidationError,
+            )
+        # The MTO item itself is a real target now (D-MTO-PO-ITEM), exactly
+        # like a direct PRE_PRODUCED row -- same ensure_target/add_edge call,
+        # same _expand() walk-and-classify machinery, same nested-PRE_PRODUCED
+        # discovery. The one difference is skip_work_order=True: this target
+        # gets a real Production Plan Item row (so ERPNext's own mandatory
+        # po_items constraint is satisfied, and its own raw materials reach
+        # readiness/Material Requests through the normal component-vector
+        # path, no separate mechanism needed), but the executor never builds
+        # a Work Order for it, and the Work Order hook refuses one server
+        # side even if something else -- ERPNext's own native "Create Work
+        # Order" button included -- tries. An MTO item is produced only from
+        # the actual order, never in advance.
+        warehouse = _department_warehouse(department)
+        graph.ensure_target(
+            department=department,
+            item_code=item_code,
+            bom_no=bom_no,
+            warehouse=warehouse,
+            stock_uom=row.get("stock_uom"),
+            production_unit=row.get("production_unit"),
+            sourcing_mode=SOURCING_IN_HOUSE,
+            skip_work_order=True,
         )
-        blockers.extend(sub_blockers)
-        for candidate in nested:
-            child_key = graph.key(
-                candidate["department"], candidate["item_code"], candidate["bom_no"], candidate["warehouse"]
-            )
-            graph.ensure_target(**candidate)
-            graph.add_edge(
-                parent_key=("mto_row", item_code),
-                child_key=child_key,
-                qty=candidate["qty"],
-                parent_item=item_code,
-                source_type="mto_assembly",
-            )
+        graph.add_edge(
+            parent_key=("plan_row", item_code),
+            child_key=graph.key(department, item_code, bom_no, warehouse),
+            qty=flt(row.get("qty")),
+            parent_item=None,
+            source_type="direct_plan_row",
+        )
         return
 
     # DIRECT_RETAIL, or any other/unclassified policy: not a target, and
@@ -317,7 +403,7 @@ class _TargetGraph:
         return (department, item_code, bom_no, warehouse)
 
     def ensure_target(self, department, item_code, bom_no, warehouse, stock_uom=None,
-                       production_unit=None, sourcing_mode=None, **_ignored):
+                       production_unit=None, sourcing_mode=None, skip_work_order=False, **_ignored):
         key = self.key(department, item_code, bom_no, warehouse)
         if key not in self._targets:
             self._targets[key] = {
@@ -328,7 +414,15 @@ class _TargetGraph:
                 "stock_uom": stock_uom,
                 "production_unit": production_unit,
                 "sourcing_mode": (sourcing_mode or SOURCING_IN_HOUSE).upper(),
+                # True only for a MADE_TO_ORDER row's own target (see
+                # _seed_from_snapshot_row). A real Production Plan Item row
+                # is still built for it -- see ury_sales_plan_production_plan
+                # and the D-MTO-PO-ITEM note there -- but the executor never
+                # builds a Work Order for it, and ury_work_order_hooks
+                # refuses one server-side regardless of who tries.
+                "skip_work_order": bool(skip_work_order),
                 "component_vector": [],
+                "raw_material_vector": [],
                 "depends_on": [],
             }
         self._dirty.add(key)
@@ -391,12 +485,14 @@ class _TargetGraph:
         target["depends_on"] = []
         if total_qty <= 0:
             target["component_vector"] = []
+            target["raw_material_vector"] = []
             return
 
         if target["sourcing_mode"] == SOURCING_EXTERNAL_RECEIPT:
             # D-EXTERNAL_RECEIPT: no BOM consumption, never a Work Order --
             # nothing further to walk.
             target["component_vector"] = []
+            target["raw_material_vector"] = []
             return
 
         try:
@@ -404,13 +500,23 @@ class _TargetGraph:
         except frappe.ValidationError as exc:
             blockers.append(_traversal_error_blocker(target["item_code"], target["bom_no"], exc))
             target["component_vector"] = []
+            target["raw_material_vector"] = []
             return
 
-        component_vector, nested, sub_blockers = _classify_walk(
+        component_vector, raw_material_vector, nested, sub_blockers = _classify_walk(
             nodes, branch, company, consuming_department=target["department"], consuming_item=target["item_code"]
         )
         blockers.extend(sub_blockers)
+        # D1: a target's own Work Order required_items wants the unfiltered
+        # vector -- PRE_PRODUCED sub-assemblies included as items. The
+        # readiness engine wants the filtered one instead (see
+        # ury_production_readiness): a nested PRE_PRODUCED sub-assembly is
+        # already its own separate target with its own separate demand: Store
+        # never stocks it directly, and counting it again here as something
+        # to request would treat an in-house-manufactured intermediate as if
+        # it were a purchasable raw material.
         target["component_vector"] = component_vector
+        target["raw_material_vector"] = raw_material_vector
 
         depends_on = []
         for candidate in nested:
@@ -430,20 +536,24 @@ class _TargetGraph:
 
     def build_department_collections(self):
         departments = {}
+
+        def _bucket_for(department, warehouse):
+            return departments.setdefault(
+                department,
+                {
+                    "department": department,
+                    "warehouse": warehouse,
+                    "targets": [],
+                    "external_receipt_targets": [],
+                },
+            )
+
         for key, target in self._targets.items():
             required_qty = self.required_qty(key)
             if required_qty <= 0:
                 continue
             department = target["department"]
-            bucket = departments.setdefault(
-                department,
-                {
-                    "department": department,
-                    "warehouse": target["warehouse"],
-                    "targets": [],
-                    "external_receipt_targets": [],
-                },
-            )
+            bucket = _bucket_for(department, target["warehouse"])
             row = dict(target)
             row["required_qty"] = required_qty
             row["sources"] = self.sources(key)
@@ -466,13 +576,23 @@ class _TargetGraph:
 def _classify_walk(nodes, branch, company, consuming_department, consuming_item):
     """Classify every node of one flat ``walk_bom_tree`` result.
 
-    Returns ``(component_vector, nested_targets, blockers)``:
+    Returns ``(component_vector, raw_material_vector, nested_targets, blockers)``:
 
     - ``component_vector``: the rows that belong directly in the consuming
       target's/row's own ``required_items`` -- raw materials, DIRECT_RETAIL
       components, and PRE_PRODUCED nodes themselves (D1: a PRE_PRODUCED
       sub-assembly appears as an item; an unstocked intermediate never does,
       only its own descendants do, once classified in turn).
+    - ``raw_material_vector``: the strict subset of ``component_vector`` that
+      is NOT a PRE_PRODUCED node -- true raw materials and DIRECT_RETAIL
+      components only. A PRE_PRODUCED node is excluded here even when it was
+      blocked as a cross-department misconfiguration (D7) and never became a
+      target at all: its own target or its own blocker already accounts for
+      it, and it must never additionally surface as something to purchase or
+      transfer. Used only for a MADE_TO_ORDER row's own raw-material demand
+      (``_TargetGraph.add_raw_material_demand``) -- a target's own
+      ``component_vector`` (Work Order ``required_items``) always wants the
+      unfiltered vector, never this one.
     - ``nested_targets``: PRE_PRODUCED nodes found in ``consuming_department``
       (candidates for ``_TargetGraph.ensure_target``/``add_edge``), each a
       dict with item_code/department/bom_no/warehouse/qty/stock_uom/
@@ -499,7 +619,7 @@ def _classify_walk(nodes, branch, company, consuming_department, consuming_item)
 
         if policy == POLICY_PRE_PRODUCED:
             stopped_prefixes.append(path)
-            _accumulate_component(component_vector_by_item, node)
+            _accumulate_component(component_vector_by_item, node, is_pre_produced=True)
 
             department = context.get("department")
             if department != consuming_department:
@@ -548,20 +668,42 @@ def _classify_walk(nodes, branch, company, consuming_department, consuming_item)
         # present later in this same flat node list and are classified in
         # their own right.
 
-    component_vector = list(component_vector_by_item.values())
-    return component_vector, nested_targets, blockers
+    component_vector = [
+        {"item_code": row["item_code"], "required_qty": row["required_qty"], "stock_uom": row["stock_uom"]}
+        for row in component_vector_by_item.values()
+    ]
+    raw_material_vector = [
+        {"item_code": row["item_code"], "required_qty": row["required_qty"], "stock_uom": row["stock_uom"]}
+        for row in component_vector_by_item.values()
+        if not row["is_pre_produced"]
+    ]
+    return component_vector, raw_material_vector, nested_targets, blockers
 
 
-def _accumulate_component(component_vector_by_item, node):
+def _accumulate_component(component_vector_by_item, node, is_pre_produced=False):
+    """Fold ``node`` into ``component_vector_by_item``, keyed by (item_code, uom).
+
+    ``is_pre_produced`` marks a PRE_PRODUCED node -- whether it went on to
+    become its own nested target, or was blocked as a cross-department
+    misconfiguration (D7) and became neither. Either way its own production
+    or its own blocker already accounts for it entirely; it must never also
+    be counted as a plain raw material or DIRECT_RETAIL component by
+    whichever caller wants only those (see ``_classify_walk``'s
+    ``raw_material_vector`` return value). A component's own Work Order
+    ``required_items`` (D1) still wants it, hence the flag is carried but
+    never used to exclude anything from ``component_vector`` itself.
+    """
     key = (node["item_code"], node["stock_uom"])
     existing = component_vector_by_item.get(key)
     if existing:
         existing["required_qty"] = flt(existing["required_qty"]) + flt(node["required_qty"])
+        existing["is_pre_produced"] = existing["is_pre_produced"] or is_pre_produced
     else:
         component_vector_by_item[key] = {
             "item_code": node["item_code"],
             "required_qty": node["required_qty"],
             "stock_uom": node["stock_uom"],
+            "is_pre_produced": is_pre_produced,
         }
 
 

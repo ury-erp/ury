@@ -165,6 +165,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "BIRYANI-BASE",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 20.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 20.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -196,11 +197,13 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "LEMONADE",
 						"stock_uom": "Nos",
 						"component_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
 					},
 					{
 						"item_code": "LEMON-CAKE",
 						"stock_uom": "Nos",
 						"component_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "LEMON", "required_qty": 0.1, "stock_uom": "Kg"}],
 					},
 				],
 				"external_receipt_targets": [],
@@ -228,6 +231,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -240,6 +244,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "Y",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -290,6 +295,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -327,6 +333,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -356,6 +363,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -379,6 +387,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 30.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 30.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -403,6 +412,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "BREAD",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "FLOUR", "required_qty": 5.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "FLOUR", "required_qty": 5.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],
@@ -449,6 +459,7 @@ class TestGeneratePurchaseMaterialRequest(FrappeTestCase):
 						"item_code": "X",
 						"stock_uom": "Kg",
 						"component_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
+						"raw_material_vector": [{"item_code": "RICE", "required_qty": 10.0, "stock_uom": "Kg"}],
 					}
 				],
 				"external_receipt_targets": [],

@@ -33,8 +33,15 @@ def _department(department, warehouse, targets=None, external_receipt_targets=No
 	}
 
 
-def _target(item_code, component_vector, stock_uom="Kg"):
-	return {"item_code": item_code, "stock_uom": stock_uom, "component_vector": component_vector}
+def _target(item_code, component_vector, stock_uom="Kg", raw_material_vector=None):
+	# raw_material_vector defaults to component_vector -- see the identical
+	# note in test_ury_production_readiness.py's own _target helper.
+	return {
+		"item_code": item_code,
+		"stock_uom": stock_uom,
+		"component_vector": component_vector,
+		"raw_material_vector": component_vector if raw_material_vector is None else raw_material_vector,
+	}
 
 
 def _component(item_code, required_qty, stock_uom="Kg"):

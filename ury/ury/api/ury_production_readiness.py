@@ -18,8 +18,12 @@ One entry point:
 ``departments`` is exactly the dict shape returned by
 ``ury_production_target_compiler.compile_production_targets`` -- keyed by
 department name, each bucket carrying ``warehouse`` (the Department
-Warehouse, D13), ``targets`` (each with a ``component_vector`` to explode)
-and ``external_receipt_targets`` (D19).
+Warehouse, D13), ``targets`` (each with a ``raw_material_vector`` to fold in
+-- see below), and ``external_receipt_targets`` (D19). MADE_TO_ORDER rows are
+real entries in ``targets`` too, marked ``skip_work_order`` -- this module
+does not care about that flag at all, since it only ever reads
+``raw_material_vector``/``required_qty``, not whether a Work Order gets
+built.
 
 This module never traverses a BOM and never decides production policy (see
 PLAN.md, section C): the component vector for every target already arrived
@@ -30,18 +34,35 @@ revalidating one department under Bin locks, D17) -- this module has no
 notion of a Sales Plan or a persisted Production Plan document at all; it
 only ever sees the shape the target compiler already produces.
 
+## Reading ``raw_material_vector``, never ``component_vector``
+
+A target's ``component_vector`` is unfiltered: it includes any PRE_PRODUCED
+node its BOM walk touched, as an item in its own right (D1), because that is
+exactly what the target's own Work Order ``required_items`` needs. This
+module must NOT read that vector. A PRE_PRODUCED sub-assembly is already its
+own separate target with its own separate demand; Store never stocks it
+directly, since it is an in-house-manufactured intermediate, not a
+purchasable raw material. Confirmed directly, not assumed: reading
+``component_vector`` here produces a spurious Store/Purchase shortage for the
+sub-assembly's own item code, on top of its correct, separate demand as a
+target -- effectively asking a supplier for something nobody sells.
+``raw_material_vector`` is the target compiler's own answer to exactly this:
+the same vector with every PRE_PRODUCED node excluded, whether it became its
+own target or was blocked as a cross-department misconfiguration (D7) and
+became neither.
+
 ## D19 -- EXTERNAL_RECEIPT demand is never lost
 
 ``sourcing_mode = EXTERNAL_RECEIPT`` targets are deliberately absent from a
-department's compiled ``targets`` component vectors and from
-``po_items``/Work Orders (Agent 3's decision) -- they are received, not
-manufactured. But the item itself still has to reach a warehouse from
-somewhere, so this module treats each ``external_receipt_targets`` entry as
-its own demand row (the target's ``item_code`` at its ``required_qty``,
-exactly as if it were a raw material in someone else's component vector).
-That is the only path by which EXTERNAL_RECEIPT demand reaches the Purchase
-requirement; if this module silently skipped ``external_receipt_targets``,
-that demand would vanish from the whole system.
+department's ``po_items``/Work Orders (Agent 3's decision) -- they are
+received, not manufactured. But the item itself still has to reach a
+warehouse from somewhere, so this module treats each
+``external_receipt_targets`` entry as its own demand row (the target's
+``item_code`` at its ``required_qty``, exactly as if it were a raw material
+in someone else's component vector). That is the only path by which
+EXTERNAL_RECEIPT demand reaches the Purchase requirement; if this module
+silently skipped ``external_receipt_targets``, that demand would vanish from
+the whole system.
 
 ## Return shape
 
@@ -180,19 +201,25 @@ def compute_readiness(departments, store_warehouse=None):
 
 
 def _collect_department_demand(departments):
-	"""Aggregate raw-material demand (from every target's ``component_vector``)
+	"""Aggregate raw-material demand (from every target's ``raw_material_vector``)
 	and EXTERNAL_RECEIPT demand (D19 -- the target itself) into one dict keyed
 	by ``(department, item_code)``.
 
-	Two component-vector rows for the same item in the same department (e.g.
-	two different targets that both consume Rice) are summed together, the
-	same way the target compiler itself sums repeated demand for one target.
+	Two raw-material rows for the same item in the same department (e.g. two
+	different targets that both consume Rice, or a MADE_TO_ORDER item and a
+	PRE_PRODUCED target both needing it) are summed together, the same way
+	the target compiler itself sums repeated demand for one target.
 	"""
 	demand = {}
 	for department, bucket in (departments or {}).items():
 		department_warehouse = bucket.get("warehouse")
 		for target in bucket.get("targets") or []:
-			for component in target.get("component_vector") or []:
+			# raw_material_vector, never component_vector -- see module
+			# docstring. A PRE_PRODUCED node in a parent's component_vector
+			# is already its own separate target with its own separate
+			# demand; reading component_vector here would double-count it as
+			# something to purchase or transfer, on top of that.
+			for component in target.get("raw_material_vector") or []:
 				_add_demand(
 					demand, department, department_warehouse,
 					item_code=component.get("item_code"),

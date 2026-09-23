@@ -989,6 +989,191 @@ holds it is checked at execution time under Bin locks (D9, D17). The Purchase
 path nets against `store_shortage` instead. The two differ deliberately and
 are not an inconsistency.
 
+### D21 — A MADE_TO_ORDER row's own raw materials are demand, never a target
+
+**Superseded by D22, kept here for the history and the reasoning about
+`raw_material_vector` vs `component_vector` that D22 still relies on.** The
+`raw_material_demand` bucket key this decision introduced no longer exists;
+a MADE_TO_ORDER row is a real target now (D22), and its raw materials reach
+readiness through the same `raw_material_vector` mechanism as every other
+target's, not a separate one.
+
+Confirmed missing, then fixed, after implementation: an MTO item excludes
+itself from the Production Plan and traverses its BOM for PRE_PRODUCED
+assemblies (the production target rules), but when that traversal finds
+none — a plain made-to-order drink mixed from raw ingredients, with no
+pre-produced base anywhere underneath it — every raw material the row
+consumes was computed by the target compiler and then discarded. Nothing
+downstream ever saw it again: not the readiness engine, not the Purchase
+Material Request, not the Transfer Material Request. The item's entire
+ingredient demand vanished from the system with no blocker and no error.
+
+Each department bucket the compiler returns now also carries
+`raw_material_demand`: a list of `{item_code, required_qty, stock_uom}` rows,
+aggregated across every MADE_TO_ORDER row in that department, for exactly the
+raw materials and DIRECT_RETAIL components those rows consume directly. A
+row here is never a target and never gets a Work Order.
+
+**The naive version of this fix is wrong, and the target compiler's own test
+suite caught it.** A MADE_TO_ORDER row's BOM can also contain a PRE_PRODUCED
+node that gets *blocked* rather than turned into a target — the D7
+cross-department case. `_classify_walk`'s `component_vector` accumulates
+that blocked node's own item_code unconditionally, before the department
+check that blocks it. Feeding the whole `component_vector` into
+`raw_material_demand` would have turned a blocking misconfiguration into a
+spurious Purchase or Transfer request for an item nobody intends the Store to
+hold — the opposite of what the blocker is telling the manager. The same
+problem applies to a PRE_PRODUCED node that becomes a real nested target: its
+own item_code is also in `component_vector`, and it must not additionally be
+requested as a raw material on top of being correctly manufactured through
+its own Work Order.
+
+`_classify_walk` therefore tags each accumulated row as PRE_PRODUCED or not,
+and returns a second, filtered `raw_material_vector` alongside the
+unfiltered `component_vector` — the latter is unchanged and still feeds a
+target's own Work Order `required_items` (D1), which legitimately wants
+PRE_PRODUCED sub-assemblies listed as items. Only the filtered vector feeds
+`raw_material_demand`.
+
+A department whose *only* demand is `raw_material_demand` — every menu item
+routed through it is MADE_TO_ORDER with no PRE_PRODUCED stop point at all —
+still needs a Production Plan, with no `po_items`, purely so the resulting
+Purchase/Transfer Material Request rows have a department plan to link to
+(D8). The "empty department" gate in `ury_sales_plan_production_plan.py`
+(originally: no plan at all without at least one target) is corrected to
+treat `raw_material_demand` as non-empty too.
+
+The readiness engine folds `raw_material_demand` into department and Store
+demand exactly like a target's `component_vector` row (the same pattern D19
+already established for `external_receipt_targets`), so it sums correctly
+against the same item required elsewhere in the same department, and nets
+against department and Store stock the same way.
+
+Owner: the target compiler (`ury_production_target_compiler.py`), the
+readiness engine (`ury_production_readiness.py`), and the empty-department
+gate in `ury_sales_plan_production_plan.py`. Agent 5's fallback bucket
+default in `ury_production_transfer.py` gained the key too, for shape
+consistency.
+
+**Considered and declined: resolving this to a Production Unit's own
+warehouse.** `resolve_production_context`'s MADE_TO_ORDER branch resolves a
+Production Unit's own warehouse before falling back to the department
+warehouse, and for a moment this fix mirrored that — keying demand by
+`(department, item_code, warehouse)` so a unit-specific warehouse wouldn't
+get silently merged with the department's.
+
+Checked against this dev site and dropped: every department, warehouse and
+Production Unit on it was created in the two days before this fix, during
+this exact feature's development, not established business configuration.
+No real branch currently gives a Production Unit a warehouse distinct from
+its department's; every unit's warehouse is blank, which means
+`resolve_production_context` already falls through to the department
+warehouse today regardless. Building for a distinction nobody uses added
+real complexity — the three-part demand key, a second warehouse resolver,
+tests for a scenario that doesn't occur — for no live benefit.
+
+`raw_material_demand` resolves to the Department Warehouse unconditionally,
+same as every other demand source in this module. If a real branch ever does
+configure a Production Unit warehouse distinct from its department's, this
+will need revisiting — check first whether that is genuine, deliberate
+configuration before rebuilding the per-warehouse keying; the resolver's own
+"older configurations" fallback comment does not by itself mean the
+distinction is in active use anywhere.
+
+
+### D22 — A MADE_TO_ORDER row is a real target; the executor and the Work Order hook keep it from ever getting a Work Order
+
+D21's design (a separate `raw_material_demand` bucket key for a MADE_TO_ORDER
+row's own raw materials, since the row itself was never a target) does not
+survive contact with ERPNext. `Production Plan.po_items` is a mandatory
+child table (`reqd: 1`). Confirmed directly, not assumed: inserting a real
+Production Plan with an empty `po_items` list raises
+`MandatoryError: [Production Plan, ...]: po_items`. A department whose only
+content was MADE_TO_ORDER rows with no PRE_PRODUCED item anywhere could
+never actually get a Production Plan under D21's design, which meant it
+could never insert one, which — because nothing in the creation loop caught
+that exception — aborted the Lock transition for the *entire* Sales Plan the
+moment any one department had this shape. This was found by testing the
+exact question "does Orange Juice's Work Order actually find its raw
+materials", not by review.
+
+**The fix: a MADE_TO_ORDER row is a real target.** It goes through the exact
+same `ensure_target`/`add_edge` call as a direct PRE_PRODUCED row, and the
+exact same `_expand()` walk-and-classify machinery discovers its raw
+materials and any nested PRE_PRODUCED dependency, precisely as it already did
+for every other target. This is not new machinery bolted onto MADE_TO_ORDER;
+it is MADE_TO_ORDER joining machinery that already existed. Two consequences
+fall out for free:
+
+- A real `Production Plan Item` row exists for it, so ERPNext's mandatory
+  `po_items` constraint is satisfied without inventing a placeholder or
+  special-casing empty departments. The empty-department gate in
+  `ury_sales_plan_production_plan.py` reverts to its original, simpler form
+  (targets or external_receipt_targets; nothing else).
+- Its raw materials reach the readiness engine and the Purchase/Transfer
+  Material Requests through the same path every other target's do — no
+  separate `raw_material_demand` mechanism, no separate aggregation rule.
+
+**What stops it from ever being manufactured in advance: `skip_work_order`,
+enforced in two places, one of them load-bearing.** Every target dict now
+carries `skip_work_order` (`True` only for a MADE_TO_ORDER row's own target).
+The executor (`ury_production_plan_auto_work_order.execute_department_targets`)
+skips building a Work Order for a flagged target — this is the well-behaved
+path, not the guarantee. The actual guarantee is server-side: a new
+`Production Plan Item.custom_ury_no_work_order` field is set on that row, and
+`ury_work_order_hooks.validate` refuses, unconditionally and before anything
+else, any Work Order whose `production_plan_item` links to a row carrying
+it — regardless of who tries to create one, including ERPNext's own native
+"Create Work Order" button on the Production Plan form, which has no
+knowledge of this module's rules at all and would otherwise happily build
+one. Confirmed directly against real documents, not mocked: a real
+Production Plan Item flagged this way, submitted, then a real `Work Order`
+insert attempted against it exactly as the native button would build one —
+refused with `frappe.ValidationError`, and the underlying Production Plan
+inserted and submitted cleanly with the flagged row present, proving the
+original `MandatoryError` is actually gone, not just theoretically
+addressed.
+
+**A second, independent, pre-existing defect was found and fixed in the same
+pass, because unifying MADE_TO_ORDER into `targets` would otherwise have
+inherited it.** A target's `component_vector` is unfiltered by design (D1):
+it includes any PRE_PRODUCED node the BOM walk touched, as an item, because
+the target's own Work Order `required_items` genuinely needs it. The
+readiness engine was reading that same unfiltered vector. Confirmed directly:
+a target whose BOM contains a nested PRE_PRODUCED sub-assembly (Biryani Base
+under Chicken Biryani, say) generated a demand row for the sub-assembly's own
+item code — a Purchase Material Request asking a supplier for an
+in-house-manufactured intermediate good nobody sells, on top of that
+sub-assembly's own, correct, separate demand as its own target. This
+predates D21/D22 entirely and was live in already-merged code.
+
+Every target now carries two vectors, not one. `component_vector` is
+unchanged — unfiltered, feeds the Work Order. `raw_material_vector` is new —
+the same walk, with every PRE_PRODUCED node excluded, whether it became its
+own nested target or was blocked as a cross-department misconfiguration (D7)
+and became neither — and the readiness engine reads only this one. In the
+overwhelming common case (a target with no nested PRE_PRODUCED dependency at
+all) the two vectors are identical; the distinction only matters, and only
+activates, when one exists.
+
+**Blockers survive a target that is never built.** A MADE_TO_ORDER row whose
+nested dependency is blocked (cross-department misconfiguration, ambiguous
+configuration, a BOM cycle) still becomes a real target — its own row is
+harmless to have regardless of what is wrong underneath it, since it never
+gets a Work Order either way, and the blocker is what actually tells the
+manager about the real problem. This is a deliberate, considered change from
+D21's version of these scenarios, which reported an empty department instead.
+
+Owner: the target compiler (`ury_production_target_compiler.py`, the
+MADE_TO_ORDER branch and the two-vector split), the readiness engine
+(`ury_production_readiness.py`, reading `raw_material_vector`), the
+executor (`ury_production_plan_auto_work_order.py`, the `skip_work_order`
+skip), the Work Order hook (`ury_work_order_hooks.py`, the actual
+enforcement), and a new `Production Plan Item.custom_ury_no_work_order`
+field (patch `v3_30`). `EXTERNAL_RECEIPT`-only departments still hit the
+original `MandatoryError` — `external_receipt_targets` still never reaches
+`po_items` — and are explicitly not fixed by this change; that remains open.
+
 ## Wave 0 — Integration owner
 
 Owned solely by the integration owner. Blocks every other wave.
