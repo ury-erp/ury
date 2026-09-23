@@ -163,6 +163,7 @@ export const PosProfilePage: React.FC = () => {
       let defaultCostCenter = '';
       let writeOffAccount = '';
       let restaurant = '';
+      let restBranch = '';
       if (addForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -180,22 +181,25 @@ export const PosProfilePage: React.FC = () => {
 
         if (!defaultCostCenter) {
            try {
-             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit: 1 });
+             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit_page_length: 1 });
              const records = ccList.message || ccList || [];
              if (records.length > 0) defaultCostCenter = records[0].name;
            } catch(e) {}
         }
         if (!writeOffAccount) {
            try {
-             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit: 1 });
+             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit_page_length: 1 });
              const records = accList.message || accList || [];
              if (records.length > 0) writeOffAccount = records[0].name;
            } catch(e) {}
         }
         try {
-           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', addForm.company]], limit: 1 });
+           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', addForm.company]], fields: ['name', 'branch'], limit_page_length: 1 });
            const records = restList.message || restList || [];
-           if (records.length > 0) restaurant = records[0].name;
+           if (records.length > 0) {
+             restaurant = records[0].name;
+             restBranch = records[0].branch;
+           }
         } catch(e) {}
       }
 
@@ -218,7 +222,7 @@ export const PosProfilePage: React.FC = () => {
           pos_profile_name: addForm.name,
           company: addForm.company,
           warehouse: addForm.warehouse,
-          branch: addForm.branch || undefined,
+          branch: addForm.branch || restBranch || undefined,
           selling_price_list: addForm.selling_price_list || 'Standard Selling',
           currency: defaultCurrency || undefined,
           cost_center: defaultCostCenter || `Main - ${addForm.company}`,
@@ -382,6 +386,7 @@ export const PosProfilePage: React.FC = () => {
       let defaultCostCenter = '';
       let writeOffAccount = '';
       let restaurant = '';
+      let restBranch = '';
       if (profileForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -398,22 +403,25 @@ export const PosProfilePage: React.FC = () => {
 
         if (!defaultCostCenter) {
            try {
-             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit: 1 });
+             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit_page_length: 1 });
              const records = ccList.message || ccList || [];
              if (records.length > 0) defaultCostCenter = records[0].name;
            } catch(e) {}
         }
         if (!writeOffAccount) {
            try {
-             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit: 1 });
+             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit_page_length: 1 });
              const records = accList.message || accList || [];
              if (records.length > 0) writeOffAccount = records[0].name;
            } catch(e) {}
         }
         try {
-           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', profileForm.company]], limit: 1 });
+           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', profileForm.company]], fields: ['name', 'branch'], limit_page_length: 1 });
            const records = restList.message || restList || [];
-           if (records.length > 0) restaurant = records[0].name;
+           if (records.length > 0) {
+             restaurant = records[0].name;
+             restBranch = records[0].branch;
+           }
         } catch(e) {}
       }
 
@@ -436,6 +444,7 @@ export const PosProfilePage: React.FC = () => {
         fieldname: {
           company: profileForm.company,
           warehouse: profileForm.warehouse,
+          branch: profileForm.branch || restBranch || undefined,
           selling_price_list: profileForm.selling_price_list,
           print_format: profileForm.print_format,
           custom_enable_discount: profileForm.custom_enable_discount,
