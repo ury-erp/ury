@@ -16,9 +16,9 @@ from frappe.utils import validate_phone_number
 #     )
 #     return tables
 
-def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
+def _resolve_menu_name(branch, room=None, order_type=None, cashier=False):
     """
-    Resolve and return menu for a given branch, room, and order type.
+    Resolve the URY Menu that applies to a branch for the given room/order type.
 
     Args:
         branch: Branch name string (already resolved)
@@ -27,11 +27,8 @@ def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
         cashier: Boolean indicating if user is a cashier
 
     Returns:
-        Dict with keys: items, modified_time, name
+        URY Menu name
     """
-    menu_items = []
-    menu_items_with_image = []
-
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
 
     if room:
@@ -75,6 +72,23 @@ def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
     if not menu:
         frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
 
+    return menu
+
+
+def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
+    """
+    Resolve and return menu for a given branch, room, and order type.
+
+    Args:
+        branch: Branch name string (already resolved)
+        room: Optional room name
+        order_type: Optional order type
+        cashier: Boolean indicating if user is a cashier
+
+    Returns:
+        Dict with keys: items, modified_time, name
+    """
+    menu = _resolve_menu_name(branch, room, order_type, cashier)
 
     # Get menu items (your existing code)
     menu_items = frappe.get_all(
@@ -120,8 +134,39 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     return resolve_restaurant_menu(branch_name, room, order_type, cashier)
 
 @frappe.whitelist()
-def getMenuCourses():
-    courses = frappe.get_all("URY Menu Course", fields=["name", "icon"])
+def getMenuCourses(pos_profile=None, room=None, order_type=None):
+    # Without a POS Profile this stays the legacy whole-catalog call (urypos, Desk).
+    if not pos_profile:
+        return _menu_courses()
+
+    branch = getBranch()
+    profile = frappe.get_doc("POS Profile", pos_profile)
+    if profile.branch != branch:
+        frappe.throw(_("Not permitted to view this POS Profile"), frappe.PermissionError)
+
+    user_roles = frappe.get_roles()
+    cashier = any(role.role in user_roles for role in profile.role_allowed_for_billing)
+
+    menu = _resolve_menu_name(branch, room, order_type, cashier)
+    courses_in_menu = frappe.get_all(
+        "URY Menu Item",
+        filters={"parent": menu, "disabled": 0},
+        pluck="course",
+    )
+    course_names = sorted({course for course in courses_in_menu if course})
+    if not course_names:
+        return []
+
+    return _menu_courses({"name": ["in", course_names]})
+
+
+def _menu_courses(filters=None):
+    courses = frappe.get_all(
+        "URY Menu Course",
+        filters=filters or {},
+        fields=["name", "icon"],
+        order_by="custom_serving_priority asc, name asc",
+    )
     return [{"name": d.name, "label": _(d.name), "icon": d.icon} for d in courses]
 
 @frappe.whitelist()
@@ -890,6 +935,17 @@ def getPosProfileFull(pos_profile):
         "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
+        "custom_allow_order_without_customer": profile.get("custom_allow_order_without_customer"),
+        "custom_enable_order_on_behalf": profile.get("custom_enable_order_on_behalf"),
+        "custom_roles_allowed_to_order_on_behalf": [
+            row.as_dict() for row in profile.get("custom_roles_allowed_to_order_on_behalf") or []
+        ],
+        "custom_require_performer_on_order": profile.get("custom_require_performer_on_order"),
+        "custom_enable_credit_settlement": profile.get("custom_enable_credit_settlement"),
+        "custom_roles_allowed_for_credit": [
+            row.as_dict() for row in profile.get("custom_roles_allowed_for_credit") or []
+        ],
+        "custom_credit_mode_of_payment": profile.get("custom_credit_mode_of_payment"),
     }
 
 
@@ -1036,9 +1092,6 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         return {
             "status": "success",
             "message": "Customer created successfully",
-            # Additive link id — distinct from display `customer_name` when
-            # naming series ≠ customer_name (e.g. CUST-00042 vs "Alice").
-            "name": customer.name,
             "customer_name": customer_name,
             "mobile_number": mobile_number,
             "customer_group": customer_group,
