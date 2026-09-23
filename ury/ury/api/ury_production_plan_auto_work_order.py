@@ -50,6 +50,27 @@ Returns one result dict per target:
         "remaining_qty": 0.0,                 # qty - produced_qty after this call
     }
 
+A target with ``skip_work_order`` set (a MADE_TO_ORDER row's own target --
+see ``ury_production_target_compiler``'s "MADE_TO_ORDER items" section) still
+gets a result entry, in order, but no Work Order is created for it:
+
+    {
+        "item_code": "CHICKEN-BIRYANI",
+        "work_order": None,
+        "work_order_created": False,
+        "manufacture_stock_entry": None,
+        "produced_qty": 0.0,
+        "remaining_qty": 0.0,
+        "skipped": "made_to_order",
+    }
+
+An MTO row's own raw materials, and any nested PRE_PRODUCED dependency it
+has, are unaffected -- both already flowed through the readiness engine and,
+for the dependency, this same loop's own Work Order creation, exactly as any
+other target's would. ``ury_work_order_hooks`` is what actually refuses a
+Work Order for this row if something else ever tries; this module simply
+never attempts one, which is the well-behaved path, not the guarantee.
+
 ## Failure handling
 
 Nothing in this module is caught and logged. This is user-invoked work
@@ -165,6 +186,29 @@ def execute_department_targets(production_plan, targets):
 	for target in targets:
 		_ensure_in_house(target)
 		_ensure_dependencies_satisfied(production_plan_doc.name, target, produced_item_codes)
+
+		if target.get("skip_work_order"):
+			# A MADE_TO_ORDER row's own target (see module docstring). Its
+			# dependency check above still ran -- any nested PRE_PRODUCED
+			# item it depends on must still have been produced first -- but
+			# it is never itself built into a Work Order. Counted as
+			# "produced" for dependency-satisfaction purposes regardless,
+			# though nothing in this architecture ever makes an MTO item a
+			# nested dependency of another target, so no other target's
+			# ordering actually depends on this.
+			results.append(
+				{
+					"item_code": target["item_code"],
+					"work_order": None,
+					"work_order_created": False,
+					"manufacture_stock_entry": None,
+					"produced_qty": 0.0,
+					"remaining_qty": 0.0,
+					"skipped": "made_to_order",
+				}
+			)
+			produced_item_codes.add(target["item_code"])
+			continue
 
 		work_order, created = get_or_create_work_order(production_plan_doc, target)
 		stock_entry_name = create_manufacture_entry(work_order.name)

@@ -88,10 +88,35 @@ Agent 7 does not need this: it is instructed to call
 (D16), which is both simpler and unconditional (no gate needed on a brand
 new, never-saved draft). The flag exists solely so the *hook* has a defined,
 testable behaviour instead of a silent no-op every single time.
+
+## Refusing a Work Order for a MADE_TO_ORDER item's own row
+
+A MADE_TO_ORDER row is itself a real target (see
+``ury_production_target_compiler``'s "MADE_TO_ORDER items" section) with a
+real Production Plan Item row, so ERPNext's mandatory ``po_items`` field is
+satisfied without an unmanufacturable, empty-``po_items`` Production Plan.
+That row must never get a Work Order -- an MTO item is produced only from
+the actual order, never in advance, and this is the invariant the whole
+target-selection design exists to hold.
+
+The executor (``ury_production_plan_auto_work_order.execute_department_targets``)
+already skips building one. This module is the actual enforcement: it
+refuses, unconditionally and before anything else in ``validate``, any Work
+Order whose ``production_plan_item`` links to a row carrying
+``custom_ury_no_work_order``. This fires for a Work Order our own executor
+would never create in the first place, but also for one created any other
+way -- by hand from the desk, by a script, or by ERPNext's own native
+"Create Work Order" button on the Production Plan form, which has no
+knowledge of this rule and would otherwise happily build one. The check runs
+before the URY-detection gate below, and does not depend on it succeeding:
+the flag on the Production Plan Item row is itself the authoritative signal.
 """
 
 import frappe
+from frappe import _
 from frappe.utils import flt
+
+PP_ITEM_NO_WORK_ORDER_FIELD = "custom_ury_no_work_order"
 
 
 def is_ury_work_order(work_order):
@@ -214,8 +239,24 @@ def required_items_rewrite_allowed(work_order):
 	return True
 
 
+def is_no_work_order_row(work_order):
+	"""True iff ``work_order``'s linked Production Plan Item carries
+	``custom_ury_no_work_order`` -- a MADE_TO_ORDER target's own row (see
+	module docstring, "Refusing a Work Order for a MADE_TO_ORDER item's own
+	row"). Checked independently of ``is_ury_work_order``/URY detection: the
+	flag on the Production Plan Item row is itself the authoritative signal,
+	and this must fire even for a Work Order created a way this module has
+	no other visibility into.
+	"""
+	production_plan_item = work_order.get("production_plan_item")
+	if not production_plan_item:
+		return False
+	return bool(frappe.db.get_value("Production Plan Item", production_plan_item, PP_ITEM_NO_WORK_ORDER_FIELD))
+
+
 def validate(doc, method=None):
-	"""``doc_events`` "validate" hook for ``Work Order`` -- a gated safeguard only.
+	"""``doc_events`` "validate" hook for ``Work Order`` -- a gated safeguard,
+	plus one unconditional refusal.
 
 	Runs after ``WorkOrder.validate()`` (``frappe/model/document.py``'s
 	``Document.hook``/``compose`` calls the controller method of the same
@@ -223,15 +264,32 @@ def validate(doc, method=None):
 	own ``set_required_items()`` by the time this runs -- see module
 	docstring.
 
-	No-ops entirely for a non-URY Work Order (see ``is_ury_work_order``).
-	For a URY Work Order: always reasserts the warehouse policy, and,
-	subject to the D16 gate, replaces ``required_items`` from
-	``doc.flags.ury_component_vector`` when a caller has stashed one there
-	(see module docstring, "Where the hook gets a component vector from").
-	Agent 7's executor does not rely on this -- it calls
-	``apply_ury_warehouse_policy``/``apply_ury_required_items`` directly
-	while constructing the draft (D16).
+	Refuses outright, before anything else, a Work Order whose Production
+	Plan Item is flagged ``custom_ury_no_work_order`` -- see
+	``is_no_work_order_row`` and the module docstring's "Refusing a Work
+	Order for a MADE_TO_ORDER item's own row". This is the actual
+	enforcement of that rule; the executor skipping it is only the
+	well-behaved path, not the guarantee.
+
+	Otherwise no-ops entirely for a non-URY Work Order (see
+	``is_ury_work_order``). For a URY Work Order: always reasserts the
+	warehouse policy, and, subject to the D16 gate, replaces
+	``required_items`` from ``doc.flags.ury_component_vector`` when a caller
+	has stashed one there (see module docstring, "Where the hook gets a
+	component vector from"). Agent 7's executor does not rely on this -- it
+	calls ``apply_ury_warehouse_policy``/``apply_ury_required_items``
+	directly while constructing the draft (D16).
 	"""
+	if is_no_work_order_row(doc):
+		frappe.throw(
+			_(
+				"{0} is a MADE_TO_ORDER item's own Production Plan row and must "
+				"never have a Work Order created against it -- it is produced only "
+				"from the actual order, never in advance."
+			).format(doc.get("production_item") or doc.get("name")),
+			frappe.ValidationError,
+		)
+
 	production_plan = get_linked_production_plan(doc)
 	if not production_plan or not production_plan.get("custom_ury_sales_plan"):
 		return

@@ -21,6 +21,7 @@ from ury.ury.api.ury_work_order_hooks import (
 	apply_ury_required_items,
 	apply_ury_warehouse_policy,
 	get_linked_production_plan,
+	is_no_work_order_row,
 	is_ury_work_order,
 	required_items_rewrite_allowed,
 	validate,
@@ -232,7 +233,57 @@ class TestRequiredItemsRewriteAllowed(FrappeTestCase):
 		self.assertFalse(required_items_rewrite_allowed(doc))
 
 
+class TestIsNoWorkOrderRow(FrappeTestCase):
+	def test_false_when_no_production_plan_item_linked(self):
+		doc = _work_order(production_plan_item=None)
+		self.assertFalse(is_no_work_order_row(doc))
+
+	def test_false_when_production_plan_item_row_has_no_flag(self):
+		doc = _work_order(production_plan_item="PPI-1")
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=0) as mock_get_value:
+			self.assertFalse(is_no_work_order_row(doc))
+		mock_get_value.assert_called_once_with("Production Plan Item", "PPI-1", "custom_ury_no_work_order")
+
+	def test_true_when_production_plan_item_row_is_flagged(self):
+		doc = _work_order(production_plan_item="PPI-1")
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=1):
+			self.assertTrue(is_no_work_order_row(doc))
+
+
 class TestValidateHook(FrappeTestCase):
+	def test_refuses_a_work_order_against_a_no_work_order_row(self):
+		# The server-side guard: a Work Order linked to a Production Plan
+		# Item flagged custom_ury_no_work_order is refused outright, before
+		# anything else in validate() runs -- this is what actually stops a
+		# MADE_TO_ORDER row's own target from ever getting a Work Order,
+		# regardless of who tries to create one (the executor's own skip is
+		# only the well-behaved path).
+		doc = _work_order(
+			production_plan="PP-1", production_plan_item="PPI-1", production_item="CHICKEN-BIRYANI",
+		)
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=1), \
+				patch(f"{MODULE}.frappe.get_doc") as mock_get_doc:
+			with self.assertRaises(frappe.ValidationError):
+				validate(doc)
+		# Refused before the URY-detection lookup even runs -- the flag on
+		# the Production Plan Item row is the authoritative signal on its
+		# own, independent of get_linked_production_plan succeeding.
+		mock_get_doc.assert_not_called()
+
+	def test_refusal_fires_even_for_a_work_order_with_no_ury_sales_plan_link(self):
+		# Defensive: the guard does not depend on custom_ury_sales_plan being
+		# set at all -- the Production Plan Item flag alone is enough.
+		doc = _work_order(production_plan=None, production_plan_item="PPI-1")
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=1):
+			with self.assertRaises(frappe.ValidationError):
+				validate(doc)
+
+	def test_does_not_refuse_a_work_order_with_no_flag_set(self):
+		doc = _work_order(production_plan=None, production_plan_item="PPI-1", wip_warehouse="Some WIP - WH")
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=0):
+			validate(doc)  # must not raise
+		self.assertEqual(doc.get("wip_warehouse"), "Some WIP - WH")
+
 	def test_noop_for_a_non_ury_work_order_with_no_production_plan(self):
 		doc = _work_order(production_plan=None, wip_warehouse="Some WIP - WH")
 		validate(doc)

@@ -236,7 +236,7 @@ def _production_plan(
 
 
 def _target(item_code="BIRYANI-BASE", bom_no="BOM-BIRYANI-BASE-001", required_qty=20.0, component_vector=None,
-			depends_on=None, sourcing_mode="IN_HOUSE"):
+			depends_on=None, sourcing_mode="IN_HOUSE", skip_work_order=False):
 	return {
 		"item_code": item_code,
 		"bom_no": bom_no,
@@ -245,6 +245,7 @@ def _target(item_code="BIRYANI-BASE", bom_no="BOM-BIRYANI-BASE-001", required_qt
 		"department": "Main Kitchen",
 		"warehouse": DEPARTMENT_WAREHOUSE,
 		"sourcing_mode": sourcing_mode,
+		"skip_work_order": skip_work_order,
 		"component_vector": component_vector or [{"item_code": "Rice", "required_qty": 4.0, "stock_uom": "Kg"}],
 		"depends_on": depends_on or [],
 	}
@@ -492,6 +493,59 @@ class TestExecuteDepartmentTargets(FrappeTestCase):
 		self.assertIsNotNone(result["manufacture_stock_entry"])
 		self.assertEqual(result["produced_qty"], 10.0)
 		self.assertEqual(result["remaining_qty"], 0.0)
+
+	def test_skip_work_order_target_gets_no_work_order_but_a_result_entry(self):
+		# A MADE_TO_ORDER row's own target (see
+		# ury_production_target_compiler's "MADE_TO_ORDER items" section):
+		# a real po_items row exists, but this loop never builds a Work
+		# Order for it. ury_work_order_hooks is the actual enforcement if
+		# something else tries; this is just the well-behaved path.
+		target = _target(item_code="CHICKEN-BIRYANI", skip_work_order=True)
+		production_plan = _plan_for(target)
+
+		results = execute_department_targets(production_plan, [target])
+
+		self.assertEqual(len(results), 1)
+		result = results[0]
+		self.assertEqual(result["item_code"], "CHICKEN-BIRYANI")
+		self.assertIsNone(result["work_order"])
+		self.assertFalse(result["work_order_created"])
+		self.assertIsNone(result["manufacture_stock_entry"])
+		self.assertEqual(result["skipped"], "made_to_order")
+		# Confirms no Work Order was ever attempted, not just that the
+		# result looks right -- the fake store would show it if one had
+		# been created.
+		self.assertEqual(len(self.store._by_name), 0)
+
+	def test_a_real_targets_dependency_on_a_nested_pre_produced_item_is_still_enforced(self):
+		# The MTO row's own row is skipped, but a real, nested PRE_PRODUCED
+		# dependency underneath it must still be produced first, and in the
+		# right order -- skipping the consumer's Work Order does not skip
+		# the dependency check.
+		dependency = _target(item_code="BIRYANI-BASE", bom_no="BOM-BIRYANI-BASE-001", required_qty=20.0)
+		mto_consumer = _target(
+			item_code="CHICKEN-BIRYANI", bom_no="BOM-CHICKEN-BIRYANI", required_qty=100.0,
+			depends_on=["BIRYANI-BASE"], skip_work_order=True,
+		)
+		production_plan = _plan_for(dependency, mto_consumer)
+
+		results = execute_department_targets(production_plan, [dependency, mto_consumer])
+
+		self.assertEqual([r["item_code"] for r in results], ["BIRYANI-BASE", "CHICKEN-BIRYANI"])
+		self.assertIsNotNone(results[0]["work_order"])  # BIRYANI-BASE: real Work Order
+		self.assertIsNone(results[1]["work_order"])  # CHICKEN-BIRYANI: skipped
+		self.assertEqual(len(self.store._by_name), 1)
+
+	def test_rejects_an_mto_consumer_submitted_before_its_real_dependency(self):
+		dependency = _target(item_code="BIRYANI-BASE", bom_no="BOM-BIRYANI-BASE-001", required_qty=20.0)
+		mto_consumer = _target(
+			item_code="CHICKEN-BIRYANI", bom_no="BOM-CHICKEN-BIRYANI", required_qty=100.0,
+			depends_on=["BIRYANI-BASE"], skip_work_order=True,
+		)
+		production_plan = _plan_for(dependency, mto_consumer)
+
+		with self.assertRaises(WorkOrderExecutionError):
+			execute_department_targets(production_plan, [mto_consumer, dependency])
 
 	def test_dependencies_are_produced_before_their_consumers(self):
 		dependency = _target(item_code="PREP-MIX", bom_no="BOM-PREP-MIX", required_qty=5.0)

@@ -626,6 +626,24 @@ def get_custom_fields():
 			},
 		],
 
+		"Production Plan Item": [
+			{
+				"fieldname": "custom_ury_no_work_order",
+				"fieldtype": "Check",
+				"label": "URY No Work Order",
+				"description": (
+					"Advisory marker for a MADE_TO_ORDER row's own target: this row exists so "
+					"ERPNext's mandatory po_items constraint is satisfied, but must never get a "
+					"Work Order -- an MTO item is produced only from the actual order, never in "
+					"advance. The executor already skips it; ury_work_order_hooks is the actual "
+					"server-side guard, refusing any Work Order linked to a Production Plan Item "
+					"row with this flag set, regardless of who tries to create one."
+				),
+				"insert_after": "warehouse",
+				"read_only": 1,
+			},
+		],
+
 		"URY Sales Plan": [
 			{
 				"fieldname": "custom_ury_production_plan",

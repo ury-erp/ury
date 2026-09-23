@@ -224,7 +224,6 @@ def _compile_department_bucket(sales_plan_doc, department):
 		"warehouse": None,
 		"targets": [],
 		"external_receipt_targets": [],
-		"raw_material_demand": [],
 	}
 	return bucket, blockers
 
