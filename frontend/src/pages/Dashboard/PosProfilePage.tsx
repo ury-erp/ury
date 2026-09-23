@@ -7,6 +7,24 @@ import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 
+const parseFrappeError = (err: any): string => {
+  let msg = err?.message || 'An error occurred';
+  if (err?._server_messages) {
+    try {
+      const messages = JSON.parse(err._server_messages).map((m: any) => {
+        const parsed = JSON.parse(m);
+        return parsed.message;
+      });
+      if (messages.length > 0) {
+        msg = messages.join(' | ');
+      }
+    } catch (e) {}
+  } else if (err?.exc_type) {
+    msg = err.exc_type;
+  }
+  return msg.replace(/<[^>]*>?/gm, '');
+};
+
 interface PosProfileRecord {
   name: string;
   branch?: string;
@@ -144,6 +162,7 @@ export const PosProfilePage: React.FC = () => {
       let defaultCurrency = '';
       let defaultCostCenter = '';
       let writeOffAccount = '';
+      let restaurant = '';
       if (addForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -154,10 +173,30 @@ export const PosProfilePage: React.FC = () => {
           defaultCurrency = comp.default_currency || '';
           const abbr = comp.abbr || '';
           defaultCostCenter = comp.default_cost_center || (abbr ? `Main - ${abbr}` : '');
-          writeOffAccount = abbr ? `Write Off - ${abbr}` : '';
+          writeOffAccount = comp.write_off_account || (abbr ? `Write Off - ${abbr}` : '');
         } catch (e) {
           console.error("Failed to fetch company details", e);
         }
+
+        if (!defaultCostCenter) {
+           try {
+             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit: 1 });
+             const records = ccList.message || ccList || [];
+             if (records.length > 0) defaultCostCenter = records[0].name;
+           } catch(e) {}
+        }
+        if (!writeOffAccount) {
+           try {
+             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', addForm.company], ['is_group', '=', 0]], limit: 1 });
+             const records = accList.message || accList || [];
+             if (records.length > 0) writeOffAccount = records[0].name;
+           } catch(e) {}
+        }
+        try {
+           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', addForm.company]], limit: 1 });
+           const records = restList.message || restList || [];
+           if (records.length > 0) restaurant = records[0].name;
+        } catch(e) {}
       }
 
       // ERPNext's standard POS Profile validation requires every payment mode
@@ -182,9 +221,10 @@ export const PosProfilePage: React.FC = () => {
           branch: addForm.branch || undefined,
           selling_price_list: addForm.selling_price_list || 'Standard Selling',
           currency: defaultCurrency || undefined,
-          cost_center: defaultCostCenter || undefined,
-          write_off_account: writeOffAccount || undefined,
-          write_off_cost_center: defaultCostCenter || undefined,
+          cost_center: defaultCostCenter || `Main - ${addForm.company}`,
+          write_off_account: writeOffAccount || `Write Off - ${addForm.company}`,
+          write_off_cost_center: defaultCostCenter || `Main - ${addForm.company}`,
+          restaurant: restaurant || undefined,
           print_format: addForm.print_format || undefined,
           custom_kot_naming_series: addForm.custom_kot_naming_series || undefined,
           applicable_for_users: addForm.applicable_for_users.filter(u => u.user).map(u => ({ user: u.user, default: u.default })),
@@ -195,7 +235,7 @@ export const PosProfilePage: React.FC = () => {
       setIsAddDrawerOpen(false);
       fetchProfiles();
     } catch (err: any) {
-      showToast.error(err.message || 'Failed to create POS Profile');
+      showToast.error(parseFrappeError(err) || 'Failed to create POS Profile');
     } finally {
       setSaving(false);
     }
@@ -341,6 +381,7 @@ export const PosProfilePage: React.FC = () => {
     try {
       let defaultCostCenter = '';
       let writeOffAccount = '';
+      let restaurant = '';
       if (profileForm.company) {
         try {
           const compDoc = await call<any>('frappe.client.get', {
@@ -349,11 +390,31 @@ export const PosProfilePage: React.FC = () => {
           });
           const comp = compDoc.message || compDoc;
           const abbr = comp.abbr || '';
-          defaultCostCenter = `Main - ${abbr}`;
-          writeOffAccount = `Write Off - ${abbr}`;
+          defaultCostCenter = comp.default_cost_center || (abbr ? `Main - ${abbr}` : '');
+          writeOffAccount = comp.write_off_account || (abbr ? `Write Off - ${abbr}` : '');
         } catch (e) {
           console.error("Failed to fetch company details", e);
         }
+
+        if (!defaultCostCenter) {
+           try {
+             const ccList = await call<any>('frappe.client.get_list', { doctype: 'Cost Center', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit: 1 });
+             const records = ccList.message || ccList || [];
+             if (records.length > 0) defaultCostCenter = records[0].name;
+           } catch(e) {}
+        }
+        if (!writeOffAccount) {
+           try {
+             const accList = await call<any>('frappe.client.get_list', { doctype: 'Account', filters: [['company', '=', profileForm.company], ['is_group', '=', 0]], limit: 1 });
+             const records = accList.message || accList || [];
+             if (records.length > 0) writeOffAccount = records[0].name;
+           } catch(e) {}
+        }
+        try {
+           const restList = await call<any>('frappe.client.get_list', { doctype: 'URY Restaurant', filters: [['company', '=', profileForm.company]], limit: 1 });
+           const records = restList.message || restList || [];
+           if (records.length > 0) restaurant = records[0].name;
+        } catch(e) {}
       }
 
       // Same account-mapping guard as create: any payment mode without a
@@ -385,8 +446,9 @@ export const PosProfilePage: React.FC = () => {
           paid_limit: profileForm.paid_limit,
           table_attention_time: profileForm.table_attention_time,
           custom_reset_order_number_daily: profileForm.custom_reset_order_number_daily,
-          write_off_account: writeOffAccount || undefined,
-          write_off_cost_center: defaultCostCenter || undefined,
+          write_off_account: writeOffAccount || `Write Off - ${profileForm.company}`,
+          write_off_cost_center: defaultCostCenter || `Main - ${profileForm.company}`,
+          restaurant: restaurant || undefined,
         },
       });
 
@@ -413,7 +475,7 @@ export const PosProfilePage: React.FC = () => {
       fetchProfiles();
       setIsEditMode(false); // Return to read-only View Mode after successful save
     } catch (err: any) {
-      showToast.error(err.message || 'Failed to save POS Profile');
+      showToast.error(parseFrappeError(err) || 'Failed to save POS Profile');
       // Remains in Edit Mode if save fails
     } finally {
       setSaving(false);
