@@ -24,6 +24,12 @@ def apply_yield_back_calculation(doc, method):
         if not is_yield_tracked:
             continue
 
+        # Fallback for legacy BOMs or partial entries: if yield_qty is missing but qty exists
+        if not row.custom_yield_qty and row.qty:
+            if not row.custom_yield_percent:
+                row.custom_yield_percent = frappe.get_cached_value("Item", row.item_code, "custom_yield_percent") or 100
+            row.custom_yield_qty = row.qty * (row.custom_yield_percent / 100)
+
         # At this point, the item is yield-tracked, so it must have required fields set
         if not row.custom_yield_qty:
             frappe.throw(_("Yield-tracked item {0} requires custom_yield_qty to be set on BOM row {1}").format(
