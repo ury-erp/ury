@@ -47,9 +47,13 @@ vi.mock('../lib/invoice-api', () => ({
   resolvePrintFormat: vi.fn(),
 }));
 
-vi.mock('@ury/core', () => ({
-  canCaptainTransfer: vi.fn().mockReturnValue(false),
-}));
+vi.mock('@ury/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@ury/core')>();
+  return {
+    ...actual,
+    canCaptainTransfer: vi.fn().mockReturnValue(false),
+  };
+});
 
 describe('TableView', () => {
   beforeEach(() => {
