@@ -1,4 +1,4 @@
-name: Deploy URY V3
+name: V3 UAT
 
 on:
  workflow_dispatch: 
