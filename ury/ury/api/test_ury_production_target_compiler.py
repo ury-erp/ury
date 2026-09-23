@@ -21,6 +21,7 @@ from ury.ury.api.ury_production_target_compiler import compile_production_target
 MOD = "ury.ury.api.ury_production_target_compiler"
 CONFIG_DOCTYPE = "URY Item Production Configuration"
 DEPARTMENT_DOCTYPE = "URY Production Department"
+PRODUCTION_UNIT_DOCTYPE = "URY Production Unit"
 
 
 def _config(item, branch="Branch A", department="Main Kitchen", production_unit="Main Kitchen Unit",
@@ -68,11 +69,13 @@ class _Fixture:
     the duration of `compile(...)`.
     """
 
-    def __init__(self, configs=None, bom_catalog=None, root_items=None, department_warehouses=None):
+    def __init__(self, configs=None, bom_catalog=None, root_items=None, department_warehouses=None,
+                 production_unit_warehouses=None):
         self.configs = configs or {}
         self.bom_catalog = bom_catalog or {}
         self.root_items = root_items or {}
         self.department_warehouses = department_warehouses or {}
+        self.production_unit_warehouses = production_unit_warehouses or {}
 
     # -- fake walk_bom_tree ---------------------------------------------
 
@@ -146,6 +149,8 @@ class _Fixture:
     def _fake_get_value(self, doctype, name, fieldname):
         if doctype == DEPARTMENT_DOCTYPE:
             return self.department_warehouses.get(name)
+        if doctype == PRODUCTION_UNIT_DOCTYPE:
+            return self.production_unit_warehouses.get(name)
         return None
 
     def compile(self, snapshot, branch="Branch A", company="Co"):
@@ -314,6 +319,67 @@ class MtoAssemblyTests(unittest.TestCase):
         demand = {row["item_code"]: row["required_qty"] for row in beverage["raw_material_demand"]}
         self.assertEqual(demand["Orange"], 6.0)  # 20 * 0.3
         self.assertEqual(demand["Sugar"], 1.0)  # 20 * 0.05
+
+    def test_mto_raw_material_lands_in_production_unit_warehouse_not_department(self):
+        # On a real site, a Production Unit's own warehouse can differ from
+        # its department's -- confirmed live: a "Beverages" department whose
+        # Production Unit warehouse is "Bevarages - U" while the department's
+        # own warehouse is "Direct Retail Warehouse - U". The Manufacture
+        # Stock Entry that actually completes an MTO Work Order consumes from
+        # whichever warehouse ury_production_context.resolve_production_context
+        # resolves for the item -- Production Unit first, department only as
+        # a fallback -- so raw-material demand has to land in the SAME place,
+        # or the replenishment is real but useless.
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={"BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3)]},
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE"},
+            department_warehouses={"Beverage": "Direct Retail Warehouse - U"},
+            production_unit_warehouses={"Beverage Unit": "Bevarages - U"},
+        )
+        snapshot = _snapshot(
+            [
+                _row(
+                    "ORANGE-JUICE", 20, department="Beverage", production_unit="Beverage Unit",
+                    production_policy="MADE_TO_ORDER", bom="BOM-ORANGE-JUICE",
+                )
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        row = departments["Beverage"]["raw_material_demand"][0]
+        self.assertEqual(row["item_code"], "Orange")
+        # The Production Unit's own warehouse, not the department's --
+        # matching resolve_production_context's MADE_TO_ORDER priority.
+        self.assertEqual(row["department_warehouse"], "Bevarages - U")
+
+    def test_mto_raw_material_falls_back_to_department_warehouse_with_no_production_unit_one(self):
+        # A Production Unit with no warehouse of its own configured (an
+        # older/incomplete setup) falls back to the department warehouse --
+        # the same fallback resolve_production_context itself uses.
+        fixture = _Fixture(
+            configs={},
+            bom_catalog={"BOM-ORANGE-JUICE": [_bom_row("Orange", 0.3)]},
+            root_items={"BOM-ORANGE-JUICE": "ORANGE-JUICE"},
+            department_warehouses={"Beverage": "Beverage - WH"},
+            production_unit_warehouses={},  # "Beverage Unit" has none configured
+        )
+        snapshot = _snapshot(
+            [
+                _row(
+                    "ORANGE-JUICE", 20, department="Beverage", production_unit="Beverage Unit",
+                    production_policy="MADE_TO_ORDER", bom="BOM-ORANGE-JUICE",
+                )
+            ]
+        )
+
+        departments, blockers = fixture.compile(snapshot)
+
+        self.assertEqual(blockers, [])
+        row = departments["Beverage"]["raw_material_demand"][0]
+        self.assertEqual(row["department_warehouse"], "Beverage - WH")
 
     def test_two_mto_rows_in_one_department_sum_shared_raw_material_demand(self):
         # ORANGE-JUICE and LEMONADE are both MADE_TO_ORDER, both in Beverage,

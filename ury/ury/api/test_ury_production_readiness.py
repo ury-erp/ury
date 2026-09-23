@@ -219,6 +219,58 @@ class TestMadeToOrderRawMaterialDemandIsNotLost(FrappeTestCase):
 		self.assertEqual(len(result["rows"]), 1)
 		self.assertEqual(result["rows"][0]["required_qty"], 7.0)  # 4.0 + 3.0
 
+	def test_raw_material_demand_with_its_own_warehouse_does_not_merge_with_the_departments(self):
+		# On a real site, a MADE_TO_ORDER row's raw_material_demand can carry
+		# its own warehouse -- a Production Unit's, distinct from the
+		# department's (see ury_production_target_compiler's
+		# _made_to_order_raw_material_warehouse). Sugar needed by a
+		# PRE_PRODUCED target (always the department warehouse, D13) and
+		# Sugar needed directly by an MTO row (a different, Production-Unit
+		# warehouse here) are two separate physical requirements. Merging
+		# them into one row under one warehouse would silently misreport
+		# stock and shortage for whichever warehouse lost.
+		departments = {
+			"Beverage": {
+				"department": "Beverage",
+				"warehouse": "Beverage - WH",
+				"targets": [
+					{
+						"item_code": "SYRUP-BASE",
+						"component_vector": [{"item_code": "Sugar", "required_qty": 2.0, "stock_uom": "Kg"}],
+					}
+				],
+				"external_receipt_targets": [],
+				"raw_material_demand": [
+					{
+						"item_code": "Sugar",
+						"required_qty": 5.0,
+						"stock_uom": "Kg",
+						"department_warehouse": "Beverage Unit - WH",
+					}
+				],
+			}
+		}
+		bin_qty = {
+			("Sugar", "Beverage - WH"): 1.0,
+			("Sugar", "Beverage Unit - WH"): 0.0,
+			("Sugar", "Store - WH"): 10.0,
+		}
+		with patch(f"{MOD}.frappe.db.get_value", side_effect=_bin_fake(bin_qty)):
+			result = compute_readiness(departments, store_warehouse="Store - WH")
+
+		self.assertEqual(len(result["rows"]), 2)
+		by_warehouse = {row["department_warehouse"]: row for row in result["rows"]}
+		self.assertEqual(by_warehouse["Beverage - WH"]["required_qty"], 2.0)
+		self.assertEqual(by_warehouse["Beverage - WH"]["department_available"], 1.0)
+		self.assertEqual(by_warehouse["Beverage - WH"]["department_shortage"], 1.0)
+		self.assertEqual(by_warehouse["Beverage Unit - WH"]["required_qty"], 5.0)
+		self.assertEqual(by_warehouse["Beverage Unit - WH"]["department_available"], 0.0)
+		self.assertEqual(by_warehouse["Beverage Unit - WH"]["department_shortage"], 5.0)
+		# Store shortage is still one number per item, summed across both
+		# warehouses, since Store itself has only one stock of Sugar to give.
+		self.assertEqual(by_warehouse["Beverage - WH"]["store_shortage"], 0.0)
+		self.assertEqual(by_warehouse["Beverage Unit - WH"]["store_shortage"], 0.0)
+
 
 class TestStoreWarehouseBlocker(FrappeTestCase):
 	def test_missing_store_warehouse_is_a_blocker_not_an_exception(self):

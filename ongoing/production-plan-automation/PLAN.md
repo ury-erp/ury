@@ -1048,6 +1048,36 @@ gate in `ury_sales_plan_production_plan.py`. Agent 5's fallback bucket
 default in `ury_production_transfer.py` gained the key too, for shape
 consistency.
 
+**Amendment — the demand still landed in the wrong warehouse.** As first
+shipped, `add_raw_material_demand` resolved every MADE_TO_ORDER row's
+warehouse as the Department Warehouse, unconditionally. That is correct for
+PRE_PRODUCED (D13), but not for MADE_TO_ORDER: `resolve_production_context`'s
+own MADE_TO_ORDER branch resolves a Production Unit's own warehouse first,
+falling back to the department warehouse only when the unit has none
+configured — and that resolved value, frozen at order-accept time, is what
+`ury_fulfilment_posting_service` actually consumes raw materials from when it
+posts the order's Manufacture Stock Entry.
+
+Checked against live data rather than assumed: at least one department on a
+real site has a Production Unit whose own warehouse differs from the
+department's. Replenishing raw-material demand into the department warehouse
+there would leave the Manufacture Stock Entry unable to find the stock it
+needs, however correctly the Purchase/Transfer request had been raised.
+
+`add_raw_material_demand` now resolves the same way
+`resolve_production_context` does — Production Unit warehouse first,
+department warehouse as fallback — and each `raw_material_demand` row carries
+that resolved warehouse itself, rather than assuming every demand source in a
+department shares the bucket's own warehouse. The readiness engine's demand
+aggregation is keyed by `(department, item_code, warehouse)`, not just
+`(department, item_code)`, so a raw-material row needing a different
+warehouse than a target's `component_vector` row for the same item produces
+two correctly-computed rows instead of one silently merged, wrong one. In the
+common case — one warehouse per department, true for every target and
+EXTERNAL_RECEIPT row (D13/D19), and true for raw-material demand whenever the
+Production Unit has no warehouse of its own — this collapses to exactly the
+one row per (department, item_code) it always produced.
+
 ## Wave 0 — Integration owner
 
 Owned solely by the integration owner. Blocks every other wave.
