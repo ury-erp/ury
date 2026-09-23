@@ -97,7 +97,9 @@ def resolve_production_units(
                 f"item {item_code} for branch {branch}: "
                 f"{[m['name'] for m in exact_matches]}",
             )
-        return _resolve_from_exact_match(exact_matches[0])
+        return _resolve_from_exact_match(
+            exact_matches[0], production_policy=production_policy
+        )
 
     # No exact mapping. Direct-retail items are not forced into production-unit
     # execution unless an explicit config said otherwise (handled above).
@@ -115,9 +117,15 @@ def resolve_production_units(
     return fallback_units
 
 
-def _resolve_from_exact_match(config_row):
+def _resolve_from_exact_match(config_row, production_policy=None):
     department = config_row.get("department")
     production_unit = config_row.get("production_unit")
+    policy = (config_row.get("production_policy") or production_policy or "").strip().upper()
+
+    # Direct-retail items are not forced into production-unit execution unless
+    # an explicit production_unit was configured on the mapping.
+    if not production_unit and policy == DIRECT_RETAIL_POLICY:
+        return []
 
     _assert_department_enabled(department)
 
@@ -157,10 +165,14 @@ def _get_exact_mappings(item_code, company, branch, department, production_polic
         if value is not None and fieldname in fieldnames:
             filters[fieldname] = value
 
+    fields = ["name", "production_unit", "department"]
+    if "production_policy" in fieldnames:
+        fields.append("production_policy")
+
     return frappe.get_all(
         ITEM_PRODUCTION_CONFIG_DOCTYPE,
         filters=filters,
-        fields=["name", "production_unit", "department"],
+        fields=fields,
     )
 
 

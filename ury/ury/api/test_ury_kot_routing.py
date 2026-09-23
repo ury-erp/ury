@@ -225,6 +225,54 @@ class TestResolveProductionUnits(FrappeTestCase):
 
         self.assertEqual(result, ["Retail Prep Unit"])
 
+    @patch(f"{MODULE}._doctype_fieldnames")
+    @patch(f"{MODULE}.frappe")
+    def test_direct_retail_item_with_explicit_config_and_no_production_unit_returns_empty(
+        self, mock_frappe, mock_fieldnames
+    ):
+        mock_frappe.db.exists.side_effect = lambda *a, **k: True
+        mock_fieldnames.side_effect = self._no_item_production_config_fields
+        mock_frappe.get_all.return_value = [
+            {"name": "UIPC-BTRSCP-URY", "production_unit": "", "department": "Beverages", "production_policy": "DIRECT_RETAIL"}
+        ]
+
+        # Case 1: Caller supplies production_policy="DIRECT_RETAIL"
+        result = resolve_production_units(
+            item_code="BTRSCP",
+            company="URY Co",
+            branch="URY",
+            production_policy="DIRECT_RETAIL",
+        )
+        self.assertEqual(result, [])
+
+        # Case 2: Caller does not supply production_policy, resolved from row
+        result2 = resolve_production_units(
+            item_code="BTRSCP",
+            company="URY Co",
+            branch="URY",
+        )
+        self.assertEqual(result2, [])
+
+    @patch(f"{MODULE}._doctype_fieldnames")
+    @patch(f"{MODULE}.frappe")
+    def test_manufactured_item_with_explicit_config_and_no_production_unit_raises(
+        self, mock_frappe, mock_fieldnames
+    ):
+        mock_frappe.db.exists.side_effect = lambda *a, **k: True
+        mock_fieldnames.side_effect = self._no_item_production_config_fields
+        mock_frappe.get_all.return_value = [
+            {"name": "CFG-MTO-1", "production_unit": None, "department": None, "production_policy": "MADE_TO_ORDER"}
+        ]
+
+        with self.assertRaises(RoutingError) as ctx:
+            resolve_production_units(
+                item_code="ITEM-MTO",
+                company="URY Co",
+                branch="Main Branch",
+                production_policy="MADE_TO_ORDER",
+            )
+        self.assertEqual(ctx.exception.reason_code, ROUTING_NOT_CONFIGURED)
+
     @patch(f"{MODULE}.frappe")
     def test_missing_branch_or_company_fails_closed(self, mock_frappe):
         with self.assertRaises(RoutingError) as ctx:
