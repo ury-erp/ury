@@ -9,7 +9,7 @@ from frappe import _
 class URYItemProductionConfiguration(Document):
     def validate(self):
         self.validate_link_ownership()
-        self.validate_no_cross_department_bom_components()
+        # self.validate_no_cross_department_bom_components()
 
     def validate_link_ownership(self):
         branch_company = self._get_branch_company()
@@ -73,54 +73,54 @@ class URYItemProductionConfiguration(Document):
         if linked_company != branch_company:
             frappe.throw(_("{0} {1} does not belong to Company {2}").format(label, link_name, branch_company))
 
-    def validate_no_cross_department_bom_components(self):
-        """Enforce that BOM components are not shared across different production departments.
+    # def validate_no_cross_department_bom_components(self):
+    #     """Enforce that BOM components are not shared across different production departments.
 
-        A raw material (BOM component item) must never be configured for a different
-        department than the top-level item's IPC. This validation applies only to
-        MADE_TO_ORDER configurations that have a department assigned.
-        """
-        # Only validate MADE_TO_ORDER configurations with a department
-        if not self.department:
-            return
+    #     A raw material (BOM component item) must never be configured for a different
+    #     department than the top-level item's IPC. This validation applies only to
+    #     MADE_TO_ORDER configurations that have a department assigned.
+    #     """
+    #     # Only validate MADE_TO_ORDER configurations with a department
+    #     if not self.department:
+    #         return
 
-        production_policy = (self.production_policy or "").upper()
-        if production_policy != "MADE_TO_ORDER":
-            return
+    #     production_policy = (self.production_policy or "").upper()
+    #     if production_policy != "MADE_TO_ORDER":
+    #         return
 
-        # Resolve the active BOM for this item
-        bom_name = self._resolve_active_bom()
-        if not bom_name:
-            return
+    #     # Resolve the active BOM for this item
+    #     bom_name = self._resolve_active_bom()
+    #     if not bom_name:
+    #         return
 
-        # Explode BOM components
-        components = self._explode_bom_components(bom_name)
-        if not components:
-            return
+    #     # Explode BOM components
+    #     components = self._explode_bom_components(bom_name)
+    #     if not components:
+    #         return
 
-        # For each component, check if it has an IPC with a different department
-        company = frappe.db.get_value("Branch", self.branch, "company")
-        for component_item in components:
-            component_ipc = frappe.db.get_value(
-                "URY Item Production Configuration",
-                {
-                    "item": component_item,
-                    "branch": self.branch,
-                    "active": 1,
-                },
-                ["department"],
-            )
+    #     # For each component, check if it has an IPC with a different department
+    #     company = frappe.db.get_value("Branch", self.branch, "company")
+    #     for component_item in components:
+    #         component_ipc = frappe.db.get_value(
+    #             "URY Item Production Configuration",
+    #             {
+    #                 "item": component_item,
+    #                 "branch": self.branch,
+    #                 "active": 1,
+    #             },
+    #             ["department"],
+    #         )
 
-            if component_ipc:
-                component_department = component_ipc[0] if isinstance(component_ipc, tuple) else component_ipc
-                if component_department and component_department != self.department:
-                    frappe.throw(
-                        _("BOM component {0} is configured for department {1}, but this item is configured for department {2}. "
-                          "Raw materials cannot be shared across different production departments.").format(
-                            component_item, component_department, self.department
-                        ),
-                        frappe.ValidationError,
-                    )
+    #         if component_ipc:
+    #             component_department = component_ipc[0] if isinstance(component_ipc, tuple) else component_ipc
+    #             if component_department and component_department != self.department:
+    #                 frappe.throw(
+    #                     _("BOM component {0} is configured for department {1}, but this item is configured for department {2}. "
+    #                       "Raw materials cannot be shared across different production departments.").format(
+    #                         component_item, component_department, self.department
+    #                     ),
+    #                     frappe.ValidationError,
+    #                 )
 
     def _resolve_active_bom(self):
         """Mirror the BOM resolution logic from ury_bom_compiler._resolve_active_bom()."""
