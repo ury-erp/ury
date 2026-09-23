@@ -18,6 +18,7 @@ interface MenuCardProps {
   disabled?: boolean;
   branch?: string;
   company?: string;
+  availability?: ItemAvailability | null;
 }
 
 const MenuCard: FC<MenuCardProps> = ({
@@ -30,26 +31,32 @@ const MenuCard: FC<MenuCardProps> = ({
   disabled,
   branch,
   company,
+  availability: propAvailability,
 }) => {
-  const [availability, setAvailability] = useState<ItemAvailability | null>(null);
+  const [internalAvailability, setInternalAvailability] = useState<ItemAvailability | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (propAvailability !== undefined) {
+      return;
+    }
     if (!branch || !company || !item) {
-      setAvailability(null);
+      setInternalAvailability(null);
       return;
     }
     getItemAvailability({ item_code: item, branch, company })
       .then((result) => {
-        if (!cancelled) setAvailability(result);
+        if (!cancelled) setInternalAvailability(result);
       })
       .catch(() => {
-        if (!cancelled) setAvailability(null);
+        if (!cancelled) setInternalAvailability(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [item, branch, company]);
+  }, [item, branch, company, propAvailability]);
+
+  const availability = propAvailability !== undefined ? propAvailability : internalAvailability;
 
   // `available_qty == null` means "unconstrained" (e.g. an "Always
   // Available" override) -- never treat it as zero/out-of-stock.

@@ -20,6 +20,7 @@ interface MenuCardProps {
   /** Branch/company for the V3-44 availability lookup; omit to skip the check entirely. */
   branch?: string;
   company?: string;
+  availability?: ItemAvailability | null;
 }
 
 const MenuCard: FC<MenuCardProps> = ({
@@ -32,8 +33,9 @@ const MenuCard: FC<MenuCardProps> = ({
   disabled,
   branch,
   company,
+  availability: propAvailability,
 }) => {
-  const [availability, setAvailability] = useState<ItemAvailability | null>(null);
+  const [internalAvailability, setInternalAvailability] = useState<ItemAvailability | null>(null);
   // Timestamp (ms) of the last successful availability refresh, from any
   // source (mount fetch, I1 realtime event, or an I2 poll tick). The I2
   // poll below reads this to decide whether a tick is redundant.
@@ -41,26 +43,31 @@ const MenuCard: FC<MenuCardProps> = ({
 
   useEffect(() => {
     let cancelled = false;
+    if (propAvailability !== undefined) {
+      return;
+    }
     if (!branch || !company || !item) {
-      setAvailability(null);
+      setInternalAvailability(null);
       return;
     }
     getItemAvailability({ item_code: item, branch, company })
       .then((result) => {
         if (!cancelled) {
-          setAvailability(result);
+          setInternalAvailability(result);
           lastRefreshedAtRef.current = Date.now();
         }
       })
       .catch(() => {
         // Display-only lookup — a failed check must never block the menu
         // from rendering. Treat as "unknown" (no gating) on error.
-        if (!cancelled) setAvailability(null);
+        if (!cancelled) setInternalAvailability(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [item, branch, company]);
+  }, [item, branch, company, propAvailability]);
+
+  const availability = propAvailability !== undefined ? propAvailability : internalAvailability;
 
   // I1: on a live "menu_availability_update_<branch>" event that names this
   // item, re-check just this item's availability (skipCache: true — never

@@ -83,4 +83,22 @@ describe("MenuList", () => {
     const grid = container.querySelector("[style*=grid]") as HTMLElement;
     expect(grid?.className).toContain("opacity-50");
   });
+
+  it("renders in-stock items before sold out and temporarily unavailable items", async () => {
+    const { sortMenuItemsByAvailability } = await import("../lib/use-menu-availability");
+    const testItems = [
+      { id: "1", name: "Apple Pie", item: "APPLE", price: 100, course: "Dessert", image: null, special_dish: 0 },
+      { id: "2", name: "Biryani", item: "BIRYANI", price: 250, course: "Main", image: null, special_dish: 0 },
+      { id: "3", name: "Cake", item: "CAKE", price: 150, course: "Dessert", image: null, special_dish: 0 },
+    ];
+
+    const availabilityMap: any = {
+      APPLE: { item_code: "APPLE", sellable: false, available_qty: 0, reason_code: "PLAN_EXHAUSTED" },
+      BIRYANI: { item_code: "BIRYANI", sellable: true, available_qty: 10, reason_code: "AVAILABLE" },
+      CAKE: { item_code: "CAKE", sellable: false, available_qty: 0, reason_code: "BLOCKING_COMPONENT" },
+    };
+
+    const sorted = sortMenuItemsByAvailability(testItems, availabilityMap);
+    expect(sorted.map(i => i.name)).toEqual(["Biryani", "Apple Pie", "Cake"]);
+  });
 });
