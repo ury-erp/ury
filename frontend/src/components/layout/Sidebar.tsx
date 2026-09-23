@@ -123,8 +123,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Control',
     items: [
-      { label: 'Stock', path: '/department-stock', icon: Boxes },
-      { label: 'Store Issue', path: '/store-issue', icon: ArrowRightLeft },
       { label: 'Wastage', path: '/wastage', icon: Trash2 },
       { label: 'Yield Checks', path: '/overdue-yield-checks', icon: ClipboardCheck },
       { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
