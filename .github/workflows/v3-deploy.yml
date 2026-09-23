@@ -16,6 +16,7 @@ jobs:
           SSH_HOST: ${{ secrets.URY_DEPLOY_HOST }}
           SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
         run: |
+          set -x
           mkdir -p ~/.ssh
 
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
