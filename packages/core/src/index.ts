@@ -1,11 +1,14 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
-export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities, isDashboardManager, DASHBOARD_MANAGER_ROLES } from './frappe/roles';
 export type { POSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
 export type { User, PosProfileCombined } from './types';
 export { storage } from './storage';
-export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt } from './format';
+export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt, setCompactSuffixes } from './format';
+export { createI18n } from './i18n/engine';
+export type { I18n, I18nOptions, TranslationMap, Direction } from './i18n/engine';
+export { setIntlLocale, getIntlLocale } from './i18n/locale-registry';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
 export { validateFieldValue } from './utils/validateField';
 export type { ValidationMessages } from './utils/validateField';

@@ -16,6 +16,7 @@ import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { getChecklist } from '../lib/checklist-api';
+import { guardOnline } from '../lib/offline-guard';
 import {
   getOpenPosOpeningEntries,
   getSubCashierPosInvoices,
@@ -336,11 +337,15 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   }, [rows, touchedModes]);
 
   const handleRequestSubmit = () => {
+    // Closing a shift writes the day's cash position; half of it is worse
+    // than none of it.
+    if (!guardOnline()) return;
     if (!validation.isValid) return;
     setShowConfirm(true);
   };
 
   const handleConfirmSubmit = async () => {
+    if (!guardOnline()) return;
     if (!openingEntry || !posProfile || !user) return;
 
     setShowConfirm(false);

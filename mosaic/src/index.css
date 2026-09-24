@@ -1,4 +1,485 @@
+/**
+ * IBM Plex Sans Arabic — self-hosted.
+ *
+ * Self-hosted rather than loaded from Google Fonts on purpose: a POS terminal
+ * in a restaurant is frequently offline or on a throttled connection, and a
+ * CDN font that fails to load would drop the whole UI to a default serif.
+ * The files live in `ury/public/fonts/`, which Frappe serves at
+ * `/assets/ury/fonts/`, so all five frontends share one copy regardless of
+ * which bundle they ship in.
+ *
+ * Only the `arabic` and `latin` subsets are included — the browser fetches a
+ * subset only when the page actually contains glyphs in its unicode-range, so
+ * an English user never downloads the Arabic file (or vice versa).
+ *
+ * `font-display: swap` keeps text visible while the face loads; the system
+ * fallback stack in rtl.css covers the swap window and the offline case.
+ *
+ * Generated — do not hand-edit. See docs/i18n/README.md.
+ */
+
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-500-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-700-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* One self-hosted family for both scripts. This said 'Avenir Next' while
+       eight IBM Plex Sans Arabic subsets were @font-face'd above and never
+       used; see the same note in urypos/src/index.css. */
+    --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, 'Noto Sans Arabic',
+      'Geeza Pro', system-ui, sans-serif;
+    font-family: var(--font-sans);
+    color: #3f2a20;
+    background: #f8f4eb;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: #f8f4eb;
+  }
+}
+
+@layer components {
+  .kitchen-app {
+    background: radial-gradient(circle at 100% 0%, rgba(255, 202, 75, 0.2), transparent 28rem), #f8f4eb;
+  }
+
+  .kitchen-header {
+    min-height: 4.5rem;
+    background: #241914;
+    border-bottom: 1px solid #3d2a22;
+    box-shadow: 0 5px 18px rgba(36, 25, 20, 0.16);
+  }
+
+  .brand-mark {
+    display: grid;
+    width: 2.5rem;
+    height: 2.5rem;
+    place-items: center;
+    border-radius: 0.75rem;
+    background: #fff;
+  }
+
+  .brand-mark img {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+  }
+
+  .brand-name {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-name strong { color: #ffca4b; }
+  .header-divider { width: 1px; height: 1.5rem; background: rgba(255,255,255,0.18); }
+  .header-context { color: rgba(255,255,255,0.58); font-size: 0.8rem; font-weight: 600; }
+
+  .header-icon-button {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border-radius: 0.75rem;
+    color: #ffca4b;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .header-icon-button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  .empty-kitchen-icon {
+    display: grid;
+    width: 3.75rem;
+    height: 3.75rem;
+    margin: 0 auto 1rem;
+    place-items: center;
+    border: 1px solid #e6d5b4;
+    border-radius: 1.25rem;
+    background: #fff8e8;
+    color: #d89917;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  /*
+   * Kitchen ticket.
+   *
+   * The height is bounded on purpose: the item list inside scrolls, so one
+   * twenty-item ticket cannot stretch its row and leave the cards beside it
+   * floating in white space. `min-height` keeps a one-item ticket from looking
+   * like a fragment, and the cap is sized so a 1080p screen still shows three
+   * full rows.
+   */
+  .kot-card {
+    min-height: 16rem;
+    max-height: min(32rem, 70vh);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .kot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(74, 48, 30, 0.14);
+  }
+
+  /* Keep the scrollbar from drawing attention on a wall-mounted screen. */
+  .kot-card ul::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .kot-card ul::-webkit-scrollbar-thumb {
+    background-color: rgba(74, 48, 30, 0.18);
+    border-radius: 9999px;
+  }
+
+  /* ------------------------------------------------------------------
+   * Station toolbar
+   *
+   * Controls for the board rather than for a ticket. Sized for a gloved
+   * finger on a wall-mounted touch screen: every interactive target here
+   * clears 40px in its smaller dimension.
+   * ------------------------------------------------------------------ */
+
+  .kds-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    background: #f7f1e6;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #735d4e;
+    white-space: nowrap;
+  }
+
+  .kds-stat b { font-size: 0.95rem; font-weight: 800; color: #3f2a20; }
+
+  .kds-stat--prep { background: #e8f3fb; color: #1f6591; }
+  .kds-stat--prep b { color: #14527a; }
+  .kds-stat--late { background: #fff0ec; color: #c83d2d; }
+  .kds-stat--late b { color: #a52d1f; }
+  .kds-stat--done { background: #eaf7ef; color: #1c7a45; }
+  .kds-stat--done b { color: #136034; }
+
+  .kds-segment {
+    display: inline-flex;
+    gap: 0.25rem;
+    border-radius: 0.85rem;
+    background: #f7f1e6;
+    padding: 0.2rem;
+  }
+
+  .kds-segment__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 0.65rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #735d4e;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+  }
+
+  .kds-segment__item:hover { background: rgba(255, 255, 255, 0.7); }
+
+  .kds-segment__item--on {
+    background: #fffdf8;
+    color: #3f2a20;
+    box-shadow: 0 1px 3px rgba(74, 48, 30, 0.14);
+  }
+
+  .kds-segment__count {
+    border-radius: 9999px;
+    background: rgba(74, 48, 30, 0.1);
+    padding: 0 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .kds-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.5rem;
+    border: 1px solid #eadfce;
+    border-radius: 0.85rem;
+    background: #fffdf8;
+    padding: 0 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #735d4e;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .kds-chip:hover { background: #f7f1e6; }
+  .kds-chip--warn { border-color: #f0d58e; background: #fff8e8; color: #8a6100; }
+  .kds-chip--danger { border-color: #f3a79a; background: #fff0ec; color: #c83d2d; }
+
+  .kds-popover {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 50;
+    width: 15rem;
+    border: 1px solid #eadfce;
+    border-radius: 1rem;
+    background: #fffdf8;
+    padding: 0.9rem;
+    box-shadow: 0 14px 34px rgba(74, 48, 30, 0.18);
+  }
+
+  .kds-popover__row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #3f2a20;
+    background: #f7f1e6;
+  }
+
+  .kds-popover__row:hover { background: #f0e7d8; }
+
+  /* ------------------------------------------------------------------
+   * Ticket urgency rail
+   *
+   * A band down the card's inline edge. This is a second channel for age,
+   * independent of the card's fill colour — which already encodes the
+   * ticket's type — so "modified" and "late" can be read at the same time.
+   * ------------------------------------------------------------------ */
+
+  .kds-rail {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 5px;
+  }
+
+  .kds-rail--ok { background: #7bc49a; }
+  .kds-rail--warn { background: #f0b83e; }
+  .kds-rail--late { background: #e0503a; animation: pulse-soft 1.6s var(--ease-in-out) infinite; }
+  .kds-rail--cancelled { background: #b9a89b; }
+
+  /* Plated-items progress. Readable as a shape from across the kitchen,
+     which "3 / 7" is not. */
+  .kds-progress {
+    position: relative;
+    display: block;
+    height: 5px;
+    flex: 1 1 auto;
+    min-width: 2.5rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: rgba(74, 48, 30, 0.12);
+  }
+
+  .kds-progress__fill {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background: #4caf7d;
+    transition: width var(--duration-base) var(--ease-out);
+  }
+}
 	
+/*
+ * RTL + Arabic typography. Mirrors packages/ui/src/styles/rtl.css, inlined
+ * because mosaic sits outside the yarn workspace and cannot import @ury/ui.
+ * Inert unless <html dir="rtl">.
+ */
+@layer base {
+  /* Metrics only — the family is `--font-sans` and is shared by both scripts. */
+  [dir='rtl'] body {
+    line-height: 1.7;
+  }
+}
+
+@layer utilities {
+  /* Keep KOT numbers, order ids and times from reordering under bidi. */
+  .bidi-isolate {
+    unicode-bidi: isolate;
+  }
+}
+
+/* ===================================================================
+ * Motion + RTL for the Vue apps.
+ *
+ * urypos and mosaic sit outside the yarn workspace, so they cannot use the
+ * @ury/ui Tailwind preset or import its stylesheets. These are hand-written
+ * equivalents of the utilities the React apps get from the preset, so the two
+ * stacks share one motion vocabulary instead of drifting apart.
+ *
+ * Plain CSS on purpose: Tailwind would purge `@layer utilities` rules whose
+ * class names it cannot find, and several of these are referenced from Vue
+ * `:class` bindings that the scanner does not reliably see.
+ *
+ * Keep the durations and easing in sync with packages/ui/src/styles/theme.css.
+ * =================================================================== */
+
+:root {
+  --duration-instant: 90ms;
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --slide-from: 8px;
+}
+
+[dir='rtl'] {
+  --slide-from: -8px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(var(--slide-from)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes check-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in { animation: fade-in var(--duration-base) var(--ease-out) both; }
+.animate-fade-in-up { animation: fade-in-up var(--duration-base) var(--ease-out) both; }
+.animate-slide-in { animation: slide-in var(--duration-base) var(--ease-out) both; }
+.animate-scale-in { animation: scale-in var(--duration-base) var(--ease-out) both; }
+.animate-pulse-soft { animation: pulse-soft 2s var(--ease-in-out) infinite; }
+.animate-check-in { animation: check-in 320ms var(--ease-emphasis) both; }
+
+/* Staggered entrance. Set --i to the item index; capped at 8 steps so a long
+   ticket rail still finishes arriving quickly. */
+.stagger { animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
+.stagger-fast { animation-delay: calc(min(var(--i, 0), 8) * 24ms); }
+
+/* Press feedback — the only confirmation a touchscreen can give. */
+.press { transition: transform var(--duration-instant) var(--ease-out); }
+.press:active { transform: scale(0.97); }
+
+.lift {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.lift:hover { transform: translateY(-1px); }
+
+/*
+ * Motion is a garnish, never a gate: anyone who asked their OS to reduce
+ * motion gets the same interface without it. The spinner is exempt because it
+ * is a status indicator, not decoration.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

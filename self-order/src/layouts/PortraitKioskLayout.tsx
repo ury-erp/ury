@@ -1,14 +1,20 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
+import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
 import { formatCurrency } from '@ury/core'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
 import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
+import { t, tPlural } from '../i18n'
+import { LanguageToggle } from '../components/LanguageToggle'
+import BillStatusNotice from './shared/BillStatusNotice'
+import CallWaiterButton from './shared/CallWaiterButton'
+import KitchenStatusStrip from './shared/KitchenStatusStrip'
 
 const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
 
-const ALL_CATEGORY = '__all__'
 
 interface LayoutProps {
   initialContext?: OrderingContext
@@ -40,6 +46,10 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    billStatus,
+    waiterStatus,
+    kitchenStatus,
+    handleCallWaiter,
     payingOnline,
     addToCart,
     decrementCart,
@@ -52,13 +62,13 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     cartTotal,
   } = useOrderingSession(initialContext)
 
-  const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
+  const discovery = useMenuDiscovery(menu)
   const [cartExpanded, setCartExpanded] = useState(false)
   const [showIdleWarning, setShowIdleWarning] = useState(false)
-  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(t('order.confirm_restart'))) {
       resetSession()
     }
   }
@@ -83,27 +93,10 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     setShowIdleWarning(false)
   }
 
-  const categories = useMemo(() => {
-    const seen = new Map<string, string>()
-    for (const item of menu) {
-      const key = item.course ?? ALL_CATEGORY
-      if (key === ALL_CATEGORY) continue
-      if (!seen.has(key)) {
-        seen.set(key, item.course_label ?? item.course ?? 'Other')
-      }
-    }
-    return Array.from(seen.entries()).map(([course, label]) => ({ course, label }))
-  }, [menu])
-
-  const visibleMenu = useMemo(() => {
-    if (selectedCategory === ALL_CATEGORY) return menu
-    return menu.filter((item) => (item.course ?? ALL_CATEGORY) === selectedCategory)
-  }, [menu, selectedCategory])
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading menu…
+        {t('order.loading_menu')}
       </div>
     )
   }
@@ -120,14 +113,17 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     <div className="flex min-h-screen flex-col pb-24">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
         <h1 className="text-2xl font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {context?.table ? t('order.table', { table: context.table }) : t('order.for_pickup')}
         </h1>
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
         <button
           onClick={handleReset}
           className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
         >
-          New Order
+          {t('order.new_order')}
         </button>
+        </div>
       </header>
 
       {error && (
@@ -135,8 +131,14 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
       )}
 
       {order && order.items.length > 0 && (
+        <div className="mx-6 mt-4">
+          <KitchenStatusStrip status={kitchenStatus} />
+        </div>
+      )}
+
+      {order && order.items.length > 0 && (
         <section className="mx-6 mt-4 rounded-lg border p-4">
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">{t('order.so_far')}</h2>
           <ul className="space-y-1 text-base">
             {order.items.map((row, idx) => (
               <li key={`${row.item_code}-${idx}`} className="flex justify-between">
@@ -146,7 +148,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
             ))}
           </ul>
           <div className="mt-2 flex justify-between border-t pt-2 text-base font-semibold">
-            <span>Total</span>
+            <span>{t('common.total')}</span>
             <span>{order.grand_total}</span>
           </div>
           {context?.capabilities.customer_payment_enabled && !order.billed && (
@@ -155,7 +157,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               disabled={payingOnline}
               onClick={payOnline}
             >
-              {payingOnline ? 'Starting payment…' : 'Pay Online'}
+              {payingOnline ? t('order.starting_payment') : t('order.pay_online')}
             </button>
           )}
           {context?.capabilities.request_bill_enabled && !order.billed && (
@@ -164,44 +166,24 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               disabled={billRequested}
               onClick={handleRequestBill}
             >
-              {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
+              {billRequested ? t('order.bill_requested') : t('order.request_bill')}
             </button>
           )}
+          <BillStatusNotice status={billStatus} />
+          <CallWaiterButton
+            context={context}
+            status={waiterStatus}
+            onCall={handleCallWaiter}
+            className="mt-3 py-3"
+          />
         </section>
       )}
 
       <div className="flex flex-1 gap-4 px-6 pt-4">
-        <nav
-          aria-label="Menu categories"
-          className="flex w-40 shrink-0 flex-col gap-2 self-start rounded-lg border p-2"
-        >
-          <button
-            onClick={() => setSelectedCategory(ALL_CATEGORY)}
-            className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
-              selectedCategory === ALL_CATEGORY
-                ? 'bg-primary text-primary-foreground'
-                : 'text-foreground hover:bg-muted'
-            }`}
-          >
-            All Items
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.course}
-              onClick={() => setSelectedCategory(category.course)}
-              className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
-                selectedCategory === category.course
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-foreground hover:bg-muted'
-              }`}
-            >
-              {category.label}
-            </button>
-          ))}
-        </nav>
-
+        <div className="w-full min-w-0">
+          <div className="mb-5"><MenuDiscoveryBar discovery={discovery} size="large" /></div>
         <section className="grid flex-1 grid-cols-2 gap-4 self-start">
-          {visibleMenu.map((item) => (
+          {discovery.visibleMenu.map((item) => (
             <MenuCard
               key={item.item}
               item={item}
@@ -211,6 +193,8 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
             />
           ))}
         </section>
+        {discovery.visibleMenu.length === 0 && <p role="status" className="py-8 text-center">{t('menu.no_results_hint')}</p>}
+        </div>
       </div>
 
       {cartCount > 0 && (
@@ -224,16 +208,16 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
                     <span className="flex items-center gap-3">
                       <button
                         onClick={() => decrementCart(entry.item.item)}
-                        className="h-8 w-8 rounded-full border text-base leading-none"
-                        aria-label={`Remove one ${entry.item.item_name}`}
+                        className="h-12 w-12 rounded-full border text-base leading-none"
+                        aria-label={t('order.remove_one', { item: entry.item.item_name })}
                       >
                         −
                       </button>
                       {entry.qty}
                       <button
                         onClick={() => addToCart(entry.item)}
-                        className="h-8 w-8 rounded-full border text-base leading-none"
-                        aria-label={`Add one more ${entry.item.item_name}`}
+                        className="h-12 w-12 rounded-full border text-base leading-none"
+                        aria-label={t('order.add_one', { item: entry.item.item_name })}
                       >
                         +
                       </button>
@@ -247,11 +231,11 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
           <div className="flex items-center gap-3 p-4">
             <button
               onClick={() => setCartExpanded((prev) => !prev)}
-              className="flex flex-1 items-center justify-between rounded-md border px-4 py-3 text-left"
+              className="flex flex-1 items-center justify-between rounded-md border px-4 py-3 text-start"
               aria-expanded={cartExpanded}
             >
               <span className="text-base font-semibold">
-                {cartCount} item{cartCount > 1 ? 's' : ''}
+                {tPlural('order.item_count', cartCount)}
               </span>
               <span className="text-base font-semibold tabular-nums">{formatCurrency(cartTotal)}</span>
             </button>
@@ -260,7 +244,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               disabled={submitting}
               className="rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
             >
-              {submitting ? 'Placing…' : 'Place Order'}
+              {submitting ? t('order.placing_short') : t('order.place')}
             </button>
           </div>
         </div>
@@ -269,14 +253,14 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
         <DialogContent onClose={handleStillHere}>
           <DialogHeader>
-            <DialogTitle>Still there?</DialogTitle>
+            <DialogTitle>{t('idle.title')}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={handleStillHere}
               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
             >
-              I'm still here
+              {t('idle.confirm')}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -299,7 +283,7 @@ function MenuCard({
   return (
     <button
       onClick={onAdd}
-      className="flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
+      className="flex flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
     >
       {showImage && item.item_image && (
         <img src={item.item_image} alt={item.item_name} className="h-48 w-full object-cover" />
@@ -308,7 +292,7 @@ function MenuCard({
         <div className="text-lg font-medium">{item.item_name}</div>
         <div className="mt-1 text-base text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
         {qtyInCart > 0 && (
-          <div className="mt-2 text-sm font-semibold text-primary">In cart: {qtyInCart}</div>
+          <div className="mt-2 text-sm font-semibold text-primary">{t('order.in_cart', { qty: qtyInCart })}</div>
         )}
       </div>
     </button>

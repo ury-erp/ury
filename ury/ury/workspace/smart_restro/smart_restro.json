@@ -1,0 +1,954 @@
+{
+ "charts": [
+  {
+   "chart_name": "Smart Restro Sales Trend",
+   "label": "Sales Trend"
+  },
+  {
+   "chart_name": "Smart Restro Revenue by Order Type",
+   "label": "Revenue by Order Type"
+  },
+  {
+   "chart_name": "Smart Restro Invoices by Branch",
+   "label": "Invoices by Branch"
+  },
+  {
+   "chart_name": "Smart Restro Top Waiters",
+   "label": "Top Waiters"
+  }
+ ],
+ "content": "[{\"id\": \"ea0762ea98\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h3\\\"><b>Smart Restro</b></span>\", \"col\": 12}}, {\"id\": \"ffc4e4e330\", \"type\": \"paragraph\", \"data\": {\"text\": \"<span class=\\\"text-muted\\\">Restaurant operations platform by <b>Smart Choice</b> — point of sale, floor service, kitchen display and self-ordering, on one set of books.</span>\", \"col\": 12}}, {\"id\": \"a0cdba16ea\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"f3bf78b9f4\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Launch</b></span>\", \"col\": 12}}, {\"id\": \"cf8a1d945c\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Smart Restro POS\", \"col\": 3}}, {\"id\": \"155ee772e3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Manager Dashboard\", \"col\": 3}}, {\"id\": \"72d87eac1a\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Kitchen Display\", \"col\": 3}}, {\"id\": \"dc45259aec\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Self-Order\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Dispatch Board\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Waitlist\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Guest Feedback\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Restaurant Website\", \"col\": 3}}, {\"id\": \"6392a306f4\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"7483c665b5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today at a Glance</b></span>\", \"col\": 12}}, {\"id\": \"5614e37760\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Smart Restro Sales Today\", \"col\": 3}}, {\"id\": \"1f3fca8b7e\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Smart Restro Invoices Today\", \"col\": 3}}, {\"id\": \"cd07be3051\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Smart Restro Open Orders\", \"col\": 3}}, {\"id\": \"910c0c1766\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Smart Restro Occupied Tables\", \"col\": 3}}, {\"id\": \"9f012f4874\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Smart Restro Kitchen Queue\", \"col\": 3}}, {\"id\": \"9ecb2cc165\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"4acdef4536\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Sales Performance</b></span>\", \"col\": 12}}, {\"id\": \"1b66bf7650\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Smart Restro Sales Trend\", \"col\": 12}}, {\"id\": \"3a5fe3086b\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Smart Restro Revenue by Order Type\", \"col\": 6}}, {\"id\": \"4c37beffe6\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Smart Restro Invoices by Branch\", \"col\": 6}}, {\"id\": \"06b821fc84\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"1b3a470f4e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Daily Operations</b></span>\", \"col\": 12}}, {\"id\": \"9a61f95999\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Invoice\", \"col\": 3}}, {\"id\": \"905d89b23f\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Opening Entry\", \"col\": 3}}, {\"id\": \"7735fd81e5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Closing Entry\", \"col\": 3}}, {\"id\": \"5a39b7b3d1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Table\", \"col\": 3}}, {\"id\": \"8f3b7a09a3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY KOT\", \"col\": 3}}, {\"id\": \"6f7f47d458\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Today's Sales\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Table Reservation\", \"col\": 3}}, {\"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Delivery\", \"col\": 3}}, {\"id\": \"427244acda\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"62b6e8f90b\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Setup &amp; Management</b></span>\", \"col\": 12}}, {\"id\": \"8033771fe7\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant Setup\", \"col\": 3}}, {\"id\": \"f83a80fb08\", \"type\": \"card\", \"data\": {\"card_name\": \"Menu Management\", \"col\": 3}}, {\"id\": \"6119a72121\", \"type\": \"card\", \"data\": {\"card_name\": \"Floor & Service\", \"col\": 3}}, {\"id\": \"c1bf8ebec8\", \"type\": \"card\", \"data\": {\"card_name\": \"Kitchen & Production\", \"col\": 3}}, {\"id\": \"19502b8dec\", \"type\": \"card\", \"data\": {\"card_name\": \"Devices & Printing\", \"col\": 3}}, {\"id\": \"e070fd6693\", \"type\": \"card\", \"data\": {\"card_name\": \"Billing & Shifts\", \"col\": 3}}, {\"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Guests, Delivery &amp; Offers</b></span>\", \"col\": 12}}, {\"type\": \"card\", \"data\": {\"card_name\": \"Guest Experience\", \"col\": 3}}, {\"type\": \"card\", \"data\": {\"card_name\": \"Delivery\", \"col\": 3}}, {\"type\": \"card\", \"data\": {\"card_name\": \"Offers & Loyalty\", \"col\": 3}}, {\"type\": \"card\", \"data\": {\"card_name\": \"Cost & Control\", \"col\": 3}}, {\"id\": \"76658fa7aa\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"6e7f17c322\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Reports &amp; Analytics</b></span>\", \"col\": 12}}, {\"id\": \"4649d26f56\", \"type\": \"card\", \"data\": {\"card_name\": \"Sales Reports\", \"col\": 4}}, {\"id\": \"8da769231f\", \"type\": \"card\", \"data\": {\"card_name\": \"Customers & Items\", \"col\": 4}}, {\"id\": \"0e88a6869d\", \"type\": \"card\", \"data\": {\"card_name\": \"Staff & Operations\", \"col\": 4}}, {\"id\": \"312c1e7d7a\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Smart Restro Top Waiters\", \"col\": 12}}, {\"id\": \"4f59da23d1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"31cee2c812\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>POS Consoles</b></span>\", \"col\": 12}}, {\"id\": \"d2c926dc3d\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"URY POS\", \"col\": 6}}, {\"id\": \"afe035e164\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"POS V1\", \"col\": 6}}]",
+ "creation": "2023-11-30 12:04:38.330350",
+ "custom_blocks": [
+  {
+   "custom_block_name": "URY POS",
+   "label": "URY POS"
+  },
+  {
+   "custom_block_name": "POS V1",
+   "label": "POS V1"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "retail",
+ "idx": 0,
+ "indicator_color": "red",
+ "is_hidden": 0,
+ "label": "Smart Restro",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Setup",
+   "icon": "setting",
+   "link_count": 7,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch",
+   "link_count": 0,
+   "link_to": "Branch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Restaurant",
+   "link_count": 0,
+   "link_to": "URY Restaurant",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Profile",
+   "link_count": 0,
+   "link_to": "POS Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Room",
+   "link_count": 0,
+   "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Table",
+   "link_count": 0,
+   "link_to": "URY Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mode of Payment",
+   "link_count": 0,
+   "link_to": "Mode of Payment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Report Settings",
+   "link_count": 0,
+   "link_to": "URY Report Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Menu Management",
+   "icon": "sell",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Menu",
+   "link_count": 0,
+   "link_to": "URY Menu",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Menu Course",
+   "link_count": 0,
+   "link_to": "URY Menu Course",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item",
+   "link_count": 0,
+   "link_to": "Item",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Group",
+   "link_count": 0,
+   "link_to": "Item Group",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Price List",
+   "link_count": 0,
+   "link_to": "Price List",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Floor & Service",
+   "icon": "organization",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Table",
+   "link_count": 0,
+   "link_to": "URY Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Room",
+   "link_count": 0,
+   "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Service Request",
+   "link_count": 0,
+   "link_to": "URY Service Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Ordering Session",
+   "link_count": 0,
+   "link_to": "URY Ordering Session",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY POS Checklist Log",
+   "link_count": 0,
+   "link_to": "URY POS Checklist Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Kitchen & Production",
+   "icon": "tool",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Production Unit",
+   "link_count": 0,
+   "link_to": "URY Production Unit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY KOT",
+   "link_count": 0,
+   "link_to": "URY KOT",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY KOT Error Log",
+   "link_count": 0,
+   "link_to": "URY KOT Error Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Devices & Printing",
+   "icon": "printer",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Network Printer Settings",
+   "link_count": 0,
+   "link_to": "Network Printer Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Payment Terminal",
+   "link_count": 0,
+   "link_to": "URY Payment Terminal",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Ordering Device",
+   "link_count": 0,
+   "link_to": "URY Ordering Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Self Ordering Profile",
+   "link_count": 0,
+   "link_to": "URY Self Ordering Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Billing & Shifts",
+   "icon": "accounting",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Invoice",
+   "link_count": 0,
+   "link_to": "POS Invoice",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Opening Entry",
+   "link_count": 0,
+   "link_to": "POS Opening Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Closing Entry",
+   "link_count": 0,
+   "link_to": "POS Closing Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Payment Terminal Transaction",
+   "link_count": 0,
+   "link_to": "URY Payment Terminal Transaction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Daily P and L",
+   "link_count": 0,
+   "link_to": "URY Daily P and L",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Reports",
+   "icon": "chart",
+   "link_count": 8,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Today's Sales",
+   "link_count": 0,
+   "link_to": "Today's Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Sales",
+   "link_count": 0,
+   "link_to": "Daywise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Invoices",
+   "link_count": 0,
+   "link_to": "Daywise Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Month Wise Sales",
+   "link_count": 0,
+   "link_to": "Month Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Time Wise Sales",
+   "link_count": 0,
+   "link_to": "Time Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Service Wise Sales",
+   "link_count": 0,
+   "link_to": "Service Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Average Bill Value",
+   "link_count": 0,
+   "link_to": "Average Bill Value",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cancelled Invoices",
+   "link_count": 0,
+   "link_to": "Cancelled Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customers & Items",
+   "icon": "customer",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer Data",
+   "link_count": 0,
+   "link_to": "Customer Data",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Customer Details",
+   "link_count": 0,
+   "link_to": "Daywise Customer Details",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Repeated Customers",
+   "link_count": 0,
+   "link_to": "Repeated Customers",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Staff & Operations",
+   "icon": "users",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Sales",
+   "link_count": 0,
+   "link_to": "Employee Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Guest Experience",
+   "icon": "website",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Website",
+   "link_count": 0,
+   "link_to": "URY Website",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reservations",
+   "link_count": 0,
+   "link_to": "URY Table Reservation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Waitlist",
+   "link_count": 0,
+   "link_to": "URY Waitlist Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Guest Feedback",
+   "link_count": 0,
+   "link_to": "URY Guest Feedback",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Service Requests",
+   "link_count": 0,
+   "link_to": "URY Service Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Delivery",
+   "icon": "map",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Deliveries",
+   "link_count": 0,
+   "link_to": "URY Delivery",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Delivery Zones",
+   "link_count": 0,
+   "link_to": "URY Delivery Zone",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Drivers",
+   "link_count": 0,
+   "link_to": "URY Driver",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Offers & Loyalty",
+   "icon": "sell",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing Rules",
+   "link_count": 0,
+   "link_to": "Pricing Rule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Coupon Codes",
+   "link_count": 0,
+   "link_to": "Coupon Code",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Promotional Schemes",
+   "link_count": 0,
+   "link_to": "Promotional Scheme",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Loyalty Programs",
+   "link_count": 0,
+   "link_to": "Loyalty Program",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Loyalty Points",
+   "link_count": 0,
+   "link_to": "Loyalty Point Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cost & Control",
+   "icon": "permission",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Waste Log",
+   "link_count": 0,
+   "link_to": "URY Waste Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Audit Log",
+   "link_count": 0,
+   "link_to": "URY Audit Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Offline Sync Requests",
+   "link_count": 0,
+   "link_to": "URY Sync Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-21 04:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Smart Restro",
+ "number_cards": [
+  {
+   "label": "Sales Today",
+   "number_card_name": "Smart Restro Sales Today"
+  },
+  {
+   "label": "Invoices Today",
+   "number_card_name": "Smart Restro Invoices Today"
+  },
+  {
+   "label": "Open Orders",
+   "number_card_name": "Smart Restro Open Orders"
+  },
+  {
+   "label": "Occupied Tables",
+   "number_card_name": "Smart Restro Occupied Tables"
+  },
+  {
+   "label": "Kitchen Queue",
+   "number_card_name": "Smart Restro Kitchen Queue"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Captain"
+  },
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Cashier"
+  }
+ ],
+ "sequence_id": 31.0,
+ "shortcuts": [
+  {
+   "label": "Smart Restro POS",
+   "type": "URL",
+   "url": "/pos",
+   "color": "Red",
+   "icon": "retail",
+   "doc_view": ""
+  },
+  {
+   "label": "Manager Dashboard",
+   "type": "URL",
+   "url": "/ury/dashboard",
+   "color": "Blue",
+   "icon": "dashboard",
+   "doc_view": ""
+  },
+  {
+   "label": "Kitchen Display",
+   "type": "URL",
+   "url": "/mosaic",
+   "color": "Orange",
+   "icon": "clipboard",
+   "doc_view": ""
+  },
+  {
+   "label": "Self-Order",
+   "type": "URL",
+   "url": "/order",
+   "color": "Green",
+   "icon": "website",
+   "doc_view": ""
+  },
+  {
+   "label": "POS Invoice",
+   "type": "DocType",
+   "link_to": "POS Invoice",
+   "color": "Grey",
+   "icon": "sell",
+   "doc_view": "List",
+   "format": "{} Draft",
+   "stats_filter": "{\n \"docstatus\": 0\n}"
+  },
+  {
+   "label": "POS Opening Entry",
+   "type": "DocType",
+   "link_to": "POS Opening Entry",
+   "color": "Grey",
+   "icon": "today",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Closing Entry",
+   "type": "DocType",
+   "link_to": "POS Closing Entry",
+   "color": "Grey",
+   "icon": "accounting",
+   "doc_view": "List"
+  },
+  {
+   "label": "URY Table",
+   "type": "DocType",
+   "link_to": "URY Table",
+   "color": "Grey",
+   "icon": "table",
+   "doc_view": "List",
+   "format": "{} Occupied",
+   "stats_filter": "{\n \"occupied\": 1\n}"
+  },
+  {
+   "label": "URY KOT",
+   "type": "DocType",
+   "link_to": "URY KOT",
+   "color": "Grey",
+   "icon": "list",
+   "doc_view": "List"
+  },
+  {
+   "label": "Today's Sales",
+   "type": "Report",
+   "link_to": "Today's Sales",
+   "color": "Grey",
+   "icon": "chart",
+   "report_ref_doctype": "POS Invoice"
+  },
+  {
+   "label": "Dispatch Board",
+   "type": "URL",
+   "url": "/ury/delivery",
+   "color": "Yellow",
+   "icon": "map",
+   "doc_view": ""
+  },
+  {
+   "label": "Waitlist",
+   "type": "URL",
+   "url": "/ury/waitlist",
+   "color": "Purple",
+   "icon": "today",
+   "doc_view": ""
+  },
+  {
+   "label": "Guest Feedback",
+   "type": "URL",
+   "url": "/ury/feedback",
+   "color": "Pink",
+   "icon": "review",
+   "doc_view": ""
+  },
+  {
+   "label": "Restaurant Website",
+   "type": "URL",
+   "url": "/ury/website",
+   "color": "Green",
+   "icon": "website",
+   "doc_view": ""
+  },
+  {
+   "label": "URY Table Reservation",
+   "type": "DocType",
+   "link_to": "URY Table Reservation",
+   "color": "Grey",
+   "icon": "calendar",
+   "doc_view": "List"
+  },
+  {
+   "label": "URY Delivery",
+   "type": "DocType",
+   "link_to": "URY Delivery",
+   "color": "Grey",
+   "icon": "map",
+   "doc_view": "List"
+  }
+ ],
+ "title": "Smart Restro"
+}

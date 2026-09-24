@@ -1,0 +1,52 @@
+/* The driver page.
+   One hand, outdoors, in sunlight, on a phone that may be three years old:
+   big targets, high contrast, no layout that reflows while being tapped. */
+
+@font-face{font-family:DriverArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2') format('woff2');font-weight:400;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:DriverArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2') format('woff2');font-weight:400;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD}
+@font-face{font-family:DriverArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2') format('woff2');font-weight:600;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:DriverArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2') format('woff2');font-weight:600;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD}
+
+:root{--ink:#16231d;--paper:#f3f4f1;--card:#fff;--line:#d9ddd6;--muted:#5f665e;--go:#1f6b3f;--warn:#8a5a12;--danger:#a22f24}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:DriverArabic,'Segoe UI',Arial,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:104px}
+
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;background:var(--ink);color:#fff}
+.who{font-weight:600;font-size:15px}
+.tracking{display:flex;align-items:center;gap:7px;font-size:11px;opacity:.9;text-align:end}
+.dot{width:9px;height:9px;border-radius:50%;background:#7b8a80;flex-shrink:0}
+.dot.live{background:#57d98a;box-shadow:0 0 0 0 #57d98a99;animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 9px #57d98a00}100%{box-shadow:0 0 0 0 #57d98a00}}
+
+.orders{padding:14px 12px;display:grid;gap:12px}
+.empty{margin:40px 0;text-align:center;color:var(--muted);font-size:14px}
+
+.order{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 2px 8px #0000000a}
+.order h2{margin:0 0 2px;font-size:17px;font-weight:600}
+.order .addr{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+.chip{background:#eef1ec;border-radius:999px;padding:3px 10px}
+.chip.cash{background:#fdf1dc;color:var(--warn);font-weight:600}
+.chip.late{background:#fbe6e3;color:var(--danger);font-weight:600}
+
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.actions .wide{grid-column:1/-1}
+button,.btn{min-height:52px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:0 12px}
+button.go{background:var(--go);border-color:var(--go);color:#fff}
+button.danger,.danger{background:#fff;border-color:#e3bdb8;color:var(--danger)}
+button.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+button:disabled{opacity:.55}
+
+.foot{position:fixed;inset-inline:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px}
+.consent{margin:0;font-size:11px;color:var(--muted);max-width:62%}
+.link{min-height:40px;background:none;border:0;color:var(--ink);text-decoration:underline;font-size:13px;padding:0}
+
+dialog{border:0;border-radius:14px;padding:18px;width:min(420px,92vw)}
+dialog::backdrop{background:#0006}
+dialog label{display:block;font-size:13px;font-weight:600}
+dialog textarea{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:15px}
+dialog menu{display:flex;gap:8px;justify-content:flex-end;margin:14px 0 0;padding:0}
+
+button:focus-visible,a:focus-visible,textarea:focus-visible{outline:3px solid var(--go);outline-offset:3px}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){.dot.live{animation:none}}

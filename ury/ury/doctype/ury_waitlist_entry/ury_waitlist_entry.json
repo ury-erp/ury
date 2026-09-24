@@ -1,0 +1,213 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-20 23:30:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "guest_name",
+  "mobile_number",
+  "no_of_pax",
+  "column_break_guest",
+  "branch",
+  "restaurant_room",
+  "source",
+  "when_section",
+  "joined_at",
+  "quoted_minutes",
+  "notified_at",
+  "column_break_when",
+  "status",
+  "table",
+  "seated_at",
+  "seated_invoice",
+  "notes_section",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "WL-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "WL-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "guest_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Guest Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mobile_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Mobile Number",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Party Size",
+   "reqd": 1,
+   "default": "2"
+  },
+  {
+   "fieldname": "column_break_guest",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "restaurant_room",
+   "fieldtype": "Link",
+   "label": "Preferred Room",
+   "options": "URY Room",
+   "description": "Optional. A guest who asks for the terrace waits for the terrace."
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Walk-in\nPhone\nStaff",
+   "default": "Walk-in"
+  },
+  {
+   "fieldname": "when_section",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "joined_at",
+   "fieldtype": "Datetime",
+   "label": "Joined At",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "When the guest actually started waiting, which is what their position in the queue is based on."
+  },
+  {
+   "fieldname": "quoted_minutes",
+   "fieldtype": "Int",
+   "label": "Quoted Wait (Minutes)",
+   "description": "What the guest was told at the door. Kept as given so the quote can be compared with the real wait."
+  },
+  {
+   "fieldname": "notified_at",
+   "fieldtype": "Datetime",
+   "label": "Notified At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_when",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "options": "Waiting\nNotified\nSeated\nCancelled\nNo Show",
+   "default": "Waiting"
+  },
+  {
+   "fieldname": "table",
+   "fieldtype": "Link",
+   "label": "Seated At",
+   "options": "URY Table"
+  },
+  {
+   "fieldname": "seated_at",
+   "fieldtype": "Datetime",
+   "label": "Seated At Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "seated_invoice",
+   "fieldtype": "Link",
+   "label": "Seated Invoice",
+   "options": "POS Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-20 23:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Waitlist Entry",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "joined_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

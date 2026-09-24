@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@ury/ui';
 import { WizardLayout } from '../../components/setup/WizardLayout';
@@ -8,7 +8,6 @@ import {
   ConfigureProvider,
   useConfigure,
   SECTION_ORDER,
-  SectionId,
 } from '../../context/ConfigureContext';
 import { BranchSection } from '../../components/setup/sections/BranchSection';
 import { RoomSection } from '../../components/setup/sections/RoomSection';
@@ -17,130 +16,19 @@ import { MenuSection } from '../../components/setup/sections/MenuSection';
 import { PaymentSection } from '../../components/setup/sections/PaymentSection';
 import { UserSection } from '../../components/setup/sections/UserSection';
 import { setupService } from '../../services/setup';
-import { call } from '@ury/core';
+import { parseFrappeError } from '@ury/core';
+import { assertConfigureSuccess } from '../../lib/configureValidation';
+import SideDrawer from '../../components/layout/SideDrawer';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
-
-const SECTION_CONFIGS: Record<
-  SectionId,
-  { title: string; description: string }
-> = {
-  branch: {
-    title: 'Branch Details',
-    description:
-      'Set up your main branch name, invoice numbering, and tax details.',
-  },
-  rooms: {
-    title: 'Rooms',
-    description:
-      "Add the seating areas in your restaurant — you'll set how many tables each one has.",
-  },
-  tables: {
-    title: 'Tables',
-    description:
-      'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
-  },
-  menu: {
-    title: 'Menu',
-    description:
-      'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
-  },
-  payment: {
-    title: 'Payments',
-    description:
-      'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
-  },
-  users: {
-    title: 'Staff Accounts',
-    description:
-      "Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below.",
-  },
-};
-
-function classifyError(err: unknown): {
-  type: 'duplicate' | 'network' | 'validation' | 'unknown';
-  msg: string;
-} {
-  if (!err) {
-    return {
-      type: 'unknown',
-      msg: 'An unknown error occurred.',
-    };
-  }
-
-  // Network / fetch failure
-  if (err instanceof TypeError) {
-    return {
-      type: 'network',
-      msg: 'Network error, check your connection and retry.',
-    };
-  }
-
-  // Parse Frappe _server_messages
-  let serverMsg = '';
-
-  if (
-    typeof err === 'object' &&
-    err !== null &&
-    '_server_messages' in err
-  ) {
-    try {
-      const parsed = JSON.parse((err as any)._server_messages);
-
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const inner =
-          typeof parsed[0] === 'string'
-            ? JSON.parse(parsed[0])
-            : parsed[0];
-
-        serverMsg = inner.message || '';
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }
-
-  // Frappe DuplicateEntryError
-  const excType: string = (err as any)?.exc_type ?? '';
-
-  if (
-    excType.includes('Duplicate') ||
-    serverMsg.toLowerCase().includes('already exists')
-  ) {
-    return {
-      type: 'duplicate',
-      msg: 'Some records already exist and have been reused.',
-    };
-  }
-
-  // Validation / mandatory field error
-  if (
-    serverMsg.toLowerCase().includes('mandatory') ||
-    serverMsg.toLowerCase().includes('required')
-  ) {
-    return {
-      type: 'validation',
-      msg: serverMsg,
-    };
-  }
-
-  const msg =
-    serverMsg ||
-    (typeof err === 'string' ? err : '') ||
-    ((err as any)?.message ?? '') ||
-    ((err as any)?.exception ?? '') ||
-    'Failed to configure setup. Check backend logs.';
-
-  return {
-    type: 'unknown',
-    msg,
-  };
-}
+import { t } from '../../i18n';
 
 function ConfigurePageContent() {
   const navigate = useNavigate();
 
   const [finishing, setFinishing] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -159,7 +47,17 @@ function ConfigurePageContent() {
     users,
     goToPrevSection,
     goToNextSection,
+    sectionValidity,
+    setActiveSection,
+    markSectionCompleted,
   } = useConfigure();
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.focus();
+      errorRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [error]);
 
   const currentIndex = SECTION_ORDER.indexOf(activeSection);
   const isFirstSection = currentIndex === 0;
@@ -183,19 +81,10 @@ function ConfigurePageContent() {
     pendingFinish.current = null;
 
     try {
-      await setupService.submitConfigureData(payload);
-
-      // Setup is complete — the in-progress wizard snapshot must not
-      // survive to a later setup attempt in the same tab/session.
-      sessionStorage.removeItem('ury.setup.configureState');
-
-      // Mark setup as complete in System Settings.
-      await call('frappe.client.set_value', {
-        doctype: 'System Settings',
-        name: 'System Settings',
-        fieldname: 'setup_complete',
-        value: 1,
-      });
+      const result = await setupService.submitConfigureData(payload);
+      assertConfigureSuccess(result);
+      // The server owns setup_complete. Keep the draft until it confirms all work.
+      try { sessionStorage.removeItem('ury.setup.configureState'); } catch { /* storage unavailable */ }
 
       // Mark all steps done.
       setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
@@ -206,38 +95,28 @@ function ConfigurePageContent() {
     } catch (err: unknown) {
       console.error('Failed to finish configure setup', err);
 
-      const classified = classifyError(err);
-
-      if (classified.type === 'duplicate') {
-        // Duplicate records are non-fatal.
-        // They already exist, so continue as if setup succeeded.
-        console.warn(
-          'Duplicate record warning (non-fatal):',
-          classified.msg
-        );
-
-        setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
-
-        setTimeout(() => {
-          window.location.href = '/ury/dashboard';
-        }, 800);
-
-        return;
-      }
-
-      if (classified.type === 'network') {
-        setError(
-          'Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.'
-        );
-      } else {
-        setError(classified.msg);
-      }
+      setError(`${t('setup.incomplete_result')} ${parseFrappeError(err, t('setup.retry_hint'))}`);
 
       setFinishing(false);
     }
   }, []);
 
   const handleFinish = () => {
+    if (finishing) return;
+    const invalidSection = SECTION_ORDER.find((section) => !sectionValidity[section]);
+    if (invalidSection) {
+      markSectionCompleted(invalidSection);
+      setActiveSection(invalidSection);
+      setError(t(`setup.validation.${invalidSection}`));
+      return;
+    }
+    setError(null);
+    setReviewing(true);
+  };
+
+  const submitConfiguration = () => {
+    if (finishing) return;
+    setReviewing(false);
     const payload = {
       branch,
       rooms,
@@ -259,6 +138,12 @@ function ConfigurePageContent() {
   };
 
   const handleNext = () => {
+    if (!sectionValidity[activeSection]) {
+      markSectionCompleted();
+      setError(t(`setup.validation.${activeSection}`));
+      return;
+    }
+    setError(null);
     if (isLastSection) {
       handleFinish();
     } else {
@@ -285,20 +170,19 @@ function ConfigurePageContent() {
     }
   };
 
-  const config =
-    SECTION_CONFIGS[activeSection] || SECTION_CONFIGS.branch;
+
 
   return (
     <WizardLayout
       step={2}
       onPrev={handlePrev}
       onNext={handleNext}
-      nextLabel={isLastSection ? 'Launch' : 'Next'}
+      nextLabel={t(isLastSection ? 'setup.review_launch' : 'setup.next')}
       isNextLoading={finishing}
       secondaryAction={
         <div className="flex items-center gap-3">
           <span className="hidden sm:inline text-xs text-muted-foreground">
-            the data can be changed later
+            {t('setup.change_later')}
           </span>
 
           <Button
@@ -306,28 +190,22 @@ function ConfigurePageContent() {
             variant="ghost"
             onClick={handleFinish}
             disabled={finishing}
-          >
-            Finish with defaults
-          </Button>
+          >{t('setup.review_launch')}</Button>
         </div>
       }
     >
       <div className="space-y-4 h-full">
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+          <div ref={errorRef} tabIndex={-1} role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
-              <span className="font-bold block mb-1">
-                Configuration Error:
-              </span>
+              <span className="font-bold block mb-1">{t('setup.config_error')}</span>
               {error}
             </div>
 
             <button
               onClick={() => setError(null)}
               className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
-            >
-              Dismiss
-            </button>
+            >{t('dash.configure.dismiss')}</button>
           </div>
         )}
 
@@ -340,8 +218,8 @@ function ConfigurePageContent() {
 
           <div className="flex-1 min-w-0">
             <SectionShell
-              title={config.title}
-              description={config.description}
+              title={t(`setup.sections.${activeSection}.title`)}
+              description={t(`setup.sections.${activeSection}.description`)}
             >
               {renderSection()}
             </SectionShell>
@@ -349,14 +227,32 @@ function ConfigurePageContent() {
         </div>
       </div>
 
+      <SideDrawer isOpen={reviewing} onClose={() => setReviewing(false)} title={t('setup.review_launch')}>
+        <p className="mb-4 text-sm text-muted-foreground">{t('setup.review_hint')}</p>
+        <dl className="space-y-3 text-sm">
+          <div className="flex justify-between gap-3"><dt>{t('setup.sections.branch.title')}</dt><dd>{branch.branchName}</dd></div>
+          {([
+            ['rooms', rooms.length], ['tables', tables.length], ['menu', menuItems.length],
+            ['payment', paymentMethods.length], ['users', users.length],
+          ] as const).map(([section, count]) => (
+            <div key={section} className="flex justify-between gap-3"><dt>{t(`setup.sections.${section}.title`)}</dt><dd>{count}</dd></div>
+          ))}
+        </dl>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setReviewing(false)}>{t('common.back')}</Button>
+          <Button onClick={submitConfiguration} disabled={finishing}>{t('setup.launch')}</Button>
+        </div>
+      </SideDrawer>
+
       {finishing && (
         <ProgressModal
           visible={true}
           activeIndex={activeIndex}
           error={error}
-          steps={CONFIGURE_PROGRESS_STEPS}
+          description={t('setup.progress_description')}
+          steps={CONFIGURE_PROGRESS_STEPS.map((_, index) => t(`setup.progress.${index}`))}
           eventName="ury_configure_progress"
-          onStepChange={setActiveIndex}
+          onStepChange={(index) => setActiveIndex(Math.min(index, CONFIGURE_PROGRESS_STEPS.length - 1))}
           onReady={doConfigureApiCall}
         />
       )}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="{{ lang | e }}" dir="{{ 'rtl' if lang == 'ar' else 'ltr' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ text.title | e }} — {{ driver_name | e }}</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#243d32">
+  <link rel="stylesheet" href="/assets/ury/css/driver.css">
+  <script id="driver-boot" type="application/json">{{ boot_json | safe }}</script>
+  <script src="/assets/ury/js/driver.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <span class="who">{{ driver_name | e }}</span>
+    <span class="tracking" id="tracking" role="status" aria-live="polite">
+      <i class="dot" id="dot"></i><span id="tracking-text">{{ text.tracking_off | e }}</span>
+    </span>
+  </header>
+
+  <main id="orders" class="orders">
+    <p class="empty" id="empty">{{ text.none | e }}</p>
+  </main>
+
+  <footer class="foot">
+    <p class="consent">{{ text.consent | e }}</p>
+    <button type="button" class="link" id="toggle">{{ text.stop | e }}</button>
+  </footer>
+
+  <noscript><p class="empty">{{ text.javascript | e }}</p></noscript>
+
+  <dialog id="reason-dialog">
+    <form method="dialog">
+      <label>{{ text.reason | e }}
+        <textarea id="reason" rows="3"></textarea>
+      </label>
+      <menu>
+        <button value="cancel" class="ghost">{{ text.cancel | e }}</button>
+        <button value="confirm" id="reason-confirm" class="danger">{{ text.send | e }}</button>
+      </menu>
+    </form>
+  </dialog>
+</body>
+</html>

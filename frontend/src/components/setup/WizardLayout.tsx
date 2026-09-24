@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Button } from '@ury/ui';
 import { Check } from 'lucide-react';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
+import { t } from '../../i18n';
 
 interface WizardLayoutProps {
   step: 1 | 2;
@@ -36,7 +37,7 @@ export function WizardLayout({
         <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
           <div className="flex items-center gap-3">
             <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
-            <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
+            <span className="text-sm font-semibold text-foreground leading-none">{t('dash.wizard_layout.let_s_get_your_restaurant_ready')}</span>
           </div>
 
           {/* 2-step breadcrumb (Setup, Configure) */}
@@ -58,9 +59,7 @@ export function WizardLayout({
         <div className={`${SHELL_WIDTH} w-full h-full flex items-center justify-between gap-4`}>
           <div className="flex items-center h-full">
             {step === 2 && onPrev && (
-              <Button variant="outline" onClick={onPrev}>
-                Previous
-              </Button>
+              <Button variant="outline" onClick={onPrev}>{t('dash.wizard_layout.previous')}</Button>
             )}
           </div>
 

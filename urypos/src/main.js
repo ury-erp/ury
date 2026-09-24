@@ -4,8 +4,11 @@ import App from "./App.vue";
 
 import { useAuthStore } from "@/stores/Auth.js";
 import router from './router';
+import { useInvoiceDataStore } from './stores/invoiceData';
+import { isInvoiceNavigationBlocked } from './router/invoiceNavigation';
 import { createPinia } from 'pinia'
 import NotificationModal from './components/NotificationModal.vue';
+import { initI18n, i18nPlugin } from './i18n';
 
 
 
@@ -14,6 +17,7 @@ const app = createApp(App);
 
 app.use(router);
 app.use(pinia)
+app.use(i18nPlugin)
 
 
 router.beforeEach((to, from, next) => {
@@ -24,11 +28,21 @@ router.beforeEach((to, from, next) => {
 		next({ name: 'Login' });
 	} else if (to.name === 'Login' && isAuthenticated) {
 		next({ name: 'Table' });
+	} else if (isInvoiceNavigationBlocked(useInvoiceDataStore().invoiceUpdating, to.path)) {
+		// Backstop for the dimmed tabs and steps: a direct URL, the browser
+		// back button or a stale link must not walk away from an amendment
+		// that has already been started on the server.
+		next(false);
 	} else {
 		next();
 	}
 });
 
-app.mount("#app");
 app.component('NotificationModal', NotificationModal);
+
+// Resolve the locale (and set <html lang/dir>) before mounting, so an RTL
+// language never renders a frame of LTR layout.
+initI18n().then(() => {
+	app.mount("#app");
+});
 

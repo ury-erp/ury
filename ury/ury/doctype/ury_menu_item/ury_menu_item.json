@@ -10,6 +10,7 @@
   "item",
   "item_name",
   "rate",
+  "plate_cost",
   "special_dish",
   "disabled",
   "course_icon",
@@ -35,6 +36,12 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Rate"
+  },
+  {
+   "description": "What this dish costs to make, when there is no BOM to work it out from. A BOM always wins — it is the recipe, and it moves when ingredient prices move.",
+   "fieldname": "plate_cost",
+   "fieldtype": "Currency",
+   "label": "Plate Cost"
   },
   {
    "default": "0",

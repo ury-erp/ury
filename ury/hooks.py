@@ -1,21 +1,36 @@
 from . import __version__ as app_version
 
+# `app_name` is the module and asset-path identity ("/assets/ury/...",
+# the URY module, the `ury` python package) and is deliberately NOT rebranded —
+# renaming it would invalidate every asset URL and module reference.
 app_name = "ury"
-app_title = "URY"
-app_publisher = "Tridz Technologies Pvt. Ltd"
-app_description = "A Complete Restaurant Order Taking Software"
+app_title = "Smart Restro"
+app_publisher = "Smart Choice"
+# Attribution and modification notice. Smart Restro is a modified distribution
+# of URY, which is licensed under the AGPL-3.0 (see LICENSE). Section 5 of that
+# licence requires a modified version to carry prominent notices stating that
+# it was changed and by whom, so the notice lives here rather than only in the
+# repository history.
+app_description = (
+    "Smart Restro — restaurant management platform by Smart Choice. "
+    "Based on URY, a complete restaurant order-taking software by "
+    "Tridz Technologies Pvt. Ltd, distributed under the AGPL-3.0."
+)
 app_email = "info@tridz.com"
-app_license = "MIT"
-app_logo_url = "/assets/ury/Images/ury-logo.jpg"
-app_icon_title = "URY"
+# Corrected from "MIT": the LICENSE file in this repository is, and always has
+# been, the GNU Affero General Public License v3. The two disagreeing was a
+# pre-existing bug, and the declared licence is what Frappe surfaces to users.
+app_license = "AGPL-3.0"
+app_logo_url = "/assets/ury/Images/smart-restro-logo.png"
+app_icon_title = "Smart Restro"
 required_apps = ["erpnext"]
 # Includes in <head>
 # ------------------
 add_to_apps_screen = [
   {
     "name": "ury",
-    "logo": "/assets/ury/Images/ury.png",
-    "title": "URY",
+    "logo": "/assets/ury/Images/smart-restro-logo.png",
+    "title": "Smart Restro",
     "route": "/ury",
     "has_permission": "ury.permission.check_app_permission"
   }
@@ -208,7 +223,11 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
 		]
-	}
+	},
+    "daily": [
+        "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests",
+        "ury.ury.api.driver_app.clear_old_positions"
+    ]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],

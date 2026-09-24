@@ -65,6 +65,33 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
     recentOrders: usetoggleRecentOrder(),
     notificationModal: useNotificationModal(),
   }),
+  getters: {
+    /**
+     * Is the cart editing an order that already exists on the server?
+     *
+     * `showUpdateButtton` was doing duty as the answer, but it never was one:
+     * it starts `true`, goes `false` while a submit is in flight and back to
+     * `true` afterwards — a busy flag, nothing more. So the button read
+     * "Update" on a brand-new, never-saved order, which tells a waiter they
+     * are amending something that does not exist yet.
+     *
+     * An order exists once any of three things has happened: a recent order
+     * was opened from the log, an occupied table's draft was loaded, or this
+     * session already created the invoice.
+     */
+    isExistingOrder(state) {
+      return Boolean(
+        state.recentOrders?.invoiceNumber ||
+          state.table?.invoiceNo ||
+          state.invoiceNumber
+      );
+    },
+
+    /** Label for the cart's primary action, from the state above. */
+    submitLabelKey() {
+      return this.isExistingOrder ? "common.update" : "order.send_order";
+    },
+  },
   actions: {
     async fetchInvoiceDetails() {
       try {
@@ -315,6 +342,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           const message = JSON.parse(messages[0]);
     
           await this.alert.createAlert("Message", message.message, "OK");
+          this.invoiceUpdating = false;
           await router.push("/Table");
           window.location.reload();
           return;

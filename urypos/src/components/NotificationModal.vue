@@ -6,7 +6,7 @@
     >
       <div class="flex justify-center px-4 pt-16">
         <!-- Modal Content -->
-        <div class="relative w-[576px] rounded-lg bg-white shadow-lg">
+        <div class="relative w-[576px] rounded-lg bg-card shadow-raised">
           <!-- Modal Header -->
           <div class="border-b border-b-gray-200 px-6 py-4">
             <div class="text-lg font-medium">{{ modal.title }}</div>
@@ -26,15 +26,15 @@
             <button
               v-if="modal.showCancelButton"
               @click="modal.handleCancel"
-              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              class="rounded-xl border border-input bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
             >
-              No
+              {{ $t('common.no') }}
             </button>
             <button
               @click="modal.handleConfirm"
-              class="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
+              class="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary"
             >
-              Yes
+              {{ $t('common.yes') }}
             </button>
           </div>
         </div>

@@ -161,13 +161,19 @@ if __name__ == "__main__":
 
 class TestSearchPosInvoiceBranchScoping(FrappeTestCase):
 
+    @patch("ury.ury_pos.api._order_log_permissions")
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api._enrich_split_group_meta")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api.frappe.session")
-    def test_normal_user_branch_a(self, mock_session, mock_get_branch, mock_enrich, mock_get_all):
+    def test_normal_user_branch_a(self, mock_session, mock_get_branch, mock_enrich, mock_get_all, mock_log_perms):
         # Normal Branch A user → sees only Branch A invoices.
         mock_session.user = "cashier@branch_a.com"
+        # This class covers branch scoping. Which statuses a POS Profile
+        # grants is a separate gate with its own tests; leaving it real made
+        # these two read a profile that does not exist in the test database
+        # and fail on a permission error that says nothing about branches.
+        mock_log_perms.return_value = frappe._dict(view_all=1, paid_limit=10)
         mock_get_branch.return_value = "Branch A"
         mock_get_all.return_value = [{"name": "INV-001"}]
         mock_enrich.side_effect = lambda x: x
@@ -227,15 +233,21 @@ class TestSearchPosInvoiceBranchScoping(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.get_roles")
     @patch("ury.ury_pos.api.frappe.session")
     def test_administrator_without_branch(self, mock_session, mock_get_roles, mock_get_branch, mock_enrich, mock_get_all):
-        # Administrator without branch mapping should not have branch filter
+        # Administrator without branch mapping should not have branch filter.
+        #
+        # "Paid", not "Recently Paid": with no branch there is no POS Profile
+        # to read a `paid_limit` from, so searchPosInvoice falls back to
+        # view_all=1 / paid_limit=0 and refuses "Recently Paid" by design.
+        # The test used to ask for it and then read the resulting
+        # PermissionError as a failure of branch scoping, which it is not.
         mock_session.user = "Administrator"
         mock_get_roles.return_value = ["Administrator"]
         mock_get_branch.side_effect = frappe.ValidationError("No branch")
         mock_get_all.return_value = []
         mock_enrich.side_effect = lambda x: x
-        
-        searchPosInvoice("TEST", "Recently Paid")
-        
+
+        searchPosInvoice("TEST", "Paid")
+
         called_args = mock_get_all.call_args[1]
         # Should NOT contain branch in filters
         self.assertNotIn("branch", called_args["filters"])
@@ -563,11 +575,18 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
+    @patch("ury.ury_pos.api.frappe.db.exists")
     def test_submit_checklist_all_mandatory_checked(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+        self, mock_has_items, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
     ):
         """Test that submit_checklist returns status='Complete' when all mandatory items are checked."""
         # Setup mocks
+        # submit_checklist returns early when the profile has no checklist
+        # items at all. Left real, this lookup hit a POS Profile that does
+        # not exist in the test database, so the function returned
+        # {"status": "Complete"} without ever building a log — and the status
+        # assertion below passed on that empty path while asserting nothing.
+        mock_has_items.return_value = True
         mock_session.user = "test_user@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_now.return_value = "2025-01-15 10:30:00"
@@ -618,11 +637,18 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
+    @patch("ury.ury_pos.api.frappe.db.exists")
     def test_submit_checklist_mandatory_unchecked(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+        self, mock_has_items, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
     ):
         """Test that submit_checklist returns status='In Progress' when at least one mandatory item is unchecked."""
         # Setup mocks
+        # submit_checklist returns early when the profile has no checklist
+        # items at all. Left real, this lookup hit a POS Profile that does
+        # not exist in the test database, so the function returned
+        # {"status": "Complete"} without ever building a log — and the status
+        # assertion below passed on that empty path while asserting nothing.
+        mock_has_items.return_value = True
         mock_session.user = "test_user@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_now.return_value = "2025-01-15 10:30:00"

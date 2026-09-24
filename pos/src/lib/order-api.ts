@@ -88,6 +88,13 @@ export interface SyncOrderRequest {
   last_modified_time?: string;
   comments?: string | null;
   room?: string;
+  /**
+   * Minted once per submission attempt so the server can recognise a retry.
+   * See ury/ury/doctype/ury_order/ury_order.py::sync_order — a replay of a
+   * key it has already applied gets the original invoice back instead of a
+   * second order in the kitchen.
+   */
+  request_id?: string;
 }
 
 /**
@@ -158,4 +165,74 @@ export async function reprintKot(invoiceNumber: string): Promise<void> {
   await call.post('ury.ury.api.ury_kot_reprint.reprint_kot', {
     invoice_number: invoiceNumber,
   });
+}
+export interface TableCloseState {
+  table: string | null;
+  tables: string[];
+  occupied: boolean;
+  has_open_invoices: boolean;
+  /** Table still held with nothing left to settle — safe to release. */
+  can_close: boolean;
+}
+
+const NO_TABLE_TO_CLOSE: TableCloseState = {
+  table: null,
+  tables: [],
+  occupied: false,
+  has_open_invoices: false,
+  can_close: false,
+};
+
+/**
+ * Reports whether an order's table is still held although every bill on it has
+ * been settled.
+ *
+ * The answer cannot be derived from the order on screen: a table is shared by a
+ * whole merge cluster and by split siblings the order screen never lists, and
+ * one of those still being open is the difference between releasing a stale
+ * flag and stranding an open bill. The backend owns that rule.
+ *
+ * Failures resolve to "nothing to close" rather than throwing: this only
+ * decides whether an optional button appears, and no button is a better
+ * outcome than an error toast on a screen the cashier did not act on.
+ */
+export async function getTableCloseState(
+  params: { invoice?: string; table?: string }
+): Promise<TableCloseState> {
+  if (!params.invoice && !params.table) return NO_TABLE_TO_CLOSE;
+  try {
+    const res = await call.get('ury.ury.doctype.ury_order.ury_order.get_table_close_state', {
+      ...(params.invoice ? { invoice: params.invoice } : {}),
+      ...(params.table ? { table: params.table } : {}),
+    });
+    return (res.message as TableCloseState) ?? NO_TABLE_TO_CLOSE;
+  } catch (error) {
+    console.error('Error fetching table close state:', error);
+    return NO_TABLE_TO_CLOSE;
+  }
+}
+
+export interface CloseTableResponse {
+  status: string;
+  invoice: string | null;
+  released: boolean;
+  had_items?: boolean;
+}
+
+/**
+ * Releases a table without printing its bill. `reason` is required by the
+ * backend whenever the invoice still has items on it, and recorded against the
+ * invoice so a manager can ask about it later.
+ */
+export async function closeTable(params: {
+  invoice?: string;
+  table?: string;
+  reason?: string;
+}): Promise<CloseTableResponse> {
+  const res = await call.post('ury.ury.doctype.ury_order.ury_order.close_table', {
+    ...(params.invoice ? { invoice: params.invoice } : {}),
+    ...(params.table ? { table: params.table } : {}),
+    ...(params.reason ? { reason: params.reason } : {}),
+  });
+  return res.message as CloseTableResponse;
 }

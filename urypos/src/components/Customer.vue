@@ -8,7 +8,7 @@
         >
           <svg
             aria-hidden="true"
-            class="h-5 w-5 text-gray-500 dark:text-gray-400"
+            class="h-5 w-5 text-muted-foreground"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -24,8 +24,8 @@
         </div>
         <input
           type="search"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500 md:w-3/5 lg:w-2/5"
-          placeholder="Search Customers"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 pl-10 text-sm text-foreground focus:border-ring focus:ring-ring md:w-3/5 lg:w-2/5"
+          :placeholder="$t('customer.search')"
           v-model="this.customers.search"
           @input="this.customers.handleSearchInput"
           @click="this.customers.searchCustomer()
@@ -38,11 +38,11 @@
           v-if="
             this.customers.showCustomers && this.customers.showAddNewCustomer
           "
-          class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded bg-white shadow md:w-3/5 lg:w-2/5"
+          class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded-xl bg-card shadow md:w-3/5 lg:w-2/5"
           ref="dropdown"
         >
           <div
-            class="h-16 rounded-lg p-4 hover:bg-gray-100"
+            class="h-16 rounded-lg p-4 hover:bg-muted"
             v-for="(customer, index) in this.customers.customer"
             :key="index"
             @click="this.customers.selectCustomer(customer)"
@@ -61,7 +61,7 @@
           </div>
           <div v-if="this.customers.showAddNewCustomer">
             <div class="flex justify-end">
-              <span class="sr-only">Close</span>
+              <span class="sr-only">{{ $t('common.close') }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="mt-2 mr-2 h-4 w-4"
@@ -80,7 +80,7 @@
             </div>
             <a
               href="#"
-              class="mt-1 lg:mt-0 inline-flex items-center text-blue-600 hover:underline"
+              class="mt-1 lg:mt-0 inline-flex items-center text-primary hover:underline"
               @click.prevent="
                 this.customers.newCustomerData(this.customers.search)
               "
@@ -99,19 +99,19 @@
                   d="M12 6v12m6-6H6"
                 ></path>
               </svg>
-              Create New Customer
+              {{ $t('customer.create_new') }}
             </a>
           </div>
         </div>
       </div>
       <div
         v-if="this.customers.showModalNewCustomer"
-        class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-gray-100"
+        class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-muted"
       >
         <div class="mb-16 mt-10 flex items-center justify-center">
-          <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
+          <div class="w-full rounded-lg bg-card p-6 shadow-raised md:max-w-md">
             <div class="flex justify-end">
-              <span class="sr-only">Close</span>
+              <span class="sr-only">{{ $t('common.close') }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -130,46 +130,46 @@
             </div>
 
             <h2
-              class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white"
+              class="mt-1 block text-left text-xl font-medium text-foreground"
             >
-              New Customer
+              {{ $t('customer.new') }}
             </h2>
             <label
               for="newCustomer"
-              class="mt-6 block text-left text-gray-900 dark:text-white"
+              class="mt-6 block text-left text-foreground"
             >
-              Customer Name
+              {{ $t('customer.name') }}
             </label>
             <input
               type="text"
               id="newCustomer"
-              class="mt-4 w-full rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+              class="mt-4 w-full rounded-lg border border-input bg-muted text-sm text-foreground focus:border-ring focus:ring-ring"
               v-model="this.customers.newCustomer"
             />
 
             <label
               for="mobileNumber"
-              class="mt-6 block text-left text-gray-900 dark:text-white"
+              class="mt-6 block text-left text-foreground"
             >
-              Mobile Number
+              {{ $t('customer.mobile') }}
             </label>
             <input
               type="number"
               id="mobileNumber"
-              class="mt-4 w-full rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+              class="mt-4 w-full rounded-lg border border-input bg-muted text-sm text-foreground focus:border-ring focus:ring-ring"
               v-model="this.customers.newCustomerMobileNo"
             />
             <div class="relative mt-5" ref="container">
               <label
                 for="customerGroup"
-                class="mt-6 block text-left text-gray-900 dark:text-white"
+                class="mt-6 block text-left text-foreground"
               >
-                Customer Group
+                {{ $t('customer.group') }}
               </label>
               <input
                 type="text"
                 id="customerGroup"
-                class="mt-4 w-full rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                class="mt-4 w-full rounded-lg border border-input bg-muted text-sm text-foreground focus:border-ring focus:ring-ring"
                 v-model="this.customers.customerGroup"
                 @click="
                   this.customers.showCustomersGroup = true;
@@ -180,11 +180,11 @@
 
               <div
                 v-if="this.customers.showCustomersGroup"
-                class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded bg-white shadow"
+                class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded-xl bg-card shadow"
                 ref="dropdown"
               >
                 <div
-                  class="h-12 rounded-lg p-4 hover:bg-gray-100"
+                  class="h-12 rounded-lg p-4 hover:bg-muted"
                   v-for="(group, index) in this.customers.customerGroupList"
                   :key="index"
                   @click="this.customers.selectCustomerGroup(group)"
@@ -198,14 +198,14 @@
             <div class="relative mt-5" ref="container">
               <label
                 for="territory"
-                class="mt-6 block text-left text-gray-900 dark:text-white"
+                class="mt-6 block text-left text-foreground"
               >
-                Territory
+                {{ $t('customer.territory') }}
               </label>
               <input
                 type="text"
                 id="territory"
-                class="mt-4 w-full rounded-lg border border-gray-300 bg-gray-50 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                class="mt-4 w-full rounded-lg border border-input bg-muted text-sm text-foreground focus:border-ring focus:ring-ring"
                 v-model="this.customers.customerTerritory"
                 @click="
                   this.customers.showCustomersTerritory = true;
@@ -216,11 +216,11 @@
 
               <div
                 v-if="this.customers.showCustomersTerritory"
-                class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded bg-white shadow"
+                class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded-xl bg-card shadow"
                 ref="dropdown"
               >
                 <div
-                  class="h-12 rounded-lg p-4 hover:bg-gray-100"
+                  class="h-12 rounded-lg p-4 hover:bg-muted"
                   v-for="(territory, index) in this.customers
                     .customerTerritoryList"
                   :key="index"
@@ -236,9 +236,9 @@
             <div class="flex justify-end">
               <button
                 @click="this.customers.addNewCustomer()"
-                class="mt-8 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+                class="mt-8 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
               >
-                Save
+                {{ $t('common.save') }}
               </button>
             </div>
           </div>
@@ -262,8 +262,8 @@
         <input
           type="number"
           id="mobileNumber"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500 md:w-3/5 lg:w-2/5"
-          placeholder="Mobile Number"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 pl-10 text-sm text-foreground focus:border-ring focus:ring-ring md:w-3/5 lg:w-2/5"
+          :placeholder="$t('customer.mobile')"
           readonly
           :value="this.customers.newCustomerMobileNo || this.recentOrders.mobileNumber || this.table.mobileNumber"
         />
@@ -273,7 +273,7 @@
           class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
         >
           <svg
-            class="h-6 w-6 text-gray-500 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-500"
+            class="h-6 w-6 text-muted-foreground group-hover:text-primary"
             fill="currentColor"
             viewBox="0 0 20 20"
             xmlns="http://www.w3.org/2000/svg"
@@ -289,8 +289,8 @@
         <input
           type="number"
           id="numberOfPax"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500 md:w-3/5 lg:w-2/5"
-          placeholder="Pax"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 pl-10 text-sm text-foreground focus:border-ring focus:ring-ring md:w-3/5 lg:w-2/5"
+          :placeholder="$t('cart.pax')"
           required
           v-model="this.customers.numberOfPax"
           @input="this.customers.validateInput"
@@ -301,7 +301,7 @@
           class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
         >
           <svg
-            class="h-6 w-6 text-gray-800 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-500"
+            class="h-6 w-6 text-foreground group-hover:text-primary"
             aria-hidden="true"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -317,8 +317,8 @@
         </div>
         <input
           type="text"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500 md:w-3/5 lg:w-2/5"
-          placeholder="Order Type"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 pl-10 text-sm text-foreground focus:border-ring focus:ring-ring md:w-3/5 lg:w-2/5"
+          :placeholder="$t('order.type')"
           :value="
             this.menu.selectedOrderType || this.recentOrders.pastOrderType
           "
@@ -334,11 +334,11 @@
           v-if="
              this.invoiceData.editOrderType && this.customers.showEditOrderType
           "
-          class="absolute left-0 top-full z-10 max-h-64 w-full rounded bg-white shadow md:w-3/5 lg:w-2/5"
+          class="absolute left-0 top-full z-10 max-h-64 w-full rounded-xl bg-card shadow md:w-3/5 lg:w-2/5"
           ref="dropdown"
         >
           <div
-            class="h-10 mb-4 rounded-lg p-4 hover:bg-gray-100"
+            class="h-10 mb-4 rounded-lg p-4 hover:bg-muted"
             @click="this.customers.selecetOrderType(customers.newOrderType)"
           >
             <h2 class="text-sm leading-normal">
@@ -352,15 +352,15 @@
         class="tex mt-5 text-lg font-medium"
         v-if="this.customers.customerFavouriteItems.length > 0"
       >
-        Favourite Items
+        {{ $t('menu.favourite_items') }}
       </h1>
 
       <div
         class="cart-item-details mt-1 grid grid-cols-2 gap-6 py-2 sm:w-full md:w-full lg:w-full lg:grid-cols-4"
         v-if="this.customers.customerFavouriteItems.length > 0"
       >
-        <h3 class="text-base font-medium">Item Name</h3>
-        <h3 class="text-center text-base font-medium">Quantity</h3>
+        <h3 class="text-base font-medium">{{ $t('menu.item_name') }}</h3>
+        <h3 class="text-center text-base font-medium">{{ $t('menu.quantity') }}</h3>
       </div>
       <div
         v-for="(item, index) in this.customers.customerFavouriteItems"

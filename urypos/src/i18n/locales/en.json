@@ -1,0 +1,182 @@
+{
+  "_meta": {
+    "direction": "ltr",
+    "language_code": "en"
+  },
+  "a11y": {
+    "breadcrumb": "Breadcrumb"
+  },
+  "cart": {
+    "add_plus": "ADD +",
+    "decrease": "Decrease quantity",
+    "empty_body": "Add items from the menu and they will appear here.",
+    "empty_title": "Nothing on this ticket yet",
+    "increase": "Increase quantity",
+    "items_count": "{{count}} items",
+    "pax": "Pax",
+    "quantity": "Quantity",
+    "title": "Cart"
+  },
+  "common": {
+    "add": "Add",
+    "additional_details": "Additional Details",
+    "all": "All",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "enter_details": "Enter Details",
+    "next": "Next",
+    "no": "No",
+    "nothing_to_show": "Nothing to show here",
+    "previous": "Previous",
+    "reload": "Reload",
+    "save": "Save",
+    "submit": "Submit",
+    "update": "Update",
+    "yes": "Yes"
+  },
+  "customer": {
+    "create_new": "Create New Customer",
+    "group": "Customer Group",
+    "mobile": "Mobile Number",
+    "name": "Customer Name",
+    "new": "New Customer",
+    "pax_count": "{{count}} guests",
+    "search": "Search Customers",
+    "territory": "Territory",
+    "title": "Customer"
+  },
+  "header": {
+    "logout": "Log out",
+    "station": "Station",
+    "switch_to_desk": "Switch To Desk",
+    "till": "Till"
+  },
+  "home": {
+    "ping": "Ping",
+    "title": "Home Page"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "login": {
+    "password": "Password:",
+    "sign_in": "Sign in",
+    "title": "Login",
+    "username": "Username:"
+  },
+  "menu": {
+    "favourite_items": "Favourite Items",
+    "item_name": "Item Name",
+    "item_search": "Item Search",
+    "items": "Items",
+    "items_not_found": "Items Not Found.",
+    "items_not_found_hint": "Items Not Found. Please select a table or set an active menu.",
+    "quantity": "Quantity",
+    "select_course": "Select Course",
+    "title": "Menu"
+  },
+  "nav": {
+    "primary": "Main navigation"
+  },
+  "order": {
+    "aggregator_id": "Aggregator ID",
+    "aggregators_list": "Aggregators List",
+    "bill": "Bill",
+    "cancel_order": "Cancel Order",
+    "close_table": "Close table",
+    "close_table_body": "The bill is closed out and the table is freed. No receipt is printed, and the order is recorded as closed without one.",
+    "close_table_reason_hint": "e.g. paid in cash, customer declined a receipt",
+    "close_table_title": "Close the table without printing?",
+    "closing": "Closing…",
+    "comments": "Comments",
+    "confirm_cancel": "Are you sure to cancel",
+    "invoice": "Invoice",
+    "kot_reprint": "KOT Reprint",
+    "kot_reprinting": "KOT Reprinting...",
+    "order_log": "OrderLog",
+    "print_receipt": "Print Receipt",
+    "printing_invoice": "Printing Invoice",
+    "priority": "Priority",
+    "reason": "Reason",
+    "recent_orders": "Recent Orders",
+    "search_placeholder": "Search by Invoice Id or Customer Name or Mobile Number",
+    "send_order": "Send order",
+    "title": "Order",
+    "type": "Order Type",
+    "updating": "Updating Order...",
+    "view_order": "View order"
+  },
+  "payment": {
+    "add_discount": "Add Discount",
+    "change_amount": "Change Amount:",
+    "enter_discount_pct": "Enter Discount Percentage",
+    "make_payment": "Make Payment",
+    "mode": "Mode of Payment",
+    "modes": "Modes of Payment",
+    "processing": "Payment Being Processing",
+    "reconciliation": "Payment Reconciliation",
+    "select_mode": "Select Mode Of Payment"
+  },
+  "pos": {
+    "branch": "Branch",
+    "cashier": "Cashier",
+    "closing_amount": "Closing Amount",
+    "closing_entry": "POS Closing Entry",
+    "company": "Company",
+    "opening_amount": "Opening Amount",
+    "opening_balance_details": "Opening Balance Details",
+    "opening_entry": "POS Opening Entry",
+    "period_details": "Period Details",
+    "period_end": "Period End Date",
+    "period_start": "Period Start Date",
+    "posting_date": "Posting Date",
+    "posting_time": "Posting Time",
+    "profile": "POS Profile",
+    "user_details": "User Details"
+  },
+  "status": {
+    "all": "All orders",
+    "consolidated": "Consolidated",
+    "draft": "Draft",
+    "paid": "Paid",
+    "recently_paid": "Recently Paid",
+    "return": "Return",
+    "unbilled": "Unbilled"
+  },
+  "steps": {
+    "label": "Order progress"
+  },
+  "tables": {
+    "captain_transfer": "Captain Transfer",
+    "current_captain": "Current Captain",
+    "current_table": "Current Table",
+    "dine_in": "Dine-in",
+    "merge_tables": "Merge Tables",
+    "merged_table": "Merged Table",
+    "new_captain": "New Captain",
+    "new_table": "New Table",
+    "none_for_room": "Tables not found. Please set tables for the room",
+    "none_takeaway_for_room": "Tables not found. Please set takeaway tables for the room",
+    "open_table": "Open Table",
+    "seats": "{{count}} seats",
+    "select_room": "Select Room",
+    "select_table": "Select a table",
+    "select_to_merge": "Select Table to Merge",
+    "table_merge": "Table Merge",
+    "table_transfer": "Table Transfer",
+    "takeaway": "Takeaway",
+    "title": "Table",
+    "transfer": "Transfer",
+    "waiter": "Waiter"
+  },
+  "totals": {
+    "grand_total": "Grand Total",
+    "net_total": "Net Total",
+    "title": "Totals",
+    "total_invoices": "Total Invoices",
+    "total_quantity": "Total Quantity"
+  }
+}

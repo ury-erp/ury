@@ -30,7 +30,17 @@ def get_service_line(branch=None):
 
 		minutes = None
 		if t.latest_invoice_time:
-			minutes = int((now - get_datetime(str(t.latest_invoice_time))).total_seconds() // 60)
+			seated_at = get_datetime(str(t.latest_invoice_time))
+			minutes = int((now - seated_at).total_seconds() // 60)
+			if minutes < 0:
+				# `latest_invoice_time` is a Time field: it carries a clock
+				# time and no date, so get_datetime() pins it to *today*. A
+				# table seated at 23:30 and looked at 00:10 therefore came
+				# out as -1400 minutes, and the service line showed a table
+				# that had been sitting for forty minutes as if it had not
+				# been seated yet. The only reading that makes sense for a
+				# negative gap is that the clock has passed midnight since.
+				minutes += 24 * 60
 
 		invoice = frappe.db.sql(
 			"""

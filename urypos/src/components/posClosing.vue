@@ -1,18 +1,18 @@
 <template>
   <div class="mt-10 flex items-center justify-between">
     <div class="flex items-center">
-      <h3 class="mr-3 text-lg font-semibold text-gray-900 dark:text-white">
-        POS Closing Entry
+      <h3 class="mr-3 text-lg font-semibold text-foreground">
+        {{ $t('pos.closing_entry') }}
       </h3>
       <span
-        class="me-2 rounded px-2.5 py-0.5 text-sm font-medium"
+        class="me-2 rounded-xl px-2.5 py-0.5 text-sm font-medium"
         :class="{
-          'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300':
+          'bg-destructive/10 text-destructive':
             this.posClose.getBadgeType() === 'red',
-          'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300':
+          'bg-secondary text-primary':
             this.posClose.getBadgeType() === 'default',
 
-          'bg-yellow-100 text-yellow-800':
+          'bg-warning/10 text-warning':
             this.posClose.getBadgeType() === 'yellow',
         }"
       >
@@ -22,61 +22,61 @@
     <div class="flex space-x-4">
       <button
         @click="this.posClose.savePosClosing()"
-        class="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+        class="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary focus:outline-none"
         v-if="this.posClose.posClosing"
       >
-        Save
+        {{ $t('common.save') }}
       </button>
       <button
         v-if="this.posClose.posCloseSaved"
         @click="this.posClose.showSumbitPosCloseModal()"
-        class="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+        class="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary focus:outline-none"
       >
-        Submit
+        {{ $t('common.submit') }}
       </button>
     </div>
   </div>
-  <h3 class="text-base font-normal text-gray-900 dark:text-white">
-    Period Details
+  <h3 class="text-base font-normal text-foreground">
+    {{ $t('pos.period_details') }}
   </h3>
 
   <div class="mb-6 mt-6 grid gap-6 md:grid-cols-2">
     <div>
       <label
         for="startDate"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Period Start Date</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.period_start') }}</label
       >
       <input
         v-model="this.posClose.startDate"
         readonly
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         type="text"
       />
     </div>
     <div>
       <label
         for="postingDate"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+        class="mb-2 block text-sm font-medium text-foreground"
       >
         <label
           for="postingDate"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-          >Posting Date</label
+          class="mb-2 block text-sm font-medium text-foreground"
+          >{{ $t('pos.posting_date') }}</label
         >
       </label>
       <input
         v-model="this.posClose.postingDate"
         readonly
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         type="text"
       />
     </div>
     <div>
       <label
         for="endDate"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Period End Date</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.period_end') }}</label
       >
 
       <date-picker
@@ -89,8 +89,8 @@
     <div>
       <label
         for="postingTime"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Posting Time</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.posting_time') }}</label
       >
       <date-picker
         v-model:value="this.posClose.postingTime"
@@ -104,25 +104,25 @@
       <div class="relative" ref="container">
         <label
           for="posOpen"
-          class="block text-sm font-medium text-gray-900 dark:text-white"
+          class="block text-sm font-medium text-foreground"
         >
-          POS Opening Entry
+          {{ $t('pos.opening_entry') }}
         </label>
         <input
           type="text"
           id="posOpen"
-          class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+          class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
           v-model="this.posClose.selectedPosOpenEntry"
           @click="this.posClose.selectPosOpen()"
           required
         />
         <div
           v-if="this.posClose.showPosOpen"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 text-sm text-foreground focus:border-ring focus:ring-ring"
           ref="dropdown"
         >
           <div
-            class="h-10 rounded-lg p-2 hover:bg-gray-100"
+            class="h-10 rounded-lg p-2 hover:bg-muted"
             v-for="(posOpen, index) in this.posClose.posOpenEntries"
             :key="index"
             @click="this.posClose.selectPos(posOpen)"
@@ -135,24 +135,24 @@
       </div>
     </div>
   </div>
-  <hr class="my-6 border-t border-gray-300" />
+  <hr class="my-6 border-t border-input" />
 
-  <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-    User Details
+  <h3 class="text-base font-semibold text-foreground">
+    {{ $t('pos.user_details') }}
   </h3>
   <div class="mb-6 mt-5 grid gap-6 md:grid-cols-2">
     <div class="md:col-span-1">
       <label
         for="company"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+        class="mb-2 block text-sm font-medium text-foreground"
       >
-        Company
+        {{ $t('pos.company') }}
       </label>
       <input
         type="text"
         id="company"
         v-model="this.invoiceData.company"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         required
       />
     </div>
@@ -160,13 +160,13 @@
       <div class="mb-6">
         <label
           for="posProfile"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-          >POS Profile</label
+          class="mb-2 block text-sm font-medium text-foreground"
+          >{{ $t('pos.profile') }}</label
         >
         <input
           type="text"
           id="posProfile"
-          class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+          class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
           v-model="this.invoiceData.posProfile"
           required
         />
@@ -174,55 +174,55 @@
       <div>
         <label
           for="cashier"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-          >Cashier</label
+          class="mb-2 block text-sm font-medium text-foreground"
+          >{{ $t('pos.cashier') }}</label
         >
         <input
           type="text"
           id="cashier"
           v-model="this.posClose.cashier"
-          class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+          class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
           required
         />
       </div>
     </div>
   </div>
   <div v-if="this.posClose.openingBalance.length > 0">
-    <hr class="my-6 border-t border-gray-300" />
-    <h3 class="mb-3 text-base font-semibold text-gray-900 dark:text-white">
-      Modes of Payment
+    <hr class="my-6 border-t border-input" />
+    <h3 class="mb-3 text-base font-semibold text-foreground">
+      {{ $t('payment.modes') }}
     </h3>
 
-    <h3 class="mb-3 text-sm font-normal text-gray-900 dark:text-white">
-      Payment Reconciliation
+    <h3 class="mb-3 text-sm font-normal text-foreground">
+      {{ $t('payment.reconciliation') }}
     </h3>
 
     <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-      <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+      <table class="w-full text-left text-sm text-muted-foreground">
         <thead
-          class="bg-gray-50 text-base font-semibold uppercase text-gray-900 dark:text-white"
+          class="bg-muted text-base font-semibold uppercase text-foreground"
         >
           <tr>
-            <th scope="col" class="px-6 py-3">Mode of Payment</th>
-            <th scope="col" class="px-6 py-3 text-center">Opening Amount</th>
-            <th scope="col" class="px-6 py-3 text-center">Closing Amount</th>
+            <th scope="col" class="px-6 py-3">{{ $t('payment.mode') }}</th>
+            <th scope="col" class="px-6 py-3 text-center">{{ $t('pos.opening_amount') }}</th>
+            <th scope="col" class="px-6 py-3 text-center">{{ $t('pos.closing_amount') }}</th>
             <th scope="col" class="px-6 py-3"></th>
           </tr>
         </thead>
         <tbody>
           <tr
-            class="border-b bg-white dark:border-gray-700 dark:bg-gray-900"
+            class="border-b bg-card"
             v-for="(modeOfPayment, index) in posClose.openingBalance"
             :key="index"
           >
             <th
               scope="row"
-              class="whitespace-nowrap px-6 py-4 font-medium text-gray-900 dark:text-white"
+              class="whitespace-nowrap px-6 py-4 font-medium text-foreground"
             >
               {{ modeOfPayment.mode_of_payment }}
             </th>
             <td
-              class="px-6 py-4 text-center font-medium text-gray-900 dark:text-white"
+              class="px-6 py-4 text-center font-medium text-foreground"
             >
               <input
                 type="number"
@@ -233,7 +233,7 @@
               />
             </td>
             <td
-              class="px-6 py-4 text-center font-medium text-gray-900 dark:text-white"
+              class="px-6 py-4 text-center font-medium text-foreground"
             >
               <input
                 type="number"
@@ -272,49 +272,49 @@
       </table>
     </div>
   </div>
-  <hr class="my-6 border-t border-gray-300" />
+  <hr class="my-6 border-t border-input" />
 
-  <h3 class="text-base font-semibold text-gray-900 dark:text-white">Totals</h3>
+  <h3 class="text-base font-semibold text-foreground">{{ $t('totals.title') }}</h3>
   <div class="mb-6 mt-6 grid gap-6 md:grid-cols-2">
     <div>
       <label
         for="grandTotal"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+        class="mb-2 block text-sm font-medium text-foreground"
       >
-        Grand Total</label
+        {{ $t('totals.grand_total') }}</label
       >
       <input
         type="text"
         id="grandTotal"
         v-model="this.posClose.grandTotal"
-        class="b block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="b block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         required
       />
     </div>
     <div>
       <label
         for="totalInvoices"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Total Invoices</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('totals.total_invoices') }}</label
       >
       <input
         type="text"
         id="totalInvoices"
         v-model="this.posClose.totalInvoices"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         required
       />
     </div>
     <div>
       <label
         for="netTotak"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Net Total</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('totals.net_total') }}</label
       >
       <input
         type="text"
         id="netTotak"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         v-model="this.posClose.netTotal"
         required
       />
@@ -322,28 +322,28 @@
     <div>
       <label
         for="totalQty"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Total Quantity</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('totals.total_quantity') }}</label
       >
       <input
         type="text"
         id="totalQty"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         v-model="this.posClose.totalQty"
         required
       />
     </div>
   </div>
-  <hr class="my-6 border-t border-gray-300" />
+  <hr class="my-6 border-t border-input" />
   <div
     v-if="this.posClose.showSumbitPosclose"
-    class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-gray-100"
+    class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-muted"
   >
     <div class="mt-3 flex items-center justify-center">
-      <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
+      <div class="w-full rounded-lg bg-card p-6 shadow-raised md:max-w-md">
         <div class="flex items-center justify-between">
-          <h3 class="text-xl text-gray-900 dark:text-white">Confirm</h3>
-          <span class="sr-only">Close</span>
+          <h3 class="text-xl text-foreground">{{ $t('common.confirm') }}</h3>
+          <span class="sr-only">{{ $t('common.close') }}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-5 w-5 cursor-pointer"
@@ -362,22 +362,22 @@
         </div>
 
         <h3
-          class="mt-5 block text-left text-base text-gray-900 dark:text-white"
+          class="mt-5 block text-left text-base text-foreground"
         >
           Permanently Submit{{ this.posClose.posClosingEntry }}?
         </h3>
         <div class="flex justify-end">
           <button
             @click="this.posClose.showSumbitPosclose = false"
-            class="mr-3 mt-6 rounded border border-gray-300 bg-gray-50 px-3 py-2"
+            class="mr-3 mt-6 rounded-xl border border-input bg-muted px-3 py-2"
           >
-            No
+            {{ $t('common.no') }}
           </button>
           <button
             @click="this.posClose.sumbitPosClosing()"
-            class="mt-6 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+            class="mt-6 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
           >
-            Yes
+            {{ $t('common.yes') }}
           </button>
         </div>
       </div>

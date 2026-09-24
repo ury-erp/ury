@@ -1,7 +1,7 @@
 <template>
   <Header />
 
-  <div class="bg-slate-300 min-h-screen">
+  <div class="kitchen-app min-h-screen">
     <router-view />
   </div>
 </template>

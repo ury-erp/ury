@@ -132,7 +132,6 @@ const TableMergeDialog = ({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('tables.search_table_placeholder')}
                 className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                disabled={phase === 'merging'}
               />
             </div>
 
@@ -151,7 +150,7 @@ const TableMergeDialog = ({
                         type="button"
                         onClick={() => toggleTarget(table.name)}
                         className={cn(
-                          'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
+                          'flex items-center gap-2 rounded-lg border-2 p-3 text-start transition-all',
                           isSelected
                             ? 'border-primary bg-primary-50'
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -222,7 +221,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    'absolute start-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
                     phase === 'done' && 'bg-green-100'
                   )}
@@ -258,7 +257,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    'absolute start-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
                     phase === 'done' && 'bg-green-100'
                   )}

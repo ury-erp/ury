@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { ErrorState } from '@ury/ui';
+import { parseFrappeError } from '@ury/core';
+import { t } from './i18n';
+import { readWizardStatus, type WizardStatus } from './lib/managementValidation';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -7,6 +11,12 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/Dashboard/DashboardPage';
 import { MenuPage } from './pages/Dashboard/MenuPage';
 import { TablePage } from './pages/Dashboard/TablePage';
+import ReservationPage from './pages/Dashboard/ReservationPage';
+import WebsiteEditorPage from './pages/Website/WebsiteEditorPage';
+import WaitlistPage from './pages/Dashboard/WaitlistPage';
+import FeedbackPage from './pages/Dashboard/FeedbackPage';
+import OffersPage from './pages/Dashboard/OffersPage';
+import DeliveryPage from './pages/Dashboard/DeliveryPage';
 import { RoomPage } from './pages/Dashboard/RoomPage';
 import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
@@ -19,6 +29,8 @@ import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
+import { AuditLog } from './pages/Reports/AuditLog';
+import { FoodCost } from './pages/Reports/FoodCost';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
 import { DaywiseInvoices } from './pages/Reports/DaywiseInvoices';
 import { MonthWiseSales } from './pages/Reports/MonthWiseSales';
@@ -36,35 +48,34 @@ import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
 
-interface WizardStatus {
-  step1_complete: boolean;
-  step2_complete: boolean;
-}
-
 function SetupGuard() {
   const [status, setStatus] = useState<WizardStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setStatusError(null);
 
     (async () => {
       try {
         const res = await call<any>(
           'ury.ury.api.minimal.setup_organization.get_wizard_status'
         );
-        const wizardStatus: WizardStatus = res?.message ?? res;
+        const wizardStatus = readWizardStatus(res);
 
         if (!cancelled) {
+          setStatusError(null);
           setStatus(wizardStatus);
         }
-      } catch {
-        // If the status fetch fails, fall back to treating setup as incomplete
-        // rather than flashing a redirect to the dashboard on bad data.
+      } catch (err) {
+        // "Could not check" is not "not set up". Defaulting to incomplete
+        // sent a live, fully configured restaurant into the setup wizard on
+        // a network blip — an answer we never had, presented as fact
+        // (UX-13). Unknown is now its own state, with a retry.
         if (!cancelled) {
-          setStatus({
-            step1_complete: false,
-            step2_complete: false,
-          });
+          setStatus(null);
+          setStatusError(parseFrappeError(err, t('dash.errors.setup_check_failed')));
         }
       }
     })();
@@ -72,14 +83,27 @@ function SetupGuard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  if (statusError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <ErrorState
+          title={t('dash.errors.setup_check_failed')}
+          description={statusError}
+          retryLabel={t('common.retry')}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </div>
+    );
+  }
 
   if (!status) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -124,6 +148,12 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
+          <Route path="reservations" element={<ReservationPage />} />
+          <Route path="website" element={<WebsiteEditorPage />} />
+          <Route path="waitlist" element={<WaitlistPage />} />
+          <Route path="feedback" element={<FeedbackPage />} />
+          <Route path="offers" element={<OffersPage />} />
+          <Route path="delivery" element={<DeliveryPage />} />
           <Route path="room" element={<RoomPage />} />
           <Route path="pos-profile" element={<PosProfilePage />} />
           <Route path="user" element={<UserPage />} />
@@ -172,6 +202,8 @@ function App() {
               element={<CompletedWorkOrders />}
             />
             <Route path="daily-pnl" element={<DailyPnl />} />
+            <Route path="audit-log" element={<AuditLog />} />
+            <Route path="food-cost" element={<FoodCost />} />
           </Route>
         </Route>
       </Route>

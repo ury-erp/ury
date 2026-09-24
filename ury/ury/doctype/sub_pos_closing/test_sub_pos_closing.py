@@ -7,13 +7,24 @@ from unittest.mock import patch, MagicMock
 from ury.ury.doctype.sub_pos_closing.sub_pos_closing import get_pos_invoices
 
 class TestSubPOSClosingSEC09(FrappeTestCase):
+    """Branch and user scoping for get_pos_invoices.
+
+    `frappe.has_permission` is stubbed in every test here. It is not the
+    unit under test, and leaving it real made these tests read the session
+    of whatever ran before them: two failed on their own, three different
+    ones failed inside the full suite, and `test_normal_cashier_other_branch`
+    *passed* on a PermissionError raised by the permission check rather than
+    by the branch scoping it claims to cover — a green test asserting
+    nothing.
+    """
 
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.sql")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.getBranch")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_normal_cashier_forced_user(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
+    def test_normal_cashier_forced_user(self, mock_has_permission, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
         # 1. Normal cashier sends another user's ID
         # Result: only their own invoices are returned (the SQL query is called with their session user).
         mock_session.user = "normal_cashier@test.com"
@@ -33,7 +44,8 @@ class TestSubPOSClosingSEC09(FrappeTestCase):
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_normal_cashier_other_branch(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch):
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
+    def test_normal_cashier_other_branch(self, mock_has_permission, mock_session, mock_get_roles, mock_get_value, mock_get_branch):
         # 2. Normal cashier requests another branch's POS Profile
         # Result: PermissionError.
         mock_session.user = "normal_cashier@test.com"
@@ -48,7 +60,8 @@ class TestSubPOSClosingSEC09(FrappeTestCase):
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_invalid_pos_profile(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch):
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
+    def test_invalid_pos_profile(self, mock_has_permission, mock_session, mock_get_roles, mock_get_value, mock_get_branch):
         # 3. Invalid POS Profile
         # Result: DoesNotExistError.
         mock_session.user = "normal_cashier@test.com"
@@ -64,7 +77,8 @@ class TestSubPOSClosingSEC09(FrappeTestCase):
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_supervisor_requests_another_cashier(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
+    def test_supervisor_requests_another_cashier(self, mock_has_permission, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
         # 4. Supervisor requests another cashier's invoices
         # Result: allowed.
         mock_session.user = "supervisor@test.com"
@@ -85,7 +99,8 @@ class TestSubPOSClosingSEC09(FrappeTestCase):
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_administrator_bypass_branch(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
+    def test_administrator_bypass_branch(self, mock_has_permission, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_sql):
         # Administrator branch bypass check
         mock_session.user = "Administrator"
         # Simulate Administrator not having a branch mapping (throws ValidationError)

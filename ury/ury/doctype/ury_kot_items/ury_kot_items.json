@@ -15,7 +15,10 @@
   "comments",
   "course",
   "serve_priority",
-  "indicate_course"
+  "indicate_course",
+  "prepared",
+  "prepared_at",
+  "prepared_by"
  ],
  "fields": [
   {
@@ -71,12 +74,34 @@
    "fieldtype": "Check",
    "label": "Indicate Course",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "prepared",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Prepared"
+  },
+  {
+   "depends_on": "prepared",
+   "fieldname": "prepared_at",
+   "fieldtype": "Datetime",
+   "label": "Prepared At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "prepared",
+   "fieldname": "prepared_by",
+   "fieldtype": "Link",
+   "label": "Prepared By",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-28 16:23:35.778511",
+ "modified": "2026-09-18 13:45:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT Items",
