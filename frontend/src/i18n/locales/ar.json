@@ -94,6 +94,8 @@
     "occupied_tables": "الطاولات المشغولة",
     "orders_today": "طلبات اليوم",
     "pending_kitchen_orders": "أوامر المطبخ المعلّقة",
+    "smart_kitchen_description": "إدارة الطلبات المباشرة وسير عمل المطبخ",
+    "smart_pos_description": "فتح شاشة المبيعات وإدارة الطلبات",
     "table_occupancy": "نسبة إشغال الطاولات",
     "today_sales": "مبيعات اليوم"
   },

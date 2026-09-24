@@ -89,6 +89,8 @@
     "occupied_tables": "Occupied Tables",
     "orders_today": "Orders Today",
     "pending_kitchen_orders": "Pending Kitchen Orders",
+    "smart_kitchen_description": "Manage live orders and kitchen workflow",
+    "smart_pos_description": "Open the sales and order terminal",
     "table_occupancy": "Table Occupancy",
     "today_sales": "Today's Sales"
   },

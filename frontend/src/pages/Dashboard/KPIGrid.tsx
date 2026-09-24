@@ -1,41 +1,53 @@
 import React from 'react';
 import { formatCurrency } from '@ury/core';
 import { Card, StatCard } from '@ury/ui';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ChefHat, MonitorSmartphone } from 'lucide-react';
 import { DashboardSummary } from '../../services/dashboard';
 import { t } from '../../i18n';
-import uryPosLogo from '../../../../pos/public/ury_pos.png';
-import uryMosaicLogo from '../../../../mosaic/src/assets/logos/mosaic.jpg';
 
 interface LinkCardProps {
-  logoSrc: string;
+  icon: React.ElementType;
   label: string;
+  description: string;
   href: string;
+  accentClassName: string;
+  iconClassName: string;
 }
 
-const LinkCard: React.FC<LinkCardProps> = ({ logoSrc, label, href }) => {
+const LinkCard: React.FC<LinkCardProps> = ({
+  icon: Icon,
+  label,
+  description,
+  href,
+  accentClassName,
+  iconClassName,
+}) => {
   return (
     <a
       href={href}
-      className="group block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      aria-label={`${label} — ${description}`}
     >
-      <Card variant="interactive" padding="lg" className="h-full">
-        <div className="mb-2 flex h-4 items-center">
-          <img
-            src={logoSrc}
-            alt=""
-            className="h-full object-contain opacity-70 mix-blend-multiply transition-opacity duration-fast group-hover:opacity-100"
-          />
+      <Card
+        variant="interactive"
+        padding="lg"
+        className={`relative h-full overflow-hidden border-0 bg-gradient-to-br ${accentClassName}`}
+      >
+        <div className="relative z-10 flex h-full min-h-28 flex-col justify-between gap-5">
+          <div className="flex items-start justify-between gap-3">
+            <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl shadow-sm ring-1 ring-black/5 ${iconClassName}`}>
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-foreground/60 transition-all duration-fast group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-white group-hover:text-primary rtl:group-hover:-translate-x-0.5">
+              <ArrowUpRight className="h-4 w-4 rtl-flip" aria-hidden="true" />
+            </span>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-foreground">{label}</h3>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+          </div>
         </div>
-        <h3 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{label}</h3>
-        {/* Affordance that this tile navigates, revealed on hover so the
-            resting grid stays quiet. */}
-        <span
-          aria-hidden="true"
-          className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity duration-fast group-hover:opacity-100"
-        >
-          <ArrowUpRight className="h-3.5 w-3.5 rtl-flip" />
-        </span>
       </Card>
     </a>
   );
@@ -78,9 +90,7 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const occupiedTables = summary?.occupied_tables ?? 0;
   const totalTables = summary?.total_tables ?? 0;
   const aov = summary?.avg_order_value ?? 0;
-  const activeCashiers = summary?.active_cashiers ?? 0;
   const pendingOrders = summary?.pending_kitchen_orders ?? 0;
-  const totalMenuItems = summary?.total_menu_items ?? 0;
 
   const occupancyRate = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0;
 
@@ -88,15 +98,21 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
     <section className="w-full">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <LinkCard
-          logoSrc={uryPosLogo}
-          label="URY POS"
+          icon={MonitorSmartphone}
+          label="Smart POS"
+          description={t('kpi.smart_pos_description')}
           href="/pos"
+          accentClassName="from-blue-50 via-white to-indigo-50"
+          iconClassName="bg-blue-600 text-white"
         />
 
         <LinkCard
-          logoSrc={uryMosaicLogo}
-          label="URY MOSAIC"
+          icon={ChefHat}
+          label="Smart Kitchen"
+          description={t('kpi.smart_kitchen_description')}
           href="/mosaic"
+          accentClassName="from-amber-50 via-white to-orange-50"
+          iconClassName="bg-amber-600 text-white"
         />
 
         <KPICard
