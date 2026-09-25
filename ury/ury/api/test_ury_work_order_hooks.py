@@ -369,15 +369,21 @@ class TestValidateHook(FrappeTestCase):
 
 class TestDoesNotRegressExistingCallers(FrappeTestCase):
 	"""`ury_mto_work_order_service` and `ury_batch_manufacture_service` both
-	build Work Orders with `wip_warehouse = fg_warehouse = source`, and
-	neither of them sets `production_plan` at all (verified by reading both
-	modules directly). They must fall through the `is_ury_work_order`/
-	`validate` no-op branch untouched."""
+	build Work Orders with `wip_warehouse = fg_warehouse = source`, and neither
+	depends on the URY warehouse-policy reassertion in `validate`.
+	`ury_mto_work_order_service` MAY set `production_plan` when
+	`_resolve_production_plan_link` finds a usable (non-
+	`custom_ury_no_work_order`) Production Plan Item row -- since commit
+	42345ea8 -- but it deliberately stays unlinked when the only matching row
+	is a guarded MADE_TO_ORDER row, and these tests cover that unlinked shape:
+	it must fall through the `is_ury_work_order`/`validate` no-op branch
+	untouched."""
 
 	def test_mto_style_work_order_is_not_ury(self):
 		# ury_mto_work_order_service.create_work_orders_for_kot builds Work
-		# Orders with wip_warehouse=fg_warehouse=context warehouse and no
-		# production_plan link at all.
+		# Orders with wip_warehouse=fg_warehouse=context warehouse; when no
+		# usable Production Plan link exists it sets no production_plan at
+		# all (and never links a guarded custom_ury_no_work_order row).
 		doc = _work_order(production_plan=None, wip_warehouse="Kitchen - WH", fg_warehouse="Kitchen - WH")
 		self.assertFalse(is_ury_work_order(doc))
 
