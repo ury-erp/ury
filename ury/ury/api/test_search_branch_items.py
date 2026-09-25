@@ -6,14 +6,68 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_dashboard import search_branch_items
 
 
+def _branch_company_lookup(company_value):
+	"""A `frappe.db.get_value` side_effect that answers ONLY this module's
+	own `frappe.db.get_value("Branch", branch, "company")` lookup with
+	`company_value`, delegating every other call to the real
+	implementation.
+
+	Running inside a real `FrappeTestCase` (a live site, not a bare mock),
+	Frappe's own internals -- permission checks, DocType meta caching,
+	savepoint bookkeeping, etc. -- call the real `frappe.db.get_value`
+	many times during a single test, often with a list of `fields` and
+	expecting a dict back. A bare `patch(..., return_value="Company A")`
+	answers ALL of those calls with that one string too, and whichever
+	internal caller then does `result.get(...)` on it blows up with
+	`AttributeError: 'str' object has no attribute 'get'` -- unrelated to
+	anything the test itself is exercising. Scoping the mock to the exact
+	(doctype, fieldname) this module calls keeps every other caller
+	talking to the real database.
+	"""
+	real_get_value = frappe.db.get_value
+
+	def _side_effect(*args, **kwargs):
+		doctype = args[0] if args else kwargs.get("doctype")
+		fieldname = args[2] if len(args) > 2 else kwargs.get("fieldname")
+		if doctype == "Branch" and fieldname == "company":
+			return company_value
+		return real_get_value(*args, **kwargs)
+
+	return _side_effect
+
+
 class TestSearchBranchItems(FrappeTestCase):
 	def _allow_search_access(self):
 		"""Mock permissions and access checks for a valid in-branch user."""
 		patches = [
 			patch("ury.ury.api.ury_dashboard.frappe.has_permission", return_value=True),
-			patch("ury.ury.api.ury_dashboard.frappe.db.get_value", return_value="Company A"),
+			patch(
+				"ury.ury.api.ury_dashboard.frappe.db.get_value",
+				side_effect=_branch_company_lookup("Company A"),
+			),
 			patch("ury.ury.api.ury_dashboard._has_dashboard_cross_branch_access", return_value=False),
 			patch("ury.ury.api.ury_dashboard.getBranch", return_value="Branch A"),
+			# search_branch_items does a local
+			# `from ury.ury.api.ury_production_settings import
+			# require_active_menu_for_planning` INSIDE the function body, so
+			# it must be patched on its defining module (a patch on
+			# `ury.ury.api.ury_dashboard.require_active_menu_for_planning`
+			# would never be seen -- that name isn't bound there until the
+			# call happens). Left unmocked, this defaults to True (no Single
+			# value has ever been saved on a fresh site) and the function
+			# then issues *real*, unmocked `frappe.get_all("URY Menu", ...)`
+			# / `frappe.get_all("URY Menu Item", ...)` queries scoped to
+			# fake branches like "Branch A" that don't exist on a live
+			# bench -- those real queries return no rows, so every
+			# configured item gets filtered out as "not on an enabled
+			# menu" and every test here that expects real results back
+			# would get an empty list instead. These tests are about the
+			# search/filter/permission logic, not menu-gating, so that
+			# separate policy is turned off here.
+			patch(
+				"ury.ury.api.ury_production_settings.require_active_menu_for_planning",
+				return_value=False,
+			),
 		]
 		for active_patch in patches:
 			active_patch.start()
@@ -51,7 +105,8 @@ class TestSearchBranchItems(FrappeTestCase):
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.has_permission", return_value=True
 		), patch(
-			"ury.ury.api.ury_dashboard.frappe.db.get_value", return_value="Company A"
+			"ury.ury.api.ury_dashboard.frappe.db.get_value",
+			side_effect=_branch_company_lookup("Company A"),
 		), patch(
 			"ury.ury.api.ury_dashboard._has_dashboard_cross_branch_access", return_value=False
 		), patch(
@@ -243,7 +298,8 @@ class TestSearchBranchItems(FrappeTestCase):
 		with patch(
 			"ury.ury.api.ury_dashboard.frappe.has_permission", return_value=True
 		), patch(
-			"ury.ury.api.ury_dashboard.frappe.db.get_value", return_value="Company B"
+			"ury.ury.api.ury_dashboard.frappe.db.get_value",
+			side_effect=_branch_company_lookup("Company B"),
 		), patch(
 			"ury.ury.api.ury_dashboard.frappe.db.get_all"
 		) as get_all:
