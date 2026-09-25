@@ -12,7 +12,10 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_mto_work_order_service import create_work_orders_for_kot
+from ury.ury.api.ury_mto_work_order_service import (
+    _first_usable_plan_row,
+    create_work_orders_for_kot,
+)
 
 MODULE = "ury.ury.api.ury_mto_work_order_service"
 
@@ -217,3 +220,43 @@ class TestCreateWorkOrdersForKot(FrappeTestCase):
         self.assertEqual(result["created"], [])
         self.assertEqual(len(result["errors"]), 1)
         self.assertEqual(result["errors"][0]["reason"], "KOT_NOT_FOUND")
+
+
+class TestFirstUsablePlanRow(FrappeTestCase):
+    """Regression: a MADE_TO_ORDER item's own Production Plan Item row is
+    flagged ``custom_ury_no_work_order``, and ``ury_work_order_hooks.validate``
+    refuses ANY Work Order linked to such a row -- including the
+    order-triggered one this service creates. The link resolver must therefore
+    never return a flagged row: otherwise ``wo_doc.insert()`` throws, the
+    per-item try/except swallows it, and the served order gets no Work Order
+    at all (issue: CBTEST on MFG-PP-2026-00025)."""
+
+    def test_flagged_mto_row_alone_returns_none(self):
+        rows = [frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1})]
+        self.assertIsNone(_first_usable_plan_row(rows))
+
+    def test_flagged_row_does_not_shadow_usable_row(self):
+        rows = [
+            frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1}),
+            frappe._dict({"pp_item_name": "PPI-USABLE", "pp_name": "PP-1", "no_work_order": 0}),
+        ]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-USABLE")
+
+    def test_usable_row_is_returned(self):
+        rows = [frappe._dict({"pp_item_name": "PPI-USABLE", "pp_name": "PP-1", "no_work_order": 0})]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-USABLE")
+
+    def test_unset_flag_counts_as_usable(self):
+        # Rows created outside the URY Sales Plan adapter have no flag at all
+        # (NULL) -- they must remain linkable.
+        rows = [frappe._dict({"pp_item_name": "PPI-PLAIN", "pp_name": "PP-1"})]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-PLAIN")
+
+    def test_empty_and_all_flagged_return_none(self):
+        self.assertIsNone(_first_usable_plan_row([]))
+        self.assertIsNone(_first_usable_plan_row(None))
+        self.assertIsNone(
+            _first_usable_plan_row(
+                [frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1})]
+            )
+        )

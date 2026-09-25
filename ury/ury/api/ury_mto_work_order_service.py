@@ -107,9 +107,22 @@ def _resolve_production_plan_link(item_code, branch, company):
     we pick the plan that actually carries this item, not just any plan for the
     branch.
 
-    Returns ``(None, None)`` if no matching submitted plan is found, or if any
+    Returns ``(None, None)`` if no usable submitted plan is found, or if any
     exception occurs.  The Work Order is still created without the links rather
     than blocking the Mosaic serve flow.
+
+    A Production Plan Item row flagged ``custom_ury_no_work_order`` (a
+    MADE_TO_ORDER item's own row -- see ``ury_work_order_hooks``' "Refusing a
+    Work Order for a MADE_TO_ORDER item's own row") is never returned: that
+    guard exists to stop the batch / Prepare-Production path building an MTO
+    item in advance, but ``ury_work_order_hooks.validate`` fires on ANY Work
+    Order linked to such a row -- including this order-triggered one, which is
+    exactly the "produced from the actual order" case the flag protects.
+    Linking to the flagged row would get the insert refused, and the service's
+    per-item try/except would swallow the refusal into ``errors``/log_error,
+    leaving the served order with no Work Order at all. Flagged rows are
+    therefore skipped here, so the Work Order is created unlinked when the
+    only plan row for the item is its guarded MTO row.
     """
     from frappe.query_builder import DocType
     from frappe.utils import getdate
@@ -123,25 +136,45 @@ def _resolve_production_plan_link(item_code, branch, company):
         rows = (
             frappe.qb.from_(PPI)
             .join(PP).on(PP.name == PPI.parent)
-            .select(PPI.name.as_("pp_item_name"), PPI.parent.as_("pp_name"))
+            .select(
+                PPI.name.as_("pp_item_name"),
+                PPI.parent.as_("pp_name"),
+                PPI.custom_ury_no_work_order.as_("no_work_order"),
+            )
             .where(PPI.item_code == item_code)
             .where(PPI.planned_start_date == today)
             .where(PP.docstatus == 1)
             .where(PP.company == company)
-            .limit(1)
             .run(as_dict=True)
         )
 
-        if not rows:
+        # Filter in Python rather than in the query: the flagged row must not
+        # win just because it sorts first, and when it is the ONLY match the
+        # result must fall back to (None, None), not to the flagged row.
+        row = _first_usable_plan_row(rows)
+        if not row:
             return None, None
 
-        return rows[0]["pp_name"], rows[0]["pp_item_name"]
+        return row["pp_name"], row["pp_item_name"]
     except Exception:
         frappe.log_error(
             title="ury_mto_work_order_service._resolve_production_plan_link",
             message=frappe.get_traceback(),
         )
         return None, None
+
+
+def _first_usable_plan_row(rows):
+    """First Production Plan Item row NOT flagged ``custom_ury_no_work_order``
+    (see :func:`_resolve_production_plan_link` for why a flagged row must never
+    be linked). ``row.get()`` truthiness check handles both 0/1 flags and
+    unset/NULL flags (rows created outside the URY Sales Plan adapter), which
+    a SQL ``== 0`` filter would wrongly drop. Returns ``None`` when every row
+    is flagged or the list is empty."""
+    for row in rows or []:
+        if not row.get("no_work_order"):
+            return row
+    return None
 
 
 @frappe.whitelist()
@@ -234,8 +267,13 @@ def create_work_orders_for_kot(kot_name):
                     "use_multi_level_bom": 0,
                     # Link to the day's Production Plan and the specific
                     # Production Plan Item row for this item. Both are None
-                    # when no submitted Production Plan exists today -- the
-                    # Work Order is still created and submitted without them.
+                    # when no submitted Production Plan exists today, or when
+                    # the only matching row is a MADE_TO_ORDER row flagged
+                    # custom_ury_no_work_order (see _resolve_production_plan_link
+                    # -- the order-triggered Work Order must not link to the
+                    # row the no-advance-production guard refuses Work Orders
+                    # against) -- the Work Order is still created and
+                    # submitted without them.
                     "production_plan": pp_name,
                     "production_plan_item": pp_item_name,
                 }
