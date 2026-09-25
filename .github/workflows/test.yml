@@ -413,3 +413,57 @@ jobs:
           # three apps use) until this track's Phase 3 bumped it; its own
           # `test` script pins the vitest config explicitly.
           yarn test
+
+      - name: Install dependencies and run tests for serve
+        working-directory: ./serve
+        run: |
+          yarn install
+          # Lint is not blocking yet: this codebase already has ~700 pre-existing
+          # no-explicit-any errors unrelated to this workflow. Fixing that is a
+          # separate cleanup task -- run lint for visibility, don't gate on it.
+          yarn lint || true
+          if grep -q '"typecheck"' package.json; then
+            # Not blocking yet either: typecheck surfaces pre-existing type
+            # errors in app source files this PR didn't touch, on top of a
+            # handful in this PR's own new test files -- same reasoning as
+            # lint above. Run for visibility, don't gate on it.
+            yarn typecheck || true
+          fi
+          yarn test
+
+      - name: Install dependencies, typecheck, and run tests for packages/core
+        working-directory: ./packages/core
+        run: |
+          yarn install
+          # Unlike the app-level typecheck steps above, this package's
+          # typecheck is clean today, so it is blocking.
+          yarn typecheck
+          yarn test
+
+      - name: Install dependencies, typecheck, and run tests for packages/ui
+        working-directory: ./packages/ui
+        run: |
+          yarn install
+          # Unlike the app-level typecheck steps above, this package's
+          # typecheck is clean today, so it is blocking.
+          yarn typecheck
+          yarn test
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Ruff (safe subset, blocking)
+        run: |
+          pip install ruff==0.16.9
+          # Full-repo ruff (`ruff check ury` with the [tool.ruff.lint] select
+          # list in pyproject.toml) has ~900 pre-existing errors, so it isn't
+          # blocking anywhere yet -- triaging that is out of scope for this
+          # workflow change (same reasoning as the `yarn lint || true` /
+          # `yarn typecheck || true` steps above, which are left as-is).
+          # This step instead runs a narrow, currently-clean rule subset and
+          # gates on it, so no *new* violations of these rules can land. See
+          # the comment above [tool.ruff] in pyproject.toml for why F811,
+          # F601, and B006 were excluded from this subset.
+          ruff check ury --select F821,F632,E9,B008

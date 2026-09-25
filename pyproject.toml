@@ -23,6 +23,19 @@ build-backend = "flit_core.buildapi"
 line-length = 110
 target-version = "py310"
 
+# CI (see .github/workflows/test.yml, frontend-lint-test job) runs a
+# blocking ruff check against this narrow, currently-clean rule subset --
+# the full `select` list below has ~900 pre-existing violations across the
+# codebase (see B/E101/etc. in `ignore`), so it can't be blocking yet.
+# Safe subset: F821 (undefined names), F632 (`is` with a literal), E9
+# (syntax errors), B008 (function calls in mutable default args).
+# F811 (redefinitions), F601 (repeated dict keys), and B006 (mutable
+# defaults) were considered but dropped -- each has existing violations in
+# product code (ury/setup/demo.py, ury/setup_customizations.py,
+# ury/ury/api/ury_kot_generate.py, ury/ury/doctype/sub_pos_closing/, ury/ury/hooks/ury_pos_opening_entry.py),
+# so making them blocking would require touching product code, which is
+# out of scope here.
+
 [tool.ruff.lint]
 select = [
     "F",
