@@ -3,12 +3,12 @@ from datetime import datetime as _datetime, timedelta as _timedelta
 import frappe
 
 from frappe.utils import get_datetime, add_to_date, today
-from ury.ury.report_api.utils import require_manager
+from ury.ury.report_api.utils import require_branch_staff
 
 
 @frappe.whitelist(methods=["GET"])
 def get_service_line(branch=None):
-	# require_manager()
+	branch = require_branch_staff(branch)
 	cache_key = f"ury_dashboard_service_line:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:
@@ -96,7 +96,7 @@ def get_service_line(branch=None):
 
 @frappe.whitelist(methods=["GET"])
 def get_running_low(branch=None):
-	# require_manager()
+	branch = require_branch_staff(branch)
 	cache_key = f"ury_dashboard_running_low:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:

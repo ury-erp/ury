@@ -18,6 +18,79 @@ def require_manager():
 		)
 
 
+#: Non-manager roles that identify a URY staff member (as opposed to a
+#: portal/Website user or any other role-less logged-in user). Sourced from
+#: `rg -o '"role": "URY[^"]*"' ury/ury/doctype` -- the actual role set granted
+#: on URY doctypes across the app -- minus the manager-tier roles already
+#: covered by `_MANAGER_ROLES` below.
+STAFF_ROLES = {"URY Captain", "URY Cashier", "URY Admin", "URY Manager"}
+
+#: Roles that bypass branch scoping entirely (any branch, or all branches
+#: when none is supplied) -- mirrors require_manager()'s admin-bypass
+#: convention.
+_MANAGER_ROLES = {"URY Manager", "System Manager"}
+
+
+def require_branch_staff(branch):
+	"""Enforce that the current user may see dashboard data for `branch`,
+	and return the effective branch to use for the query/cache key.
+
+	Replaces the commented-out `require_manager()` gate in the
+	staff-facing dashboard endpoints (get_active_insights, get_service_line,
+	get_running_low) after upstream PR ury-erp/ury#456 intentionally opened
+	those endpoints to non-manager staff roles so POS dashboard cards render
+	for cashiers/captains, not just managers. Without this, any logged-in
+	user -- including a Website/portal user -- could read any branch's data
+	by passing an arbitrary `branch`, or every branch's data by passing
+	none.
+
+	Rules:
+	  - Administrator / System Manager / URY Manager: allowed for any
+	    branch, including None (meaning "all branches").
+	  - Any other user must hold at least one URY staff role (see
+	    STAFF_ROLES) AND must supply a `branch` that matches their own
+	    branch, as resolved by ury.ury_pos.api.getBranch() (the same
+	    Branch.user-child-table assignment the POS frontend itself relies
+	    on). A staff user passing no branch, another branch, or no branch
+	    assignment at all is rejected -- staff never get the "all branches"
+	    view that managers get.
+	  - Anyone else (no URY role at all, e.g. a Website/portal user) is
+	    rejected outright.
+
+	Raises frappe.PermissionError on any rejection.
+	"""
+	user = frappe.session.user
+	if user == "Administrator":
+		return branch
+
+	user_roles = set(frappe.get_roles(user))
+	if _MANAGER_ROLES & user_roles:
+		return branch
+
+	def _deny():
+		frappe.throw(
+			"You do not have permission to access this report.",
+			frappe.PermissionError,
+		)
+
+	if not STAFF_ROLES & user_roles:
+		_deny()
+
+	if not branch:
+		_deny()
+
+	# Imported inside the function (not at module level) to avoid a
+	# circular import -- ury.ury_pos.api imports from ury.ury.report_api in
+	# other code paths.
+	from ury.ury_pos.api import getBranch
+
+	user_branch = getBranch()
+	if branch != user_branch:
+		_deny()
+
+	return branch
+
+
 def user_has_branch_access(user, branch):
 	"""True if `user` is assigned to `branch` via Branch's `user` child table
 	(rows of URY User, each linking a User in its own `user` field), or if
