@@ -530,8 +530,16 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 	@patch("ury.ury.hooks.ury_bom.frappe.throw")
 	@patch("ury.ury.hooks.ury_bom.frappe.get_cached_value")
 	def test_throws_when_missing_yield_qty(self, mock_get_cached_value, mock_throw):
-		"""A yield-tracked row without custom_yield_qty throws (I6 hardening --
-		this is no longer a silent skip, see the class docstring above)."""
+		"""A yield-tracked row with BOTH custom_yield_qty and qty missing
+		throws (I6 hardening -- this is no longer a silent skip, see the
+		class docstring above).
+
+		ury-erp/ury#464 (commit bdc5d9625e) added a fallback: when
+		custom_yield_qty is missing but qty IS set, custom_yield_qty is now
+		derived as qty * percent/100 instead of throwing. row.qty is set to
+		None here (in addition to custom_yield_qty) so there is nothing to
+		derive from and the throw path is still reached. Behavior change
+		pending owner confirmation."""
 		from ury.ury.hooks.ury_bom import apply_yield_back_calculation
 
 		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
@@ -542,6 +550,7 @@ class TestBOMHookYieldBackCalculation(unittest.TestCase):
 		row.custom_yield_qty = None  # Missing!
 		row.custom_yield_percent = 85.0
 		row.item_code = "TEST-ITEM"
+		row.qty = None  # Also missing -- nothing to derive custom_yield_qty from
 		bom_doc.items = [row]
 
 		with self.assertRaises(frappe.ValidationError):
