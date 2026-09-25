@@ -55,11 +55,11 @@ def _validate_receiving_secondary_measure(doc):
 	for row in items:
 		flags = item_flags.get(row.item_code)
 
-		# Always reset first -- otherwise a row that had tracking toggled
-		# off, or had its secondary qty cleared, keeps showing stale
-		# computed values from a prior save.
+		# Always reset the *derived* fields first -- otherwise a row that had
+		# tracking toggled off, or had its secondary qty cleared, keeps
+		# showing stale computed values from a prior save. custom_rcv_std_
+		# secondary_snapshot is deliberately NOT reset here: see below.
 		row.custom_rcv_item_secondary_measure = ""
-		row.custom_rcv_std_secondary_snapshot = 0
 		row.custom_rcv_expected_secondary_qty = 0
 		row.custom_rcv_actual_secondary_per_stock_unit = 0
 		row.custom_rcv_variance_pct = 0
@@ -69,11 +69,26 @@ def _validate_receiving_secondary_measure(doc):
 			continue
 
 		row.custom_rcv_item_secondary_measure = flags.custom_rcv_secondary_measure
-		std = flt(flags.custom_rcv_std_secondary_per_stock_unit)
-		# Snapshot the standard now; a later revision of
-		# Item.custom_rcv_std_secondary_per_stock_unit must not retroactively
-		# change what an already-submitted/amended receipt reports.
-		row.custom_rcv_std_secondary_snapshot = std
+
+		# Snapshot the standard ONLY the first time this row is ever
+		# validated (i.e. while the field is still unset/0). validate()
+		# re-runs on every later save of an already-submitted document too
+		# (e.g. editing custom_rcv_variance_reason, which allow_on_submit
+		# permits) -- if we recomputed the snapshot from the Item's current
+		# standard on every one of those saves, a later revision of
+		# Item.custom_rcv_std_secondary_per_stock_unit would retroactively
+		# rewrite what this receipt reports, defeating the entire point of
+		# having a snapshot. Once set, it is load-bearing history and must
+		# survive every subsequent save of this same row, not just be
+		# frozen once. amendment/copy_doc carries the field's stored value
+		# forward (it is intentionally NOT no_copy), so an amended document
+		# also preserves the original snapshot rather than picking up
+		# whatever the Item's standard has since become.
+		if not row.get("custom_rcv_std_secondary_snapshot"):
+			row.custom_rcv_std_secondary_snapshot = flt(
+				flags.custom_rcv_std_secondary_per_stock_unit
+			)
+		std = flt(row.custom_rcv_std_secondary_snapshot)
 
 		# stock_qty, not qty: qty is in the purchase UOM (e.g. Box); stock_qty
 		# is already converted to the Item's actual Stock UOM (Nos for
