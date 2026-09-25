@@ -96,7 +96,14 @@ def _mock_kot_doc(name="KOT-1", branch="Branch A", production_unit="UNIT-1", ite
 
 
 def _new_wastage_doc_recorder():
-	"""Return a frappe.get_doc side_effect that records URY Issue Wastage creation."""
+	"""Return a frappe.get_doc side_effect that records URY Issue Wastage creation.
+
+	The returned callable must be wired up as (or delegated to from) the actual
+	`frappe.get_doc` side_effect used during the call under test, so it observes
+	the real dict that production code builds -- not a value fabricated ahead of
+	time by the test. See `_kot_then_recorder_side_effect` below for the usual
+	way to combine this with a fixed first-call return (the KOT doc fetch).
+	"""
 	created_wastage = []
 
 	def _get_doc(*args, **kwargs):
@@ -105,6 +112,7 @@ def _new_wastage_doc_recorder():
 			import frappe
 
 			doc = frappe._dict(dict(arg))
+			doc.setdefault("name", "WASTAGE-1")
 			doc.insert = MagicMock()
 			doc.save = MagicMock()
 			if doc.get("doctype") == "URY Issue Wastage":
@@ -113,6 +121,27 @@ def _new_wastage_doc_recorder():
 		raise AssertionError("doc lookups should be by dict in these tests")
 
 	return _get_doc, created_wastage
+
+
+def _kot_then_recorder_side_effect(kot_doc, recorder):
+	"""Build a frappe.get_doc side_effect that returns `kot_doc` on the first
+	call (the KOT fetch) and delegates every subsequent call to `recorder`,
+	mirroring resolve_cancellation_disposition's real call order: fetch the
+	KOT doc, then frappe.get_doc(dict) to construct the wastage record.
+
+	Passing `recorder` through as a live callable side_effect (rather than
+	invoking it eagerly with a hand-written dict) is what lets the recorder
+	capture the dict production code actually builds.
+	"""
+	state = {"calls": 0}
+
+	def _dispatch(*args, **kwargs):
+		state["calls"] += 1
+		if state["calls"] == 1:
+			return kot_doc
+		return recorder(*args, **kwargs)
+
+	return _dispatch
 
 
 class TestReturnToStockDisposition(FrappeTestCase):
@@ -182,26 +211,11 @@ class TestWasteDisposition(FrappeTestCase):
 		get_doc_side_effect, created_wastage = _new_wastage_doc_recorder()
 
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
-			f"{MODULE}.frappe.get_doc", side_effect=[
-				# First call: get the KOT doc
-				kot_doc,
-				# Second call: get_doc for wastage creation
-				get_doc_side_effect({
-					"doctype": "URY Issue Wastage",
-					"branch": "Branch A",
-					"company": "Company A",
-					"department": "Dept-1",
-					"production_unit": "UNIT-1",
-					"component_item": "Item-A",
-					"status": "Draft",
-					"wasted_qty": 5,
-					"reason_category": "Spoilage",
-					"reason_notes": "Spoilage",
-					"captured_by": "chef1@example.com",
-					"captured_on": "2024-01-01 00:00:00",
-					"name": "WASTAGE-1",
-				}),
-			]
+			f"{MODULE}.frappe.get_doc",
+			# First call: get the KOT doc. Second call: get_doc for wastage
+			# creation -- delegates to the recorder so it captures the real
+			# dict resolve_cancellation_disposition builds.
+			side_effect=_kot_then_recorder_side_effect(kot_doc, get_doc_side_effect),
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 		), patch(
@@ -226,19 +240,19 @@ class TestWasteDisposition(FrappeTestCase):
 
 	def test_waste_uses_reason_category_when_valid(self):
 		"""Reason category is used when it matches a valid Select option."""
-		kot_item_row = _mock_kot_item_row(name="ROW-1", item="Item-A")
-		kot_doc = _mock_kot_doc(items=[kot_item_row])
 		get_doc_side_effect, created_wastage = _new_wastage_doc_recorder()
 
 		# Try each valid reason category
 		for reason in ["Spoilage", "Preparation Error", "Dropped/Damaged", "Expired"]:
 			created_wastage.clear()
+			# Fresh, unresolved row/KOT per iteration: a successful waste call
+			# marks the row Wasted, so reusing it would hit ALREADY_RESOLVED.
+			kot_item_row = _mock_kot_item_row(name="ROW-1", item="Item-A")
+			kot_doc = _mock_kot_doc(items=[kot_item_row])
 
 			with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
-				f"{MODULE}.frappe.get_doc", side_effect=[
-					kot_doc,
-					get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
-				]
+				f"{MODULE}.frappe.get_doc",
+				side_effect=_kot_then_recorder_side_effect(kot_doc, get_doc_side_effect),
 			), patch(
 				f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 			), patch(
@@ -259,10 +273,8 @@ class TestWasteDisposition(FrappeTestCase):
 		get_doc_side_effect, created_wastage = _new_wastage_doc_recorder()
 
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
-			f"{MODULE}.frappe.get_doc", side_effect=[
-				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
-			]
+			f"{MODULE}.frappe.get_doc",
+			side_effect=_kot_then_recorder_side_effect(kot_doc, get_doc_side_effect),
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 		), patch(
@@ -285,10 +297,8 @@ class TestWasteDisposition(FrappeTestCase):
 		get_doc_side_effect, created_wastage = _new_wastage_doc_recorder()
 
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
-			f"{MODULE}.frappe.get_doc", side_effect=[
-				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
-			]
+			f"{MODULE}.frappe.get_doc",
+			side_effect=_kot_then_recorder_side_effect(kot_doc, get_doc_side_effect),
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 		), patch(
@@ -549,10 +559,8 @@ class TestInvalidQtyError(FrappeTestCase):
 		get_doc_side_effect, created_wastage = _new_wastage_doc_recorder()
 
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
-			f"{MODULE}.frappe.get_doc", side_effect=[
-				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
-			]
+			f"{MODULE}.frappe.get_doc",
+			side_effect=_kot_then_recorder_side_effect(kot_doc, get_doc_side_effect),
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
 		), patch(
