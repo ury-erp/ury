@@ -116,6 +116,14 @@ def capture_wastage(
             "captured_on": frappe.utils.now(),
         }
     )
+    # Valued at capture too so a Draft row displays its estimated BOM-based
+    # rate instead of 0. Approval re-resolves the rate anyway (see
+    # _resolve_wastage), so the Authorized record is always valued as of the
+    # approval moment, not the capture moment.
+    compute_wastage_valuation(
+        doc,
+        valuation_rate=_resolve_bom_valuation_rate(auth_doc.get("component_item"), auth_doc.get("company")),
+    )
     append_audit(doc, "captured", actor, {"held_qty_before": held_qty, "wasted_qty": wasted_qty})
     doc.insert(ignore_permissions=False)
     return doc
