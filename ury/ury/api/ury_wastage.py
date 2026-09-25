@@ -1,9 +1,11 @@
 """Wastage capture, approval, and valuation-hook module for one Issue Authorization.
 
 Depends only on V3-31 (`ury.ury.api.ury_issue_authorization`). This module
-never creates a Stock Entry, mutates a warehouse quantity, or touches
-ERPNext ledger/stock/costing APIs — it only records an audited, explicitly
+never creates a Stock Entry, mutates a warehouse quantity, or writes to any
+ERPNext ledger/stock/costing API — it only records an audited, explicitly
 approved wastage amount that V3-31's `prior_quantities()` can later read.
+Valuation is a read-only lookup of ERPNext's own maintained ``BOM.total_cost``
+(see `_resolve_bom_valuation_rate`); it posts nothing.
 
 Doctype/field contract this module MUST honor (do not change without also
 changing V3-31, which is out of scope for this task):
@@ -32,6 +34,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 from ury.ury.api.ury_issue_authorization import ISSUE_AUTH_DOCTYPE
 
@@ -156,7 +159,13 @@ def _resolve_wastage(wastage, actor, approve):
                 ),
                 frappe.ValidationError,
             )
-        compute_wastage_valuation(doc)
+        # Frozen at approval: the BOM-based rate is re-resolved here (not
+        # reused from capture time) so an approved record carries the cost
+        # as of the approval moment, matching this doctype's audit philosophy.
+        compute_wastage_valuation(
+            doc,
+            valuation_rate=_resolve_bom_valuation_rate(doc.get("component_item"), doc.get("company")),
+        )
         doc.status = "Authorized"
     else:
         doc.status = "Rejected"
@@ -176,17 +185,14 @@ def _resolve_wastage(wastage, actor, approve):
 
 
 def compute_wastage_valuation(wastage_doc, valuation_rate=None):
-    """Valuation hook (stub): attribute a cost to approved wastage.
+    """Valuation hook: attribute a cost to approved wastage.
 
-    FUTURE WORK: real ERPNext valuation-rate sourcing (item bin valuation
-    rate, moving-average/FIFO layers, warehouse-specific rate, etc.) is NOT
-    implemented here — this module never calls any ERPNext costing/ledger
-    API. For now this simply computes `qty * valuation_rate`, where
-    `valuation_rate` is either the argument passed in, or a
-    `valuation_rate` value already present on the doc (e.g. set by a
-    caller who already looked it up), defaulting to 0 if neither is
-    available. `valuation_is_estimated` stays 1 to flag that this number is
-    not sourced from a real valuation ledger yet.
+    ``valuation_rate`` is either the argument passed in — approval passes
+    the BOM-based rate from :func:`_resolve_bom_valuation_rate` — or a
+    ``valuation_rate`` value already present on the doc, defaulting to 0 if
+    neither is available. Simply computes ``qty * valuation_rate``.
+    ``valuation_is_estimated`` stays 1 to flag that this number is BOM
+    standard cost, not a rate sourced from live stock valuation layers.
     """
     rate = valuation_rate if valuation_rate is not None else (wastage_doc.get("valuation_rate") or 0)
     qty = wastage_doc.get("wasted_qty") or 0
@@ -194,6 +200,46 @@ def compute_wastage_valuation(wastage_doc, valuation_rate=None):
     wastage_doc.valuation_amount = qty * rate
     wastage_doc.valuation_is_estimated = 1
     return wastage_doc.valuation_amount
+
+
+def _resolve_bom_valuation_rate(component_item, company):
+    """Per-unit BOM total cost for ``component_item``, or ``None``.
+
+    Business rule: an item's wastage is valued at its BOM total cost. The
+    source is ERPNext's own ``BOM.total_cost`` — the stored field ERPNext
+    maintains via ``BOM.calculate_cost()`` — NOT a hand-rolled costing
+    algorithm. Selection precedence mirrors ``ury.services.bom_cost_resolver``:
+    the submitted, active, company-matching BOM marked ``is_default`` first,
+    falling back to any other submitted active BOM for the item. ``None``
+    (not 0) is returned when no such BOM exists, so "no BOM" stays
+    distinguishable from a genuinely zero-cost BOM.
+    """
+    if not component_item:
+        return None
+    base_filters = {"item": component_item, "docstatus": 1, "is_active": 1}
+    if company:
+        base_filters["company"] = company
+
+    bom = frappe.db.get_value(
+        "BOM",
+        dict(base_filters, is_default=1),
+        ["total_cost", "quantity"],
+        as_dict=True,
+    )
+    if not bom:
+        bom = frappe.db.get_value(
+            "BOM",
+            base_filters,
+            ["total_cost", "quantity"],
+            as_dict=True,
+        )
+    if not bom:
+        return None
+
+    # total_cost covers the whole BOM batch; the valuation rate is per unit
+    # of the item, so normalize by the BOM quantity.
+    quantity = flt(bom.get("quantity")) or 1
+    return flt(bom.get("total_cost")) / quantity
 
 
 def held_quantity(auth_doc, exclude_wastage=None):
