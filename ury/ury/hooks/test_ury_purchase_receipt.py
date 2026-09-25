@@ -60,6 +60,29 @@ def _get_supplier():
 	return name
 
 
+def _get_buying_price_list():
+	# A site's global default Price List can be a selling-only list (seen on
+	# a reference/demo dataset restore, e.g. "Default Menu"), which ERPNext's
+	# accounts_controller.validate_price_list() rejects on a buying
+	# transaction. Purchase Receipt in these tests is otherwise unrelated to
+	# price lists -- pin an explicit buying-enabled one so that unrelated
+	# site data doesn't fail these tests.
+	name = "Standard Buying"
+	if not frappe.db.exists("Price List", name):
+		frappe.get_doc(
+			{
+				"doctype": "Price List",
+				"price_list_name": name,
+				"buying": 1,
+				"selling": 0,
+				"currency": frappe.db.get_default("currency") or "INR",
+			}
+		).insert(ignore_permissions=True, ignore_mandatory=True)
+	else:
+		frappe.db.set_value("Price List", name, "buying", 1)
+	return name
+
+
 _counter = {"n": 0}
 
 
@@ -139,6 +162,7 @@ def make_purchase_receipt(
 			"company": company,
 			"supplier": supplier,
 			"set_warehouse": warehouse,
+			"buying_price_list": _get_buying_price_list(),
 			"items": [row],
 		}
 	)
@@ -239,6 +263,7 @@ class TestURYPurchaseReceiptSecondaryMeasureVariance(FrappeTestCase):
 				"is_return": 1,
 				"return_against": original.name,
 				"set_warehouse": warehouse,
+				"buying_price_list": _get_buying_price_list(),
 				"items": [
 					{
 						"item_code": item.item_code,
@@ -361,6 +386,7 @@ class TestURYPurchaseReceiptSecondaryMeasureVariance(FrappeTestCase):
 				"company": company,
 				"supplier": supplier,
 				"set_warehouse": warehouse,
+				"buying_price_list": _get_buying_price_list(),
 				"items": [
 					{
 						"item_code": item.item_code,
@@ -394,20 +420,30 @@ class TestURYPurchaseReceiptSecondaryMeasureVariance(FrappeTestCase):
 		self.assertEqual(pr.items[0].custom_rcv_variance_reason, "Supplier Note")
 
 	# 12. qty = 0 row (fully rejected line) with secondary_qty entered -> no ZeroDivisionError.
+	#
+	# ERPNext's own core validation (accounts_controller.validate_qty_is_not_zero)
+	# refuses to insert/submit a Purchase Receipt Item row with qty=0 at all, so
+	# this scenario can never reach our hook through a real submitted document --
+	# it can only occur if stock_qty ends up 0 for some other reason (e.g. a
+	# pathological conversion_factor) while qty itself is nonzero. Unit-test the
+	# hook's own zero-guard directly instead of trying to force an unreachable
+	# document state through the full ERPNext validation stack.
 	def test_zero_qty_row_no_zero_division(self):
+		from ury.ury.hooks.ury_purchase_receipt import _validate_receiving_secondary_measure
+
 		item = make_item(
 			stock_uom="Nos",
 			secondary_measure="Weight",
 			std_secondary_per_stock_unit=1.5,
 		)
-		pr = make_purchase_receipt(
-			item.item_code,
-			qty=0,
-			secondary_qty=5,
-			do_submit=False,
-			extra_row_fields={"rejected_qty": 0},
+		row = frappe._dict(
+			item_code=item.item_code,
+			stock_qty=0,
+			custom_rcv_secondary_qty=5,
 		)
-		row = pr.items[0]
+		doc = frappe._dict(is_return=0, items=[row])
+		# Must not raise ZeroDivisionError.
+		_validate_receiving_secondary_measure(doc)
 		self.assertEqual(flt(row.custom_rcv_expected_secondary_qty), 0)
 		self.assertEqual(flt(row.custom_rcv_actual_secondary_per_stock_unit), 0)
 
@@ -427,6 +463,7 @@ class TestURYPurchaseReceiptSecondaryMeasureVariance(FrappeTestCase):
 				"company": company,
 				"supplier": supplier,
 				"set_warehouse": warehouse,
+				"buying_price_list": _get_buying_price_list(),
 				"items": [
 					{
 						"item_code": item.item_code,
@@ -441,8 +478,13 @@ class TestURYPurchaseReceiptSecondaryMeasureVariance(FrappeTestCase):
 			}
 		)
 
+		# Patch the module-local helper precisely, not frappe.db.get_all
+		# globally -- ERPNext's own controller stack (e.g. get_item_details /
+		# get_barcode_data) also calls frappe.db.get_all during Purchase
+		# Receipt validate, so a blanket patch of that global breaks
+		# unrelated core logic instead of isolating our own hook's failure.
 		with patch(
-			"ury.ury.hooks.ury_purchase_receipt.frappe.db.get_all",
+			"ury.ury.hooks.ury_purchase_receipt._validate_receiving_secondary_measure",
 			side_effect=RuntimeError("forced failure"),
 		), patch(
 			"ury.ury.hooks.ury_purchase_receipt.frappe.log_error"
