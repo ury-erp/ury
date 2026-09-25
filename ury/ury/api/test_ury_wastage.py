@@ -80,6 +80,8 @@ class TestCaptureWastage(FrappeTestCase):
             f"{MODULE}.frappe.get_all", return_value=[]
         ), patch(
             f"{MODULE}.frappe.db.exists", return_value=False
+        ), patch(
+            f"{MODULE}._resolve_bom_valuation_rate", return_value=2.5
         ):
             result = capture_wastage(
                 issue_authorization="AUTH-1",
@@ -92,6 +94,10 @@ class TestCaptureWastage(FrappeTestCase):
         self.assertEqual(result.status, "Draft")
         self.assertEqual(result.wasted_qty, 3)
         self.assertEqual(result.held_qty_before, 10)
+        # Valued at capture from the BOM-based rate so Draft rows display it.
+        self.assertEqual(result.valuation_rate, 2.5)
+        self.assertEqual(result.valuation_amount, 7.5)
+        self.assertEqual(result.valuation_is_estimated, 1)
         audit = json.loads(result.audit_log)
         self.assertEqual(audit[0]["event"], "captured")
         result.insert.assert_called_once()
@@ -282,11 +288,43 @@ class TestApproveWastage(FrappeTestCase):
             f"{MODULE}.frappe.get_all", return_value=[]
         ), patch(
             f"{MODULE}.frappe.db.exists", return_value=False
+        ), patch(
+            f"{MODULE}._resolve_bom_valuation_rate", return_value=None
         ):
             result = approve_wastage("W-1", actor="stock-mgr@example.com")
 
         self.assertEqual(result.status, "Authorized")
+        # No BOM for the item -> resolver returns None -> valuation stays 0
+        # rather than failing the approval.
         self.assertEqual(result.valuation_amount, 0)
+        result.save.assert_called_once()
+
+    def test_approval_freezes_bom_valuation_rate(self):
+        draft = self._draft_doc(wasted_qty=2)
+        auth_doc = _auth_doc()
+
+        def get_doc_dispatch(*args, **kwargs):
+            if args and args[0] == "URY Issue Wastage":
+                return draft
+            if args and args[0] == "URY Issue Authorization":
+                return auth_doc
+            raise AssertionError("unexpected get_doc call")
+
+        with patch(f"{MODULE}.frappe.get_roles", return_value=["Stock Manager"]), patch(
+            f"{MODULE}.frappe.has_permission", return_value=True
+        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.db.exists", return_value=False
+        ), patch(
+            f"{MODULE}._resolve_bom_valuation_rate", return_value=6.8
+        ):
+            result = approve_wastage("W-1", actor="stock-mgr@example.com")
+
+        self.assertEqual(result.status, "Authorized")
+        self.assertEqual(result.valuation_rate, 6.8)
+        self.assertEqual(result.valuation_amount, 13.6)
+        self.assertEqual(result.valuation_is_estimated, 1)
         result.save.assert_called_once()
 
     def test_reject_wastage_leaves_status_rejected(self):
@@ -322,6 +360,46 @@ class TestValuationHook(FrappeTestCase):
         doc = frappe._dict({"wasted_qty": 2, "valuation_rate": 5})
         amount = compute_wastage_valuation(doc)
         self.assertEqual(amount, 10)
+
+
+class TestResolveBomValuationRate(FrappeTestCase):
+    """_resolve_bom_valuation_rate: per-unit rate from ERPNext's maintained
+    BOM.total_cost, preferring the submitted active default BOM of the same
+    company, falling back to any other submitted active BOM, and returning
+    None (not 0) when no BOM exists."""
+
+    def _resolve(self, default_bom, fallback_bom):
+        from ury.ury.api.ury_wastage import _resolve_bom_valuation_rate
+
+        def _get_value(doctype, filters=None, fieldname=None, as_dict=False):
+            self.assertEqual(doctype, "BOM")
+            self.assertTrue(as_dict)
+            if filters.get("is_default"):
+                return default_bom
+            return fallback_bom
+
+        with patch(f"{MODULE}.frappe.db.get_value", side_effect=_get_value):
+            return _resolve_bom_valuation_rate("COMP-1", "Company A")
+
+    def test_rate_is_total_cost_divided_by_bom_quantity(self):
+        bom = frappe._dict({"total_cost": 13.6, "quantity": 2})
+        self.assertEqual(self._resolve(bom, None), 6.8)
+
+    def test_fallback_to_non_default_active_bom(self):
+        fallback = frappe._dict({"total_cost": 6.8, "quantity": 1})
+        self.assertEqual(self._resolve(None, fallback), 6.8)
+
+    def test_no_bom_returns_none_not_zero(self):
+        self.assertIsNone(self._resolve(None, None))
+
+    def test_missing_item_returns_none(self):
+        from ury.ury.api.ury_wastage import _resolve_bom_valuation_rate
+
+        self.assertIsNone(_resolve_bom_valuation_rate(None, "Company A"))
+
+    def test_zero_bom_quantity_guards_division(self):
+        bom = frappe._dict({"total_cost": 6.8, "quantity": 0})
+        self.assertEqual(self._resolve(bom, None), 6.8)
 
 
 class TestListWastage(FrappeTestCase):
