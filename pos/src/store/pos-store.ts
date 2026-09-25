@@ -220,6 +220,16 @@ const calculateItemPrice = (item: OrderItem): number => {
   return basePrice + addonsTotal;
 };
 
+// Default currency precision in decimal places. No shared precision/rounding
+// helper exists in pos/src or packages/core/src, and no POS profile/currency
+// precision is available on the store, so default to 2 (standard cents).
+const DEFAULT_CURRENCY_PRECISION = 2;
+
+const roundToCurrencyPrecision = (value: number, precision: number = DEFAULT_CURRENCY_PRECISION): number => {
+  const factor = Math.pow(10, precision);
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
 export const usePOSStore = create<POSStore>((set, get) => ({
   menuItems: [],
   categories: [],
@@ -614,7 +624,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   getCartTotals: (): CartTotals => {
     const items = get().activeOrders;
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    
+
     const subtotal = items.reduce((sum, item) => {
       const itemPrice = calculateItemPrice(item);
       return sum + (itemPrice * item.quantity);
@@ -626,10 +636,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return sum + (itemPrice * item.quantity * (taxRate / 100));
     }, 0);
 
+    // Round the final returned money values to currency precision to avoid
+    // binary floating point drift (e.g. 0.1 + 0.2 -> 0.30000000000000004)
+    // leaking into the UI/receipt. No shared precision helper exists in
+    // pos/src or packages/core/src, so default to 2 decimal places.
+    const roundedSubtotal = roundToCurrencyPrecision(subtotal);
+    const roundedTax = roundToCurrencyPrecision(tax);
+
     return {
-      subtotal,
-      tax,
-      total: subtotal + tax,
+      subtotal: roundedSubtotal,
+      tax: roundedTax,
+      total: roundToCurrencyPrecision(roundedSubtotal + roundedTax),
       itemCount
     };
   },
