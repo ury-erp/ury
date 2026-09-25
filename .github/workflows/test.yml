@@ -11,7 +11,24 @@ on:
 permissions: {}
 
 jobs:
+  module-registry-check:
+    # Fast, dependency-free gate that runs before "Setup Frappe" even
+    # starts: scripts/backend-test-modules.txt (read by the backend job's
+    # sharding step below, and by test-v16-nightly.yml) must list every
+    # test_*.py file under ury/, or explicitly exclude it with a reason.
+    # Without this, a new test file can silently never run in CI --
+    # which is exactly how test.yml and test-v16-nightly.yml drifted
+    # ~20 modules apart from each other before this check existed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check backend test module registry
+        run: python3 scripts/check-backend-test-modules.py
+
   backend:
+    needs: module-registry-check
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -111,134 +128,18 @@ jobs:
       # no longer exists: the v3-stg merge in Session 5 deleted the file
       # upstream, resolving that ModuleNotFoundError mystery by removing its
       # cause entirely.
+      # Module lists are no longer hardcoded here -- they are computed at
+      # run time from scripts/backend-test-modules.txt (see the "Select
+      # test modules for this shard" step below), split into 4 shards by
+      # index modulo 4. This is what keeps this file and
+      # test-v16-nightly.yml from drifting apart again: both read the
+      # same file. scripts/check-backend-test-modules.py (run as the
+      # module-registry-check job, a dependency of this job) guarantees
+      # every test_*.py file under ury/ is accounted for in that file.
       matrix:
-        include:
-          - shard: 0
-            modules: |
-              ury.setup.test_setup_wizard
-              ury.ury.ai_tools.test_agent_seeding
-              ury.ury.ai_tools.test_ury_tools
-              ury.ury.api.minimal.test_business_setup
-              ury.ury.api.minimal.test_setup_organization
-              ury.ury.api.test_button_permission
-              ury.ury.api.test_dashboard
-              ury.ury.api.test_payment_terminal
-              ury.ury.api.test_pos_extend
-              ury.ury.api.test_seed_v3_demo
-              ury.ury.api.test_self_ordering
-              ury.ury.api.test_service_requests
-              ury.ury.api.test_ury_ai_settings
-              ury.ury.api.test_ury_availability
-              ury.ury.api.test_ury_batch_manufacture_service
-              ury.ury.api.test_ury_batch_work_order_adapter
-              ury.ury.api.test_ury_bom_compiler
-              ury.ury.api.test_ury_bom_staleness
-              ury.ury.api.test_ury_branch_operational_state
-              ury.ury.api.test_ury_chat
-              ury.ury.api.test_ury_comparable_weekday_history
-              ury.ury.api.test_ury_cost_variance_attribution
-              ury.ury.api.test_ury_dashboard
-          - shard: 1
-            modules: |
-              ury.ury.api.test_ury_department_profitability
-              ury.ury.api.test_ury_desk_link
-              ury.ury.api.test_ury_fast_moving
-              ury.ury.api.test_ury_feature_flags
-              ury.ury.api.test_ury_fulfilment_posting_service
-              ury.ury.api.test_ury_insight
-              ury.ury.api.test_ury_insight_rules
-              ury.ury.api.test_ury_inventory_projection
-              ury.ury.api.test_ury_issue_authorization
-              ury.ury.api.test_ury_job_card_controls
-              ury.ury.api.test_ury_kot_cancellation_service
-              ury.ury.api.test_ury_kot_chef_filter
-              ury.ury.api.test_ury_kot_display
-              ury.ury.api.test_ury_kot_display_serve_and_list
-              ury.ury.api.test_ury_kot_execution_service
-              ury.ury.api.test_ury_kot_generate
-              ury.ury.api.test_ury_kot_item_execution_service
-              ury.ury.api.test_ury_kot_notification
-              ury.ury.api.test_ury_kot_order_number
-              ury.ury.api.test_ury_kot_reprint
-              ury.ury.api.test_ury_kot_routing
-              ury.ury.api.test_ury_kot_validation
-              ury.ury.api.test_ury_menu_course_validation
-              ury.ury.api.test_ury_mto_fulfilment_service
-          - shard: 2
-            modules: |
-              ury.ury.api.test_ury_order_reservation_service
-              ury.ury.api.test_ury_reservation_service
-              ury.ury.api.test_ury_reservation_service_expiry
-              ury.ury.api.test_ury_preproduced_fulfilment_service
-              ury.ury.api.test_ury_print
-              ury.ury.api.test_ury_production_context
-              ury.ury.api.test_ury_production_plan_adapter
-              ury.ury.api.test_ury_production_validation
-              ury.ury.api.test_ury_requirements_stock
-              ury.ury.api.test_ury_sales_plan
-              ury.ury.api.test_ury_sales_plan_commit
-              ury.ury.api.test_ury_service_line
-              ury.ury.api.test_ury_stock_service
-              ury.ury.api.test_ury_waiter_print
-              ury.ury.api.test_ury_wastage
-              ury.ury.api.test_ury_yield_variance
-              ury.ury.api.test_ury_workstation_mapping
-              ury.ury.controllers.test_setup_redirect
-              ury.ury.dev_seed.test_demo_runner
-              ury.ury.doctype.alert_settings.test_alert_settings
-              ury.ury.doctype.staff_discount_policy.test_staff_discount_policy
-              ury.ury.doctype.stock_correction.test_stock_correction
-              ury.ury.doctype.bulk_production.test_bulk_production
-              ury.ury.doctype.menu_for_room.test_menu_for_room
-              ury.ury.doctype.sub_pos_closing.test_sub_pos_closing
-              ury.ury.doctype.sub_pos_closing.test_sub_pos_closing_lookups
-              ury.ury.doctype.ury_commission_settings.test_ury_commission_settings
-              ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l
-              ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l_get_profit_loss_details
-              ury.ury.doctype.ury_insight.test_ury_insight
-              ury.ury.doctype.ury_item_production_configuration.test_ury_item_production_configuration
-              ury.ury.doctype.ury_kot.test_ury_kot
-              ury.ury.doctype.ury_kot_error_log.test_ury_kot_error_log
-              ury.ury.doctype.ury_kot_execution.test_ury_kot_execution
-              ury.ury.doctype.ury_kot_item_execution.test_ury_kot_item_execution
-              ury.ury.doctype.ury_menu.test_ury_menu
-          - shard: 3
-            modules: |
-              ury.ury.doctype.ury_menu_course.test_ury_menu_course
-              ury.ury.doctype.ury_notification_recipient.test_ury_notification_recipient
-              ury.ury.doctype.ury_order.test_ury_order
-              ury.ury.doctype.ury_order_item.test_ury_order_item
-              ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
-              ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
-              ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
-              ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
-              ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
-              ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
-              ury.ury.doctype.ury_production_department.test_ury_production_department
-              ury.ury.doctype.ury_production_unit.test_ury_production_unit
-              ury.ury.doctype.ury_report_settings.test_ury_report_settings
-              ury.ury.doctype.ury_restaurant.test_ury_restaurant
-              ury.ury.doctype.ury_room.test_ury_room
-              ury.ury.doctype.ury_self_ordering_profile.test_ury_self_ordering_profile
-              ury.ury.doctype.ury_service_request.test_ury_service_request
-              ury.ury.doctype.ury_table.test_ury_table
-              ury.ury.doctype.ury_yield_check.test_ury_yield_check
-              ury.ury.hooks.test_ury_bom
-              ury.ury.hooks.test_ury_item
-              ury.ury.report_api.test_commission
-              ury.ury.report_api.test_customers
-              ury.ury.report_api.test_day_close
-              ury.ury.report_api.test_employees
-              ury.ury.report_api.test_financial
-              ury.ury.report_api.test_items
-              ury.ury.report_api.test_operations
-              ury.ury.report_api.test_sales
-              ury.ury.report_api.test_sales_data_logic
-              ury.ury.services.test_bom_cost_resolver
-              ury.ury.services.test_production_unit_department_migration
-              ury.ury.services.test_yield_check_reminders
-              ury.ury_pos.test_api
-              ury.ury_pos.test_e2e_p0_p1_flow
+        shard: [0, 1, 2, 3]
+    env:
+      SHARD_COUNT: 4
 
     steps:
       - name: Checkout code
@@ -402,6 +303,34 @@ jobs:
           y
           PYEOF
 
+      - name: Select test modules for this shard
+        id: modules
+        run: |
+          python3 - "$SHARD_COUNT" "${{ matrix.shard }}" <<'PYEOF'
+          import sys
+          from pathlib import Path
+
+          shard_count = int(sys.argv[1])
+          shard_index = int(sys.argv[2])
+
+          lines = Path("scripts/backend-test-modules.txt").read_text().splitlines()
+          modules = [
+              line.strip()
+              for line in lines
+              if line.strip() and not line.strip().startswith("#")
+          ]
+
+          shard_modules = [
+              m for i, m in enumerate(modules) if i % shard_count == shard_index
+          ]
+
+          out_path = Path("/tmp/shard_modules.txt")
+          out_path.write_text("\n".join(shard_modules) + "\n" if shard_modules else "")
+          print(f"Shard {shard_index}/{shard_count}: {len(shard_modules)} module(s)")
+          for m in shard_modules:
+              print(f"  {m}")
+          PYEOF
+
       - name: Run backend tests
         env:
           PYTHONUNBUFFERED: "1"
@@ -410,9 +339,7 @@ jobs:
           while IFS= read -r module; do
             [ -z "$module" ] && continue
             bench --site test_site run-tests --app ury --module "$module"
-          done <<'MODULES'
-          ${{ matrix.modules }}
-          MODULES
+          done < /tmp/shard_modules.txt
 
   frontend-lint-test:
     runs-on: ubuntu-latest
