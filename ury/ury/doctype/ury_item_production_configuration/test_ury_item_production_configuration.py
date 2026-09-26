@@ -442,13 +442,17 @@ class TestURYItemProductionConfiguration(FrappeTestCase):
                     doc.insert(ignore_permissions=True)
 
     def test_mto_with_cross_department_bom_accepts(self):
-        """ury-erp/ury#466 (commit 466c10676b): the cross-department BOM
-        component check (validate_no_cross_department_bom_components) is
-        disabled in ury_item_production_configuration.py (see the commented-out
-        call in validate() and the commented-out method body). A component
-        item configured for a different department than the top-level item's
-        IPC no longer raises -- the insert now succeeds. Behavior change
-        pending owner confirmation."""
+        """This pins a currently-DISABLED validation, not confirmed intended
+        product behavior -- see ury-erp/ury#466 (commit 466c10676b): the
+        cross-department BOM component check
+        (validate_no_cross_department_bom_components) is disabled in
+        ury_item_production_configuration.py (see the commented-out call in
+        validate() and the commented-out method body). A component item
+        configured for a different department than the top-level item's IPC
+        no longer raises -- the insert now succeeds only because the check is
+        off. This test should be revisited (and likely inverted) once the
+        owner confirms whether the check should be re-enabled; do not read it
+        as a permanent behavior guarantee."""
         values = {
             "Branch": "Branch Co",
             ("BOM", "BOM-MTO-002"): ("MTO Item Cross", "Branch Co"),

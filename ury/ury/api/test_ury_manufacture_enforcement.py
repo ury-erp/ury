@@ -23,7 +23,7 @@ def _stock_entry(*, purpose="Manufacture", work_order=None, items=None, flags=No
 
 
 class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
-	def test_blocks_pre_produced_in_house_finished_item_without_work_order(self):
+	def test_pre_produced_in_house_finished_item_not_blocked_while_enforcement_disabled(self):
 		# NOTE: as of ury commit 92a06535a1 ("...bypass manufacture
 		# enforcement"), the enforcement body in
 		# validate_manufacture_requires_work_order() unconditionally
@@ -60,7 +60,7 @@ class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
 	def test_never_blocks_made_to_order_finished_item_regardless_of_work_order(self):
 		# NOTE: as of ury commit 92a06535a1, the enforcement body always
 		# returns before reaching the config lookup at all (see comment in
-		# test_blocks_pre_produced_in_house_finished_item_without_work_order
+		# test_pre_produced_in_house_finished_item_not_blocked_while_enforcement_disabled
 		# above), so db.exists is never called and nothing is ever blocked --
 		# for MADE_TO_ORDER items and PRE_PRODUCED/IN_HOUSE items alike.
 		doc = _stock_entry(
