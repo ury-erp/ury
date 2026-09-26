@@ -562,7 +562,7 @@ class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
 				],
 			}
 		)
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaisesRegex(frappe.ValidationError, "custom_yield_qty"):
 			bom.insert(ignore_permissions=True)
 
 
