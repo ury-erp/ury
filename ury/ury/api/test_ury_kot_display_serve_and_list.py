@@ -76,10 +76,12 @@ class TestServeKot(FrappeTestCase):
 
 		mock_kot_doc = MagicMock()
 		mock_kot_doc.creation = creation_time
+		mock_kot_doc.branch = "Branch A"
 
 		with patch(f"{MODULE}.frappe.request", None), \
 			patch(f"{MODULE}.frappe.get_doc", return_value=mock_kot_doc) as mock_get_doc, \
 			patch(f"{MODULE}.frappe.has_permission", return_value=True), \
+			patch(f"{MODULE}.getBranch", return_value="Branch A"), \
 			patch(f"{MODULE}.get_datetime", return_value=current_time), \
 			patch(f"{MODULE}.frappe.db.set_value") as mock_set_value:
 			serve_kot("KOT-0001")
