@@ -1,9 +1,40 @@
 import { storage } from './storage';
 
+type FrappeBoot = {
+  sysdefaults?: { currency?: string; number_format?: string };
+  docs?: Array<{ doctype?: string; name?: string; symbol?: string }>;
+};
+
+// The Frappe page boot (window.frappe.boot) is injected by every URY entry page,
+// including the guest self-order page, which never loads the POS profile.
+function frappeBoot(): FrappeBoot | undefined {
+  return typeof window !== 'undefined' ? (window as any).frappe?.boot : undefined;
+}
+
+// Symbol: the one the POS stored, else the site currency resolved the way Frappe
+// Desk does (boot ':Currency' doc symbol, else the currency code), else ₹.
+function currencySymbol(): string {
+  const stored = storage.getItem('currencySymbol');
+  if (stored) return stored;
+  const boot = frappeBoot();
+  const currency = boot?.sysdefaults?.currency;
+  if (!currency) return '₹';
+  const doc = boot?.docs?.find((d) => d?.doctype === ':Currency' && d?.name === currency);
+  return doc?.symbol || currency;
+}
+
+// Digit grouping: Indian (lakh) grouping only for the '#,##,###' number format or
+// when no site format is known (historical behaviour); thousands grouping otherwise.
+function groupingLocale(): string {
+  const fmt = frappeBoot()?.sysdefaults?.number_format;
+  if (!fmt || fmt.startsWith('#,##,###')) return 'en-IN';
+  return 'en-US';
+}
+
 export function formatCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
+  const symbol = currencySymbol();
   const roundedAmount = flt(amount, 2);
-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString('en-IN') : roundedAmount;
+  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString(groupingLocale()) : roundedAmount;
   return `${symbol} ${formattedVal}`;
 }
 
@@ -27,7 +58,7 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
  * e.g. 600000 -> "₹6L", 12500000 -> "₹1.25Cr", 8200 -> "₹8.2k".
  */
 export function formatCompactCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
+  const symbol = currencySymbol();
   if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
 
   const sign = amount < 0 ? '-' : '';
