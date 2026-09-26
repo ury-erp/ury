@@ -3,7 +3,7 @@ import { formatCurrency, formatCompactCurrency } from './format';
 // Minimal browser stand-ins: format.ts reads localStorage (via storage.ts) and,
 // for sites that never ran the POS, the Frappe boot the page already injects
 // (window.frappe.boot.sysdefaults), the same source Desk uses for currency.
-type Boot = { sysdefaults?: { currency?: string; number_format?: string }; currency_symbols?: Record<string, string> };
+type Boot = { sysdefaults?: { currency?: string; number_format?: string }; docs?: Array<{ doctype: string; name: string; symbol?: string }> };
 
 const store = new Map<string, string>();
 (globalThis as any).localStorage = {
@@ -50,9 +50,17 @@ const cases: Case[] = [
     expected: 'UGX 150,000',
   },
   {
-    label: 'boot currency_symbols map is used when present',
+    label: "unknown symbol falls back to the currency code (Frappe's get_currency_symbol rule)",
     run: () => {
-      reset({ sysdefaults: { currency: 'USD', number_format: '#,###.##' }, currency_symbols: { USD: '$' } });
+      reset({ sysdefaults: { currency: 'KES', number_format: '#,###.##' } });
+      return formatCurrency(12.5);
+    },
+    expected: 'KES 12.5',
+  },
+  {
+    label: 'Desk boot docs carry the Currency symbol: use it',
+    run: () => {
+      reset({ sysdefaults: { currency: 'USD', number_format: '#,###.##' }, docs: [{ doctype: ':Currency', name: 'USD', symbol: '$' }] } as Boot);
       return formatCurrency(12.5);
     },
     expected: '$ 12.5',
