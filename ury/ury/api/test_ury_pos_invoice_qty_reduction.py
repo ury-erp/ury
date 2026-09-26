@@ -28,6 +28,12 @@ from ury.ury.api.ury_pos_invoice_qty_reduction import (
 
 
 MODULE = "ury.ury.api.ury_pos_invoice_qty_reduction"
+#: process_items_for_cancel_kot (in ury_kot_generate.py) calls this real
+#: collaborator to route items to a production unit, which needs real
+#: Item/Branch/Item-Group routing data these fixtures do not provide.
+#: Patched to a single fixed production unit everywhere
+#: below -- it is not the code under test in this file.
+KOT_GEN_MODULE = "ury.ury.api.ury_kot_generate"
 
 
 def _pos_invoice_doc(
@@ -38,6 +44,7 @@ def _pos_invoice_doc(
 	customer="CUST-001",
 	restaurant_table=None,
 	items=None,
+	company="Test Company",
 ):
 	"""Build a mock POS Invoice doc."""
 	if items is None:
@@ -49,19 +56,38 @@ def _pos_invoice_doc(
 				"item_name": "Biryani",
 			}
 		]
-	doc = frappe._dict({
-		"name": name,
-		"order_type": order_type,
-		"invoice_printed": invoice_printed,
-		"pos_profile": pos_profile,
-		"customer": customer,
-		"restaurant_table": restaurant_table,
-		"items": [frappe._dict(item) for item in items],
-		"custom_ury_order_number": "ORD-123",
-	})
-	doc.get = lambda key, default=None: doc.get(key, default) if hasattr(doc, key) else default
+	# A plain object, NOT a dict subclass: on frappe._dict, `.items` is the
+	# read-only dict.items() method and cannot hold the child table the API
+	# iterates (`for row in pos_invoice.items`).
+	doc = _FakeDoc(
+		name=name,
+		order_type=order_type,
+		invoice_printed=invoice_printed,
+		pos_profile=pos_profile,
+		customer=customer,
+		restaurant_table=restaurant_table,
+		items=[frappe._dict(item) for item in items],
+		custom_ury_order_number="ORD-123",
+		company=company,
+	)
 	doc.save = MagicMock()
 	return doc
+
+
+class _FakeDoc:
+	"""Attribute bag with a Document-like `.get()`; `.items` is a plain attribute."""
+
+	def __init__(self, **fields):
+		self.__dict__.update(fields)
+
+	def __getattr__(self, key):
+		# Only reached for unset fields: mirror frappe._dict/Document (None).
+		if key.startswith("__"):
+			raise AttributeError(key)
+		return None
+
+	def get(self, key, default=None):
+		return self.__dict__.get(key, default)
 
 
 def _pos_profile_doc(
@@ -130,6 +156,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists") as mock_exists, \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all") as mock_get_all, \
 		     patch(f"{MODULE}.frappe.db.get_value") as mock_get_value, \
@@ -206,6 +233,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
 		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
@@ -254,6 +282,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
 		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
@@ -297,6 +326,7 @@ class TestQtyReductionOnAllowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
 		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
@@ -333,6 +363,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -363,6 +394,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -391,6 +423,7 @@ class TestQtyReductionOnDisallowedOrderType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -423,6 +456,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -451,6 +485,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -479,6 +514,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -507,6 +543,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -540,6 +577,7 @@ class TestInvalidQtyValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -586,6 +624,7 @@ class TestInvoiceAndItemNotFoundErrors(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -617,6 +656,7 @@ class TestInvoiceAndItemNotFoundErrors(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -647,6 +687,7 @@ class TestPermissionChecks(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=False):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -676,6 +717,7 @@ class TestPermissionChecks(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=False) as mock_has_permission, \
 		     patch(f"{MODULE}.frappe.session") as mock_session:
 
@@ -712,6 +754,7 @@ class TestKOTNamingSeriesValidation(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -746,6 +789,7 @@ class TestLastItemCannotBeRemoved(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True):
 
 			with self.assertRaises(QtyReductionError) as ctx:
@@ -781,6 +825,7 @@ class TestLastItemCannotBeRemoved(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
 		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
 		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
@@ -811,41 +856,39 @@ class TestValidateInvoiceGuardRegression(FrappeTestCase):
 		"""
 		from ury.ury.hooks.ury_pos_invoice import validate_invoice
 
-		pos_invoice = frappe._dict({
-			"name": "INV-001",
-			"invoice_printed": 1,
-			"pos_profile": "POS-1",
-			"waiter": "waiter1@example.com",
-			"modified_by": "waiter1@example.com",
-			"items": [
-				frappe._dict({"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"})
-			],
-		})
-		pos_invoice.save = MagicMock()
+		def build_invoice(qty):
+			# Real (unsaved) POS Invoice documents: `items` is a genuine child
+			# table, unlike frappe._dict where dict.items() shadows the field.
+			doc = frappe.new_doc("POS Invoice")
+			doc.name = "INV-001"
+			doc.invoice_printed = 1
+			doc.pos_profile = "POS-1"
+			doc.waiter = "waiter1@example.com"
+			doc.modified_by = "waiter1@example.com"
+			doc.append("items", {"item_code": "ITEM-001", "qty": qty, "item_name": "Biryani"})
+			return doc
 
-		# Original doc before modification
-		original_invoice = frappe._dict({
-			"items": [
-				frappe._dict({"item_code": "ITEM-001", "qty": 2, "item_name": "Biryani"})
-			],
-		})
-
+		# Original doc as stored before the modification
+		original_invoice = build_invoice(2)
 		# Simulate direct qty reduction (not via the API)
-		pos_invoice.items[0].qty = 1
+		pos_invoice = build_invoice(1)
 
-		# Mock: ensure frappe.flags.ury_qty_reduction is NOT set
-		def mock_getattr(obj, name, *args):
-			if obj is frappe.flags and name == "ury_qty_reduction":
-				return False
-			return object.__getattribute__(obj, name) if args else None
-
-		with patch(f"ury.ury.hooks.ury_pos_invoice.frappe.db.get_value", return_value=0), \
-		     patch(f"ury.ury.hooks.ury_pos_invoice.frappe.get_doc", return_value=original_invoice), \
-		     patch(f"ury.ury.hooks.ury_pos_invoice.getattr", side_effect=mock_getattr):
-
-			# This should throw because the guard is still in place and flag is not set
-			with self.assertRaises(frappe.ValidationError):
-				validate_invoice(pos_invoice, None)
+		saved_flags = {
+			key: frappe.flags.get(key) for key in ("ury_qty_reduction", "ury_bill_split")
+		}
+		frappe.flags.ury_qty_reduction = False
+		frappe.flags.ury_bill_split = False
+		try:
+			# remove_items == 0 on the POS Profile; original doc served from "DB"
+			with patch("ury.ury.hooks.ury_pos_invoice.frappe.db.get_value", return_value=0), \
+			     patch("ury.ury.hooks.ury_pos_invoice.frappe.get_doc", return_value=original_invoice):
+				# The guard is still in place and the flag is not set -> must throw
+				with self.assertRaises(frappe.ValidationError) as ctx:
+					validate_invoice(pos_invoice, None)
+			self.assertIn("qty reduced from 2", str(ctx.exception))
+		finally:
+			for key, value in saved_flags.items():
+				frappe.flags[key] = value
 
 
 class TestActorAuthority(FrappeTestCase):
@@ -869,12 +912,20 @@ class TestActorAuthority(FrappeTestCase):
 				return pos_profile
 			return get_kot_side_effect(*args, **kwargs)
 
+		# Note: frappe.db.get_all/get_value are NOT patched here even though
+		# an earlier version of this test did -- ury_pos_invoice_qty_reduction.py
+		# never calls them, and patching `{MODULE}.frappe.db.*` monkey-patches
+		# the shared `frappe.db` singleton for the whole process (not just
+		# this module), which broke unrelated Document/meta loading deeper in
+		# the call stack (process_items_for_cancel_kot -> resolve_production_context
+		# -> frappe.get_all -> frappe.get_meta, which itself calls
+		# frappe.db.get_value internally and got the stubbed None back,
+		# surfacing as a spurious "DocType ... not found").
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True), \
 		     patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), \
+		     patch(f"{KOT_GEN_MODULE}.resolve_production_units", return_value=["Kitchen"]), \
 		     patch(f"{MODULE}.frappe.has_permission", return_value=True), \
-		     patch(f"{MODULE}.frappe.session") as mock_session, \
-		     patch(f"{MODULE}.frappe.db.get_all", return_value=[frappe._dict({"name": "PROD-1"})]), \
-		     patch(f"{MODULE}.frappe.db.get_value", return_value=None):
+		     patch(f"{MODULE}.frappe.session") as mock_session:
 
 			mock_session.user = "default_user@example.com"
 
