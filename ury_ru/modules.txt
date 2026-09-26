@@ -1,0 +1,9 @@
+URY_RU_1C
+URY_RU_Fiscal
+URY_RU_Payments
+URY_RU_Delivery
+URY_RU_Marking
+URY_RU_EGAIS
+URY_RU_Mercury
+URY_RU_Deepseek
+URY_RU_Telegram

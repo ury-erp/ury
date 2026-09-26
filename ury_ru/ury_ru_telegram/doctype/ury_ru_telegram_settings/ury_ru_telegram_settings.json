@@ -1,0 +1,84 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Telegram",
+ "name": "URY RU Telegram Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Рассылка включена",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер",
+   "options": "Simulated\nTelegram Bot API",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "bot_token",
+   "fieldtype": "Password",
+   "label": "Токен бота"
+  },
+  {
+   "fieldname": "schedule",
+   "fieldtype": "Select",
+   "label": "Расписание",
+   "options": "Manual\nEvery 5 min\nEvery hour\nDaily",
+   "default": "Daily"
+  },
+  {
+   "fieldname": "include_sales",
+   "fieldtype": "Check",
+   "label": "Продажи",
+   "default": "1"
+  },
+  {
+   "fieldname": "include_customers",
+   "fieldtype": "Check",
+   "label": "Клиенты",
+   "default": "1"
+  },
+  {
+   "fieldname": "include_kitchen",
+   "fieldtype": "Check",
+   "label": "Кухня",
+   "default": "1"
+  },
+  {
+   "fieldname": "include_orders",
+   "fieldtype": "Check",
+   "label": "Заказы",
+   "default": "1"
+  },
+  {
+   "fieldname": "chats_section",
+   "fieldtype": "Section Break",
+   "label": "Получатели"
+  },
+  {
+   "fieldname": "chats",
+   "fieldtype": "Table",
+   "label": "Чаты",
+   "options": "URY RU Telegram Chat"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

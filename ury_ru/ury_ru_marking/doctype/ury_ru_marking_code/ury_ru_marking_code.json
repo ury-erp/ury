@@ -1,0 +1,48 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Marking",
+ "name": "URY RU Marking Code",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "label": "Код маркировки (DataMatrix)",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Товар",
+   "options": "Item",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Received\nIn Circulation\nSold\nWritten Off",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "parent_code",
+   "fieldtype": "Data",
+   "label": "Родительский код (агрегация)"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

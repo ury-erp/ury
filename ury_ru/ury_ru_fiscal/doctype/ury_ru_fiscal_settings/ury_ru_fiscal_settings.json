@@ -1,0 +1,74 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU Fiscal Settings",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Фискализация включена",
+   "default": "0"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Select",
+   "label": "Фискальный драйвер",
+   "options": "Simulated\nATOL\nShtrih-M",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "fiscal_format",
+   "fieldtype": "Select",
+   "label": "Формат фискальных данных (ФФД)",
+   "options": "1.05\n1.1\n1.2",
+   "default": "1.1"
+  },
+  {
+   "fieldname": "offline_mode_enabled",
+   "fieldtype": "Check",
+   "label": "Офлайн-режим (очередь при недоступности ККТ)",
+   "default": "1"
+  },
+  {
+   "fieldname": "retry_count",
+   "fieldtype": "Int",
+   "label": "Число повторов",
+   "default": "3"
+  },
+  {
+   "fieldname": "retry_delay",
+   "fieldtype": "Int",
+   "label": "Задержка повтора (сек)",
+   "default": "30"
+  },
+  {
+   "fieldname": "section_break_vat",
+   "fieldtype": "Section Break",
+   "label": "НДС маппинг"
+  },
+  {
+   "fieldname": "vat_mapping",
+   "fieldtype": "Table",
+   "label": "Маппинг ставок НДС",
+   "options": "URY RU Fiscal VAT Mapping"
+  }
+ ],
+ "is_virtual": 1,
+ "is_single": 1,
+ "issingle": 1,
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

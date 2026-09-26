@@ -1,0 +1,75 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU Fiscal Receipt",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "pos_invoice",
+   "fieldtype": "Link",
+   "label": "POS Invoice",
+   "options": "POS Invoice",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "receipt_type",
+   "fieldtype": "Select",
+   "label": "Тип чека",
+   "options": "sell\nsell_return\ncorrection",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Сумма",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "fiscal_document_number",
+   "fieldtype": "Int",
+   "label": "ФД (номер фискального документа)"
+  },
+  {
+   "fieldname": "fiscal_sign",
+   "fieldtype": "Data",
+   "label": "ФПД (фискальный признак)"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Pending\nSent\nConfirmed\nFailed\nOffline",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "retries",
+   "fieldtype": "Int",
+   "label": "Повторы",
+   "default": "0"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Ошибка"
+  },
+  {
+   "fieldname": "shift",
+   "fieldtype": "Data",
+   "label": "Смена"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

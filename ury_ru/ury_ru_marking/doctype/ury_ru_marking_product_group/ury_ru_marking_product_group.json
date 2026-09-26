@@ -1,0 +1,30 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Marking",
+ "name": "URY RU Marking Product Group",
+ "istable": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Группа товаров URY",
+   "options": "Item Group",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Код товарной группы (Честный знак)",
+   "in_list_view": 1
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC"
+}

@@ -1,0 +1,78 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Deepseek",
+ "name": "URY RU Deepseek Insight",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "insight_type",
+   "fieldtype": "Select",
+   "label": "Тип",
+   "options": "Management\nVisitor Flow\nFood Orders",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "period_from",
+   "fieldtype": "Date",
+   "label": "Период с"
+  },
+  {
+   "fieldname": "period_to",
+   "fieldtype": "Date",
+   "label": "Период по"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Филиал",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Data",
+   "label": "Резюме",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "conclusions",
+   "fieldtype": "Text",
+   "label": "Выводы"
+  },
+  {
+   "fieldname": "advice",
+   "fieldtype": "Text",
+   "label": "Советы по управлению"
+  },
+  {
+   "fieldname": "metrics_json",
+   "fieldtype": "Long Text",
+   "label": "Показатели (JSON)"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Success\nFailed",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Ошибка"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -1,0 +1,37 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU Fiscal VAT Mapping",
+ "istable": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "account_head",
+   "fieldtype": "Link",
+   "label": "Налоговый счёт (Account Head)",
+   "options": "Account",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "fiscal_vat_rate",
+   "fieldtype": "Select",
+   "label": "Ставка ФФД",
+   "options": "vat20\nvat10\nvat0\nnone\nvat20_120\nvat10_110",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "percent",
+   "fieldtype": "Float",
+   "label": "Числовая ставка, %"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC"
+}

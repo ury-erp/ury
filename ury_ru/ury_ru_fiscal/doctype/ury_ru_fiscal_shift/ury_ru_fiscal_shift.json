@@ -1,0 +1,77 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU Fiscal Shift",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "kkt",
+   "fieldtype": "Link",
+   "label": "ККТ",
+   "options": "URY RU KKT",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "label": "Кассир",
+   "options": "User",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Open\nClosed",
+   "in_list_view": 1,
+   "default": "Open"
+  },
+  {
+   "fieldname": "opened_at",
+   "fieldtype": "Datetime",
+   "label": "Открыта"
+  },
+  {
+   "fieldname": "closed_at",
+   "fieldtype": "Datetime",
+   "label": "Закрыта"
+  },
+  {
+   "fieldname": "opening_fiscal_document",
+   "fieldtype": "Int",
+   "label": "ФД отчёта об открытии"
+  },
+  {
+   "fieldname": "closing_fiscal_document",
+   "fieldtype": "Int",
+   "label": "ФД Z-отчёта"
+  },
+  {
+   "fieldname": "receipts_count",
+   "fieldtype": "Int",
+   "label": "Чеков в смене",
+   "default": "0"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Сумма по смене"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

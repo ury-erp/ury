@@ -1,0 +1,32 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Mercury",
+ "name": "URY RU VSD Item",
+ "istable": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "product_name",
+   "fieldtype": "Data",
+   "label": "Продукция",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Кол-во"
+  },
+  {
+   "fieldname": "unit",
+   "fieldtype": "Data",
+   "label": "Ед. изм."
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC"
+}

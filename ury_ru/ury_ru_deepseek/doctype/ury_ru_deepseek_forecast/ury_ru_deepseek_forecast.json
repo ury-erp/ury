@@ -1,0 +1,74 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Deepseek",
+ "name": "URY RU Deepseek Forecast",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "forecast_type",
+   "fieldtype": "Select",
+   "label": "Тип прогноза",
+   "options": "Visitor Flow\nFood Orders",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "forecast_date",
+   "fieldtype": "Date",
+   "label": "Дата",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Филиал",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Товар",
+   "options": "Item"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Название товара"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "Ед. изм.",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "predicted_qty",
+   "fieldtype": "Float",
+   "label": "Прогноз (кол-во)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "confidence",
+   "fieldtype": "Percent",
+   "label": "Уверенность, %"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Примечание"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
