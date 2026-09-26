@@ -48,12 +48,14 @@ def require_branch_staff(branch):
 	  - Administrator / System Manager / URY Manager: allowed for any
 	    branch, including None (meaning "all branches").
 	  - Any other user must hold at least one URY staff role (see
-	    STAFF_ROLES) AND must supply a `branch` that matches their own
-	    branch, as resolved by ury.ury_pos.api.getBranch() (the same
-	    Branch.user-child-table assignment the POS frontend itself relies
-	    on). A staff user passing no branch, another branch, or no branch
-	    assignment at all is rejected -- staff never get the "all branches"
-	    view that managers get.
+	    STAFF_ROLES) AND must supply a `branch` they are assigned to, via
+	    user_has_branch_access() below (Branch's `user` child table -- the
+	    same assignment the POS frontend relies on, and correctly supports
+	    a staff member assigned to more than one branch, unlike an earlier
+	    version of this check that only ever compared against a single
+	    "first row" branch). A staff user passing no branch, an
+	    unassigned branch, or no branch assignment at all is rejected --
+	    staff never get the "all branches" view that managers get.
 	  - Anyone else (no URY role at all, e.g. a Website/portal user) is
 	    rejected outright.
 
@@ -79,13 +81,7 @@ def require_branch_staff(branch):
 	if not branch:
 		_deny()
 
-	# Imported inside the function (not at module level) to avoid a
-	# circular import -- ury.ury_pos.api imports from ury.ury.report_api in
-	# other code paths.
-	from ury.ury_pos.api import getBranch
-
-	user_branch = getBranch()
-	if branch != user_branch:
+	if not user_has_branch_access(user, branch):
 		_deny()
 
 	return branch
