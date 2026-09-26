@@ -336,10 +336,22 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           cd frappe_env
-          while IFS= read -r module; do
+          mapfile -t mods < /tmp/shard_modules.txt
+          if [ "${#mods[@]}" -eq 0 ]; then
+            echo "No modules assigned to this shard; failing so an empty shard cannot pass silently."
+            exit 1
+          fi
+          failures=()
+          for module in "${mods[@]}"; do
             [ -z "$module" ] && continue
-            bench --site test_site run-tests --app ury --module "$module"
-          done < /tmp/shard_modules.txt
+            if ! bench --site test_site run-tests --app ury --module "$module" < /dev/null; then
+              failures+=("$module")
+            fi
+          done
+          if [ "${#failures[@]}" -gt 0 ]; then
+            echo "Failed modules: ${failures[*]}"
+            exit 1
+          fi
 
   frontend-lint-test:
     runs-on: ubuntu-latest
