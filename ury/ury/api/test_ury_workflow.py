@@ -127,6 +127,21 @@ class TestURYWorkflowGeneric(FrappeTestCase):
 
     def setUp(self):
         frappe.set_user("Administrator")
+        # The "URY Sales Plan" Workflow fixture links to Workflow State /
+        # Workflow Action Master records that are normally seeded by
+        # ury.ury.workflow.ury_sales_plan.install.before_migrate() -- a
+        # `before_migrate` hook, so it only runs on `bench migrate`. A fresh
+        # CI test site that never ran `bench migrate` (e.g. install-app
+        # only) won't have these Link targets, and while that's fine for
+        # merely reading the already-imported Workflow doc, re-saving it
+        # (as test_unsatisfied_condition_is_a_validation_error_not_a_
+        # permission_error does) re-validates every workflow_document_states
+        # row and raises LinkValidationError if they're missing. Seed them
+        # here directly so this test module doesn't depend on migrate
+        # having run first; idempotent, safe to call every setUp.
+        from ury.ury.workflow.ury_sales_plan.install import before_migrate as _seed_workflow_links
+
+        _seed_workflow_links()
         self.company = "URY Workflow Generic Test Co"
         self.branch = "URY Workflow Generic Test Branch"
         self.plan_date = "2026-09-27"

@@ -23,7 +23,18 @@ def _stock_entry(*, purpose="Manufacture", work_order=None, items=None, flags=No
 
 
 class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
-	def test_blocks_pre_produced_in_house_finished_item_without_work_order(self):
+	def test_pre_produced_in_house_finished_item_not_blocked_while_enforcement_disabled(self):
+		# NOTE: as of ury commit 92a06535a1 ("...bypass manufacture
+		# enforcement"), the enforcement body in
+		# validate_manufacture_requires_work_order() unconditionally
+		# `return`s right after the ignore_manufacture_enforcement flag
+		# check ("User specifically requested to disable this block on
+		# manual creation from the UI") -- a deliberate business decision,
+		# not a bug. The PRE_PRODUCED/IN_HOUSE-without-work_order case is
+		# therefore no longer blocked, and the lookup (frappe.db.exists) is
+		# never reached. This test is kept to pin that current no-op
+		# behavior; if enforcement is ever re-enabled, restore the
+		# assertRaises/assert_called_once_with variant below.
 		doc = _stock_entry(
 			items=[
 				{"item_code": "RICE", "qty": 4, "is_finished_item": 0},
@@ -31,17 +42,8 @@ class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
 			]
 		)
 		with patch(f"{MODULE}.frappe.db.exists", return_value=True) as mock_exists:
-			with self.assertRaises(frappe.ValidationError):
-				validate_manufacture_requires_work_order(doc)
-		mock_exists.assert_called_once_with(
-			"URY Item Production Configuration",
-			{
-				"item": "BIRYANI-1",
-				"active": 1,
-				"production_policy": "PRE_PRODUCED",
-				"sourcing_mode": "IN_HOUSE",
-			},
-		)
+			validate_manufacture_requires_work_order(doc)  # does not raise (enforcement disabled)
+		mock_exists.assert_not_called()
 
 	def test_allows_pre_produced_in_house_finished_item_with_work_order(self):
 		doc = _stock_entry(
@@ -56,21 +58,24 @@ class TestValidateManufactureRequiresWorkOrder(FrappeTestCase):
 		mock_exists.assert_not_called()
 
 	def test_never_blocks_made_to_order_finished_item_regardless_of_work_order(self):
+		# NOTE: as of ury commit 92a06535a1, the enforcement body always
+		# returns before reaching the config lookup at all (see comment in
+		# test_pre_produced_in_house_finished_item_not_blocked_while_enforcement_disabled
+		# above), so db.exists is never called and nothing is ever blocked --
+		# for MADE_TO_ORDER items and PRE_PRODUCED/IN_HOUSE items alike.
 		doc = _stock_entry(
 			items=[{"item_code": "PLATE-1", "qty": 1, "is_finished_item": 1}],
 		)
 		with patch(f"{MODULE}.frappe.db.exists", return_value=False) as mock_exists:
 			validate_manufacture_requires_work_order(doc)  # does not raise
-		mock_exists.assert_called_once()
+		mock_exists.assert_not_called()
 
-		# Even if a config row happened to exist but is not PRE_PRODUCED/IN_HOUSE
-		# (e.g. MADE_TO_ORDER), db.exists (filtered on those exact values) would
-		# return False and the entry is never blocked -- exercised directly:
-		with patch(f"{MODULE}.frappe.db.exists", return_value=True):
-			with self.assertRaises(frappe.ValidationError):
-				validate_manufacture_requires_work_order(doc)
-		# (this second call demonstrates enforcement only fires when the
-		# PRE_PRODUCED/IN_HOUSE-filtered exists() check is True)
+		# Even if a config row would have existed and matched PRE_PRODUCED/
+		# IN_HOUSE, enforcement is currently disabled globally, so this is
+		# still a no-op:
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True) as mock_exists:
+			validate_manufacture_requires_work_order(doc)  # does not raise
+		mock_exists.assert_not_called()
 
 	def test_ignores_non_manufacture_stock_entries(self):
 		doc = _stock_entry(

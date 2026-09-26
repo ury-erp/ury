@@ -193,16 +193,35 @@ class TestGetActiveInsightsHappyPath(FrappeTestCase):
 
 
 class TestGetActiveInsightsPermissions(FrappeTestCase):
-	"""Test permission checks in get_active_insights()."""
+	"""Test permission checks in get_active_insights().
+
+	get_active_insights() now goes through require_branch_staff() (upstream
+	PR ury-erp/ury#456 opened the dashboard feed to non-manager staff roles,
+	but that means the branch argument itself needs gating -- see
+	ury.ury.report_api.utils.require_branch_staff's docstring): a role-less
+	user is rejected outright; a staff user (e.g. URY Cashier) is only
+	allowed for their own branch and never for "all branches"; a manager
+	(or System Manager/Administrator) may pass any branch, including None.
+	"""
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		_ensure_test_branch()
+		_ensure_test_branch("Other Branch")
 		self._create_test_user(TEST_MANAGER, roles=["URY Manager"])
 		self._create_test_user(TEST_NON_MANAGER, roles=[])
+		self.staff_user = self._create_test_user(
+			"_test_ury_insight_api_staff@example.com", roles=["URY Cashier"]
+		)
+		# Assign the staff user to "Test Branch" via Branch's `user` child
+		# table so ury.ury_pos.api.getBranch() resolves it.
+		branch_doc = frappe.get_doc("Branch", "Test Branch")
+		branch_doc.append("user", {"user": self.staff_user.name})
+		branch_doc.save(ignore_permissions=True)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
-		for user in [TEST_MANAGER, TEST_NON_MANAGER]:
+		for user in [TEST_MANAGER, TEST_NON_MANAGER, "_test_ury_insight_api_staff@example.com"]:
 			if frappe.db.exists("User", user):
 				try:
 					frappe.delete_doc("User", user, force=True, ignore_permissions=True)
@@ -216,7 +235,7 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_non_manager_cannot_call_get_active_insights(self):
-		"""Non-manager users get PermissionError when calling get_active_insights()."""
+		"""A user with no URY role gets PermissionError when calling get_active_insights()."""
 		frappe.set_user(TEST_NON_MANAGER)
 		try:
 			with self.assertRaises(frappe.PermissionError):
@@ -224,11 +243,40 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
+	def test_staff_user_requesting_another_branch_is_rejected(self):
+		"""A staff user (non-manager) requesting a branch other than their own gets PermissionError."""
+		frappe.set_user(self.staff_user.name)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				get_active_insights(branch="Other Branch")
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_staff_user_requesting_own_branch_is_allowed(self):
+		"""A staff user requesting their own branch is allowed."""
+		frappe.set_user(self.staff_user.name)
+		try:
+			result = get_active_insights(branch="Test Branch")
+			self.assertIsInstance(result, list)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_staff_user_with_no_branch_is_rejected(self):
+		"""A staff user requesting no branch (i.e. "all branches") gets PermissionError."""
+		frappe.set_user(self.staff_user.name)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				get_active_insights()
+		finally:
+			frappe.set_user("Administrator")
+
 	def test_manager_can_call_get_active_insights(self):
-		"""URY Manager users can call get_active_insights()."""
+		"""URY Manager users can call get_active_insights() for any branch, including none."""
 		frappe.set_user(TEST_MANAGER)
 		try:
 			result = get_active_insights()
+			self.assertIsInstance(result, list)
+			result = get_active_insights(branch="Other Branch")
 			self.assertIsInstance(result, list)
 		finally:
 			frappe.set_user("Administrator")
@@ -240,7 +288,7 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 		self.assertIsInstance(result, list)
 
 	def test_system_manager_can_call_get_active_insights(self):
-		"""System Manager role allows access to get_active_insights()."""
+		"""System Manager role allows access to get_active_insights() for any branch."""
 		frappe.set_user("Administrator")
 		self._create_test_user("_test_sysmanager@example.com", roles=["System Manager"])
 		frappe.set_user("_test_sysmanager@example.com")
@@ -250,7 +298,7 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 		finally:
 			frappe.set_user("Administrator")
 			if frappe.db.exists("User", "_test_sysmanager@example.com"):
-				frappe.delete_doc("User", "_test_sysmanager@example.com", 
+				frappe.delete_doc("User", "_test_sysmanager@example.com",
 								  force=True, ignore_permissions=True)
 
 

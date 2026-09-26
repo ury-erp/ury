@@ -11,7 +11,19 @@ from ury.ury.api.ury_service_line import (
 class TestGetServiceLine(FrappeTestCase):
 
     def setUp(self):
-        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        # require_manager() is no longer called by get_service_line() --
+        # it now goes through require_branch_staff(), which also decides
+        # the *effective* branch (`branch = require_branch_staff(branch)`).
+        # Every test in this class below runs as Administrator (the
+        # FrappeTestCase default) and passes branch="URY Branch" straight
+        # through, asserting on that exact value in cache keys/results, so
+        # the mock must pass the branch argument through unchanged rather
+        # than swallowing it the way the old no-return require_manager()
+        # mock did.
+        patcher = patch(
+            "ury.ury.api.ury_service_line.require_branch_staff",
+            side_effect=lambda branch=None: branch,
+        )
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -205,7 +217,13 @@ class TestGetServiceLine(FrappeTestCase):
 class TestGetRunningLow(FrappeTestCase):
 
     def setUp(self):
-        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        # See TestGetServiceLine.setUp: same require_manager -> require_branch_staff
+        # swap, same pass-through side_effect so branch="URY Branch"/None keep
+        # flowing to cache keys/results exactly as these tests assert.
+        patcher = patch(
+            "ury.ury.api.ury_service_line.require_branch_staff",
+            side_effect=lambda branch=None: branch,
+        )
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -360,34 +378,117 @@ class TestGetRunningLow(FrappeTestCase):
 
 
 class TestServiceLineRealPermissionBoundary(FrappeTestCase):
-	"""Real (non-mocked) coverage of `require_manager()` for this module.
+	"""Real (non-mocked) coverage of `require_branch_staff()` for this
+	module.
 
-	Every test class above in this file patches `require_manager` out
-	entirely, so the actual permission gate guarding `get_service_line()`
-	and `get_running_low()` has never been exercised against a real
-	session/role table -- only the business logic behind it has. This uses
-	`frappe.set_user()` with a real, role-less user and asserts the actual
-	`frappe.PermissionError`.
+	Every test class above in this file patches the permission gate out
+	entirely, so the actual gate guarding `get_service_line()` and
+	`get_running_low()` has never been exercised against a real
+	session/role/branch table -- only the business logic behind it has.
+	This uses `frappe.set_user()` with real users (no role, staff-with-a-
+	branch, manager) and asserts the actual `frappe.PermissionError`
+	behavior of `require_branch_staff()`:
+	  (a) no URY role at all -> PermissionError
+	  (b) staff role, but requesting another branch -> PermissionError
+	  (c) staff role, requesting their own branch -> allowed
+	  (d) staff role, branch=None ("all branches") -> PermissionError
+	  (e) manager role -> any branch (including None) is allowed
 	"""
 
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		from ury.ury.tests.factories import make_user
+		from ury.ury.tests.factories import make_branch, make_user
+
+		cls.branch = make_branch(branch="P4R3 Service Line Branch").name
+		cls.other_branch = make_branch(branch="P4R3 Service Line Other Branch").name
 
 		cls.no_role_user = make_user(
 			email="p4r3-serviceline-norole@ury.test", roles=[]
 		).name
+		cls.staff_user = make_user(
+			email="p4r3-serviceline-staff@ury.test", roles=["URY Cashier"]
+		).name
+		cls.manager_user = make_user(
+			email="p4r3-serviceline-manager@ury.test", roles=["URY Manager"]
+		).name
+
+		# Assign staff_user to cls.branch via Branch's custom `user` child
+		# table, so ury.ury_pos.api.getBranch()'s raw SQL join resolves it
+		# the same way the real POS frontend session would.
+		branch_doc = frappe.get_doc("Branch", cls.branch)
+		branch_doc.append("user", {"user": cls.staff_user})
+		branch_doc.save(ignore_permissions=True)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
 
-	def test_get_service_line_rejects_user_without_manager_role(self):
-		frappe.set_user(self.no_role_user)
-		with self.assertRaises(frappe.PermissionError):
-			get_service_line()
+	# ---------------------------------------------------------- (a) no role
 
-	def test_get_running_low_rejects_user_without_manager_role(self):
+	def test_get_service_line_rejects_user_without_any_ury_role(self):
 		frappe.set_user(self.no_role_user)
 		with self.assertRaises(frappe.PermissionError):
-			get_running_low()
+			get_service_line(branch=self.branch)
+
+	def test_get_running_low_rejects_user_without_any_ury_role(self):
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_running_low(branch=self.branch)
+
+	# ------------------------------------------------ (b) staff, other branch
+
+	def test_get_service_line_rejects_staff_requesting_other_branch(self):
+		frappe.set_user(self.staff_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_service_line(branch=self.other_branch)
+
+	def test_get_running_low_rejects_staff_requesting_other_branch(self):
+		frappe.set_user(self.staff_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_running_low(branch=self.other_branch)
+
+	# -------------------------------------------------- (c) staff, own branch
+
+	def test_get_service_line_allows_staff_requesting_own_branch(self):
+		frappe.set_user(self.staff_user)
+		result = get_service_line(branch=self.branch)
+		self.assertIsInstance(result, list)
+
+	def test_get_running_low_allows_staff_requesting_own_branch(self):
+		frappe.set_user(self.staff_user)
+		result = get_running_low(branch=self.branch)
+		self.assertIsInstance(result, list)
+
+	# ------------------------------------------------------- (d) staff, None
+
+	def test_get_service_line_rejects_staff_with_no_branch(self):
+		frappe.set_user(self.staff_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_service_line(branch=None)
+
+	def test_get_running_low_rejects_staff_with_no_branch(self):
+		frappe.set_user(self.staff_user)
+		with self.assertRaises(frappe.PermissionError):
+			get_running_low(branch=None)
+
+	# ------------------------------------------------------- (e) manager, any
+
+	def test_get_service_line_allows_manager_for_any_branch(self):
+		frappe.set_user(self.manager_user)
+		result = get_service_line(branch=self.other_branch)
+		self.assertIsInstance(result, list)
+
+	def test_get_service_line_allows_manager_with_no_branch(self):
+		frappe.set_user(self.manager_user)
+		result = get_service_line(branch=None)
+		self.assertIsInstance(result, list)
+
+	def test_get_running_low_allows_manager_for_any_branch(self):
+		frappe.set_user(self.manager_user)
+		result = get_running_low(branch=self.other_branch)
+		self.assertIsInstance(result, list)
+
+	def test_get_running_low_allows_manager_with_no_branch(self):
+		frappe.set_user(self.manager_user)
+		result = get_running_low(branch=None)
+		self.assertIsInstance(result, list)

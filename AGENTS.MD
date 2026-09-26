@@ -254,3 +254,7 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 - Modify `ury/public/pos/`, `ury/public/mosaic/`, or `ury/public/urypos/` directly — these are build output, not source.
 - Edit `fixtures/custom_field.json` directly — export from Frappe desk instead.
 - Add business logic to `www/pos.py` — it should only return boot context data.
+
+## Testing
+
+See `TESTING.md` for the agent test gate (`scripts/agent-test-gate.sh`) and test layers.

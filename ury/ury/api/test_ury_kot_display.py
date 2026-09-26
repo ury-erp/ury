@@ -11,48 +11,119 @@ from ury.ury.api.ury_kot_display import (
 
 class TestServeKotBlocksCancelled(FrappeTestCase):
 
+    @patch("ury.ury.api.ury_kot_display.getBranch")
     @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
     @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
     @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
     @patch("ury.ury.api.ury_kot_display.frappe.request", None)
-    def test_serve_rejects_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value):
+    def test_serve_rejects_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_branch):
         mock_doc = MagicMock()
         mock_doc.type = "Cancelled"
+        mock_doc.branch = "Branch A"
         mock_get_doc.return_value = mock_doc
         mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Branch A"
 
         with self.assertRaisesRegex(frappe.ValidationError, "KOT has been cancelled and cannot be served"):
             serve_kot("KOT-001")
 
         mock_set_value.assert_not_called()
 
+    @patch("ury.ury.api.ury_kot_display.getBranch")
     @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
     @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
     @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
     @patch("ury.ury.api.ury_kot_display.frappe.request", None)
-    def test_serve_rejects_partially_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value):
+    def test_serve_rejects_partially_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_branch):
         mock_doc = MagicMock()
         mock_doc.type = "Partially cancelled"
+        mock_doc.branch = "Branch A"
         mock_get_doc.return_value = mock_doc
         mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Branch A"
 
         with self.assertRaisesRegex(frappe.ValidationError, "KOT has been cancelled and cannot be served"):
             serve_kot("KOT-001")
 
         mock_set_value.assert_not_called()
 
+    @patch("ury.ury.api.ury_kot_display.getBranch")
     @patch("ury.ury.api.ury_kot_display.get_datetime")
     @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
     @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
     @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
     @patch("ury.ury.api.ury_kot_display.frappe.request", None)
-    def test_serve_allows_non_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_datetime):
+    def test_serve_allows_non_cancelled_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_datetime, mock_get_branch):
         mock_doc = MagicMock()
         mock_doc.type = "New Order"
+        mock_doc.creation = datetime(2024, 1, 1)
+        mock_doc.branch = "Branch A"
+        mock_get_doc.return_value = mock_doc
+        mock_get_datetime.return_value = datetime(2024, 1, 1, 0, 5)
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Branch A"
+
+        serve_kot("KOT-001")
+
+        mock_set_value.assert_any_call("URY KOT", "KOT-001", "order_status", "Served")
+
+    @patch("ury.ury.api.ury_kot_display.getBranch")
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_kot_rejects_cross_branch_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_branch):
+        mock_doc = MagicMock()
+        mock_doc.type = "New Order"
+        mock_doc.branch = "Branch B"
+        mock_get_doc.return_value = mock_doc
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Branch A"  # Mismatched branch
+
+        with self.assertRaisesRegex(frappe.PermissionError, "You do not have permission to modify KOTs from other branches"):
+            serve_kot("KOT-001")
+
+        mock_set_value.assert_not_called()
+
+    @patch("ury.ury.api.ury_kot_display.getBranch")
+    @patch("ury.ury.api.ury_kot_display.get_datetime")
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_kot_allows_same_branch_kot(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_datetime, mock_get_branch):
+        mock_doc = MagicMock()
+        mock_doc.type = "New Order"
+        mock_doc.branch = "Branch A"
         mock_doc.creation = datetime(2024, 1, 1)
         mock_get_doc.return_value = mock_doc
         mock_get_datetime.return_value = datetime(2024, 1, 1, 0, 5)
         mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Branch A"
+
+        serve_kot("KOT-001")
+
+        mock_set_value.assert_any_call("URY KOT", "KOT-001", "order_status", "Served")
+
+    @patch("ury.ury.api.ury_kot_display.frappe.get_roles")
+    @patch("ury.ury.api.ury_kot_display.frappe.session")
+    @patch("ury.ury.api.ury_kot_display.getBranch")
+    @patch("ury.ury.api.ury_kot_display.get_datetime")
+    @patch("ury.ury.api.ury_kot_display.frappe.db.set_value")
+    @patch("ury.ury.api.ury_kot_display.frappe.has_permission")
+    @patch("ury.ury.api.ury_kot_display.frappe.get_doc")
+    @patch("ury.ury.api.ury_kot_display.frappe.request", None)
+    def test_serve_kot_administrator_bypasses_branch(self, mock_get_doc, mock_has_permission, mock_set_value, mock_get_datetime, mock_get_branch, mock_session, mock_get_roles):
+        mock_doc = MagicMock()
+        mock_doc.type = "New Order"
+        mock_doc.branch = "Branch C"
+        mock_doc.creation = datetime(2024, 1, 1)
+        mock_get_doc.return_value = mock_doc
+        mock_get_datetime.return_value = datetime(2024, 1, 1, 0, 5)
+        mock_has_permission.return_value = True
+        mock_get_branch.side_effect = frappe.ValidationError("No branch")
+        mock_session.user = "Administrator"
+        mock_get_roles.return_value = ["Administrator"]
 
         serve_kot("KOT-001")
 

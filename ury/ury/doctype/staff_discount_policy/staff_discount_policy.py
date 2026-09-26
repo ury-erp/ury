@@ -2,12 +2,38 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, today
+from frappe.utils import flt, getdate, today
 
 
 class StaffDiscountPolicy(Document):
-	pass
+	def validate(self):
+		if self.discount_type == "Percentage":
+			if flt(self.discount_percentage) < 0 or flt(self.discount_percentage) > 100:
+				frappe.throw(
+					_("Discount Percentage must be between 0 and 100."),
+					title=_("Invalid Discount Percentage"),
+				)
+
+		if self.discount_amount is not None and flt(self.discount_amount) < 0:
+			frappe.throw(
+				_("Discount Amount cannot be negative."), title=_("Invalid Discount Amount")
+			)
+
+		if self.per_transaction_cap is not None and flt(self.per_transaction_cap) < 0:
+			frappe.throw(
+				_("Per Transaction Cap cannot be negative."), title=_("Invalid Per Transaction Cap")
+			)
+
+		if self.period_cap is not None and flt(self.period_cap) < 0:
+			frappe.throw(_("Period Cap cannot be negative."), title=_("Invalid Period Cap"))
+
+		if self.valid_from and self.valid_to and getdate(self.valid_to) < getdate(self.valid_from):
+			frappe.throw(
+				_("Valid To date cannot be before Valid From date."),
+				title=_("Invalid Validity Range"),
+			)
 
 
 def _is_within_validity(policy, on_date):
@@ -36,7 +62,6 @@ def _matches_item_group(policy, item_group=None):
 	return any(row.item_group == item_group for row in policy.eligible_item_groups)
 
 
-@frappe.whitelist()
 def get_applicable_policy(customer=None, employee=None, branch=None, item_group=None):
 	"""
 	Resolve the best-matching, enabled Staff Discount Policy for the given
@@ -50,6 +75,15 @@ def get_applicable_policy(customer=None, employee=None, branch=None, item_group=
 		   against the resolved role(s)/department/customer_group, validity
 		   dates are checked against today, and item_group restrictions (if
 		   any) are respected.
+		3. Deterministic tie-break: candidates are loaded via frappe.get_all
+		   with order_by="creation asc, name asc", so among multiple
+		   candidates of equal specificity the oldest matching policy
+		   (earliest creation, then name as a final tie-break) always wins,
+		   regardless of table/iteration order.
+
+	This function is called server-side only (see
+	ury/ury/hooks/ury_pos_invoice.py) and is intentionally not an HTTP
+	endpoint.
 
 	Args:
 		customer: Customer name, used when a policy's applies_to is
@@ -80,7 +114,12 @@ def get_applicable_policy(customer=None, employee=None, branch=None, item_group=
 		customer_group = frappe.db.get_value("Customer", customer, "customer_group")
 
 	filters = {"enabled": 1}
-	policy_names = frappe.get_all("Staff Discount Policy", filters=filters, pluck="name")
+	policy_names = frappe.get_all(
+		"Staff Discount Policy",
+		filters=filters,
+		pluck="name",
+		order_by="creation asc, name asc",
+	)
 	if not policy_names:
 		return None
 

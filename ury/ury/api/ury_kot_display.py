@@ -4,6 +4,27 @@ from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
 from frappe import _
 
+def _check_branch_permission(kot_doc):
+    """Ensure the current session's branch matches the KOT's branch.
+
+    Administrator/System Manager are exempt. Raises frappe.PermissionError
+    on mismatch.
+    """
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            session_branch = None
+        else:
+            raise
+
+    if session_branch and kot_doc.branch != session_branch:
+        frappe.throw(
+            "You do not have permission to modify KOTs from other branches.",
+            frappe.PermissionError
+        )
+
+
 # Function to set order status in a KOT document
 @frappe.whitelist(methods=["POST"])
 def serve_kot(name, time=None):
@@ -13,6 +34,8 @@ def serve_kot(name, time=None):
     kot_doc = frappe.get_doc("URY KOT", name)
     if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
         frappe.throw(_("Not permitted to serve this KOT"), frappe.PermissionError)
+
+    _check_branch_permission(kot_doc)
 
     if kot_doc.type in ("Cancelled", "Partially cancelled"):
         frappe.throw(_("KOT has been cancelled and cannot be served"), frappe.ValidationError)
@@ -56,19 +79,7 @@ def confirm_cancel_kot(name):
         )
 
     # Branch-level permission check
-    try:
-        session_branch = getBranch()
-    except Exception:
-        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
-            session_branch = None
-        else:
-            raise
-
-    if session_branch and kot_doc.branch != session_branch:
-        frappe.throw(
-            "You do not have permission to modify KOTs from other branches.",
-            frappe.PermissionError
-        )
+    _check_branch_permission(kot_doc)
 
     frappe.db.set_value("URY KOT", name, "verified", 1)
     frappe.db.set_value("URY KOT", name, "verified_by", frappe.session.user)

@@ -1,4 +1,9 @@
-import { defineConfig, devices } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "@playwright/test";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Playwright config for the URY frontend SPAs (frontend/, pos/,
@@ -13,15 +18,44 @@ import { defineConfig, devices } from "@playwright/test";
  * frontend/ and mosaic/ do), so a `yarn dev` server for pos/self-order
  * cannot reach a live API in the first place.
  *
- * Point URY_BASE_URL at a live bench + site (built via `yarn build` in
- * each app dir, copied into that site app's public/www dirs, cache
- * cleared) before running.
+ * Env-driven from e2e/.env.local (URY_BASE_URL, plus the admin creds
+ * global-setup uses to seed fixtures — see fixtures/global-setup.ts).
+ * process.env wins over .env.local so CI/ad-hoc overrides still work.
  */
-const BASE_URL = process.env.URY_BASE_URL ?? "http://sa-testcov-verify.local:8114";
+function readEnvLocal(): Record<string, string> {
+  const envPath = path.join(__dirname, ".env.local");
+  const out: Record<string, string> = {};
+  if (!fs.existsSync(envPath)) return out;
+  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx === -1) continue;
+    out[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
+  }
+  return out;
+}
+
+const envLocal = readEnvLocal();
+for (const [key, value] of Object.entries(envLocal)) {
+  if (process.env[key] === undefined) process.env[key] = value;
+}
+
+const BASE_URL = process.env.URY_BASE_URL ?? "http://localhost:8102";
 
 export default defineConfig({
   testDir: "./tests",
-  fullyParallel: true,
+  globalSetup: "./fixtures/global-setup.ts",
+  // A single Chromium worker running one project at a time is a hard
+  // requirement here, not a tuning knob: running multiple projects in
+  // parallel is a documented, reproducible Chromium crash on this
+  // container's ARM64 host (see README.md), and the golden-path spec
+  // itself is order-dependent within a project (each test opens a real
+  // table / advances a real order) so parallel workers within one file
+  // would race over the same live-bench state. `--workers=1` is the
+  // default here rather than an opt-in flag a future run can forget.
+  workers: 1,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

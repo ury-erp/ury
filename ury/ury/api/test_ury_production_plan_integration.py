@@ -44,11 +44,11 @@ fixtures it created itself.
 ## Fixture policy
 
 Every fixture below is created fresh, with a random suffix, inside each test
-class's own ``setUpClass``/``setUp`` -- never touching the shared
-``Demo Branch`` / ``Demo Kitchen Department`` demo data beyond *reading* it
-(so tests cannot corrupt or depend on another test run's leftovers), except
-where reuse is explicitly called out as safe (e.g. reading, never writing,
-``URY Production Settings.store_warehouse``).
+class's own ``setUpClass``/``setUp`` -- no dependency on demo data at all
+(no ``Demo Branch``, no hard-coded Company/Cost Center/Store Warehouse), so
+the module runs on a fresh CI site. ``ensure_base_fixtures()`` resolves the
+site's own Company and get-or-creates this module's two test Branches; it
+runs inside setUpClass/setUp, never at import time.
 
 Per PLAN.md's own Wave 0 note: the Store Warehouse and every Department
 Warehouse created here are distinct, correctly-oriented Warehouse records
@@ -105,10 +105,84 @@ from ury.ury.api.ury_sales_plan import advance_plan_to_approved, transition_sale
 from ury.ury.api.ury_sales_plan_auto_production_plan import create_production_plans_on_lock
 
 
-COMPANY = "URY"
-BRANCH = "Demo Branch"
-COST_CENTER = "Main - U"
-STORE_WAREHOUSE = "Stores - U"  # URY Production Settings.store_warehouse on ury.localhost
+#: Test-owned Branch records. Created (idempotently) by
+#: ``ensure_base_fixtures()`` from every class's ``setUpClass``/``setUp`` --
+#: never at import time -- so this module runs on a fresh CI site with no
+#: demo data (no "Demo Branch", no "URY" company, no "Main - U"/"Stores - U").
+BRANCH = "URY PP Integration Test Branch"
+OTHER_BRANCH = "URY PP Integration Other Branch"
+
+#: Resolved per site by ``ensure_base_fixtures()``: company, cost_center, currency.
+_BASE = frappe._dict()
+
+
+def _company():
+	return _BASE.company
+
+
+def _ensure_fiscal_year(company):
+	"""A fresh CI site's Company may have no Fiscal Year covering today, and
+	every Stock Entry / BOM / Work Order here would then raise
+	FiscalYearError. Create a company-scoped calendar-year Fiscal Year if
+	none applies (company-scoped so ERPNext's overlap check never collides
+	with a global or other-company Fiscal Year)."""
+	from erpnext.accounts.utils import FiscalYearError, get_fiscal_year
+	from frappe.utils import getdate, nowdate
+
+	today = getdate(nowdate())
+	try:
+		get_fiscal_year(today, company=company)
+		return
+	except FiscalYearError:
+		pass
+
+	year_name = f"URY PP Test FY {today.year} {company}"
+	if not frappe.db.exists("Fiscal Year", year_name):
+		frappe.get_doc(
+			{
+				"doctype": "Fiscal Year",
+				"year": year_name,
+				"year_start_date": f"{today.year}-01-01",
+				"year_end_date": f"{today.year}-12-31",
+				"companies": [{"company": company}],
+			}
+		).insert(ignore_permissions=True)
+	frappe.cache().delete_key("fiscal_years")
+
+
+def ensure_base_fixtures():
+	"""Resolve the site's Company (whatever the test site was bootstrapped
+	with -- "Test Company" on CI, "URY" on a dev bench) and get-or-create the
+	Branch records this module uses. Re-run from every ``setUpClass``/``setUp``
+	rather than cached forever, because ``FrappeTestCase`` rolls back each
+	class's writes (a Branch created by an earlier class may be gone)."""
+	company = (
+		frappe.db.get_single_value("Global Defaults", "default_company")
+		or frappe.db.get_value("Company", {}, "name", order_by="creation asc")
+	)
+	if not company:
+		raise AssertionError("Test site has no Company; run the setup wizard / before_tests first.")
+	company_doc = frappe.db.get_value(
+		"Company", company, ["cost_center", "default_currency"], as_dict=True
+	)
+	cost_center = company_doc.cost_center or frappe.db.get_value(
+		"Cost Center", {"company": company, "is_group": 0}, "name", order_by="creation asc"
+	)
+	_BASE.update(company=company, cost_center=cost_center, currency=company_doc.default_currency or "INR")
+
+	_ensure_fiscal_year(company)
+
+	for branch_name in (BRANCH, OTHER_BRANCH):
+		if not frappe.db.exists("Branch", branch_name):
+			frappe.get_doc(
+				{
+					"doctype": "Branch",
+					"branch": branch_name,
+					"company": company,
+					"user": [{"user": "Administrator"}],
+				}
+			).insert(ignore_permissions=True)
+	return _BASE
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +194,9 @@ def _uniq(prefix):
 	return f"{prefix}{frappe.generate_hash(length=6).upper()}"
 
 
-def make_item(item_code, stock_uom="Kg", item_group="Products"):
+def make_item(item_code, stock_uom="Kg", item_group=None):
+	if not item_group:
+		item_group = "Products" if frappe.db.exists("Item Group", "Products") else "All Item Groups"
 	if not frappe.db.exists("Item", item_code):
 		frappe.get_doc(
 			{
@@ -135,7 +211,8 @@ def make_item(item_code, stock_uom="Kg", item_group="Products"):
 	return item_code
 
 
-def make_warehouse(hint, company=COMPANY):
+def make_warehouse(hint, company=None):
+	company = company or _company()
 	doc = frappe.get_doc(
 		{"doctype": "Warehouse", "warehouse_name": hint, "company": company}
 	)
@@ -143,7 +220,9 @@ def make_warehouse(hint, company=COMPANY):
 	return doc.name
 
 
-def make_department(department_name, warehouse, branch=BRANCH, company=COMPANY, cost_center=COST_CENTER):
+def make_department(department_name, warehouse, branch=BRANCH, company=None, cost_center=None):
+	company = company or _company()
+	cost_center = cost_center or _BASE.cost_center
 	frappe.get_doc(
 		{
 			"doctype": "URY Production Department",
@@ -158,7 +237,8 @@ def make_department(department_name, warehouse, branch=BRANCH, company=COMPANY, 
 	return department_name
 
 
-def make_production_unit(unit_name, department, branch=BRANCH, company=COMPANY):
+def make_production_unit(unit_name, department, branch=BRANCH, company=None):
+	company = company or _company()
 	frappe.get_doc(
 		{
 			"doctype": "URY Production Unit",
@@ -172,15 +252,16 @@ def make_production_unit(unit_name, department, branch=BRANCH, company=COMPANY):
 	return unit_name
 
 
-def make_bom(item_code, components, company=COMPANY, quantity=1):
+def make_bom(item_code, components, company=None, quantity=1):
 	"""``components``: list of ``(item_code, qty, uom, bom_no_or_None)``."""
+	company = company or _company()
 	doc = frappe.get_doc(
 		{
 			"doctype": "BOM",
 			"item": item_code,
 			"company": company,
 			"quantity": quantity,
-			"currency": "INR",
+			"currency": _BASE.currency,
 			"conversion_rate": 1,
 			"items": [
 				{
@@ -218,10 +299,11 @@ def make_config(item, department, production_unit, bom, branch=BRANCH, policy="P
 	return item
 
 
-def stock_receipt(item_code, warehouse, qty, company=COMPANY):
+def stock_receipt(item_code, warehouse, qty, company=None):
 	"""A real, submitted Material Receipt Stock Entry -- the honest way to
 	seed Bin quantity, exercising the same stock ledger every other
 	production entry in these tests reads through."""
+	company = company or _company()
 	doc = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
@@ -246,7 +328,7 @@ def bin_qty(item_code, warehouse):
 	return flt(frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": warehouse}, "actual_qty"))
 
 
-def make_sales_plan_snapshot(items, branch=BRANCH, company=COMPANY):
+def make_sales_plan_snapshot(items, branch=BRANCH, company=None):
 	"""Build a decoded snapshot dict in exactly the shape
 	``ury_sales_plan.freeze_approval_snapshot``/``snapshot_item`` produces,
 	for tests that only need ``compile_production_targets`` and do not need
@@ -254,7 +336,7 @@ def make_sales_plan_snapshot(items, branch=BRANCH, company=COMPANY):
 	least ``item_code``, ``qty``, ``production_policy``, ``bom``; PRE_PRODUCED
 	rows also need ``department``.
 	"""
-	return {"branch": branch, "company": company, "items": items}
+	return {"branch": branch, "company": company or _company(), "items": items}
 
 
 #: `validate_no_overlapping_plan_scope` refuses two Approved/Locked plans for
@@ -273,7 +355,7 @@ def _next_plan_date():
 	return _add_days(_nowdate(), next(_plan_date_offsets))
 
 
-def make_real_sales_plan(items, branch=BRANCH, company=COMPANY, plan_date=None):
+def make_real_sales_plan(items, branch=BRANCH, company=None, plan_date=None):
 	"""Insert a real, Draft ``URY Sales Plan`` with ``items`` rows. Does not
 	advance its workflow state -- callers do that explicitly (via
 	``advance_plan_to_approved``/``transition_sales_plan``) so every test is
@@ -282,7 +364,7 @@ def make_real_sales_plan(items, branch=BRANCH, company=COMPANY, plan_date=None):
 		{
 			"doctype": "URY Sales Plan",
 			"branch": branch,
-			"company": company,
+			"company": company or _company(),
 			"plan_date": plan_date or _next_plan_date(),
 			"items": items,
 		}
@@ -353,10 +435,14 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10A")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
 		cls.department = make_department(f"{cls.suffix} Dept", cls.warehouse)
 		cls.unit = make_production_unit(f"{cls.suffix} Unit", cls.department)
+		# Store warehouse handed straight to compute_readiness (no reliance on
+		# a pre-configured URY Production Settings.store_warehouse).
+		cls.store = make_warehouse(f"{cls.suffix} Store")
 
 		# Nested tree: MTO finished item -> PRE_PRODUCED assembly -> raw
 		# material, plus a second, deeper PRE_PRODUCED dependency nested
@@ -417,18 +503,24 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 		# acceptance criterion (scenario 22).
 
 	def test_mto_excludes_finished_item_includes_scaled_preproduced_assembly(self):
-		"""Scenario 10: an MTO finished item is excluded; its PRE_PRODUCED
-		assembly is included at the scaled quantity."""
+		"""Scenario 10: its PRE_PRODUCED assembly is included at the scaled
+		quantity. Since 11122ebcac ("make a MADE_TO_ORDER row a real target,
+		guarded against ever getting a Work Order") the MTO finished item is
+		itself a target too, flagged ``skip_work_order`` -- see the
+		"MADE_TO_ORDER items" section of ury_production_target_compiler."""
 		snapshot = make_sales_plan_snapshot(
 			[{"item_code": self.finished, "qty": 5, "production_policy": "MADE_TO_ORDER", "bom": self.finished_bom, "department": self.department}]
 		)
-		departments, blockers = compile_production_targets(snapshot, BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(snapshot, BRANCH, _company())
 
 		self.assertEqual(blockers, [])
 		bucket = departments[self.department]
 		by_item = {t["item_code"]: t for t in bucket["targets"]}
-		self.assertNotIn(self.finished, by_item)
+		self.assertIn(self.finished, by_item)
+		self.assertTrue(by_item[self.finished]["skip_work_order"])
+		self.assertEqual(flt(by_item[self.finished]["required_qty"]), 5.0)
 		self.assertIn(self.assembly, by_item)
+		self.assertFalse(by_item[self.assembly]["skip_work_order"])
 		# finished_bom: 4 Kg BASE per FINISHED, needed_qty 5 -> 20 Kg.
 		self.assertEqual(flt(by_item[self.assembly]["required_qty"]), 20.0)
 
@@ -439,7 +531,7 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 		snapshot = make_sales_plan_snapshot(
 			[{"item_code": self.finished, "qty": 5, "production_policy": "MADE_TO_ORDER", "bom": self.finished_bom, "department": self.department}]
 		)
-		departments, blockers = compile_production_targets(snapshot, BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(snapshot, BRANCH, _company())
 		self.assertEqual(blockers, [])
 
 		targets = departments[self.department]["targets"]
@@ -463,21 +555,26 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 		# one row) and irrelevant to what this test actually needs, which
 		# is simply a branch that carries no configuration for `self.finished`
 		# or any of its BOM's items.
-		other_branch = "Sales Plan Workflow Test Branch"
+		other_branch = OTHER_BRANCH
 
 		snapshot = make_sales_plan_snapshot(
 			[{"item_code": self.finished, "qty": 2, "production_policy": "MADE_TO_ORDER", "bom": self.finished_bom, "department": self.department}],
 			branch=other_branch,
 		)
-		departments, blockers = compile_production_targets(snapshot, other_branch, COMPANY)
+		departments, blockers = compile_production_targets(snapshot, other_branch, _company())
 
 		# No department has a config for `other_branch`, so the assembly is
 		# never recognised as PRE_PRODUCED there and never becomes a
 		# target -- traversal passes straight through it as an unstocked
 		# intermediate (it has a BOM) down to Masala/Rice/deep BOM raw
-		# materials, none of which are targets either.
-		self.assertEqual(departments, {})
+		# materials, none of which are targets either. The MTO row itself
+		# is still a (skip_work_order) target in the department the
+		# snapshot row names (11122ebcac), and nothing else is.
 		self.assertEqual(blockers, [])
+		self.assertEqual(list(departments), [self.department])
+		targets = departments[self.department]["targets"]
+		self.assertEqual([t["item_code"] for t in targets], [self.finished])
+		self.assertTrue(targets[0]["skip_work_order"])
 
 	def test_cross_department_dependency_produces_blocker_not_target(self):
 		"""Scenario 14 (D7): an MTO parent in one department consuming a
@@ -486,7 +583,7 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 		snapshot = make_sales_plan_snapshot(
 			[{"item_code": self.cross_finished, "qty": 3, "production_policy": "MADE_TO_ORDER", "bom": self.cross_finished_bom, "department": self.department}]
 		)
-		departments, blockers = compile_production_targets(snapshot, BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(snapshot, BRANCH, _company())
 
 		types = [b["type"] for b in blockers]
 		self.assertIn("cross_department_dependency", types)
@@ -514,7 +611,7 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 				"bom": self.external_bom, "department": self.department,
 			}]
 		)
-		departments, blockers = compile_production_targets(snapshot, BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(snapshot, BRANCH, _company())
 		self.assertEqual(blockers, [])
 		bucket = departments[self.department]
 		self.assertEqual(bucket["targets"], [])
@@ -523,7 +620,7 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 
 		# D19's second half: the demand still reaches the readiness engine's
 		# Purchase-side requirement rather than vanishing.
-		readiness = compute_readiness(departments, store_warehouse=STORE_WAREHOUSE)
+		readiness = compute_readiness(departments, store_warehouse=self.store)
 		rows_for_item = [r for r in readiness["rows"] if r["item_code"] == self.external_item]
 		self.assertEqual(len(rows_for_item), 1)
 		self.assertEqual(flt(rows_for_item[0]["required_qty"]), 7.0)
@@ -549,7 +646,7 @@ class TestTargetCompilerRealRecords(FrappeTestCase):
 		)
 
 		with self.assertRaises(frappe.ValidationError) as ctx:
-			walk_bom_tree(bom_x, 10, COMPANY)
+			walk_bom_tree(bom_x, 10, _company())
 		self.assertIn("Circular BOM reference", str(ctx.exception))
 
 
@@ -562,6 +659,7 @@ class TestProductionPlanCreationRealRecords(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10B")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
 		cls.department = make_department(f"{cls.suffix} Dept", cls.warehouse)
@@ -626,6 +724,7 @@ class TestSalesPlanLockCreatesProductionPlans(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10C")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
 		cls.department = make_department(f"{cls.suffix} Dept", cls.warehouse)
@@ -636,6 +735,7 @@ class TestSalesPlanLockCreatesProductionPlans(FrappeTestCase):
 		make_config(cls.item, cls.department, cls.unit, cls.bom)
 
 	def setUp(self):
+		ensure_base_fixtures()
 		frappe.set_user("Administrator")
 		self._toggle_before = frappe.db.get_single_value("URY Production Settings", "enable_auto_production_plan")
 
@@ -720,6 +820,7 @@ class TestReadinessAndTransferRealStock(FrappeTestCase):
 	``department_shortage`` read as zero and nothing needed transferring)."""
 
 	def setUp(self):
+		ensure_base_fixtures()
 		frappe.set_user("Administrator")
 		self.suffix = _uniq("AGT10D")
 		self.store = make_warehouse(f"{self.suffix} Store")
@@ -836,6 +937,7 @@ class TestWorkOrderExecutionRealRecords(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10E")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
 		cls.department = make_department(f"{cls.suffix} Dept", cls.warehouse)
@@ -856,7 +958,7 @@ class TestWorkOrderExecutionRealRecords(FrappeTestCase):
 		doc = advance_plan_to_approved(doc)
 		result = create_or_get_department_production_plans(doc, submit=True)
 		plan_name = result["production_plans"][0]["production_plan"]
-		departments, blockers = compile_production_targets(doc.get("approval_snapshot"), BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(doc.get("approval_snapshot"), BRANCH, _company())
 		self.assertEqual(blockers, [])
 		return frappe.get_doc("Production Plan", plan_name), departments[self.department]["targets"]
 
@@ -914,7 +1016,7 @@ class TestWorkOrderExecutionRealRecords(FrappeTestCase):
 				"production_item": plain_item,
 				"bom_no": plain_bom,
 				"qty": 3,
-				"company": COMPANY,
+				"company": _company(),
 				"fg_warehouse": self.warehouse,
 				"wip_warehouse": self.warehouse,
 			}
@@ -935,6 +1037,7 @@ class TestCancelGuardsRealRecords(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10F")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
 		cls.department = make_department(f"{cls.suffix} Dept", cls.warehouse)
@@ -954,7 +1057,7 @@ class TestCancelGuardsRealRecords(FrappeTestCase):
 		doc = advance_plan_to_approved(doc)
 		result = create_or_get_department_production_plans(doc, submit=True)
 		plan_name = result["production_plans"][0]["production_plan"]
-		departments, blockers = compile_production_targets(doc.get("approval_snapshot"), BRANCH, COMPANY)
+		departments, blockers = compile_production_targets(doc.get("approval_snapshot"), BRANCH, _company())
 		self.assertEqual(blockers, [])
 		return frappe.get_doc("Production Plan", plan_name), departments[self.department]["targets"]
 
@@ -1017,6 +1120,7 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		ensure_base_fixtures()
 		cls.suffix = _uniq("AGT10G")
 		cls.store = make_warehouse(f"{cls.suffix} Store")
 		cls.warehouse = make_warehouse(f"{cls.suffix} Dept WH")
@@ -1028,6 +1132,7 @@ class TestMaterialRequestsRealRecords(FrappeTestCase):
 		make_config(cls.item, cls.department, cls.unit, cls.bom)
 
 	def setUp(self):
+		ensure_base_fixtures()
 		self._store_before = frappe.db.get_single_value("URY Production Settings", "store_warehouse")
 		frappe.db.set_single_value("URY Production Settings", "store_warehouse", self.store)
 
@@ -1233,6 +1338,7 @@ class TestFullHappyPathEndToEnd(FrappeTestCase):
 	(see module docstring)."""
 
 	def setUp(self):
+		ensure_base_fixtures()
 		frappe.set_user("Administrator")
 		self.suffix = _uniq("AGT10H")
 		self.store = make_warehouse(f"{self.suffix} Store")

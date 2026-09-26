@@ -162,6 +162,110 @@ def make_pos_profile(**overrides) -> "frappe.Document":
 	return doc
 
 
+def _make_room(**overrides) -> "frappe.Document":
+	"""Get-or-create a URY Room, defaulting to a factory-made Branch.
+
+	URY Room is not itself part of B7's public factory surface (only
+	`make_restaurant`/`make_menu` are), but `URY Restaurant.default_room` is
+	`reqd`, so restaurant creation needs one. Private helper to avoid
+	duplicating the get-or-create dance inside `make_restaurant`.
+	"""
+	room_name = overrides.pop("name", None) or f"Test Room {_faker().unique.random_number(digits=6)}"
+	if frappe.db.exists("URY Room", room_name):
+		return frappe.get_doc("URY Room", room_name)
+
+	branch = overrides.pop("branch", None) or make_branch().name
+
+	fields = {
+		"doctype": "URY Room",
+		"name": room_name,
+		"branch": branch,
+	}
+	fields.update(overrides)
+	doc = frappe.get_doc(fields)
+	doc.insert(ignore_permissions=True, ignore_mandatory=True)
+	return doc
+
+
+def make_restaurant(**overrides) -> "frappe.Document":
+	"""Get-or-create a URY Restaurant.
+
+	`URY Restaurant` autonames by `"prompt"` (see `ury_restaurant.json`'s
+	`autoname`), so callers must supply/receive an explicit `name`; there is
+	no natural-key lookup like Item's `item_code`, so we mint one when the
+	caller doesn't pin it. `company`, `invoice_series_prefix`, `branch` and
+	`default_room` are all `reqd` on the doctype -- everything else
+	(`address`, `default_tax_template`, `active_menu`, ...) is optional and
+	left to Faker/overrides.
+
+	`ury_restaurant.py`'s controller has no `validate()` (or any other
+	lifecycle hook) at all -- it's a bare `Document` subclass -- so there are
+	no doctype-level business rules for tests to exercise here beyond plain
+	mandatory-field validation.
+	"""
+	restaurant_name = overrides.pop("name", None) or f"Test Restaurant {_faker().unique.random_number(digits=6)}"
+	if frappe.db.exists("URY Restaurant", restaurant_name):
+		return frappe.get_doc("URY Restaurant", restaurant_name)
+
+	branch = overrides.pop("branch", None) or make_branch().name
+	company = overrides.pop("company", None) or (
+		frappe.db.get_value("Company", {}, "name") or "_Test Company"
+	)
+	default_room = overrides.pop("default_room", None) or _make_room(branch=branch).name
+
+	fields = {
+		"doctype": "URY Restaurant",
+		"name": restaurant_name,
+		"company": company,
+		"branch": branch,
+		"default_room": default_room,
+		"invoice_series_prefix": overrides.pop("invoice_series_prefix", None)
+		or f"TR{_faker().unique.random_number(digits=4)}",
+	}
+	fields.update(overrides)
+	doc = frappe.get_doc(fields)
+	doc.insert(ignore_permissions=True, ignore_mandatory=True)
+	return doc
+
+
+def make_menu(**overrides) -> "frappe.Document":
+	"""Get-or-create a URY Menu, defaulting to a single factory-made Item row.
+
+	`branch` and `items` are both `reqd` on `URY Menu` (see
+	`ury_menu.json`). `URYMenu.validate()` backfills any item row's `rate`
+	from `Item.standard_rate` when the row's `rate` is falsy (see
+	`ury_menu.py`), so a caller-supplied row without a `rate` is a valid,
+	deliberate way to exercise that fallback rather than an oversight here.
+
+	`URY Menu` autonames by `"prompt"` too (see `ury_menu.json`'s
+	`autoname`), same as `URY Restaurant` -- there is no natural key like
+	Item's `item_code` to look up by, so idempotency here is keyed on the
+	explicit `name` a caller passes (or the one we mint), exactly like
+	`make_restaurant`.
+	"""
+	menu_name = overrides.pop("name", None) or f"Test Menu {_faker().unique.random_number(digits=6)}"
+	if frappe.db.exists("URY Menu", menu_name):
+		return frappe.get_doc("URY Menu", menu_name)
+
+	branch = overrides.pop("branch", None) or make_branch().name
+
+	items = overrides.pop("items", None)
+	if items is None:
+		item = make_item()
+		items = [{"item": item.name, "item_name": item.item_name}]
+
+	fields = {
+		"doctype": "URY Menu",
+		"name": menu_name,
+		"branch": branch,
+		"items": items,
+	}
+	fields.update(overrides)
+	doc = frappe.get_doc(fields)
+	doc.insert(ignore_permissions=True, ignore_mandatory=True)
+	return doc
+
+
 def make_user(email: str | None = None, roles: list[str] | None = None, **overrides) -> "frappe.Document":
 	"""Get-or-recreate a test User with the given roles.
 

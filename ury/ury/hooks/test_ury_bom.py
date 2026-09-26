@@ -63,14 +63,24 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 	@patch(f"{MODULE}.frappe.get_cached_value")
 	@patch(f"{MODULE}.frappe.throw")
 	@patch(f"{MODULE}.set_bom_revision")
-	def test_throws_when_tracked_item_missing_custom_yield_qty(self, mock_set_revision, mock_throw, mock_get_cached_value):
-		"""Tracked item without custom_yield_qty throws ValidationError."""
+	def test_throws_when_tracked_item_missing_both_qty_and_yield_qty(self, mock_set_revision, mock_throw, mock_get_cached_value):
+		"""Tracked item with BOTH custom_yield_qty and qty missing still throws.
+
+		ury-erp/ury#464 (commit bdc5d9625e) added a fallback: when
+		custom_yield_qty is missing but qty IS set, custom_yield_qty is now
+		derived as qty * percent/100 instead of throwing (see
+		test_derives_custom_yield_qty_from_qty_when_missing below). This test
+		covers the remaining case the fallback does not reach -- qty is also
+		missing, so there is nothing to derive from -- which still throws.
+		Behavior change pending owner confirmation.
+		"""
 		# Create BOM row
 		row = MagicMock()
 		row.item_code = "TRACKED-ITEM"
 		row.custom_yield_qty = None  # Missing!
 		row.custom_yield_percent = 85
 		row.idx = 1
+		row.qty = None  # Also missing -- nothing to derive custom_yield_qty from
 
 		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
 		mock_throw.side_effect = frappe.ValidationError
@@ -86,6 +96,36 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
 		self.assertIn("custom_yield_qty", str(call_args[0]))
+
+	@patch(f"{MODULE}.frappe.get_cached_value")
+	@patch(f"{MODULE}.set_bom_revision")
+	def test_derives_custom_yield_qty_from_qty_when_missing(self, mock_set_revision, mock_get_cached_value):
+		"""ury-erp/ury#464 (commit bdc5d9625e): when custom_yield_qty is
+		missing but qty is set, custom_yield_qty is now derived as
+		qty * (percent / 100) instead of throwing. Behavior change pending
+		owner confirmation.
+		"""
+		row = MagicMock()
+		row.item_code = "TRACKED-ITEM"
+		row.custom_yield_qty = None  # Missing, but qty is set below
+		row.custom_yield_percent = 85
+		row.idx = 1
+		row.qty = 100  # Present -- used to derive custom_yield_qty
+
+		mock_get_cached_value.return_value = 1  # custom_yield_tracked = 1
+
+		doc = MagicMock()
+		doc.items = [row]
+		doc.get.return_value = doc.items
+
+		apply_yield_back_calculation(doc, "before_validate")
+
+		# Derived: custom_yield_qty = qty * (percent / 100) = 100 * 0.85 = 85
+		self.assertAlmostEqual(row.custom_yield_qty, 85.0, places=5)
+		# Then qty is back-calculated from the derived custom_yield_qty:
+		# qty = custom_yield_qty / (percent / 100) = 85 / 0.85 = 100 (round-trips)
+		self.assertAlmostEqual(row.qty, 100.0, places=5)
+		mock_set_revision.assert_called_once_with(doc)
 
 	@patch(f"{MODULE}.frappe.get_cached_value")
 	@patch(f"{MODULE}.frappe.throw")
@@ -462,10 +502,14 @@ class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
 		self.assertTrue(bom.custom_bom_revision)
 		self.assertEqual(len(bom.custom_bom_revision), 16)
 
-	def test_real_bom_insert_rejects_yield_tracked_row_missing_yield_qty(self):
-		"""A real BOM insert for a yield-tracked component with no
-		custom_yield_qty set must fail closed (real ValidationError, not a
-		silent qty=0)."""
+	def test_real_bom_insert_derives_yield_qty_when_missing_but_qty_set(self):
+		"""ury-erp/ury#464 (commit bdc5d9625e): a real BOM insert for a
+		yield-tracked component with custom_yield_qty missing but qty set
+		no longer fails closed -- custom_yield_qty is derived as
+		qty * (percent / 100), and qty is then back-calculated from that
+		derived value (round-tripping to the original qty here since the
+		derivation and back-calculation are inverses). Behavior change
+		pending owner confirmation."""
 		bom = frappe.get_doc(
 			{
 				"doctype": "BOM",
@@ -486,7 +530,39 @@ class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
 				],
 			}
 		)
-		with self.assertRaises(frappe.ValidationError):
+		bom.insert(ignore_permissions=True)
+
+		# Derived custom_yield_qty = qty * (percent / 100) = 1 * 0.5 = 0.5
+		self.assertAlmostEqual(bom.items[0].custom_yield_qty, 0.5)
+		# Back-calculated qty = custom_yield_qty / (percent / 100) = 0.5 / 0.5 = 1.0
+		self.assertAlmostEqual(bom.items[0].qty, 1.0)
+
+	def test_real_bom_insert_rejects_yield_tracked_row_missing_both_qty_and_yield_qty(self):
+		"""A real BOM insert for a yield-tracked component with BOTH qty
+		and custom_yield_qty missing still fails closed (real
+		ValidationError) -- there is nothing for the ury-erp/ury#464
+		fallback to derive custom_yield_qty from."""
+		bom = frappe.get_doc(
+			{
+				"doctype": "BOM",
+				"item": self.finished_item,
+				"quantity": 1,
+				"company": self.company,
+				"is_active": 1,
+				"is_default": 1,
+				"with_operations": 0,
+				"items": [
+					{
+						"item_code": self.raw_item,
+						"uom": "Nos",
+						"qty": None,
+						"custom_yield_qty": None,
+						"custom_yield_percent": 50,
+					}
+				],
+			}
+		)
+		with self.assertRaisesRegex(frappe.ValidationError, "custom_yield_qty"):
 			bom.insert(ignore_permissions=True)
 
 
