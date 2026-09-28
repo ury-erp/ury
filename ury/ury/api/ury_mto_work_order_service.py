@@ -94,7 +94,7 @@ def _resolve_bom(item_code, configured_bom=None):
     return bom_no
 
 
-def _resolve_production_plan_link(item_code, branch, company):
+def _resolve_production_plan_link(item_code, branch, company, allow_no_work_order_row=False):
     """Return (production_plan_name, production_plan_item_name) or (None, None).
 
     Finds the submitted Production Plan for today that contains `item_code` by
@@ -112,17 +112,17 @@ def _resolve_production_plan_link(item_code, branch, company):
     than blocking the Mosaic serve flow.
 
     A Production Plan Item row flagged ``custom_ury_no_work_order`` (a
-    MADE_TO_ORDER item's own row -- see ``ury_work_order_hooks``' "Refusing a
-    Work Order for a MADE_TO_ORDER item's own row") is never returned: that
-    guard exists to stop the batch / Prepare-Production path building an MTO
-    item in advance, but ``ury_work_order_hooks.validate`` fires on ANY Work
-    Order linked to such a row -- including this order-triggered one, which is
-    exactly the "produced from the actual order" case the flag protects.
-    Linking to the flagged row would get the insert refused, and the service's
-    per-item try/except would swallow the refusal into ``errors``/log_error,
-    leaving the served order with no Work Order at all. Flagged rows are
-    therefore skipped here, so the Work Order is created unlinked when the
-    only plan row for the item is its guarded MTO row.
+    MADE_TO_ORDER item's own row) means "never build a *batch* Work Order for
+    this row from Prepare Production" -- it must NOT prevent an order-triggered
+    MTO Work Order from referencing the row it was actually produced for.
+    Unflagged rows are always preferred. Flagged rows are returned only when
+    ``allow_no_work_order_row`` is set -- which
+    :func:`create_work_orders_for_kot` does, having marked its Work Order with
+    ``flags.from_mto_kot`` so ``ury_work_order_hooks.validate`` allows the link
+    (see that module's "MADE_TO_ORDER item's own row" section). Without that
+    carve-out the insert would be refused and the per-item try/except would
+    swallow the refusal into ``errors``/log_error, leaving the served order
+    with no Work Order at all (the CBTEST / MFG-PP-2026-00025 incident).
     """
     from frappe.query_builder import DocType
     from frappe.utils import getdate
@@ -148,10 +148,11 @@ def _resolve_production_plan_link(item_code, branch, company):
             .run(as_dict=True)
         )
 
-        # Filter in Python rather than in the query: the flagged row must not
-        # win just because it sorts first, and when it is the ONLY match the
-        # result must fall back to (None, None), not to the flagged row.
-        row = _first_usable_plan_row(rows)
+        # Filter in Python rather than in the query: an unflagged row must
+        # win over a flagged one regardless of ordering, and only an
+        # explicitly MTO-order-triggered caller (allow_no_work_order_row)
+        # may fall back to a flagged row at all.
+        row = _first_usable_plan_row(rows, allow_no_work_order_row=allow_no_work_order_row)
         if not row:
             return None, None
 
@@ -164,16 +165,25 @@ def _resolve_production_plan_link(item_code, branch, company):
         return None, None
 
 
-def _first_usable_plan_row(rows):
-    """First Production Plan Item row NOT flagged ``custom_ury_no_work_order``
-    (see :func:`_resolve_production_plan_link` for why a flagged row must never
-    be linked). ``row.get()`` truthiness check handles both 0/1 flags and
-    unset/NULL flags (rows created outside the URY Sales Plan adapter), which
-    a SQL ``== 0`` filter would wrongly drop. Returns ``None`` when every row
-    is flagged or the list is empty."""
+def _first_usable_plan_row(rows, allow_no_work_order_row=False):
+    """First linkable Production Plan Item row.
+
+    Unflagged rows (``custom_ury_no_work_order`` falsy -- covering both 0/1
+    flags and unset/NULL rows created outside the URY Sales Plan adapter,
+    which a SQL ``== 0`` filter would wrongly drop) always win. When no
+    unflagged row exists, a flagged row is returned only if
+    ``allow_no_work_order_row`` is set -- the order-triggered MTO KOT path,
+    whose Work Order carries ``flags.from_mto_kot`` and is therefore allowed
+    by ``ury_work_order_hooks.validate`` to reference its item's own guarded
+    row. Returns ``None`` when no row qualifies or the list is empty.
+    """
     for row in rows or []:
         if not row.get("no_work_order"):
             return row
+    if allow_no_work_order_row:
+        for row in rows or []:
+            if row.get("no_work_order"):
+                return row
     return None
 
 
@@ -236,7 +246,7 @@ def create_work_orders_for_kot(kot_name):
             qty = frappe.utils.flt(row.get("quantity")) or 1
 
             pp_name, pp_item_name = _resolve_production_plan_link(
-                item_code, branch, context.get("company")
+                item_code, branch, context.get("company"), allow_no_work_order_row=True
             )
 
             wo_doc = frappe.get_doc(
@@ -267,19 +277,22 @@ def create_work_orders_for_kot(kot_name):
                     "use_multi_level_bom": 0,
                     # Link to the day's Production Plan and the specific
                     # Production Plan Item row for this item. Both are None
-                    # when no submitted Production Plan exists today, or when
-                    # the only matching row is a MADE_TO_ORDER row flagged
-                    # custom_ury_no_work_order (see _resolve_production_plan_link
-                    # -- the order-triggered Work Order must not link to the
-                    # row the no-advance-production guard refuses Work Orders
-                    # against) -- the Work Order is still created and
-                    # submitted without them.
+                    # only when no submitted Production Plan for today
+                    # carries this item. The row may legitimately be a
+                    # MADE_TO_ORDER row flagged custom_ury_no_work_order --
+                    # that flag only forbids BATCH Work Orders from Prepare
+                    # Production, and this order-triggered Work Order is
+                    # exactly the "produced from the actual order" case.
+                    # flags.from_mto_kot below tells ury_work_order_hooks.
+                    # validate to allow the link to a flagged row.
                     "production_plan": pp_name,
                     "production_plan_item": pp_item_name,
                 }
             )
 
-            wo_doc.insert()
+            wo_doc.flags.from_mto_kot = True
+            wo_doc.insert(ignore_permissions=True)
+            wo_doc.flags.ignore_permissions = True
             wo_doc.submit()
 
             if has_link_field:

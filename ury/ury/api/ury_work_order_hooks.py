@@ -101,8 +101,8 @@ target-selection design exists to hold.
 
 The executor (``ury_production_plan_auto_work_order.execute_department_targets``)
 already skips building one. This module is the actual enforcement: it
-refuses, unconditionally and before anything else in ``validate``, any Work
-Order whose ``production_plan_item`` links to a row carrying
+refuses, before anything else in ``validate``, any Work Order whose
+``production_plan_item`` links to a row carrying
 ``custom_ury_no_work_order``. This fires for a Work Order our own executor
 would never create in the first place, but also for one created any other
 way -- by hand from the desk, by a script, or by ERPNext's own native
@@ -110,6 +110,18 @@ way -- by hand from the desk, by a script, or by ERPNext's own native
 knowledge of this rule and would otherwise happily build one. The check runs
 before the URY-detection gate below, and does not depend on it succeeding:
 the flag on the Production Plan Item row is itself the authoritative signal.
+
+One deliberate carve-out: a Work Order created by the order-triggered MTO
+KOT service (``ury_mto_work_order_service.create_work_orders_for_kot``) is
+marked with ``flags.from_mto_kot`` and IS allowed to link to the flagged
+row. The flag's meaning is "no *batch* Work Order from Prepare Production
+for this row" -- not "no Work Order may ever reference this row". The
+order-triggered Work Order is exactly the "produced from the actual order"
+case the invariant protects, and it must remain traceable to the Production
+Plan via ``production_plan``/``production_plan_item``. The carve-out is
+narrow by construction: ``flags`` are process-local, never persisted, and
+cannot be set through the desk or API -- so a batch/manual Work Order can
+never smuggle its way past the refusal.
 """
 
 import frappe
@@ -264,12 +276,16 @@ def validate(doc, method=None):
 	own ``set_required_items()`` by the time this runs -- see module
 	docstring.
 
-	Refuses outright, before anything else, a Work Order whose Production
+	Refuses, before anything else, a Work Order whose Production
 	Plan Item is flagged ``custom_ury_no_work_order`` -- see
 	``is_no_work_order_row`` and the module docstring's "Refusing a Work
 	Order for a MADE_TO_ORDER item's own row". This is the actual
 	enforcement of that rule; the executor skipping it is only the
-	well-behaved path, not the guarantee.
+	well-behaved path, not the guarantee. The single carve-out: a Work
+	Order carrying ``doc.flags.from_mto_kot`` (set only by the
+	order-triggered MTO KOT service) is allowed to link to its item's own
+	flagged row -- the flag forbids batch Work Orders, not the actual
+	order-triggered one.
 
 	Otherwise no-ops entirely for a non-URY Work Order (see
 	``is_ury_work_order``). For a URY Work Order: always reasserts the
@@ -280,11 +296,12 @@ def validate(doc, method=None):
 	calls ``apply_ury_warehouse_policy``/``apply_ury_required_items``
 	directly while constructing the draft (D16).
 	"""
-	if is_no_work_order_row(doc):
+	flags = getattr(doc, "flags", None)
+	if is_no_work_order_row(doc) and not (flags and flags.get("from_mto_kot")):
 		frappe.throw(
 			_(
 				"{0} is a MADE_TO_ORDER item's own Production Plan row and must "
-				"never have a Work Order created against it -- it is produced only "
+				"never have a batch Work Order created against it -- it is produced only "
 				"from the actual order, never in advance."
 			).format(doc.get("production_item") or doc.get("name")),
 			frappe.ValidationError,
@@ -296,7 +313,6 @@ def validate(doc, method=None):
 
 	apply_ury_warehouse_policy(doc, production_plan)
 
-	flags = getattr(doc, "flags", None)
 	component_vector = flags.get("ury_component_vector") if flags else None
 	if component_vector is None:
 		return
