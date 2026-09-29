@@ -553,7 +553,21 @@ def getPosProfile():
     if app_array:
         invoice_details["enable_kot_reprint"] = pos_profiles.custom_enable_kot_reprint
 
+    invoice_details["custom_disable_print_status_tracking"] = (
+        pos_profiles.get("custom_disable_print_status_tracking")
+    )
+
     return invoice_details
+
+
+@frappe.whitelist(allow_guest=False)
+def is_printer_watch_installed() -> dict:
+    """Return whether the optional URY Printer Watch app is installed on the current site."""
+    try:
+        installed = "ury_printer_watch" in frappe.get_installed_apps()
+    except Exception:
+        installed = False
+    return {"installed": bool(installed)}
 
 
 @frappe.whitelist()
