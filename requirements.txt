@@ -1,1 +1,2 @@
 # frappe -- https://github.com/frappe/frappe is installed via 'bench init'
+pycups~=2.0.4  # required by ury.ury.printing (CUPS submit/poll) and printer health
