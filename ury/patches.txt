@@ -1,0 +1,3 @@
+[post_model_sync]
+# Patches added in this section will be executed after doctypes are migrated
+ury.patches.v2_0.migrate_kot_reprint_config

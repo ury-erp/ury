@@ -684,3 +684,102 @@ def get_customer_defaults():
         "territory": frappe.db.get_single_value("Selling Settings", "territory")
     }
 
+
+
+TABLE_RELEASE_FIELDS = {
+    "occupied": 0,
+    "latest_invoice_time": None,
+    "merged_with": None,
+}
+
+
+def _parse_merged_with(merged_with):
+    if not merged_with:
+        return []
+    return [partner.strip() for partner in merged_with.split(",") if partner.strip()]
+
+
+def _get_merge_cluster(table):
+    """Return the merge cluster (list of table names) for ``table``.
+
+    Cluster members are discovered by walking the ``merged_with`` links of the
+    tables in the same room. Raises if the table does not exist.
+    """
+    room = frappe.db.get_value("URY Table", table, "restaurant_room")
+    if not room:
+        frappe.throw(_("Table not found."))
+
+    room_tables = frappe.get_all(
+        "URY Table",
+        filters={"restaurant_room": room},
+        fields=["name", "merged_with", "occupied"],
+    )
+    table_by_name = {row.name: row for row in room_tables}
+
+    if table not in table_by_name:
+        frappe.throw(_("Table not found."))
+
+    visited = set()
+    members = []
+    queue = [table]
+
+    while queue:
+        name = queue.pop(0)
+        if name in visited:
+            continue
+        visited.add(name)
+        members.append(name)
+
+        row = table_by_name.get(name)
+        if not row:
+            continue
+
+        for partner in _parse_merged_with(row.merged_with):
+            if partner in table_by_name and partner not in visited:
+                queue.append(partner)
+
+    return members, table_by_name
+
+
+def _get_cluster_table_names(table):
+    if not table:
+        return []
+    try:
+        members, _table_map = _get_merge_cluster(table)
+        return members
+    except Exception:
+        return [table]
+
+
+def _get_table_group(restaurant_table, custom_merged_tables=None):
+    tables = _get_cluster_table_names(restaurant_table)
+    if custom_merged_tables:
+        for table_name in custom_merged_tables.split(","):
+            table_name = table_name.strip()
+            if table_name and table_name not in tables:
+                tables.append(table_name)
+    return tables
+
+
+def release_merge_cluster_tables(table_or_tables):
+    """Release a table, or every table in its merge cluster, after printing.
+
+    Frees ``occupied``/``latest_invoice_time`` (and clears ``merged_with``
+    links) for the given table(s) and their merge partners. Sites without the
+    merge-cluster fields degrade gracefully to releasing the given table(s)
+    only, matching the legacy single-table release behavior.
+    """
+    if isinstance(table_or_tables, (list, tuple, set)):
+        cluster = list(table_or_tables)
+    else:
+        cluster = _get_table_group(table_or_tables)
+
+    for member in cluster:
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            TABLE_RELEASE_FIELDS,
+            update_modified=False,
+        )
+
+    frappe.db.commit()

@@ -108,6 +108,10 @@ website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+override_doctype_class = {
+    "Network Printer Settings": "ury.ury.printing.custom_network_printer_settings.CustomNetworkPrinterSettings"
+}
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -140,23 +144,33 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
+# Scheduled Tasks
+# ---------------
+
+scheduler_events = {
+	"cron": {
+		"* * * * *": [
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs"
+		]
+	},
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
 # 	"daily": [
 # 		"ury.tasks.daily"
 # 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs",
+		"ury.ury.printing.printer_monitor.check_all_printers_health"
+	],
 # 	"weekly": [
 # 		"ury.tasks.weekly"
 # 	],
 # 	"monthly": [
 # 		"ury.tasks.monthly"
 # 	],
-# }
+}
 
 # Testing
 # -------
@@ -315,7 +329,21 @@ fixtures = [
                     "POS Opening Entry-custom_rooms",
                     "POS Opening Entry-custom_sub_pos_close_entry",
                     "POS Closing Entry Detail-custom_closing_amount",
-                    "POS Profile-custom_edit_order_type"
+                    "POS Profile-custom_edit_order_type",
+                    "POS Profile-custom_disable_print_status_tracking",
+                    "POS Invoice-custom_printing_time",
+                    "POS Profile-custom_enable_kot_reprint",
+                    "POS Profile-custom_reprint_kot_format",
+                    "POS Profile-custom_parcel_order_printer",
+                    "POS Profile-custom_column_break_wwq3q",
+                    "POS Profile-custom_table_order_printer",
+                    "URY Printer Settings-custom_kot_print",
+                    "URY Printer Settings-custom_kot_print_format",
+                    "URY Printer Settings-custom_kot_reprint",
+                    "URY Printer Settings-custom_kot_reprint_format",
+                    "URY Printer Settings-custom_waiter_print",
+                    "URY Printer Settings-custom_waiter_print_format",
+                    "URY Printer Settings-custom_block_takeaway_kot"
                 },
             ]
         ],
