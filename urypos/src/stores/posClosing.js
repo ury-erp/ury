@@ -101,11 +101,20 @@ export const posClosing = defineStore("posClose", {
       };
       this.call
         .get(
-          "erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices",
+          "erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_invoices",
           PosOpenEntry
         )
         .then((result) => {
-          this.invoiceDetails = result.message;
+          let msg = result.message;
+          if (msg && msg.invoices && !Array.isArray(msg)) {
+            let invMap = {};
+            msg.invoices.forEach(i => { i.payments = []; i.taxes = []; invMap[i.name] = i; });
+            if (msg.payments) msg.payments.forEach(p => { if (invMap[p.parent]) invMap[p.parent].payments.push(p); });
+            if (msg.taxes) msg.taxes.forEach(t => { if (invMap[t.parent]) invMap[t.parent].taxes.push(t); });
+            this.invoiceDetails = msg.invoices;
+          } else {
+            this.invoiceDetails = msg || [];
+          }
           let paymentAggregated = {};
           this.invoiceDetails.forEach((payment) => {
             this.grandTotal += parseFloat(payment.grand_total);

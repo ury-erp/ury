@@ -250,11 +250,20 @@ export async function getMainCashierPosInvoices(
 ): Promise<POSClosingInvoice[]> {
   try {
     const response = await call.get<{ message: POSClosingInvoice[] }>(
-      'erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices',
+      'erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_invoices',
       { start, end, pos_profile: posProfile, user }
     );
 
-    return response.message;
+    let msg = response.message as any;
+    if (msg && msg.invoices && !Array.isArray(msg)) {
+      let invMap: any = {};
+      msg.invoices.forEach((i: any) => { i.payments = []; i.taxes = []; invMap[i.name] = i; });
+      if (msg.payments) msg.payments.forEach((p: any) => { if (invMap[p.parent]) invMap[p.parent].payments.push(p); });
+      if (msg.taxes) msg.taxes.forEach((t: any) => { if (invMap[t.parent]) invMap[t.parent].taxes.push(t); });
+      return msg.invoices as POSClosingInvoice[];
+    }
+
+    return msg as POSClosingInvoice[];
   } catch (error) {
     console.error('Error fetching main-cashier POS invoices:', error);
     throw error;
