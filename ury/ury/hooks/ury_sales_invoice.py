@@ -28,6 +28,11 @@ def set_sales_invoice_commission_attribution(doc, method=None):
     doc.custom_closing_employee = _employee_for_user(doc.cashier) or doc.get("custom_closing_employee")
 
 
+def validate(doc, method):
+    if doc.is_pos:
+        doc.update_stock = 1
+
+
 def before_insert(doc, method):
     sales_invoice_naming(doc, method)
     set_sales_invoice_commission_attribution(doc, method)

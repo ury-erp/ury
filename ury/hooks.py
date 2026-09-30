@@ -237,6 +237,7 @@ doc_events = {
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
     "Sales Invoice": {
+        "validate": "ury.ury.hooks.ury_sales_invoice.validate",
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
         "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
         "on_submit": [
