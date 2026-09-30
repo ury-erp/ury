@@ -879,7 +879,7 @@ def getPosProfileFull(pos_profile):
         "country": profile.country,
         "disabled": profile.disabled,
         "warehouse": profile.warehouse,
-        "campaign": profile.campaign,
+        "campaign": profile.get("campaign"),
         "company_address": profile.company_address,
         "restaurant": profile.restaurant,
         "branch": profile.branch,
