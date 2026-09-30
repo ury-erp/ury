@@ -426,6 +426,11 @@ def _transition(kot_item, target_state, idempotency_key, actor_field, timestamp_
 	_require_execution_actor(actor, locked["branch"], locked["company"])
 	if locked["state"] == target_state:
 		return _result_dict(locked, idempotent=True)
+	
+	state_order = {QUEUED: 0, IN_PREPARATION: 1, READY: 2, SERVED: 3}
+	if state_order.get(locked["state"], -1) > state_order.get(target_state, -1):
+		return _result_dict(locked, idempotent=True)
+
 	if locked["state"] not in (QUEUED, IN_PREPARATION, READY) or (locked["state"] == QUEUED and target_state not in (IN_PREPARATION, READY)):
 		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("Cannot transition KOT item {0} execution from {1} to {2}").format(kot_item, locked["state"], target_state))
 	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, locked["name"])
