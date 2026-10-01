@@ -55,9 +55,19 @@ async function renderContext(data = context) {
 
 describe('occupied till message', () => {
   it('formats the start time for humans rather than showing the raw database timestamp', async () => {
+    const formatDate = vi.spyOn(Date.prototype, 'toLocaleString');
     const message = await renderContext();
-    expect(message).toContain('since 10/1/2026, 8:10:00 AM');
+    expect(message).toMatch(/since .+;/);
     expect(message).not.toContain('2026-10-01 08:10:00');
+    expect(formatDate).toHaveBeenCalledWith('en');
+  });
+
+  it('formats the start time using the active French language', async () => {
+    await initI18n('fr');
+    const formatDate = vi.spyOn(Date.prototype, 'toLocaleString');
+    const message = await renderContext();
+    expect(message).toMatch(/depuis .+ ;/);
+    expect(formatDate).toHaveBeenCalledWith('fr');
   });
 
   it('shows the holder full name without their email address', async () => {
@@ -72,15 +82,33 @@ describe('occupied till message', () => {
       occupied_entry: { ...context.occupied_entry!, user_full_name: 'other@example.com' },
     });
     expect(message).toContain('POS-1');
+    expect(message).toContain('another cashier');
     expect(container.textContent).not.toContain('other@example.com');
+  });
+
+  it.each([
+    ['en', 'another cashier'],
+    ['fr', 'un autre caissier'],
+    ['ar', 'أمين صندوق آخر'],
+  ])('renders a translated holder fallback in %s when the full name is missing', async (language, holder) => {
+    await initI18n(language);
+    const message = await renderContext({
+      ...context,
+      occupied_entry: { ...context.occupied_entry!, user_full_name: null },
+    });
+    expect(message).toContain(holder);
+    expect(message).toContain('POS-1');
+    expect(message).not.toContain('{{');
   });
 
   it('renders an Arabic occupied-till message with the profile and holder', async () => {
     await initI18n('ar');
+    const formatDate = vi.spyOn(Date.prototype, 'toLocaleString');
     const message = await renderContext();
     expect(message).toMatch(/[\u0600-\u06ff]/);
     expect(message).toContain('POS-1');
     expect(message).toContain('Other Cashier');
     expect(message).not.toContain('{{');
+    expect(formatDate).toHaveBeenCalledWith('ar');
   });
 });
