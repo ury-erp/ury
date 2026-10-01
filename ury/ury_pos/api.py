@@ -965,6 +965,54 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "message": str(e)
         }
 
+@frappe.whitelist(methods=["GET"])
+def get_till_invoices(start, end, pos_profile, user):
+    """Return full invoices for the holder's open till, regardless of cashier.
+
+    Keep the v15 closing response contract on v16. The opening, not the
+    client-supplied start, defines the beginning of the inclusive period.
+    """
+    if frappe.session.user != user and not (
+        {"URY Manager", "System Manager"} & set(frappe.get_roles(frappe.session.user))
+    ):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    openings = frappe.get_list(
+        "POS Opening Entry",
+        filters={"docstatus": 1, "status": "Open", "pos_profile": pos_profile, "user": user},
+        fields=["period_start_date"],
+        order_by="period_start_date desc",
+        limit_page_length=1,
+    )
+    if not openings:
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    start = frappe.utils.get_datetime(openings[0].period_start_date)
+    end = frappe.utils.get_datetime(end)
+    rows = frappe.get_list(
+        "POS Invoice",
+        filters={
+            "docstatus": 1,
+            "pos_profile": pos_profile,
+            "consolidated_invoice": ["is", "not set"],
+            "posting_date": ["between", [start.date(), end.date()]],
+        },
+        fields=["name", "posting_date", "posting_time"],
+        order_by="posting_date asc, posting_time asc",
+        limit_page_length=0,
+    )
+    invoices = []
+    for row in rows:
+        # MariaDB returns posting_time as a timedelta, not a datetime.time.
+        timestamp = datetime.combine(
+            frappe.utils.get_datetime(row.posting_date).date(),
+            frappe.utils.get_time(row.posting_time),
+        )
+        if start <= timestamp <= end:
+            invoices.append(frappe.get_doc("POS Invoice", row.name).as_dict())
+    return invoices
+
+
 @frappe.whitelist()
 def get_open_pos_opening_entries(pos_profile):
     """Currently open (status=Open, submitted) POS Opening Entries for the

@@ -18,6 +18,7 @@ export const posClosing = defineStore("posClose", {
     showPosOpen: false,
     selectedPosOpenEntry: null,
     cashier: null,
+    posProfile: null,
     postingTime: new Date(),
     openingBalance: [],
     closingAmount: 0,
@@ -73,7 +74,8 @@ export const posClosing = defineStore("posClose", {
         .get("frappe.client.get", getPosOpenEntry)
         .then((result) => {
           this.startDate = result.message.period_start_date;
-          this.cashier = result.message.owner;
+          this.cashier = result.message.user;
+          this.posProfile = result.message.pos_profile;
           this.openingBalance = result.message.balance_details;
 
           this.getInvoice();
@@ -96,12 +98,12 @@ export const posClosing = defineStore("posClose", {
       const PosOpenEntry = {
         start: this.startDate,
         end: this.formattedDateTime,
-        pos_profile: this.invoiceData.posProfile,
+        pos_profile: this.posProfile,
         user: this.cashier,
       };
       this.call
         .get(
-          "erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices",
+          "ury.ury_pos.api.get_till_invoices",
           PosOpenEntry
         )
         .then((result) => {
@@ -184,9 +186,8 @@ export const posClosing = defineStore("posClose", {
           posting_date: this.postingDate,
           posting_time: formattedTime,
           company: this.invoiceData.company,
-          pos_profile: this.invoiceData.posProfile,
+          pos_profile: this.posProfile,
           payment_reconciliation: payment_reconciliation,
-          pos_transactions: this.posInvoice,
           pos_opening_entry: this.selectedPosOpenEntry,
           user: this.cashier,
           grand_total: this.grandTotal,
