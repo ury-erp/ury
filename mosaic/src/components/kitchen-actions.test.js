@@ -146,6 +146,47 @@ test("LATE starts at the configured warning threshold and ignores an unset thres
   assert.equal(ticket.late, false);
 });
 
+test("ticket elapsed time follows the site clock instead of the browser clock", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 0 });
+  const { state } = kitchen();
+  // Berlin's wall clock is one hour behind Africa/Kampala on this date.
+  const cases = [
+    { browserTime: "2026-10-01T12:00:30", offset: 3600000, ticketTime: "13:00:00", elapsed: "0 : 0" },
+    { browserTime: "2026-10-01T12:05:30", offset: 3600000, ticketTime: "13:00:00", elapsed: "0 : 5" },
+    { browserTime: "2026-10-01T12:05:30", offset: 3600000, ticketTime: "12:00:00", elapsed: "1 : 5" },
+    { browserTime: "2026-10-01T13:05:30", offset: -3600000, ticketTime: "12:00:00", elapsed: "0 : 5" },
+    { browserTime: "2026-09-30T23:05:30", offset: 3600000, ticketTime: "00:00:00", elapsed: "0 : 5" },
+  ];
+  for (const { browserTime, offset, ticketTime, elapsed } of cases) {
+    t.mock.timers.setTime(new Date(browserTime).getTime());
+    state.serverTimeOffset = offset;
+    assert.equal(state.calculateTimeRemaining(ticketTime), elapsed, `${browserTime}, site offset ${offset}`);
+  }
+});
+
+test("ticket elapsed time never displays a negative duration", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:00").getTime() });
+  const { state } = kitchen();
+  state.serverTimeOffset = 3600000;
+  assert.equal(state.calculateTimeRemaining("13:00:01"), "0 : 0");
+  assert.equal(state.calculateTimeRemaining("13:01:00"), "0 : 0");
+});
+
+test("elapsed time drives the LATE cue and delay notification on the site clock", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:15:00").getTime() });
+  const { state, ticket, requests } = kitchen();
+  state.serverTimeOffset = 3600000;
+  state.kot_alert_time = 15;
+  ticket.time = "13:00:00";
+  state.updateTimeRemaining();
+  assert.equal(ticket.timeRemaining, "0 : 15");
+  assert.equal(ticket.late, true);
+  assert.equal(ticket.timecolor, "text-[#DC0000]");
+  assert.deepEqual(requests, [{
+    method: "ury.ury.api.ury_kot_notification.order_delay_notification", args: { id: "KOT-001" },
+  }]);
+});
+
 test("recent served query is native and constrained to the branch and production unit", async () => {
   const { state, call } = kitchen();
   state.branch = "Branch A";
