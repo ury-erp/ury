@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { logoutSession, clearAppStorage, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { showToast } from '@ury/ui';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
 import {
   Bell,
@@ -37,6 +38,8 @@ export const Header: React.FC = () => {
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutPending = useRef(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userInfo, setUserInfo] = useState({ fullName: 'Admin User', email: 'admin@urypos.com' });
@@ -109,21 +112,24 @@ export const Header: React.FC = () => {
   };
 
   const handleClearCache = () => {
-    // Clear all local storage
-    localStorage.clear();
-    // Clear all session storage
-    sessionStorage.clear();
+    clearAppStorage();
     // Reload the page
     window.location.reload();
   };
 
   const handleLogout = async () => {
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    setLoggingOut(true);
     try {
-      await logout();
+      await logoutSession((window as Window & { csrf_token?: string }).csrf_token);
+      clearAppStorage();
+      window.location.href = '/login';
     } catch {
-      // Ignore logout errors
+      showToast.error('Failed to logout. Please try again.');
     } finally {
-      window.location.href = '/login?redirect-to=%2Fpos';
+      logoutPending.current = false;
+      setLoggingOut(false);
     }
   };
 
@@ -258,6 +264,7 @@ export const Header: React.FC = () => {
 
                   <button
                     onClick={handleLogout}
+                    disabled={loggingOut}
                     className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut className="w-4 h-4 text-red-500" />
