@@ -6,6 +6,7 @@ import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import MultiSelect from '../../components/common/MultiSelect';
 
 interface UserRecord {
   name: string;
@@ -345,39 +346,14 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-2">Roles / Access Level</label>
-            <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              {URY_ROLE_OPTIONS.map((option) => {
-                const isChecked = newUser.roles.includes(option.value);
-                return (
-                  <label
-                    key={option.value}
-                    className={`flex items-center gap-2.5 p-2 rounded-md border text-sm cursor-pointer transition-colors ${
-                      isChecked
-                        ? 'bg-primary/10 border-primary/40 text-primary font-medium'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setNewUser((prev) => ({ ...prev, roles: [...prev.roles, option.value] }));
-                        } else {
-                          setNewUser((prev) => ({
-                            ...prev,
-                            roles: prev.roles.filter((r) => r !== option.value),
-                          }));
-                        }
-                      }}
-                      className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                );
-              })}
-            </div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Roles / Access Level</label>
+            <MultiSelect
+              id="user-roles"
+              values={newUser.roles}
+              options={URY_ROLE_OPTIONS}
+              placeholder="Select roles..."
+              onChange={(selectedRoles) => setNewUser({ ...newUser, roles: selectedRoles })}
+            />
           </div>
 
           <div className="flex items-center gap-2">

@@ -81,7 +81,7 @@ describe("UserPage", () => {
     });
   });
 
-  it("renders role checkboxes including URY Admin when opening Add User drawer", async () => {
+  it("renders multi-select role dropdown including URY Admin when opening Add User drawer", async () => {
     vi.mocked(dashboardService.getModuleRecords).mockResolvedValue([]);
 
     render(<UserPage />);
@@ -94,10 +94,20 @@ describe("UserPage", () => {
     fireEvent.click(addButton);
 
     await waitFor(() => {
+      expect(screen.getByText("Roles / Access Level")).toBeInTheDocument();
+      expect(screen.getByText("URY Cashier")).toBeInTheDocument();
+    });
+
+    // Click the MultiSelect dropdown trigger
+    const selectTrigger = screen.getByText("URY Cashier").closest("div");
+    if (selectTrigger) {
+      fireEvent.click(selectTrigger);
+    }
+
+    await waitFor(() => {
       expect(screen.getByText("URY Admin")).toBeInTheDocument();
       expect(screen.getByText("URY Manager")).toBeInTheDocument();
       expect(screen.getByText("URY Captain")).toBeInTheDocument();
-      expect(screen.getByText("URY Cashier")).toBeInTheDocument();
     });
   });
 });
