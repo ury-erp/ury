@@ -201,9 +201,9 @@ before_uninstall = "ury.uninstall.uninstall"
 # ---------------
 # Override standard doctype classes
 
-override_doctype_class = {
-	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
-}
+# override_doctype_class = {
+# 	"ToDo": "custom_app.overrides.CustomToDo"
+# }
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
 # on every migrate. Safe to define even when huf is not installed — the
@@ -479,6 +479,7 @@ fixtures = [
                     "URY Production Unit-disable",
                     "URY Restaurant-tax_id",
                     "URY Room-print_format",
+                    "URY Room-room_name",
                     "URY Table-table_name",
                     "Production Plan-custom_ury_section",
                     "Production Plan-custom_ury_sales_plan",
