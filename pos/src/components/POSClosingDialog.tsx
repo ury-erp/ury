@@ -188,6 +188,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0 });
   const [rows, setRows] = useState<ClosingPaymentSummary[]>([]);
+  // Sales-only tenders must be reconciled without affecting blind-count UI or validation.
+  const [hiddenRows, setHiddenRows] = useState<ClosingPaymentSummary[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Set once the close submission (Sub POS Closing / POS Closing Entry) has
@@ -271,7 +273,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setInvoiceCount(invoices.length);
       const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
       setTotals(aggregatedTotals);
-      setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode, blindCashCount, paymentModes));
+      const paymentRows = buildRows(openingDoc?.balance_details ?? [], expectedByMode, blindCashCount, paymentModes);
+      setRows(paymentRows);
+      setHiddenRows(blindCashCount
+        ? buildRows([], expectedByMode, false, []).filter(
+            (row) => !paymentRows.some((visibleRow) => visibleRow.mode_of_payment === row.mode_of_payment)
+          )
+        : []);
       setTouchedModes(new Set());
     } catch (error) {
       console.error('Failed to load POS closing details:', error);
@@ -359,7 +367,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const paymentReconciliation = rows.map((row) => ({
+    const paymentReconciliation = [...rows, ...hiddenRows].map((row) => ({
       mode_of_payment: row.mode_of_payment,
       opening_amount: row.opening_amount,
       expected_amount: row.expected_amount,
