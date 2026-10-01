@@ -318,7 +318,12 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           selectedTables ? `Sent to kitchen · ${selectedTables}` : "Sent to kitchen"
         );
         this.table.fetchTable();
-        await router.push("/Table");
+        if (this.auth.cashier) {
+          await router.push("/recentOrder");
+          this.recentOrders.viewRecentOrder(response.message);
+        } else {
+          await router.push("/Table");
+        }
       } catch (error) {
         if (error === 'User cancelled the operation') {
           return; // Silently handle cancellation
