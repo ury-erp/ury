@@ -52,8 +52,8 @@ export function kitchenErrorMessage(error, fallback) {
     : fallback;
 }
 
-export function rememberKot(seen, kot, production) {
-  if (kot.production !== production || seen.has(kot.name)) return false;
+export function rememberKot(seen, kot) {
+  if (seen.has(kot.name)) return false;
   seen.add(kot.name);
   return true;
 }
