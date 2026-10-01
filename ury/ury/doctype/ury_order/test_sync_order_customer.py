@@ -22,6 +22,7 @@ class TestSyncOrderCustomer(unittest.TestCase):
         )
         self.invoice = MagicMock()
         self.invoice.name = None
+        self.invoice.customer = None
         self.invoice.waiter = None
         self.invoice.invoice_printed = 0
         self.invoice.restaurant_table = None
@@ -77,9 +78,23 @@ class TestSyncOrderCustomer(unittest.TestCase):
             **kwargs,
         )
 
+    def send_existing(self, customer):
+        self.invoice.name = "POS-INV-001"
+        self.invoice.waiter = self.frappe.session.user
+        self.invoice.modified = "2026-10-01 08:00:00"
+        try:
+            return self.send(
+                customer,
+                last_invoice=self.invoice.name,
+                last_modified_time=self.invoice.modified,
+            )
+        except frappe.ValidationError as error:
+            self.fail(f"A valid existing or default customer must allow sending: {error}")
+
     def test_empty_customer_uses_profile_customer(self):
         for customer in ("", None):
             with self.subTest(customer=customer):
+                self.invoice.customer = None
                 try:
                     self.send(customer)
                 except frappe.ValidationError as error:
@@ -93,6 +108,34 @@ class TestSyncOrderCustomer(unittest.TestCase):
         self.send("Named Customer")
         self.assertEqual(self.invoice.customer, "Named Customer")
         self.assertEqual(self.customer_lookups, ["Named Customer"])
+        self.invoice.save.assert_called_once()
+
+    def test_explicit_customer_overrides_existing_invoice_and_profile(self):
+        self.invoice.customer = "Existing Customer"
+        self.send_existing("Named Customer")
+        self.assertEqual(self.invoice.customer, "Named Customer")
+        self.assertEqual(self.customer_lookups, ["Named Customer"])
+        self.invoice.save.assert_called_once()
+
+    def test_empty_customer_preserves_existing_invoice_customer(self):
+        self.invoice.customer = "Existing Customer"
+        self.send_existing("")
+        self.assertEqual(self.invoice.customer, "Existing Customer")
+        self.assertEqual(self.customer_lookups, ["Existing Customer"])
+        self.invoice.save.assert_called_once()
+
+    def test_existing_customer_does_not_require_profile_default(self):
+        self.invoice.customer = "Existing Customer"
+        self.profile.customer = None
+        self.send_existing(None)
+        self.assertEqual(self.invoice.customer, "Existing Customer")
+        self.assertEqual(self.customer_lookups, ["Existing Customer"])
+        self.invoice.save.assert_called_once()
+
+    def test_existing_invoice_without_customer_uses_profile_customer(self):
+        self.send_existing("")
+        self.assertEqual(self.invoice.customer, "Walk-in Customer")
+        self.assertEqual(self.customer_lookups, ["Walk-in Customer"])
         self.invoice.save.assert_called_once()
 
     def test_explicit_customer_does_not_require_profile_default(self):
