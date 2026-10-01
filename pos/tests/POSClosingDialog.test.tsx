@@ -119,13 +119,30 @@ describe('blind cash count totals', () => {
     expect(text).not.toContain('600.11');
   });
 
-  it.each([0, undefined])('keeps both totals visible when blind count is %s', async (flag) => {
+  it.each([
+    { label: 'Total Quantity', value: '7' },
+    { label: 'Total Invoices', value: '1' },
+  ])('hides the $label card and its sales activity before the cashier declares', async ({ label, value }) => {
+    const text = await renderClosing();
+    expect(text).not.toContain(label);
+    const summaryValues = Array.from(container.querySelectorAll('p.text-lg.font-semibold'))
+      .map((summary) => summary.textContent);
+    expect(summaryValues).not.toContain(value);
+  });
+
+  it.each([0, undefined])('keeps totals and activity summaries visible when blind count is %s', async (flag) => {
     state.profile.custom_blind_cash_count = flag;
     const text = await renderClosing();
     expect(text).toContain('Grand Total');
     expect(text).toContain('654.32');
     expect(text).toContain('Net Total');
     expect(text).toContain('600.11');
+    expect(text).toContain('Total Quantity');
+    expect(text).toContain('Total Invoices');
+    const summaryValues = Array.from(container.querySelectorAll('p.text-lg.font-semibold'))
+      .map((summary) => summary.textContent);
+    expect(summaryValues).toContain('7');
+    expect(summaryValues).toContain('1');
   });
 });
 
