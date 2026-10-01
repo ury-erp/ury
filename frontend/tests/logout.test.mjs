@@ -64,6 +64,37 @@ test('URY: successful logout lands on the common login without an app redirect',
   assert.equal(env.globals.window.location.href, '/login');
 });
 
+test('URY: successful logout stays disabled and blocks requests while navigating', async () => {
+  const env = environment();
+  const render = header(env);
+  await render()('Logout').props.onClick();
+  const button = render()('Logout');
+  const disabled = button.props.disabled;
+  await button.props.onClick();
+  assert.equal(disabled, true);
+  assert.equal(env.calls.length, 1);
+  assert.equal(env.globals.window.location.href, '/login');
+});
+
+for (const action of ['Logout', 'Clear Cache']) {
+  for (const [storage, key] of [
+    ['sessionStorage', 'ury.setup.configureState'],
+    ['localStorage', 'ury_active_branch_id'],
+  ]) {
+    test(`URY: ${action} removes ${key} before another user inherits it`, async () => {
+      const env = environment();
+      await header(env)()(action).props.onClick();
+      assert.equal(env.globals[storage].getItem(key), null, key);
+    });
+  }
+
+  test(`URY: ${action} preserves the language preference`, async () => {
+    const env = environment();
+    await header(env)()(action).props.onClick();
+    assert.equal(env.globals.localStorage.getItem('ury_language'), 'fr');
+  });
+}
+
 test('URY: successful logout removes session carts but preserves unrelated storage', async () => {
   const env = environment();
   env.globals.localStorage.setItem('posOrderTabsData:bob@example.com', 'Bob carts');

@@ -50,9 +50,15 @@ export function environment() {
     userAuth: 'true', selectedRoom: 'Dining', posOrderTabsData: 'legacy carts',
     'posOrderTabsData:alice@example.com': 'Alice carts', kot_time: '08:00',
     'KOT-001_item-001_strike': 'true', deskPreference: 'keep',
-    ury_device_credential: 'keep',
+    ury_device_credential: 'keep', ury_active_branch_id: 'alice-branch',
+    ury_language: 'fr',
   });
-  const sessionStorage = memoryStorage({ posProfile: 'cached', deskSession: 'keep' });
+  const sessionStorage = memoryStorage({
+    posProfile: 'cached', deskSession: 'keep',
+    'ury.setup.configureState': JSON.stringify({
+      users: [{ passwordPlaceholder: 'test-only-initial-password' }],
+    }),
+  });
   const window = {
     csrf_token: 'session-token',
     frappe: { boot: { user: { name: 'alice@example.com' } } },
