@@ -142,6 +142,20 @@ class TestKitchenActions(unittest.TestCase):
         result = kitchen.kot_list()
         self.assertEqual(result.get("server_time"), "2026-10-01 00:05:00")
 
+    def test_active_list_includes_the_pos_profile_socket_alert_sound(self):
+        self.patch(frappe, "get_list", return_value=[])
+        self.patch(frappe.utils, "now", return_value="2026-10-01 00:05:00")
+        self.patch(frappe.utils, "add_to_date", return_value="2026-09-30 21:05:00")
+        frappe.db.get_value.side_effect = lambda doctype, filters, field: (
+            "/files/kitchen-alert.wav"
+            if (doctype, filters, field) == (
+                "POS Profile", {"branch": "Branch A"}, "custom_kot_alert_sound"
+            ) else 0
+        )
+        result = kitchen.kot_list()
+        self.assertEqual(result.get("audio_file"), "/files/kitchen-alert.wav")
+        self.assert_no_write()
+
 
 if __name__ == "__main__":
     unittest.main()

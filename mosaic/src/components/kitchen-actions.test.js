@@ -22,8 +22,9 @@ const socketTicket = (name, production = "Kitchen") => ({
   time: "13:00:00", kot_items: [], invoice: "INV-001", user: "Cook",
 });
 const socketEvent = kot => ({ kot, audio_file: "/alert.wav", last_kot_time: null });
-const kotSnapshot = (tickets, serverTime = "2026-10-01 13:00:30") => ({ message: {
+const kotSnapshot = (tickets, serverTime = "2026-10-01 13:00:30", settings = {}) => ({ message: {
   Branch: "Branch A", kot_alert_time: 9999, audio_alert: 1,
+  audio_file: "/snapshot-alert.wav", ...settings,
   daily_order_number: 0, server_time: serverTime, KOT: structuredClone(tickets),
 } });
 
@@ -34,12 +35,13 @@ function kitchen({ connected = true } = {}) {
   const socket = new EventEmitter();
   socket.connected = connected;
   let snapshot = [socketTicket("KNOWN")], serverTime = "2026-10-01 13:00:30";
+  let snapshotSettings = {};
   let timerId = 0;
   const call = {
     post: async (method, args) => { requests.push({ method, args }); return {}; },
     get: async (method, args) => {
       requests.push({ method, args });
-      return kotSnapshot(snapshot, serverTime);
+      return kotSnapshot(snapshot, serverTime, snapshotSettings);
     },
   };
   const auth = { getLoggedInUser: async () => "cook@example.test" };
@@ -89,7 +91,9 @@ function kitchen({ connected = true } = {}) {
   };
   return { state, ticket, requests, timers, call, component, socket, chimes, auth, intervals, mount, html,
     unmount: mounted => component.beforeUnmount.call(mounted),
-    snapshot: (value, time = serverTime) => { snapshot = value; serverTime = time; },
+    snapshot: (value, time = serverTime, settings = {}) => {
+      snapshot = value; serverTime = time; snapshotSettings = settings;
+    },
     disconnect() { socket.connected = false; socket.emit("disconnect", "transport close"); },
     connect() { socket.connected = true; socket.emit("connect"); },
   };
@@ -378,7 +382,7 @@ test("known, repeated and wrong-station tickets do not produce new-ticket chimes
   const state = k.mount();
   await settle();
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("KNOWN")));
-  k.socket.emit(state.kot_channel, socketEvent(socketTicket("OTHER", "Bar")));
+  k.socket.emit("kot_update_Branch A_Bar", socketEvent(socketTicket("OTHER", "Bar")));
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
   assert.equal(k.chimes.length, 1, "Only a previously unseen ticket for this station should chime");
@@ -388,7 +392,7 @@ test("known, repeated and wrong-station tickets do not produce new-ticket chimes
   assert.equal(k.chimes.length, 1, "An already-seen served ticket is not a new ticket");
 });
 
-test("reconnect resyncs missed tickets and the server clock without replay chimes", async (t) => {
+test("reconnect resyncs the server clock and chimes once for all missed station tickets", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:30").getTime() });
   const k = kitchen();
   const state = k.mount();
@@ -396,19 +400,141 @@ test("reconnect resyncs missed tickets and the server clock without replay chime
   assert.equal(state.serverTimeOffset, 3600000);
   k.disconnect();
   t.mock.timers.setTime(new Date("2026-10-01T12:05:30").getTime());
-  k.snapshot([socketTicket("MISSED"), socketTicket("KNOWN")], "2026-10-01 13:05:30");
+  k.snapshot([socketTicket("MISSED"), socketTicket("MISSED-2"), socketTicket("KNOWN")], "2026-10-01 13:05:30");
   k.connect();
   await settle();
-  assert.deepEqual(state.kot.map(kot => kot.name), ["MISSED", "KNOWN"], "Socket.IO does not replay disconnected tickets");
+  assert.deepEqual(state.kot.map(kot => kot.name), ["MISSED", "MISSED-2", "KNOWN"], "Socket.IO does not replay disconnected tickets");
   assert.deepEqual(k.requests, Array.from({ length: 2 }, () => ({ method: "ury.ury.api.ury_kot_display.kot_list", args: {} })));
   assert.equal(state.serverTimeOffset, 3600000, "Reconnect must also refresh the site-clock offset");
   assert.equal(state.calculateTimeRemaining("13:00:00"), "0 : 5");
-  assert.equal(k.chimes.length, 0, "Server snapshots must be silent");
+  assert.deepEqual(k.chimes, ["https://test/snapshot-alert.wav"], "Reconnect must combine missed station tickets into one chime using the snapshot sound");
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("KNOWN")));
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("MISSED")));
-  assert.equal(k.chimes.length, 0, "Resynced tickets are already known");
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("MISSED-2")));
+  assert.equal(k.chimes.length, 1, "Resynced tickets are already known");
   k.socket.emit(state.kot_channel, socketEvent(socketTicket("AFTER")));
-  assert.equal(k.chimes.length, 1);
+  assert.equal(k.chimes.length, 2);
+});
+
+test("initial snapshots and reconnects with only known or other-station tickets stay silent", async () => {
+  const k = kitchen();
+  k.snapshot([socketTicket("KNOWN"), socketTicket("KNOWN-2")]);
+  const state = k.mount();
+  await settle();
+  assert.equal(k.chimes.length, 0, "Initial page load must stay silent");
+  k.disconnect();
+  k.snapshot([socketTicket("OTHER", "Bar"), socketTicket("KNOWN"), socketTicket("KNOWN-2")]);
+  k.connect();
+  await settle();
+  assert.equal(k.chimes.length, 0, "Another station's unseen tickets must not chime here");
+  k.socket.emit("kot_update_Branch A_Bar", socketEvent(socketTicket("OTHER", "Bar")));
+  assert.equal(k.chimes.length, 0);
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
+  assert.deepEqual(k.chimes, ["https://test/alert.wav"]);
+});
+
+test("reconnect uses the last socket-delivered sound when the snapshot has none", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.socket.emit(state.kot_channel, { ...socketEvent(socketTicket("KNOWN")), audio_file: "/socket-alert.wav" });
+  assert.equal(k.chimes.length, 0, "A known socket ticket can supply the fallback without chiming");
+  k.disconnect();
+  k.snapshot([socketTicket("MISSED"), socketTicket("KNOWN")], undefined, { audio_file: undefined });
+  k.connect();
+  await settle();
+  assert.deepEqual(k.chimes, ["https://test/socket-alert.wav"]);
+});
+
+test("reconnect prefers the server sound over the last socket-delivered sound", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.socket.emit(state.kot_channel, { ...socketEvent(socketTicket("KNOWN")), audio_file: "/old-alert.wav" });
+  k.disconnect();
+  k.snapshot([socketTicket("MISSED")]);
+  k.connect();
+  await settle();
+  assert.deepEqual(k.chimes, ["https://test/snapshot-alert.wav"]);
+});
+
+test("reconnect respects disabled audio and remembers missed tickets without replay", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  k.snapshot([socketTicket("MISSED")], undefined, { audio_alert: 0 });
+  k.connect();
+  await settle();
+  assert.equal(state.kot[0].name, "MISSED");
+  assert.equal(k.chimes.length, 0);
+  k.disconnect();
+  k.snapshot([socketTicket("MISSED")]);
+  k.connect();
+  await settle();
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("MISSED")));
+  assert.equal(k.chimes.length, 0, "Re-enabling audio must not replay a previously seen ticket");
+});
+
+test("a reconnect with no snapshot or socket sound does not play an invalid audio URL", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  k.snapshot([socketTicket("MISSED")], undefined, { audio_file: null });
+  k.connect();
+  await settle();
+  assert.equal(state.kot[0].name, "MISSED");
+  assert.equal(k.chimes.length, 0);
+});
+
+test("an older resync cannot clear staleness or update the board while a newer resync is pending", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  const finishes = [];
+  k.call.get = () => new Promise(resolve => finishes.push(resolve));
+  k.disconnect();
+  k.connect();
+  k.disconnect();
+  k.connect();
+  assert.equal(finishes.length, 2);
+  finishes[0](kotSnapshot([socketTicket("OLDER")]));
+  await settle();
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*stale/i);
+  assert.deepEqual(state.kot.map(kot => kot.name), ["KNOWN"]);
+  assert.equal(k.chimes.length, 0);
+  finishes[1](kotSnapshot([socketTicket("LATEST")]));
+  await settle();
+  assert.doesNotMatch(await k.html(state), /role="status"/);
+  assert.deepEqual(state.kot.map(kot => kot.name), ["LATEST"]);
+  assert.deepEqual(k.chimes, ["https://test/snapshot-alert.wav"]);
+});
+
+test("an older resync finishing last cannot overwrite the latest board, clock or seen tickets", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:30").getTime() });
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  const finishes = [];
+  k.call.get = () => new Promise(resolve => finishes.push(resolve));
+  k.disconnect();
+  k.connect();
+  k.disconnect();
+  k.connect();
+  assert.equal(finishes.length, 2);
+  finishes[1](kotSnapshot([socketTicket("LATEST")], "2026-10-01 13:05:30"));
+  await settle();
+  const offset = state.serverTimeOffset;
+  finishes[0](kotSnapshot([socketTicket("OLDER")], "2026-10-01 13:00:30", { audio_alert: 0 }));
+  await settle();
+  assert.deepEqual(state.kot.map(kot => kot.name), ["LATEST"]);
+  assert.equal(state.serverTimeOffset, offset);
+  assert.equal(state.audio_alert, 1);
+  assert.doesNotMatch(await k.html(state), /role="status"/);
+  assert.deepEqual(k.chimes, ["https://test/snapshot-alert.wav"]);
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("OLDER")));
+  assert.equal(k.chimes.length, 2, "Discarded snapshots must not mark their tickets as seen");
 });
 
 test("socket disconnect shows a persistent offline/stale banner even with navigator online", async () => {
@@ -438,7 +564,7 @@ test("reconnect keeps the board stale until its server snapshot succeeds", async
   await settle();
   assert.doesNotMatch(await k.html(state), /role="status"/);
   assert.equal(state.kot[0].name, "MISSED");
-  assert.equal(k.chimes.length, 0);
+  assert.deepEqual(k.chimes, ["https://test/snapshot-alert.wav"]);
 });
 
 test("failed reconnect snapshots keep a visible stale warning", async () => {
@@ -498,9 +624,27 @@ test("a disconnect during resync cannot be cleared by the late snapshot", async 
   await settle();
   assert.equal(typeof finish, "function", "Reconnect must request a snapshot");
   k.disconnect();
-  finish(kotSnapshot([socketTicket("KNOWN")]));
+  finish(kotSnapshot([socketTicket("MISSED")]));
   await settle();
   assert.match(await k.html(state), /role="status"[^>]*>[^<]*(?:offline|stale)/i);
+  assert.deepEqual(state.kot.map(kot => kot.name), ["KNOWN"]);
+  assert.equal(k.chimes.length, 0);
+});
+
+test("leaving during reconnect discards the late snapshot and its chime", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  let finish;
+  k.call.get = () => new Promise(resolve => { finish = resolve; });
+  k.connect();
+  await settle();
+  k.unmount(state);
+  finish(kotSnapshot([socketTicket("MISSED")]));
+  await settle();
+  assert.deepEqual(state.kot.map(kot => kot.name), ["KNOWN"]);
+  assert.equal(k.chimes.length, 0);
 });
 
 test("new-ticket chimes still respect the configured audio setting", async () => {
