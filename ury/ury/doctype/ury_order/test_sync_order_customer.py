@@ -104,6 +104,13 @@ class TestSyncOrderCustomer(unittest.TestCase):
                 self.assertEqual(self.invoice.no_of_pax, 2)
         self.assertEqual(self.invoice.save.call_count, 2)
 
+    def test_new_invoice_prefilled_customer_uses_profile_customer(self):
+        self.invoice.customer = "User Default Customer"
+        self.send("")
+        self.assertEqual(self.invoice.customer, "Walk-in Customer")
+        self.assertEqual(self.customer_lookups, ["Walk-in Customer"])
+        self.invoice.save.assert_called_once()
+
     def test_explicit_customer_overrides_profile_customer(self):
         self.send("Named Customer")
         self.assertEqual(self.invoice.customer, "Named Customer")
