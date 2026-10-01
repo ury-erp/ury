@@ -99,6 +99,11 @@ class TestTillInvoices(unittest.TestCase):
         self.assertFalse(any(call.args[0] == "POS Invoice" for call in self.frappe.get_list.call_args_list))
         self.frappe.get_doc.assert_not_called()
 
+    def test_till_invoice_endpoint_allows_only_get(self):
+        self.assertEqual(
+            frappe.allowed_http_methods_for_whitelisted_func[api.get_till_invoices], ["GET"]
+        )
+
     def test_holder_counts_other_cashiers_and_guest_bills(self):
         self._invoice("ROW-1", cashier="cashier1")
         self._invoice("HOLDER", cashier="cashier2")
@@ -163,6 +168,10 @@ class TestTillInvoices(unittest.TestCase):
         self._invoice("CONSOLIDATED", consolidated_invoice="SINV-1")
         self.assertEqual([row["name"] for row in self._read()], ["VALID"])
         self.assertEqual([call.args[1] for call in self.frappe.get_doc.call_args_list], ["VALID"])
+        invoice_query = next(
+            call for call in self.frappe.get_list.call_args_list if call.args[0] == "POS Invoice"
+        )
+        self.assertEqual(invoice_query.kwargs["filters"].get("consolidated_invoice"), ["is", "not set"])
 
     def test_exact_period_boundaries_use_timedelta_posting_time(self):
         for name, stamp in (
