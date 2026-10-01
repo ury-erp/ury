@@ -98,7 +98,6 @@ const Header = () => {
       window.location.href = '/login';
     } catch (error) {
       showToast.error(t('errors.failed_logout'));
-    } finally {
       logoutPending.current = false;
       setLoggingOut(false);
     }

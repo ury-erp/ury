@@ -107,7 +107,6 @@ export default {
         window.location.href = '/login';
       } catch (e) {
         this.logoutError = 'Failed to logout. Please try again.';
-      } finally {
         this.loggingOut = false;
       }
     },

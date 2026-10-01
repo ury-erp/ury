@@ -127,7 +127,6 @@ export const Header: React.FC = () => {
       window.location.href = '/login';
     } catch {
       showToast.error('Failed to logout. Please try again.');
-    } finally {
       logoutPending.current = false;
       setLoggingOut(false);
     }
