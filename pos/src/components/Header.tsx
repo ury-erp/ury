@@ -14,11 +14,13 @@ import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout } from '@ury/core';
+import { logoutSession, clearAppStorage } from '@ury/core';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutPending = useRef(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -87,19 +89,23 @@ const Header = () => {
   };
 
   const handleLogout = async () => {
+    if (logoutPending.current) return;
+    logoutPending.current = true;
+    setLoggingOut(true);
     try {
-      await logout();
-      window.location.href = '/login?redirect-to=%2Fpos';
+      await logoutSession((window as Window & { csrf_token?: string }).csrf_token);
+      clearAppStorage();
+      window.location.href = '/login';
     } catch (error) {
       showToast.error(t('errors.failed_logout'));
+    } finally {
+      logoutPending.current = false;
+      setLoggingOut(false);
     }
   };
 
   const handleClearCache = () => {
-    // Clear all local storage
-    localStorage.clear();
-    // Clear all session storage
-    sessionStorage.clear();
+    clearAppStorage();
     // Reload the page
     window.location.reload();
   };
@@ -202,6 +208,7 @@ const Header = () => {
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                     onClick={handleLogout}
+                    disabled={loggingOut}
                   >
                     <LogOut className="w-4 h-4 me-3" />
                     {t('header.logout')}
@@ -216,4 +223,4 @@ const Header = () => {
   );
 };
 
-export default Header; 
+export default Header;

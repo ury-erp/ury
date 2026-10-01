@@ -79,13 +79,14 @@
                 >Switch To Desk
               </a>
               <div class="border-t border-gray-200"></div>
-              <a
-                href="#"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              <button
+                type="button"
+                :disabled="this.auth.loggingOut"
+                class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 @click="this.auth.logOut"
               >
                 Log out
-              </a>
+              </button>
             </div>
           </div>
         </div>

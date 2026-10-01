@@ -8,6 +8,8 @@ import axios from "axios";
 import { useAlert } from "./Alert.js";
 import router from "../router";
 import { disconnectQzPrinter } from "./utils/PrintWithQz";
+import { logoutSession } from "../../../packages/core/src/logout.ts";
+import { clearAppStorage } from "../../../packages/core/src/storage.ts";
 
 axios.defaults.baseURL = frappe.url;
 
@@ -22,6 +24,7 @@ export const useAuthStore = defineStore("auth", {
     hasAccess: false,
     showPassword: false,
     activeDropdown: false,
+    loggingOut: false,
     cashierisPosOpen: false,
     cashier: null,
     viewItemImage: null,
@@ -238,17 +241,20 @@ export const useAuthStore = defineStore("auth", {
       this.activeDropdown = false;
     },
 
-    logOut() {
-      this.auth
-        .logout()
-        .then(() => {
-          router.push("/login").then(() => {
-            window.location.reload();
-          });
-          localStorage.removeItem("userAuth", "true");
-          disconnectQzPrinter();
-        })
-        .catch((error) => console.error(error));
+    async logOut() {
+      if (this.loggingOut) return;
+      this.loggingOut = true;
+      try {
+        await logoutSession(window.csrf_token);
+        clearAppStorage();
+        this.userAuth = false;
+        disconnectQzPrinter();
+        window.location.href = "/login";
+      } catch (error) {
+        this.alert.createAlert("Message", "Failed to logout. Please try again.", "OK");
+      } finally {
+        this.loggingOut = false;
+      }
     },
   },
 });
