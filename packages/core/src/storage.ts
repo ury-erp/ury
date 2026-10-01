@@ -1,9 +1,10 @@
 const APP_LOCAL_STORAGE_KEYS = [
   'userAuth', 'selectedRoom', 'posOrderTabsData', 'pos_profile',
-  'currency', 'currencySymbol', 'ury_language', 'kot_time',
+  'currency', 'currencySymbol', 'kot_time', 'ury_active_branch_id',
 ];
 const APP_SESSION_STORAGE_KEYS = [
   'posProfile', 'menuCategories', 'customerGroups', 'territories', 'payment_modes',
+  'ury.setup.configureState',
 ];
 
 export function getOrderTabsStorageKey(user: string | undefined): string | null {

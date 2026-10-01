@@ -252,7 +252,6 @@ export const useAuthStore = defineStore("auth", {
         window.location.href = "/login";
       } catch (error) {
         this.alert.createAlert("Message", "Failed to logout. Please try again.", "OK");
-      } finally {
         this.loggingOut = false;
       }
     },
