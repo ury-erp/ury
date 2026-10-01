@@ -319,7 +319,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       (row) =>
         touchedModes.has(row.mode_of_payment) &&
         row.closing_amount === 0 &&
-        (row.opening_amount !== 0 || row.expected_amount !== 0)
+        (row.opening_amount !== 0 || (!blindCashCount && row.expected_amount !== 0))
     );
 
     let blockingMessage: string | null = null;
@@ -335,7 +335,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         : null;
 
     return { isValid: !blockingMessage, blockingMessage, warningMessage };
-  }, [rows, touchedModes]);
+  }, [rows, touchedModes, blindCashCount]);
 
   const handleRequestSubmit = () => {
     if (!validation.isValid) return;
