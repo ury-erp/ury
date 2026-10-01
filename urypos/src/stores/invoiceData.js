@@ -9,6 +9,7 @@ import { useAlert } from "./Alert.js";
 import { useNotificationModal } from './NotificationModal';
 import { useAuthStore } from "./Auth.js";
 import frappe from "./frappeSdk.js";
+import { orderSendError } from "../utils/order-send.js";
 
 import {
   printWithQz,
@@ -139,6 +140,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
 
     // Method for creating an invoice
     async invoiceCreation() {
+      if (this.invoiceUpdating || !this.showUpdateButtton) return;
       this.showUpdateButtton = false;
       this.invoiceUpdating = true;
       let selectedTables = "";
@@ -163,7 +165,6 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
 
       selectedTables =
         this.table.selectedTable || this.recentOrders.restaurantTable;
-      const cartCopy = JSON.parse(JSON.stringify(cart));
       let waiter = null
       if (lastInvoice) {
         waiter = this.table.previousWaiter !== null &&
@@ -280,7 +281,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       if (!this.auth.cashier && !numberOfPax && this.table.takeAwayTable == 0) {
         this.alert.createAlert(
           "Message",
-          "Please Select Customer / No of Pax",
+          "Please enter the number of Pax",
           "OK"
         );
         this.showUpdateButtton = true;
@@ -308,52 +309,25 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           creatingInvoice
         );
     
-        this.showUpdateButtton = true;
         if (response.message.status === "Failure") {
-          const alert = response._server_messages;
-          const messages = JSON.parse(alert);
-          const message = JSON.parse(messages[0]);
-    
-          await this.alert.createAlert("Message", message.message, "OK");
-          await router.push("/Table");
-          window.location.reload();
-          return;
+          throw response;
         }
     
-        // Handle successful response
-        this.invoiceNumber = response.message.name;
-        this.grandTotal = response.message.grand_total;
-        this.notification.createNotification("Order Update");
+        this.clearDataAfterUpdate();
+        this.notification.createNotification(
+          selectedTables ? `Sent to kitchen · ${selectedTables}` : "Sent to kitchen"
+        );
         this.table.fetchTable();
-        
-        let items = this.menu.items;
-        // items.forEach((item) => {
-        //   item.comment = "";
-        // });
-        
-        this.table.previousOrderdItem = response.message.items;
-        this.recentOrders.pastOrderdItem = response.message.items;
-        this.previousOrderItem.splice(0, this.previousOrderItem.length);
-        this.previousOrderItem.splice(0, this.previousOrderItem.length, ...cartCopy);
-        this.invoiceUpdating = false;
-        this.table.modifiedTime = response.message.modified;
-        this.recentOrders.modifiedTime = response.message.modified;
-        if (this.auth.cashier) {
-          this.clearDataAfterUpdate();
-          await router.push("/recentOrder");
-          this.recentOrders.viewRecentOrder(response.message);
-        }
+        await router.push("/Table");
       } catch (error) {
-        this.showUpdateButtton = true;
-        this.invoiceUpdating = false;
         if (error === 'User cancelled the operation') {
           return; // Silently handle cancellation
         }
-        if (error._server_messages) {
-          const messages = JSON.parse(error._server_messages);
-          const message = JSON.parse(messages[0]);
-          await this.alert.createAlert("Message", message.message, "OK");
-        }
+        this.invoiceUpdating = false;
+        await this.alert.createAlert("Message", orderSendError(error), "OK");
+      } finally {
+        this.showUpdateButtton = true;
+        this.invoiceUpdating = false;
       }
     },
 
@@ -366,6 +340,13 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       this.table.takeAwayTable = 0;
       this.recentOrders.restaurantTable = "";
       this.table.selectedTable = "";
+      this.table.invoiceNo = "";
+      this.table.previousOrderdItem = [];
+      this.table.modifiedTime = null;
+      this.recentOrders.pastOrderdItem = [];
+      this.recentOrders.modifiedTime = null;
+      this.previousOrderItem = [];
+      this.modifiedTime = null;
       this.customers.numberOfPax = "";
       this.customers.newCustomerMobileNo=""
       this.menu.cart = [];
