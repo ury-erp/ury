@@ -51,3 +51,9 @@ export function kitchenErrorMessage(error, fallback) {
     ? message.replace(/<[^>]*>/g, "")
     : fallback;
 }
+
+export function rememberKot(seen, kot, production) {
+  if (kot.production !== production || seen.has(kot.name)) return false;
+  seen.add(kot.name);
+  return true;
+}
