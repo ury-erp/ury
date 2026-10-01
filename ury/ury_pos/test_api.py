@@ -522,6 +522,93 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
         self.assertFalse(result["permissions"]["submit"])
         self.assertEqual(result["open_entries"], [])
 
+class TestPOSOpeningOccupancy(unittest.TestCase):
+    """Opening context regressions that run without a Frappe site."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.enterContext(patch("ury.ury_pos.api._", side_effect=lambda message: message))
+        self.frappe.session.user = "cashier@example.com"
+        self.frappe.defaults.get_user_default.return_value = "Test Co"
+        self.frappe.PermissionError = frappe.PermissionError
+        self.frappe.throw.side_effect = frappe.PermissionError("Not permitted")
+        self.allowed = self.enterContext(patch("ury.ury_pos.api._get_allowed_pos_profiles"))
+        self.allowed.return_value = [{"name": "POS-1"}, {"name": "POS-2"}]
+        self.enterContext(patch("ury.ury_pos.api.getPosProfile", return_value={"pos_profile": "POS-1"}))
+        self.enterContext(patch("ury.ury_pos.api.validate_pos_close", return_value="Success"))
+        self.enterContext(patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": False}))
+        self.profile = frappe._dict(name="POS-2", branch="Branch A", restaurant="Rest A", payments=[])
+        self.entry = frappe._dict(
+            name="POS-OPE-0002", pos_profile="POS-2", user="other@example.com",
+            period_start_date="2026-10-01 08:10:00", status="Open", docstatus=1,
+        )
+        self.frappe.get_doc.side_effect = lambda doctype, name: (
+            self.entry if doctype == "POS Opening Entry" else self.profile
+        )
+        self.frappe.db.get_value.side_effect = lambda doctype, name, field: (
+            "Other Cashier" if doctype == "User" and name == self.entry.user else None
+        )
+        self.frappe.has_permission.return_value = True
+        self.frappe.get_all.side_effect = lambda doctype, **kwargs: (
+            [self.entry] if kwargs["filters"].get("pos_profile") == self.entry.pos_profile else []
+        )
+
+    def test_returns_other_holders_name_and_start_for_selected_profile(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertEqual(result["selected_profile"], "POS-2")
+        self.assertEqual(result["occupied_entry"], {
+            "name": "POS-OPE-0002", "user": "other@example.com",
+            "user_full_name": "Other Cashier", "period_start_date": "2026-10-01 08:10:00",
+        })
+        query = next(call for call in self.frappe.get_all.call_args_list if call.kwargs["filters"].get("pos_profile"))
+        self.assertEqual(query.kwargs["filters"], {
+            "pos_profile": "POS-2", "user": ["!=", "cashier@example.com"],
+            "docstatus": 1, "status": "Open",
+        })
+        self.frappe.has_permission.assert_any_call("POS Opening Entry", "read", doc=self.entry)
+
+    def test_hides_entry_id_without_document_read_permission(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.has_permission.side_effect = lambda doctype, perm, **kwargs: perm != "read"
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertNotIn("name", result["occupied_entry"])
+        self.assertEqual(result["occupied_entry"]["user_full_name"], "Other Cashier")
+        self.assertNotIn("POS-OPE-0002", json.dumps(result))
+
+    def test_default_profile_does_not_return_another_profiles_entry(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.assertIsNone(get_pos_opening_screen_data()["occupied_entry"])
+
+    def test_default_profile_reports_its_other_holder(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.entry.pos_profile = "POS-1"
+        occupied = get_pos_opening_screen_data().get("occupied_entry")
+        self.assertIsNotNone(occupied, "The other cashier's open till must be reported")
+        self.assertEqual(occupied["user_full_name"], "Other Cashier")
+
+    def test_holder_falls_back_to_user_when_full_name_is_missing(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.db.get_value.return_value = None
+        self.frappe.db.get_value.side_effect = None
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+        self.assertEqual(result["occupied_entry"]["user_full_name"], "other@example.com")
+
+    def test_unavailable_profile_cannot_disclose_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        with self.assertRaises(frappe.PermissionError):
+            get_pos_opening_screen_data(pos_profile="Forbidden POS")
+        self.frappe.get_all.assert_not_called()
+
+
 class TestSubmitChecklistSEC10(FrappeTestCase):
     """Test cases for submit_checklist function."""
 
