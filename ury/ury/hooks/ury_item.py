@@ -7,6 +7,53 @@ def validate(doc, method):
 	update_variants_add_on(doc, method)
 	validate_yield_tracking(doc, method)
 	validate_yield_standard_permission(doc, method)
+	validate_receiving_secondary_measure(doc, method)
+
+
+def validate_receiving_secondary_measure(doc, method):
+	"""Reject configuring Item.custom_rcv_secondary_measure to the same kind
+	of unit as the Item's own Stock UOM -- e.g. Weight-secondary on an
+	already-Kg-stocked item is meaningless (the "actual per stock unit"
+	ratio would always be ~1) and should be a clear error, not a silently
+	accepted no-op. See ury_workspaces track yield-purchase-uom-bom-problem
+	/ ANALYSIS_AND_STRATEGY.md and PLAN.md sec 1.1.
+	"""
+	measure = doc.get("custom_rcv_secondary_measure")
+	if not measure:
+		return
+
+	stock_uom = doc.get("stock_uom")
+	if not stock_uom:
+		return
+
+	is_weight_uom = stock_uom in _weight_uom_names()
+	is_count_uom = stock_uom in _count_uom_names()
+
+	if measure == "Weight" and is_weight_uom:
+		frappe.throw(
+			_(
+				"Secondary Measurement cannot be Weight: this Item's Stock UOM ({0}) "
+				"is already a weight unit."
+			).format(stock_uom)
+		)
+	if measure == "Count" and is_count_uom:
+		frappe.throw(
+			_(
+				"Secondary Measurement cannot be Count: this Item's Stock UOM ({0}) "
+				"is already a count unit."
+			).format(stock_uom)
+		)
+
+
+def _weight_uom_names():
+	# Common weight UOM names as shipped by Frappe/ERPNext's default UOM
+	# fixture. Kept as a small static set rather than a UOM.uom_name pattern
+	# match, since sites can rename/duplicate UOM records freely.
+	return {"Kg", "Gram", "Gm", "Ton", "Pound", "Ounce", "Lb", "Oz", "Milligram", "Mg"}
+
+
+def _count_uom_names():
+	return {"Nos", "Unit", "Piece", "Pcs", "Each", "No"}
 
 
 def update_menu_item(doc, event):

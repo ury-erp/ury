@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "creation": "2026-09-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "tolerance_section",
+  "default_tolerance_lower_pct",
+  "default_tolerance_upper_pct",
+  "default_warning_band_multiplier"
+ ],
+ "fields": [
+  {
+   "fieldname": "tolerance_section",
+   "fieldtype": "Section Break",
+   "label": "Receiving Secondary-Measure Variance Defaults"
+  },
+  {
+   "default": "5",
+   "description": "Used for any Item whose own Tolerance Lower % is left blank.",
+   "fieldname": "default_tolerance_lower_pct",
+   "fieldtype": "Percent",
+   "label": "Default Tolerance Lower %"
+  },
+  {
+   "default": "5",
+   "description": "Used for any Item whose own Tolerance Upper % is left blank.",
+   "fieldname": "default_tolerance_upper_pct",
+   "fieldtype": "Percent",
+   "label": "Default Tolerance Upper %"
+  },
+  {
+   "default": "2",
+   "description": "Multiplier applied to tolerance to derive the warning band before an off-spec receipt is treated as reject-band. Not yet consumed by Phase 1 logic (advisory-only); reserved for the escalation workflow.",
+   "fieldname": "default_warning_band_multiplier",
+   "fieldtype": "Float",
+   "label": "Default Warning Band Multiplier"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Receiving Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
