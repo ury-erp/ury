@@ -192,6 +192,35 @@ test("a reported failure preserves the cart and explains stale-table recovery", 
   assert.equal(state.invoiceUpdating, false);
 });
 
+for (const rejected of [false, true]) {
+  test(`an already-billed ${rejected ? "request error" : "failure response"} directs the waiter to the cashier, not to reopen`, async () => {
+    const { state, events } = fixture();
+    const error = {
+      message: { status: "Failure" },
+      _server_messages: JSON.stringify([JSON.stringify({
+        title: "Invoice Already Billed",
+        message: "This order has already been billed. Please reload the page.",
+      })]),
+    };
+    state.call.post = async () => {
+      if (rejected) throw error;
+      return error;
+    };
+    await state.invoiceCreation();
+    assert.equal(events.alerts.length, 1);
+    assert.match(events.alerts[0], /already been billed/i);
+    assert.match(events.alerts[0], /cashier/i);
+    assert.doesNotMatch(events.alerts[0], /reopen|reload|refresh|try again/i);
+    assert.equal(state.menu.cart.length, 1);
+    assert.equal(state.table.selectedTable, "T-01");
+    assert.deepEqual(events.notifications, []);
+    assert.deepEqual(events.routes, []);
+    assert.equal(events.reloads, 0);
+    assert.equal(state.invoiceUpdating, false);
+    assert.equal(state.showUpdateButtton, true);
+  });
+}
+
 for (const error of [
   new Error("Network connection lost"),
   { _server_messages: "not JSON" },
