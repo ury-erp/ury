@@ -6,10 +6,14 @@ export function orderSendLabel(invoice, pending) {
 }
 
 export function orderSendError(error) {
-  return parseFrappeError(
+  const message = parseFrappeError(
     error,
     "Could not send to kitchen. Your cart has been kept. Please try again."
-  ).replace(
+  );
+  if (/already (?:been )?billed/i.test(message)) {
+    return "This order has already been billed. Please ask the cashier.";
+  }
+  return message.replace(
     /Please (?:reload|refresh) the page[^.]*\./gi,
     "Reopen the table from Tables to retrieve the latest order before sending again."
   );
