@@ -71,7 +71,8 @@ Cart.render = new Function(
 )(Vue);
 
 function fixture(cashier = false) {
-  const events = { routes: [], alerts: [], notifications: [], posts: [], reloads: 0 };
+  const events = { routes: [], viewedOrders: [], alerts: [], notifications: [], posts: [], reloads: 0 };
+  const sentOrder = { name: "POS-INV-001", items: [], modified: "now" };
   globalThis.orderTest = {};
   const state = Object.assign(options.state(), options.actions, {
     posProfile: "Salama POS",
@@ -82,20 +83,25 @@ function fixture(cashier = false) {
       selectedOrderType: "Dine In",
     },
     table: { selectedTable: "T-01", takeAwayTable: 0, invoiceNo: "", fetchTable() {} },
-    recentOrders: { draftInvoice: "", viewRecentOrder() {} },
+    recentOrders: {
+      draftInvoice: "",
+      viewRecentOrder(order) {
+        events.viewedOrders.push({ order, routes: [...events.routes], cart: [...state.menu.cart] });
+      },
+    },
     customers: { search: "", numberOfPax: "2", validateInput() {} },
     alert: { createAlert: async (title, message) => events.alerts.push(message) },
     notification: { createNotification: message => events.notifications.push(message) },
     call: {
       post: async (method, payload) => {
         events.posts.push({ method, payload });
-        return { message: { name: "POS-INV-001", items: [], modified: "now" } };
+        return { message: sentOrder };
       },
     },
   });
   globalThis.orderTest = { ...state, invoiceData: state, ...events };
   globalThis.window = { location: { reload: () => events.reloads++ } };
-  return { state, events };
+  return { state, events, sentOrder };
 }
 
 async function renderCart() {
@@ -143,9 +149,12 @@ test("missing Pax asks only for Pax and does not send", async () => {
   assert.equal(state.invoiceUpdating, false);
 });
 
-for (const cashier of [false, true]) {
-  test(`successful ${cashier ? "cashier" : "captain"} sends clear the cart and return to Tables`, async () => {
-    const { state, events } = fixture(cashier);
+for (const { cashier, route, outcome } of [
+  { cashier: false, route: "/Table", outcome: "waiter/captain sends clear the cart and return to Tables" },
+  { cashier: true, route: "/recentOrder", outcome: "cashier sends clear the cart and open the sent check for tender" },
+]) {
+  test(`successful ${outcome}`, async () => {
+    const { state, events, sentOrder } = fixture(cashier);
     await state.invoiceCreation();
     assert.deepEqual(events.notifications, ["Sent to kitchen · T-01"]);
     assert.deepEqual(state.menu.cart, []);
@@ -153,7 +162,16 @@ for (const cashier of [false, true]) {
     assert.equal(state.table.selectedTable, "");
     assert.equal(state.table.invoiceNo, "");
     assert.equal(state.invoiceNumber, "");
-    assert.deepEqual(events.routes, ["/Table"]);
+    assert.deepEqual(events.routes, [route]);
+    if (cashier) {
+      assert.equal(events.viewedOrders.length, 1);
+      assert.equal(events.viewedOrders[0].order, sentOrder);
+      assert.deepEqual(events.viewedOrders[0].routes, ["/recentOrder"]);
+      assert.deepEqual(events.viewedOrders[0].cart, []);
+    } else {
+      assert.deepEqual(events.viewedOrders, []);
+    }
+    assert.deepEqual(events.alerts, []);
     assert.equal(events.reloads, 0);
     assert.equal(state.invoiceUpdating, false);
     assert.equal(events.posts[0].payload.customer, "");
