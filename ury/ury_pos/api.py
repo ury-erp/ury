@@ -1278,7 +1278,7 @@ def get_pos_opening_screen_data(pos_profile: str | None = None) -> dict:
     )
 
     occupied_entry = None
-    if pos_profile_name in {profile["name"] for profile in allowed_profiles}:
+    if not multi_cashier["enabled"] and pos_profile_name in {profile["name"] for profile in allowed_profiles}:
         other_entries = frappe.get_all(
             "POS Opening Entry",
             filters={
