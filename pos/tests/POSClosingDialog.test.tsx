@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { db } from '@ury/core';
+import { call, db } from '@ury/core';
 import { initI18n } from '../src/i18n';
 import { getMainCashierPosInvoices, getOpenPosOpeningEntries } from '../src/lib/pos-closing-api';
 import POSClosingDialog from '../src/components/POSClosingDialog';
@@ -103,6 +103,71 @@ describe('blind cash count payment modes', () => {
     const rowsWithSales = await renderPaymentModes(true);
     expect(rowsWithSales.map((row) => row.querySelector('td')?.textContent)).toEqual(['Cash', 'Card']);
     expect(rowsWithSales[1].querySelectorAll('td')[2].textContent).toBe('₹ 50');
+  });
+});
+
+describe('blind cash count reconciliation', () => {
+  it('submits sales-only tenders with a zero count without changing the rendered dialog', async () => {
+    const createDoc = vi.spyOn(db, 'createDoc').mockResolvedValue({ name: 'POS-CLO-1' });
+    const updateDoc = vi.spyOn(db, 'updateDoc').mockResolvedValue({ name: 'POS-CLO-1' });
+    vi.spyOn(call, 'get').mockResolvedValue({
+      message: { items: [], log_name: null, log_status: 'Complete' },
+    });
+
+    const dialogMarkup = () => {
+      // Remounting changes React's generated title ID, not the cashier-visible UI.
+      const titleId = container.querySelector('[role="dialog"]')!.getAttribute('aria-labelledby')!;
+      return container.innerHTML.replaceAll(titleId, 'closing-dialog-title');
+    };
+    const renderedDialogs: string[][] = [];
+
+    for (const withCardSales of [false, true]) {
+      const paymentRows = await renderPaymentModes(withCardSales);
+      expect(paymentRows.map((row) => row.querySelector('td')?.textContent)).toEqual(['Cash']);
+      const beforeCount = dialogMarkup();
+      const cashInput = paymentRows[0].querySelector<HTMLInputElement>('input[type="number"]')!;
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(cashInput, '100');
+        cashInput.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const afterCount = dialogMarkup();
+      expect(container.querySelectorAll('p.text-amber-700')).toHaveLength(0);
+
+      const submit = Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Close POS')!;
+      expect(submit.disabled).toBe(false);
+      await act(async () => submit.click());
+      renderedDialogs.push([beforeCount, afterCount, dialogMarkup()]);
+
+      const confirm = Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Yes, Close POS')!;
+      await act(async () => confirm.click());
+    }
+
+    expect(renderedDialogs[1]).toEqual(renderedDialogs[0]);
+    expect(createDoc).toHaveBeenCalledTimes(2);
+    expect(updateDoc).toHaveBeenCalledTimes(2);
+    expect(updateDoc).toHaveBeenLastCalledWith('POS Closing Entry', 'POS-CLO-1', { docstatus: 1 });
+    expect(createDoc.mock.calls[0]).toEqual(['POS Closing Entry', expect.objectContaining({
+      docstatus: 0,
+      payment_reconciliation: [{
+        mode_of_payment: 'Cash', opening_amount: 10, expected_amount: 100,
+        closing_amount: 100, difference: 0,
+      }],
+    })]);
+    expect(createDoc.mock.calls[1]).toEqual(['POS Closing Entry', expect.objectContaining({
+      docstatus: 0,
+      payment_reconciliation: [
+        {
+          mode_of_payment: 'Cash', opening_amount: 10, expected_amount: 100,
+          closing_amount: 100, difference: 0,
+        },
+        {
+          mode_of_payment: 'Card', opening_amount: 0, expected_amount: 50,
+          closing_amount: 0, difference: -50,
+        },
+      ],
+    })]);
   });
 });
 
