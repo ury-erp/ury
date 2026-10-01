@@ -971,7 +971,7 @@ def create_customer(customer_name, mobile_number=None, customer_group=None, terr
             "message": str(e)
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_till_invoices(start, end, pos_profile, user):
     """Return full invoices for the holder's open till, regardless of cashier.
 
@@ -1000,16 +1000,15 @@ def get_till_invoices(start, end, pos_profile, user):
         filters={
             "docstatus": 1,
             "pos_profile": pos_profile,
+            "consolidated_invoice": ["is", "not set"],
             "posting_date": ["between", [start.date(), end.date()]],
         },
-        fields=["name", "posting_date", "posting_time", "consolidated_invoice"],
+        fields=["name", "posting_date", "posting_time"],
         order_by="posting_date asc, posting_time asc",
         limit_page_length=0,
     )
     invoices = []
     for row in rows:
-        if row.consolidated_invoice:
-            continue
         # MariaDB returns posting_time as a timedelta, not a datetime.time.
         timestamp = datetime.combine(
             frappe.utils.get_datetime(row.posting_date).date(),
