@@ -1434,7 +1434,7 @@ def sync_order(
             )
             return {"status": "Failure"}
 
-    customer = customer or posprofile.customer
+    customer = customer or invoice.customer or posprofile.customer
     if not customer:
         frappe.throw(
             _("Select a customer or set a default customer in the POS Profile.")
