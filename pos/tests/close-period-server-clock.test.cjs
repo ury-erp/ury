@@ -42,6 +42,8 @@ async function closingInvoiceQuery({ subCashier = false, serverTime, failure } =
     Date: BrowserDate,
     console: { error: (...args) => errors.push(args) },
     posProfile: { name: 'POS-1', multiple_cashier: subCashier ? 1 : 0, owner: 'cashier@example.com' },
+    blindCashCount: false,
+    paymentModes: ['Cash'],
     user: { name: 'cashier@example.com' },
     t: (key) => key,
     getOpenPosOpeningEntries: async () => [{
@@ -61,7 +63,7 @@ async function closingInvoiceQuery({ subCashier = false, serverTime, failure } =
   };
   for (const setter of [
     'setIsLoading', 'setLoadError', 'setSubmitError', 'setOpeningEntry',
-    'setIsSubCashier', 'setPeriodEndDate', 'setInvoiceCount', 'setTotals', 'setRows', 'setTouchedModes',
+    'setIsSubCashier', 'setPeriodEndDate', 'setInvoiceCount', 'setTotals', 'setRows', 'setHiddenRows', 'setTouchedModes',
   ]) context[setter] = () => {};
   vm.createContext(context);
   await vm.runInContext(`${outputText}\nloadClosingDetails();`, context);

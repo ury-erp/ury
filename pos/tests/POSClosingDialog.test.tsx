@@ -42,6 +42,15 @@ beforeEach(async () => {
   vi.spyOn(db, 'getDoc').mockResolvedValue({
     name: 'POS-OPE-1', balance_details: [{ mode_of_payment: 'Cash', opening_amount: 10 }],
   });
+  vi.spyOn(call, 'get').mockImplementation(async <T,>(method: string): Promise<T> => {
+    if (method === 'ury.ury.api.ury_server_time.get_server_time') {
+      return { message: '2026-10-01T10:12:13.123456' } as T;
+    }
+    if (method === 'ury.ury_pos.api.get_checklist') {
+      return { message: { items: [], log_name: null, log_status: 'Complete' } } as T;
+    }
+    throw new Error(`Unexpected closing API call: ${method}`);
+  });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -50,6 +59,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -108,11 +118,11 @@ describe('blind cash count payment modes', () => {
 
 describe('blind cash count reconciliation', () => {
   it('submits sales-only tenders with a zero count without changing the rendered dialog', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // The browser clock precedes opening; both blind-close payloads must still use server time.
+    vi.setSystemTime(new Date('2026-10-01T06:31:00'));
     const createDoc = vi.spyOn(db, 'createDoc').mockResolvedValue({ name: 'POS-CLO-1' });
     const updateDoc = vi.spyOn(db, 'updateDoc').mockResolvedValue({ name: 'POS-CLO-1' });
-    vi.spyOn(call, 'get').mockResolvedValue({
-      message: { items: [], log_name: null, log_status: 'Complete' },
-    });
 
     const dialogMarkup = () => {
       // Remounting changes React's generated title ID, not the cashier-visible UI.
