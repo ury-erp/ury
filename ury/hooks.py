@@ -479,7 +479,6 @@ fixtures = [
                     "URY Production Unit-disable",
                     "URY Restaurant-tax_id",
                     "URY Room-print_format",
-                    "URY Room-room_name",
                     "URY Table-table_name",
                     "Production Plan-custom_ury_section",
                     "Production Plan-custom_ury_sales_plan",

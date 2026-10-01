@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn, messageToPlainText } from '@ury/ui';
-import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -19,6 +18,15 @@ interface UserRecord {
   roles?: Array<{ role: string }>;
 }
 
+const URY_ROLE_OPTIONS = [
+  { value: 'URY Admin', label: 'URY Admin' },
+  { value: 'URY Manager', label: 'URY Manager' },
+  { value: 'URY Captain', label: 'URY Captain' },
+  { value: 'URY Cashier', label: 'URY Cashier' },
+];
+
+const URY_ROLE_NAMES = URY_ROLE_OPTIONS.map((r) => r.value);
+
 export const UserPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -27,16 +35,20 @@ export const UserPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
-  const [newUser, setNewUser] = useState({
+  const [newUser, setNewUser] = useState<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    roles: string[];
+    enabled: boolean;
+  }>({
     first_name: '',
     last_name: '',
     email: '',
-    role: 'URY Cashier',
+    roles: ['URY Cashier'],
     enabled: true,
   });
   const [originalUser, setOriginalUser] = useState<any>(null);
-
-  const URY_ROLES = ['URY Manager', 'URY Captain', 'URY Cashier'];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -54,55 +66,54 @@ export const UserPage: React.FC = () => {
     fetchUsers();
   }, [activeBranchId]);
 
-  const getDisplayRole = (user: UserRecord): string => {
-    // Try to extract URY role from user's roles
+  const getDisplayRoles = (user: UserRecord): string[] => {
+    const roles: string[] = [];
     if (user.roles && Array.isArray(user.roles)) {
       for (const roleObj of user.roles) {
-        if (roleObj.role === 'URY Manager') return 'Manager';
-        if (roleObj.role === 'URY Captain') return 'Captain';
-        if (roleObj.role === 'URY Cashier') return 'Cashier';
+        if (roleObj.role === 'URY Admin') roles.push('Admin');
+        else if (roleObj.role === 'URY Manager') roles.push('Manager');
+        else if (roleObj.role === 'URY Captain') roles.push('Captain');
+        else if (roleObj.role === 'URY Cashier') roles.push('Cashier');
       }
     }
-    return 'User';
+    return roles.length > 0 ? roles : ['User'];
   };
 
   const openAddDrawer = () => {
     setEditingUser(null);
-    setNewUser({ first_name: '', last_name: '', email: '', role: 'URY Cashier', enabled: true });
+    setNewUser({ first_name: '', last_name: '', email: '', roles: ['URY Cashier'], enabled: true });
     setIsDrawerOpen(true);
   };
 
   const openEditDrawer = async (user: UserRecord) => {
     setEditingUser(user);
-    let userRole = 'URY Cashier'; // default
+    let userRoles: string[] = [];
 
     try {
-      // Fetch the full user record with roles
       const fullUserRes = await call('frappe.client.get', {
         doctype: 'User',
         name: user.name,
       });
       const fullUser = (fullUserRes as any).message || fullUserRes;
 
-      // Extract the actual URY role from the roles array
       if (fullUser.roles && Array.isArray(fullUser.roles)) {
-        for (const roleObj of fullUser.roles) {
-          if (URY_ROLES.includes(roleObj.role)) {
-            userRole = roleObj.role;
-            break;
-          }
-        }
+        userRoles = fullUser.roles
+          .map((r: any) => r.role)
+          .filter((r: string) => URY_ROLE_NAMES.includes(r));
       }
     } catch (err) {
       console.error('Failed to fetch user roles', err);
-      // Default to URY Cashier on error
+    }
+
+    if (userRoles.length === 0) {
+      userRoles = ['URY Cashier'];
     }
 
     const initialForm = {
       first_name: user.first_name || '',
       last_name: user.last_name || '',
       email: user.email || '',
-      role: userRole,
+      roles: userRoles,
       enabled: user.enabled === 1,
     };
     setNewUser(initialForm);
@@ -114,17 +125,22 @@ export const UserPage: React.FC = () => {
     e.preventDefault();
     if (!newUser.email) return;
 
+    if (newUser.roles.length === 0) {
+      showToast.warning('Please select at least one role for the user');
+      return;
+    }
+
     if (editingUser && originalUser) {
       const original = {
         first_name: (originalUser.first_name || '').trim(),
         last_name: (originalUser.last_name || '').trim(),
-        role: originalUser.role,
+        roles: [...originalUser.roles].sort(),
         enabled: originalUser.enabled ? 1 : 0,
       };
       const current = {
         first_name: (newUser.first_name || '').trim(),
         last_name: (newUser.last_name || '').trim(),
-        role: newUser.role,
+        roles: [...newUser.roles].sort(),
         enabled: newUser.enabled ? 1 : 0,
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
@@ -146,31 +162,25 @@ export const UserPage: React.FC = () => {
           },
         });
 
-        if (newUser.role) {
-          // Fetch current roles
-          const fullUserRes = await call('frappe.client.get', {
-            doctype: 'User',
-            name: editingUser.name,
-          });
-          const fullUser = (fullUserRes as any).message || fullUserRes;
+        const fullUserRes = await call('frappe.client.get', {
+          doctype: 'User',
+          name: editingUser.name,
+        });
+        const fullUser = (fullUserRes as any).message || fullUserRes;
 
-          // Start with current roles
-          let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
+        let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
+        updatedRoles = updatedRoles.filter((roleObj: any) => !URY_ROLE_NAMES.includes(roleObj.role));
 
-          // Filter out existing URY roles
-          updatedRoles = updatedRoles.filter((roleObj: any) => !URY_ROLES.includes(roleObj.role));
+        newUser.roles.forEach((r) => {
+          updatedRoles.push({ role: r });
+        });
 
-          // Add the new URY role
-          updatedRoles.push({ role: newUser.role });
-
-          // Save the merged roles
-          await call('frappe.client.set_value', {
-            doctype: 'User',
-            name: editingUser.name,
-            fieldname: 'roles',
-            value: updatedRoles,
-          });
-        }
+        await call('frappe.client.set_value', {
+          doctype: 'User',
+          name: editingUser.name,
+          fieldname: 'roles',
+          value: updatedRoles,
+        });
       } else {
         await call('frappe.client.insert', {
           doc: {
@@ -180,7 +190,7 @@ export const UserPage: React.FC = () => {
             last_name: newUser.last_name,
             send_welcome_email: 1,
             enabled: newUser.enabled ? 1 : 0,
-            roles: [{ role: newUser.role }],
+            roles: newUser.roles.map((r) => ({ role: r })),
           },
         });
       }
@@ -268,12 +278,16 @@ export const UserPage: React.FC = () => {
                   { key: 'email', header: 'User ID', render: (row) => <span className="text-gray-600 font-medium">{row.email}</span> },
                   {
                     key: 'role',
-                    header: 'Role',
+                    header: 'Roles',
                     render: (row) => (
-                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                        <ShieldCheck className="w-3 h-3 mr-1" />
-                        {getDisplayRole(row)}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {getDisplayRoles(row).map((r) => (
+                          <Badge key={r} variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                            <ShieldCheck className="w-3 h-3 mr-1" />
+                            {r}
+                          </Badge>
+                        ))}
+                      </div>
                     )
                   },
                   {
@@ -331,17 +345,39 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Role / Access Level</label>
-            <SearchableSelect
-              id="role"
-              value={newUser.role}
-              onChange={(_, value) => setNewUser({ ...newUser, role: value })}
-              options={[
-                { value: 'URY Cashier', label: 'URY Cashier' },
-                { value: 'URY Captain', label: 'URY Captain' },
-                { value: 'URY Manager', label: 'URY Manager' },
-              ]}
-            />
+            <label className="block font-semibold text-gray-700 mb-2">Roles / Access Level</label>
+            <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {URY_ROLE_OPTIONS.map((option) => {
+                const isChecked = newUser.roles.includes(option.value);
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex items-center gap-2.5 p-2 rounded-md border text-sm cursor-pointer transition-colors ${
+                      isChecked
+                        ? 'bg-primary/10 border-primary/40 text-primary font-medium'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewUser((prev) => ({ ...prev, roles: [...prev.roles, option.value] }));
+                        } else {
+                          setNewUser((prev) => ({
+                            ...prev,
+                            roles: prev.roles.filter((r) => r !== option.value),
+                          }));
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

@@ -54,7 +54,7 @@ export const BranchPage: React.FC = () => {
 
   // Linked data
   const [menus, setMenus] = useState<{ name: string; menu_name?: string }[]>([]);
-  const [rooms, setRooms] = useState<{ name: string; room_name?: string; branch?: string }[]>([]);
+  const [rooms, setRooms] = useState<{ name: string; branch?: string }[]>([]);
   const [addresses, setAddresses] = useState<{ name: string; address_title?: string }[]>([]);
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
@@ -78,7 +78,7 @@ export const BranchPage: React.FC = () => {
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
-        fields: ['name', 'branch', 'custom_no_taxes'],
+        fields: ['name', 'branch', 'custom_no_taxes', 'tax_id', 'custom_invoice_series_prefix', 'custom_aggregator_series_prefix'],
         limit_page_length: 100
       });
       list = Array.isArray(res) ? res : (res?.message || []);
@@ -91,7 +91,10 @@ export const BranchPage: React.FC = () => {
           list = fallbackList.map((b: any) => ({
             name: b.id || b.name,
             branch: b.name || b.branch,
-            address: b.address || ''
+            address: b.address || '',
+            tax_id: b.tax_id || '',
+            invoice_series_prefix: b.invoice_series_prefix || '',
+            aggregator_series_prefix: b.aggregator_series_prefix || ''
           }));
         }
       } catch (fallbackErr) {
@@ -101,24 +104,54 @@ export const BranchPage: React.FC = () => {
 
     if (list.length > 0) {
       try {
-        const restRes = await call<any>('frappe.client.get_list', {
-          doctype: 'URY Restaurant',
-          fields: ['branch', 'active_menu'],
-          limit_page_length: 100
-        });
+        const [restRes, compRes] = await Promise.all([
+          call<any>('frappe.client.get_list', {
+            doctype: 'URY Restaurant',
+            fields: ['branch', 'active_menu', 'invoice_series_prefix', 'aggregator_series_prefix', 'company'],
+            limit_page_length: 100
+          }),
+          call<any>('frappe.client.get_list', {
+            doctype: 'Company',
+            fields: ['name', 'tax_id'],
+            limit_page_length: 100
+          })
+        ]);
         const restaurantList = Array.isArray(restRes) ? restRes : (restRes?.message || []);
+        const companyList = Array.isArray(compRes) ? compRes : (compRes?.message || []);
+
         const menuMap: Record<string, string> = {};
+        const invoicePrefixMap: Record<string, string> = {};
+        const aggregatorPrefixMap: Record<string, string> = {};
+        const companyMap: Record<string, string> = {};
+
         restaurantList.forEach((r: any) => {
-          if (r.branch && r.active_menu) {
-            menuMap[r.branch] = r.active_menu;
+          if (r.branch) {
+            if (r.active_menu) menuMap[r.branch] = r.active_menu;
+            if (r.invoice_series_prefix) invoicePrefixMap[r.branch] = r.invoice_series_prefix;
+            if (r.aggregator_series_prefix) aggregatorPrefixMap[r.branch] = r.aggregator_series_prefix;
+            if (r.company) companyMap[r.branch] = r.company;
           }
         });
-        list = list.map((b) => ({
-          ...b,
-          default_menu: menuMap[b.name] || (b.branch ? menuMap[b.branch] : '') || ''
-        }));
+
+        const taxIdByCompany: Record<string, string> = {};
+        companyList.forEach((c: any) => {
+          if (c.name && c.tax_id) taxIdByCompany[c.name] = c.tax_id;
+        });
+        const defaultTaxId = companyList.find((c: any) => c.tax_id)?.tax_id || '';
+
+        list = list.map((b) => {
+          const bKey = b.name || b.branch || '';
+          const compName = companyMap[bKey];
+          return {
+            ...b,
+            default_menu: menuMap[bKey] || (b.branch ? menuMap[b.branch] : '') || '',
+            invoice_series_prefix: invoicePrefixMap[bKey] || (b as any).custom_invoice_series_prefix || b.invoice_series_prefix || '',
+            aggregator_series_prefix: aggregatorPrefixMap[bKey] || (b as any).custom_aggregator_series_prefix || b.aggregator_series_prefix || '',
+            tax_id: (b as any).tax_id || (compName ? taxIdByCompany[compName] : '') || defaultTaxId || b.tax_id || ''
+          };
+        });
       } catch (err) {
-        console.error('Failed to map default menu names', err);
+        console.error('Failed to map default menu and fiscal attributes', err);
       }
     }
 
@@ -130,7 +163,7 @@ export const BranchPage: React.FC = () => {
     try {
       const [menuRes, roomRes] = await Promise.all([
         dashboardService.getModuleRecords<{ name: string; menu_name?: string }>('URY Menu', 'all'),
-        dashboardService.getModuleRecords<{ name: string; room_name?: string; branch?: string }>('URY Room', 'all'),
+        dashboardService.getModuleRecords<{ name: string; branch?: string }>('URY Room', 'all'),
       ]);
       setMenus(menuRes || []);
       setRooms(roomRes || []);
@@ -200,6 +233,21 @@ export const BranchPage: React.FC = () => {
       });
       const branch = branchRes.message || branchRes;
       setBranchData(branch);
+
+      // Fetch company tax ID fallback
+      let companyTaxId = '';
+      try {
+        const compRes = await call<any>('frappe.client.get_list', {
+          doctype: 'Company',
+          fields: ['name', 'tax_id'],
+          limit_page_length: 100,
+        });
+        const companyList = Array.isArray(compRes) ? compRes : (compRes?.message || []);
+        companyTaxId = companyList.find((c: any) => c.tax_id)?.tax_id || '';
+      } catch {
+        // ignore
+      }
+
       setBranchForm({
         branch_name: branch.branch_name || branch.name || '',
         // Branch itself has no address field -- the real Link lives on the
@@ -232,9 +280,9 @@ export const BranchPage: React.FC = () => {
           // the edit form is bound to.
           setBranchForm((prev) => ({ ...prev, address: restaurant.address || '' }));
           setRestaurantForm({
-            invoice_series_prefix: restaurant.invoice_series_prefix || '',
-            aggregator_series_prefix: restaurant.aggregator_series_prefix || '',
-            tax_id: restaurant.tax_id || '',
+            invoice_series_prefix: restaurant.invoice_series_prefix || branch.custom_invoice_series_prefix || '',
+            aggregator_series_prefix: restaurant.aggregator_series_prefix || branch.custom_aggregator_series_prefix || '',
+            tax_id: restaurant.tax_id || branch.tax_id || companyTaxId || '',
             active_menu: restaurant.active_menu || '',
             default_room: restaurant.default_room || '',
             room_wise_menu: restaurant.room_wise_menu || 0,
@@ -245,11 +293,19 @@ export const BranchPage: React.FC = () => {
           });
         } else {
           setRestaurantData(null);
-          setRestaurantForm({});
+          setRestaurantForm({
+            invoice_series_prefix: branch.custom_invoice_series_prefix || '',
+            aggregator_series_prefix: branch.custom_aggregator_series_prefix || '',
+            tax_id: branch.tax_id || companyTaxId || '',
+          });
         }
       } catch {
         setRestaurantData(null);
-        setRestaurantForm({});
+        setRestaurantForm({
+          invoice_series_prefix: branch.custom_invoice_series_prefix || '',
+          aggregator_series_prefix: branch.custom_aggregator_series_prefix || '',
+          tax_id: branch.tax_id || companyTaxId || '',
+        });
       }
     } catch (err) {
       console.error('Failed to fetch branch details:', err);
@@ -278,12 +334,11 @@ export const BranchPage: React.FC = () => {
     if (!selectedBranch) return;
     setSaving(true);
     try {
-      const roomName = `Main Dining - ${selectedBranch.name}`;
+      const roomName = 'Main Dining';
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Room',
           name: roomName,
-          room_name: 'Main Dining',
           branch: selectedBranch.name,
         },
       });
@@ -345,12 +400,11 @@ export const BranchPage: React.FC = () => {
           user: [{ user: currentUser }]
         }
       });
-      const roomName = `Main Dining - ${addForm.branchName}`;
+      const roomName = 'Main Dining';
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Room',
           name: roomName,
-          room_name: 'Main Dining',
           branch: addForm.branchName
         }
       });
@@ -617,10 +671,10 @@ export const BranchPage: React.FC = () => {
               </div>
             </div>
 
-            {/* RESTAURANT INFO SUBSECTION */}
+            {/* RESTAURANT INFO / FISCAL IDENTIFICATION SUBSECTION */}
             <div>
               <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 pb-2 border-b border-border">
-                Restaurant Info
+                Fiscal & Operational Identification
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -629,7 +683,8 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.invoice_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
+                    placeholder="e.g. INV-"
                   />
                 </div>
                 <div className="space-y-2">
@@ -638,7 +693,8 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.aggregator_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
+                    placeholder="e.g. AGG-"
                   />
                 </div>
                 <div className="space-y-2">
@@ -647,7 +703,8 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.tax_id || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
+                    placeholder="e.g. TAX-12345"
                   />
                 </div>
                 <div className="space-y-2">
@@ -656,7 +713,7 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.default_tax_template || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, default_tax_template: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
                     placeholder="e.g. GST 5% - Restaurant"
                   />
                 </div>
@@ -730,7 +787,7 @@ export const BranchPage: React.FC = () => {
                                 }}
                                 options={[
                                   { value: '', label: 'Select Room' },
-                                  ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
+                                  ...rooms.map(r => ({ value: r.name, label: r.name }))
                                 ]}
                                 disabled={!isEditMode}
                                 placeholder="Select Room"
@@ -811,7 +868,7 @@ export const BranchPage: React.FC = () => {
                       onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
                       options={[
                         { value: '', label: 'None' },
-                        ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
+                        ...rooms.map((r) => ({ value: r.name, label: r.name }))
                       ]}
                       disabled={!isEditMode}
                       placeholder="None"
@@ -848,7 +905,7 @@ export const BranchPage: React.FC = () => {
                       {branchRooms.length > 0 ? (
                         <ul className="text-sm text-foreground list-disc list-inside">
                           {branchRooms.map((r) => (
-                            <li key={r.name}>{r.room_name || r.name}</li>
+                            <li key={r.name}>{r.name}</li>
                           ))}
                         </ul>
                       ) : (
@@ -992,6 +1049,21 @@ export const BranchPage: React.FC = () => {
                     key: 'branch',
                     header: 'Branch',
                     render: (row) => <span className="font-semibold text-foreground">{row.branch || row.branch_name || row.name}</span>
+                  },
+                  {
+                    key: 'invoice_series_prefix',
+                    header: 'Invoice Prefix',
+                    render: (row) => <span className="font-mono text-xs text-foreground">{row.invoice_series_prefix || '-'}</span>
+                  },
+                  {
+                    key: 'aggregator_series_prefix',
+                    header: 'Aggregator Prefix',
+                    render: (row) => <span className="font-mono text-xs text-foreground">{row.aggregator_series_prefix || '-'}</span>
+                  },
+                  {
+                    key: 'tax_id',
+                    header: 'Tax ID',
+                    render: (row) => <span className="font-mono text-xs text-foreground">{row.tax_id || '-'}</span>
                   },
                   { key: 'default_menu', header: 'Default Menu', render: (row) => row.default_menu || '-' },
                   {
