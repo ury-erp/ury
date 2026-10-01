@@ -517,32 +517,30 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
             <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
           ) : (
             <>
-              <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {!blindCashCount && (
-                  <>
-                    <div className="rounded-lg border border-gray-200 p-3">
-                      <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(totals.grandTotal)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-gray-200 p-3">
-                      <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(totals.netTotal)}
-                      </p>
-                    </div>
-                  </>
-                )}
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
+              {!blindCashCount && (
+                <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(totals.grandTotal)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(totals.netTotal)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
+                    <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
+                    <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
-                </div>
-              </div>
+              )}
 
               {hasRows ? (
                 <ClosingPaymentTable
