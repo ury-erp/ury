@@ -430,8 +430,8 @@ export default {
       if (this.pendingServes[kot.name]) return;
       this.actionError = "";
       kot.isRotated = false;
-      const pending = { timer: null, sending: false };
-      this.pendingServes[kot.name] = pending;
+      this.pendingServes[kot.name] = { timer: null, sending: false };
+      const pending = this.pendingServes[kot.name];
       pending.timer = setTimeout(async () => {
         pending.sending = true;
         try {
