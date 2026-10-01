@@ -650,6 +650,62 @@ class TestPOSOpeningOccupancy(unittest.TestCase):
         self.frappe.get_all.assert_not_called()
 
 
+class TestBlindCashCount(unittest.TestCase):
+    """POS Profile fixture and API flag, without a Frappe site."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.enterContext(patch("ury.ury_pos.api.getBranch", return_value="Branch A"))
+        self.frappe.session.user = "cashier@example.com"
+        self.profile = frappe._dict(
+            name="POS-1", branch="Branch A", company="Test Co", warehouse="Stores",
+            applicable_for_users=[frappe._dict(user="cashier@example.com")],
+            printer_settings=[], qz_print=0, custom_enable_multiple_cashier=0,
+        )
+        self.frappe.db.exists.return_value = self.profile.name
+        self.frappe.get_doc.return_value = self.profile
+        self.frappe.get_single.return_value = frappe._dict(disable_rounded_total=0)
+
+    def test_exposes_enabled_blind_count(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.profile.custom_blind_cash_count = 1
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 1)
+
+    def test_exposes_disabled_blind_count(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.profile.custom_blind_cash_count = 0
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 0)
+
+    def test_missing_field_defaults_to_disabled(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 0)
+
+    def test_fixture_is_an_opt_in_pos_profile_checkbox(self):
+        from pathlib import Path
+
+        fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "custom_field.json"
+        with fixture_path.open() as fixture_file:
+            fields = json.load(fixture_file)
+        matches = [field for field in fields if field["name"] == "POS Profile-custom_blind_cash_count"]
+        self.assertEqual(len(matches), 1, "Ship exactly one blind-count field")
+        field = matches[0]
+        self.assertEqual(field["dt"], "POS Profile")
+        self.assertEqual(field["fieldname"], "custom_blind_cash_count")
+        self.assertEqual(field["fieldtype"], "Check")
+        self.assertEqual(field["default"], "0")
+        self.assertEqual(field["reqd"], 0)
+
+    def test_fixture_export_keeps_the_blind_count_field(self):
+        from ury.hooks import fixtures
+
+        custom_fields = next(fixture for fixture in fixtures if fixture.get("doctype") == "Custom Field")
+        names = next(values for field, operator, values in custom_fields["filters"] if field == "name" and operator == "in")
+        self.assertIn("POS Profile-custom_blind_cash_count", names)
+
+
 class TestSubmitChecklistSEC10(FrappeTestCase):
     """Test cases for submit_checklist function."""
 
