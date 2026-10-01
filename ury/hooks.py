@@ -201,9 +201,9 @@ before_uninstall = "ury.uninstall.uninstall"
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+}
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
 # on every migrate. Safe to define even when huf is not installed — the
