@@ -133,11 +133,21 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
 
 function buildRows(
   openingBalances: OpeningBalanceDetail[],
-  expectedByMode: Record<string, number>
+  expectedByMode: Record<string, number>,
+  blindCashCount: boolean,
+  profilePaymentModes: string[]
 ): ClosingPaymentSummary[] {
   const rows = new Map<string, ClosingPaymentSummary>();
+  const rowBalances = blindCashCount
+    ? [
+        ...openingBalances,
+        ...profilePaymentModes
+          .filter((mode) => !openingBalances.some((detail) => detail.mode_of_payment === mode))
+          .map((mode) => ({ mode_of_payment: mode, opening_amount: 0 })),
+      ]
+    : openingBalances;
 
-  openingBalances.forEach((detail) => {
+  rowBalances.forEach((detail) => {
     rows.set(detail.mode_of_payment, {
       mode_of_payment: detail.mode_of_payment,
       opening_amount: Number(detail.opening_amount) || 0,
@@ -151,7 +161,7 @@ function buildRows(
     const existing = rows.get(mode);
     if (existing) {
       existing.expected_amount = expected;
-    } else {
+    } else if (!blindCashCount) {
       rows.set(mode, {
         mode_of_payment: mode,
         opening_amount: 0,
@@ -166,7 +176,7 @@ function buildRows(
 }
 
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
-  const { posProfile } = usePOSStore();
+  const { posProfile, paymentModes } = usePOSStore();
   const { user } = useRootStore();
   const blindCashCount = isBlindCashCount(posProfile);
 
@@ -261,7 +271,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setInvoiceCount(invoices.length);
       const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
       setTotals(aggregatedTotals);
-      setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
+      setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode, blindCashCount, paymentModes));
       setTouchedModes(new Set());
     } catch (error) {
       console.error('Failed to load POS closing details:', error);
@@ -269,7 +279,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     } finally {
       setIsLoading(false);
     }
-  }, [posProfile, user]);
+  }, [posProfile, user, blindCashCount, paymentModes]);
 
   useEffect(() => {
     if (!open) return;
