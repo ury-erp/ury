@@ -456,14 +456,15 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
             "ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect
         ):
             mock_validate_close.return_value = "Success"
-            mock_has_permission.side_effect = lambda doctype, perm: perm == "create" or perm == "submit"
+            mock_has_permission.side_effect = lambda doctype, perm, **kwargs: perm == "create" or perm == "submit"
             mock_multi_cashier.return_value = {
                 "enabled": True,
                 "main_cashier_configured": True,
                 "main_cashier_open": True,
             }
             mock_get_all.return_value = [
-                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open"}
+                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open",
+                 "user": "cashier@example.com", "period_start_date": "2026-10-01 08:10:00"}
             ]
 
             result = get_pos_opening_screen_data()
