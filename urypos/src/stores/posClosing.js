@@ -101,7 +101,7 @@ export const posClosing = defineStore("posClose", {
       };
       this.call
         .get(
-          "erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices",
+          "ury.ury_pos.api.get_till_invoices",
           PosOpenEntry
         )
         .then((result) => {
