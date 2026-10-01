@@ -73,7 +73,7 @@ export const posClosing = defineStore("posClose", {
         .get("frappe.client.get", getPosOpenEntry)
         .then((result) => {
           this.startDate = result.message.period_start_date;
-          this.cashier = result.message.owner;
+          this.cashier = result.message.user;
           this.openingBalance = result.message.balance_details;
 
           this.getInvoice();
