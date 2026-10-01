@@ -1294,8 +1294,7 @@ def get_pos_opening_screen_data(pos_profile: str | None = None) -> dict:
         if other_entries:
             entry = other_entries[0]
             occupied_entry = {
-                "user": entry["user"],
-                "user_full_name": frappe.db.get_value("User", entry["user"], "full_name") or entry["user"],
+                "user_full_name": frappe.db.get_value("User", entry["user"], "full_name") or None,
                 "period_start_date": entry["period_start_date"],
             }
             entry_doc = frappe.get_doc("POS Opening Entry", entry["name"])

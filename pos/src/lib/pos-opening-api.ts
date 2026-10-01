@@ -40,8 +40,7 @@ export interface POSOpeningPermissions {
 
 export interface POSOpeningOccupiedEntry {
   name?: string;
-  user: string;
-  user_full_name: string;
+  user_full_name: string | null;
   period_start_date: string;
 }
 
