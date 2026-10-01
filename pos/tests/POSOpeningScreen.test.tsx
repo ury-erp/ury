@@ -1,13 +1,13 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { initI18n } from '../i18n';
-import { getPOSOpeningContext, type POSOpeningContext } from '../lib/pos-opening-api';
-import POSOpeningScreen from './POSOpeningScreen';
+import { initI18n } from '../src/i18n';
+import { getPOSOpeningContext, type POSOpeningContext } from '../src/lib/pos-opening-api';
+import POSOpeningScreen from '../src/components/POSOpeningScreen';
 
-vi.mock('../store/root-store', () => ({ useRootStore: () => ({ user: null }) }));
-vi.mock('../lib/pos-opening-api', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../lib/pos-opening-api')>(),
+vi.mock('../src/store/root-store', () => ({ useRootStore: () => ({ user: null }) }));
+vi.mock('../src/lib/pos-opening-api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/pos-opening-api')>(),
   getPOSOpeningContext: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ const context: POSOpeningContext = {
 };
 
 beforeEach(async () => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   await initI18n('en');
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -45,6 +45,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function renderContext(data = context) {
