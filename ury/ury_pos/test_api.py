@@ -13,6 +13,63 @@ import json
 from datetime import date
 
 
+class TestCreateCustomerDefaults(unittest.TestCase):
+    """Site-less regression tests for native Selling Settings defaults."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.enterContext(patch("ury.ury_pos.api.validate_phone_number"))
+        self.frappe.has_permission.return_value = True
+        self.defaults = {"territory": "Uganda", "customer_group": "Retail"}
+        self.frappe.db.get_single_value.side_effect = (
+            lambda doctype, field: self.defaults[field] if doctype == "Selling Settings" else None
+        )
+
+    def assert_customer_defaults(self, expected_territory, expected_customer_group, **kwargs):
+        result = create_customer("Test Customer", "+256772123456", **kwargs)
+        self.assertEqual(result["status"], "success")
+        payload = self.frappe.get_doc.call_args.args[0]
+        self.assertEqual(payload["doctype"], "Customer")
+        self.assertEqual(payload["territory"], expected_territory)
+        self.assertEqual(payload["customer_group"], expected_customer_group)
+        self.assertEqual(result["territory"], expected_territory)
+        self.assertEqual(result["customer_group"], expected_customer_group)
+        self.frappe.get_doc.return_value.insert.assert_called_once_with()
+        self.frappe.db.commit.assert_called_once_with()
+
+    def test_omitted_values_use_selling_settings(self):
+        self.assert_customer_defaults("Uganda", "Retail")
+
+    def test_unset_settings_use_root_defaults(self):
+        self.defaults = {"territory": None, "customer_group": None}
+        self.assert_customer_defaults("All Territories", "All Customer Groups")
+
+    def test_blank_settings_use_root_defaults(self):
+        self.defaults = {"territory": "", "customer_group": ""}
+        self.assert_customer_defaults("All Territories", "All Customer Groups")
+
+    def test_explicit_values_override_selling_settings(self):
+        self.assert_customer_defaults(
+            "Kenya", "Wholesale", territory="Kenya", customer_group="Wholesale"
+        )
+        self.frappe.db.get_single_value.assert_not_called()
+
+    def test_explicit_territory_preserves_default_customer_group(self):
+        self.assert_customer_defaults("Kenya", "Retail", territory="Kenya")
+
+    def test_explicit_customer_group_preserves_default_territory(self):
+        self.assert_customer_defaults("Uganda", "Wholesale", customer_group="Wholesale")
+
+    def test_denied_permission_does_not_read_defaults_or_create_customer(self):
+        self.frappe.has_permission.return_value = False
+        self.frappe.PermissionError = frappe.PermissionError
+        self.frappe.throw.side_effect = frappe.PermissionError("Not permitted")
+        with self.assertRaises(frappe.PermissionError):
+            create_customer("Test Customer", "+256772123456")
+        self.frappe.db.get_single_value.assert_not_called()
+        self.frappe.get_doc.assert_not_called()
+
+
 class TestGetRestaurantMenuPhase1(unittest.TestCase):
     """Phase 1 regression: getRestaurantMenu() must remain a thin wrapper
     around resolve_restaurant_menu() with byte-identical behavior for
