@@ -124,7 +124,8 @@
         "save_button": "حفظ التعليق"
     },
     "pos_opening": {
-        "occupied_till": "{{profile}} مفتوح باسم {{holder}} منذ {{since}}؛ يجب على {{holder}} إغلاق الوردية، أو على المدير إغلاقها في Desk."
+        "occupied_till": "{{profile}} مفتوح باسم {{holder}} منذ {{since}}؛ يجب على {{holder}} إغلاق الوردية، أو على المدير إغلاقها في Desk.",
+        "another_cashier": "أمين صندوق آخر"
     },
     "errors": {
         "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",

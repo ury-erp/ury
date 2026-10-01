@@ -10,7 +10,7 @@ import {
   POSOpeningContext,
   POSOpeningPayment,
 } from '../lib/pos-opening-api';
-import { t } from '../i18n';
+import { getActiveLanguage, t } from '../i18n';
 import POSOpeningPaymentTable from './POSOpeningPaymentTable';
 
 type OpeningBlockingState =
@@ -218,9 +218,11 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
             <p className="text-orange-700 text-sm">
               {t('pos_opening.occupied_till', {
                 profile: context?.selected_profile || '',
-                holder: occupied?.user_full_name?.includes('@') ? '' : occupied?.user_full_name || '',
+                holder: occupied?.user_full_name && !occupied.user_full_name.includes('@')
+                  ? occupied.user_full_name
+                  : t('pos_opening.another_cashier'),
                 since: occupied?.period_start_date
-                  ? new Date(occupied.period_start_date.replace(' ', 'T')).toLocaleString()
+                  ? new Date(occupied.period_start_date.replace(' ', 'T')).toLocaleString(getActiveLanguage())
                   : '',
               })}
             </p>
