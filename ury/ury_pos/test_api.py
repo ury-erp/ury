@@ -19,7 +19,10 @@ class TestCreateCustomerDefaults(unittest.TestCase):
     def setUp(self):
         self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
         self.enterContext(patch("ury.ury_pos.api.validate_phone_number"))
+        self.get_root_of = self.enterContext(patch("frappe.utils.nestedset.get_root_of"))
+        self.get_root_of.return_value = "Tous les territoires"
         self.frappe.has_permission.return_value = True
+        self.frappe.throw.side_effect = frappe.ValidationError
         self.defaults = {"territory": "Uganda", "customer_group": "Retail"}
         self.frappe.db.get_single_value.side_effect = (
             lambda doctype, field: self.defaults[field] if doctype == "Selling Settings" else None
@@ -39,26 +42,63 @@ class TestCreateCustomerDefaults(unittest.TestCase):
 
     def test_omitted_values_use_selling_settings(self):
         self.assert_customer_defaults("Uganda", "Retail")
+        self.get_root_of.assert_not_called()
 
-    def test_unset_settings_use_root_defaults(self):
+    def test_unset_customer_group_raises_configuration_error_without_creating_customer(self):
         self.defaults = {"territory": None, "customer_group": None}
-        self.assert_customer_defaults("All Territories", "All Customer Groups")
+        with self.assertRaisesRegex(frappe.ValidationError, "Default Customer Group.*Selling Settings"):
+            create_customer("Test Customer", "+256772123456")
+        self.frappe.get_doc.assert_not_called()
+        self.frappe.db.commit.assert_not_called()
 
-    def test_blank_settings_use_root_defaults(self):
+    def test_blank_customer_group_raises_configuration_error_without_creating_customer(self):
         self.defaults = {"territory": "", "customer_group": ""}
-        self.assert_customer_defaults("All Territories", "All Customer Groups")
+        with self.assertRaisesRegex(frappe.ValidationError, "Default Customer Group.*Selling Settings"):
+            create_customer("Test Customer", "+256772123456", territory="Kenya")
+        self.frappe.get_doc.assert_not_called()
+        self.frappe.db.commit.assert_not_called()
+
+    def test_unset_territory_uses_native_translated_root(self):
+        self.defaults["territory"] = None
+        self.assert_customer_defaults("Tous les territoires", "Retail")
+        self.get_root_of.assert_called_once_with("Territory")
+
+    def test_blank_territory_uses_native_translated_root(self):
+        self.defaults["territory"] = ""
+        self.assert_customer_defaults("Tous les territoires", "Retail")
+        self.get_root_of.assert_called_once_with("Territory")
+
+    def test_explicit_customer_group_with_unset_settings_uses_native_territory_root(self):
+        self.defaults = {"territory": None, "customer_group": None}
+        self.assert_customer_defaults("Tous les territoires", "Wholesale", customer_group="Wholesale")
+        self.get_root_of.assert_called_once_with("Territory")
 
     def test_explicit_values_override_selling_settings(self):
         self.assert_customer_defaults(
             "Kenya", "Wholesale", territory="Kenya", customer_group="Wholesale"
         )
         self.frappe.db.get_single_value.assert_not_called()
+        self.get_root_of.assert_not_called()
+
+    def test_explicit_values_work_without_selling_settings_defaults(self):
+        self.defaults = {"territory": None, "customer_group": None}
+        self.assert_customer_defaults(
+            "Kenya", "Wholesale", territory="Kenya", customer_group="Wholesale"
+        )
+        self.frappe.db.get_single_value.assert_not_called()
+        self.get_root_of.assert_not_called()
+
+    def test_blank_values_use_selling_settings(self):
+        self.assert_customer_defaults("Uganda", "Retail", territory="", customer_group="")
+        self.get_root_of.assert_not_called()
 
     def test_explicit_territory_preserves_default_customer_group(self):
         self.assert_customer_defaults("Kenya", "Retail", territory="Kenya")
+        self.get_root_of.assert_not_called()
 
     def test_explicit_customer_group_preserves_default_territory(self):
         self.assert_customer_defaults("Uganda", "Wholesale", customer_group="Wholesale")
+        self.get_root_of.assert_not_called()
 
     def test_denied_permission_does_not_read_defaults_or_create_customer(self):
         self.frappe.has_permission.return_value = False
@@ -68,6 +108,7 @@ class TestCreateCustomerDefaults(unittest.TestCase):
             create_customer("Test Customer", "+256772123456")
         self.frappe.db.get_single_value.assert_not_called()
         self.frappe.get_doc.assert_not_called()
+        self.get_root_of.assert_not_called()
 
 
 class TestGetRestaurantMenuPhase1(unittest.TestCase):
