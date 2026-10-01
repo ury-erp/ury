@@ -614,7 +614,7 @@ export default {
       });
     },
     calculateTimeRemaining(targetTime) {
-      const currentTime = new Date();
+      const currentTime = new Date(Date.now() + this.serverTimeOffset);
       const [targetHours, targetMinutes, targetSeconds] = targetTime.split(":");
       const targetDate = new Date(
         currentTime.getFullYear(),
@@ -625,7 +625,7 @@ export default {
         targetSeconds
       );
 
-      const timeDifference = currentTime - targetDate;
+      const timeDifference = Math.max(0, currentTime - targetDate);
       const hoursRemaining = Math.floor(timeDifference / 3600000);
       const minutesRemaining = Math.floor((timeDifference % 3600000) / 60000);
 
