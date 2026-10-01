@@ -14,6 +14,7 @@ import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
+import { isBlindCashCount } from '../lib/pos-closing-visibility';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { getChecklist } from '../lib/checklist-api';
 import {
@@ -167,6 +168,7 @@ function buildRows(
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
   const { posProfile } = usePOSStore();
   const { user } = useRootStore();
+  const blindCashCount = isBlindCashCount(posProfile);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -532,6 +534,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                 <ClosingPaymentTable
                   rows={rows}
                   touchedModes={touchedModes}
+                  blindCashCount={blindCashCount}
                   onChange={handleRowChange}
                 />
               ) : (
