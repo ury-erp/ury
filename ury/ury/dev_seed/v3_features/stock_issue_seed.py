@@ -49,21 +49,33 @@ def _get_department():
 def _ensure_component_items():
     """Create lightweight stock Items to use as BOM/components if they do not exist."""
     created = []
+    meta = frappe.get_meta("Item")
+    has_hsn = meta.has_field("gst_hsn_code") or frappe.db.has_column("Item", "gst_hsn_code")
+
     for item_name, uom in DEMO_COMPONENTS:
         if frappe.db.exists("Item", item_name):
             continue
-        doc = frappe.get_doc(
-            {
-                "doctype": "Item",
-                "item_code": item_name,
-                "item_name": item_name,
-                "item_group": "Raw Material",
-                "stock_uom": uom,
-                "is_stock_item": 1,
-                "is_sales_item": 0,
-            }
-        )
-        doc.insert(ignore_permissions=True)
+        item_dict = {
+            "doctype": "Item",
+            "item_code": item_name,
+            "item_name": item_name,
+            "item_group": "Raw Material",
+            "stock_uom": uom,
+            "is_stock_item": 1,
+            "is_sales_item": 0,
+        }
+        if has_hsn:
+            item_dict["gst_hsn_code"] = "999512"
+
+        doc = frappe.get_doc(item_dict)
+        try:
+            doc.insert(ignore_permissions=True)
+        except frappe.ValidationError as e:
+            if "HSN" in str(e) or "SAC" in str(e):
+                doc.flags.ignore_mandatory = True
+                doc.insert(ignore_permissions=True)
+            else:
+                raise
         created.append(doc.name)
         print(f"  + Created component Item: {doc.name}")
     return created
