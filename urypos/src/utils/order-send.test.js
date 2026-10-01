@@ -127,7 +127,7 @@ test("the send button is disabled and says Sending… while pending", async () =
 test("Cart exposes the shared Pax value without defaulting it", async () => {
   const { state } = fixture();
   state.customers.numberOfPax = "";
-  assert.match(await renderCart(), /<input[^>]*id="cart-pax"[^>]*value=""/);
+  assert.match(await renderCart(), /<input[^>]*id="cart-pax"[^>]*value(?:=""|(?=[ >]))/);
   state.customers.numberOfPax = "3";
   assert.match(await renderCart(), /<input[^>]*id="cart-pax"[^>]*value="3"/);
 });
