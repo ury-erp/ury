@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import * as Vue from "vue";
+import { compile } from "@vue/compiler-dom";
+import { renderToString } from "@vue/server-renderer";
 
 // Exercise the real component methods without a DOM, site, or a test runner.
 const source = await readFile(new URL("./kot.vue", import.meta.url), "utf8");
@@ -40,6 +43,7 @@ function kitchen() {
   const ticket = {
     name: "KOT-001", type: "New Order", order_status: "Ready For Prepare",
     production: "Kitchen", time: "12:00:00", kot_items: [], isRotated: true,
+    invoice: "INV-001", tableortakeaway: "T-01", user: "Cook",
   };
   state.kot = [ticket];
   return { state, ticket, requests, timers, call, component };
@@ -203,4 +207,49 @@ test("unknown request errors use a visible fallback message", () => {
   assert.equal(typeof helpers.kitchenErrorMessage, "function", "Missing kitchen error presentation");
   assert.equal(helpers.kitchenErrorMessage({}, "Could not serve KOT-001."), "Could not serve KOT-001.");
   assert.equal(helpers.kitchenErrorMessage({ _server_messages: "bad JSON" }, "Could not recall."), "Could not recall.");
+});
+
+test("Vue reacts when the undo window ends and the request becomes in-flight", async () => {
+  const { state: plainState, ticket, timers } = kitchen();
+  const state = Vue.reactive(plainState);
+  const changes = [];
+  const stop = Vue.watchEffect(() => changes.push(state.pendingServes[ticket.name]?.sending));
+  let finish;
+  state.call.post = () => new Promise(resolve => { finish = resolve; });
+  state.serveOrder(ticket);
+  await Vue.nextTick();
+  const sending = [...timers.values()][0].callback();
+  await Vue.nextTick();
+  try {
+    assert.equal(changes.at(-1), true, "Serving… and Undo must update through Vue's reactive state");
+  } finally {
+    finish({});
+    await sending;
+    stop();
+  }
+});
+
+test("the rendered card shows LATE, an Undo control, and a visible failure banner", async () => {
+  const { state, ticket, component } = kitchen();
+  const { code } = compile(source.split("<template>")[1].split("</template>")[0], { mode: "function", prefixIdentifiers: true });
+  const render = new Function("Vue", code)(Vue);
+  ticket.late = true;
+  state.actionError = "Could not serve KOT-001.";
+  state.pendingServes[ticket.name] = { sending: false };
+  let html = await renderToString(Vue.createSSRApp({ data: () => state, computed: component.computed, render }));
+  assert.match(html, /role="alert"/);
+  assert.match(html, /Could not serve KOT-001\./);
+  assert.match(html, /ring-4 ring-red-600/);
+  assert.match(html, />LATE</);
+  assert.match(html, />Undo</);
+  state.pendingServes[ticket.name].sending = true;
+  html = await renderToString(Vue.createSSRApp({ data: () => state, computed: component.computed, render }));
+  assert.match(html, /Serving…/);
+  assert.doesNotMatch(html, />Undo</);
+});
+
+test("the native recent-served query uses a site-local cutoff across midnight", () => {
+  const query = helpers.recentServedQuery("Branch A", "Kitchen", new Date("2026-10-01T00:05:00"));
+  assert.deepEqual(query.filters.modified, [">=", "2026-09-30 23:50:00"]);
+  assert.deepEqual(query.filters.type, ["not in", ["Cancelled", "Partially cancelled"]]);
 });
