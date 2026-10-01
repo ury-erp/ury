@@ -60,17 +60,39 @@ test('POS: logout includes CSRF, clears only URY state and goes to /login', asyn
   assert.equal(env.globals.window.location.href, '/login');
   assert.equal(env.globals.localStorage.getItem('posOrderTabsData'), null);
   assert.equal(env.globals.sessionStorage.getItem('posProfile'), null);
+  assert.equal(env.globals.sessionStorage.getItem('ury.setup.configureState'), null);
+  assert.equal(env.globals.localStorage.getItem('ury_active_branch_id'), null);
+  assert.equal(env.globals.localStorage.getItem('ury_language'), 'fr');
   assert.equal(env.globals.localStorage.getItem('deskPreference'), 'keep');
 });
 
-test('POS: rejected HTTP logout stays on the page with a visible error', async () => {
+test('POS: successful logout stays disabled and blocks requests while navigating', async () => {
   const env = environment();
-  env.globals.fetch = async () => ({ ok: false, status: 403 });
-  await header(env)()('header.logout').props.onClick();
-  assert.equal(env.globals.window.location.href, '/current');
-  assert.ok(env.errors[0]);
-  assert.equal(env.globals.localStorage.getItem('posOrderTabsData'), 'legacy carts');
+  const render = header(env);
+  await render()('header.logout').props.onClick();
+  const button = render()('header.logout');
+  const disabled = button.props.disabled;
+  await button.props.onClick();
+  assert.equal(disabled, true);
+  assert.equal(env.calls.length, 1);
+  assert.equal(env.globals.window.location.href, '/login');
 });
+
+for (const failure of ['HTTP', 'network']) {
+  test(`POS: rejected ${failure} logout re-enables its button and reports an error`, async () => {
+    const env = environment();
+    env.globals.fetch = async () => {
+      if (failure === 'network') throw new Error('Network unavailable');
+      return { ok: false, status: 403 };
+    };
+    const render = header(env);
+    await render()('header.logout').props.onClick();
+    assert.equal(env.globals.window.location.href, '/current');
+    assert.ok(env.errors[0]);
+    assert.equal(env.globals.localStorage.getItem('posOrderTabsData'), 'legacy carts');
+    assert.equal(Boolean(render()('header.logout').props.disabled), false);
+  });
+}
 
 test('POS: pending logout disables its button and sends only one request', async () => {
   const env = environment();
@@ -99,4 +121,7 @@ test('POS: Clear Cache preserves Desk storage and self-ordering credentials', ()
   assert.equal(env.globals.sessionStorage.getItem('deskSession'), 'keep');
   assert.equal(env.globals.localStorage.getItem('posOrderTabsData'), null);
   assert.equal(env.globals.sessionStorage.getItem('posProfile'), null);
+  assert.equal(env.globals.sessionStorage.getItem('ury.setup.configureState'), null);
+  assert.equal(env.globals.localStorage.getItem('ury_active_branch_id'), null);
+  assert.equal(env.globals.localStorage.getItem('ury_language'), 'fr');
 });

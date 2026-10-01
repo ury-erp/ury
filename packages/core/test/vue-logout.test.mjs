@@ -16,14 +16,28 @@ for (const app of ['urypos', 'mosaic']) {
     await loadVueLogout(app, env).run();
     assert.equal(env.globals.window.location.href, '/login');
     for (const key of ['userAuth', 'selectedRoom', 'posOrderTabsData',
-      'posOrderTabsData:alice@example.com', 'kot_time', 'KOT-001_item-001_strike']) {
+      'posOrderTabsData:alice@example.com', 'kot_time', 'KOT-001_item-001_strike',
+      'ury_active_branch_id']) {
       assert.equal(env.globals.localStorage.getItem(key), null, key);
     }
     assert.equal(env.globals.localStorage.getItem('deskPreference'), 'keep');
     assert.equal(env.globals.localStorage.getItem('ury_device_credential'), 'keep');
+    assert.equal(env.globals.localStorage.getItem('ury_language'), 'fr');
     assert.equal(env.globals.sessionStorage.getItem('posProfile'), null);
+    assert.equal(env.globals.sessionStorage.getItem('ury.setup.configureState'), null);
     assert.equal(env.globals.sessionStorage.getItem('deskSession'), 'keep');
     assert.equal(env.calls.some(([name]) => name === 'router' || name === 'reload'), false);
+  });
+
+  test(`${app}: successful logout stays disabled and blocks requests while navigating`, async () => {
+    const env = environment();
+    const { instance, run } = loadVueLogout(app, env);
+    await run();
+    const disabled = instance.loggingOut;
+    await run();
+    assert.equal(disabled, true);
+    assert.equal(env.calls.length, 1);
+    assert.equal(env.globals.window.location.href, '/login');
   });
 
   for (const failure of ['HTTP', 'network']) {
