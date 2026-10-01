@@ -170,6 +170,9 @@ def kot_list():
     audio_alert = frappe.db.get_value(
         "POS Profile", {"branch": branch}, "custom_kot_alert"
     )
+    audio_file = frappe.db.get_value(
+        "POS Profile", {"branch": branch}, "custom_kot_alert_sound"
+    )
     kotList = frappe.get_list(
         "URY KOT",
         fields=["name"],
@@ -221,6 +224,7 @@ def kot_list():
         "server_time": today,
         "kot_alert_time": kot_alert_time,
         "audio_alert": audio_alert,
+        "audio_file": audio_file,
         "daily_order_number":daily_order_number
     }
 

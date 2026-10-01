@@ -329,6 +329,8 @@ export default {
       socketStale: true,
       socketActive: false,
       socketHandlers: {},
+      resyncGeneration: 0,
+      lastSocketAudioFile: null,
       masonry: null,
       call: frappe.call(),
       branch: "",
@@ -380,12 +382,17 @@ export default {
           });
       });
     },
-    fetchKOT() {
+    fetchKOT(resync = false) {
+      const generation = this.resyncGeneration;
       return new Promise((resolve, reject) => {
         try {
           this.call
             .get("ury.ury.api.ury_kot_display.kot_list", {})
             .then((result) => {
+              if (generation !== this.resyncGeneration) { resolve(); return; }
+              const missedTickets = resync && result.message.KOT.some(
+                kot => kot.production === this.production && !this.knownKots.has(kot.name)
+              );
               console.log(result,"..............result")
               this.branch = result.message.Branch;
               this.serverTimeOffset = new Date(result.message.server_time.replace(" ", "T")).getTime() - Date.now();
@@ -400,15 +407,19 @@ export default {
               this.updateQtyColorTable();
               this.updateTimeRemaining();
               this.masonryLoading();
+              const audioFile = result.message.audio_file || this.lastSocketAudioFile;
+              if (missedTickets && this.audio_alert === 1 && audioFile) {
+                this.playAlertSound(audioFile);
+              }
               resolve();
             })
             .catch((error) => {
               console.error(error);
-              this.loadingKots = false;
+              if (generation === this.resyncGeneration) this.loadingKots = false;
               reject(error);
             });
         } catch (error) {
-          this.loadingKots = false;
+          if (generation === this.resyncGeneration) this.loadingKots = false;
           reject(error);
         }
       });
@@ -713,13 +724,17 @@ export default {
           }
           this.socketHandlers = {
             connect: () => {
+              const generation = ++this.resyncGeneration;
               this.socketStale = true;
-              this.fetchKOT().then(() => { this.socketStale = !socket.connected; }).catch(console.error);
+              this.fetchKOT(true).then(() => {
+                if (generation === this.resyncGeneration) this.socketStale = !socket.connected;
+              }).catch(console.error);
             },
-            disconnect: () => { this.socketStale = true; },
+            disconnect: () => { ++this.resyncGeneration; this.socketStale = true; },
           };
           this.socketHandlers[this.kot_channel] = (doc) => {
-            if (!rememberKot(this.knownKots, doc.kot, this.production)) return;
+            if (doc.audio_file) this.lastSocketAudioFile = doc.audio_file;
+            if (!rememberKot(this.knownKots, doc.kot)) return;
             if (this.audio_alert === 1) {
               this.playAlertSound(doc.audio_file);
             }
@@ -773,6 +788,7 @@ export default {
   },
   beforeUnmount() {
     this.socketActive = false;
+    ++this.resyncGeneration;
     for (const [channel, handler] of Object.entries(this.socketHandlers)) socket.off(channel, handler);
     this.cancelPendingServes();
     clearInterval(this.timeInterval);
