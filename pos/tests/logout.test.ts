@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolve } from 'node:path';
-import { environment, loadModule } from '../../../packages/core/test/logout-harness.mjs';
+import { environment, loadModule } from '../../packages/core/test/logout-harness.mjs';
 
 function header(env: ReturnType<typeof environment>) {
   let state: unknown[] = [true];
