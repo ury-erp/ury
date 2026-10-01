@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolve } from 'node:path';
 import { create } from 'zustand';
-import { environment, loadModule } from '../../../packages/core/test/logout-harness.mjs';
+import { environment, loadModule } from '../../packages/core/test/logout-harness.mjs';
 
 const saved = JSON.stringify({
   tabOrder: [{ id: 'alice-tab', name: 'Tab 1' }], activeTabId: 'alice-tab',
