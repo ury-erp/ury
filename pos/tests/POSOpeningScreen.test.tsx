@@ -27,7 +27,6 @@ const context: POSOpeningContext = {
   multi_cashier: { enabled: false, main_cashier_open: false, main_cashier_configured: false },
   permissions: { create: true, submit: true },
   occupied_entry: {
-    user: 'other@example.com',
     user_full_name: 'Other Cashier',
     period_start_date: '2026-10-01 08:10:00',
   },
