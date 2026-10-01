@@ -1,20 +1,20 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@ury/core';
-import { initI18n } from '../i18n';
-import { getMainCashierPosInvoices, getOpenPosOpeningEntries } from '../lib/pos-closing-api';
-import POSClosingDialog from './POSClosingDialog';
+import { initI18n } from '../src/i18n';
+import { getMainCashierPosInvoices, getOpenPosOpeningEntries } from '../src/lib/pos-closing-api';
+import POSClosingDialog from '../src/components/POSClosingDialog';
 
 const state = vi.hoisted(() => ({
   profile: { name: 'POS-1', company: 'Test Co', multiple_cashier: 0, custom_blind_cash_count: 1 as number | undefined },
   user: { name: 'cashier@example.com' },
 }));
 
-vi.mock('../store/pos-store', () => ({ usePOSStore: () => ({ posProfile: state.profile }) }));
-vi.mock('../store/root-store', () => ({ useRootStore: () => ({ user: state.user }) }));
-vi.mock('../lib/pos-closing-api', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../lib/pos-closing-api')>(),
+vi.mock('../src/store/pos-store', () => ({ usePOSStore: () => ({ posProfile: state.profile }) }));
+vi.mock('../src/store/root-store', () => ({ useRootStore: () => ({ user: state.user }) }));
+vi.mock('../src/lib/pos-closing-api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/pos-closing-api')>(),
   getOpenPosOpeningEntries: vi.fn(),
   getMainCashierPosInvoices: vi.fn(),
 }));
@@ -23,7 +23,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(async () => {
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   await initI18n('en');
   state.profile.custom_blind_cash_count = 1;
   vi.mocked(getOpenPosOpeningEntries).mockResolvedValue([{
@@ -47,6 +47,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function renderClosing() {
