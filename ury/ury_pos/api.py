@@ -810,7 +810,8 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
+        "enable_kot_reprint":enable_kot_reprint,
+        "custom_blind_cash_count": pos_profiles.get("custom_blind_cash_count") or 0,
 
     }
 
