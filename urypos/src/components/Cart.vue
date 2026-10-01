@@ -3,7 +3,7 @@
     class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
     v-if="this.invoiceData.invoiceUpdating"
   >
-    Updating Order...
+    Sending…
   </div>
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
@@ -18,10 +18,11 @@
     <div class="float-right rounded" v-if="this.menu.cart.length > 0">
       <button
         class="mr-4 rounded px-4 py-2 shadow"
-        v-if="this.invoiceData.showUpdateButtton === true"
+        v-if="this.invoiceData.showUpdateButtton || this.invoiceData.invoiceUpdating"
+        :disabled="this.invoiceData.invoiceUpdating"
         @click="this.invoiceData.invoiceCreation()"
       >
-        Update
+        {{ sendButtonLabel }}
       </button>
       <button
       class="mr-4 rounded py-2 px-4 shadow"
@@ -42,6 +43,20 @@
         Cancel
       </button>
     </div>
+  </div>
+  <div class="mt-5" v-if="this.menu.cart.length > 0">
+    <label for="cart-pax" class="block text-sm font-medium text-gray-900">
+      Pax
+    </label>
+    <input
+      type="number"
+      id="cart-pax"
+      min="1"
+      class="mt-2 block w-full rounded-md border bg-gray-50 p-2.5 text-sm text-gray-900 md:w-3/5 lg:w-2/5"
+      placeholder="Pax"
+      v-model="this.customers.numberOfPax"
+      @input="this.customers.validateInput"
+    />
   </div>
   <div
     class="flex h-screen items-center justify-center"
@@ -375,11 +390,21 @@ import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { useAuthStore } from "@/stores/Auth.js";
 import { usetoggleRecentOrder } from "@/stores/recentOrder.js";
 import { useNotifications } from "@/stores/Notification.js";
+import { useCustomerStore } from "@/stores/Customer.js";
+import { orderSendLabel } from "../utils/order-send.js";
 
 export default {
   name: "Cart",
   components: {
     orderInfo,
+  },
+  computed: {
+    sendButtonLabel() {
+      return orderSendLabel(
+        this.recentOrders.draftInvoice || this.table.invoiceNo || this.invoiceData.invoiceNumber,
+        this.invoiceData.invoiceUpdating
+      );
+    },
   },
   methods: {
     handleConfirmCancellation() {
@@ -400,7 +425,8 @@ export default {
     const recentOrders = usetoggleRecentOrder();
     const invoiceData = useInvoiceDataStore();
     const notification = useNotifications();
-    return { menu, table, invoiceData, auth, recentOrders, notification };
+    const customers = useCustomerStore();
+    return { menu, table, invoiceData, auth, recentOrders, notification, customers };
   },
   mounted() {
     window.scrollTo(0, 0);
