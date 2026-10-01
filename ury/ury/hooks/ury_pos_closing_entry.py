@@ -40,7 +40,7 @@ def populate_pos_transactions(doc, method):
     every row satisfies core's invariant, rather than selecting by
     ``cashier`` and then dropping rows that fail it after the fact.
     """
-    if doc.get("pos_transactions"):
+    if doc.get("pos_invoices"):
         return
     if not doc.pos_profile or not doc.period_start_date or not doc.period_end_date:
         return
@@ -66,7 +66,7 @@ def populate_pos_transactions(doc, method):
         if not (period_start <= invoice_ts <= period_end):
             continue
         doc.append(
-            "pos_transactions",
+            "pos_invoices",
             {
                 "pos_invoice": invoice.name,
                 "posting_date": invoice.posting_date,

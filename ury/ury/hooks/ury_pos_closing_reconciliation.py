@@ -183,14 +183,14 @@ def _reconcile_session(doc):
 def _session_invoice_names(doc):
 	"""The POS Invoices in this closing entry's session, deduplicated.
 
-	Read from `pos_transactions`, the same table
+	Read from `pos_invoices`, the same table
 	`ury_pos_closing_entry.populate_pos_transactions` rebuilds. Hook ordering
 	in `hooks.py` puts `ury_pos_closing_entry.validate` (which runs
 	`populate_pos_transactions`) before this handler, so by the time we read
 	it the table is populated even for the custom frontend's path, which
 	never sends it.
 	"""
-	rows = doc.get("pos_transactions") or []
+	rows = doc.get("pos_invoices") or []
 	names = []
 	for row in rows:
 		name = row.get("pos_invoice") if hasattr(row, "get") else getattr(row, "pos_invoice", None)
