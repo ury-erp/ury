@@ -135,6 +135,7 @@
     "main_cashier_not_open": "The main cashier hasn't opened the register yet. Please wait or contact your main cashier.",
     "main_cashier_not_configured": "No main cashier is set up for this terminal. Contact your manager.",
     "session_already_open": "A session is already open for this terminal.",
+    "occupied_till": "{{profile}} is open under {{holder}} since {{since}}; {{holder}} must close the shift, or a manager closes it in Desk.",
     "user_already_assigned": "You already have an open session elsewhere.",
     "payment_mode_misconfigured": "A payment method is not fully configured. Contact your manager.",
     "contact_manager": "Contact your manager",

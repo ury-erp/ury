@@ -1172,7 +1172,7 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
 
 
 @frappe.whitelist()
-def get_pos_opening_screen_data() -> dict:
+def get_pos_opening_screen_data(pos_profile: str | None = None) -> dict:
     """Return the full context needed by the ORI native POS Opening screen.
 
     This is a read-only, permission-aware context call. It aggregates the
@@ -1180,7 +1180,8 @@ def get_pos_opening_screen_data() -> dict:
     POS Profile data (including branch, restaurant and multi-cashier flags),
     payment modes seeded with an opening amount of zero, the daily-close
     pre-check status, create/submit permission flags, and any existing open
-    POS Opening Entry for the current user.
+    POS Opening Entry for the current user. Also reports another cashier's
+    open entry on the selected profile, with its ID only when readable.
 
     The method does not create or mutate any document; submit-time
     validations (payment accounts, duplicate entries, multi-cashier rules)
@@ -1199,15 +1200,22 @@ def get_pos_opening_screen_data() -> dict:
     # back to the first allowed profile if the helper cannot resolve one.
     pos_profile_data = None
     pos_profile_name = None
-    try:
-        pos_profile_data = getPosProfile()
-        pos_profile_name = pos_profile_data.get("pos_profile")
-    except Exception:
-        pos_profile_data = None
-        pos_profile_name = None
+    if pos_profile:
+        if pos_profile not in {profile["name"] for profile in allowed_profiles}:
+            frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
+        pos_profile_name = pos_profile
+    else:
+        try:
+            pos_profile_data = getPosProfile()
+            pos_profile_name = pos_profile_data.get("pos_profile")
+        except Exception:
+            pos_profile_data = None
+            pos_profile_name = None
 
     if not pos_profile_name and allowed_profiles:
         pos_profile_name = allowed_profiles[0]["name"]
+
+    if pos_profile_name and not pos_profile_data:
         try:
             pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
             pos_profile_data = {
@@ -1269,6 +1277,31 @@ def get_pos_opening_screen_data() -> dict:
         order_by="period_start_date desc",
     )
 
+    occupied_entry = None
+    if pos_profile_name in {profile["name"] for profile in allowed_profiles}:
+        other_entries = frappe.get_all(
+            "POS Opening Entry",
+            filters={
+                "pos_profile": pos_profile_name,
+                "user": ["!=", user],
+                "docstatus": 1,
+                "status": "Open",
+            },
+            fields=["name", "user", "period_start_date"],
+            order_by="period_start_date desc",
+            limit=1,
+        )
+        if other_entries:
+            entry = other_entries[0]
+            occupied_entry = {
+                "user": entry["user"],
+                "user_full_name": frappe.db.get_value("User", entry["user"], "full_name") or entry["user"],
+                "period_start_date": entry["period_start_date"],
+            }
+            entry_doc = frappe.get_doc("POS Opening Entry", entry["name"])
+            if frappe.has_permission("POS Opening Entry", "read", doc=entry_doc):
+                occupied_entry["name"] = entry["name"]
+
     # Currency information for display.
     company_currency = None
     currency_symbol = None
@@ -1304,6 +1337,7 @@ def get_pos_opening_screen_data() -> dict:
         "multi_cashier": multi_cashier,
         "permissions": {"create": can_create, "submit": can_submit},
         "open_entries": open_entries,
+        "occupied_entry": occupied_entry,
     }
 
 
