@@ -8,10 +8,13 @@ import POSClosingDialog from '../src/components/POSClosingDialog';
 
 const state = vi.hoisted(() => ({
   profile: { name: 'POS-1', company: 'Test Co', multiple_cashier: 0, custom_blind_cash_count: 1 as number | undefined },
+  paymentModes: ['Cash'],
   user: { name: 'cashier@example.com' },
 }));
 
-vi.mock('../src/store/pos-store', () => ({ usePOSStore: () => ({ posProfile: state.profile }) }));
+vi.mock('../src/store/pos-store', () => ({
+  usePOSStore: () => ({ posProfile: state.profile, paymentModes: state.paymentModes }),
+}));
 vi.mock('../src/store/root-store', () => ({ useRootStore: () => ({ user: state.user }) }));
 vi.mock('../src/lib/pos-closing-api', async (importOriginal) => ({
   ...await importOriginal<typeof import('../src/lib/pos-closing-api')>(),
@@ -26,6 +29,7 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   await initI18n('en');
   state.profile.custom_blind_cash_count = 1;
+  state.paymentModes = ['Cash'];
   vi.mocked(getOpenPosOpeningEntries).mockResolvedValue([{
     name: 'POS-OPE-1', pos_profile: 'POS-1', user: 'cashier@example.com',
     period_start_date: '2026-10-01 08:10:00',
@@ -55,6 +59,52 @@ async function renderClosing(key?: string) {
   expect(container.querySelector('input[type="number"]')).not.toBeNull();
   return container.textContent || '';
 }
+
+async function renderPaymentModes(withCardSales: boolean) {
+  vi.mocked(getMainCashierPosInvoices).mockResolvedValue([{
+    name: 'POS-INV-1', grand_total: withCardSales ? 150 : 100,
+    net_total: withCardSales ? 150 : 100, total_qty: 1,
+    change_amount: 0, account_for_change_amount: 'Cash', taxes: [],
+    payments: [
+      { mode_of_payment: 'Cash', amount: 100, account: 'Cash' },
+      ...(withCardSales ? [{ mode_of_payment: 'Card', amount: 50, account: 'Card' }] : []),
+    ],
+  }]);
+  await renderClosing(String(withCardSales));
+  return Array.from(container.querySelectorAll('tbody tr'));
+}
+
+describe('blind cash count payment modes', () => {
+  it.each([
+    { profileModes: ['Cash', 'Card', 'Cash'], expectedModes: ['Cash', 'Card'] },
+    { profileModes: [], expectedModes: ['Cash'] },
+  ])('keeps rows independent of Card sales with cached modes $profileModes', async ({ profileModes, expectedModes }) => {
+    state.paymentModes = profileModes;
+    const rowsWithoutSales = await renderPaymentModes(false);
+    const modesWithoutSales = rowsWithoutSales.map((row) => row.querySelector('td')?.textContent);
+    const visibleRowsWithoutSales = rowsWithoutSales.map((row) => row.outerHTML);
+
+    const rowsWithSales = await renderPaymentModes(true);
+    const modesWithSales = rowsWithSales.map((row) => row.querySelector('td')?.textContent);
+    const visibleRowsWithSales = rowsWithSales.map((row) => row.outerHTML);
+
+    expect(modesWithSales).toEqual(modesWithoutSales);
+    expect(modesWithoutSales).toEqual(expectedModes);
+    expect(visibleRowsWithSales).toEqual(visibleRowsWithoutSales);
+  });
+
+  it.each([0, undefined])('keeps sales-derived rows when blind count is %s', async (flag) => {
+    state.profile.custom_blind_cash_count = flag;
+    state.paymentModes = ['Cash', 'Card'];
+
+    const rowsWithoutSales = await renderPaymentModes(false);
+    expect(rowsWithoutSales.map((row) => row.querySelector('td')?.textContent)).toEqual(['Cash']);
+
+    const rowsWithSales = await renderPaymentModes(true);
+    expect(rowsWithSales.map((row) => row.querySelector('td')?.textContent)).toEqual(['Cash', 'Card']);
+    expect(rowsWithSales[1].querySelectorAll('td')[2].textContent).toBe('₹ 50');
+  });
+});
 
 describe('blind cash count totals', () => {
   it('hides the Grand Total card and its expected amount before the cashier declares', async () => {
