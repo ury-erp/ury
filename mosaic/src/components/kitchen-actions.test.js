@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as Vue from "vue";
@@ -15,27 +16,55 @@ try {
   if (error.code !== "ERR_MODULE_NOT_FOUND") throw error;
 }
 
-function kitchen() {
+const settle = () => new Promise(setImmediate);
+const socketTicket = (name, production = "Kitchen") => ({
+  name, production, type: "New Order", order_status: "Ready For Prepare",
+  time: "13:00:00", kot_items: [], invoice: "INV-001", user: "Cook",
+});
+const socketEvent = kot => ({ kot, audio_file: "/alert.wav", last_kot_time: null });
+const kotSnapshot = (tickets, serverTime = "2026-10-01 13:00:30") => ({ message: {
+  Branch: "Branch A", kot_alert_time: 9999, audio_alert: 1,
+  daily_order_number: 0, server_time: serverTime, KOT: structuredClone(tickets),
+} });
+
+function kitchen({ connected = true } = {}) {
   const requests = [];
   const timers = new Map();
+  const intervals = new Map(), chimes = [], stored = new Map();
+  const socket = new EventEmitter();
+  socket.connected = connected;
+  let snapshot = [socketTicket("KNOWN")], serverTime = "2026-10-01 13:00:30";
   let timerId = 0;
   const call = {
     post: async (method, args) => { requests.push({ method, args }); return {}; },
-    get: async () => ({ message: [] }),
+    get: async (method, args) => {
+      requests.push({ method, args });
+      return kotSnapshot(snapshot, serverTime);
+    },
   };
-  const storage = { removeItem() {} };
+  const auth = { getLoggedInUser: async () => "cook@example.test" };
+  const storage = {
+    removeItem: key => stored.delete(key), getItem: key => stored.get(key) ?? null,
+    setItem: (key, value) => stored.set(key, value),
+  };
   const component = new Function(
     "FrappeApp", "window", "navigator", "localStorage", "setTimeout", "clearTimeout", "fetch", "io", "console",
+    "document", "Audio", "setInterval", "clearInterval",
     ...Object.keys(helpers),
     script.replace(/^import .*;\s*$/gm, "").replace("export default", "return"),
   )(
-    class { call() { return call; } },
-    { location: { hostname: "test", protocol: "https:", port: "" } },
+    class { call() { return call; } auth() { return auth; } },
+    { location: { hostname: "test", protocol: "https:", port: "", origin: "https://test" },
+      addEventListener() {}, removeEventListener() {} },
     { onLine: true }, storage,
     (callback, delay) => { timers.set(++timerId, { callback, delay }); return timerId; },
     (id) => timers.delete(id),
     async () => ({ json: async () => ({ message: { site_name: "test" } }) }),
-    () => ({ on() {} }), { log() {}, error() {} }, ...Object.values(helpers),
+    () => socket, { log() {}, error() {} },
+    { addEventListener() {}, removeEventListener() {} },
+    class { constructor(path) { this.path = path; } play() { chimes.push(this.path); } },
+    (callback, delay) => { intervals.set(++timerId, { callback, delay }); return timerId; },
+    id => intervals.delete(id), ...Object.values(helpers),
   );
   const state = { ...component.data(), production: "Kitchen", ...component.methods };
   state.masonryLoading = () => {};
@@ -46,7 +75,24 @@ function kitchen() {
     invoice: "INV-001", tableortakeaway: "T-01", user: "Cook",
   };
   state.kot = [ticket];
-  return { state, ticket, requests, timers, call, component };
+  function mount(production = "Kitchen") {
+    const mounted = { ...component.data(), production };
+    for (const [name, method] of Object.entries(component.methods)) mounted[name] = method.bind(mounted);
+    mounted.masonryLoading = () => {};
+    component.mounted.call(mounted);
+    return mounted;
+  }
+  const html = mounted => {
+    const { code } = compile(source.split("<template>")[1].split("</template>")[0], { mode: "function", prefixIdentifiers: true });
+    const render = new Function("Vue", code)(Vue);
+    return renderToString(Vue.createSSRApp({ data: () => mounted, computed: component.computed, render }));
+  };
+  return { state, ticket, requests, timers, call, component, socket, chimes, auth, intervals, mount, html,
+    unmount: mounted => component.beforeUnmount.call(mounted),
+    snapshot: (value, time = serverTime) => { snapshot = value; serverTime = time; },
+    disconnect() { socket.connected = false; socket.emit("disconnect", "transport close"); },
+    connect() { socket.connected = true; socket.emit("connect"); },
+  };
 }
 
 test("serve waits five seconds before posting and removing the card", async () => {
@@ -293,4 +339,176 @@ test("the native recent-served query uses a site-local cutoff across midnight", 
   const query = helpers.recentServedQuery("Branch A", "Kitchen", new Date("2026-10-01T00:05:00"));
   assert.deepEqual(query.filters.modified, [">=", "2026-09-30 23:50:00"]);
   assert.deepEqual(query.filters.type, ["not in", ["Cancelled", "Partially cancelled"]]);
+});
+
+test("leaving a station detaches both listeners without disturbing shared subscribers", async () => {
+  const k = kitchen();
+  const old = k.mount();
+  await settle();
+  let observed = 0;
+  k.socket.on("kot_update_Branch A_Kitchen", () => observed++);
+  k.unmount(old);
+  k.socket.emit("kot_update_Branch A_Kitchen", socketEvent(socketTicket("NEW")));
+  k.socket.emit("kot_error_Branch A_Kitchen", { kot: "KNOWN", invoice: "INV-001" });
+  assert.equal(k.chimes.length, 0, "An unmounted station must not chime");
+  assert.equal(old.showKotErrorAlert, false, "An unmounted station must not receive delay alerts");
+  assert.equal(observed, 1, "Unmount must preserve another consumer of the shared socket");
+  assert.equal(k.intervals.size, 0, "The station's minute timer must still be cleaned up");
+  k.disconnect();
+  k.connect();
+  await settle();
+  assert.equal(k.requests.length, 1, "An old station must not resync on reconnect");
+});
+
+test("station to root to station produces exactly one chime and one card", async () => {
+  const k = kitchen();
+  const old = k.mount();
+  await settle();
+  k.unmount(old);
+  const current = k.mount();
+  await settle();
+  k.socket.emit("kot_update_Branch A_Kitchen", socketEvent(socketTicket("NEW")));
+  assert.deepEqual(k.chimes, ["https://test/alert.wav"], "Revisiting the station currently doubles its chime");
+  assert.equal(old.kot.some(kot => kot.name === "NEW"), false);
+  assert.equal(current.kot.filter(kot => kot.name === "NEW").length, 1);
+});
+
+test("known, repeated and wrong-station tickets do not produce new-ticket chimes", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("KNOWN")));
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("OTHER", "Bar")));
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
+  assert.equal(k.chimes.length, 1, "Only a previously unseen ticket for this station should chime");
+  assert.deepEqual(state.kot.map(kot => kot.name), ["NEW", "KNOWN"]);
+  state.kot = state.kot.filter(kot => kot.name !== "NEW");
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
+  assert.equal(k.chimes.length, 1, "An already-seen served ticket is not a new ticket");
+});
+
+test("reconnect resyncs missed tickets and the server clock without replay chimes", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-01T12:00:30").getTime() });
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  assert.equal(state.serverTimeOffset, 3600000);
+  k.disconnect();
+  t.mock.timers.setTime(new Date("2026-10-01T12:05:30").getTime());
+  k.snapshot([socketTicket("MISSED"), socketTicket("KNOWN")], "2026-10-01 13:05:30");
+  k.connect();
+  await settle();
+  assert.deepEqual(state.kot.map(kot => kot.name), ["MISSED", "KNOWN"], "Socket.IO does not replay disconnected tickets");
+  assert.deepEqual(k.requests, Array.from({ length: 2 }, () => ({ method: "ury.ury.api.ury_kot_display.kot_list", args: {} })));
+  assert.equal(state.serverTimeOffset, 3600000, "Reconnect must also refresh the site-clock offset");
+  assert.equal(state.calculateTimeRemaining("13:00:00"), "0 : 5");
+  assert.equal(k.chimes.length, 0, "Server snapshots must be silent");
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("KNOWN")));
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("MISSED")));
+  assert.equal(k.chimes.length, 0, "Resynced tickets are already known");
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("AFTER")));
+  assert.equal(k.chimes.length, 1);
+});
+
+test("socket disconnect shows a persistent offline/stale banner even with navigator online", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  assert.equal(state.isOnline, true, "This test does not simulate a browser offline event");
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*(?:offline|stale)/i, "The board currently hides a dead realtime connection");
+  state.handleOnline();
+  await settle();
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*(?:offline|stale)/i, "navigator.onLine cannot clear socket staleness");
+});
+
+test("reconnect keeps the board stale until its server snapshot succeeds", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  let finish;
+  k.call.get = () => new Promise(resolve => { finish = resolve; });
+  k.connect();
+  await settle();
+  assert.equal(typeof finish, "function", "Reconnect must request a snapshot");
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*stale/i);
+  finish(kotSnapshot([socketTicket("MISSED")]));
+  await settle();
+  assert.doesNotMatch(await k.html(state), /role="status"/);
+  assert.equal(state.kot[0].name, "MISSED");
+  assert.equal(k.chimes.length, 0);
+});
+
+test("failed reconnect snapshots keep a visible stale warning", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  k.call.get = async () => { throw new Error("Server unavailable"); };
+  k.connect();
+  await settle();
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*stale/i);
+  assert.equal(state.kot[0].name, "KNOWN");
+  assert.equal(state.showModal, false, "A reconnect read failure is not an authentication failure");
+});
+
+test("leaving during authentication never installs late station listeners", async () => {
+  const k = kitchen();
+  let login;
+  k.auth.getLoggedInUser = () => new Promise(resolve => { login = resolve; });
+  const old = k.mount();
+  k.unmount(old);
+  login("cook@example.test");
+  await settle();
+  k.socket.emit("kot_update_Branch A_Kitchen", socketEvent(socketTicket("LATE")));
+  assert.equal(k.chimes.length, 0, "Async mount completion must not resurrect an unmounted station");
+  assert.equal(old.kot.some(kot => kot.name === "LATE"), false);
+});
+
+test("leaving during the initial snapshot never installs late station listeners", async () => {
+  const k = kitchen();
+  let finish;
+  k.call.get = () => new Promise(resolve => { finish = resolve; });
+  const old = k.mount();
+  await settle();
+  k.unmount(old);
+  finish(kotSnapshot([socketTicket("KNOWN")]));
+  await settle();
+  k.socket.emit("kot_update_Branch A_Kitchen", socketEvent(socketTicket("NEW")));
+  assert.equal(k.chimes.length, 0, "An initial read completing after unmount must not attach listeners");
+});
+
+test("mounting onto an already-disconnected socket immediately shows staleness", async () => {
+  const k = kitchen({ connected: false });
+  const state = k.mount();
+  await settle();
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*(?:offline|stale)/i);
+});
+
+test("a disconnect during resync cannot be cleared by the late snapshot", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  k.disconnect();
+  let finish;
+  k.call.get = () => new Promise(resolve => { finish = resolve; });
+  k.connect();
+  await settle();
+  assert.equal(typeof finish, "function", "Reconnect must request a snapshot");
+  k.disconnect();
+  finish(kotSnapshot([socketTicket("KNOWN")]));
+  await settle();
+  assert.match(await k.html(state), /role="status"[^>]*>[^<]*(?:offline|stale)/i);
+});
+
+test("new-ticket chimes still respect the configured audio setting", async () => {
+  const k = kitchen();
+  const state = k.mount();
+  await settle();
+  state.audio_alert = 0;
+  k.socket.emit(state.kot_channel, socketEvent(socketTicket("NEW")));
+  assert.equal(k.chimes.length, 0);
+  assert.equal(state.kot[0].name, "NEW");
 });
