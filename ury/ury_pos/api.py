@@ -2,7 +2,7 @@ import frappe
 import json
 from frappe import _
 from datetime import date, datetime, timedelta
-from frappe.utils import validate_phone_number
+from frappe.utils import nestedset, validate_phone_number
 
 
 #GetTable  decripted temporarily
@@ -939,9 +939,12 @@ def create_customer(customer_name, mobile_number=None, customer_group=None, terr
         frappe.throw("Invalid mobile number format")
 
     """Create a new customer"""
+    customer_group = customer_group or frappe.db.get_single_value("Selling Settings", "customer_group")
+    if not customer_group:
+        frappe.throw("Please set Default Customer Group in Selling Settings.")
+
     try:
-        customer_group = customer_group or frappe.db.get_single_value("Selling Settings", "customer_group") or "All Customer Groups"
-        territory = territory or frappe.db.get_single_value("Selling Settings", "territory") or "All Territories"
+        territory = territory or frappe.db.get_single_value("Selling Settings", "territory") or nestedset.get_root_of("Territory")
         customer = frappe.get_doc({
             "doctype": "Customer",
             "customer_name": customer_name,
