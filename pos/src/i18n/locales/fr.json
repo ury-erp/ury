@@ -135,6 +135,7 @@
     "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
     "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",
     "session_already_open": "Une session est déjà ouverte pour ce terminal.",
+    "occupied_till": "{{profile}} est ouvert par {{holder}} depuis {{since}} ; {{holder}} doit clôturer la session, ou un responsable la clôture dans Desk.",
     "user_already_assigned": "Vous avez déjà une session ouverte ailleurs.",
     "payment_mode_misconfigured": "Un mode de paiement n'est pas entièrement configuré. Contactez votre responsable.",
     "contact_manager": "Contactez votre responsable",

@@ -1,4 +1,4 @@
-import { call } from '@ury/core';
+import { call, parseFrappeError as parseCoreFrappeError } from '@ury/core';
 
 export interface POSOpeningEntryRef {
   name: string;
@@ -38,6 +38,13 @@ export interface POSOpeningPermissions {
   submit: boolean;
 }
 
+export interface POSOpeningOccupiedEntry {
+  name?: string;
+  user: string;
+  user_full_name: string;
+  period_start_date: string;
+}
+
 export interface POSOpeningContext {
   company: string;
   company_currency?: string;
@@ -54,6 +61,7 @@ export interface POSOpeningContext {
   daily_close_pending: boolean;
   multi_cashier: POSOpeningMultiCashierFlags;
   permissions: POSOpeningPermissions;
+  occupied_entry?: POSOpeningOccupiedEntry | null;
 }
 
 export interface POSOpeningContextResponse {
@@ -92,25 +100,11 @@ export interface POSOpeningCreateResponse {
 }
 
 /**
- * Extract the first human-readable message from a Frappe server error.
- * Frappe wraps server errors in `_server_messages` as a JSON string of an array,
- * where each element is itself a JSON-encoded object containing `message`.
+ * Reuse the shared parser so opening errors never display literal HTML.
+ * Keep null for errors without a message so callers can use their own fallback.
  */
 export const parseFrappeError = (error: unknown): string | null => {
-  if (!error || typeof error !== 'object') return null;
-
-  const serverMessages = (error as { _server_messages?: string })._server_messages;
-  if (typeof serverMessages !== 'string') return null;
-
-  try {
-    const messages = JSON.parse(serverMessages) as string[];
-    if (!Array.isArray(messages) || messages.length === 0) return null;
-
-    const firstMessage = JSON.parse(messages[0]) as { message?: string };
-    return firstMessage.message || null;
-  } catch {
-    return null;
-  }
+  return parseCoreFrappeError(error, '') || null;
 };
 
 /**
