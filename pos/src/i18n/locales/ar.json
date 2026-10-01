@@ -123,6 +123,9 @@
         "placeholder": "أدخل أي تعليمات خاصة أو تعليقات...",
         "save_button": "حفظ التعليق"
     },
+    "pos_opening": {
+        "occupied_till": "{{profile}} مفتوح باسم {{holder}} منذ {{since}}؛ يجب على {{holder}} إغلاق الوردية، أو على المدير إغلاقها في Desk."
+    },
     "errors": {
         "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",
         "pos_profile_not_loaded": "لم يتم تحميل ملف تعريف نقطة البيع بعد",

@@ -210,19 +210,23 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
             <p className="text-red-700 text-sm">{t('pos_opening.no_profiles')}</p>
           </div>
         );
-      case 'occupied_till':
+      case 'occupied_till': {
+        const occupied = context?.occupied_entry;
         return (
           <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
             <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
             <p className="text-orange-700 text-sm">
               {t('pos_opening.occupied_till', {
                 profile: context?.selected_profile || '',
-                holder: context?.occupied_entry?.user_full_name || '',
-                since: context?.occupied_entry?.period_start_date || '',
+                holder: occupied?.user_full_name?.includes('@') ? '' : occupied?.user_full_name || '',
+                since: occupied?.period_start_date
+                  ? new Date(occupied.period_start_date.replace(' ', 'T')).toLocaleString()
+                  : '',
               })}
             </p>
           </div>
         );
+      }
       case 'no_payment_modes':
         return (
           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
