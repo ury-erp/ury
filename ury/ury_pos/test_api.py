@@ -594,6 +594,31 @@ class TestPOSOpeningOccupancy(unittest.TestCase):
         self.assertIsNotNone(occupied, "The other cashier's open till must be reported")
         self.assertEqual(occupied["user_full_name"], "Other Cashier")
 
+    def test_shared_profile_does_not_report_or_query_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        with patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": True}):
+            result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertIsNone(result["occupied_entry"])
+        self.assertFalse(any(
+            call.kwargs["filters"].get("pos_profile")
+            for call in self.frappe.get_all.call_args_list
+        ))
+
+    def test_default_shared_profile_does_not_report_or_query_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.entry.pos_profile = "POS-1"
+        with patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": True}):
+            result = get_pos_opening_screen_data()
+
+        self.assertIsNone(result["occupied_entry"])
+        self.assertFalse(any(
+            call.kwargs["filters"].get("pos_profile")
+            for call in self.frappe.get_all.call_args_list
+        ))
+
     def test_holder_falls_back_to_user_when_full_name_is_missing(self):
         from ury.ury_pos.api import get_pos_opening_screen_data
 
