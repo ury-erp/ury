@@ -1,5 +1,8 @@
 <template>
   <div class="mx-auto p-6 mb-16 relative">
+    <div v-if="socketStale" role="status" class="fixed bottom-0 inset-x-0 p-3 bg-red-600 text-white text-center z-50">
+      Realtime offline or resyncing — board may be stale.
+    </div>
     <!-- Alert Modal div start-->
     <div
       v-if="this.showModal"
@@ -269,7 +272,7 @@
 import { FrappeApp } from "frappe-js-sdk";
 import Masonry from "masonry-layout";
 import io from "socket.io-client";
-import { canRecallKot, isKotLate, kitchenErrorMessage, recentServedQuery } from "./kitchen-actions.js";
+import { canRecallKot, isKotLate, kitchenErrorMessage, recentServedQuery, rememberKot } from "./kitchen-actions.js";
 
 let host = window.location.hostname;
 let port = window.location.port;
@@ -322,6 +325,10 @@ export default {
   data() {
     return {
       kot: [],
+      knownKots: new Set(),
+      socketStale: true,
+      socketActive: false,
+      socketHandlers: {},
       masonry: null,
       call: frappe.call(),
       branch: "",
@@ -388,6 +395,7 @@ export default {
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot_error_channel = `kot_error_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
+              this.kot.forEach(kot => this.knownKots.add(kot.name));
               this.loadingKots = false;
               this.updateQtyColorTable();
               this.updateTimeRemaining();
@@ -687,6 +695,7 @@ export default {
     },
   },
   mounted() {
+    this.socketActive = true;
     window.addEventListener("online", this.handleOnline);
     window.addEventListener("offline", this.handleOffline);
     document.addEventListener("click", this.hideAudioAlertMessage);
@@ -697,10 +706,20 @@ export default {
     this.auth()
       .then(() => {
         self.fetchKOT().then(() => {
+          if (!this.socketActive) return;
+          this.socketStale = !socket.connected;
           if (this.audio_alert === 1) {
             this.showAudioAlertMessage = true;
           }
-          socket.on(this.kot_channel, (doc) => {
+          this.socketHandlers = {
+            connect: () => {
+              this.socketStale = true;
+              this.fetchKOT().then(() => { this.socketStale = !socket.connected; }).catch(console.error);
+            },
+            disconnect: () => { this.socketStale = true; },
+          };
+          this.socketHandlers[this.kot_channel] = (doc) => {
+            if (!rememberKot(this.knownKots, doc.kot, this.production)) return;
             if (this.audio_alert === 1) {
               this.playAlertSound(doc.audio_file);
             }
@@ -724,10 +743,10 @@ export default {
               }
             },1500)
             localStorage.setItem("kot_time", doc.kot.time);
-          });
+          };
 
           // New socket listener for KOT error alerts (delayed orders)
-          socket.on(this.kot_error_channel, (doc) => {
+          this.socketHandlers[this.kot_error_channel] = (doc) => {
             // Look up the matching KOT in the local array to get table/order info
             const matchingKot = this.kot.find(k => k.name === doc.kot);
 
@@ -742,7 +761,8 @@ export default {
             setTimeout(() => {
               this.hideKotErrorAlert();
             }, 8000);
-          });
+          };
+          for (const [channel, handler] of Object.entries(this.socketHandlers)) socket.on(channel, handler);
         });
       })
       .catch((error) => {
@@ -752,6 +772,8 @@ export default {
     this.timeInterval = setInterval(this.updateTimeRemaining, 60000);
   },
   beforeUnmount() {
+    this.socketActive = false;
+    for (const [channel, handler] of Object.entries(this.socketHandlers)) socket.off(channel, handler);
     this.cancelPendingServes();
     clearInterval(this.timeInterval);
     window.removeEventListener("resize", this.masonryLoading);
