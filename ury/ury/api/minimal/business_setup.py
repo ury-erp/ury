@@ -36,7 +36,23 @@ def get_branches():
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
     
     branches = frappe.get_all("Branch", fields=["name", "branch"])
-    return [{"id": b.name, "name": b.branch, "tax_id": tax_id} for b in branches]
+    restaurants = frappe.get_all("URY Restaurant", fields=["branch", "invoice_series_prefix", "aggregator_series_prefix"])
+    rest_map = {}
+    for r in restaurants:
+        if r.get("branch"):
+            rest_map[r.get("branch")] = r
+
+    res = []
+    for b in branches:
+        r = rest_map.get(b.name) or rest_map.get(b.branch)
+        res.append({
+            "id": b.name,
+            "name": b.branch,
+            "tax_id": tax_id,
+            "invoice_series_prefix": r.get("invoice_series_prefix") if r else None,
+            "aggregator_series_prefix": r.get("aggregator_series_prefix") if r else None
+        })
+    return res
 
 @frappe.whitelist()
 def update_business_setup(branch=None, restaurant=None):

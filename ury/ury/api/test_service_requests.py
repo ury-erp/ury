@@ -383,7 +383,6 @@ class TestServiceRequestRealPermissionBoundary(FrappeTestCase):
             cls.room = frappe.get_doc({
                 "doctype": "URY Room",
                 "name": "P4R4 SR Room",
-                "room_name": "P4R4 SR Room",
                 "branch": cls.branch.name,
             }).insert(ignore_permissions=True, ignore_mandatory=True)
 
