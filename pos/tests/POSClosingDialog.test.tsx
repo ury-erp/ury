@@ -145,11 +145,17 @@ describe('blind cash count reconciliation', () => {
     }
 
     expect(renderedDialogs[1]).toEqual(renderedDialogs[0]);
+    expect(getMainCashierPosInvoices).toHaveBeenLastCalledWith(
+      '2026-10-01 08:10:00', '2026-10-01 10:12:13', 'POS-1', 'cashier@example.com'
+    );
     expect(createDoc).toHaveBeenCalledTimes(2);
     expect(updateDoc).toHaveBeenCalledTimes(2);
     expect(updateDoc).toHaveBeenLastCalledWith('POS Closing Entry', 'POS-CLO-1', { docstatus: 1 });
     expect(createDoc.mock.calls[0]).toEqual(['POS Closing Entry', expect.objectContaining({
       docstatus: 0,
+      period_end_date: '2026-10-01 10:12:13',
+      posting_date: '2026-10-01',
+      posting_time: '10:12:13',
       payment_reconciliation: [{
         mode_of_payment: 'Cash', opening_amount: 10, expected_amount: 100,
         closing_amount: 100, difference: 0,
@@ -157,6 +163,9 @@ describe('blind cash count reconciliation', () => {
     })]);
     expect(createDoc.mock.calls[1]).toEqual(['POS Closing Entry', expect.objectContaining({
       docstatus: 0,
+      period_end_date: '2026-10-01 10:12:13',
+      posting_date: '2026-10-01',
+      posting_time: '10:12:13',
       payment_reconciliation: [
         {
           mode_of_payment: 'Cash', opening_amount: 10, expected_amount: 100,

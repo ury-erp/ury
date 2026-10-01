@@ -78,7 +78,7 @@ for (const subCashier of [false, true]) {
     assert.deepEqual(Array.from(query.args), [
       '2026-09-15 13:00:00', '2026-09-15 13:02:03', 'POS-1', 'cashier@example.com',
     ]);
-    assert.equal(errors.length, 0);
+    assert.deepEqual(errors, [], 'combined closing loader must finish without errors');
   });
 }
 
