@@ -22,7 +22,11 @@ class TestCreateCustomerDefaults(unittest.TestCase):
         self.get_root_of = self.enterContext(patch("frappe.utils.nestedset.get_root_of"))
         self.get_root_of.return_value = "Tous les territoires"
         self.frappe.has_permission.return_value = True
-        self.frappe.throw.side_effect = frappe.ValidationError
+
+        def throw_validation_error(message):
+            raise frappe.ValidationError(message)
+
+        self.frappe.throw.side_effect = throw_validation_error
         self.defaults = {"territory": "Uganda", "customer_group": "Retail"}
         self.frappe.db.get_single_value.side_effect = (
             lambda doctype, field: self.defaults[field] if doctype == "Selling Settings" else None
