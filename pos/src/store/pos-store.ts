@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage } from '@ury/core';
+import { storage, getOrderTabsStorageKey } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -248,9 +248,12 @@ export const generateCartHash = (state: Partial<POSState>) => {
   });
 };
 
+// Frappe injects the authenticated identity before this module is loaded.
+const orderTabsStorageKey = getOrderTabsStorageKey((window as any).frappe?.boot?.user?.name);
+
 const getInitialTabsState = () => {
   try {
-    const saved = localStorage.getItem('posOrderTabsData');
+    const saved = orderTabsStorageKey ? localStorage.getItem(orderTabsStorageKey) : null;
     if (saved) {
       const data = JSON.parse(saved);
       if (data && data.tabOrder && data.tabOrder.length > 0) {
@@ -1130,7 +1133,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   }
 })); 
 usePOSStore.subscribe((state) => {
-  if (state.isInitializing) return;
+  if (state.isInitializing || !orderTabsStorageKey) return;
 
   const dataToSave = {
     tabOrder: state.tabOrder,
@@ -1150,5 +1153,5 @@ usePOSStore.subscribe((state) => {
       originalCartHash: state.originalCartHash,
     }
   };
-  localStorage.setItem('posOrderTabsData', JSON.stringify(dataToSave));
+  localStorage.setItem(orderTabsStorageKey, JSON.stringify(dataToSave));
 });
