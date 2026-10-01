@@ -561,9 +561,10 @@ class TestPOSOpeningOccupancy(unittest.TestCase):
 
         self.assertEqual(result["selected_profile"], "POS-2")
         self.assertEqual(result["occupied_entry"], {
-            "name": "POS-OPE-0002", "user": "other@example.com",
+            "name": "POS-OPE-0002",
             "user_full_name": "Other Cashier", "period_start_date": "2026-10-01 08:10:00",
         })
+        self.assertNotIn("other@example.com", json.dumps(result))
         query = next(call for call in self.frappe.get_all.call_args_list if call.kwargs["filters"].get("pos_profile"))
         self.assertEqual(query.kwargs["filters"], {
             "pos_profile": "POS-2", "user": ["!=", "cashier@example.com"],
@@ -578,8 +579,10 @@ class TestPOSOpeningOccupancy(unittest.TestCase):
         result = get_pos_opening_screen_data(pos_profile="POS-2")
 
         self.assertNotIn("name", result["occupied_entry"])
+        self.assertNotIn("user", result["occupied_entry"])
         self.assertEqual(result["occupied_entry"]["user_full_name"], "Other Cashier")
         self.assertNotIn("POS-OPE-0002", json.dumps(result))
+        self.assertNotIn("other@example.com", json.dumps(result))
 
     def test_default_profile_does_not_return_another_profiles_entry(self):
         from ury.ury_pos.api import get_pos_opening_screen_data
@@ -619,13 +622,25 @@ class TestPOSOpeningOccupancy(unittest.TestCase):
             for call in self.frappe.get_all.call_args_list
         ))
 
-    def test_holder_falls_back_to_user_when_full_name_is_missing(self):
+    def test_holder_has_no_display_name_when_full_name_is_missing(self):
         from ury.ury_pos.api import get_pos_opening_screen_data
 
         self.frappe.db.get_value.return_value = None
         self.frappe.db.get_value.side_effect = None
         result = get_pos_opening_screen_data(pos_profile="POS-2")
-        self.assertEqual(result["occupied_entry"]["user_full_name"], "other@example.com")
+        self.assertIsNone(result["occupied_entry"]["user_full_name"])
+        self.assertNotIn("user", result["occupied_entry"])
+        self.assertNotIn("other@example.com", json.dumps(result))
+
+    def test_holder_has_no_display_name_when_full_name_is_empty(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.db.get_value.return_value = ""
+        self.frappe.db.get_value.side_effect = None
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+        self.assertIsNone(result["occupied_entry"]["user_full_name"])
+        self.assertNotIn("user", result["occupied_entry"])
+        self.assertNotIn("other@example.com", json.dumps(result))
 
     def test_unavailable_profile_cannot_disclose_occupancy(self):
         from ury.ury_pos.api import get_pos_opening_screen_data
