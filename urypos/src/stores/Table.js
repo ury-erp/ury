@@ -183,13 +183,34 @@ export const useTableStore = defineStore("table", {
           filters: [["restaurant_room", "=", this.selectedRoom]],
           limit: 0,
         })
-        .then((tables) => {
+        .then(async (tables) => {
           this.tables = tables.sort((a, b) => {
             return a.name.localeCompare(b.name, undefined, {
               numeric: true,
               sensitivity: "base",
             });
           });
+          // Publish the floor first; a pending/denied bill read must not block it.
+          const occupiedTables = this.tables.filter((table) => table.occupied === 1);
+          if (!occupiedTables.length) return;
+          const invoices = await this.db.getDocList("POS Invoice", {
+            fields: ["restaurant_table", "creation", "custom_merged_tables"],
+            filters: [
+              ["docstatus", "=", 0],
+              ["restaurant_table", "in", occupiedTables.map((table) => table.name)],
+            ],
+            orderBy: { field: "creation", order: "desc" },
+            limit: 0,
+          });
+          // Match the dashboard's newest draft creation, including merged partners.
+          // Keep these captured rows so a late response cannot affect another room.
+          for (const table of occupiedTables) {
+            const invoice = invoices.find((bill) =>
+              bill.restaurant_table === table.name ||
+              (bill.custom_merged_tables || "").split(",").some((name) => name.trim() === table.name)
+            );
+            table.open_bill_creation = invoice ? invoice.creation : null;
+          }
         })
         .catch((error) => console.error(error));
     },
@@ -296,24 +317,26 @@ export const useTableStore = defineStore("table", {
       this.showCaptain = false;
     },
     getTimeDifference(table) {
-      const hasInvoiceTime = table && table.occupied === 1 && table.latest_invoice_time;
       const now = new Date(Date.now() + this.serverTimeOffset);
-      let tableTime = "00:00:00";
-      if (hasInvoiceTime) {
-        tableTime = table.latest_invoice_time;
-      }
-      const [tableHours, tableMinutes, tableSeconds] = tableTime.split(":");
-      const tableDate = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        tableHours,
-        tableMinutes,
-        tableSeconds
-      );
-      // Only a time over twelve hours ahead indicates the previous day.
-      if (hasInvoiceTime && tableDate - now > 12 * 60 * 60 * 1000) {
-        tableDate.setDate(tableDate.getDate() - 1);
+      const creation = table && table.occupied === 1 && table.open_bill_creation;
+      // Frappe creation and the server clock use the same site-local wall time.
+      let tableDate = new Date(creation ? creation.replace(" ", "T") : NaN);
+      if (!Number.isFinite(tableDate.getTime())) {
+        // Preserve the legacy fallback only when no readable, valid bill exists.
+        const hasInvoiceTime = table && table.occupied === 1 && table.latest_invoice_time;
+        const tableTime = hasInvoiceTime ? table.latest_invoice_time : "00:00:00";
+        const [tableHours, tableMinutes, tableSeconds] = tableTime.split(":");
+        tableDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          tableHours,
+          tableMinutes,
+          tableSeconds
+        );
+        if (hasInvoiceTime && tableDate - now > 12 * 60 * 60 * 1000) {
+          tableDate.setDate(tableDate.getDate() - 1);
+        }
       }
       const timeDifferenceInMs = Math.max(0, now - tableDate);
       const secondsDifference = Math.floor(timeDifferenceInMs / 1000);
