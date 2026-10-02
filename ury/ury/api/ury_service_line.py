@@ -1,6 +1,8 @@
 import frappe
 
-from frappe.utils import get_datetime, add_to_date, today
+from frappe.utils import get_datetime
+
+from ury.ury.api.ury_dashboard import _business_day_bounds
 
 
 @frappe.whitelist(methods=["GET"])
@@ -75,11 +77,11 @@ def get_running_low(branch=None):
 		pos_profile = frappe.db.get_value("POS Profile", {"branch": branch}, "warehouse")
 		warehouse = pos_profile
 
-	shift_start = get_datetime(f"{today()} 00:00:00")
+	shift_start, shift_end = _business_day_bounds(branch)
 	hours_elapsed = max((get_datetime() - shift_start).total_seconds() / 3600, 0.5)
 
-	sold_conditions = "inv.`docstatus` = 1 AND inv.`posting_date` = CURDATE() AND item.`is_stock_item` = 1"
-	sold_params = {}
+	sold_conditions = "inv.`docstatus` = 1 AND TIMESTAMP(inv.`posting_date`, inv.`posting_time`) >= %(start)s AND TIMESTAMP(inv.`posting_date`, inv.`posting_time`) < %(end)s AND item.`is_stock_item` = 1"
+	sold_params = {"start": shift_start, "end": shift_end}
 	if branch:
 		sold_conditions += " AND inv.`branch` = %(branch)s"
 		sold_params["branch"] = branch
