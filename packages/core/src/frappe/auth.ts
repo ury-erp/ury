@@ -1,4 +1,5 @@
 import { db, auth } from './client';
+import { clearAppStorage } from '../storage';
 
 type LoggedUserResponse = string | null;
 
@@ -11,6 +12,17 @@ interface UserDoc {
     parent: string;
   }>;
 }
+
+export const getSessionUser = (): LoggedUserResponse => {
+  const cookie = document.cookie.split(';').map((part) => part.trim())
+    .find((part) => part.startsWith('user_id='));
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice('user_id='.length)) || null;
+  } catch {
+    return null;
+  }
+};
 
 export const getLoggedUser = async (): Promise<LoggedUserResponse> => {
   try {
@@ -60,7 +72,10 @@ export const getUserRoles = async (email: string): Promise<{ roles: string[]; fu
 
 export const logout = async () => {
   try {
-    return auth.logout();
+    return auth.logout().then((result) => {
+      clearAppStorage();
+      return result;
+    });
   }catch(e){
     console.error('Error logging out:', e);
     return false;

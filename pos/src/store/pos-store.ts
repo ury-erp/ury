@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage } from '@ury/core';
+import { storage, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -356,7 +356,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
-      const cached = sessionStorage.getItem('posProfile');
+      sessionStorage.removeItem('posProfile');
+      const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
+      const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
       if (cached) {
         const profile = JSON.parse(cached);
         set({ 
@@ -373,7 +375,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ profileLoading: true, error: null });
       const combinedProfile = await getCombinedPosProfile();
       
-      sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
+      if (cacheKey) sessionStorage.setItem(cacheKey, JSON.stringify(combinedProfile));
       set({ 
         posProfile: combinedProfile, 
         profileLoading: false,
@@ -663,7 +665,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchCustomerGroups: async () => {
-    const cached = sessionStorage.getItem('customerGroups');
+    sessionStorage.removeItem('customerGroups');
+    const cacheKey = getUserSessionStorageKey('customerGroups', getSessionUser());
+    const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
     if (cached) {
       set({ customerGroups: JSON.parse(cached) });
       return;
@@ -671,11 +675,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     const groups = await getCustomerGroups();
     const names = groups.map((g: any) => g.name);
     set({ customerGroups: names });
-    sessionStorage.setItem('customerGroups', JSON.stringify(names));
+    if (cacheKey) sessionStorage.setItem(cacheKey, JSON.stringify(names));
   },
 
   fetchTerritories: async () => {
-    const cached = sessionStorage.getItem('territories');
+    sessionStorage.removeItem('territories');
+    const cacheKey = getUserSessionStorageKey('territories', getSessionUser());
+    const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
     if (cached) {
       set({ territories: JSON.parse(cached) });
       return;
@@ -683,7 +689,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     const terrs = await getCustomerTerritories();
     const names = terrs.map((t: any) => t.name);
     set({ territories: names });
-    sessionStorage.setItem('territories', JSON.stringify(names));
+    if (cacheKey) sessionStorage.setItem(cacheKey, JSON.stringify(names));
   },
 
   getCartTotals: (): CartTotals => {
