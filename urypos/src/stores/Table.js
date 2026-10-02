@@ -297,7 +297,7 @@ export const useTableStore = defineStore("table", {
     },
     getTimeDifference(table) {
       const hasInvoiceTime = table && table.occupied === 1 && table.latest_invoice_time;
-      const now = new Date(Date.now() + (hasInvoiceTime ? this.serverTimeOffset : 0));
+      const now = new Date(Date.now() + this.serverTimeOffset);
       let tableTime = "00:00:00";
       if (hasInvoiceTime) {
         tableTime = table.latest_invoice_time;
@@ -320,7 +320,7 @@ export const useTableStore = defineStore("table", {
       const minutesDifference = Math.floor(secondsDifference / 60);
       const hoursDifference = Math.floor(minutesDifference / 60);
       const minutes = minutesDifference % 60;
-      const formattedTimeDifference = `${hoursDifference}:${hasInvoiceTime ? String(minutes).padStart(2, "0") : minutes}`;
+      const formattedTimeDifference = `${hoursDifference}:${String(minutes).padStart(2, "0")}`;
       return formattedTimeDifference;
     },
     getBadgeType(table) {
