@@ -1,8 +1,9 @@
 import frappe
 import json
 from frappe import _
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from frappe.utils import validate_phone_number
+from ury.ury.api.ury_dashboard import _business_day_bounds
 
 
 #GetTable  decripted temporarily
@@ -1000,19 +1001,15 @@ def validate_pos_close(pos_profile):
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
     
     if enable_unclosed_pos_check:
-        current_datetime = frappe.utils.now_datetime()
-        start_of_day = current_datetime.replace(hour=5, minute=0, second=0, microsecond=0)
-        
-        if current_datetime > start_of_day:
-            previous_day = start_of_day - timedelta(days=1)
-            
-        else:
-            previous_day = start_of_day
+        branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+        start_of_day, _end = _business_day_bounds(
+            branch, default_hours=5, now=frappe.utils.now_datetime()
+        )
     
         unclosed_pos_opening = frappe.db.exists(
             "POS Opening Entry",
             {
-                "posting_date": previous_day.date(),
+                "period_start_date": ["<", start_of_day],
                 "status": "Open",
                 "pos_profile": pos_profile,
                 "docstatus": 1
