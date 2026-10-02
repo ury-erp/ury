@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { setImmediate as flushPromises } from 'node:timers/promises';
 import { useTableStore } from './Table.js';
 
 vi.mock('../router', () => ({ default: { push: vi.fn() } }));
-vi.mock('./Menu.js', () => ({ useMenuStore: () => ({}) }));
+vi.mock('./Menu.js', () => ({ useMenuStore: () => ({ fetchItems: vi.fn() }) }));
 vi.mock('./invoiceData.js', () => ({
   useInvoiceDataStore: () => ({ tableAttention: 15 }),
 }));
@@ -39,9 +40,71 @@ async function fetchTable(table, serverNow) {
     }
     return Promise.resolve({ message: serverNow });
   });
-  await store.fetchTable();
+  store.fetchTable();
+  await flushPromises();
   return store;
 }
+
+function roomStore(tables, serverTime) {
+  const store = useTableStore();
+  store.selectedRoom = 'Dining';
+  store.invoiceData.multipleCashier = true;
+  store.invoiceData.posProfile = 'Dining POS';
+  store.db.getDocList.mockReturnValue(tables);
+  store.call.get.mockImplementation((method) => {
+    switch (method) {
+      case 'ury.ury.api.ury_server_time.get_server_time':
+        return serverTime;
+      case 'ury.ury_pos.api.getRestaurantMenu':
+        return Promise.resolve({
+          message: { items: [{ item: 'Coffee' }], name: 'Dining Menu', modified: '2026-10-02 12:00:00' },
+        });
+      case 'ury.ury_pos.api.getCashier':
+        return Promise.resolve({ message: 'Dining Cashier' });
+      default:
+        throw new Error(`Unexpected endpoint: ${method}`);
+    }
+  });
+  return store;
+}
+
+describe('room changes load menu and cashier independently of floor-plan requests', () => {
+  it.each(['table list', 'server clock'])('loads the menu and cashier while the %s is pending', async (pending) => {
+    const unresolved = new Promise(() => {});
+    const store = roomStore(
+      pending === 'table list' ? unresolved : Promise.resolve([]),
+      pending === 'server clock' ? unresolved : Promise.resolve({ message: '2026-10-02T12:00:00' }),
+    );
+
+    store.handleRoomChange();
+    await flushPromises();
+
+    expect(store.call.get).toHaveBeenCalledWith('ury.ury_pos.api.getRestaurantMenu', {
+      room: 'Dining', pos_profile: 'Dining POS',
+    });
+    expect(store.tableMenu).toEqual([{ item: 'Coffee' }]);
+    expect(store.cashier).toBe('Dining Cashier');
+  });
+
+  it('loads the menu and cashier without propagating a rejected table list', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = roomStore(
+      Promise.reject(new Error('Table list unavailable')),
+      Promise.resolve({ message: '2026-10-02T12:00:00' }),
+    );
+    let roomError;
+    const change = store.handleRoomChange().catch((error) => { roomError = error; });
+    await flushPromises();
+    await change;
+
+    expect(roomError).toBeUndefined();
+    expect(store.call.get).toHaveBeenCalledWith('ury.ury_pos.api.getRestaurantMenu', {
+      room: 'Dining', pos_profile: 'Dining POS',
+    });
+    expect(store.tableMenu).toEqual([{ item: 'Coffee' }]);
+    expect(store.cashier).toBe('Dining Cashier');
+  });
+});
 
 describe('floor-plan table age uses the site clock', () => {
   it('shows 0:05 when the browser is one hour behind the server', async () => {
@@ -108,7 +171,8 @@ describe('floor-plan table age uses the site clock', () => {
       { name: 'Table 2', occupied: 1, latest_invoice_time: '11:55:00' },
     ]);
 
-    await store.fetchTable();
+    store.fetchTable();
+    await flushPromises();
 
     expect(store.tables.map((table) => table.name)).toEqual(['Table 2', 'Table 10']);
     expect(store.getTimeDifference(store.tables[0])).toBe('0:05');
