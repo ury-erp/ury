@@ -6,11 +6,8 @@ from frappe.utils import now_datetime
 def get_server_time():
 	"""Return the Frappe server's current datetime as an ISO 8601 string.
 
-	Internal, dependency-free source of truth for client-side clock-integrity
-	checks. Added to replace grillax's `pos_closing_entry_hide_fields.js`
-	`onload` fetch to worldtimeapi.org (an external, third-party network call
-	that risked breaking offline/self-hosted deployments) with a call to
-	ury's own backend, which the app already depends on being reachable for
-	everything else.
+	Authenticated site-local clock for floor-plan table ages and other URY
+	clients that need to compare time-only fields with the site's current time.
+	Uses Frappe's clock without depending on an external time service.
 	"""
 	return now_datetime().isoformat()
