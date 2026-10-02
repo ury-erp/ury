@@ -69,6 +69,9 @@
         "cancel_order": "إلغاء الطلب",
         "enter_cancel_reason": "أدخل سبب الإلغاء",
         "print": "طباعة",
+        "print_bill": "طباعة الفاتورة",
+        "print_receipt": "طباعة الإيصال",
+        "settle_bill": "تسوية الفاتورة",
         "payment": "الدفع"
     },
     "payment": {
@@ -238,6 +241,9 @@
         "delivery": "توصيل",
         "phone_in": "طلب هاتفي",
         "aggregators": "منصات تجميع"
+    },
+    "bill_split": {
+        "split_bill": "تقسيم الفاتورة"
     },
     "order_status_types": {
         "draft": "مسودة",
