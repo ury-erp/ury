@@ -197,19 +197,30 @@ export const useTableStore = defineStore("table", {
             fields: ["restaurant_table", "creation", "custom_merged_tables"],
             filters: [
               ["docstatus", "=", 0],
+            ],
+            orFilters: [
               ["restaurant_table", "in", occupiedTables.map((table) => table.name)],
+              ...occupiedTables.map((table) => ["custom_merged_tables", "like", `%${table.name}%`]),
             ],
             orderBy: { field: "creation", order: "desc" },
             limit: 0,
           });
-          // Match the dashboard's newest draft creation, including merged partners.
+          // Seating starts at the oldest still-open check, including split siblings.
           // Keep these captured rows so a late response cannot affect another room.
           for (const table of occupiedTables) {
-            const invoice = invoices.find((bill) =>
-              bill.restaurant_table === table.name ||
-              (bill.custom_merged_tables || "").split(",").some((name) => name.trim() === table.name)
-            );
-            table.open_bill_creation = invoice ? invoice.creation : null;
+            let oldestTime = Infinity;
+            table.open_bill_creation = null;
+            for (const bill of invoices) {
+              if (
+                bill.restaurant_table !== table.name &&
+                !(bill.custom_merged_tables || "").split(",").some((name) => name.trim() === table.name)
+              ) continue;
+              const creationTime = new Date((bill.creation || "").replace(" ", "T")).getTime();
+              if (creationTime < oldestTime) {
+                oldestTime = creationTime;
+                table.open_bill_creation = bill.creation;
+              }
+            }
           }
         })
         .catch((error) => console.error(error));
@@ -316,8 +327,8 @@ export const useTableStore = defineStore("table", {
       this.newCaptain = captain.name;
       this.showCaptain = false;
     },
-    getTimeDifference(table) {
-      const now = new Date(Date.now() + this.serverTimeOffset);
+    getTimeDifference(table, browserNow = Date.now()) {
+      const now = new Date(browserNow + this.serverTimeOffset);
       const creation = table && table.occupied === 1 && table.open_bill_creation;
       // Frappe creation and the server clock use the same site-local wall time.
       let tableDate = new Date(creation ? creation.replace(" ", "T") : NaN);
@@ -346,13 +357,13 @@ export const useTableStore = defineStore("table", {
       const formattedTimeDifference = `${hoursDifference}:${String(minutes).padStart(2, "0")}`;
       return formattedTimeDifference;
     },
-    getBadgeType(table) {
+    getBadgeType(table, browserNow) {
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "green";
       } else if (table.name === this.selectedTable) {
         return "default";
       } else if (table.occupied === 1 && table.name !== this.selectedTable) {
-        const timeDifference = this.getTimeDifference(table);
+        const timeDifference = this.getTimeDifference(table, browserNow);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
         if (totalMinutes > this.invoiceData.tableAttention) {
@@ -362,13 +373,13 @@ export const useTableStore = defineStore("table", {
         }
       }
     },
-    getBadgeText(table) {
+    getBadgeText(table, browserNow) {
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "Free";
       } else if (table.name === this.selectedTable) {
         return "Active";
       } else if (table.occupied === 1 && table.name !== this.selectedTable) {
-        const timeDifference = this.getTimeDifference(table);
+        const timeDifference = this.getTimeDifference(table, browserNow);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
         if (totalMinutes > this.invoiceData.tableAttention) {
