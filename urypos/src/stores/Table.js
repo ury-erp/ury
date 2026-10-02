@@ -143,7 +143,7 @@ export const useTableStore = defineStore("table", {
     },
     async handleRoomChange() {
       localStorage.setItem("selectedRoom", this.selectedRoom);
-      await this.fetchTable();
+      this.fetchTable();
       await this.getMenu();
       if (this.invoiceData.multipleCashier) {
         this.getCashier()
@@ -158,14 +158,14 @@ export const useTableStore = defineStore("table", {
       });
     },
     fetchTable() {
-      const serverTime = this.call
+      this.call
         .get("ury.ury.api.ury_server_time.get_server_time")
         .then((result) => {
           // Match Mosaic's site-local wall-clock offset.
           this.serverTimeOffset = new Date(result.message.replace(" ", "T")).getTime() - Date.now();
         })
         .catch((error) => console.error(error));
-      const tables = this.db
+      this.db
         .getDocList("URY Table", {
           fields: [
             "name",
@@ -190,8 +190,8 @@ export const useTableStore = defineStore("table", {
               sensitivity: "base",
             });
           });
-        });
-      return Promise.all([serverTime, tables]);
+        })
+        .catch((error) => console.error(error));
     },
     async getMenu() {
       const getMenuIem = {
