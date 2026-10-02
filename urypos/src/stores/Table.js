@@ -50,6 +50,7 @@ export const useTableStore = defineStore("table", {
     call: frappe.call(),
     customers: useCustomerStore(),
     db: frappe.db(),
+    serverTimeOffset: 0,
     totalMinutes: null,
     invoiceNumber: null,
     modifiedTime: null,
@@ -157,7 +158,14 @@ export const useTableStore = defineStore("table", {
       });
     },
     fetchTable() {
-      this.db
+      const serverTime = this.call
+        .get("ury.ury.api.ury_server_time.get_server_time")
+        .then((result) => {
+          // Match Mosaic's site-local wall-clock offset.
+          this.serverTimeOffset = new Date(result.message.replace(" ", "T")).getTime() - Date.now();
+        })
+        .catch((error) => console.error(error));
+      const tables = this.db
         .getDocList("URY Table", {
           fields: [
             "name",
@@ -183,6 +191,7 @@ export const useTableStore = defineStore("table", {
             });
           });
         });
+      return Promise.all([serverTime, tables]);
     },
     async getMenu() {
       const getMenuIem = {
@@ -287,9 +296,10 @@ export const useTableStore = defineStore("table", {
       this.showCaptain = false;
     },
     getTimeDifference(table) {
-      const now = new Date();
+      const hasInvoiceTime = table && table.occupied === 1 && table.latest_invoice_time;
+      const now = new Date(Date.now() + (hasInvoiceTime ? this.serverTimeOffset : 0));
       let tableTime = "00:00:00";
-      if (table && table.occupied === 1 && table.latest_invoice_time) {
+      if (hasInvoiceTime) {
         tableTime = table.latest_invoice_time;
       }
       const [tableHours, tableMinutes, tableSeconds] = tableTime.split(":");
@@ -301,12 +311,16 @@ export const useTableStore = defineStore("table", {
         tableMinutes,
         tableSeconds
       );
+      // A time-only value later than site now belongs to the previous day.
+      if (hasInvoiceTime && tableDate > now) {
+        tableDate.setDate(tableDate.getDate() - 1);
+      }
       const timeDifferenceInMs = now - tableDate;
       const secondsDifference = Math.floor(timeDifferenceInMs / 1000);
       const minutesDifference = Math.floor(secondsDifference / 60);
       const hoursDifference = Math.floor(minutesDifference / 60);
-      const formattedTimeDifference = `${hoursDifference}:${minutesDifference % 60
-        }`;
+      const minutes = minutesDifference % 60;
+      const formattedTimeDifference = `${hoursDifference}:${hasInvoiceTime ? String(minutes).padStart(2, "0") : minutes}`;
       return formattedTimeDifference;
     },
     getBadgeType(table) {
