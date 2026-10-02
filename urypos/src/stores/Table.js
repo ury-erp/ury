@@ -311,11 +311,11 @@ export const useTableStore = defineStore("table", {
         tableMinutes,
         tableSeconds
       );
-      // A time-only value later than site now belongs to the previous day.
-      if (hasInvoiceTime && tableDate > now) {
+      // Only a time over twelve hours ahead indicates the previous day.
+      if (hasInvoiceTime && tableDate - now > 12 * 60 * 60 * 1000) {
         tableDate.setDate(tableDate.getDate() - 1);
       }
-      const timeDifferenceInMs = now - tableDate;
+      const timeDifferenceInMs = Math.max(0, now - tableDate);
       const secondsDifference = Math.floor(timeDifferenceInMs / 1000);
       const minutesDifference = Math.floor(secondsDifference / 60);
       const hoursDifference = Math.floor(minutesDifference / 60);
