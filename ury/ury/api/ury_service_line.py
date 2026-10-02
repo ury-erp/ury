@@ -14,7 +14,7 @@ def get_service_line(branch=None):
 	tables = frappe.get_all(
 		"URY Table",
 		filters=table_filters,
-		fields=["name", "occupied", "latest_invoice_time", "is_take_away"],
+		fields=["name", "occupied", "is_take_away"],
 		order_by="name",
 	)
 
@@ -29,12 +29,9 @@ def get_service_line(branch=None):
 			continue
 
 		minutes = None
-		if t.latest_invoice_time:
-			minutes = int((now - get_datetime(str(t.latest_invoice_time))).total_seconds() // 60)
-
 		invoice = frappe.db.sql(
 			"""
-			SELECT name FROM `tabPOS Invoice`
+			SELECT name, creation FROM `tabPOS Invoice`
 			WHERE restaurant_table = %(table)s AND docstatus = 0
 			ORDER BY creation DESC LIMIT 1
 			""",
@@ -44,6 +41,7 @@ def get_service_line(branch=None):
 
 		stage = "seated"
 		if invoice:
+			minutes = max(0, int((now - get_datetime(invoice[0].creation)).total_seconds() // 60))
 			kot = frappe.db.sql(
 				"""
 				SELECT order_status FROM `tabURY KOT`
