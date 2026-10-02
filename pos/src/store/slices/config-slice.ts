@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AuthSlice } from './auth-slice';
-import { getLoggedUser, getUserSessionStorageKey } from '@ury/core';
+import { getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
 
 interface RolePermission {
@@ -98,7 +98,8 @@ export const createConfigSlice: StateCreator<
       set({ isLoading: true, error: null });
 
       // Check session storage first if not forcing refresh
-      const cacheKey = getUserSessionStorageKey('posProfile', await getLoggedUser());
+      sessionStorage.removeItem('posProfile');
+      const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
       const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);

@@ -1,4 +1,4 @@
-import { call, getLoggedUser, getUserSessionStorageKey } from '@ury/core';
+import { call, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 
 interface PaymentMode {
   mode_of_payment: string;
@@ -11,7 +11,8 @@ interface PaymentModeResponse {
 
 export const getPaymentModes = async (): Promise<string[]> => {
   // Check session storage first
-  const cacheKey = getUserSessionStorageKey('payment_modes', await getLoggedUser());
+  sessionStorage.removeItem('payment_modes');
+  const cacheKey = getUserSessionStorageKey('payment_modes', getSessionUser());
   const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
   if (cached) {
     return JSON.parse(cached);

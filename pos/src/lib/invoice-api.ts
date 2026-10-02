@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db, getLoggedUser, getUserSessionStorageKey } from '@ury/core';
+import { call, db, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -327,7 +327,8 @@ const MERGE_CANDIDATE_FIELDS = [
 ] as const;
 
 async function getBranchFromSession(): Promise<string> {
-  const cacheKey = getUserSessionStorageKey('posProfile', await getLoggedUser());
+  sessionStorage.removeItem('posProfile');
+  const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
   const raw = cacheKey ? sessionStorage.getItem(cacheKey) : null;
   if (!raw) {
     throw new Error('POS profile not loaded');

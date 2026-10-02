@@ -9,8 +9,6 @@ const APP_SESSION_STORAGE_KEYS = [
 const USER_SESSION_STORAGE_KEYS = ['posProfile', 'payment_modes', 'customerGroups', 'territories'];
 
 export function getUserSessionStorageKey(key: string, user: string | null | undefined): string | null {
-  // Legacy entries have no session owner and must never be reused.
-  sessionStorage.removeItem(key);
   return user && user !== 'Guest' ? `${key}:${user}` : null;
 }
 

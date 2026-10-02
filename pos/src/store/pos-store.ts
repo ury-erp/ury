@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage, getLoggedUser, getUserSessionStorageKey } from '@ury/core';
+import { storage, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -356,7 +356,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
-      const cacheKey = getUserSessionStorageKey('posProfile', await getLoggedUser());
+      sessionStorage.removeItem('posProfile');
+      const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
       const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
       if (cached) {
         const profile = JSON.parse(cached);
@@ -664,7 +665,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchCustomerGroups: async () => {
-    const cacheKey = getUserSessionStorageKey('customerGroups', await getLoggedUser());
+    sessionStorage.removeItem('customerGroups');
+    const cacheKey = getUserSessionStorageKey('customerGroups', getSessionUser());
     const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
     if (cached) {
       set({ customerGroups: JSON.parse(cached) });
@@ -677,7 +679,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchTerritories: async () => {
-    const cacheKey = getUserSessionStorageKey('territories', await getLoggedUser());
+    sessionStorage.removeItem('territories');
+    const cacheKey = getUserSessionStorageKey('territories', getSessionUser());
     const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
     if (cached) {
       set({ territories: JSON.parse(cached) });
