@@ -275,14 +275,14 @@ describe('floor-plan age uses the oldest open bill creation', () => {
     });
   });
 
-  it.each(['newest first', 'oldest first'])('selects the oldest open check with the list returned %s', async (order) => {
+  it.each(['newest first', 'reversed'])('selects the oldest open check with the list returned %s', async (order) => {
     vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
     const drafts = [
       { restaurant_table: 'Table 1', creation: '2026-10-03 00:05:00', custom_merged_tables: '' },
       { restaurant_table: 'Table 1', creation: '2026-10-01 11:05:00', custom_merged_tables: '' },
       { restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: '' },
     ];
-    if (order === 'oldest first') drafts.reverse();
+    if (order === 'reversed') drafts.reverse();
     const store = await fetchTable(
       { name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' },
       '2026-10-03 00:10:00', drafts,
