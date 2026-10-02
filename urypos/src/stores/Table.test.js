@@ -107,6 +107,37 @@ describe('room changes load menu and cashier independently of floor-plan request
 });
 
 describe('floor-plan table age uses the site clock', () => {
+  it('shows 0:00 when the invoice time is two seconds ahead of site now', async () => {
+    vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '12:00:02' },
+      '2026-10-02T12:00:00',
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:00');
+    expect(store.getBadgeText(store.tables[0])).toBe('Occupied');
+    expect(store.getBadgeType(store.tables[0])).toBe('yellow');
+  });
+
+  it('shows 0:00 while the site offset is not yet loaded', () => {
+    vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
+    const store = useTableStore();
+
+    expect(store.getTimeDifference({
+      name: 'Table 1', occupied: 1, latest_invoice_time: '11:00:02',
+    })).toBe('0:00');
+  });
+
+  it('does not roll back a day when the invoice is exactly twelve hours ahead', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '12:10:00' },
+      '2026-10-03T00:10:00',
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:00');
+  });
+
   it('shows 0:05 when the browser is one hour behind the server', async () => {
     vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
     const store = await fetchTable(
