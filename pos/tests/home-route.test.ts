@@ -46,7 +46,7 @@ describe.each([
   [{ name: 'multi', roles: ['System Manager', 'URY Cashier'] }, '/orders'],
   [{ name: 'manager', roles: ['URY Manager'] }, '/dashboard'],
   [{ name: 'Administrator', roles: ['System Manager'] }, '/dashboard'],
-  [{ name: 'Administrator', roles: ['System Manager', 'URY Cashier'] }, '/dashboard'],
+  [{ name: 'Administrator', roles: ['System Manager', 'URY Cashier'] }, '/orders'],
   [null, '/dashboard'],
 ])('Home for %j', (user, path) => {
   beforeEach(() => { state.user = user as typeof state.user; });
