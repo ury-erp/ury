@@ -127,6 +127,31 @@ describe('read-only bill-request strip', () => {
     await render(); await pickup(); expect(container.textContent).toContain('Bill lookup unavailable');
     expect(select).not.toHaveBeenCalled();
   });
+  it.each([
+    { httpStatus: 404, exception: 'frappe.exceptions.DoesNotExistError', want: 'Bill POS-1 is not open' },
+    { httpStatus: 403, exception: 'frappe.exceptions.PermissionError', want: 'Bill lookup unavailable' },
+  ])('distinguishes $httpStatus at the native split-group lookup from an open bill', async ({ httpStatus, exception, want }) => {
+    queue = [];
+    vi.mocked(call.get).mockImplementation(async (method) => {
+      if (method === 'frappe.client.get_list') return { message: requests };
+      if (method === 'ury.ury_pos.api.searchPosInvoice') return { message: { data: [], next: false } };
+      throw { httpStatus, exception };
+    });
+    await render(); await pickup();
+    expect(select).not.toHaveBeenCalled(); expect(container.textContent).toContain(want);
+  });
+  it('shows the native record when a request has neither table nor invoice', async () => {
+    requests[0].table = null; requests[0].invoice = null;
+    await render(); await click('REQ-1');
+    expect(container.textContent).toContain('Request has no linked table or bill');
+    expect(select).not.toHaveBeenCalled(); expect(call.get).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/app/ury-service-request/REQ-1');
+  });
+  it('renders the request count and controls in French', async () => {
+    await initI18n('fr'); await render();
+    expect(container.textContent).toContain('Demandes d’addition : 1 en attente');
+    expect(container.textContent).toContain('Actualiser');
+  });
   it.each([1, 2, 0])('resolves a table-only request with %i matching open checks, never guesses', async (count) => {
     requests[0].invoice = null;
     queue = [check('WRONG-TABLE', 'Table 10'), check('PAID', 'Table 1', 'Paid'),
