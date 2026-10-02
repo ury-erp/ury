@@ -67,7 +67,10 @@ def before_submit(doc, method):
             "is_return": row.is_return,
             "return_against": row.return_against,
         })
-    doc.set("taxes", get_taxes(inside))
+    doc.set("taxes", [
+        {"account_head": tax.account_head, "amount": tax.tax_amount}
+        for tax in get_taxes(inside)
+    ])
     doc.grand_total = sum(row.grand_total or 0 for row in inside)
     doc.net_total = sum(row.net_total or 0 for row in inside)
     doc.total_quantity = sum(row.total_qty or 0 for row in inside)
