@@ -31,6 +31,7 @@ import {
 } from '../lib/invoice-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+import BillRequestStrip from '../components/BillRequestStrip';
 
 function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
   if (!order.restaurant_table) return null;
@@ -38,7 +39,7 @@ function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom
 }
 
 function isOrderEditable(status: string) {
-  return status === 'Draft' || status === 'Unbilled' || status === 'Recently Paid';
+  return status === 'Draft' || status === 'Unbilled';
 }
 
 function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
@@ -270,7 +271,9 @@ export default function Orders() {
         selectOrder({ ...selectedOrder, invoice_printed: 1 });
       }
       // If order was Unbilled, set to Draft and reload draft orders
-      if (selectedStatus === 'Unbilled') {
+      if (selectedStatus === 'Outstanding') {
+        await fetchOrders();
+      } else if (selectedStatus === 'Unbilled') {
         showToast.info(t('success.order_moved_to_draft'));
         setSelectedStatus('Draft');
         fetchOrders();
@@ -294,7 +297,7 @@ export default function Orders() {
       !!selectedOrder.restaurant_table &&
       String(selectedOrder.invoice_printed) === '1';
 
-    if (childOnUnbilledTab) {
+    if (childOnUnbilledTab && selectedStatus !== 'Outstanding') {
       await setSelectedStatus('Unbilled');
     } else {
       await fetchOrders();
@@ -360,11 +363,14 @@ export default function Orders() {
 
   if (error) {
     return (
+      <div>
+      <BillRequestStrip orders={[]} selectOrder={selectOrder} />
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
           <p className="text-gray-600">{error}</p>
         </div>
+      </div>
       </div>
     );
   }
@@ -380,6 +386,7 @@ export default function Orders() {
       {/* Middle Section - Order Cards */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
+          <BillRequestStrip orders={orders} selectOrder={selectOrder} />
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
               <Spinner  message={t('common.loading')} />
@@ -446,6 +453,9 @@ export default function Orders() {
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
+                        <Badge variant="outline">
+                          {t(String(order.invoice_printed) === '1' ? 'order.printed' : 'order.not_printed')}
+                        </Badge>
                         <Badge variant={getBadgeVariant(order.status)}>
                           {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
                         </Badge>
@@ -472,7 +482,12 @@ export default function Orders() {
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Clock className="w-3.5 h-3.5" />
                         <span>{formatDateTime(order.posting_date, order.posting_time)}</span>
+                        {order.age_minutes !== undefined && <span>{t('order.age_minutes', { count: order.age_minutes })}</span>}
                       </div>
+                      {order.waiter && <p className="text-xs text-gray-500">{order.waiter}</p>}
+                      {order.items_preview?.length ? <p className="mt-2 text-sm text-gray-700">
+                        {order.items_preview.map(item => `${item.qty}× ${item.item_name}`).join(', ')}
+                      </p> : null}
 
                       {/* Total - pushed to bottom like MenuCard */}
                       <div className="mt-auto pt-2">
@@ -719,24 +734,29 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
+            {/* Sticky Bottom Section: Print | Split | Settle | Total */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
-              <div className="flex items-center gap-3 w-full">
-                {/* Print Icon Button */}
+              <div className="flex flex-wrap items-center gap-3 w-full">
+                {/* Print Bill / Receipt Button */}
                 <Button
                   variant="outline"
-                  size="icon"
-                  className="flex-shrink-0"
+                  className="min-h-11 shrink-0 gap-2"
                   onClick={handlePrintOrder}
-                  aria-label="Print"
                   disabled={isPrinting}
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
+                  {t(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled'
+                    ? 'order.print_bill' : 'order.print_receipt')}
                 </Button>
-                {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
+                {isOrderEditable(selectedOrder.status) && canSplitBill && (
+                  <Button variant="outline" className="min-h-11" onClick={() => setShowSplitDialog(true)}>
+                    {t('bill_split.split_bill')}
+                  </Button>
+                )}
+                {/* Settlement is only available for open checks. */}
                 {isOrderEditable(selectedOrder.status) && (
                   <Button
-                    className="flex-1"
+                    className="min-h-11 flex-1"
                     onClick={() => {
                       if (String(selectedOrder.invoice_printed) === '0') {
                         showToast.error(t('errors.please_print_first'));
@@ -745,7 +765,7 @@ export default function Orders() {
                       setShowPaymentDialog(true);
                     }}
                   >
-                    {t('order.payment')}
+                    {t('order.settle_bill')}
                   </Button>
                 )}
                 {/* Total */}

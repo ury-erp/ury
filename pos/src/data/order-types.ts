@@ -40,10 +40,14 @@ export const DINE_IN="Dine In"
 export const DEFAULT_ORDER_TYPE="Take Away"
 export const DEFAULT_PAYMENT_MODE="Cash"
 
-export type OrderStatusType = "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return";
+export type OrderStatusType = "Outstanding" | "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return";
 
 // Base status types that are always available
 export const BASE_ORDER_STATUS_TYPES = [
+    {
+        label: "Outstanding",
+        value: "Outstanding"
+    },
     {
         label: "Draft",
         value: "Draft"

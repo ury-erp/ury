@@ -10,7 +10,95 @@ from ury.ury_pos.api import get_split_group, getPosInvoiceItems
 from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
 from ury.ury_pos.api import submit_checklist
 import json
-from datetime import date
+from datetime import date, datetime
+from ury.ury_pos.api import getPosInvoice
+
+
+class TestOutstandingInvoices(unittest.TestCase):
+    """Site-less query and enrichment contracts for the cashier working queue."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.branch = self.enterContext(patch("ury.ury_pos.api.getBranch", return_value="Branch A"))
+        self.enterContext(patch("ury.ury_pos.api._enrich_split_group_meta", side_effect=lambda rows: rows))
+        self.now = datetime(2026, 10, 2, 12, 0, 0)
+        self.frappe.utils.now_datetime.return_value = self.now
+        self.frappe.utils.get_datetime.side_effect = lambda value: (
+            value if isinstance(value, datetime) else datetime.fromisoformat(value)
+        )
+        self.rows = [
+            {"name": "INV-OLD", "status": "Draft", "invoice_printed": 1,
+             "creation": datetime(2026, 10, 1, 23, 0), "custom_split_group": None},
+            {"name": "INV-NEW", "status": "Draft", "invoice_printed": 0,
+             "creation": "2026-10-02 11:57:30", "custom_split_group": None},
+            {"name": "INV-NEXT", "status": "Draft", "invoice_printed": 0,
+             "creation": self.now, "custom_split_group": None},
+        ]
+        self.frappe.db.sql.return_value = self.rows
+        self.frappe.get_all.return_value = [
+            {"parent": "INV-NEW", "item_name": "Tea", "qty": 1},
+            {"parent": "INV-OLD", "item_name": "Soup", "qty": 2},
+            {"parent": "INV-OLD", "item_name": "Bread", "qty": 1},
+        ]
+
+    def test_outstanding_retains_branch_draft_scope_oldest_first_and_no_print_filter(self):
+        result = getPosInvoice("Outstanding", 2, 4)
+        sql, values = self.frappe.db.sql.call_args.args
+        sql = " ".join(sql.lower().split())
+        self.assertEqual(values, ("Branch A", "Draft", 3, 4))
+        self.assertIn("where branch = %s and status = %s", sql)
+        self.assertIn("order by creation asc", sql)
+        self.assertNotIn("invoice_printed", sql.split("where")[1])
+        self.assertIn("creation", sql.split("from")[0])
+        self.assertEqual([row["name"] for row in result["data"]], ["INV-OLD", "INV-NEW"])
+        self.assertTrue(result["next"])
+        self.branch.assert_called_once_with()
+
+    def test_age_minutes_uses_server_now_and_full_creation_not_posting_time(self):
+        result = getPosInvoice("Outstanding", 2, 0)
+        self.assertEqual([row.get("age_minutes") for row in result["data"]], [780, 2])
+        self.frappe.utils.now_datetime.assert_called_once_with()
+
+    def test_one_batched_item_read_for_only_the_visible_page(self):
+        result = getPosInvoice("Outstanding", 2, 0)
+        item_calls = [c for c in self.frappe.get_all.call_args_list if c.args[0] == "POS Invoice Item"]
+        self.assertEqual(len(item_calls), 1)
+        self.assertEqual(item_calls[0].kwargs["filters"], {"parent": ["in", ["INV-OLD", "INV-NEW"]]})
+        self.assertEqual(item_calls[0].kwargs["fields"], ["parent", "item_name", "qty"])
+        self.assertEqual(result["data"][0].get("items_preview"),
+                         [{"item_name": "Soup", "qty": 2}, {"item_name": "Bread", "qty": 1}])
+        self.assertEqual(result["data"][1].get("items_preview"), [{"item_name": "Tea", "qty": 1}])
+
+    def test_empty_outstanding_page_does_not_query_children(self):
+        self.frappe.db.sql.return_value = []
+        self.assertEqual(getPosInvoice("Outstanding", 2, 0), {"data": [], "next": False})
+        self.frappe.get_all.assert_not_called()
+
+    def test_search_outstanding_maps_to_draft_without_print_or_table_filter(self):
+        self.frappe.get_all.return_value = []
+        self.assertEqual(searchPosInvoice("INV", "Outstanding"), {"data": [], "next": False})
+        self.assertEqual(self.frappe.get_all.call_args.kwargs["filters"], {"branch": "Branch A", "status": "Draft"})
+
+    def test_existing_draft_and_unbilled_queries_keep_their_print_filters(self):
+        for status, printed in [("Draft", "invoice_printed = 1"), ("Unbilled", "invoice_printed = 0")]:
+            self.frappe.db.sql.return_value = []
+            getPosInvoice(status, 2, 0)
+            self.assertIn(printed, self.frappe.db.sql.call_args.args[0])
+
+    def test_outstanding_search_enriches_the_returned_checks_in_one_item_read(self):
+        def read(doctype, **kwargs):
+            if doctype == "POS Invoice":
+                return self.rows[:2]
+            return [{"parent": "INV-OLD", "item_name": "Soup", "qty": 2}]
+
+        self.frappe.get_all.side_effect = read
+        result = searchPosInvoice("INV", "Outstanding")
+        self.assertEqual(result["data"][0].get("age_minutes"), 780)
+        self.assertEqual(result["data"][0].get("items_preview"), [{"item_name": "Soup", "qty": 2}])
+        self.assertEqual(result["data"][1].get("items_preview"), [])
+        reads = self.frappe.get_all.call_args_list
+        self.assertIn("creation", reads[0].kwargs["fields"])
+        self.assertEqual(len([c for c in reads if c.args[0] == "POS Invoice Item"]), 1)
 
 
 class TestGetRestaurantMenuPhase1(unittest.TestCase):

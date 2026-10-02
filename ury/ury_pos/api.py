@@ -483,7 +483,27 @@ def getPosInvoice(status, limit, limit_start):
     updatedlist = []
     limit = int(limit)+1
     limit_start = int(limit_start)
-    if status == "Draft":
+    if status == "Outstanding":
+        invoices = frappe.db.sql(
+            """
+            SELECT
+                name, creation, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                cashier, waiter, net_total, posting_time,
+                total_taxes_and_charges, customer, status, mobile_number,
+                posting_date, rounded_total, order_type,
+                custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total,
+                additional_discount_percentage, discount_amount
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND status = %s
+            ORDER BY creation ASC
+            LIMIT %s OFFSET %s
+            """,
+            (branch, "Draft", limit, limit_start),
+            as_dict=True,
+        )
+        updatedlist.extend(invoices)
+    elif status == "Draft":
         invoices = frappe.db.sql(
             """
             SELECT 
@@ -574,7 +594,27 @@ def getPosInvoice(status, limit, limit_start):
     else:
             next = False
     updatedlist = _enrich_split_group_meta(updatedlist)
+    if status == "Outstanding":
+        _enrich_outstanding_invoices(updatedlist)
     return  { "data":updatedlist,"next":next}
+
+
+def _enrich_outstanding_invoices(invoices):
+    if not invoices:
+        return
+    now = frappe.utils.now_datetime()
+    previews = {inv["name"]: [] for inv in invoices}
+    items = frappe.get_all(
+        "POS Invoice Item",
+        filters={"parent": ["in", list(previews)]},
+        fields=["parent", "item_name", "qty"],
+        order_by="idx asc",
+    )
+    for item in items:
+        previews[item["parent"]].append({"item_name": item["item_name"], "qty": item["qty"]})
+    for inv in invoices:
+        inv["age_minutes"] = max(0, int((now - frappe.utils.get_datetime(inv["creation"])).total_seconds() // 60))
+        inv["items_preview"] = previews[inv["name"]]
 
 
 @frappe.whitelist()
@@ -582,7 +622,7 @@ def searchPosInvoice(query,status):
     if not query:
         return {"data": [], "next": False}
     query = query.lower()
-    filters = {"status": "Paid" if status == "Recently Paid" else status}
+    filters = {"status": "Paid" if status == "Recently Paid" else "Draft" if status == "Outstanding" else status}
     
     try:
         branch = getBranch()
@@ -610,7 +650,7 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=[
+        fields=(["creation"] if status == "Outstanding" else []) + [
             "name",
             "customer",
             "grand_total",
@@ -637,6 +677,8 @@ def searchPosInvoice(query,status):
         limit_page_length=10 
     )
     pos_invoices = _enrich_split_group_meta(pos_invoices)
+    if status == "Outstanding":
+        _enrich_outstanding_invoices(pos_invoices)
     
     return {"data": pos_invoices, "next": len(pos_invoices) == 10}
     
