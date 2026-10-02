@@ -30,10 +30,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function fetchTable(table, serverNow) {
+async function fetchTables(tables, serverNow, invoices = []) {
   const store = useTableStore();
   store.selectedRoom = 'Dining';
-  store.db.getDocList.mockResolvedValue([table]);
+  store.db.getDocList.mockImplementation((doctype) => {
+    if (doctype === 'URY Table') return Promise.resolve(tables);
+    if (doctype === 'POS Invoice') return Promise.resolve(invoices);
+    throw new Error(`Unexpected doctype: ${doctype}`);
+  });
   store.call.get.mockImplementation((method) => {
     if (method !== 'ury.ury.api.ury_server_time.get_server_time') {
       throw new Error(`Unexpected endpoint: ${method}`);
@@ -43,6 +47,10 @@ async function fetchTable(table, serverNow) {
   store.fetchTable();
   await flushPromises();
   return store;
+}
+
+async function fetchTable(table, serverNow, invoices = []) {
+  return fetchTables([table], serverNow, invoices);
 }
 
 function roomStore(tables, serverTime) {
@@ -207,5 +215,171 @@ describe('floor-plan table age uses the site clock', () => {
 
     expect(store.tables.map((table) => table.name)).toEqual(['Table 2', 'Table 10']);
     expect(store.getTimeDifference(store.tables[0])).toBe('0:05');
+  });
+});
+
+describe('floor-plan age uses the latest open bill creation', () => {
+  it.each([
+    { creation: '2026-10-02 11:05:00.000000', age: '13:05' },
+    { creation: '2026-10-01 11:05:00', age: '37:05' },
+  ])('shows $age across midnight instead of guessing from a time-only field', async ({ creation, age }) => {
+    vi.setSystemTime(new Date(2026, 9, 2, 23, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '11:05:00' },
+      '2026-10-03 00:10:00',
+      [{ restaurant_table: 'Table 1', creation, custom_merged_tables: '' }],
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe(age);
+    expect(store.getBadgeText(store.tables[0])).toBe('Attention');
+    expect(store.getBadgeType(store.tables[0])).toBe('red');
+    vi.advanceTimersByTime(20 * 60 * 1000);
+    expect(store.getTimeDifference(store.tables[0])).toBe(age === '13:05' ? '13:25' : '37:25');
+  });
+
+  it('uses the newest draft creation after a transfer, not a reset table time or an older bill', async () => {
+    vi.setSystemTime(new Date(2026, 9, 2, 23, 10, 0));
+    const store = await fetchTables([
+      { name: 'Table 2', occupied: 1, latest_invoice_time: '00:05:00' },
+      { name: 'Table 10', occupied: 0, latest_invoice_time: '11:05:00' },
+      { name: 'Table 3', occupied: 1, latest_invoice_time: '00:08:00' },
+    ], '2026-10-03 00:10:00', [
+      { restaurant_table: 'Table 2', creation: '2026-10-02 11:05:00', custom_merged_tables: '' },
+      { restaurant_table: 'Table 2', creation: '2026-10-01 11:05:00', custom_merged_tables: '' },
+    ]);
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('13:05');
+    expect(store.getTimeDifference(store.tables[1])).toBe('0:02');
+    expect(store.getBadgeText(store.tables[2])).toBe('Free');
+    // Verify the external read contract: room table names, drafts only,
+    // newest first, and no default 20-row pagination truncation.
+    expect(store.db.getDocList).toHaveBeenCalledWith('POS Invoice', {
+      fields: ['restaurant_table', 'creation', 'custom_merged_tables'],
+      filters: [['docstatus', '=', 0], ['restaurant_table', 'in', ['Table 2', 'Table 3']]],
+      orderBy: { field: 'creation', order: 'desc' },
+      limit: 0,
+    });
+  });
+
+  it('uses the primary bill for merged partners with exact, trimmed table names', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTables([
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' },
+      { name: 'Table 2', occupied: 1, latest_invoice_time: '00:05:00', merged_with: 'Table 1' },
+      { name: 'Table 20', occupied: 1, latest_invoice_time: '00:05:00' },
+      { name: 'Table 3', occupied: 0, latest_invoice_time: '00:05:00' },
+    ], '2026-10-03 00:10:00', [
+      { restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: ' Table 2, Table 3, Other Room Table ' },
+    ]);
+
+    expect(store.tables.map((table) => store.getTimeDifference(table))).toEqual(['13:05', '13:05', '0:10', '0:05']);
+    expect(store.getBadgeText(store.tables[1])).toBe('Attention');
+    expect(store.getBadgeText(store.tables[2])).toBe('Free');
+  });
+
+  it('does not let a stale time-only value age a future bill', async () => {
+    vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '10:00:00' },
+      '2026-10-02 12:00:00',
+      [{ restaurant_table: 'Table 1', creation: '2026-10-02 12:00:02', custom_merged_tables: '' }],
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:00');
+    expect(store.getBadgeText(store.tables[0])).toBe('Occupied');
+  });
+
+  it('can age an occupied table even when its time-only field is empty', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: null },
+      '2026-10-03 00:10:00',
+      [{ restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: '' }],
+    );
+    expect(store.getTimeDifference(store.tables[0])).toBe('13:05');
+  });
+
+  it('falls back to the time-only field for an invalid bill datetime', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '23:50:00' },
+      '2026-10-03 00:10:00',
+      [{ restaurant_table: 'Table 1', creation: 'invalid', custom_merged_tables: '' }],
+    );
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:20');
+  });
+
+  it('does not query invoices when the room has no occupied tables', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 0 }, '2026-10-03 00:10:00',
+    );
+    expect(store.db.getDocList.mock.calls.map(([doctype]) => doctype)).toEqual(['URY Table']);
+    expect(store.getBadgeText(store.tables[0])).toBe('Free');
+  });
+
+  it('clears a previous bill timestamp on refresh when an occupied table no longer has an open bill', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' },
+      '2026-10-03 00:10:00',
+      [{ restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: '' }],
+    );
+    expect(store.getTimeDifference(store.tables[0])).toBe('13:05');
+
+    store.db.getDocList.mockImplementation((doctype) => Promise.resolve(doctype === 'URY Table'
+      ? [{ name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' }] : []));
+    store.fetchTable();
+    await flushPromises();
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:05');
+  });
+
+  it('keeps floor, menu and cashier usable while the open-bill query is pending or denied', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let deny;
+    const billQuery = new Promise((resolve, reject) => { deny = reject; });
+    const store = roomStore(Promise.resolve([]), Promise.resolve({ message: '2026-10-03 00:10:00' }));
+    store.db.getDocList.mockImplementation((doctype) => doctype === 'URY Table'
+      ? Promise.resolve([{ name: 'Table 1', occupied: 1, latest_invoice_time: '23:50:00' }]) : billQuery);
+
+    await store.handleRoomChange();
+    await flushPromises();
+    expect(store.tables.map((table) => table.name)).toEqual(['Table 1']);
+    expect(store.tableMenu).toEqual([{ item: 'Coffee' }]);
+    expect(store.cashier).toBe('Dining Cashier');
+    expect(store.db.getDocList).toHaveBeenCalledWith('POS Invoice', expect.any(Object));
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:20');
+
+    deny(new Error('POS Invoice read denied'));
+    await flushPromises();
+    expect(errorLog).toHaveBeenCalledWith(expect.objectContaining({ message: 'POS Invoice read denied' }));
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:20');
+  });
+
+  it('does not apply a pending old-room bill to the newly loaded room', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    let finishBills;
+    const oldBills = new Promise((resolve) => { finishBills = resolve; });
+    const store = useTableStore();
+    store.selectedRoom = 'Dining';
+    store.call.get.mockResolvedValue({ message: '2026-10-03 00:10:00' });
+    store.db.getDocList.mockImplementation((doctype) => doctype === 'URY Table'
+      ? Promise.resolve([{ name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' }]) : oldBills);
+    store.fetchTable();
+    await flushPromises();
+    expect(store.db.getDocList).toHaveBeenCalledWith('POS Invoice', expect.any(Object));
+
+    store.selectedRoom = 'Terrace';
+    store.db.getDocList.mockResolvedValue([{ name: 'Terrace 1', occupied: 0 }]);
+    store.fetchTable();
+    await flushPromises();
+    finishBills([{ restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: 'Terrace 1' }]);
+    await flushPromises();
+
+    expect(store.tables.map((table) => table.name)).toEqual(['Terrace 1']);
+    expect(store.getBadgeText(store.tables[0])).toBe('Free');
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:10');
   });
 });
