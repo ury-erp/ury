@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPinia, setActivePinia } from 'pinia';
+import { createPinia, getActivePinia, setActivePinia } from 'pinia';
+import { createApp, nextTick } from 'vue';
 import { setImmediate as flushPromises } from 'node:timers/promises';
 import { useTableStore } from './Table.js';
+import FloorPlan from '../components/Table.vue';
 
 vi.mock('../router', () => ({ default: { push: vi.fn() } }));
 vi.mock('./Menu.js', () => ({ useMenuStore: () => ({ fetchItems: vi.fn() }) }));
@@ -20,12 +22,19 @@ vi.mock('./frappeSdk.js', () => ({
   },
 }));
 
+let floorApp;
+let floorElement;
+
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.useFakeTimers();
 });
 
 afterEach(() => {
+  floorApp?.unmount();
+  floorElement?.remove();
+  floorApp = undefined;
+  floorElement = undefined;
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -218,7 +227,7 @@ describe('floor-plan table age uses the site clock', () => {
   });
 });
 
-describe('floor-plan age uses the latest open bill creation', () => {
+describe('floor-plan age uses the oldest open bill creation', () => {
   it.each([
     { creation: '2026-10-02 11:05:00.000000', age: '13:05' },
     { creation: '2026-10-01 11:05:00', age: '37:05' },
@@ -237,7 +246,7 @@ describe('floor-plan age uses the latest open bill creation', () => {
     expect(store.getTimeDifference(store.tables[0])).toBe(age === '13:05' ? '13:25' : '37:25');
   });
 
-  it('uses the newest draft creation after a transfer, not a reset table time or an older bill', async () => {
+  it('uses the oldest draft creation after a transfer, not a reset table time or a newer bill', async () => {
     vi.setSystemTime(new Date(2026, 9, 2, 23, 10, 0));
     const store = await fetchTables([
       { name: 'Table 2', occupied: 1, latest_invoice_time: '00:05:00' },
@@ -248,14 +257,86 @@ describe('floor-plan age uses the latest open bill creation', () => {
       { restaurant_table: 'Table 2', creation: '2026-10-01 11:05:00', custom_merged_tables: '' },
     ]);
 
-    expect(store.getTimeDifference(store.tables[0])).toBe('13:05');
+    expect(store.getTimeDifference(store.tables[0])).toBe('37:05');
     expect(store.getTimeDifference(store.tables[1])).toBe('0:02');
     expect(store.getBadgeText(store.tables[2])).toBe('Free');
     // Verify the external read contract: room table names, drafts only,
-    // newest first, and no default 20-row pagination truncation.
+    // include merged partners, and no default 20-row pagination truncation.
     expect(store.db.getDocList).toHaveBeenCalledWith('POS Invoice', {
       fields: ['restaurant_table', 'creation', 'custom_merged_tables'],
-      filters: [['docstatus', '=', 0], ['restaurant_table', 'in', ['Table 2', 'Table 3']]],
+      filters: [['docstatus', '=', 0]],
+      orFilters: [
+        ['restaurant_table', 'in', ['Table 2', 'Table 3']],
+        ['custom_merged_tables', 'like', '%Table 2%'],
+        ['custom_merged_tables', 'like', '%Table 3%'],
+      ],
+      orderBy: { field: 'creation', order: 'desc' },
+      limit: 0,
+    });
+  });
+
+  it.each(['newest first', 'oldest first'])('selects the oldest open check with the list returned %s', async (order) => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const drafts = [
+      { restaurant_table: 'Table 1', creation: '2026-10-03 00:05:00', custom_merged_tables: '' },
+      { restaurant_table: 'Table 1', creation: '2026-10-01 11:05:00', custom_merged_tables: '' },
+      { restaurant_table: 'Table 1', creation: '2026-10-02 11:05:00', custom_merged_tables: '' },
+    ];
+    if (order === 'oldest first') drafts.reverse();
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '00:05:00' },
+      '2026-10-03 00:10:00', drafts,
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('37:05');
+    expect(store.getBadgeText(store.tables[0])).toBe('Attention');
+    expect(store.getBadgeType(store.tables[0])).toBe('red');
+  });
+
+  it('keeps seating age and Attention after a split inserts a newer sibling draft', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const source = { restaurant_table: 'Table 1', creation: '2026-10-03 00:00:00', custom_merged_tables: '' };
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '00:00:00' },
+      '2026-10-03 00:10:00', [source],
+    );
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:10');
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    store.call.get.mockResolvedValue({ message: '2026-10-03 00:20:00' });
+    store.db.getDocList.mockImplementation((doctype) => Promise.resolve(doctype === 'URY Table'
+      ? [{ name: 'Table 1', occupied: 1, latest_invoice_time: '00:19:00' }]
+      : [{ ...source, creation: '2026-10-03 00:19:00' }, source]));
+
+    store.fetchTable();
+    await flushPromises();
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('0:20');
+    expect(store.getBadgeText(store.tables[0])).toBe('Attention');
+    expect(store.getBadgeType(store.tables[0])).toBe('red');
+  });
+
+  it('takes the oldest primary or exact merged-partner draft even when the primary is outside the room', async () => {
+    vi.setSystemTime(new Date(2026, 9, 3, 0, 10, 0));
+    const store = await fetchTable(
+      { name: 'Table 2', occupied: 1, latest_invoice_time: '00:05:00', merged_with: 'Other Room Table' },
+      '2026-10-03 00:10:00', [
+        { restaurant_table: 'Table 2', creation: '2026-10-03 00:05:00', custom_merged_tables: '' },
+        { restaurant_table: 'Other Room Table', creation: '2026-10-03 00:04:00', custom_merged_tables: ' Table 2, Table 3 ' },
+        { restaurant_table: 'Other Room Table', creation: '2026-10-01 11:05:00', custom_merged_tables: ' Table 2, Table 3 ' },
+        { restaurant_table: 'Other Table', creation: '2026-09-30 11:05:00', custom_merged_tables: 'Table 20, Table 21' },
+      ],
+    );
+
+    expect(store.getTimeDifference(store.tables[0])).toBe('37:05');
+    expect(store.getBadgeText(store.tables[0])).toBe('Attention');
+    expect(store.getBadgeType(store.tables[0])).toBe('red');
+    expect(store.db.getDocList).toHaveBeenCalledWith('POS Invoice', {
+      fields: ['restaurant_table', 'creation', 'custom_merged_tables'],
+      filters: [['docstatus', '=', 0]],
+      orFilters: [
+        ['restaurant_table', 'in', ['Table 2']],
+        ['custom_merged_tables', 'like', '%Table 2%'],
+      ],
       orderBy: { field: 'creation', order: 'desc' },
       limit: 0,
     });
@@ -381,5 +462,44 @@ describe('floor-plan age uses the latest open bill creation', () => {
     expect(store.tables.map((table) => table.name)).toEqual(['Terrace 1']);
     expect(store.getBadgeText(store.tables[0])).toBe('Free');
     expect(store.getTimeDifference(store.tables[0])).toBe('0:10');
+  });
+});
+
+describe('idle floor-plan rendering', () => {
+  it.each([false, true])('advances the rendered age and Attention badge without refetching (takeaway=%s)', async (takeaway) => {
+    vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
+    const store = await fetchTable(
+      { name: 'Table 1', occupied: 1, latest_invoice_time: '11:46:00', is_take_away: takeaway ? 1 : 0 },
+      '2026-10-02 12:00:00',
+      [{ restaurant_table: 'Table 1', creation: '2026-10-02 11:46:00', custom_merged_tables: '' }],
+    );
+    store.isTakeaeay = takeaway;
+    floorElement = document.createElement('div');
+    document.body.appendChild(floorElement);
+    floorApp = createApp(FloorPlan);
+    floorApp.use(getActivePinia());
+    const timerCount = vi.getTimerCount();
+    floorApp.mount(floorElement);
+
+    expect(floorElement.textContent).toContain('0:14');
+    expect(floorElement.textContent).toContain('Occupied');
+    const listReads = store.db.getDocList.mock.calls.length;
+    const serverReads = store.call.get.mock.calls.length;
+
+    vi.advanceTimersByTime(60 * 1000);
+    await nextTick();
+    expect(floorElement.textContent).toContain('0:15');
+    expect(floorElement.textContent).toContain('Occupied');
+    vi.advanceTimersByTime(60 * 1000);
+    await nextTick();
+    expect(floorElement.textContent).toContain('0:16');
+    expect(floorElement.textContent).toContain('Attention');
+    expect(floorElement.querySelector('.bg-red-100')).not.toBeNull();
+    expect(store.db.getDocList).toHaveBeenCalledTimes(listReads);
+    expect(store.call.get).toHaveBeenCalledTimes(serverReads);
+
+    floorApp.unmount();
+    floorApp = undefined;
+    expect(vi.getTimerCount()).toBe(timerCount);
   });
 });
