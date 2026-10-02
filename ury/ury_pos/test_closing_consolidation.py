@@ -267,7 +267,7 @@ class TestClosingConsolidation(unittest.TestCase):
         self.assertEqual((self.doc.grand_total, self.doc.net_total,
                           self.doc.total_quantity, self.doc.total_taxes_and_charges),
                          (29500, 25000, 5, 4500))
-        self.assertEqual(self.doc.taxes, [{"account_head": "VAT", "tax_amount": 4500}])
+        self.assertEqual(self.doc.taxes, [{"account_head": "VAT", "amount": 4500}])
         self.get_taxes.assert_called_once()
         self.assertEqual([row.name for row in self.get_taxes.call_args.args[0]], ["ONE", "TWO"])
 
@@ -284,6 +284,7 @@ class TestClosingConsolidation(unittest.TestCase):
         self.assertEqual((self.doc.grand_total, self.doc.net_total,
                           self.doc.total_quantity, self.doc.total_taxes_and_charges),
                          (11800, 10000, 1, 1800))
+        self.assertEqual(self.doc.taxes, [{"account_head": "VAT", "amount": 1800}])
 
     def test_ten_invoices_make_ten_rows_without_calling_native_consolidation(self):
         for index in range(10):
