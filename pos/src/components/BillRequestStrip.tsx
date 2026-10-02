@@ -68,7 +68,10 @@ export default function BillRequestStrip({ orders, selectOrder }: {
         if (!active.current) return;
         const exact = (result.data as POSInvoice[]).find(inv => inv.name === request.invoice && isOpen(inv));
         if (exact) { await selectOrder(exact); return; }
-        const group = await getSplitGroup(request.invoice);
+        const group = await getSplitGroup(request.invoice).catch((error: { httpStatus?: number }) => {
+          if (error.httpStatus === 404) return { invoices: [], current: request.invoice!, group: null };
+          throw error;
+        });
         if (!active.current) return;
         const unpaid = group.invoices.filter(isOpen).map(mapSplitGroupInvoiceToPOSInvoice);
         if (unpaid.length) setChoices(unpaid);
