@@ -1,14 +1,24 @@
 import frappe
-from frappe.tests.utils import FrappeTestCase
+from unittest import TestCase, addModuleCleanup
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from ury.ury.api.ury_service_line import (
     get_service_line,
     get_running_low,
 )
 
 
-class TestGetServiceLine(FrappeTestCase):
+def setUpModule():
+    for target, value in (
+        ("ury.ury.api.ury_service_line.frappe", MagicMock()),
+        ("frappe.utils.data.get_system_timezone", lambda: "Africa/Kampala"),
+    ):
+        patcher = patch(target, value)
+        patcher.start()
+        addModuleCleanup(patcher.stop)
+
+
+class TestGetServiceLine(TestCase):
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     def test_cache_hit_returns_immediately(self, mock_cache_obj):
@@ -55,12 +65,7 @@ class TestGetServiceLine(FrappeTestCase):
         mock_cache_instance.get_value.return_value = None
 
         now = datetime(2026, 8, 19, 14, 30, 0)
-        # get_datetime() is called twice in source with different args: once
-        # bare for "now", once with t.latest_invoice_time to normalize it.
-        # A plain return_value would collapse both calls to the same value
-        # and always yield a zero minute delta, so use side_effect to mimic
-        # real get_datetime's passthrough-on-datetime-arg behavior.
-        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
+        mock_get_datetime.side_effect = lambda *args: now if not args else frappe.utils.get_datetime(args[0])
 
         mock_get_all.return_value = [
             frappe._dict({
@@ -72,7 +77,7 @@ class TestGetServiceLine(FrappeTestCase):
         ]
 
         mock_sql.side_effect = [
-            [frappe._dict({"name": "INV-001"})],
+            [frappe._dict({"name": "INV-001", "creation": datetime(2026, 8, 19, 14)})],
             [frappe._dict({"order_status": "Ready For Prepare"})],
         ]
 
@@ -104,7 +109,7 @@ class TestGetServiceLine(FrappeTestCase):
         ]
 
         mock_sql.side_effect = [
-            [frappe._dict({"name": "INV-002"})],
+            [frappe._dict({"name": "INV-002", "creation": datetime(2026, 8, 19, 14)})],
             [frappe._dict({"order_status": "Served"})],
         ]
 
@@ -175,7 +180,7 @@ class TestGetServiceLine(FrappeTestCase):
         mock_cache_instance.get_value.return_value = None
 
         now = datetime(2026, 8, 19, 15, 45, 0)
-        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
+        mock_get_datetime.side_effect = lambda *args: now if not args else frappe.utils.get_datetime(args[0])
 
         mock_get_all.return_value = [
             frappe._dict({
@@ -187,7 +192,7 @@ class TestGetServiceLine(FrappeTestCase):
         ]
 
         mock_sql.side_effect = [
-            [frappe._dict({"name": "INV-003"})],
+            [frappe._dict({"name": "INV-003", "creation": datetime(2026, 8, 19, 14)})],
             [frappe._dict({"order_status": "Served"})],
         ]
 
@@ -197,7 +202,53 @@ class TestGetServiceLine(FrappeTestCase):
         self.assertEqual(result[0]["minutes"], 105)
 
 
-class TestGetRunningLow(FrappeTestCase):
+class TestServiceLineInvoiceAge(TestCase):
+    def check_age(self, creation, latest_time, expected_minutes, expected_stage):
+        now = datetime(2026, 10, 2, 0, 7)
+
+        def site_datetime(value=None):
+            if value is None:
+                return now
+            if isinstance(value, str) and len(value) == 8:
+                return datetime.combine(now.date(), time.fromisoformat(value))
+            return frappe.utils.get_datetime(value)
+
+        cache = MagicMock()
+        cache.get_value.return_value = None
+        invoices = [frappe._dict(name="INV-001", creation=creation)] if creation else []
+        with patch("ury.ury.api.ury_service_line.frappe.cache", return_value=cache), patch(
+            "ury.ury.api.ury_service_line.get_datetime", side_effect=site_datetime,
+        ), patch("ury.ury.api.ury_service_line.frappe.get_all", return_value=[
+            frappe._dict(name="Table 1", occupied=1, latest_invoice_time=latest_time, is_take_away=0),
+        ]), patch("ury.ury.api.ury_service_line.frappe.db.sql", side_effect=[
+            invoices, [frappe._dict(order_status="Served")],
+        ]) as sql:
+            result = get_service_line("Salama")
+        self.assertEqual(result, [{"table": "Table 1", "stage": expected_stage, "minutes": expected_minutes}])
+        query, params = sql.call_args_list[0].args
+        self.assertIn("creation", query.split("FROM")[0])
+        self.assertIn("docstatus = 0", query)
+        self.assertIn("ORDER BY creation DESC LIMIT 1", query)
+        self.assertEqual(params, {"table": "Table 1"})
+        cache.set_value.assert_called_once_with("ury_dashboard_service_line:Salama", result, expires_in_sec=15)
+
+    def test_overnight_age_uses_open_invoice_datetime_not_time_only_field(self):
+        self.check_age("2026-10-01 23:50:00", timedelta(hours=23, minutes=50), 17, "served")
+
+    def test_future_invoice_age_is_never_negative(self):
+        self.check_age("2026-10-02 00:12:00", "00:12:00", 0, "served")
+
+    def test_no_open_invoice_has_no_age_even_when_table_time_exists(self):
+        self.check_age(None, "00:00:00", None, "seated")
+
+    def test_open_invoice_has_age_when_table_time_is_missing(self):
+        self.check_age("2026-10-01 23:50:00", None, 17, "served")
+
+    def test_over_stage_uses_invoice_age_not_table_time(self):
+        self.check_age("2026-10-01 22:22:00", "00:00:00", 105, "over")
+
+
+class TestGetRunningLow(TestCase):
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     def test_cache_hit_returns_immediately(self, mock_cache_obj):
