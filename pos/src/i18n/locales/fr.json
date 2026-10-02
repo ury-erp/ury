@@ -414,6 +414,7 @@
     "waiting": "Demandes d’addition : {{count}} en attente",
     "loading": "Chargement des demandes d’addition",
     "unavailable": "Demandes d’addition indisponibles",
+    "refresh_failed": "Bill requests refresh failed",
     "empty": "Aucune demande d’addition en attente",
     "refresh": "Actualiser",
     "open_record": "Ouvrir la demande",

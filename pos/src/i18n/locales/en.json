@@ -441,6 +441,7 @@
     "waiting": "Bill requests: {{count}} waiting",
     "loading": "Loading bill requests",
     "unavailable": "Bill requests unavailable",
+    "refresh_failed": "Bill requests refresh failed",
     "empty": "No bill requests waiting",
     "refresh": "Refresh",
     "open_record": "Open request",

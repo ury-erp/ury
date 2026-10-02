@@ -24,28 +24,51 @@ export default function BillRequestStrip({ orders, selectOrder }: {
   const [requests, setRequests] = useState<BillRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [choices, setChoices] = useState<POSInvoice[]>([]);
   const active = useRef(false);
   const refreshId = useRef(0);
+  const hasLoaded = useRef(false);
+  const branch = useRef('');
 
   const refresh = useCallback(async () => {
     const id = ++refreshId.current;
-    setLoading(true);
-    setUnavailable(false);
+    setLoading(!hasLoaded.current);
+    setRefreshing(true);
     try {
-      const response = await call.get<{ message: BillRequest[] }>('frappe.client.get_list', {
+      // Use the same session branch as getPosInvoice, never a caller-supplied branch.
+      const till = await call.get<{ message: string }>('ury.ury_pos.api.getBranch');
+      if (!till.message) throw Error('Till branch unavailable');
+      const tables = await call.get<{ message: Array<{ name: string }> }>('frappe.client.get_list', {
+        doctype: 'URY Table', filters: { branch: till.message }, fields: ['name'], limit_page_length: 0,
+      });
+      const tableNames = tables.message.map(table => table.name);
+      const response = tableNames.length ? await call.get<{ message: BillRequest[] }>('frappe.client.get_list', {
         doctype: 'URY Service Request',
-        filters: { request_type: 'Bill', status: ['!=', 'Resolved'] },
+        filters: [['request_type', '=', 'Bill'], ['status', '!=', 'Resolved'], ['table', 'in', tableNames]],
         fields: ['name', 'table', 'invoice', 'status', 'requested_at'],
         limit_page_length: 0,
-      });
-      if (active.current && id === refreshId.current) setRequests(response.message);
+      }) : { message: [] };
+      if (active.current && id === refreshId.current) {
+        branch.current = till.message;
+        hasLoaded.current = true;
+        setRequests(response.message);
+        setUnavailable(false);
+        setRefreshFailed(false);
+      }
     } catch {
-      if (active.current && id === refreshId.current) setUnavailable(true);
+      if (active.current && id === refreshId.current) {
+        if (hasLoaded.current) setRefreshFailed(true);
+        else setUnavailable(true);
+      }
     } finally {
-      if (active.current && id === refreshId.current) setLoading(false);
+      if (active.current && id === refreshId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
@@ -80,7 +103,7 @@ export default function BillRequestStrip({ orders, selectOrder }: {
         // The visible queue is paginated; native permission-filtered reads find all table checks.
         const response = await call.get<{ message: POSInvoice[] }>('frappe.client.get_list', {
           doctype: 'POS Invoice',
-          filters: { restaurant_table: request.table, status: 'Draft', docstatus: 0 },
+          filters: { restaurant_table: request.table, branch: branch.current, status: 'Draft', docstatus: 0 },
           fields: ['name', 'restaurant_table', 'status', 'docstatus', 'invoice_printed',
             'grand_total', 'rounded_total', 'net_total', 'total_taxes_and_charges',
             'customer', 'mobile_number', 'cashier', 'waiter', 'order_type', 'posting_date', 'posting_time'],
@@ -108,10 +131,11 @@ export default function BillRequestStrip({ orders, selectOrder }: {
           {loading ? t('bill_requests.loading') : unavailable ? t('bill_requests.unavailable')
             : t('bill_requests.waiting', { count: requests.length })}
         </h2>
-        <Button variant="outline" className="min-h-11" disabled={loading} onClick={() => void refresh()}>
+        <Button variant="outline" className="min-h-11" disabled={refreshing} onClick={() => void refresh()}>
           {t('bill_requests.refresh')}
         </Button>
       </div>
+      {refreshFailed && <p role="status" className="mt-2 text-sm text-gray-500">{t('bill_requests.refresh_failed')}</p>}
       {!loading && !unavailable && (requests.length === 0
         ? <p className="mt-2 text-sm text-gray-500">{t('bill_requests.empty')}</p>
         : <ul className="mt-2 space-y-2">

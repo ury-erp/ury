@@ -69,6 +69,12 @@
         "cancel_order": "إلغاء الطلب",
         "enter_cancel_reason": "أدخل سبب الإلغاء",
         "print": "طباعة",
+        "print_bill": "Print bill",
+        "print_receipt": "Print receipt",
+        "settle_bill": "Settle bill",
+        "printed": "Printed",
+        "not_printed": "Not printed",
+        "age_minutes": "{{count}} min",
         "payment": "الدفع"
     },
     "payment": {
@@ -210,6 +216,7 @@
         "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
     },
     "footer": {
+        "analytics": "Analytics",
         "dashboard": "لوحة التحكم",
         "pos": "نقطة البيع",
         "tables": "الطاولات",
@@ -235,12 +242,32 @@
         "phone_in": "طلب هاتفي",
         "aggregators": "منصات تجميع"
     },
+    "bill_split": {
+        "split_bill": "Split bill"
+    },
     "order_status_types": {
+        "outstanding": "Outstanding",
         "draft": "مسودة",
         "unbilled": "غير مفوتر",
         "recently_paid": "مدفوع مؤخراً",
         "paid": "مدفوع",
         "consolidated": "مجمع",
         "return": "مرتجع"
+    },
+    "bill_requests": {
+        "title": "Bill requests",
+        "waiting": "Bill requests: {{count}} waiting",
+        "loading": "Loading bill requests",
+        "unavailable": "Bill requests unavailable",
+        "refresh_failed": "Bill requests refresh failed",
+        "empty": "No bill requests waiting",
+        "refresh": "Refresh",
+        "open_record": "Open request",
+        "not_open": "Bill {{invoice}} is not open",
+        "no_open_checks": "No open checks for {{table}}",
+        "no_link": "Request has no linked table or bill",
+        "lookup_unavailable": "Bill lookup unavailable",
+        "lookup_loading": "Finding open bill…",
+        "choose_check": "Choose an open check"
     }
 }
