@@ -1,6 +1,17 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const session = vi.hoisted(() => ({ user: 'cashier@salama.local' as string | null }));
+const session = vi.hoisted(() => ({
+  get user(): string | null {
+    const cookie = document.cookie.split(';').map((part) => part.trim())
+      .find((part) => part.startsWith('user_id='));
+    return cookie ? decodeURIComponent(cookie.slice('user_id='.length)) : null;
+  },
+  set user(user: string | null) {
+    document.cookie = user === null
+      ? 'user_id=; Max-Age=0; Path=/'
+      : `user_id=${encodeURIComponent(user)}; Path=/`;
+  },
+}));
 const client = vi.hoisted(() => ({
   auth: { getLoggedInUser: vi.fn(), logout: vi.fn() },
   call: { get: vi.fn(), post: vi.fn() },
@@ -11,6 +22,7 @@ const client = vi.hoisted(() => ({
 vi.mock('../../packages/core/src/frappe/client', () => client);
 
 import { logout } from '../../packages/core/src/frappe/auth';
+import { getUserSessionStorageKey } from '../../packages/core/src/storage';
 import { usePOSStore } from '../src/store/pos-store';
 import { useRootStore } from '../src/store/root-store';
 import { getMergeBillCandidates } from '../src/lib/invoice-api';
@@ -103,6 +115,18 @@ test('a same-tab session change loads the new cashier profile without app logout
   });
 });
 
+test('the live cookie wins over a stale identity response and boot user', async () => {
+  session.user = trainee;
+  client.auth.getLoggedInUser.mockResolvedValue(cashier);
+  sessionStorage.setItem(`posProfile:${cashier}`, JSON.stringify(profiles[cashier]));
+  sessionStorage.setItem(`posProfile:${trainee}`, JSON.stringify(profiles[trainee]));
+
+  await usePOSStore.getState().fetchPosProfile();
+
+  expect(usePOSStore.getState().posProfile?.name).toBe('Salama Training Till');
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
+});
+
 test('legacy unowned profile cache is discarded rather than used for the training till', async () => {
   session.user = trainee;
   sessionStorage.setItem('posProfile', JSON.stringify(profiles[cashier]));
@@ -116,6 +140,7 @@ test('legacy unowned profile cache is discarded rather than used for the trainin
 
 test('a matching user cache is reused without a profile request', async () => {
   session.user = trainee;
+  sessionStorage.setItem('posProfile', 'stale legacy entry');
   sessionStorage.setItem(`posProfile:${trainee}`, JSON.stringify(profiles[trainee]));
   client.call.get.mockRejectedValue(new Error('Profile request should not be needed'));
 
@@ -123,6 +148,8 @@ test('a matching user cache is reused without a profile request', async () => {
 
   expect(usePOSStore.getState().posProfile?.name).toBe('Salama Training Till');
   expect(usePOSStore.getState().error).toBeNull();
+  expect(sessionStorage.getItem('posProfile')).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
 });
 
 test.each([null, 'Guest'])('an unidentified session (%s) does not cache a POS profile', async (user) => {
@@ -145,6 +172,7 @@ test('access checks use the current session profile rather than the previous use
 
 test('access checks reuse the current user cache', async () => {
   session.user = trainee;
+  sessionStorage.setItem('posProfile', 'stale legacy entry');
   sessionStorage.setItem(`posProfile:${trainee}`, JSON.stringify(profiles[trainee]));
   client.call.get.mockRejectedValue(new Error('Profile request should not be needed'));
 
@@ -152,6 +180,8 @@ test('access checks reuse the current user cache', async () => {
 
   expect(useRootStore.getState().posProfile?.name).toBe('Salama Training Till');
   expect(useRootStore.getState().error).toBeNull();
+  expect(sessionStorage.getItem('posProfile')).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
 });
 
 test('a forced access recheck updates only the current user profile cache', async () => {
@@ -191,13 +221,46 @@ test('legacy payment modes are ignored', async () => {
 });
 
 test('matching user payment modes are reused', async () => {
+  sessionStorage.setItem('payment_modes', '["stale legacy entry"]');
   sessionStorage.setItem(`payment_modes:${cashier}`, '["Cash"]');
   client.call.get.mockRejectedValue(new Error('Payment modes request should not be needed'));
 
   await usePOSStore.getState().fetchPaymentModes();
 
   expect(usePOSStore.getState().paymentModes).toEqual(['Cash']);
+  expect(sessionStorage.getItem('payment_modes')).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
 });
+
+test.each([
+  ['fetchCustomerGroups', 'customerGroups', 'Salama Customer Group'],
+  ['fetchTerritories', 'territories', 'Salama Territory'],
+] as const)('%s reuses its cookie-owned cache without an identity request', async (fetch, field, value) => {
+  sessionStorage.setItem(`${field}:${cashier}`, JSON.stringify([value]));
+  sessionStorage.setItem(field, '["stale legacy entry"]');
+  client.db.getDocList.mockRejectedValue(new Error('Cached list must not need HTTP'));
+
+  await usePOSStore.getState()[fetch]();
+
+  expect(usePOSStore.getState()[field]).toEqual([value]);
+  expect(sessionStorage.getItem(field)).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
+});
+
+test.each([cashier, 'Guest', null, ''])(
+  'building a user cache key for %s never mutates storage', (user) => {
+    sessionStorage.setItem('posProfile', 'legacy');
+    sessionStorage.setItem(`posProfile:${cashier}`, 'owned');
+    sessionStorage.setItem('other-app', 'keep');
+
+    expect(getUserSessionStorageKey('posProfile', user)).toBe(
+      user && user !== 'Guest' ? `posProfile:${user}` : null,
+    );
+    expect(Object.fromEntries(Object.entries(sessionStorage))).toEqual({
+      posProfile: 'legacy', [`posProfile:${cashier}`]: 'owned', 'other-app': 'keep',
+    });
+  },
+);
 
 test.each([
   ['fetchCustomerGroups', 'customerGroups', 'Customer Group'],
@@ -230,6 +293,8 @@ test('paid order listing takes the limit from the current session cache', async 
   await useRootStore.getState().fetchOrders();
 
   expect(useRootStore.getState().orders[0]?.name).toBe('paid-limit-3');
+  expect(sessionStorage.getItem('posProfile')).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
 });
 
 test('bill merge candidates take their branch from the current session cache', async () => {
@@ -240,6 +305,8 @@ test('bill merge candidates take their branch from the current session cache', a
   const result = await getMergeBillCandidates({ primaryInvoice: 'INV-1', linkedSecondaries: [] });
 
   expect(result.data[0]?.name).toBe('invoice-Salama Training');
+  expect(sessionStorage.getItem('posProfile')).toBeNull();
+  expect(client.auth.getLoggedInUser).not.toHaveBeenCalled();
 });
 
 test('logout removes all user-scoped application caches but preserves unrelated storage', async () => {
