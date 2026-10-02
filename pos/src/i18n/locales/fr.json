@@ -63,6 +63,12 @@
     "cancel_order": "Annuler la commande",
     "enter_cancel_reason": "Saisir le motif d'annulation",
     "print": "Imprimer",
+    "print_bill": "Imprimer l’addition",
+    "print_receipt": "Imprimer le reçu",
+    "settle_bill": "Régler l’addition",
+    "printed": "Imprimée",
+    "not_printed": "Non imprimée",
+    "age_minutes": "{{count}} min",
     "payment": "Paiement",
     "order_actions": "Actions sur la commande"
   },
@@ -368,6 +374,7 @@
     "merged_items": "Articles de l'addition fusionnée"
   },
   "footer": {
+    "analytics": "Analyses",
     "dashboard": "Tableau de bord",
     "pos": "PDV",
     "tables": "Tables",
@@ -394,11 +401,27 @@
     "aggregators": "Agrégateurs"
   },
   "order_status_types": {
+    "outstanding": "À régler",
     "draft": "Brouillon",
     "unbilled": "Non facturé",
     "recently_paid": "Payé récemment",
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "bill_requests": {
+    "title": "Demandes d’addition",
+    "waiting": "Demandes d’addition : {{count}} en attente",
+    "loading": "Chargement des demandes d’addition",
+    "unavailable": "Demandes d’addition indisponibles",
+    "empty": "Aucune demande d’addition en attente",
+    "refresh": "Actualiser",
+    "open_record": "Ouvrir la demande",
+    "not_open": "L’addition {{invoice}} n’est pas ouverte",
+    "no_open_checks": "Aucune addition ouverte pour {{table}}",
+    "no_link": "La demande n’est liée à aucune table ni addition",
+    "lookup_unavailable": "Recherche d’addition indisponible",
+    "lookup_loading": "Recherche de l’addition ouverte…",
+    "choose_check": "Choisir une addition ouverte"
   }
 }

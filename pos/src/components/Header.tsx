@@ -16,6 +16,7 @@ import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
 import { showToast } from '@ury/ui';
+import { homePath } from '../lib/home-route';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -114,7 +115,7 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to={homePath(user)} className="flex items-center gap-3">
             <img
               src="/assets/ury/pos/ury_pos.png"
               alt="URY POS" 

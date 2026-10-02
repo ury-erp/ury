@@ -8,14 +8,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
+import { useRootStore } from '../store/root-store';
+import { homePath } from '../lib/home-route';
 
 const Footer = () => {
+  const user = useRootStore((state) => state.user);
+  const home = homePath(user);
 
   const navItems = [
-    { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
+    { icon: LayoutDashboard, label: t('footer.dashboard'), path: home },
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
     { icon: Table, label: t('footer.tables'), path: '/tables' },
-    { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
+    { icon: ClipboardList, label: t(home === '/orders' ? 'footer.analytics' : 'footer.orders'), path: home === '/orders' ? '/dashboard' : '/orders' },
     { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
   ].filter((item) => !item.hidden);
 
@@ -44,4 +48,4 @@ const Footer = () => {
   );
 };
 
-export default Footer; 
+export default Footer;

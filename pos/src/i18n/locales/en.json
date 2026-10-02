@@ -63,6 +63,12 @@
     "cancel_order": "Cancel order",
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
+    "print_bill": "Print bill",
+    "print_receipt": "Print receipt",
+    "settle_bill": "Settle bill",
+    "printed": "Printed",
+    "not_printed": "Not printed",
+    "age_minutes": "{{count}} min",
     "payment": "Payment",
     "order_actions": "Order actions"
   },
@@ -395,6 +401,7 @@
     "merged_items": "Items from merged bill"
   },
   "footer": {
+    "analytics": "Analytics",
     "dashboard": "Dashboard",
     "pos": "POS",
     "tables": "Tables",
@@ -421,11 +428,27 @@
     "aggregators": "Aggregators"
   },
   "order_status_types": {
+    "outstanding": "Outstanding",
     "draft": "Draft",
     "unbilled": "Unbilled",
     "recently_paid": "Recently Paid",
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "bill_requests": {
+    "title": "Bill requests",
+    "waiting": "Bill requests: {{count}} waiting",
+    "loading": "Loading bill requests",
+    "unavailable": "Bill requests unavailable",
+    "empty": "No bill requests waiting",
+    "refresh": "Refresh",
+    "open_record": "Open request",
+    "not_open": "Bill {{invoice}} is not open",
+    "no_open_checks": "No open checks for {{table}}",
+    "no_link": "Request has no linked table or bill",
+    "lookup_unavailable": "Bill lookup unavailable",
+    "lookup_loading": "Finding open bill…",
+    "choose_check": "Choose an open check"
   }
 }
