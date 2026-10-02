@@ -19,16 +19,16 @@
               class="me-2 rounded px-2.5 py-0.5 text-sm font-medium"
               :class="{
                 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300':
-                  this.table.getBadgeType(table) === 'default',
+                  this.table.getBadgeType(table, now) === 'default',
                 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300':
-                  this.table.getBadgeType(table) === 'red',
+                  this.table.getBadgeType(table, now) === 'red',
                 'bg-yellow-100 text-yellow-800':
-                  this.table.getBadgeType(table) === 'yellow',
+                  this.table.getBadgeType(table, now) === 'yellow',
                 'bg-green-100 text-green-800':
-                  this.table.getBadgeType(table) === 'green',
+                  this.table.getBadgeType(table, now) === 'green',
               }"
             >
-              {{ this.table.getBadgeText(table) }}
+              {{ this.table.getBadgeText(table, now) }}
             </span>
           </div>
           <div class="relative" v-if="table.occupied !== 1">
@@ -101,7 +101,7 @@
               </svg>
             </h5>
             <span class="text-sm text-gray-500 dark:text-gray-400">{{
-              table.occupied === 1 ? this.table.getTimeDifference(table) : ""
+              table.occupied === 1 ? this.table.getTimeDifference(table, now) : ""
             }}</span>
           </div>
           <div class="mt-8 text-center" v-if="table.occupied != 1">
@@ -207,6 +207,7 @@ import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { useAuthStore } from "@/stores/Auth.js";
 
 export default {
+  props: { now: { type: Number, default: Date.now } },
   name: "takeAwayTable",
 
   setup() {
