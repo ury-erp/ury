@@ -971,6 +971,37 @@ def create_customer(customer_name, mobile_number=None, customer_group=None, terr
             "message": str(e)
         }
 
+def _till_invoice_rows(pos_profile, start, end, reader):
+    """Select submitted, unconsolidated till invoices in the inclusive window."""
+    start = frappe.utils.get_datetime(start)
+    end = frappe.utils.get_datetime(end)
+    rows = reader(
+        "POS Invoice",
+        filters={
+            "docstatus": 1,
+            "pos_profile": pos_profile,
+            "consolidated_invoice": ["is", "not set"],
+            "posting_date": ["between", [start.date(), end.date()]],
+        },
+        fields=[
+            "name", "posting_date", "posting_time", "customer", "grand_total",
+            "net_total", "total_qty", "total_taxes_and_charges", "is_return", "return_against",
+        ],
+        order_by="posting_date asc, posting_time asc",
+        limit_page_length=0,
+    )
+    invoices = []
+    for row in rows:
+        # MariaDB returns posting_time as a timedelta, not a datetime.time.
+        timestamp = datetime.combine(
+            frappe.utils.get_datetime(row.posting_date).date(),
+            frappe.utils.get_time(row.posting_time),
+        )
+        if start <= timestamp <= end:
+            invoices.append(row)
+    return invoices
+
+
 @frappe.whitelist(methods=["GET"])
 def get_till_invoices(start, end, pos_profile, user):
     """Return full invoices for the holder's open till, regardless of cashier.
@@ -993,30 +1024,13 @@ def get_till_invoices(start, end, pos_profile, user):
     if not openings:
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-    start = frappe.utils.get_datetime(openings[0].period_start_date)
-    end = frappe.utils.get_datetime(end)
-    rows = frappe.get_list(
-        "POS Invoice",
-        filters={
-            "docstatus": 1,
-            "pos_profile": pos_profile,
-            "consolidated_invoice": ["is", "not set"],
-            "posting_date": ["between", [start.date(), end.date()]],
-        },
-        fields=["name", "posting_date", "posting_time"],
-        order_by="posting_date asc, posting_time asc",
-        limit_page_length=0,
-    )
-    invoices = []
-    for row in rows:
-        # MariaDB returns posting_time as a timedelta, not a datetime.time.
-        timestamp = datetime.combine(
-            frappe.utils.get_datetime(row.posting_date).date(),
-            frappe.utils.get_time(row.posting_time),
-        )
-        if start <= timestamp <= end:
-            invoices.append(frappe.get_doc("POS Invoice", row.name).as_dict())
-    return invoices
+    def reader(doctype, **query):
+        # Full documents are read below; preserve the endpoint's narrow query.
+        query["fields"] = ["name", "posting_date", "posting_time"]
+        return frappe.get_list(doctype, **query)
+
+    rows = _till_invoice_rows(pos_profile, openings[0].period_start_date, end, reader)
+    return [frappe.get_doc("POS Invoice", row.name).as_dict() for row in rows]
 
 
 @frappe.whitelist()
