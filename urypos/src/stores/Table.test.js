@@ -177,14 +177,14 @@ describe('floor-plan table age uses the site clock', () => {
     expect(store.getTimeDifference(store.tables[0])).toBe('0:25');
   });
 
-  it('leaves unoccupied table time and free badges unchanged', async () => {
+  it('uses padded site time for unoccupied tables and keeps free badges unchanged', async () => {
     vi.setSystemTime(new Date(2026, 9, 2, 11, 0, 0));
     const store = await fetchTable(
       { name: 'Table 1', occupied: 0, latest_invoice_time: '11:55:00' },
       '2026-10-02T12:00:00',
     );
 
-    expect(store.getTimeDifference(store.tables[0])).toBe('11:0');
+    expect(store.getTimeDifference(store.tables[0])).toBe('12:00');
     expect(store.getBadgeText(store.tables[0])).toBe('Free');
     expect(store.getBadgeType(store.tables[0])).toBe('green');
   });
