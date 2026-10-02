@@ -77,6 +77,7 @@ beforeEach(async () => {
   state.order.custom_merged_total = 0;
   state.items = [{ name: 'ROW-1', item_name: 'Soup', qty: 2, rate: 20, amount: 40 }];
   vi.spyOn(call, 'get').mockImplementation(async (method) => {
+    if (method === 'ury.ury_pos.api.getBranch') return { message: 'Branch A' };
     if (method === 'frappe.client.get_list') return { message: [] };
     if (method === 'ury.ury_pos.api.getPosInvoiceItems') return { message: [[], []] };
     if (method === 'frappe.client.has_permission') return { message: { has_permission: false } };
