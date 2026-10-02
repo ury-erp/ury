@@ -63,6 +63,9 @@
     "cancel_order": "Cancel order",
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
+    "print_bill": "Print bill",
+    "print_receipt": "Print receipt",
+    "settle_bill": "Settle bill",
     "payment": "Payment",
     "order_actions": "Order actions"
   },
