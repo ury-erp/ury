@@ -4,7 +4,7 @@ export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilit
 export type { POSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
 export type { User, PosProfileCombined } from './types';
-export { storage } from './storage';
+export { storage, getUserSessionStorageKey, clearAppStorage } from './storage';
 export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
 export { validateFieldValue } from './utils/validateField';

@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AuthSlice } from './auth-slice';
+import { getLoggedUser, getUserSessionStorageKey } from '@ury/core';
 import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
 
 interface RolePermission {
@@ -97,7 +98,8 @@ export const createConfigSlice: StateCreator<
       set({ isLoading: true, error: null });
 
       // Check session storage first if not forcing refresh
-      const cached = sessionStorage.getItem('posProfile');
+      const cacheKey = getUserSessionStorageKey('posProfile', await getLoggedUser());
+      const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);
         set({ posProfile: profile });
@@ -114,7 +116,7 @@ export const createConfigSlice: StateCreator<
       const profile = await getCombinedPosProfile();
 
       // Cache the profile
-      sessionStorage.setItem('posProfile', JSON.stringify(profile));
+      if (cacheKey) sessionStorage.setItem(cacheKey, JSON.stringify(profile));
       set({ posProfile: profile });
 
       // Allowed to enter the app: see deriveAllowedRoles.
@@ -153,4 +155,4 @@ export const createConfigSlice: StateCreator<
     // After setting new roles, recheck access
     get().checkAccess();
   },
-}); 
+});

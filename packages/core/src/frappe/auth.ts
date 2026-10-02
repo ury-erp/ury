@@ -1,4 +1,5 @@
 import { db, auth } from './client';
+import { clearAppStorage } from '../storage';
 
 type LoggedUserResponse = string | null;
 
@@ -60,7 +61,10 @@ export const getUserRoles = async (email: string): Promise<{ roles: string[]; fu
 
 export const logout = async () => {
   try {
-    return auth.logout();
+    return auth.logout().then((result) => {
+      clearAppStorage();
+      return result;
+    });
   }catch(e){
     console.error('Error logging out:', e);
     return false;
