@@ -5,7 +5,7 @@ import App from './App.tsx'
 import { initI18n, applyDocumentLocale } from './i18n'
 import { initPrinting } from '@ury/core'
 
-initPrinting({ signKey: '' })
+initPrinting()
 
 initI18n().then(() => {
   // Set <html lang/dir> before the first render so an RTL locale never paints
