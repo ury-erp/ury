@@ -3,11 +3,10 @@
  *
  * `format.ts` cannot import the app's i18n instance (core is the lower layer),
  * so the app registers its locale here once, right after i18n init. Until then
- * the previous default — Indian grouping — is preserved so existing
- * deployments are unaffected by this indirection.
+ * it is Iraqi Arabic with Western digits, the product's only market.
  */
 
-let intlLocale = 'en-IN';
+let intlLocale = 'ar-IQ-u-nu-latn';
 
 export function setIntlLocale(locale: string): void {
   intlLocale = locale;
