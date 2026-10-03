@@ -535,7 +535,7 @@ export const PosProfilePage: React.FC = () => {
                         <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">{t('dash.pos_profile.direct_thermal_ready')}</Badge>
                       </div>
                       <p className="text-gray-600">
-                        Bill printer and KOT kitchen printer configuration are loaded automatically from POS Profile events and URY Printer Mappings.
+                        Bill printer and KOT kitchen printer configuration are loaded automatically from POS Profile events and the printer mappings.
                       </p>
                     </div>
                   </div>
