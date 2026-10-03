@@ -78,13 +78,24 @@ def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
         frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
 
 
-    # Get menu items (your existing code)
-    menu_items = frappe.get_all(
-        "URY Menu Item",
-        filters={"parent": menu, "disabled": 0},
-        fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
-        order_by="item_name asc"
+    # One query instead of an Item lookup per row. The POS groups its grid by
+    # `category` — the dish's Item Group, the same thing that routes it to a
+    # kitchen — so what the cashier browses and what the kitchen receives can
+    # never disagree. `course` is still sent for the KOT/serving-order code
+    # paths that read it.
+    menu_items = frappe.db.sql(
+        """
+        SELECT mi.item, mi.item_name, mi.rate, mi.special_dish, mi.disabled, mi.course,
+               it.image AS item_image, it.item_group AS category
+        FROM `tabURY Menu Item` mi
+        LEFT JOIN `tabItem` it ON it.name = mi.item
+        WHERE mi.parent = %s AND mi.disabled = 0
+        ORDER BY mi.item_name ASC
+        """,
+        menu,
+        as_dict=True,
     )
+    category_icons = _category_icons({item.category for item in menu_items if item.category})
 
     menu_items_with_image = [
         {
@@ -93,7 +104,10 @@ def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
             "rate": item.rate,
             "special_dish": item.special_dish,
             "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
+            "item_image": item.item_image,
+            "category": item.category,
+            "category_label": _(item.category) if item.category else item.category,
+            "category_icon": category_icons.get(item.category),
             "course": item.course,
             "course_label": _(item.course) if item.course else item.course,
         }
@@ -120,6 +134,20 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     branch_name = getBranch()
 
     return resolve_restaurant_menu(branch_name, room, order_type, cashier)
+
+def _category_icons(categories):
+    """Icons for item-group categories, borrowed from a same-named URY Menu Course."""
+    if not categories:
+        return {}
+    return dict(
+        frappe.get_all(
+            "URY Menu Course",
+            filters={"name": ["in", list(categories)], "icon": ["is", "set"]},
+            fields=["name", "icon"],
+            as_list=True,
+        )
+    )
+
 
 @frappe.whitelist()
 def getMenuCourses():
@@ -923,6 +951,8 @@ def getPosProfile():
         multiple_cashier = pos_profiles.custom_enable_multiple_cashier
         edit_order_type = pos_profiles.custom_edit_order_type
         enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
+        require_bill_print = pos_profiles.get("custom_require_bill_print") or 0
+        qz_bill_printer = pos_profiles.get("custom_qz_bill_printer")
         if multiple_cashier:
             details = getBranchRoom()
             room = details[0].get('name') 
@@ -1005,7 +1035,9 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
+        "enable_kot_reprint":enable_kot_reprint,
+        "require_bill_print":require_bill_print,
+        "qz_bill_printer":qz_bill_printer,
 
     }
 
@@ -1092,15 +1124,25 @@ def getAggregatorItem(aggregator):
         fields=["item_code", "item_name", "price_list_rate"],
         filters={"selling": 1, "price_list": priceList},
     )
+    item_info = {
+        row.name: row
+        for row in frappe.get_all(
+            "Item",
+            filters={"name": ["in", [i.item_code for i in aggregatorItem] or [""]]},
+            fields=["name", "image", "item_group", "disabled"],
+        )
+    }
     aggregatorItemList = [
         {
             "item": item.item_code,
             "item_name": item.item_name,
             "rate": item.price_list_rate,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
+            "item_image": item_info[item.item_code].image,
+            "category": item_info[item.item_code].item_group,
+            "category_label": _(item_info[item.item_code].item_group),
         }
         for item in aggregatorItem
-        if not frappe.db.get_value("Item", item.item_code, "disabled")
+        if item.item_code in item_info and not item_info[item.item_code].disabled
     ]
     return aggregatorItemList
 
