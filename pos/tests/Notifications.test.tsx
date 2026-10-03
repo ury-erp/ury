@@ -86,6 +86,14 @@ describe('shared native operational notifications (Dashboard consumer)', () => {
     expect(links.some(link => link?.includes('javascript'))).toBe(false);
     expect(panel().textContent).toContain('Record link unavailable');
   });
+  it('opens native Desk records in a separate tab so navigation cannot cancel the native read write', async () => {
+    await render();
+    const link = panel().querySelector<HTMLAnchorElement>('a')!;
+    expect(link?.target).toBe('_blank');
+    expect(link.rel).toContain('noopener');
+    await act(async () => link.click());
+    expect(call.post).toHaveBeenCalledWith('frappe.desk.doctype.notification_log.notification_log.mark_as_read', { docname: 'ALERT-1' });
+  });
   it('marks just the chosen notification read through the native method and keeps other alerts unread', async () => {
     rows.push(alert({ name: 'SHIFT', subject: 'Shift opened' }));
     await render(); await click('Mark read');
@@ -97,6 +105,16 @@ describe('shared native operational notifications (Dashboard consumer)', () => {
     vi.mocked(call.post).mockRejectedValue(new Error('Denied'));
     await render(); await click('Mark read');
     expect(panel().textContent).toContain('Unread'); expect(panel().textContent).toContain('Could not mark notification read');
+  });
+  it('preserves a native read write against an earlier in-flight refresh but trusts later native read state', async () => {
+    await render();
+    let finish!: (value: any) => void;
+    fetchAlerts.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await emit('notification'); await click('Mark read');
+    await act(async () => finish({ ok: true, json: async () => ({ message: [alert()] }) }));
+    expect(panel().textContent).not.toContain('Unread');
+    // A subsequent Desk change back to unread must not be hidden by local state.
+    await emit('notification'); expect(panel().textContent).toContain('Unread');
   });
   it('distinguishes initial loading, empty and failed requests', async () => {
     let finish!: (value: any) => void;

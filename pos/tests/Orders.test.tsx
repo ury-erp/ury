@@ -176,7 +176,7 @@ describe('Orders native notifications working area', () => {
         if (failure === 'denied') throw new Error('Denied');
         return { message: { name: 'KOT-1', invoice: failure === 'missing' ? null : 'POS-OTHER' } };
       }
-      if (method === 'frappe.client.get' && args.doctype === 'POS Invoice') return { message: { ...state.order, branch: 'Branch B' } };
+      if (method === 'frappe.client.get' && args.doctype === 'POS Invoice') return { message: { ...state.order, name: 'POS-OTHER', branch: 'Branch B' } };
       return nativeRead(method, args);
     });
     await renderOrders();
