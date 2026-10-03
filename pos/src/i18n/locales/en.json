@@ -86,7 +86,8 @@
     "edit_order": "Edit order",
     "close_table": "Close Table",
     "close_table_confirm": "Every bill on table {{table}} has been settled. Close it and make the table available again?",
-    "details_title": "Order details"
+    "details_title": "Order details",
+    "print_before_payment": "Print the table bill first, then take payment"
   },
   "payment": {
     "title": "Payment",
@@ -123,7 +124,10 @@
       "expired": "This coupon has expired.",
       "exhausted": "This coupon has been fully used.",
       "other_customer": "This coupon belongs to another customer."
-    }
+    },
+    "settled_title": "Bill settled",
+    "print_receipt": "Print receipt",
+    "done": "Done"
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
@@ -233,7 +237,7 @@
     "incomplete_error": "All mandatory items must be checked before this checklist can be completed."
   },
   "customer": {
-    "search_placeholder": "Search customer...",
+    "search_placeholder": "Customer (optional) — billed to the table if empty",
     "type_to_search": "Please type to search...",
     "no_customers_found": "No customers found",
     "add_new": "Add New Customer",
@@ -533,7 +537,9 @@
       "printed": "Printed successfully.",
       "table_transferred": "Table transferred.",
       "captain_transferred": "Captain transferred."
-    }
+    },
+    "feature_off_title": "Captain ordering is switched off",
+    "feature_off_body": "Ask an administrator to turn it on in the Control Center."
   },
   "auth": {
     "access_denied": "Access Denied",
@@ -713,5 +719,8 @@
       "one": "1 queued order was refused by the server and removed. Re-enter it.",
       "other": "{{count}} queued orders were refused by the server and removed. Re-enter them."
     }
+  },
+  "qz": {
+    "print_failed": "Could not print on {{printer}}: {{reason}}"
   }
 }
