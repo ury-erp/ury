@@ -1,11 +1,12 @@
 import { useConfigure, SectionId } from '../../context/ConfigureContext';
 import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check, AlertCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { t } from '../../i18n';
 
 interface SidebarItem {
   id: SectionId;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
