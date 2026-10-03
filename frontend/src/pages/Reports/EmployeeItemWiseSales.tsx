@@ -158,7 +158,7 @@ export function EmployeeItemWiseSales() {
               icon={<IndianRupee className="w-4 h-4" />}
             />
           </div>
-          <DataTable columns={getColumns()} rows={data.items} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.items} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
         </>
       )}
     </div>
