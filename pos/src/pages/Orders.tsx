@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, DoorClosed, ListFilter } from 'lucide-react';
-import { Badge, Button, Card, CardContent, ErrorState, cn } from '@ury/ui';
+import { Badge, Button, Card, CardContent, EmptyState, ErrorState, cn } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
@@ -783,9 +783,7 @@ export default function Orders() {
               <Spinner  message={t('common.loading')} />
             </div>
           ) : orders.length === 0 ? (
-            <div className="text-center mt-10">
-              <p className="text-gray-500">{t('orders.no_orders_found')}</p>
-            </div>
+            <EmptyState illustration="orders" title={t('orders.no_orders_found')} className="mt-4" />
           ) : (
             <div className={orderGridClasses}>
               {orders.map((order) => {
