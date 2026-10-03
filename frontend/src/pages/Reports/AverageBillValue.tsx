@@ -103,7 +103,7 @@ export function AverageBillValue() {
 
           <LineChartCard title={t('reports.average_bill_value.abv_trend')} data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: t('fields.avg_bill_value') }} />
 
-          <DataTable columns={getColumns()} rows={data.data} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.data} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
         </>
       ) : null}
     </div>
