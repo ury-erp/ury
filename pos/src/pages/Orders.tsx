@@ -31,6 +31,7 @@ import {
 } from '../lib/invoice-api';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+import Notifications from '../components/Notifications';
 
 function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
   if (!order.restaurant_table) return null;
@@ -358,15 +359,17 @@ export default function Orders() {
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
-          <p className="text-gray-600">{error}</p>
-        </div>
-      </div>
-    );
+  async function openNotificationCheck(kotName: string, isCurrentSession: () => boolean) {
+    const kot = await call.get<{ message: { invoice?: string } }>('frappe.client.get', { doctype: 'URY KOT', name: kotName });
+    if (!isCurrentSession() || !kot.message?.invoice) return false;
+    const response = await call.get<{ message: POSInvoice & { branch: string } }>('frappe.client.get', {
+      doctype: 'POS Invoice', name: kot.message.invoice,
+    });
+    if (!isCurrentSession()) return false;
+    const till = await call.get<{ message: string }>('ury.ury_pos.api.getBranch');
+    if (!isCurrentSession() || !till.message || response.message?.branch !== till.message || response.message.name !== kot.message.invoice) return false;
+    await selectOrder(response.message);
+    return true;
   }
 
   return (
@@ -379,8 +382,14 @@ export default function Orders() {
 
       {/* Middle Section - Order Cards */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
-          {orderLoading ? (
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-4 bg-gray-50 p-4 pb-40 xl:grid-cols-[minmax(0,1fr)_14rem] xl:grid-rows-1">
+          <div className="min-w-0 overflow-y-auto">
+          {error ? (
+            <div className="p-4 text-center">
+              <p className="font-semibold text-red-600">Failed to load orders</p>
+              <p className="text-gray-600">{error}</p>
+            </div>
+          ) : orderLoading ? (
             <div className="flex items-center justify-center h-full">
               <Spinner  message={t('common.loading')} />
             </div>
@@ -389,7 +398,7 @@ export default function Orders() {
               <p className="text-gray-500">{t('orders.no_orders_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
+            <div className="grid grid-cols-1 gap-4 max-w-screen-xl mx-auto 2xl:grid-cols-2">
               {orders.map((order) => {
                 const splitBill = isSplitBill(order);
                 const mergedBill = isMergedBill(order);
@@ -517,6 +526,8 @@ export default function Orders() {
               </div>
             </div>
           )}
+          </div>
+          <Notifications title="Notifications" onOpenCheck={openNotificationCheck} />
         </div>
       </div>
 
