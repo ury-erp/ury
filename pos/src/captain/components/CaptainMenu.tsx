@@ -42,7 +42,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
   const filteredItems = useMemo(() => {
     const term = searchQuery.toLowerCase();
     return menuItems.filter((item) => {
-      const matchesCategory = !selectedCategory || item.course === selectedCategory;
+      const matchesCategory = !selectedCategory || item.category === selectedCategory;
       const matchesSearch =
         !searchQuery ||
         item.name.toLowerCase().includes(term) ||
@@ -118,7 +118,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 name={item.name}
                 price={item.price}
                 item_image={item.image}
-                course={item.course_label || item.course}
+                category={item.category_label || item.category}
                 item={item.item}
                 onClick={() => handleTap(item)}
                 disabled={disabled}
