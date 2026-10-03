@@ -21,7 +21,7 @@ interface ScreenSizeProviderProps {
  * Phones are still out of scope for the cashier surface and keep the legacy
  * fallback. This provider renders above the router (App.tsx:
  * ScreenSizeProvider > AuthGuard > POSOpeningProvider > Router), so a blind
- * width check would also take out the captain surface (`/ury/order*`), which
+ * width check would also take out the captain surface (`/restro/order*`), which
  * is deliberately mobile-first — hence the exemption below.
  */
 const isCaptainRoute = () => window.location.pathname.includes('/order');
