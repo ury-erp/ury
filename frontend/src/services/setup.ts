@@ -6,6 +6,8 @@ export interface SetupDefaults {
   countries: string[];
   currencies: { value: string; label: string; symbol: string }[];
   timezones: string[];
+  /** Demo data is offered only on sites that allow it (never in production). */
+  allow_demo?: boolean;
 }
 
 export interface CountryDefaults {
