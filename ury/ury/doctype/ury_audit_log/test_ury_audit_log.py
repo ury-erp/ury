@@ -14,6 +14,13 @@ from ury.ury.doctype.ury_audit_log.ury_audit_log import EVENTS, record_event
 MOD = "ury.ury.doctype.ury_audit_log.ury_audit_log"
 
 
+
+def _audit_payload(mock_get_doc):
+    """The URY Audit Log dict passed to get_doc — not the activity comment
+    record_event also writes on the invoice."""
+    return next(c[0][0] for c in mock_get_doc.call_args_list if c[0][0].get("doctype") == "URY Audit Log")
+
+
 class TestRecordEvent(FrappeTestCase):
 
     @patch(f"{MOD}.frappe.log_error")
@@ -44,7 +51,7 @@ class TestRecordEvent(FrappeTestCase):
         operator cannot choose."""
         record_event("Discount Applied", reference_doctype="POS Invoice", reference_name="INV-1")
 
-        payload = mock_get_doc.call_args[0][0]
+        payload = _audit_payload(mock_get_doc)
         self.assertEqual(payload["performed_by"], frappe.session.user)
 
     @patch(f"{MOD}.frappe.db.get_value", return_value=None)
@@ -54,7 +61,7 @@ class TestRecordEvent(FrappeTestCase):
         cost detail, not the whole entry."""
         record_event("Price Overridden", old_value="x" * 500, new_value="y" * 500)
 
-        payload = mock_get_doc.call_args[0][0]
+        payload = _audit_payload(mock_get_doc)
         self.assertEqual(len(payload["old_value"]), 140)
         self.assertEqual(len(payload["new_value"]), 140)
 
@@ -63,7 +70,7 @@ class TestRecordEvent(FrappeTestCase):
     def test_details_are_stored_as_json(self, mock_get_doc, mock_get_value):
         record_event("Bill Split", details={"items_moved": 3})
 
-        payload = mock_get_doc.call_args[0][0]
+        payload = _audit_payload(mock_get_doc)
         self.assertIn('"items_moved": 3', payload["details"])
 
     def test_every_event_used_in_the_codebase_is_declared(self):
