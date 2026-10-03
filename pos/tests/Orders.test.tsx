@@ -96,6 +96,7 @@ beforeEach(async () => {
     if (method === 'ury.ury_pos.api.get_split_group') return { message: { invoices: [], current: 'POS-INV-1', group: null } };
     throw new Error(`Unexpected Frappe call: ${method}`);
   });
+  vi.spyOn(call, 'post').mockResolvedValue({ message: null });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
