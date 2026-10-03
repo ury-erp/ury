@@ -190,14 +190,8 @@ export default function CaptainOrder() {
         showToast.error(t('captain.errors.empty_order'));
         return;
       }
-      // sync_order requires `customer` as a hard backend parameter (found via
-      // live E2E test — a 500 "missing 1 required positional argument:
-      // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
-      // exact validate-before-submit gate rather than only omitting the field.
-      if (!selectedCustomer?.name) {
-        showToast.error(t('captain.errors.no_customer'));
-        return;
-      }
+      // `customer` must still be sent (sync_order takes it positionally), but
+      // it may be empty: the server then bills the table.
 
       setIsSubmitting(true);
 
@@ -214,7 +208,7 @@ export default function CaptainOrder() {
         order_type: DINE_IN,
         table,
         room: selectedRoom || undefined,
-        customer: selectedCustomer.name,
+        customer: selectedCustomer?.name || '',
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
@@ -393,9 +387,7 @@ export default function CaptainOrder() {
   const OrderListContent = () => (
     <div className="flex-1 overflow-y-auto p-3 space-y-5 pb-32">
       {canModify && (
-        // sync_order requires customer server-side (§handleSend) — surfaced
-        // here so a Captain can satisfy it before hitting the send-time
-        // validation error. Reused as-is from the Cashier OrderPanel.
+        // Optional: with no customer the order is billed to the table.
         <CustomerSelect disabled={isInteractionDisabled} />
       )}
 
