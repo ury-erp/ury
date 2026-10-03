@@ -334,7 +334,7 @@ def confirm_cancel_kot(name):
     try:
         kot_doc = frappe.get_doc("URY KOT", name)
     except frappe.DoesNotExistError:
-        frappe.throw(f"URY KOT {name} not found.", frappe.DoesNotExistError)
+        frappe.throw(_("Kitchen ticket {0} not found.").format(name), frappe.DoesNotExistError)
 
     # Document-level permission check
     if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
