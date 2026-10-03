@@ -12,3 +12,4 @@ ury.patches.v2_0.publish_menu_prices
 ury.patches.v2_0.rename_driver_position_field
 ury.patches.v2_0.course_to_item_group
 ury.patches.v2_0.iraqi_dinar_display
+ury.patches.v2_0.restro_landing_routes
