@@ -1,12 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Layout, Loader2, RefreshCw, Square } from 'lucide-react';
+import { AlertTriangle, Layout, Loader2, RefreshCw } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { getRooms, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
 import { getTableReservationStatus, type ReservationsByTable } from '../lib/reservation-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups } from '../lib/table-utils';
-import { Spinner, ErrorState } from '@ury/ui';
+import { Spinner, ErrorState, EmptyState } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
@@ -518,10 +518,7 @@ const TableView = () => {
           ) : showGridSkeleton ? (
             <Spinner message={t('common.loading_tables')} />
           ) : tablesToDisplay.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
-              <Square className="w-10 h-10" />
-              <p>{t('tables.no_tables_found')}</p>
-            </div>
+            <EmptyState className="h-full" illustration="tables" title={t('tables.no_tables_found')} />
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-4 pb-10">
               {tableRenderGroups.map((group, groupIndex) =>
