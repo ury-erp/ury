@@ -33,6 +33,9 @@ export interface MenuItem {
   special_dish: number
   disabled: number
   item_image: string | null
+  /** The item's category (Item Group) — what the menu is grouped by. */
+  category?: string | null
+  category_label?: string | null
   course: string | null
   course_label: string | null
 }
