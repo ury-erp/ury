@@ -65,8 +65,14 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
-# Splash Image in Website Settings
-website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
+# Smart Choice marks in place of Frappe's. `update_website_context` and the
+# branding entry in `extend_bootinfo` make them win over Website Settings and
+# other apps; this is the plain default underneath.
+website_context = {
+    "favicon": "/assets/ury/Images/smart-choice-icon.png",
+    "splash_image": "/assets/ury/Images/smart-restro-logo.png",
+}
+update_website_context = ["ury.ury.controllers.branding.update_website_context"]
 
 website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
@@ -307,12 +313,20 @@ website_redirects = [
         "source": "/setup-wizard",
         "target": "/ury/setup-wizard/0",
         "redirect_http_status": 302,
-    }
+    },
+    # Browsers ask for /favicon.ico on any page that does not name an icon;
+    # Frappe has no such route and would answer with its 404 page.
+    {
+        "source": "/favicon.ico",
+        "target": "/assets/ury/Images/favicon.ico",
+        "redirect_http_status": 301,
+    },
 ]
 
 extend_bootinfo = [
     "ury.ury.controllers.setup_redirect.extend_bootinfo",
     "ury.ury.controllers.access.extend_bootinfo",
+    "ury.ury.controllers.branding.extend_bootinfo",
 ]
 
 # Job Events
