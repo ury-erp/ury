@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ChevronLeft, ChevronRight, FilePen, Plus, Search, ShoppingCart, Truck, Wallet, X } from 'lucide-react';
 import { formatCurrency, getIntlLocale, parseFrappeError } from '@ury/core';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ErrorState, Input, Spinner, StatCard } from '@ury/ui';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ErrorState, Input, Spinner, StatCard, Illustration } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   purchaseService,
@@ -409,7 +409,11 @@ export const PurchasesPage: React.FC = () => {
                 ) : !data || data.rows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-12 text-center">
-                      <ShoppingCart className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                      {hasFilters ? (
+                        <ShoppingCart className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                      ) : (
+                        <Illustration name="purchases" className="mx-auto mb-1" />
+                      )}
                       <p className="text-sm text-gray-500">
                         {hasFilters ? t('dash.transactions.no_match') : t('dash.purchases.empty')}
                       </p>
