@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/useAuth';
+import { isRouteHidden } from '@ury/core';
+import { useAccess } from '../../hooks/useAccess';
 import { reportsRegistry, groupReports, reportLabel, reportGroupLabel } from '../../pages/Reports/reportsRegistry';
 import { t } from '../../i18n';
 import { SidebarContainer, SidebarActiveIndicator, sidebarItemVariants, cn } from '@ury/ui';
 import {
+  Printer,
   LayoutDashboard,
   UtensilsCrossed,
   Grid3X3,
@@ -19,7 +22,8 @@ import {
   Store,
   BarChart3,
   Grid
-, CalendarClock, Hourglass, MessageSquareHeart, Tags, Bike } from 'lucide-react';
+, CalendarClock, Hourglass, MessageSquareHeart, Tags, Bike, ShoppingCart, Warehouse, BookOpen, ShieldCheck } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface NavItem {
   /** i18n key; resolved at render time, not module scope. */
@@ -27,7 +31,7 @@ interface NavItem {
   /** English fallback shown if the key is missing from a locale. */
   label: string;
   path: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
 }
 
 /** Resolve a nav label, falling back to English when untranslated. */
@@ -45,6 +49,9 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'nav.feedback', label: 'Guest feedback', path: '/feedback', icon: MessageSquareHeart },
   { labelKey: 'nav.offers', label: 'Offers', path: '/offers', icon: Tags },
   { labelKey: 'nav.delivery', label: 'Dispatch', path: '/delivery', icon: Bike },
+  { labelKey: 'nav.inventory', label: 'Warehouses', path: '/inventory', icon: Warehouse },
+  { labelKey: 'nav.recipes', label: 'Recipes', path: '/recipes', icon: BookOpen },
+  { labelKey: 'nav.purchases', label: 'Purchases', path: '/purchases', icon: ShoppingCart },
   { labelKey: 'nav.room', label: 'Room', path: '/room', icon: Map },
   { labelKey: 'nav.branch', label: 'Branch', path: '/branch', icon: Building2 },
 ];
@@ -54,7 +61,8 @@ const SETTINGS_ITEMS: NavItem[] = [
   { labelKey: 'nav.user', label: 'User', path: '/user', icon: Users },
   { labelKey: 'nav.aggregators', label: 'Aggregators', path: '/aggregator', icon: Store },
   { labelKey: 'nav.daily_pnl_settings', label: 'Daily P&L Settings', path: '/report-settings', icon: FileText },
-  { labelKey: 'nav.production_unit', label: 'Production Unit', path: '/production-unit', icon: Grid }
+  { labelKey: 'nav.production_unit', label: 'Production Unit', path: '/production-unit', icon: Grid },
+  { labelKey: 'nav.printers', label: 'Printers', path: '/printers', icon: Printer },
 ];
 
 const reportGroups = groupReports(reportsRegistry);
@@ -102,6 +110,9 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
+  const { access } = useAccess();
+  // Switched-off features are left out of the menu; their routes are guarded too.
+  const navItems = NAV_ITEMS.filter((item) => !isRouteHidden(access, item.path));
   const isSettingsPath = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.path));
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(isSettingsPath);
 
@@ -130,7 +141,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         </NavLink>
       )}
 
-      {NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const Icon = item.icon;
         return (
           <NavLink
@@ -151,7 +162,19 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         );
       })}
 
-      {isManager && (
+      {access.can_manage && (
+        <a
+          href="/app/ury-control-center"
+          className={sidebarItemVariants({ active: false })}
+        >
+          <div className="flex items-center gap-3 ms-1">
+            <ShieldCheck className="w-4 h-4 text-gray-500 shrink-0" />
+            <span>{t('nav.control_center')}</span>
+          </div>
+        </a>
+      )}
+
+      {isManager && !isRouteHidden(access, '/website') && (
         <NavLink
           to="/website"
           className={({ isActive }) => sidebarItemVariants({ active: isActive })}
