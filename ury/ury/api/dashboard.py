@@ -196,26 +196,20 @@ def get_dashboard_charts(branch=None):
         as_dict=True,
     )
 
-    sales_by_course = []
-    if frappe.db.exists("DocType", "URY Menu Item"):
-        sales_by_course = frappe.db.sql(
-            f"""
-            SELECT COALESCE(mi.`course`, 'Uncategorized') AS course, ROUND(SUM(i.`amount`), 2) AS total
-            FROM `tabPOS Invoice Item` i
-            INNER JOIN `tabPOS Invoice` b ON b.`name` = i.`parent`
-            LEFT JOIN (
-                SELECT `item`, MIN(`course`) AS course
-                FROM `tabURY Menu Item`
-                WHERE `course` IS NOT NULL
-                GROUP BY `item`
-            ) mi ON mi.`item` = i.`item_code`
-            WHERE b.`docstatus` = 1 AND b.`status` IN %(statuses)s AND b.`posting_date` = CURDATE()
-                {branch_clause.replace('`branch`', 'b.`branch`')}
-            GROUP BY course
-            """,
-            params,
-            as_dict=True,
-        )
+    # Grouped by the item's category (Item Group) — the same grouping the POS
+    # and the kitchen use. The key stays `course` for the chart's contract.
+    sales_by_course = frappe.db.sql(
+        f"""
+        SELECT COALESCE(NULLIF(i.`item_group`, ''), 'Uncategorized') AS course, ROUND(SUM(i.`amount`), 2) AS total
+        FROM `tabPOS Invoice Item` i
+        INNER JOIN `tabPOS Invoice` b ON b.`name` = i.`parent`
+        WHERE b.`docstatus` = 1 AND b.`status` IN %(statuses)s AND b.`posting_date` = CURDATE()
+            {branch_clause.replace('`branch`', 'b.`branch`')}
+        GROUP BY course
+        """,
+        params,
+        as_dict=True,
+    )
 
     return {
         "sales_trend": sales_trend,
