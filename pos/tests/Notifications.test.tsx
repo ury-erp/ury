@@ -52,6 +52,73 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); container.remove();
   vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks();
+  vi.unstubAllEnvs();
+});
+
+describe('notification ages use the floor-plan site clock', () => {
+  function siteClock(browserNow: string, serverNow: string, clock?: () => Promise<{ message: string }>) {
+    vi.stubEnv('TZ', 'Europe/Berlin');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(browserNow));
+    vi.mocked(call.get).mockImplementation(async <T,>(method: string): Promise<T> => {
+      if (method === 'ury.ury.api.ury_server_time.get_server_time') {
+        return (clock ? await clock() : { message: serverNow }) as T;
+      }
+      return { message: [] } as T;
+    });
+  }
+
+  it.each([
+    { label: 'Berlin summer time', browser: '2026-10-03T11:06:08+02:00', server: '2026-10-03T12:06:08.123456', creation: '2026-10-03 12:00:00.123456' },
+    { label: 'Berlin winter time', browser: '2026-12-03T10:06:08+01:00', server: '2026-12-03T12:06:08', creation: '2026-12-03 12:00:00' },
+    { label: 'a skewed browser clock', browser: '2026-10-03T06:06:08+02:00', server: '2026-10-03T12:06:08', creation: '2026-10-03 12:00:00' },
+    { label: 'site midnight', browser: '2026-10-02T23:04:08+02:00', server: '2026-10-03T00:04:08', creation: '2026-10-02 23:58:00' },
+  ])('shows six minutes for an Africa/Kampala notification with $label', async ({ browser, server, creation }) => {
+    siteClock(browser, server);
+    rows = [alert({ creation })];
+    await render();
+    expect(panel().querySelector('time')?.textContent).toBe('6 min ago');
+  });
+
+  it('advances ages on the existing poll without trusting a changed browser clock', async () => {
+    siteClock('2026-10-03T11:06:08+02:00', '2026-10-03T12:06:08');
+    rows = [alert({ creation: '2026-10-03 12:00:00' })];
+    await render();
+    expect(panel().querySelector('time')?.textContent).toBe('6 min ago');
+    // Browser time jumps but server time advances by the actual elapsed minute.
+    siteClock('2026-10-03T15:07:08+02:00', '2026-10-03T12:07:08');
+    await emit('notification');
+    expect(panel().querySelector('time')?.textContent).toBe('7 min ago');
+    siteClock('2026-10-03T15:07:08+02:00', '', async () => { throw new Error('Clock unavailable'); });
+    await act(async () => vi.advanceTimersByTimeAsync(60000));
+    expect(panel().querySelector('time')?.textContent).toBe('8 min ago');
+  });
+
+  it.each(['rejected', 'invalid', 'pending'])('keeps notifications usable and does not invent an age when the site clock is %s', async (failure) => {
+    siteClock('2026-10-03T11:06:08+02:00', 'invalid', async () => {
+      if (failure === 'rejected') throw new Error('Offline');
+      if (failure === 'pending') return new Promise(() => {});
+      return { message: 'invalid' };
+    });
+    rows = [alert({ creation: '2026-10-03 12:00:00' })];
+    await render();
+    expect(panel().textContent).toContain('Food ready: Table 1 (KOT-1)');
+    expect(panel().querySelector('time')?.textContent).toBe('Time unavailable');
+    await click('Mark read');
+    expect(panel().textContent).not.toContain('Unread');
+  });
+
+  it('discards a late clock sample from an earlier refresh', async () => {
+    let finish!: (value: { message: string }) => void;
+    siteClock('2026-10-03T11:06:08+02:00', '', () => new Promise(resolve => { finish = resolve; }));
+    rows = [alert({ creation: '2026-10-03 12:00:00' })];
+    await render();
+    siteClock('2026-10-03T11:06:08+02:00', '2026-10-03T12:06:08');
+    await emit('notification');
+    expect(panel().querySelector('time')?.textContent).toBe('6 min ago');
+    await act(async () => finish({ message: '2026-10-03T15:06:08' }));
+    expect(panel().querySelector('time')?.textContent).toBe('6 min ago');
+  });
 });
 
 describe('shared native operational notifications (Dashboard consumer)', () => {
