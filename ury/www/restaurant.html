@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="{{ page.language | e }}" dir="{{ 'rtl' if page.language == 'ar' else 'ltr' }}">
 <head>
+  <link rel="icon" href="{{ (page.logo or '/assets/ury/Images/smart-choice-icon.png') | e }}">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ (page.seo_title or page.restaurant_name) | e }}</title>
