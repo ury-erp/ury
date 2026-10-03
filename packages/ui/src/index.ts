@@ -12,6 +12,7 @@ export { default as Loader } from './components/loader';
 export * from './components/card';
 export * from './components/skeleton';
 export * from './components/empty-state';
+export * from './components/illustration';
 export * from './components/error-state';
 export * from './components/animated-number';
 export * from './components/field';
