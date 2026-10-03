@@ -18,6 +18,12 @@ class URYKOT(Document):
 
     # Function for printing multiple KOTs.
     def multi_print_kot(self):
+        # A branch printing through QZ Tray queues the ticket for its print
+        # station instead; network printing below is the non-QZ path.
+        from ury.ury.api.qz_printing import queue_kot
+        if queue_kot(self):
+            return
+
         # Function for printing a KOT on a specified printer using a print format.
         def print_kot(printer, kot_print_format):
             try:
