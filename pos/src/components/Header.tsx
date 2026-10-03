@@ -211,7 +211,7 @@ const Header = () => {
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => window.location.href = '/ury/dashboard'}
+                    onClick={() => window.location.href = '/restro/dashboard'}
                   >
                     <Monitor className="w-4 h-4 me-3" />
                     {t('header.switch_to_dashboard')}
