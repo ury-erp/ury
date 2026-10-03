@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, BookOpen, CheckCircle2, ChefHat, CircleSlash, Clock, Flame, Package, Plus, RefreshCw, Search } from 'lucide-react';
 import { formatCompactCurrency, formatCurrency, getIntlLocale, parseFrappeError } from '@ury/core';
-import { Button, Card, ErrorState, Input, Spinner, StatCard, showToast } from '@ury/ui';
+import { Button, Card, ErrorState, Input, Spinner, StatCard, showToast, Illustration } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { recipeService, type ConsumptionReport, type RecipeList } from '../../services/recipes';
 import { BarList } from '../Inventory/InventoryCharts';
@@ -201,7 +201,12 @@ const RecipesTab: React.FC = () => {
               {!data ? (
                 <tr><td colSpan={6} className="py-12"><div className="flex justify-center"><Spinner className="w-6 h-6 text-primary" /></div></td></tr>
               ) : data.rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">{t('dash.recipes.empty')}</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">
+                    <Illustration name="recipes" className="mx-auto mb-1" />
+                    {t('dash.recipes.empty')}
+                  </td>
+                </tr>
               ) : (
                 data.rows.map((r) => (
                   <tr
