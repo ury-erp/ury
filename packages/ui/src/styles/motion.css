@@ -34,6 +34,12 @@
   }
 }
 
+/* The slow drift of the feature illustrations (EmptyState `illustration`). */
+@keyframes ury-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
 @layer utilities {
   /*
    * Staggered list entrance. Set `--i` per item (its index) and the delay
