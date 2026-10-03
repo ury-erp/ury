@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn } from '@ury/ui';
-import { formatInvoiceTime } from '@ury/core';
+import { formatCurrency, formatInvoiceTime } from '@ury/core';
 import { call } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { t } from '../../i18n';
@@ -652,7 +652,7 @@ const LayoutView: React.FC<Props> = ({ tables, onRefresh }) => {
                     <div className="flex justify-between items-center pt-2 mt-2 border-t border-blue-200">
                       <span>{t('tables.total_amount')}</span>
                       <span className="font-bold text-lg text-blue-800">
-                        {getCombinedOrderTotals(selectedTableOrder).roundedTotal.toFixed(2)}
+                        {formatCurrency(getCombinedOrderTotals(selectedTableOrder).roundedTotal)}
                       </span>
                     </div>
                   )}
