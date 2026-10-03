@@ -189,6 +189,7 @@ export function FoodCost() {
         rows={plates}
         isLoading={isLoading}
         emptyMessage={t('reports.food_cost.no_menu_items')}
+        emptyIllustration="reports"
       />
     </div>
   );
