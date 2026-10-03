@@ -173,7 +173,7 @@ Warehouses dashboard,لوحة المخازن
 "Stock across warehouses, with the 3D warehouse map.",المخزون بكل المخازن، مع خريطة المخازن ثلاثية الأبعاد.
 Recipes & consumption,الوصفات والاستهلاك
 "Ingredients per product, deducted from stock on every sale and costed from purchases.",مكونات كل منتج، تنصرف من المخزن مع كل بيعة وتنحسب كلفتها من المشتريات.
-URY login page,صفحة دخول المطعم
+Restaurant sign-in page,صفحة دخول المطعم
 The restaurant's own sign-in page instead of the standard one.,صفحة تسجيل دخول خاصة بالمطعم بدل الصفحة الافتراضية.
 Guests,الزبائن
 Back office,الإدارة الخلفية
@@ -304,3 +304,84 @@ Your workspace,مساحة عملك
 "Welcome, {0}",أهلاً بك، {0}
 Restaurant reports,تقارير المطعم
 Go back,رجوع
+URY,سمارت ريسترو
+URY Admin,مسؤول النظام
+URY Audit Log,سجل التدقيق
+URY Captain,كابتن الصالة
+URY Cashier,كاشير
+URY Checklist Item,بند قائمة التحقق
+URY Checklist Log Item,بند سجل التحقق
+URY Consumption Log,سجل الاستهلاك
+URY Consumption Log Item,بند سجل الاستهلاك
+URY Cost Of Goods,كلفة البضاعة
+URY Daily P and L,الأرباح والخسائر اليومية
+URY Delivery,طلب توصيل
+URY Delivery Zone,منطقة التوصيل
+URY Driver,سائق التوصيل
+URY Feature Flag,مفتاح ميزة
+URY Feature Settings,إعدادات الميزات
+URY Fixed Expenses,المصاريف الثابتة
+URY Guest Feedback,تقييم الضيف
+URY KOT,تذكرة المطبخ
+URY KOT Error Log,سجل أخطاء تذاكر المطبخ
+URY KOT Items,بند تذكرة المطبخ
+URY Kitchen Message,رسالة المطبخ
+URY Kitchen Message Ack,تأكيد استلام رسالة المطبخ
+URY Kitchen Ticket,قالب تذكرة المطبخ
+URY Manager,مدير المطعم
+URY Materials,المواد
+URY Menu,قائمة الطعام
+URY Menu Course,مرحلة التقديم
+URY Menu Item,صنف القائمة
+URY Merged POS Invoice Detail,تفاصيل فاتورة نقطة البيع المدمجة
+URY Notification Recipient,مستلم الإشعار
+URY Order,طلب المطعم
+URY Order Item,بند الطلب
+URY Ordering Device,جهاز الطلب الذاتي
+URY Ordering Session,جلسة الطلب الذاتي
+URY P and L Breakup,تفصيل الأرباح والخسائر
+URY P and L Materials,مواد الأرباح والخسائر
+URY POS,نقطة البيع
+URY POS Checklist Log,سجل قائمة تحقق نقطة البيع
+URY Payment Terminal,جهاز الدفع
+URY Payment Terminal Transaction,عملية جهاز الدفع
+URY Printer Settings,إعدادات الطابعة
+URY Production Item Groups,مجموعات أصناف القسم
+URY Production Unit,قسم المطبخ
+URY Report Settings,إعدادات التقارير
+URY Restaurant,المطعم
+URY Role Access,صلاحيات الدور
+URY Room,صالة الطعام
+URY Self Ordering Profile,ملف الطلب الذاتي
+URY Service Request,طلب خدمة
+URY Sync Request,طلب مزامنة
+URY Table,الطاولة
+URY Table Reservation,حجز طاولة
+URY User,مستخدم المطعم
+URY Variable Expenses,المصاريف المتغيرة
+URY Waiter,نادل
+URY Waiter Order Slip,قالب وصل النادل
+URY Waitlist Entry,قائمة الانتظار
+URY Waste Log,سجل الهدر
+URY Waste Log Item,بند سجل الهدر
+Smart Restro,سمارت ريسترو
+Restro POS,نقطة البيع
+Generate Smart Restro demo data,إنشاء بيانات تجريبية لسمارت ريسترو
+"If checked, we will create Smart Restro demo data for you to explore the system. This demo data can be erased later.",عند التفعيل، سننشئ بيانات تجريبية لتستكشف بها النظام، ويمكن حذفها لاحقاً.
+No company found for Smart Restro demo data,لا توجد شركة لإنشاء البيانات التجريبية
+Missing Report Settings,إعدادات التقارير غير موجودة
+Please set up Report Settings for the selected branch: <strong>{0}</strong>,يرجى ضبط إعدادات التقارير للفرع المحدد: <strong>{0}</strong>
+Waste: {0},هدر: {0}
+Kitchen ticket {0} not found.,تذكرة المطبخ {0} غير موجودة.
+No Of Hours cannot be zero when extended hours are on.,لا يمكن أن يكون عدد الساعات صفراً عند تفعيل الساعات الإضافية.
+Zero Value,قيمة صفرية
+Item {0} in POS Add On Items is not on any menu,الصنف {0} في الإضافات غير موجود في أي قائمة طعام
+Item {0} in POS Item Variants is not on any menu,الصنف {0} في متغيرات الصنف غير موجود في أي قائمة طعام
+Restaurant Order Number,رقم طلب المطعم
+Last Restaurant Invoice,آخر فاتورة مطعم
+Last Aggregator Invoice,آخر فاتورة منصة توصيل
+POS Restrictions,قيود نقطة البيع
+Show Item Image in POS,إظهار صورة الصنف في نقطة البيع
+Kitchen Ticket Naming Series,تسلسل ترقيم تذاكر المطبخ
+Enable the discount feature in the POS,تفعيل الخصم في نقطة البيع
+Add this item to a restaurant menu to make it available in the POS,أضف هذا الصنف إلى قائمة طعام ليظهر في نقطة البيع
