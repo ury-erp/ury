@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2, UtensilsCrossed, Map } from 'lucide-react';
-import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Input, Spinner, showToast, Illustration } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { call, getLoggedUser } from '@ury/core';
@@ -815,9 +815,7 @@ export const BranchPage: React.FC = () => {
         </div>
       ) : branchList.length === 0 ? (
         <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Building2 className="w-6 h-6 text-primary" />
-          </div>
+          <Illustration name="setup" className="mb-3" />
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.branch.no_branch_configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">{t('dash.branch.create_a_branch_to_manage_restaurant_setting')}</p>
           <Button
