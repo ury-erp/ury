@@ -6,14 +6,9 @@ import { SearchableSelect } from '../../common/SearchableSelect';
 import { Switch } from '../../ui/switch';
 import { MenuBulkUpload } from '../../common/MenuBulkUpload';
 import { t } from '../../../i18n';
+import { IRAQI_CATEGORY_PRESETS } from '../../menu/QuickItemForm';
 
-const COURSE_OPTIONS = [
-  { value: 'Starters', label: 'Starters' },
-  { value: 'Main Course', label: 'Main Course' },
-  { value: 'Beverages', label: 'Beverages' },
-  { value: 'Desserts', label: 'Desserts' },
-  { value: 'Sides', label: 'Sides' },
-];
+const COURSE_OPTIONS = IRAQI_CATEGORY_PRESETS.map((name) => ({ value: name, label: name }));
 
 export function MenuSection() {
   const {
@@ -30,12 +25,14 @@ export function MenuSection() {
   } = useConfigure();
 
   const currencyLabel = (window as any).frappe?.boot?.sysdefaults?.currency;
-  const priceColumnLabel = currencyLabel ? `Price (${currencyLabel})` : 'Price';
+  const priceColumnLabel = currencyLabel
+    ? `${t('dash.quick_item.price')} (${currencyLabel === 'IQD' ? t('dash.quick_item.iqd') : currencyLabel})`
+    : t('dash.quick_item.price');
 
   const handleAdd = () => {
     addMenuItem({
       name: '',
-      course: 'Main Course',
+      course: 'أكلات عراقية',
       price: 0,
     });
   };
