@@ -13,6 +13,7 @@ import {
   type DeliverySummary,
 } from '../../services/delivery';
 import { t } from '../../i18n';
+import { useAccess } from '../../hooks/useAccess';
 
 /** The board's columns, in the order an order actually moves through them. */
 const COLUMNS = ['Pending', 'Assigned', 'On The Way'] as const;
@@ -45,6 +46,7 @@ const Elapsed: React.FC<{ row: DeliveryRow }> = ({ row }) => (
 );
 
 export const DeliveryPage: React.FC = () => {
+  const { access } = useAccess();
   const { activeBranchId } = useBranchContext();
   const [rows, setRows] = useState<DeliveryRow[]>([]);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
@@ -163,9 +165,11 @@ export const DeliveryPage: React.FC = () => {
             <Map className="me-2 h-4 w-4" />
             {t('dash.delivery.map.title')}
           </Button>
-          <Button variant="outline" onClick={() => window.open('/app/ury-delivery-zone', '_blank', 'noopener')}>
-            {t('dash.delivery.zones')}
-          </Button>
+          {access.desk && (
+            <Button variant="outline" onClick={() => window.open('/app/ury-delivery-zone', '_blank', 'noopener')}>
+              {t('dash.delivery.zones')}
+            </Button>
+          )}
         </div>
       </div>
 
