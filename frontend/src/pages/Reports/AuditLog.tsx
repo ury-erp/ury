@@ -146,6 +146,7 @@ export function AuditLog() {
         rows={rows}
         isLoading={isLoading}
         emptyMessage={t('reports.audit_log.nothing_recorded')}
+        emptyIllustration="reports"
       />
     </div>
   );
