@@ -138,7 +138,7 @@ export function DaywiseSales() {
             labels={{ grand_total: t('fields.grand_total') }}
           />
 
-          <DataTable columns={getColumns()} rows={data.rows} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.rows} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
         </>
       ) : null}
     </div>
