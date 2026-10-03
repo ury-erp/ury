@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { ContactShadows, Edges, OrbitControls, RoundedBox } from '@react-three/drei';
+import { BoxEdges, RoundedBox, SceneControls, ShadowGround } from './scenePrimitives';
 import { Vector3 } from 'three';
 import { Spinner } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
@@ -264,7 +264,7 @@ const Building: React.FC<{
         <mesh position={[0, 0.1 + height / 2, 0]}>
           <boxGeometry args={[size, height, size]} />
           <meshStandardMaterial color="#e9eef5" transparent opacity={hover ? 0.32 : 0.22} depthWrite={false} />
-          <Edges color={hover ? '#2a78d6' : '#8b97a8'} />
+          <BoxEdges args={[size, height, size]} color={hover ? '#2a78d6' : '#8b97a8'} />
         </mesh>
         {/* Goods */}
         {pallets.map((p, i) => (
@@ -394,7 +394,7 @@ const ItemBox: React.FC<{
         ) : (
           <meshStandardMaterial color={color} emissive={highlighted ? '#2a78d6' : '#000000'} emissiveIntensity={highlighted ? 0.35 : 0} />
         )}
-        {(empty || hover || highlighted) && <Edges color={empty ? STATUS_COLOR.out : '#2a78d6'} />}
+        {(empty || hover || highlighted) && <BoxEdges args={[size, size, size]} color={empty ? STATUS_COLOR.out : '#2a78d6'} />}
       </mesh>
     </group>
   );
@@ -710,15 +710,8 @@ const WarehouseScene: React.FC<WarehouseSceneProps> = ({
         ) : null}
         <LabelProjector labels={labels} nodes={labelNodes} />
 
-        <ContactShadows key={viewKey} position={[0, -0.01, 0]} opacity={0.25} scale={distance * 2 + 10} blur={2.4} far={8} frames={1} />
-        <OrbitControls
-          makeDefault
-          enableDamping
-          dampingFactor={0.12}
-          minDistance={4}
-          maxDistance={distance * 2.2}
-          maxPolarAngle={Math.PI / 2.15}
-        />
+        <ShadowGround size={distance * 2 + 10} />
+        <SceneControls minDistance={4} maxDistance={distance * 2.2} maxPolarAngle={Math.PI / 2.15} />
         <CameraRig viewKey={viewKey} distance={distance} resetSignal={resetSignal} />
       </Canvas>
 
