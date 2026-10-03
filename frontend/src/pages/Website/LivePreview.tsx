@@ -1,5 +1,6 @@
 import React from 'react';
 import { Monitor, Tablet, Smartphone, RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../../i18n';
 
@@ -12,7 +13,7 @@ const DEVICE_WIDTH: Record<PreviewDevice, number> = {
   desktop: 1280,
 };
 
-const DEVICE_ICON: Record<PreviewDevice, React.ElementType> = {
+const DEVICE_ICON: Record<PreviewDevice, LucideIcon> = {
   phone: Smartphone,
   tablet: Tablet,
   desktop: Monitor,
