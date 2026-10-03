@@ -56,10 +56,10 @@ def page_content(slug, preview=False, draft=False):
 		if menu.enabled and menu.branch == restaurant.branch:
 			data["currency"] = frappe.db.get_value("Price List", menu.price_list, "currency") or ""
 			items = frappe.get_all("Item", filters={"name": ["in", [r.item for r in menu.items]], "disabled": 0},
-								 fields=["name", "item_name", "image"])
+								 fields=["name", "item_name", "image", "item_group"])
 			by_name = {item.name: item for item in items}
 			data["menu_items"] = [{"name": row.item_name or by_name[row.item].item_name,
-				"rate": row.rate, "course": row.course or "", "special": row.special_dish,
+				"rate": row.rate, "course": by_name[row.item].item_group or row.course or "", "special": row.special_dish,
 				"image": public_url(by_name[row.item].image, image=True)}
 				for row in menu.items if not row.disabled and row.item in by_name]
 	return data
