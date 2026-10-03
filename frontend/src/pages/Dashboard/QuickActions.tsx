@@ -4,6 +4,7 @@ import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogF
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
 import { t } from '../../i18n';
+import { currencyLabel } from '@ury/core';
 
 type ModalType = 'menu' | 'table' | 'room' | 'branch' | 'user' | null;
 
@@ -254,7 +255,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
+              <label className="block font-semibold text-gray-700 mb-1">{t('dash.quick_item.price')} ({currencyLabel()})</label>
               <Input
                 type="number"
                 placeholder="280"
