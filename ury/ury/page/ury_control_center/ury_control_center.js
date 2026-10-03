@@ -45,7 +45,7 @@ class URYControlCenter {
 		this.tab = "features";
 		this.page.set_primary_action(__("Save"), () => this.confirm_save(), "check");
 		this.page.set_secondary_action(__("Discard"), () => this.reset());
-		this.page.add_inner_button(__("Open restaurant dashboard"), () => window.open("/ury/dashboard", "_blank", "noopener"));
+		this.page.add_inner_button(__("Open restaurant dashboard"), () => window.open("/restro/dashboard", "_blank", "noopener"));
 		$(wrapper).on("show", () => this.load());
 		this.load();
 	}
@@ -343,8 +343,8 @@ class URYControlCenter {
 		const labels = {
 			"/pos": __("POS (cashier)"),
 			"/pos/order": __("Captain order pad"),
-			"/ury/dashboard": __("Restaurant dashboard"),
-			"/ury/reports": __("Reports"),
+			"/restro/dashboard": __("Restaurant dashboard"),
+			"/restro/reports": __("Reports"),
 			"/mosaic": __("Kitchen display"),
 			"/app": __("Desk"),
 		};
