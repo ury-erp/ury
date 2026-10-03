@@ -113,7 +113,7 @@ export function RepeatedCustomers() {
             labels={{ new_customers: t('fields.new_customers'), repeat_customers: t('fields.repeat_customers') }}
           />
 
-          <DataTable columns={getColumns()} rows={data.rows} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.rows} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
         </>
       ) : null}
     </div>
