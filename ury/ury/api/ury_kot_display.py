@@ -553,6 +553,70 @@ def kot_list():
     }
 
 @frappe.whitelist()
+def station_summary():
+    """Every kitchen station with the numbers its board will show.
+
+    "Waiting" uses the board's own rule (unserved, unverified, from the last
+    three hours), so the station picker never promises tickets the board then
+    does not have. "Served" and "Orders" cover today.
+    """
+    units = frappe.get_list(
+        "URY Production Unit", fields=["name", "disable"], order_by="name asc"
+    )
+    if not units:
+        return []
+
+    now = frappe.utils.now_datetime()
+    since = frappe.utils.add_to_date(now, hours=-3)
+    day_start = frappe.utils.get_datetime(frappe.utils.nowdate())
+    from frappe.query_builder import Case
+    from frappe.query_builder.functions import Sum
+
+    kot = frappe.qb.DocType("URY KOT")
+    rows = (
+        frappe.qb.from_(kot)
+        .select(
+            kot.production,
+            Sum(
+                Case()
+                .when(
+                    (kot.order_status == "Ready For Prepare")
+                    & (kot.verified == 0)
+                    & (kot.creation >= since),
+                    1,
+                )
+                .else_(0)
+            ).as_("waiting"),
+            Sum(
+                Case()
+                .when((kot.order_status == "Served") & (kot.creation >= day_start), 1)
+                .else_(0)
+            ).as_("served"),
+            Sum(Case().when(kot.creation >= day_start, 1).else_(0)).as_("orders"),
+        )
+        .where(
+            (kot.docstatus == 1)
+            # Just after midnight the board still shows the last three hours.
+            & (kot.creation >= min(day_start, since))
+            & kot.production.isin([u.name for u in units])
+        )
+        .groupby(kot.production)
+    ).run(as_dict=True)
+    by_unit = {r.production: r for r in rows}
+
+    return [
+        {
+            "name": u.name,
+            "disabled": bool(u.disable),
+            "waiting": int((by_unit.get(u.name) or {}).get("waiting") or 0),
+            "served": int((by_unit.get(u.name) or {}).get("served") or 0),
+            "orders": int((by_unit.get(u.name) or {}).get("orders") or 0),
+        }
+        for u in units
+    ]
+
+
+@frappe.whitelist()
 def served_kot_list():
     today = frappe.utils.now()
     branch = getBranch()
