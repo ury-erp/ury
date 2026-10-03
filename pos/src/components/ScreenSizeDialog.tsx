@@ -12,7 +12,7 @@ import { POS_MIN_WIDTH } from '../hooks/useViewport';
  */
 const ScreenSizeDialog = () => {
   const handleSwitchToVersion1 = () => {
-    window.open(`${window.location.origin}/urypos`, '_blank');
+    window.open(`${window.location.origin}/pos-mobile`, '_blank');
   };
 
   return (
