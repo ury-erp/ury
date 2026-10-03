@@ -94,6 +94,7 @@ export function CompletedWorkOrders() {
         rows={data?.work_orders ?? []}
         isLoading={isLoading}
         emptyMessage={t('reports.completed_work_orders.no_completed_work_orders_in_this_range')}
+        emptyIllustration="reports"
       />
     </div>
   );
