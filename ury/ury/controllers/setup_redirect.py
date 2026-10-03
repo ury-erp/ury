@@ -1,7 +1,7 @@
 import frappe
 
 # Paths that must keep working during setup (wizard SPA, APIs, static files, login).
-_SKIP_PREFIXES = ("ury", "api", "assets", "files", "private", "login")
+_SKIP_PREFIXES = ("restro", "ury", "api", "assets", "files", "private", "login")
 
 # Desk / default landing paths that should send an incomplete site to the URY wizard.
 # PathResolver strips leading slashes, so these are first-segment matches.
@@ -33,8 +33,8 @@ def _setup_wizard_target():
     completed". Otherwise start at Step 0.
     """
     if frappe.db.exists("Company", {}) and not frappe.db.exists("Branch", {}):
-        return "/ury/setup-wizard/1"
-    return "/ury/setup-wizard/0"
+        return "/restro/setup-wizard/1"
+    return "/restro/setup-wizard/0"
 
 
 def _normalize_path(path):
