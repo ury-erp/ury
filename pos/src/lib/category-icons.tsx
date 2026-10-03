@@ -146,6 +146,35 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
   const normalized = courseName.trim().toLowerCase();
   if (!normalized) return undefined;
 
+  // Arabic names don't survive the a-z tokenizer below, so they're matched
+  // by substring first. Ordered most specific first ("كص دجاج" is a sandwich,
+  // not poultry); spellings cover the common Iraqi variants (برگر/برجر/بركر).
+  const arabic = normalized.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+  const arabicRules: Array<[string[], string]> = [
+    [['كص', 'شاورم', 'سندويش', 'لفاف', 'صمون', 'فلافل'], 'Sandwich'],
+    [['برگر', 'برجر', 'بركر', 'همبر'], 'Hamburger'],
+    [['بيتز'], 'Pizza'],
+    [['مسكوف', 'سمك', 'اسماك', 'بحري'], 'Fish'],
+    [['روبيان', 'جمبري'], 'Shrimp'],
+    [['شوي', 'مشوي', 'كباب', 'تكه', 'معلاق', 'لحم', 'قوزي'], 'Beef'],
+    [['دجاج', 'فروج', 'بروستد', 'زنجر'], 'Drumstick'],
+    [['شوربه', 'شوربات', 'عدس'], 'Soup'],
+    [['سلطه', 'سلطات', 'فتوش', 'تبوله'], 'Salad'],
+    [['مقبل', 'مازه'], 'HandPlatter'],
+    [['تمن', 'رز', 'مرق', 'باجه', 'دولمه', 'تشريب', 'قيمه', 'عراقي', 'شعبي', 'طبيخ'], 'CookingPot'],
+    [['فطور', 'ريوك', 'بيض', 'كاهي', 'كيمر', 'قيمر'], 'EggFried'],
+    [['معجنات', 'فطائر', 'خبز', 'مخبوز'], 'Croissant'],
+    [['ايس كريم', 'ايسكريم', 'دوندرمه', 'مثلجات'], 'IceCreamCone'],
+    [['حلو', 'كيك', 'كنافه', 'زلابي', 'بقلاو'], 'Cake'],
+    [['عصير', 'عصائر', 'شربت', 'ليمون'], 'Citrus'],
+    [['شاي', 'چاي', 'جاي', 'قهو', 'ساخن', 'كابتشينو', 'نسكاف'], 'Coffee'],
+    [['مشروب', 'بارد', 'غازي', 'ماء', 'مياه', 'لبن', 'كولا', 'بيبسي'], 'CupSoda'],
+    [['اضاف', 'اضافات', 'صوص'], 'Cookie'],
+  ];
+  for (const [needles, iconName] of arabicRules) {
+    if (needles.some((needle) => arabic.includes(needle))) return iconName;
+  }
+
   // Split into tokens so compound names like "Chicken Pizza" or "Smash Burger"
   // are evaluated word-by-word. Rules are ordered from most specific dish type
   // to broad ingredient/descriptor so the dominant term wins.

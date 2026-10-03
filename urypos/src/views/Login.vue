@@ -1,18 +1,18 @@
 <template>
-  <div class="min-h-screen bg-white flex">
+  <div class="min-h-screen bg-card flex">
     <div class="mx-auto w-full max-w-sm lg:w-96">
       <form @submit.prevent="login" class="space-y-6">
-        <label for="email"> Username: </label>
+        <label for="email"> {{ $t('login.username') }} </label>
         <input type="text" v-model="email" />
         <br />
-        <label for="password"> Password: </label>
+        <label for="password"> {{ $t('login.password') }} </label>
         <input type="password" v-model="password" />
 
         <button
-          class="bg-blue-500 block text-white p-2 hover:bg-blue-700"
+          class="bg-primary block text-primary-foreground p-2 hover:bg-primary"
           type="submit"
         >
-          Sign in
+          {{ $t('login.sign_in') }}
         </button>
       </form>
     </div>

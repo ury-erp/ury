@@ -5,7 +5,7 @@ const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "
 
 export interface PieChartCardProps {
   title: string;
-  data: Record<string, unknown>[];
+  data: object[];
   dataKey: string;
   nameKey: string;
   colors?: string[];

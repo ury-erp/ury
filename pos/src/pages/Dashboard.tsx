@@ -1,546 +1,412 @@
-import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell } from 'lucide-react';
-import { Card, CardContent } from '@ury/ui';
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import {
+  TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell,
+  RefreshCw, Package, UserCheck, Activity, Sparkles,
+} from 'lucide-react';
+import { Button, StatCard, cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency, call } from '@ury/core';
 import HufLogo from '../components/HufLogo';
+import { t, tPlural } from '../i18n';
+import { useDashboardData } from './dashboard/use-dashboard-data';
+import { Panel } from './dashboard/Panel';
+import {
+  formatETA, formatMinutes, formatRelativeTime, percentDelta,
+} from './dashboard/format';
 
-// Helper function to format relative time
-function getRelativeTime(creationDate: string): string {
-  const now = new Date();
-  const date = new Date(creationDate);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+/** Service stages, in the order a table moves through them. */
+const STAGE_STYLE: Record<string, { bar: string; swatch: string; label: string }> = {
+  open:   { bar: 'bg-gray-300',  swatch: 'bg-gray-300',  label: 'dashboard.open' },
+  seated: { bar: 'bg-blue-300',  swatch: 'bg-blue-300',  label: 'dashboard.seated' },
+  fired:  { bar: 'bg-blue-500',  swatch: 'bg-blue-500',  label: 'dashboard.fired' },
+  served: { bar: 'bg-blue-700',  swatch: 'bg-blue-700',  label: 'dashboard.served' },
+  over:   { bar: 'bg-destructive', swatch: 'bg-destructive', label: 'dashboard.over_time' },
+};
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hr ago`;
-  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+/** A labelled figure compared against its historical median. */
+function MetricTile({
+  label, value, delta, positive,
+}: { label: string; value: string; delta?: string | null; positive?: boolean }) {
+  return (
+    <div className="rounded-lg bg-muted/50 p-3">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{value}</p>
+      {delta ? (
+        <p className="mt-1 text-xs">
+          <span className={cn('font-semibold', positive ? 'text-green-600' : 'text-destructive')}>
+            {delta}
+          </span>
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
-// Helper to format ETA minutes into readable time
-function formatETA(minutes: number | null): string {
-  if (minutes === null) return 'Holds';
-  if (minutes <= 90) return `~${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `~${hours} hr ${mins > 0 ? `${mins} min` : ''}`.trim();
+/** Horizontal meter used by Floor Load and Running Low. */
+function Meter({ pct, tone }: { pct: number; tone: 'primary' | 'warning' }) {
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className={cn(
+          'h-full rounded-full',
+          // Width animates so a refresh reads as the bar moving rather than
+          // the value teleporting.
+          'transition-[width] duration-slow ease-out',
+          tone === 'primary' ? 'bg-primary' : 'bg-amber-500',
+        )}
+        style={{ width: `${Math.max(0, Math.min(pct, 100))}%` }}
+      />
+    </div>
+  );
 }
 
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
-  const [stats, setStats] = useState<any[]>([]);
-  const [serviceLine, setServiceLine] = useState<any[]>([]);
-  const [shiftMetrics, setShiftMetrics] = useState<any>(null);
-  const [baseline, setBaseline] = useState<any>(null);
-  const [floorLoad, setFloorLoad] = useState<any[]>([]);
-  const [runningLow, setRunningLow] = useState<any[]>([]);
-  const [needsAttention, setNeedsAttention] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [serviceLineLoading, setServiceLineLoading] = useState(false);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [floorLoadLoading, setFloorLoadLoading] = useState(false);
-  const [runningLowLoading, setRunningLowLoading] = useState(false);
-  const [needsAttentionLoading, setNeedsAttentionLoading] = useState(false);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [serviceLineError, setServiceLineError] = useState<string | null>(null);
-  const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [floorLoadError, setFloorLoadError] = useState<string | null>(null);
-  const [runningLowError, setRunningLowError] = useState<string | null>(null);
-  const [needsAttentionError, setNeedsAttentionError] = useState<string | null>(null);
-  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const branch = posProfile?.branch;
+  const d = useDashboardData(branch);
 
-  useEffect(() => {
-    if (!posProfile?.branch) return;
+  const stats = d.stats.data;
+  const overTime = d.serviceLine.data.filter((r) => r.stage === 'over').length;
 
-    const fetchDashboardData = async () => {
+  // Bars are scaled against a 90-minute floor so a quiet service does not make
+  // a 5-minute table look alarming by filling the whole chart.
+  const maxMinutes = useMemo(
+    () => Math.max(90, ...d.serviceLine.data.map((r) => r.minutes ?? 0)),
+    [d.serviceLine.data],
+  );
+  const maxTables = useMemo(
+    () => Math.max(1, ...d.floorLoad.data.map((f) => f.table_count)),
+    [d.floorLoad.data],
+  );
 
-      // Fetch dashboard stats
-      setStatsLoading(true);
-      setStatsError(null);
-      try {
-        const statsRes = await call.get('ury.ury.api.ury_dashboard.get_dashboard_stats', {
-          branch: posProfile.branch
-        });
-        const statsData = statsRes.message;
-        setStats([
-          {
-            label: "Today's Sales",
-            value: formatCurrency(statsData.todays_sales),
-            icon: TrendingUp,
-            color: 'text-green-600'
-          },
-          {
-            label: 'Orders Today',
-            value: String(statsData.orders_today),
-            icon: ShoppingCart,
-            color: 'text-blue-600'
-          },
-          {
-            label: 'Avg. Order Value',
-            value: formatCurrency(statsData.avg_order_value),
-            icon: Clock,
-            color: 'text-purple-600'
-          },
-          {
-            label: 'Active Tables',
-            value: `${statsData.active_tables} / ${statsData.total_tables}`,
-            icon: Users,
-            color: 'text-orange-600'
-          }
-        ]);
-      } catch (err) {
-        setStatsError('Failed to load stats');
-        console.error('Error fetching stats:', err);
-      } finally {
-        setStatsLoading(false);
-      }
-
-      // Fetch service line
-      setServiceLineLoading(true);
-      setServiceLineError(null);
-      try {
-        const serviceRes = await call.get('ury.ury.api.ury_service_line.get_service_line', {
-          branch: posProfile.branch
-        });
-        const serviceData = Array.isArray(serviceRes.message) ? serviceRes.message : [];
-        setServiceLine(serviceData);
-      } catch (err) {
-        setServiceLineError('Failed to load service line');
-        console.error('Error fetching service line:', err);
-      } finally {
-        setServiceLineLoading(false);
-      }
-
-      // Fetch shift metrics and baseline
-      setMetricsLoading(true);
-      setMetricsError(null);
-      try {
-        const metricsRes = await call.get('ury.ury.api.ury_dashboard.get_shift_metrics', {
-          branch: posProfile.branch
-        });
-        setShiftMetrics(metricsRes.message);
-
-        const baselineRes = await call.get('ury.ury.api.ury_dashboard.get_baseline', {
-          branch: posProfile.branch
-        });
-        setBaseline(baselineRes.message);
-      } catch (err) {
-        setMetricsError('Failed to load metrics');
-        console.error('Error fetching metrics:', err);
-      } finally {
-        setMetricsLoading(false);
-      }
-
-      // Fetch floor load
-      setFloorLoadLoading(true);
-      setFloorLoadError(null);
-      try {
-        const floorRes = await call.get('ury.ury.api.ury_dashboard.get_floor_load', {
-          branch: posProfile.branch
-        });
-        const floorData = Array.isArray(floorRes.message) ? floorRes.message : [];
-        setFloorLoad(floorData);
-      } catch (err) {
-        setFloorLoadError('Failed to load floor load');
-        console.error('Error fetching floor load:', err);
-      } finally {
-        setFloorLoadLoading(false);
-      }
-
-      // Fetch running low items
-      setRunningLowLoading(true);
-      setRunningLowError(null);
-      try {
-        const runningRes = await call.get('ury.ury.api.ury_service_line.get_running_low', {
-          branch: posProfile.branch
-        });
-        const runningData = Array.isArray(runningRes.message) ? runningRes.message : [];
-        setRunningLow(runningData);
-      } catch (err) {
-        setRunningLowError('Failed to load running low items');
-        console.error('Error fetching running low:', err);
-      } finally {
-        setRunningLowLoading(false);
-      }
-
-      // Fetch needs attention
-      setNeedsAttentionLoading(true);
-      setNeedsAttentionError(null);
-      try {
-        const attentionRes = await call.get('ury.ury.api.ury_dashboard.get_needs_attention', {
-          branch: posProfile.branch
-        });
-        const attentionData = attentionRes.message;
-        if (Array.isArray(attentionData) && attentionData.length > 0) {
-          const processedAttention = attentionData.map((item, idx) => ({
-            id: idx,
-            message: item.message,
-            icon: item.severity === 'high' ? AlertTriangle : Clock,
-            severity: item.severity
-          }));
-          setNeedsAttention(processedAttention);
-        } else {
-          setNeedsAttention([]);
-        }
-      } catch (err) {
-        setNeedsAttentionError('Failed to load needs attention');
-        console.error('Error fetching needs attention:', err);
-      } finally {
-        setNeedsAttentionLoading(false);
-      }
-
-      // Fetch recent notifications
-      setNotificationsLoading(true);
-      setNotificationsError(null);
-      try {
-        const params = new URLSearchParams({
-          doctype: 'Notification Log',
-          fields: JSON.stringify(['name', 'subject', 'creation']),
-          order_by: 'creation desc',
-          limit_page_length: '10'
-        });
-        const notificationsRes = await fetch(
-          `/api/method/frappe.client.get_list?${params.toString()}`
-        );
-        if (!notificationsRes.ok) throw new Error('Failed to fetch notifications');
-        const notificationsData = await notificationsRes.json();
-        const processedNotifications = (notificationsData.message || []).map((notif: any) => ({
-          id: notif.name,
-          message: notif.subject,
-          timestamp: getRelativeTime(notif.creation)
-        }));
-        setNotifications(processedNotifications);
-      } catch (err) {
-        setNotificationsError('Failed to load notifications');
-        console.error('Error fetching notifications:', err);
-      } finally {
-        setNotificationsLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, [posProfile?.branch]);
-
-  // Calculate max minutes for service line bar height
-  const maxMinutes = Math.max(90, ...serviceLine.filter(t => t.minutes !== null).map((t: any) => t.minutes), 1);
-  const maxTableCount = Math.max(...floorLoad.map((f: any) => f.table_count), 1);
+  if (!branch) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <p className="text-sm text-muted-foreground">{t('dashboard.no_branch')}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
-      {/* 1. Stat Cards Row (Aligned with Core UI & Icons Preserved) */}
-      <section className="w-full">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {statsError ? (
-            <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>
-          ) : statsLoading ? (
-            <div className="col-span-full text-gray-600 text-sm">Loading...</div>
-          ) : (
-            stats.map((stat, index) => {
-              const IconComponent = stat.icon;
-              return (
-                <Card
-                  key={index}
-                  className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-gray-600">{stat.label}</span>
-                    {IconComponent && <IconComponent className={`w-4 h-4 ${stat.color}`} />}
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</p>
-                </Card>
-              );
-            })
-          )}
-        </div>
-      </section>
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="mx-auto max-w-screen-2xl space-y-6 p-6 pb-24">
 
-      {/* 2. Service Line Section (v3-test design) */}
-      <div>
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Service Line</h3>
-            {serviceLineError ? (
-              <p className="text-red-600 text-sm">Failed to load service line</p>
-            ) : serviceLineLoading ? (
-              <p className="text-gray-600 text-sm">Loading...</p>
-            ) : serviceLine.length === 0 ? (
-              <p className="text-gray-600 text-sm">No tables currently seated.</p>
-            ) : (
-              <div>
-                {/* Legend */}
-                <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                    <span>Open</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-300 rounded"></div>
-                    <span>Seated</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span>Fired</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-700 rounded"></div>
-                    <span>Served</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-600 rounded"></div>
-                    <span>Over time</span>
-                  </div>
-                </div>
+        {/* ---- header ---------------------------------------------------- */}
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground">
+              {t('dashboard.title')}
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
+          </div>
 
-                {/* Bars */}
-                <div className="flex items-end gap-1 h-24 border-b border-gray-200 pb-2 overflow-x-auto">
-                  {serviceLine.map((table: any, idx: number) => {
-                    let barColor = 'bg-gray-300';
-                    if (table.stage === 'open') barColor = 'bg-gray-300';
-                    else if (table.stage === 'seated') barColor = 'bg-blue-300';
-                    else if (table.stage === 'fired') barColor = 'bg-blue-500';
-                    else if (table.stage === 'served') barColor = 'bg-blue-700';
-                    else if (table.stage === 'over') barColor = 'bg-red-600';
+          <div className="flex items-center gap-3">
+            {d.lastUpdated ? (
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                {t('dashboard.updated_at', {
+                  time: d.lastUpdated.toLocaleTimeString(undefined, {
+                    hour: '2-digit', minute: '2-digit',
+                  }),
+                })}
+              </span>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={d.refresh}
+              loading={d.refreshing}
+              loadingText={t('dashboard.refreshing')}
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              {t('dashboard.refresh')}
+            </Button>
+          </div>
+        </header>
 
-                    const barHeight = table.minutes !== null ? (table.minutes / maxMinutes) * 100 : 5;
+        {/* ---- headline figures ----------------------------------------- */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label={t('dashboard.todays_sales')}
+            value={stats ? formatCurrency(stats.todays_sales) : '—'}
+            isLoading={d.stats.loading}
+            tone="success"
+            icon={<TrendingUp className="h-4 w-4" />}
+          />
+          <StatCard
+            label={t('dashboard.orders_today')}
+            value={stats ? String(stats.orders_today) : '—'}
+            isLoading={d.stats.loading}
+            tone="primary"
+            icon={<ShoppingCart className="h-4 w-4" />}
+          />
+          <StatCard
+            label={t('dashboard.avg_order_value')}
+            value={stats ? formatCurrency(stats.avg_order_value) : '—'}
+            isLoading={d.stats.loading}
+            icon={<Clock className="h-4 w-4" />}
+          />
+          <StatCard
+            label={t('dashboard.active_tables')}
+            // A ratio, so it is isolated from bidi reordering: "3 / 10"
+            // reversed would read as the wrong number.
+            value={stats ? `${stats.active_tables} / ${stats.total_tables}` : '—'}
+            isLoading={d.stats.loading}
+            tone={stats && stats.active_tables === stats.total_tables ? 'warning' : 'default'}
+            icon={<Users className="h-4 w-4" />}
+            className="bidi-isolate"
+          />
+        </section>
 
-                    return (
-                      <div key={idx} className="flex flex-col items-center flex-shrink-0">
-                        {table.minutes !== null && (
-                          <span className="text-xs text-gray-600 mb-1 h-4">{table.minutes}</span>
-                        )}
-                        <div
-                          className={`w-8 ${barColor} rounded-t transition-all`}
-                          style={{ height: `${barHeight}%`, minHeight: '4px' }}
-                        />
-                        <span className="text-xs text-gray-700 mt-1">{table.table}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* ---- service line --------------------------------------------- */}
+        <Panel
+          title={t('dashboard.service_line')}
+          icon={<Activity />}
+          loading={d.serviceLine.loading}
+          error={d.serviceLine.error}
+          empty={d.serviceLine.data.length === 0}
+          emptyTitle={t('dashboard.no_tables_seated')}
+          emptyIcon={<Users />}
+          aside={
+            overTime > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse-soft" aria-hidden="true" />
+                {tPlural('dashboard.tables_over_time', overTime)}
+              </span>
+            ) : null
+          }
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              {Object.entries(STAGE_STYLE).map(([stage, s]) => (
+                <span key={stage} className="flex items-center gap-2">
+                  <span className={cn('h-3 w-3 rounded', s.swatch)} aria-hidden="true" />
+                  {t(s.label)}
+                </span>
+              ))}
+            </div>
 
-                {/* Summary */}
-                {serviceLine.filter((t: any) => t.stage === 'over').length > 0 && (
-                  <div className="mt-3 text-sm text-red-600">
-                    {serviceLine.filter((t: any) => t.stage === 'over').length} table{serviceLine.filter((t: any) => t.stage === 'over').length !== 1 ? 's' : ''} running over time
+            <div className="flex h-32 items-end gap-1.5 overflow-x-auto border-b border-border pb-2">
+              {d.serviceLine.data.map((row, i) => {
+                const style = STAGE_STYLE[row.stage] ?? STAGE_STYLE.open;
+                const pct = row.minutes !== null ? (row.minutes / maxMinutes) * 100 : 4;
+                return (
+                  <div
+                    key={`${row.table}-${i}`}
+                    className="group flex shrink-0 flex-col items-center animate-fade-in-up stagger-fast"
+                    style={{ '--i': i } as React.CSSProperties}
+                    title={`${row.table} · ${t(style.label)}${row.minutes !== null ? ` · ${formatMinutes(row.minutes)}` : ''}`}
+                  >
+                    <span className="mb-1 h-4 text-xs tabular-nums text-muted-foreground">
+                      {row.minutes ?? ''}
+                    </span>
+                    <div
+                      className={cn(
+                        'w-8 rounded-t',
+                        style.bar,
+                        'transition-[height,filter] duration-slow ease-out group-hover:brightness-110',
+                      )}
+                      style={{ height: `${pct}%`, minHeight: 4 }}
+                    />
+                    <span className="mt-1 max-w-[3rem] truncate text-xs text-foreground">
+                      {row.table}
+                    </span>
                   </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                );
+              })}
+            </div>
+          </div>
+        </Panel>
 
-      {/* 3. Two-column layout (v3-test design) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        {/* Left column - stacked sections */}
-        <div className="space-y-6">
-          {/* Needs Attention Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Needs Attention</h3>
-              </div>
-              <div className="space-y-3">
-                {needsAttentionError ? (
-                  <p className="text-red-600 text-sm">Failed to load</p>
-                ) : needsAttentionLoading ? (
-                  <p className="text-gray-600 text-sm">Loading...</p>
-                ) : needsAttention.length === 0 ? (
-                  <p className="text-gray-600 text-sm">Nothing needs attention right now.</p>
-                ) : (
-                  needsAttention.map((item) => {
-                    const ItemIcon = item.icon;
-                    const severityColor = item.severity === 'high'
-                      ? 'border-l-4 border-l-red-500 bg-red-50'
-                      : 'border-l-4 border-l-amber-500 bg-amber-50';
-                    return (
-                      <div key={item.id} className={`p-3 rounded ${severityColor}`}>
-                        <div className="flex items-center gap-3">
-                          <ItemIcon className={`w-4 h-4 flex-shrink-0 ${item.severity === 'high' ? 'text-red-600' : 'text-amber-600'}`} />
-                          <p className="text-sm text-gray-700">{item.message}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* ---- two columns ---------------------------------------------- */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-6">
 
-          {/* Tonight vs Baseline */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tonight vs Baseline</h3>
-              {metricsError ? (
-                <p className="text-red-600 text-sm">Failed to load metrics</p>
-              ) : metricsLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
-              ) : !shiftMetrics || !baseline ? (
-                <p className="text-gray-600 text-sm">No data available</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Sales */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Sales</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.sales)}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.sales >= baseline.median_sales ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.sales >= baseline.median_sales ? '+' : ''}{((shiftMetrics.sales - baseline.median_sales) / baseline.median_sales * 100).toFixed(0)}%
+            <Panel
+              title={t('dashboard.needs_attention')}
+              icon={<AlertTriangle />}
+              loading={d.attention.loading}
+              error={d.attention.error}
+              empty={d.attention.data.length === 0}
+              emptyTitle={t('dashboard.nothing_needs_attention')}
+              emptyIcon={<Sparkles />}
+            >
+              <ul className="space-y-2">
+                {d.attention.data.map((item, i) => {
+                  const high = item.severity === 'high';
+                  return (
+                    <li
+                      key={i}
+                      style={{ '--i': i } as React.CSSProperties}
+                      className={cn(
+                        // Logical border so the severity stripe stays on the
+                        // reading-start edge in Arabic.
+                        'flex items-start gap-3 rounded-md border-s-4 p-3 animate-slide-in stagger-fast',
+                        high
+                          ? 'border-s-destructive bg-destructive/5'
+                          : 'border-s-amber-500 bg-amber-50',
+                      )}
+                    >
+                      {high
+                        ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                        : <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />}
+                      <p className="text-sm text-foreground">{item.message}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+
+            <Panel
+              title={t('dashboard.tonight_vs_baseline')}
+              icon={<TrendingUp />}
+              loading={d.metrics.loading}
+              error={d.metrics.error}
+              empty={!d.metrics.data.shift || !d.metrics.data.baseline}
+              emptyTitle={t('dashboard.no_data')}
+              skeletonLines={4}
+            >
+              {(() => {
+                const { shift, baseline } = d.metrics.data;
+                if (!shift || !baseline) return null;
+                const hasBaseline = baseline.sample_days > 0;
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    <MetricTile
+                      label={t('dashboard.sales')}
+                      value={formatCurrency(shift.sales)}
+                      delta={hasBaseline ? percentDelta(shift.sales, baseline.median_sales) : null}
+                      positive={shift.sales >= baseline.median_sales}
+                    />
+                    <MetricTile
+                      label={t('dashboard.covers')}
+                      value={String(shift.covers)}
+                      delta={hasBaseline
+                        ? `${shift.covers >= baseline.median_covers ? '+' : ''}${shift.covers - baseline.median_covers}`
+                        : null}
+                      positive={shift.covers >= baseline.median_covers}
+                    />
+                    <MetricTile
+                      label={t('dashboard.avg_per_cover')}
+                      value={formatCurrency(shift.avg_per_cover)}
+                    />
+                    <MetricTile
+                      label={t('dashboard.avg_ticket_time')}
+                      value={formatMinutes(shift.avg_ticket_minutes)}
+                    />
+                  </div>
+                );
+              })()}
+            </Panel>
+
+            <Panel
+              title={t('dashboard.running_low')}
+              icon={<Package />}
+              loading={d.runningLow.loading}
+              error={d.runningLow.error}
+              empty={d.runningLow.data.length === 0}
+              emptyTitle={t('dashboard.no_forecast')}
+              emptyIcon={<Package />}
+            >
+              <ul className="space-y-3">
+                {d.runningLow.data.map((item, i) => {
+                  const total = item.remaining + item.qty_sold_today;
+                  const pct = total > 0 ? (item.remaining / total) * 100 : 0;
+                  return (
+                    <li
+                      key={`${item.item_name}-${i}`}
+                      style={{ '--i': i } as React.CSSProperties}
+                      className="animate-slide-in stagger-fast"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {item.item_name}
                         </span>
-                        <span className="text-gray-600"> vs {formatCurrency(baseline.median_sales)}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Covers */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Covers</p>
-                    <p className="text-lg font-bold text-gray-900">{shiftMetrics.covers}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.covers >= baseline.median_covers ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.covers >= baseline.median_covers ? '+' : ''}{shiftMetrics.covers - baseline.median_covers}
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatETA(item.eta_minutes)}
                         </span>
-                        <span className="text-gray-600"> vs {baseline.median_covers}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Avg per Cover */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Avg per Cover</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.avg_per_cover)}</p>
-                  </div>
-
-                  {/* Avg Ticket Time */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Avg Ticket Time</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {shiftMetrics.avg_ticket_minutes !== null ? `${shiftMetrics.avg_ticket_minutes} min` : '—'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Running Low Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Running Low</h3>
-              {runningLowError ? (
-                <p className="text-red-600 text-sm">Failed to load</p>
-              ) : runningLowLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
-              ) : runningLow.length === 0 ? (
-                <p className="text-gray-600 text-sm">No items selling fast enough to forecast yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {runningLow.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-900 truncate">{item.item_name}</span>
-                          <span className="text-xs text-gray-600 ml-2 flex-shrink-0">{formatETA(item.eta_minutes)}</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-amber-500 rounded-full"
-                            style={{ width: `${Math.min((item.remaining / (item.remaining + item.qty_sold_today)) * 100, 100)}%` }}
-                          />
-                        </div>
-                        {item.data_quality_issue && (
-                          <p className="text-xs text-gray-500 mt-1">(stock data needs review)</p>
-                        )}
                       </div>
+                      <Meter pct={pct} tone="warning" />
+                      {item.data_quality_issue ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t('dashboard.stock_needs_review')}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          </div>
+
+          {/* ---- right rail --------------------------------------------- */}
+          <div className="space-y-6">
+
+            <Panel
+              title={t('dashboard.floor_load')}
+              icon={<UserCheck />}
+              loading={d.floorLoad.loading}
+              error={d.floorLoad.error}
+              empty={d.floorLoad.data.length === 0}
+              emptyTitle={t('dashboard.no_tables_assigned')}
+              emptyIcon={<Users />}
+            >
+              <ul className="space-y-3">
+                {d.floorLoad.data.map((w, i) => (
+                  <li
+                    key={`${w.waiter}-${i}`}
+                    style={{ '--i': i } as React.CSSProperties}
+                    className="animate-slide-in stagger-fast"
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">{w.waiter}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {tPlural('dashboard.table_count', w.table_count)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    <Meter pct={(w.table_count / maxTables) * 100} tone="primary" />
+                  </li>
+                ))}
+              </ul>
+            </Panel>
 
-        {/* Right column - narrow rail */}
-        <div className="space-y-6">
-          {/* Floor Load Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Floor Load</h3>
-              {floorLoadError ? (
-                <p className="text-red-600 text-sm">Failed to load</p>
-              ) : floorLoadLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
-              ) : floorLoad.length === 0 ? (
-                <p className="text-gray-600 text-sm">No tables currently assigned.</p>
-              ) : (
-                <div className="space-y-3">
-                  {floorLoad.map((waiter, idx) => (
-                    <div key={idx}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{waiter.waiter}</span>
-                        <span className="text-xs text-gray-600">{waiter.table_count} table{waiter.table_count !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 rounded-full"
-                          style={{ width: `${(waiter.table_count / maxTableCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Shift Brief Section (with HUF Logo) */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Shift Brief</h3>
-                <span className="inline-flex items-center justify-center px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
+            <Panel
+              title={t('dashboard.shift_brief')}
+              aside={
+                <span className="inline-flex items-center justify-center rounded border border-purple-200 bg-purple-50 px-2 py-1">
                   <HufLogo className="h-3.5 w-auto" />
                 </span>
-              </div>
-              <p className="text-sm text-gray-600">
-                AI-written shift summaries are not yet connected. This panel will show HUF&apos;s shift observations once integrated.
+              }
+            >
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t('dashboard.shift_brief_pending')}
               </p>
-            </CardContent>
-          </Card>
+            </Panel>
 
-          {/* Recent Notifications Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Recent Notifications</h3>
-              </div>
-              <div className="space-y-2">
-                {notificationsError ? (
-                  <p className="text-red-600 text-sm">Failed to load</p>
-                ) : notificationsLoading ? (
-                  <p className="text-gray-600 text-sm">Loading...</p>
-                ) : notifications.length === 0 ? (
-                  <p className="text-gray-600 text-sm">No recent notifications.</p>
-                ) : (
-                  notifications.map((notification) => (
-                    <div key={notification.id} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <p className="text-xs text-gray-700">{notification.message}</p>
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0 whitespace-nowrap">{notification.timestamp}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <Panel
+              title={t('dashboard.recent_notifications')}
+              icon={<Bell />}
+              loading={d.notifications.loading}
+              error={d.notifications.error}
+              empty={d.notifications.data.length === 0}
+              emptyTitle={t('dashboard.no_notifications')}
+              emptyIcon={<Bell />}
+            >
+              <ul className="-my-1 divide-y divide-border">
+                {d.notifications.data.map((n, i) => (
+                  <li
+                    key={n.name}
+                    style={{ '--i': i } as React.CSSProperties}
+                    className="flex items-start justify-between gap-2 py-2 animate-fade-in stagger-fast"
+                  >
+                    <p className="text-xs leading-relaxed text-foreground">{n.subject}</p>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                      {formatRelativeTime(n.creation)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          </div>
         </div>
       </div>
     </div>

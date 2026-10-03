@@ -1,25 +1,30 @@
 <template>
-  <div class="flex flex-col items-center justify-center">
+  <div class="flex min-h-[70vh] flex-col items-center justify-center">
     <!-- Main Container -->
-    <div class="mt-20 w-full max-w-md">
-      <!-- Logo Container -->
+    <div class="w-full max-w-md">
+      <!--
+        Sign-in carries the same brand lockup as the header rather than a
+        separate JPEG wordmark, so the first screen of the shift and every
+        screen after it agree on what this product is called.
+      -->
+      <div class="mb-6 flex flex-col items-center gap-3">
+        <span class="grid h-14 w-14 place-items-center rounded-2xl bg-card shadow-card">
+          <img :src="imagePath" alt="" class="h-10 w-10 object-contain" />
+        </span>
+        <p class="text-xl font-bold tracking-tight text-foreground">
+          Smart <strong class="text-primary">Restro</strong>
+        </p>
+      </div>
 
       <!-- Card Container -->
-      <div class="rounded-lg bg-white px-6 py-8 shadow-md">
-        <div class="mb-8 flex justify-center">
-          <img
-            :src="imagePath"
-            alt="URY POS logo"
-            class="h-8 w-auto sm:h-8 lg:h-8"
-          />
-        </div>
+      <div class="pos-card px-6 py-8">
 
         <form class="space-y-6" @submit.prevent="this.auth.login">
           <!-- Email Input -->
           <div class="relative">
             <div class="absolute inset-y-0 left-0 flex items-center pl-3">
               <svg
-                class="h-5 w-5 text-gray-400"
+                class="h-5 w-5 text-muted-foreground"
                 width="20"
                 height="20"
                 viewBox="0 0 20 20"
@@ -44,7 +49,7 @@
               name="user_id"
               v-model="this.auth.userId"
               required
-              class="block w-full rounded-md border border-gray-200 py-3 pl-10 text-sm placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+              class="block w-full rounded-md border border-border py-3 pl-10 text-sm placeholder:text-muted-foreground focus:border-ring focus:ring-ring"
               placeholder="jane@example.com"
             />
           </div>
@@ -73,7 +78,7 @@
               name="currentPassword"
               v-model="this.auth.currentPassword"
               required
-              class="block w-full rounded-md border border-gray-200 py-3 pl-10 pr-16 text-sm placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+              class="block w-full rounded-md border border-border py-3 pl-10 pr-16 text-sm placeholder:text-muted-foreground focus:border-ring focus:ring-ring"
               placeholder="•••••"
             />
             <button
@@ -81,7 +86,7 @@
               class="absolute inset-y-0 right-0 flex items-center pr-3"
               @click="this.auth.showPassword = !this.auth.showPassword"
             >
-              <span class="text-sm text-gray-400">
+              <span class="text-sm text-muted-foreground">
                 {{ this.auth.showPassword ? "Hide" : "Show" }}
               </span>
             </button>
@@ -90,9 +95,9 @@
           <!-- Login Button -->
           <button
             type="submit"
-            class="flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="flex w-full justify-center rounded-md border border-transparent bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
-            Login
+            {{ $t('login.title') }}
           </button>
         </form>
       </div>
@@ -102,7 +107,8 @@
 
 <script>
 import { useAuthStore } from "@/stores/Auth.js";
-import uriPosImage from "@/assets/logos/URY_POS.jpg";
+// Shared with the header and the kitchen display.
+import smartLogo from "../../../smart_logo.png";
 
 export default {
   setup() {
@@ -111,7 +117,7 @@ export default {
   },
   data() {
     return {
-      imagePath: uriPosImage,
+      imagePath: smartLogo,
     };
   },
 };

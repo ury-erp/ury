@@ -3,7 +3,7 @@
 (() => {
 	if (frappe.boot && frappe.boot.ury_setup_complete === false) {
 		window.location.replace(
-			frappe.boot.ury_setup_wizard_target || "/ury/setup-wizard/0"
+			frappe.boot.ury_setup_wizard_target || "/restro/setup-wizard/0"
 		);
 	}
 })();

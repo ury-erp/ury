@@ -103,3 +103,20 @@ class TestURYKOTDisplaySEC06(FrappeTestCase):
         self.assertEqual(mock_set_value.call_count, 2)
         mock_set_value.assert_any_call("URY KOT", "KOT-001", "verified", 1)
         mock_set_value.assert_any_call("URY KOT", "KOT-001", "verified_by", "Administrator")
+
+
+class TestStationSummary(FrappeTestCase):
+    def test_every_station_with_board_counts(self):
+        from ury.ury.api.ury_kot_display import station_summary
+
+        frappe.set_user("Administrator")
+        rows = station_summary()
+        names = set(frappe.get_all("URY Production Unit", pluck="name"))
+        self.assertEqual({r["name"] for r in rows}, names)
+        for r in rows:
+            self.assertEqual(set(r), {"name", "disabled", "waiting", "served", "orders"})
+            self.assertIsInstance(r["disabled"], bool)
+            # Waiting tickets are from the last three hours, served ones from
+            # today: neither can exceed today's orders.
+            self.assertLessEqual(r["served"], r["orders"])
+            self.assertGreaterEqual(min(r["waiting"], r["served"], r["orders"]), 0)

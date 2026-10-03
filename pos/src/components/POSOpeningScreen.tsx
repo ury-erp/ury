@@ -397,7 +397,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
               variant="outline"
               className="w-full sm:w-auto"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-4 h-4 me-2" />
               {t('pos_opening.retry')}
             </Button>
           </div>

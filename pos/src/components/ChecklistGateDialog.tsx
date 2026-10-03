@@ -153,7 +153,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
+            <div className="flex-1 overflow-y-auto space-y-4 mb-6 pe-1">
               {rows.map((row, index) => (
                 <div key={`${row.item_label}-${index}`}>
                   <label className="flex items-start gap-3 cursor-pointer">
@@ -165,7 +165,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
                     />
                     <span className="text-sm font-medium text-gray-900">
                       {row.item_label}
-                      {row.is_mandatory && <span className="text-red-600 ml-1">*</span>}
+                      {row.is_mandatory && <span className="text-red-600 ms-1">*</span>}
                     </span>
                   </label>
                   <Input
@@ -174,7 +174,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
                     onChange={(e) => handleRemarksChange(index, e.target.value)}
                     placeholder={t('checklist.remarks_placeholder')}
                     size="sm"
-                    className="mt-2 ml-7 w-[calc(100%-1.75rem)]"
+                    className="mt-2 ms-7 w-[calc(100%-1.75rem)]"
                   />
                 </div>
               ))}

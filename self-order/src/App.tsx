@@ -4,6 +4,7 @@ import TabletLayout from './layouts/TabletLayout'
 import LandscapeKioskLayout from './layouts/LandscapeKioskLayout'
 import PortraitKioskLayout from './layouts/PortraitKioskLayout'
 import type { OrderingLayout } from './lib/api'
+import { t } from './i18n'
 
 const LAYOUTS: Record<OrderingLayout, typeof MobileQRLayout> = {
   Mobile: MobileQRLayout,
@@ -28,14 +29,14 @@ function App() {
     if (deviceLoading) {
       return (
         <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-          Starting up…
+          {t('common.starting_up')}
         </div>
       )
     }
     if (deviceError || !deviceContext) {
       return (
         <div className="flex min-h-screen items-center justify-center p-6 text-center text-destructive">
-          {deviceError ?? 'This device could not be started. Please contact staff.'}
+          {deviceError ?? t('device.start_failed')}
         </div>
       )
     }

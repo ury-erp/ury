@@ -1,0 +1,55 @@
+/**
+ * Shared RTL + Arabic typography for all URY frontends.
+ *
+ * Import this *after* theme.css and the Tailwind layers in each app's
+ * index.css. It only takes effect when <html dir="rtl">, so it is inert for
+ * the LTR locales and safe to import unconditionally.
+ */
+
+@layer base {
+  /* The family itself is `--font-sans` (theme.css) and is shared by both
+     scripts; IBM Plex Sans Arabic is self-hosted in fonts.css so it also
+     works on an offline terminal. Only the metrics differ by script. */
+
+  /*
+   * Arabic glyphs sit lower and taller than Latin at the same size, so the
+   * default leading crowds diacritics and descenders.
+   */
+  [dir='rtl'] body {
+    line-height: 1.7;
+  }
+
+  /*
+   * Keep numerals, currency amounts, invoice ids and times rendering
+   * left-to-right inside RTL text. Without this, a string like "INV-0042"
+   * or "12:30" next to Arabic can reorder under the bidi algorithm and show
+   * the wrong value to a cashier — the one place a POS cannot be wrong.
+   */
+  [dir='rtl'] .ltr-nums,
+  [dir='rtl'] time,
+  [dir='rtl'] input[type='number'],
+  [dir='rtl'] input[type='tel'] {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: end;
+  }
+}
+
+@layer utilities {
+  /*
+   * Opt-in isolation for any interpolated value that is not natural-language
+   * text (invoice numbers, table names, amounts, phone numbers). Use on the
+   * span wrapping the value, not the whole sentence.
+   */
+  .bidi-isolate {
+    unicode-bidi: isolate;
+  }
+
+  /*
+   * Mirror decorative directional icons (chevrons, arrows) in RTL.
+   * Apply to the icon itself, never to a container holding text.
+   */
+  [dir='rtl'] .rtl-flip {
+    transform: scaleX(-1);
+  }
+}

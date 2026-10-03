@@ -1,4 +1,7 @@
+@import '@ury/ui/styles/fonts.css';
 @import '@ury/ui/styles/theme.css';
+@import '@ury/ui/styles/rtl.css';
+@import '@ury/ui/styles/motion.css';
 
 @tailwind base;
 @tailwind components;

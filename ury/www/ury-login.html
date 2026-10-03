@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="{{ lang|e }}" dir="{{ dir|e }}">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<meta name="robots" content="noindex, nofollow">
+	<meta name="referrer" content="same-origin">
+	<meta name="color-scheme" content="light">
+	<meta name="theme-color" content="#f8f5f0">
+	<title>{{ _("Sign in") }} · {{ app_name|e }}</title>
+	<link rel="icon" type="image/png" href="{{ favicon|e }}">
+	<link rel="apple-touch-icon" href="/assets/ury/Images/smart-choice-apple-touch.png">
+	<link rel="preload" href="/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2" as="font" type="font/woff2" crossorigin>
+	<style>
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFC, U+200C-200E; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFC, U+200C-200E; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 700; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-700-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFC, U+200C-200E; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 700; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+
+		:root {
+			--ink: #303c38;
+			--ink-2: #65706a;
+			--muted: #727a73;
+			--line: #e3e5de;
+			--surface: #fffefb;
+			--page: #f8f5f0;
+			--brand: #b64c32;
+			--brand-dark: #9e3f29;
+			--danger: #ba2939;
+			--ring: 0 0 0 4px rgba(182,76,50,.14);
+		}
+		* { box-sizing: border-box; }
+		html { min-height: 100%; }
+		body {
+			margin: 0; min-height: 100vh; min-height: 100svh;
+			font-family: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+			color: var(--ink); background: var(--page); -webkit-font-smoothing: antialiased;
+		}
+		button, a, input { -webkit-tap-highlight-color: transparent; }
+		button, input { font: inherit; }
+		.ambient { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: -1;
+			background: radial-gradient(ellipse at 12% 24%, #f2e6d9 0, transparent 46%), radial-gradient(ellipse at 90% 84%, #e6ebe0 0, transparent 42%); }
+		.orb { position: absolute; border-radius: 50%; background: radial-gradient(circle at 30% 24%, #fff9ef 0%, #f3cfb9 48%, #d39c80 83%);
+			box-shadow: inset -12px -14px 26px #b9785520, 16px 24px 38px #9c73551a; }
+		.orb-one { width: 150px; height: 150px; top: -62px; left: 32%; }
+		.orb-two { width: 82px; height: 82px; bottom: 12%; right: -28px; background: radial-gradient(circle at 28% 22%, #fcfff8, #bfcab3 60%, #93a58a); }
+		.orbit { position: absolute; width: 240px; height: 240px; border: 32px solid #eee2d0; border-radius: 50%; bottom: -150px; left: 10%;
+			transform: rotate(-28deg) scaleY(.7); box-shadow: inset 3px 7px 12px #b8a18e35, 5px 10px 14px #b8a18e25; }
+
+		.shell { min-height: 100vh; min-height: 100svh; max-width: 1720px; margin: auto; display: grid;
+			grid-template-columns: minmax(430px, .9fr) minmax(0, 1.1fr); gap: clamp(20px, 4vw, 64px);
+			padding: 32px clamp(28px, 4.5vw, 80px); }
+		.side-form { min-width: 0; display: flex; flex-direction: column; }
+		.topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; }
+		.brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+		.brand-mark { display: grid; place-items: center; width: 50px; height: 56px; background: #fffefa; border: 1px solid #ede5da;
+			border-radius: 16px; box-shadow: 0 4px 12px #a58a6610; flex-shrink: 0; }
+		.brand img { width: 30px; height: 42px; object-fit: contain; }
+		.brand-copy { display: grid; gap: 1px; }
+		.brand b { font-size: 19px; letter-spacing: -.6px; }
+		.brand small { font-size: 10px; letter-spacing: 2.2px; color: var(--ink-2); }
+		.lang { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); text-decoration: none; min-height: 40px;
+			padding: 7px 12px; border: 1px solid #dedfd5; border-radius: 999px; background: #fffdf9eb; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+		.lang:hover, .lang:focus-visible { border-color: var(--brand); color: var(--brand); outline: none; box-shadow: var(--ring); }
+
+		.form-wrap { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding-block: clamp(32px, 9vh, 104px) 40px; }
+		.card { position: relative; width: 100%; max-width: 460px; padding: clamp(28px, 3vw, 44px); border: 1px solid #fff; border-radius: 28px;
+			background: rgba(255,254,251,.96); box-shadow: 0 24px 80px -32px #73604f40, 0 3px 10px #7d6c5210; }
+		.eyebrow { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-size: 12px; font-weight: 600; color: #56715f;
+			background: #edf2e9; padding: 5px 11px; border: 1px solid #dfe7d9; border-radius: 999px; }
+		.eyebrow svg { flex-shrink: 0; }
+		.step > h1:first-child { margin-top: 0; }
+		h1 { margin: 20px 0 10px; font-size: clamp(28px, 2.8vw, 36px); font-weight: 600; line-height: 1.4; letter-spacing: -.9px; }
+		.lead { margin: 0 0 28px; color: var(--ink-2); font-size: 13px; line-height: 1.9; }
+		.field { margin-block-end: 18px; }
+		.field label { display: block; font-size: 12px; font-weight: 600; margin-block-end: 8px; }
+		.control { position: relative; }
+		.control svg.lead-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #889287; pointer-events: none; }
+		.control input { width: 100%; height: 52px; padding: 0 15px 0 44px; font-size: 15px; color: var(--ink); border: 1px solid var(--line);
+			border-radius: 12px; background: #fdfdfa; transition: border-color .15s, box-shadow .15s; }
+		.control input:focus { outline: none; border-color: var(--brand); box-shadow: var(--ring); background: #fff; }
+		.control input[aria-invalid="true"] { border-color: var(--danger); background: #fffafa; }
+		.control input[aria-invalid="true"]:focus { box-shadow: 0 0 0 4px rgba(186,41,57,.12); }
+		.control input:-webkit-autofill { -webkit-box-shadow: 0 0 0 60px #fdfdfa inset; -webkit-text-fill-color: var(--ink); caret-color: var(--ink); }
+		.control input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 60px #fff inset, var(--ring); }
+		.control input::-ms-reveal { display: none; }
+		.control .reveal { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; width: 40px; height: 40px;
+			display: grid; place-items: center; border-radius: 8px; color: var(--muted); cursor: pointer; }
+		.control .reveal:hover, .control .reveal:focus-visible { color: var(--ink); background: #eef1ea; outline: 2px solid #d8e0d2; }
+		.control.has-reveal input { padding-right: 48px; }
+		input[dir="ltr"] { text-align: start; }
+		.hint { margin-top: 6px; font-size: 12px; color: #946006; display: none; align-items: center; gap: 6px; }
+		.hint.show { display: flex; }
+		.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: -2px 0 24px; font-size: 12px; }
+		.link { color: var(--brand); text-decoration: none; font-weight: 600; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+		.link:hover, .link:focus-visible { text-decoration: underline; outline: 2px solid #b64c3260; outline-offset: 4px; border-radius: 2px; }
+
+		.btn { width: 100%; min-height: 52px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+			border: 1px solid #9e3f2925; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
+			background: linear-gradient(115deg, #bd583c, var(--brand)); box-shadow: 0 6px 16px -6px #b64c3270; transition: transform .15s, box-shadow .15s, opacity .15s; }
+		.btn:hover { background: var(--brand-dark); box-shadow: 0 8px 22px -6px #b64c3280; }
+		.btn:active { transform: translateY(1px); }
+		.btn:focus-visible { outline: 2px solid var(--brand-dark); outline-offset: 4px; }
+		.btn[disabled] { opacity: .65; cursor: progress; }
+		.btn.secondary { color: var(--ink); background: #fff; border: 1px solid var(--line); box-shadow: none; }
+		.btn.secondary:hover { border-color: var(--ink-2); }
+		.signin-arrow { margin-inline-start: auto; }
+		#login-btn .spinner + span { margin-inline-start: auto; }
+		[dir="rtl"] .signin-arrow { transform: rotate(180deg); }
+		.spinner { width: 18px; height: 18px; border: 2px solid #ffffff70; border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; display: none; }
+		.btn.loading .spinner { display: inline-block; }
+		.alert { display: none; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; margin-block-end: 18px; }
+		.alert.show { display: flex; }
+		.alert.error { background: #fdecec; color: #8e1b20; border: 1px solid #f7caca; }
+		.alert.info { background: #ecf5ff; color: #164a8a; border: 1px solid #cfe3fb; }
+		.alert svg { flex-shrink: 0; margin-top: 2px; }
+		.divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 22px 0 16px; }
+		.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+		.socials { display: grid; gap: 10px; }
+		.social { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line);
+			color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; background: #fff; }
+		.social:hover, .social:focus-visible { border-color: var(--ink-2); outline: 2px solid #b64c3260; outline-offset: 2px; }
+		.social img, .social svg { width: 18px; height: 18px; }
+		.step { display: none; }
+		.step.active { display: block; animation: rise .35s ease both; }
+
+		/* Signed in: a short confirmation while the destination loads. */
+		.done { text-align: center; padding-block: 6px 2px; }
+		.done-badge { position: relative; width: 92px; height: 92px; margin: 0 auto 22px; border-radius: 50%; box-shadow: 0 12px 26px -8px #6f8a6070; animation: pop .45s cubic-bezier(.2,1.4,.4,1) both; }
+		.done-badge::before { content: ""; position: absolute; inset: -10px; border-radius: 50%;
+			background: radial-gradient(circle, #e3ecd9 0, #e3ecd900 70%); animation: glow 1.6s ease-out .35s both; }
+		.done-badge svg { position: relative; width: 92px; height: 92px; display: block; }
+		.done-badge .disc { fill: url(#done-fill); }
+		.done-badge .tick { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round;
+			stroke-dasharray: 48; stroke-dashoffset: 48; animation: draw .45s ease-out .3s forwards; }
+		.done h1 { margin: 0 0 8px; font-size: clamp(24px, 2.2vw, 30px); line-height: 1.45; text-wrap: balance; overflow-wrap: anywhere; }
+		.done h1 bdi { color: var(--brand); }
+		.done:focus { outline: none; }
+		.done .lead { margin-bottom: 22px; }
+		.dest { display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: start; border: 1px solid var(--line);
+			border-radius: 14px; background: #fdfcf8; }
+		.dest-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px; color: var(--brand); background: #fbeee7; }
+		.dest small { display: block; font-size: 11px; color: var(--muted); }
+		.dest b { display: block; font-size: 14px; font-weight: 600; }
+		.dest .spinner { display: inline-block; margin-inline-start: auto; border-color: #b64c3230; border-top-color: var(--brand); }
+		.progress { height: 4px; margin-top: 18px; border-radius: 4px; overflow: hidden; background: #efe9e0; }
+		.progress span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #d78a68, var(--brand));
+			animation: fill var(--wait, 1.2s) cubic-bezier(.4,0,.2,1) forwards; }
+		[dir="rtl"] .progress span { margin-inline-start: auto; }
+		.go-now { display: inline-block; margin-top: 14px; font-size: 12px; visibility: hidden; }
+		.go-now.show { visibility: visible; }
+		.back { display: inline-flex; align-items: center; gap: 6px; margin-block-end: 14px; }
+		.otp input { letter-spacing: .5em; text-align: center; padding-inline: 14px; font-size: 22px; font-weight: 600; }
+		.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 10px; color: var(--muted); }
+		.secure { display: inline-flex; align-items: flex-start; gap: 6px; max-width: 285px; line-height: 1.7; }
+		.secure svg { flex-shrink: 0; margin-top: 1px; }
+
+		.side-art { position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding-block: 24px; }
+		.art-head { position: relative; z-index: 1; padding-inline: 4%; }
+		.chip { display: inline-flex; align-items: center; gap: 9px; font-size: 10px; text-transform: uppercase; font-weight: 600; letter-spacing: 2.5px; color: #717869; }
+		.chip::before { content: ""; width: 24px; height: 1px; background: #a4ad98; }
+		.art-head h2 { margin: 18px 0 12px; font-size: clamp(34px, 3.5vw, 54px); font-weight: 600; line-height: 1.35; letter-spacing: -1.8px; }
+		.art-head h2 span { display: block; color: var(--brand); }
+		.art-head p { margin: 0; max-width: 390px; color: var(--ink-2); font-size: 13px; line-height: 1.9; }
+		.scene { position: relative; width: 112%; max-width: 680px; align-self: center; margin: -12px -6% -16px; isolation: isolate; }
+		.scene::before { content: ""; position: absolute; inset: 12% 5% 5%; border-radius: 50%; background: radial-gradient(ellipse, #e7d9c47a, transparent 67%); z-index: -1; }
+		.workspace-art { width: 100%; height: auto; display: block; animation: float 9s ease-in-out infinite; }
+		.scene-tag { position: absolute; bottom: 18%; inset-inline-end: 2%; display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+			border-radius: 15px; border: 1px solid #fff; background: #fffffff2; box-shadow: 0 12px 28px #66543b12; font-size: 11px; color: #60705d; }
+		.scene-tag svg { width: 27px; height: 27px; padding: 5px; border-radius: 9px; background: #edf3e8; color: #68825b; }
+		.scene-tag b { display: block; color: var(--ink); font-size: 12px; font-weight: 600; }
+		.highlights { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding: 20px 4% 0; border-top: 1px solid #dcded26b; }
+		.hl { min-width: 0; }
+		.hl svg { width: 20px; height: 20px; color: #9a755a; }
+		.hl b { display: block; margin: 8px 0 5px; font-size: 12px; font-weight: 600; }
+		.hl span { display: block; font-size: 10px; color: var(--ink-2); line-height: 1.8; }
+
+		@keyframes spin { to { transform: rotate(360deg); } }
+		@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+		@keyframes draw { to { stroke-dashoffset: 0; } }
+		@keyframes glow { from { transform: scale(.6); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1.25); opacity: 0; } }
+		@keyframes fill { to { width: 100%; } }
+		@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+		@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+		@media (min-width: 981px) and (max-height: 800px) {
+			.shell { padding-block: 24px; }
+			.side-art { padding-block: 12px; }
+			.art-head h2 { font-size: 36px; margin-top: 12px; }
+			.scene { max-width: 530px; align-self: center; margin-block: -20px; }
+			.form-wrap { padding-block: clamp(20px, 5vh, 56px) 24px; }
+		}
+		@media (min-width: 1720px) { .scene { max-width: 750px; align-self: center; } }
+		@media (max-width: 980px) {
+			.shell { max-width: 680px; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 24px; }
+			.form-wrap { padding-block: 34px 24px; }
+			.card { max-width: 480px; }
+			.side-art { padding-block: 22px 12px; border-top: 1px solid #dedfd566; }
+			.art-head { text-align: center; padding-inline: 0; }
+			.art-head h2 { font-size: 32px; margin-top: 12px; }
+			.art-head p { margin-inline: auto; }
+			.scene { width: 100%; max-width: 500px; margin: -15px auto -10px; }
+			.scene-tag { inset-inline-end: 0; }
+			.highlights { padding-inline: 0; }
+			.foot { max-width: 480px; width: 100%; margin-inline: auto; }
+			.orb-one { left: 75%; top: 120px; width: 100px; height: 100px; }
+		}
+		@media (max-width: 480px) {
+			.shell { padding: 18px; }
+			.brand b { font-size: 17px; }
+			.brand small { font-size: 9px; letter-spacing: 1.8px; }
+			.brand-mark { width: 42px; height: 48px; border-radius: 12px; }
+			.brand img { width: 25px; height: 35px; }
+			.lang { padding-inline: 10px; }
+			.card { padding: 28px 24px; border-radius: 24px; }
+			h1 { font-size: 30px; }
+			.lead { font-size: 12px; }
+			.art-head h2 { font-size: 27px; letter-spacing: -.8px; }
+			.scene-tag { padding: 8px 10px; font-size: 9px; bottom: 13%; }
+			.scene-tag b { font-size: 10px; }
+			.highlights { gap: 12px; }
+			.hl b { font-size: 11px; }
+			.hl span { font-size: 10px; }
+			.foot { flex-direction: column; align-items: center; text-align: center; }
+		}
+		/* Right-to-left: keep the field icons and the show-password button on the
+		   reading side, and never letter-space Arabic script. */
+		[dir="rtl"] .control svg.lead-icon { left: auto; right: 15px; }
+		[dir="rtl"] .control input { padding: 0 44px 0 15px; text-align: right; }
+		[dir="rtl"] .control .reveal { right: auto; left: 6px; }
+		[dir="rtl"] .control.has-reveal input { padding-left: 48px; }
+		[dir="rtl"] .otp input { padding-inline: 14px; text-align: center; }
+		[dir="rtl"] h1, [dir="rtl"] .art-head h2, [dir="rtl"] .chip { letter-spacing: 0; }
+		[dir="rtl"] .art-head h2 { line-height: 1.5; }
+		[dir="rtl"] .lead, [dir="rtl"] .art-head p { font-size: 14px; }
+		[dir="rtl"] .chip { font-size: 12px; }
+		[dir="rtl"] .hl span, [dir="rtl"] .foot { font-size: 11px; }
+		[dir="rtl"] .back-arrow { transform: rotate(180deg); }
+		@media (prefers-reduced-motion: reduce) {
+			.done-badge .tick { stroke-dashoffset: 0; }
+			.progress span { width: 100%; }
+			.done-badge::before { display: none; }
+			*, *::before, *::after { animation: none !important; transition: none !important; }
+		}
+	</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"><span class="orb orb-one"></span><span class="orb orb-two"></span><span class="orbit"></span></div>
+<div class="shell">
+	<!-- ============================================================ form -->
+	<main class="side-form">
+		<div class="topbar">
+			<a class="brand" href="/" aria-label="{{ app_name|e }}">
+				<span class="brand-mark"><img src="{{ logo|e }}" alt="" width="30" height="42" fetchpriority="high"></span>
+				<span class="brand-copy"><b dir="ltr">{{ app_name|e }}</b><small dir="ltr">SMART RESTRO</small></span>
+			</a>
+			<a class="lang" id="lang-switch" href="?_lang={{ other_lang|e }}" hreflang="{{ other_lang|e }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z"/></svg><span lang="{{ other_lang|e }}">{{ "English" if lang == "ar" else "العربية" }}</span></a>
+		</div>
+
+		<div class="form-wrap">
+			<div class="card">
+				<div id="alert" class="alert" role="alert" aria-live="assertive">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+					<span id="alert-text"></span>
+				</div>
+
+				<!-- Step: sign in -->
+				<section class="step active" id="step-login" aria-labelledby="t-login">
+					{% if restaurant and restaurant != app_name %}
+					<span class="eyebrow">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 11h18M5 11V7a7 7 0 0 1 14 0v4"/><rect x="3" y="11" width="18" height="10" rx="2"/></svg>
+						{{ restaurant|e }}
+					</span>
+					{% endif %}
+					<h1 id="t-login">{{ _("Welcome back") }}</h1>
+					<p class="lead">{{ _("Your team, your orders, your restaurant. All in one place.") }}</p>
+
+					{% if show_password_login %}
+					<form id="login-form" method="post" action="/api/method/login" novalidate autocomplete="on">
+						<div class="field">
+							<label for="usr">{{ _("Email or username") }}</label>
+							<div class="control">
+								<svg class="lead-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+								<input id="usr" name="usr" type="text" inputmode="email" dir="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="140">
+							</div>
+						</div>
+						<div class="field">
+							<label for="pwd">{{ _("Password") }}</label>
+							<div class="control has-reveal">
+								<svg class="lead-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+								<input id="pwd" name="pwd" type="password" dir="ltr" autocomplete="current-password" required maxlength="512">
+								<button type="button" class="reveal" id="reveal" aria-label="{{ _('Show password')|e }}" aria-pressed="false">
+									<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+								</button>
+							</div>
+							<div class="hint" id="caps">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 12h4v6h8v-6h4z"/></svg>
+								{{ _("Caps Lock is on") }}
+							</div>
+						</div>
+						<div class="row">
+							<button type="button" class="link" data-go="forgot">{{ _("Forgot password?") }}</button>
+							{% if login_with_email_link %}<button type="button" class="link" data-go="email-link">{{ _("Email me a sign-in link") }}</button>{% endif %}
+						</div>
+						<button class="btn" type="submit" id="login-btn"><span class="spinner" aria-hidden="true"></span><span>{{ _("Sign in") }}</span><svg class="signin-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+					</form>
+					{% else %}
+					<div class="alert info show">{{ _("Password sign-in is turned off on this site. Use one of the options below.") }}</div>
+					{% endif %}
+
+					{% if provider_logins %}
+					<div class="divider">{{ _("or continue with") }}</div>
+					<div class="socials">
+						{% for p in provider_logins %}
+						<a class="social" href="{{ p.auth_url|e }}" rel="nofollow">
+							{% if p.icon %}{{ p.icon }}{% endif %}
+							<span>{{ p.provider_name|e }}</span>
+						</a>
+						{% endfor %}
+					</div>
+					{% endif %}
+				</section>
+
+				<!-- Step: two-factor -->
+				<section class="step" id="step-otp" aria-labelledby="t-otp">
+					<button type="button" class="link back" data-go="login"><svg class="back-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>{{ _("Back") }}</button>
+					<h1 id="t-otp">{{ _("Verify it's you") }}</h1>
+					<p class="lead" id="otp-prompt">{{ _("Enter the verification code.") }}</p>
+					<form id="otp-form" novalidate>
+						<div class="field otp">
+							<label for="otp">{{ _("Verification code") }}</label>
+							<div class="control"><input id="otp" name="otp" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="10" required></div>
+						</div>
+						<button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span>{{ _("Confirm code") }}</span></button>
+					</form>
+				</section>
+
+				<!-- Step: forgot password -->
+				<section class="step" id="step-forgot" aria-labelledby="t-forgot">
+					<button type="button" class="link back" data-go="login"><svg class="back-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>{{ _("Back to sign in") }}</button>
+					<h1 id="t-forgot">{{ _("Reset your password") }}</h1>
+					<p class="lead">{{ _("Enter the email of your account and we'll send a link to set a new password.") }}</p>
+					<form id="forgot-form" novalidate>
+						<div class="field">
+							<label for="forgot-email">{{ _("Email") }}</label>
+							<div class="control">
+								<svg class="lead-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+								<input id="forgot-email" type="email" dir="ltr" autocomplete="email" required maxlength="140">
+							</div>
+						</div>
+						<button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span>{{ _("Send reset link") }}</span></button>
+					</form>
+				</section>
+
+				<!-- Step: email link -->
+				<section class="step" id="step-email-link" aria-labelledby="t-link">
+					<button type="button" class="link back" data-go="login"><svg class="back-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>{{ _("Back to sign in") }}</button>
+					<h1 id="t-link">{{ _("Sign in with a link") }}</h1>
+					<p class="lead">{{ _("We'll email you a one-time link that signs you in. It expires shortly.") }}</p>
+					<form id="link-form" novalidate>
+						<div class="field">
+							<label for="link-email">{{ _("Email") }}</label>
+							<div class="control">
+								<svg class="lead-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+								<input id="link-email" type="email" dir="ltr" autocomplete="email" required maxlength="140">
+							</div>
+						</div>
+						<button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span>{{ _("Send sign-in link") }}</span></button>
+					</form>
+				</section>
+				<!-- Step: signed in -->
+				<section class="step" id="step-done" aria-labelledby="t-done" aria-live="polite">
+					<div class="done" id="done" tabindex="-1">
+						<div class="done-badge" aria-hidden="true">
+							<svg viewBox="0 0 92 92">
+								<defs><linearGradient id="done-fill" x1="14" y1="10" x2="78" y2="84" gradientUnits="userSpaceOnUse"><stop stop-color="#b9cba6"/><stop offset="1" stop-color="#6f8a60"/></linearGradient></defs>
+								<circle class="disc" cx="46" cy="46" r="40"/>
+								<path class="tick" d="M31 47.5l10 10 20-22"/>
+							</svg>
+						</div>
+						<h1 id="t-done">{{ _("You're signed in") }}</h1>
+						<p class="lead" id="done-lead">{{ _("Getting your workspace ready…") }}</p>
+						<div class="dest">
+							<span class="dest-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg></span>
+							<span><small>{{ _("Opening") }}</small><b id="done-dest">{{ _("Your workspace") }}</b></span>
+							<span class="spinner" aria-hidden="true"></span>
+						</div>
+						<div class="progress" aria-hidden="true"><span></span></div>
+						<a class="link go-now" id="go-now" href="/app">{{ _("Not moving? Continue") }}</a>
+					</div>
+				</section>
+			</div>
+		</div>
+
+		<div class="foot">
+			<span class="secure">
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+				{{ _("Protected sign-in · repeated failed attempts lock the account for a while") }}
+			</span>
+			<span dir="ltr">© {{ year }} {{ app_name|e }}</span>
+		</div>
+	</main>
+
+	<!-- ============================================================ art -->
+	<aside class="side-art" aria-hidden="true">
+		<div class="art-head">
+			<span class="chip">{{ _("Smart Restro · by Smart Choice") }}</span>
+			<h2>{{ _("Every detail, connected.") }}<span>{{ _("Every day, a little smarter.") }}</span></h2>
+			<p>{{ _("From the first order to the last coffee. A calmer way to run your restaurant.") }}</p>
+		</div>
+
+		<div class="scene">
+			<img class="workspace-art" src="/assets/ury/Images/login-workspace.svg" alt="" width="800" height="650" fetchpriority="high">
+			<div class="scene-tag">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>
+				<span><b>{{ _("Made for your team") }}</b>{{ _("Connected at every step") }}</span>
+			</div>
+		</div>
+
+		<div class="highlights">
+			<div class="hl">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg>
+				<b>{{ _("Fast checkout") }}</b>
+				<span>{{ _("Dine-in, take-away and delivery from one screen.") }}</span>
+			</div>
+			<div class="hl">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 9.18 0A4 4 0 0 1 18 13.87V21H6Z"/><path d="M6 17h12"/></svg>
+				<b>{{ _("Kitchen in sync") }}</b>
+				<span>{{ _("Tickets reach the right station the moment they're ordered.") }}</span>
+			</div>
+			<div class="hl">
+				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12M6 14h12"/></svg>
+				<b>{{ _("Stock that adds up") }}</b>
+				<span>{{ _("Recipes deduct ingredients on every sale, costed from purchases.") }}</span>
+			</div>
+		</div>
+	</aside>
+</div>
+
+<script>
+(() => {
+	"use strict";
+	const LANG = {{ lang | tojson }};
+	const T = {
+		failed: {{ _("Sign-in failed. Check your details and try again.") | tojson }},
+		network: {{ _("Can't reach the server. Check the connection and try again.") | tojson }},
+		missing: {{ _("Enter your email or username and your password.") | tojson }},
+		tooMany: {{ _("Too many attempts. Wait a few minutes before trying again.") | tojson }},
+		locked: {{ _("This account is locked for a while after too many failed attempts. Try again later.") | tojson }},
+		disabled: {{ _("This account is disabled. Contact the restaurant administrator.") | tojson }},
+		resetSent: {{ _("If an account exists for that email, a reset link is on its way.") | tojson }},
+		linkSent: {{ _("If an account exists for that email, a sign-in link is on its way.") | tojson }},
+		badEmail: {{ _("Enter a valid email address.") | tojson }},
+		otpMissing: {{ _("Enter the code.") | tojson }},
+		show: {{ _("Show password") | tojson }},
+		hide: {{ _("Hide password") | tojson }},
+		server: {{ _("Something went wrong on our side. Try again in a moment.") | tojson }},
+		welcome: {{ _("Welcome, {0}") | tojson }},
+		places: {
+			"/pos": {{ _("POS (cashier)") | tojson }},
+			"/pos/order": {{ _("Captain order pad") | tojson }},
+			"/restro/dashboard": {{ _("Restaurant dashboard") | tojson }},
+			"/restro/reports": {{ _("Restaurant reports") | tojson }},
+			"/mosaic": {{ _("Kitchen display") | tojson }},
+			"/app": {{ _("Desk") | tojson }},
+		},
+	};
+
+	const $ = (id) => document.getElementById(id);
+	const alertBox = $("alert");
+	const alertText = $("alert-text");
+	let tmpId = null;
+
+	// The redirect is passed to the server, which decides whether this user may
+	// go there (restaurant staff never land in Desk). Only same-site paths.
+	const params = new URLSearchParams(location.search);
+	const wanted = params.get("redirect-to");
+	const redirectTo = wanted && wanted.startsWith("/") && !wanted.startsWith("//") && !wanted.includes("\\") ? wanted : "";
+	const langLink = $("lang-switch");
+	if (langLink && redirectTo) langLink.href += "&redirect-to=" + encodeURIComponent(redirectTo);
+
+	// The message sits in the active step, right above its fields.
+	function show(kind, text) {
+		const form = document.querySelector(".step.active form");
+		if (form && alertBox.nextElementSibling !== form) form.before(alertBox);
+		alertBox.className = "alert show " + kind;
+		alertText.textContent = text;
+	}
+	function invalid(input) {
+		input.setAttribute("aria-invalid", "true");
+		input.focus();
+		if (input.select) input.select();
+	}
+	document.querySelectorAll(".control input").forEach((i) => i.addEventListener("input", () => i.removeAttribute("aria-invalid")));
+	function clear() {
+		alertBox.className = "alert";
+		alertText.textContent = "";
+	}
+	function go(step) {
+		clear();
+		document.querySelectorAll("[aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+		document.querySelectorAll(".step").forEach((s) => s.classList.toggle("active", s.id === "step-" + step));
+		const first = document.querySelector("#step-" + step + " input");
+		if (first) setTimeout(() => first.focus(), 30);
+	}
+	document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+
+	function busy(form, on) {
+		const btn = form.querySelector("button[type=submit]");
+		btn.disabled = on;
+		btn.classList.toggle("loading", on);
+	}
+
+	function serverMessage(data) {
+		try {
+			if (data && data._server_messages) {
+				const msgs = JSON.parse(data._server_messages).map((m) => {
+					try { return JSON.parse(m).message; } catch (e) { return m; }
+				});
+				const div = document.createElement("div");
+				div.innerHTML = msgs.join(" ");
+				return div.textContent.trim();
+			}
+			if (data && typeof data.message === "string" && data.message !== "Logged In") return data.message;
+			if (data && data.exc_type === "AuthenticationError") return T.failed;
+		} catch (e) {}
+		return "";
+	}
+
+	async function post(method, body) {
+		const res = await fetch("/api/method/" + method, {
+			method: "POST",
+			credentials: "same-origin",
+			headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest" },
+			body: new URLSearchParams(body).toString(),
+		});
+		let data = {};
+		try { data = await res.json(); } catch (e) {}
+		return { ok: res.ok, status: res.status, data };
+	}
+
+	function finish(data) {
+		// redirect_to is the server's decision for this user's role.
+		const target = data.redirect_to || data.home_page || "/app";
+		const safe = typeof target === "string" && target.startsWith("/") && !target.startsWith("//") ? target : "/app";
+		// Confirm the sign-in and name where the user is going, then go there.
+		const name = (data.full_name || "").trim();
+		if (name) {
+			// The name is isolated so a Latin name keeps its order inside Arabic text.
+			const [before, after] = T.welcome.split("{0}");
+			const bdi = document.createElement("bdi");
+			bdi.textContent = name;
+			$("t-done").replaceChildren(before, bdi, after || "");
+		}
+		const path = safe.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+		const place = T.places[path] || T.places["/" + path.split("/")[1]];
+		if (place) $("done-dest").textContent = place;
+		$("go-now").href = safe;
+		const wait = matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 1200;
+		$("step-done").style.setProperty("--wait", wait + "ms");
+		go("done");
+		$("done").focus({ preventScroll: true });
+		if (langLink) langLink.style.visibility = "hidden";
+		setTimeout(() => location.replace(safe), wait);
+		// Only if the next page is slow to open.
+		setTimeout(() => $("go-now").classList.add("show"), wait + 2500);
+	}
+
+	async function signIn(extra) {
+		const res = await post("login", { ...extra, redirect_to: redirectTo });
+		if (res.ok && res.data && res.data.verification) {
+			tmpId = res.data.tmp_id;
+			const v = res.data.verification;
+			// The server's prompt (it names where the code was sent) is in the
+			// browser's language: use it only when it is in this page's script.
+			const prompt = (v && (v.prompt || v.message)) || "";
+			if (prompt && /[\u0600-\u06FF]/.test(prompt) === (LANG.split("-")[0] === "ar")) $("otp-prompt").textContent = prompt;
+			go("otp");
+			return;
+		}
+		if (res.ok && res.data && (res.data.message === "Logged In" || res.data.message === "No App" || res.data.home_page)) {
+			finish(res.data);
+			return;
+		}
+		if (res.status === 429) return show("error", T.tooMany);
+		if (res.status >= 500) return show("error", T.server);
+		// The server answers in the browser's language, not this page's: show our
+		// own wording, picking out the cases that need different advice.
+		const msg = (serverMessage(res.data) || "").toLowerCase();
+		if (msg.includes("locked")) return show("error", T.locked);
+		if (msg.includes("disabled")) return show("error", T.disabled);
+		if (res.status === 401 || res.status === 403 || res.status === 417) return show("error", T.failed);
+		show("error", serverMessage(res.data) || T.failed);
+	}
+
+	// ---------------------------------------------------------- sign in
+	const loginForm = $("login-form");
+	if (loginForm) {
+		const pwd = $("pwd");
+		const reveal = $("reveal");
+		reveal.addEventListener("click", () => {
+			const showing = pwd.type === "text";
+			pwd.type = showing ? "password" : "text";
+			reveal.setAttribute("aria-pressed", String(!showing));
+			reveal.setAttribute("aria-label", showing ? T.show : T.hide);
+			pwd.focus();
+		});
+		const caps = $("caps");
+		const capsCheck = (e) => caps.classList.toggle("show", !!(e.getModifierState && e.getModifierState("CapsLock")));
+		pwd.addEventListener("keyup", capsCheck);
+		pwd.addEventListener("keydown", capsCheck);
+		pwd.addEventListener("blur", () => caps.classList.remove("show"));
+
+		loginForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			clear();
+			const usr = $("usr").value.trim();
+			const password = pwd.value;
+			if (!usr || !password) {
+				show("error", T.missing);
+				return invalid(!usr ? $("usr") : pwd);
+			}
+			busy(loginForm, true);
+			try {
+				await signIn({ usr, pwd: password });
+			} catch (err) {
+				show("error", T.network);
+			} finally {
+				busy(loginForm, false);
+				pwd.value = "";
+				if (alertBox.classList.contains("error") && $("step-login").classList.contains("active")) invalid(pwd);
+			}
+		});
+	}
+
+	// ---------------------------------------------------------- two-factor
+	$("otp-form").addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const otp = $("otp").value.trim();
+		if (!otp) {
+			show("error", T.otpMissing);
+			return invalid($("otp"));
+		}
+		busy(e.target, true);
+		try {
+			await signIn({ otp, tmp_id: tmpId });
+		} catch (err) {
+			show("error", T.network);
+		} finally {
+			busy(e.target, false);
+			if (alertBox.classList.contains("error")) invalid($("otp"));
+		}
+	});
+
+	// ---------------------------------------------------------- forgot / email link
+	// The same answer whether or not the account exists, so the form cannot be
+	// used to find out who has one.
+	async function requestEmail(form, input, method, argName, doneText) {
+		clear();
+		const email = input.value.trim();
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			show("error", T.badEmail);
+			return invalid(input);
+		}
+		busy(form, true);
+		try {
+			const res = await post(method, { [argName]: email });
+			if (res.status === 429) show("error", T.tooMany);
+			else if (res.status >= 500) show("error", T.server);
+			else show("info", doneText);
+		} catch (err) {
+			show("error", T.network);
+		} finally {
+			busy(form, false);
+		}
+	}
+	$("forgot-form").addEventListener("submit", (e) => {
+		e.preventDefault();
+		requestEmail(e.target, $("forgot-email"), "frappe.core.doctype.user.user.reset_password", "user", T.resetSent);
+	});
+	$("link-form").addEventListener("submit", (e) => {
+		e.preventDefault();
+		requestEmail(e.target, $("link-email"), "frappe.www.login.send_login_link", "email", T.linkSent);
+	});
+
+	if (location.hash === "#forgot") go("forgot");
+	else if ($("usr") && matchMedia("(hover: hover) and (pointer: fine)").matches) $("usr").focus();
+})();
+</script>
+</body>
+</html>

@@ -66,7 +66,12 @@ class TestURYOrder(FrappeTestCase):
         mock_pos_profile.custom_enable_multiple_cashier = 0
         mock_pos_profile.applicable_for_users = []
         mock_pos_profile.transfer_role_permissions = _role_rows("URY Manager")
-        mock_pos_profile.role_allowed_for_billing = _role_rows()
+        # Billing access as well as elevated access. Without it sync_order
+        # takes the "table is already occupied, refresh the page" exit before
+        # it ever reaches the attribution this test is about, and returns
+        # {"status": "Failure"} — which the old blanket `except` swallowed,
+        # leaving the assertions below to compare unset MagicMock attributes.
+        mock_pos_profile.role_allowed_for_billing = _role_rows("URY Manager")
         mock_pos_profile.role_restricted_for_table_order = _role_rows()
         mock_get_doc.return_value = mock_pos_profile
 
@@ -78,45 +83,52 @@ class TestURYOrder(FrappeTestCase):
         # Setup has_permission to return True
         mock_has_permission.return_value = True
 
-        # Call sync_order
-        try:
-            # We mock frappe.db.sql as well in another patch if needed
-            with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql") as mock_sql:
-                # We expect this to not raise a PermissionError
-                # It might raise other errors due to missing items etc, but we just want to ensure
-                # it passes the permission check.
-                # Actually, let's catch everything and just assert has_permission was called.
-                try:
-                    sync_order(
-                        items="[]",
-                        cashier="fake_cashier",
-                        owner="fake_owner",
-                        mode_of_payment="Cash",
-                        customer="Test Customer",
-                        no_of_pax=2,
-                        last_invoice=None,
-                        waiter="fake_waiter",
-                        pos_profile="Test Profile"
-                    )
-                except Exception as e:
-                    pass
-                
-                mock_has_permission.assert_called_once_with("POS Invoice", "write", doc=mock_invoice)
-                
-                # Verify fake cashier/waiter were ignored
-                self.assertEqual(mock_invoice.cashier, "authorized@example.com")
-                # Waiter should remain "existing_waiter" because it was an existing invoice and we don't overwrite
-                self.assertEqual(mock_invoice.waiter, "existing_waiter")
-        except Exception as e:
-            self.fail(f"Test failed with {e}")
+        # Call sync_order. Nothing is caught here on purpose: the previous
+        # version wrapped the call in `except Exception: pass`, so a call
+        # that failed before doing any of this work still reached the
+        # assertions and compared MagicMock attributes to each other.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+            sync_order(
+                items="[]",
+                cashier="fake_cashier",
+                owner="fake_owner",
+                mode_of_payment="Cash",
+                customer="Test Customer",
+                no_of_pax=2,
+                last_invoice=None,
+                waiter="fake_waiter",
+                pos_profile="Test Profile",
+            )
 
+        # The write check ran against the invoice being modified.
+        mock_has_permission.assert_any_call("POS Invoice", "write", doc=mock_invoice)
+
+        # The client-supplied cashier is ignored; the session user is used.
+        self.assertEqual(mock_invoice.cashier, "authorized@example.com")
+        # Waiter stays "existing_waiter": an existing order keeps its owner.
+        self.assertEqual(mock_invoice.waiter, "existing_waiter")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
-    def test_sync_order_unauthorized(self, mock_has_permission, mock_get_order_invoice):
+    def test_sync_order_unauthorized(
+        self, mock_has_permission, mock_get_order_invoice, mock_get_doc, mock_get_roles
+    ):
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-001"
         mock_get_order_invoice.return_value = mock_invoice
-        
+
+        # sync_order loads the POS Profile before it checks permissions, so
+        # without these the test died on "POS Profile Test Profile not found"
+        # and never reached the denial it exists to prove.
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = _role_rows()
+        mock_pos_profile.transfer_role_permissions = _role_rows()
+        mock_pos_profile.role_restricted_for_table_order = _role_rows()
+        mock_get_doc.return_value = mock_pos_profile
+        mock_get_roles.return_value = ["URY Captain"]
+
         # Setup has_permission to return False
         mock_has_permission.return_value = False
         
@@ -213,9 +225,9 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     def test_price_items_for_invoice_shape(self, mock_get_value, mock_get_list):
-        def get_value_side_effect(doctype, filters, fieldname=None):
+        def get_value_side_effect(doctype, filters, fieldname=None, as_dict=False):
             if doctype == "URY Menu Item":
-                return "Starters"
+                return frappe._dict(course="Starters", rate=150)
             if doctype == "POS Profile":
                 return "Cost Center A"
             return None
@@ -241,7 +253,10 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
 
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
-    def test_price_items_for_invoice_throws_on_missing_price(self, mock_get_value, mock_get_list):
+    def test_price_items_for_invoice_throws_when_there_is_no_price_anywhere(
+        self, mock_get_value, mock_get_list
+    ):
+        """Not on the menu, not in the price list: there is nothing to charge."""
         mock_get_value.return_value = None
         mock_get_list.return_value = []
 
@@ -249,6 +264,82 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
             price_items_for_invoice(
                 [{"item": "Biryani", "item_name": "Biryani", "qty": 1}],
                 "Standard Selling", "Test Profile", "Branch A", "Menu A",
+            )
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.log_error")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    def test_unpublished_menu_rate_is_charged_rather_than_refused(
+        self, mock_get_value, mock_get_list, mock_log
+    ):
+        """A menu row with a rate but no Item Price is a sync gap.
+
+        The price list is published FROM the menu, and the menu rate is the
+        number the POS grid and the self-ordering page just showed the
+        customer, so it is what gets charged. Refusing instead stopped a
+        whole branch from taking any order at all.
+        """
+        def get_value_side_effect(doctype, filters, fieldname=None, as_dict=False):
+            if doctype == "URY Menu Item":
+                return frappe._dict(course="Starters", rate=250)
+            if doctype == "POS Profile":
+                return "Cost Center A"
+            return None
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_list.return_value = []
+
+        result = price_items_for_invoice(
+            [{"item": "Pizza", "item_name": "Pizza", "qty": 1}],
+            "Default Menu", "Test Profile", "Branch A", "Menu A",
+        )
+
+        self.assertEqual(result[0]["rate"], 250)
+        self.assertEqual(result[0]["price_list_rate"], 250)
+        self.assertEqual(result[0]["base_price_list_rate"], 250)
+        # Charging on is the right call, but the drift still has to be findable.
+        mock_log.assert_called_once()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    def test_a_published_price_wins_over_the_menu_rate(self, mock_get_value, mock_get_list):
+        """The price list stays authoritative wherever it has an answer."""
+        def get_value_side_effect(doctype, filters, fieldname=None, as_dict=False):
+            if doctype == "URY Menu Item":
+                return frappe._dict(course="Starters", rate=250)
+            if doctype == "POS Profile":
+                return "Cost Center A"
+            return None
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_price = MagicMock()
+        mock_price.price_list_rate = 300
+        mock_get_list.return_value = [mock_price]
+
+        result = price_items_for_invoice(
+            [{"item": "Pizza", "item_name": "Pizza", "qty": 1}],
+            "Default Menu", "Test Profile", "Branch A", "Menu A",
+        )
+
+        self.assertEqual(result[0]["rate"], 300)
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    def test_a_zero_menu_rate_is_not_treated_as_a_price(self, mock_get_value, mock_get_list):
+        """Zero is what an unpriced item looks like, and giving food away by
+        accident is worse than refusing the line."""
+        def get_value_side_effect(doctype, filters, fieldname=None, as_dict=False):
+            if doctype == "URY Menu Item":
+                return frappe._dict(course="Starters", rate=0)
+            return None
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_list.return_value = []
+
+        with self.assertRaises(frappe.ValidationError):
+            price_items_for_invoice(
+                [{"item": "Pizza", "item_name": "Pizza", "qty": 1}],
+                "Default Menu", "Test Profile", "Branch A", "Menu A",
             )
 
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")

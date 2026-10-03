@@ -1,5 +1,8 @@
 import frappe
 from frappe import _
+from frappe.utils import cstr
+
+from ury.ury.api.menu_quick_add import ensure_category
 
 @frappe.whitelist()
 def get_business_setup():
@@ -130,7 +133,7 @@ def submit_configure_data(data):
             comp_doc = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": default_company,
-                "default_currency": "INR"
+                "default_currency": "IQD"
             })
             comp_doc.insert(ignore_permissions=True)
             
@@ -258,28 +261,30 @@ def submit_configure_data(data):
     frappe.publish_realtime("ury_configure_progress", {"step": 2, "status": "loading"}, user=user)
 
     menu_items_table = []
-    item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
+    # Each item's category is its Item Group: what the POS groups by and what
+    # the kitchen below is told to prepare. (Every item used to land in the
+    # first leaf group found, so the POS showed one category and the kitchen
+    # only knew about that one.)
+    categories = []
     
     if not frappe.db.exists("UOM", "Unit"):
         frappe.get_doc({"doctype": "UOM", "uom_name": "Unit", "must_be_whole_number": 0}).insert(ignore_permissions=True)
     uom = "Unit"
 
     results["created_items"] = []
-    existing_courses = set(frappe.get_all("URY Menu Course", pluck="name"))
-    
+
     for m in data.get("menuItems", []):
         item_title = m.get("name")
-        course_title = m.get("course", "Main Course")
+        category = " ".join(cstr(m.get("category") or m.get("course") or _("Main Dishes")).split())
         item_price = float(m.get("price", 0))
 
         if not item_title:
             continue
 
-        # 5a. Ensure URY Menu Course exists
-        if course_title not in existing_courses:
-            c_doc = frappe.get_doc({"doctype": "URY Menu Course", "course": course_title})
-            c_doc.insert(ignore_permissions=True)
-            existing_courses.add(course_title)
+        # 5a. Ensure the category exists as a leaf Item Group
+        item_group = ensure_category(category)
+        if item_group not in categories:
+            categories.append(item_group)
 
         # 5b. PASS 1: Create ERPNext Item DocType record with Maintain Stock (is_stock_item) = 0!
         if not frappe.db.exists("Item", item_title):
@@ -301,7 +306,6 @@ def submit_configure_data(data):
             "item": item_title,
             "item_name": item_title,
             "rate": item_price,
-            "course": course_title
         })
 
     # 5c. PASS 2: Create URY Menu DocType record with the items
@@ -533,7 +537,7 @@ def submit_configure_data(data):
                 "pos_profile": pos_profile_name,
                 "branch": branch_name,
                 "warehouse": warehouse_name,
-                "item_groups": [{"item_group": item_group}]
+                "item_groups": [{"item_group": g} for g in categories]
             })
             prod_doc.insert(ignore_permissions=True)
             results["production_unit"] = prod_doc.name

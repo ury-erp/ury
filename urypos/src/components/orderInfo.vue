@@ -1,19 +1,19 @@
 <template>
-  <nav class="mb-3 mt-1 flex" aria-label="Breadcrumb" v-if="this.auth.cashier">
+  <nav class="mb-3 mt-1 flex" :aria-label="$t('a11y.breadcrumb')" v-if="this.auth.cashier">
     <ol
       class="inline-flex items-center space-x-1 rtl:space-x-reverse md:space-x-2"
     >
       <li>
         <div class="flex items-center">
-          <span class="text-base font-medium text-gray-700 dark:text-gray-400"
-            >Order</span
+          <span class="text-base font-medium text-foreground"
+            >{{ $t('order.title') }}</span
           >
         </div>
       </li>
       <li aria-current="page">
         <div class="flex items-center">
           <svg
-            class="mx-1 h-3 w-3 text-gray-400 rtl:rotate-180"
+            class="mx-1 h-3 w-3 text-muted-foreground rtl:rotate-180"
             aria-hidden="true"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -28,7 +28,7 @@
             />
           </svg>
           <span
-            class="ms-1 text-base font-medium text-gray-500 dark:text-gray-400 md:ms-2"
+            class="ms-1 text-base font-medium text-muted-foreground md:ms-2"
             >{{ this.recentOrders.orderNumber }}</span
           >
         </div>

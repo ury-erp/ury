@@ -76,7 +76,7 @@ const POSOpeningDialog = ({
       primaryAction: onCloseNow
         ? {
             label: t('pos.opening.close_now'),
-            icon: <Lock className="w-5 h-5 mr-2" />,
+            icon: <Lock className="w-5 h-5 me-2" />,
             onClick: onCloseNow,
           }
         : undefined,
@@ -89,7 +89,7 @@ const POSOpeningDialog = ({
       description: message || t('pos.opening.contact_manager'),
       primaryAction: {
         label: t('pos.opening.retry'),
-        icon: <RefreshCw className="w-5 h-5 mr-2" />,
+        icon: <RefreshCw className="w-5 h-5 me-2" />,
         onClick: onRetry,
       },
     },
@@ -105,7 +105,7 @@ const POSOpeningDialog = ({
       }),
       primaryAction: {
         label: t('pos.opening.continue_to_pos'),
-        icon: <ArrowRight className="w-5 h-5 mr-2" />,
+        icon: <ArrowRight className="w-5 h-5 me-2" />,
         onClick: onContinue,
       },
     },
@@ -119,7 +119,7 @@ const POSOpeningDialog = ({
       description: t('pos.opening.contact_manager'),
       primaryAction: {
         label: t('pos.opening.retry'),
-        icon: <RefreshCw className="w-5 h-5 mr-2" />,
+        icon: <RefreshCw className="w-5 h-5 me-2" />,
         onClick: onRetry,
       },
     },
@@ -158,7 +158,7 @@ const POSOpeningDialog = ({
                 variant="outline"
                 className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-6 rounded-lg transition-colors duration-200"
               >
-                <Monitor className="w-5 h-5 mr-2" />
+                <Monitor className="w-5 h-5 me-2" />
                 {t('pos.switch_to_desk')}
               </Button>
             )}

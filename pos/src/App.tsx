@@ -9,13 +9,13 @@ import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import KotAlertListener from './components/KotAlertListener';
+import QzPrintAgent from './components/QzPrintAgent';
 import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
 import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
-import { getActiveLanguage } from './i18n';
 
 function App() {
   const {
@@ -26,16 +26,11 @@ function App() {
     initializeApp();
   }, [initializeApp]);
 
-  useEffect(() => {
-    const lang = getActiveLanguage();
-    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang || 'en';
-  }, []);
   return (
     <>
       <ToastProvider />
       <KotAlertListener />
+      <QzPrintAgent />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
@@ -54,7 +49,7 @@ function App() {
                   Cashier POS routes above, not nested under AppLayout
                   (PLAN.md §6/§10: own navigation, mobile-first, not the
                   desktop Header/Footer shell). This Router (basename
-                  "/ury") is already the outer app-nesting layer that mounts
+                  "/restro") is already the outer app-nesting layer that mounts
                   "/pos" today, so "/order" sits alongside it here rather
                   than in a separate outer router file.
                 */}

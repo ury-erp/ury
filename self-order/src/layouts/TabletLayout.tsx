@@ -5,6 +5,10 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+import { useMenuDiscovery } from '../hooks/useMenuDiscovery'
+import { MenuDiscoveryBar } from '../components/MenuDiscoveryBar'
+import { t } from '../i18n'
+import { LanguageToggle } from '../components/LanguageToggle'
 
 const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
@@ -29,6 +33,10 @@ function TabletLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    billStatus,
+    waiterStatus,
+    kitchenStatus,
+    handleCallWaiter,
     payingOnline,
     addToCart,
     decrementCart,
@@ -42,10 +50,13 @@ function TabletLayout({ initialContext }: LayoutProps) {
   } = useOrderingSession(initialContext)
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
-  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  // Same search and course filtering as every other ordering surface,
+  // so finding a dish does not depend on which screen the guest is at.
+  const discovery = useMenuDiscovery(menu)
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(t('order.confirm_restart'))) {
       resetSession()
     }
   }
@@ -73,7 +84,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading menu…
+        {t('order.loading_menu')}
       </div>
     )
   }
@@ -90,14 +101,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b bg-background/95 px-6 py-4">
         <h1 className="text-xl font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {context?.table ? t('order.table', { table: context.table }) : t('order.for_pickup')}
         </h1>
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
         <button
           onClick={handleReset}
           className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
         >
-          New Order
+          {t('order.new_order')}
         </button>
+        </div>
       </header>
 
       {error && (
@@ -105,14 +119,18 @@ function TabletLayout({ initialContext }: LayoutProps) {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="w-[68%] overflow-y-auto p-6">
+        <main className="w-[60%] overflow-y-auto p-6">
+          <div className="mb-5">
+            <MenuDiscoveryBar discovery={discovery} size="default" />
+          </div>
+
           <MenuGrid
-            menu={menu}
+            menu={discovery.visibleMenu}
             cart={cart}
             capabilities={context?.capabilities}
             onAdd={addToCart}
-            gridClassName="grid grid-cols-3 gap-4 lg:grid-cols-4"
-            cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
+            gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            cardClassName="flex min-w-0 flex-col overflow-hidden rounded-xl border text-start transition active:scale-[0.98]"
             imageClassName="h-32 w-full object-cover"
           />
         </main>
@@ -125,27 +143,31 @@ function TabletLayout({ initialContext }: LayoutProps) {
           cartTotal={cartTotal}
           submitting={submitting}
           billRequested={billRequested}
+          billStatus={billStatus}
+          waiterStatus={waiterStatus}
+          kitchenStatus={kitchenStatus}
+          onCallWaiter={handleCallWaiter}
           payingOnline={payingOnline}
           onIncrement={addToCart}
           onDecrement={decrementCart}
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
-          className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
+          className="flex w-[40%] flex-col overflow-hidden border-s bg-background p-4"
         />
       </div>
 
       <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
         <DialogContent onClose={handleStillHere}>
           <DialogHeader>
-            <DialogTitle>Still there?</DialogTitle>
+            <DialogTitle>{t('idle.title')}</DialogTitle>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={handleStillHere}
               className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
             >
-              I'm still here
+              {t('idle.confirm')}
             </button>
           </DialogFooter>
         </DialogContent>

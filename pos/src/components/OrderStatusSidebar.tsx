@@ -7,6 +7,7 @@ import { t } from '../i18n';
 
 interface OrderStatusSidebarProps {
   disabled?: boolean;
+  className?: string;
   selectedStatus: OrderStatusType;
   setSelectedStatus: (status: OrderStatusType) => void;
   getStatusCount?: (status: OrderStatusType) => number;
@@ -14,6 +15,7 @@ interface OrderStatusSidebarProps {
 
 const OrderStatusSidebar = ({ 
   disabled,
+  className,
   selectedStatus,
   setSelectedStatus,
 }: OrderStatusSidebarProps) => {
@@ -25,7 +27,8 @@ const OrderStatusSidebar = ({
   return (
     <div className={cn(
       "w-64 bg-white border-e border-gray-200 h-full flex flex-col",
-      disabled && "opacity-50 pointer-events-none"
+      disabled && "opacity-50 pointer-events-none",
+      className
     )}>
       <nav className="flex-1 p-6 overflow-y-auto">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">

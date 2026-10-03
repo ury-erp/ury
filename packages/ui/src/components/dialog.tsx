@@ -82,6 +82,11 @@ export interface DialogProps
    * false for blocking gates (e.g. ChecklistGateDialog) that must not be
    * dismissible via Escape. */
   closeOnEscape?: boolean
+  /** Whether clicking the backdrop closes the dialog. Defaults to true.
+   * `closeOnEscape` alone was not enough to make a dialog non-dismissible:
+   * the overlay closed unconditionally, so a payment mid-flight could still
+   * be dismissed by a stray tap beside it. */
+  closeOnBackdrop?: boolean
 }
 
 // Elements considered reachable via Tab, used both to seed initial focus and
@@ -105,7 +110,7 @@ function mergeRefs<T>(
 
 const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
   (
-    { className, variant, open, onOpenChange, closeOnEscape = true, children, ...props },
+    { className, variant, open, onOpenChange, closeOnEscape = true, closeOnBackdrop = true, children, ...props },
     ref
   ) => {
     const titleId = React.useId()
@@ -180,7 +185,9 @@ const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
       >
         <div
           className={cn(overlayVariants({ variant }))}
-          onClick={() => onOpenChange?.(false)}
+          onClick={() => {
+            if (closeOnBackdrop) onOpenChange?.(false)
+          }}
         />
         <DialogTitleContext.Provider value={titleId}>
           {children}

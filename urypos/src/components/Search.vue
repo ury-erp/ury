@@ -15,7 +15,7 @@
       >
         <svg
           aria-hidden="true"
-          class="h-5 w-5 text-gray-500 dark:text-gray-400"
+          class="h-5 w-5 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -32,8 +32,8 @@
       <input
         type="search"
         id="default-search"
-        class="block w-full rounded border border-gray-300 bg-gray-50 px-10 pb-2 pt-2.5 text-sm font-medium text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
-        placeholder="Item Search"
+        class="block w-full rounded-xl border border-input bg-muted px-10 pb-2 pt-2.5 text-sm font-medium text-foreground focus:border-ring focus:ring-ring"
+        :placeholder="$t('menu.item_search')"
         v-model="this.menu.searchTerm"
         @input="this.menu.handleSearchInput"
         @click="this.menu.clearSearch"
@@ -47,11 +47,11 @@
       <div class="relative w-full">
         <label
           for="first"
-          class="absolute z-50 -mt-2 ml-2 bg-white px-2 text-xs"
-          >Select Course</label
+          class="absolute z-50 -mt-2 ml-2 bg-card px-2 text-xs"
+          >{{ $t('menu.select_course') }}</label
         >
         <select
-          class="relative w-full rounded border border-gray-300 bg-gray-50 pt-2.5 text-sm"
+          class="relative w-full rounded-xl border border-input bg-muted pt-2.5 text-sm"
           id="course"
           v-model="menu.selectedCourse"
           @change="this.menu.displayAll = false"
@@ -66,20 +66,20 @@
         </select>
       </div>
       <button
-        class="focus:shadow-outline w-28 rounded bg-blue-700 p-2 font-bold text-white hover:bg-blue-900 focus:outline-blue-500"
+        class="focus:shadow-outline w-28 rounded-xl bg-primary p-2 font-bold text-primary-foreground hover:brightness-95 focus:outline-blue-500"
         type="button"
-        :class="{ 'bg-blue-900': this.menu.priority }"
+        :class="{ 'ring-2 ring-accent brightness-90': this.menu.priority }"
         @click="this.menu.showSpecialItems"
       >
-        Priority
+        {{ $t('order.priority') }}
       </button>
       <button
-        class="focus:shadow-outline w-28 rounded bg-blue-700 p-2 font-bold text-white hover:bg-blue-900 focus:outline-blue-500"
+        class="focus:shadow-outline w-28 rounded-xl bg-primary p-2 font-bold text-primary-foreground hover:brightness-95 focus:outline-blue-500"
         type="button"
-        :class="{ 'bg-blue-900': this.menu.displayAll }"
+        :class="{ 'ring-2 ring-accent brightness-90': this.menu.displayAll }"
         @click="this.menu.showAllItems"
       >
-        All
+        {{ $t('common.all') }}
       </button>
     </div>
   </div>

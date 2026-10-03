@@ -552,5 +552,6 @@ class URYDailyPandL(Document):
 	def get_proft_loss_details(self):
 		return frappe.render_template(
 			"ury/doctype/ury_daily_p_and_l/profit_loss_details.html",
-			{"data": self, "currency": "INR"},
+			{"data": self, "currency": frappe.get_cached_value("Company", self.get("company"), "default_currency")
+				if self.get("company") else frappe.defaults.get_global_default("currency") or "IQD"},
 		)
