@@ -9,6 +9,7 @@ import {
   Users,
   Timer,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button, Input, Textarea, Badge, Spinner, showToast } from '@ury/ui';
 import { parseFrappeError } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
@@ -40,7 +41,7 @@ function quoteText(estimate?: WaitEstimate): string {
   return t('dash.waitlist.about_minutes', { count: String(estimate.minutes) });
 }
 
-const StatCard: React.FC<{ icon: React.ElementType; label: string; value: string }> = ({
+const StatCard: React.FC<{ icon: LucideIcon; label: string; value: string }> = ({
   icon: Icon,
   label,
   value,
