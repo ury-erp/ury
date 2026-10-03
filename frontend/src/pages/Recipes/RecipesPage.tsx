@@ -378,7 +378,7 @@ const ConsumptionTab: React.FC = () => {
               <li key={p.name} className="flex flex-wrap items-start justify-between gap-3 px-5 py-3 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-gray-900">
-                    <a href={`/ury/invoices/${encodeURIComponent(p.pos_invoice)}`} className="text-primary hover:underline">{p.pos_invoice}</a>
+                    <a href={`/restro/invoices/${encodeURIComponent(p.pos_invoice)}`} className="text-primary hover:underline">{p.pos_invoice}</a>
                     <span className="ms-2 text-xs font-normal text-gray-500">{formatServerDate(p.posting_date, locale)}</span>
                   </p>
                   <p className={`mt-0.5 text-xs ${p.status === 'Failed' ? 'text-red-700' : 'text-gray-500'}`}>
