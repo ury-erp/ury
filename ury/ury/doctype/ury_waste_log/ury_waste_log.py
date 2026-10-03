@@ -87,7 +87,7 @@ class URYWasteLog(Document):
 					}
 					for row in stock_rows
 				],
-				"remarks": _("URY waste: {0}").format(self.reason),
+				"remarks": _("Waste: {0}").format(self.reason),
 			})
 			entry.insert(ignore_permissions=True)
 			entry.submit()
