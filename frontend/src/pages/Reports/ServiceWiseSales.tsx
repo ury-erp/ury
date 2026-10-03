@@ -7,6 +7,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { orderTypeLabel } from '../../lib/statusLabels';
 import { t } from '../../i18n';
 import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
@@ -24,7 +25,7 @@ interface ServiceWiseSalesData {
 }
 
 const getColumns = (): DataTableColumn<ServiceRow>[] => [
-  { key: 'order_type', header: t('fields.order_type') },
+  { key: 'order_type', header: t('fields.order_type'), render: (r) => orderTypeLabel(r.order_type) },
   { key: 'order_count', header: t('fields.orders'), align: 'right' },
   { key: 'revenue', header: t('fields.revenue'), render: (r) => formatCurrency(r.revenue), align: 'right' },
   { key: 'avg_order_value', header: t('fields.avg_order_value'), render: (r) => formatCurrency(r.avg_order_value), align: 'right' },
@@ -107,7 +108,7 @@ export function ServiceWiseSales() {
             <div className="lg:col-span-2">
               <PieChartCard
                 title={t('reports.service_wise_sales.revenue_by_order_type')}
-                data={data.by_service_type}
+                data={data.by_service_type.map((r) => ({ ...r, order_type: orderTypeLabel(r.order_type) }))}
                 dataKey="revenue"
                 nameKey="order_type"
               />
