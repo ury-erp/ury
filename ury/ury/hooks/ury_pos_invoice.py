@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from datetime import datetime
 from frappe.utils import now_datetime, get_time, now, get_datetime
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
@@ -106,14 +107,24 @@ def calculate_and_set_times(doc, method):
 
 
 def validate_invoice_print(doc, method):
-    # Check if the invoice has been printed
-    invoice_printed = frappe.db.get_value("POS Invoice", doc.name, "invoice_printed")
+    """Refuse to settle an unprinted table bill — only where the restaurant asks.
 
-    # If the invoice is associated with a restaurant table and hasn't been printed
-    if doc.restaurant_table and invoice_printed == 0:
-        frappe.throw(
-            "Printing the invoice is mandatory before submitting. Please print the invoice."
-        )
+    Settling used to require a printed bill unconditionally, while the POS had
+    stopped asking for one (a guest may not want a receipt): the cashier took
+    the money and the submit then failed. It is now a POS Profile choice,
+    for restaurants that want every table bill on paper before payment.
+    """
+    if not doc.restaurant_table or not requires_bill_print(doc.pos_profile):
+        return
+
+    if not frappe.db.get_value("POS Invoice", doc.name, "invoice_printed"):
+        frappe.throw(_("Print the bill before taking payment for this table."))
+
+
+def requires_bill_print(pos_profile):
+    if not pos_profile or not frappe.get_meta("POS Profile").has_field("custom_require_bill_print"):
+        return False
+    return bool(frappe.db.get_value("POS Profile", pos_profile, "custom_require_bill_print"))
 
 
 def table_status_delete(doc, method):
