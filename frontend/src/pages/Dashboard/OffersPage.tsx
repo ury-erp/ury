@@ -5,6 +5,7 @@ import { formatCurrency } from '@ury/core';
 import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 import { promotionsService, type OfferRule } from '../../services/promotions';
 import { t } from '../../i18n';
+import { useAccess } from '../../hooks/useAccess';
 
 /** What the rule takes off, in the words a cashier would use. */
 function offerValue(rule: OfferRule): string {
@@ -15,7 +16,7 @@ function offerValue(rule: OfferRule): string {
   return t('dash.offers.see_rule');
 }
 
-const OfferCard: React.FC<{ rule: OfferRule; needsCode: boolean }> = ({ rule, needsCode }) => (
+const OfferCard: React.FC<{ rule: OfferRule; needsCode: boolean; desk: boolean }> = ({ rule, needsCode, desk }) => (
   <li className="rounded-xl border border-gray-200 bg-white p-4">
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
@@ -35,7 +36,7 @@ const OfferCard: React.FC<{ rule: OfferRule; needsCode: boolean }> = ({ rule, ne
         : t('dash.offers.no_end_date')}
     </p>
 
-    <a
+    {desk && <a
       href={`/app/pricing-rule/${encodeURIComponent(rule.name)}`}
       target="_blank"
       rel="noopener noreferrer"
@@ -43,7 +44,7 @@ const OfferCard: React.FC<{ rule: OfferRule; needsCode: boolean }> = ({ rule, ne
     >
       <ExternalLink className="h-3.5 w-3.5" />
       {t('dash.offers.edit_rule')}
-    </a>
+    </a>}
   </li>
 );
 
@@ -56,6 +57,8 @@ const OfferCard: React.FC<{ rule: OfferRule; needsCode: boolean }> = ({ rule, ne
  * ask for".
  */
 export const OffersPage: React.FC = () => {
+  // Pricing rules are edited in Desk; people kept out of Desk see them read-only.
+  const { access } = useAccess();
   const [automatic, setAutomatic] = useState<OfferRule[]>([]);
   const [coupon, setCoupon] = useState<OfferRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,9 +92,11 @@ export const OffersPage: React.FC = () => {
           </h1>
           <p className="text-sm text-gray-500">{t('dash.offers.subtitle')}</p>
         </div>
-        <Button variant="outline" onClick={() => window.open('/app/pricing-rule/new', '_blank', 'noopener')}>
-          {t('dash.offers.new_rule')}
-        </Button>
+        {access.desk && (
+          <Button variant="outline" onClick={() => window.open('/app/pricing-rule/new', '_blank', 'noopener')}>
+            {t('dash.offers.new_rule')}
+          </Button>
+        )}
       </div>
 
       {loadError && <LoadErrorBanner onRetry={() => void fetch()} />}
@@ -115,7 +120,7 @@ export const OffersPage: React.FC = () => {
             ) : (
               <ul className="space-y-3">
                 {automatic.map((rule) => (
-                  <OfferCard key={rule.name} rule={rule} needsCode={false} />
+                  <OfferCard key={rule.name} rule={rule} needsCode={false} desk={access.desk} />
                 ))}
               </ul>
             )}
@@ -134,7 +139,7 @@ export const OffersPage: React.FC = () => {
             ) : (
               <ul className="space-y-3">
                 {coupon.map((rule) => (
-                  <OfferCard key={rule.name} rule={rule} needsCode />
+                  <OfferCard key={rule.name} rule={rule} needsCode desk={access.desk} />
                 ))}
               </ul>
             )}
