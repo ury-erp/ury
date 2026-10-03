@@ -2,6 +2,7 @@ import React from 'react';
 import { Spinner } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import { t } from '../../i18n';
+import { useAccess } from '../../hooks/useAccess';
 
 interface Props {
   children: React.ReactNode;
@@ -29,6 +30,19 @@ interface Props {
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { capabilities, isLoading, error } = useCaptainContext();
+  const { access, loaded } = useAccess();
+
+  if (loaded && access.pos_off.includes('captain')) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-amber-600 text-xl mb-4">⛔</div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('captain.feature_off_title')}</h2>
+          <p className="text-gray-600">{t('captain.feature_off_body')}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
