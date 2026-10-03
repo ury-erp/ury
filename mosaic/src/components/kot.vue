@@ -75,33 +75,36 @@
     <!-- Load failure. Shown ahead of every empty state so a broken feed is
          never reported as a clear kitchen. Any tickets already on screen stay
          where they are; this only replaces the "nothing here" message. -->
-    <div v-if="kotsError && stationKots.length === 0 && !loadingKots" role="alert" class="text-center py-20 animate-fade-in">
-      <div class="empty-kitchen-icon">!</div>
-      <p class="text-lg font-bold text-[#3f2a20]">{{ $t('kot.load_failed') }}</p>
-      <p class="mt-1 text-sm text-[#9a7e6b]">{{ $t('kot.load_failed_hint') }}</p>
-      <button
-        type="button"
-        class="press mt-4 rounded-xl bg-[#ffca4b] px-5 py-2 font-bold text-[#3f2a20]"
-        @click="retryFetchKot"
-      >
+    <EmptyState
+      v-if="kotsError && stationKots.length === 0 && !loadingKots"
+      role="alert"
+      image="kitchen-offline"
+      :title="$t('kot.load_failed')"
+      :body="$t('kot.load_failed_hint')"
+    >
+      <button type="button" class="btn-kitchen press" :disabled="loadingKots" @click="retryFetchKot">
         {{ $t('kot.retry') }}
       </button>
-    </div>
+    </EmptyState>
 
-    <div v-else-if="stationKots.length === 0 && !loadingKots" class="text-center py-20 animate-fade-in">
-      <div class="empty-kitchen-icon">✓</div>
-      <p class="text-lg font-bold text-[#3f2a20]">{{ $t('kot.kitchen_clear') }}</p>
-      <p class="mt-1 text-sm text-[#9a7e6b]">{{ $t('kot.no_active_orders', { station: production }) }}</p>
-    </div>
+    <EmptyState
+      v-else-if="stationKots.length === 0 && !loadingKots"
+      image="kitchen-clear"
+      :title="$t('kot.kitchen_clear')"
+      :body="$t('kot.clear_hint', { station: production })"
+    />
 
     <!-- Tickets exist, but the current filter hides all of them. Saying so
          beats an empty board that looks like a broken feed. -->
-    <div v-else-if="visibleKots.length === 0 && !loadingKots" class="text-center py-16 animate-fade-in">
-      <p class="text-base font-bold text-[#3f2a20]">{{ $t('toolbar.none_in_filter') }}</p>
-      <button type="button" class="press mt-3 rounded-xl bg-[#ffca4b] px-5 py-2 font-bold text-[#3f2a20]" @click="filter = 'all'">
+    <EmptyState
+      v-else-if="visibleKots.length === 0 && !loadingKots"
+      compact
+      :title="$t('toolbar.none_in_filter')"
+    >
+      <button type="button" class="btn-kitchen btn-kitchen--quiet press" @click="filter = 'all'">
         {{ $t('toolbar.show_all') }}
       </button>
-    </div>
+    </EmptyState>
 
     <!--
       The board.
@@ -494,12 +497,13 @@ import KitchenMessages from "./KitchenMessages.vue";
 import KotDetails from "./KotDetails.vue";
 import KitchenToolbar from "./KitchenToolbar.vue";
 import RecallPanel from "./RecallPanel.vue";
+import EmptyState from "./EmptyState.vue";
 
 /** Fallback when the branch has no KOT warning time configured, in minutes. */
 const DEFAULT_ALERT_MINUTES = 15;
 
 export default {
-  components: { KitchenMessages, KotDetails, KitchenToolbar, RecallPanel },
+  components: { KitchenMessages, KotDetails, KitchenToolbar, RecallPanel, EmptyState },
   props: ["production"],
   data() {
     return {
