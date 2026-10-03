@@ -22,7 +22,7 @@
    "fieldtype": "Check",
    "label": "Keep restaurant staff out of Desk",
    "default": "1",
-   "description": "Users whose URY roles are all blocked below are sent to their own screen instead of Desk. System Managers and Administrator are never blocked."
+   "description": "Users whose restaurant roles are all blocked below are sent to their own screen instead of Desk. System Managers and Administrator are never blocked."
   },
   {
    "fieldname": "role_access",
@@ -44,7 +44,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-03 00:00:00.000000",
+ "modified": "2026-10-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Feature Settings",
