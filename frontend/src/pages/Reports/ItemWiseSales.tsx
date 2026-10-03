@@ -121,7 +121,7 @@ export function ItemWiseSales() {
         </div>
       )}
 
-      <DataTable columns={getColumns()} rows={data?.items ?? []} isLoading={isLoading} />
+      <DataTable columns={getColumns()} rows={data?.items ?? []} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
 
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
