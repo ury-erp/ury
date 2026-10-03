@@ -115,7 +115,7 @@ export function EmployeeSales() {
         </>
       )}
 
-      <DataTable columns={getColumns()} rows={data?.employees ?? []} isLoading={isLoading} />
+      <DataTable columns={getColumns()} rows={data?.employees ?? []} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
     </div>
   );
 }
