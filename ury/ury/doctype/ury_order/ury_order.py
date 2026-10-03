@@ -1578,6 +1578,84 @@ def get_captain_context():
     }
 
 
+def _log_order_activity(invoice, past_items, is_new_order):
+    """Write what this sync changed onto the bill's activity timeline."""
+    from ury.ury.api.invoice_activity import log_activity
+
+    before, names = {}, {}
+    for row in past_items:
+        before[row["item_code"]] = before.get(row["item_code"], 0) + flt(row["qty"])
+        names[row["item_code"]] = row.get("item_name") or row["item_code"]
+    after = {}
+    for row in invoice.items:
+        after[row.item_code] = after.get(row.item_code, 0) + flt(row.qty)
+        names[row.item_code] = row.item_name or row.item_code
+
+    def lines(pairs):
+        return "، ".join(f"{names[code]} ×{frappe.utils.fmt_float(qty) if qty % 1 else int(qty)}" for code, qty in pairs)
+
+    added = [(c, q - before.get(c, 0)) for c, q in after.items() if q > before.get(c, 0)]
+    removed = [(c, q - after.get(c, 0)) for c, q in before.items() if q > after.get(c, 0)]
+
+    if is_new_order:
+        where = _("table {0}").format(invoice.restaurant_table) if invoice.restaurant_table else _(invoice.order_type or "")
+        log_activity(invoice.name, _("Order opened ({0}): {1}").format(where, lines(added)))
+        return
+    if added:
+        log_activity(invoice.name, _("Items added: {0}").format(lines(added)))
+    if removed:
+        log_activity(invoice.name, _("Items removed: {0}").format(lines(removed)))
+
+
+WALK_IN_CUSTOMER = "زبون نقدي"
+
+
+def resolve_order_customer(customer, table, invoice, pos_profile):
+    """The customer an order is billed to; choosing one is optional.
+
+    Picking a customer for every bill slowed the counter down for no gain —
+    most guests are anonymous. When none is chosen:
+    - an order already running keeps the customer it has,
+    - a table order is billed to the table, registered as a customer the
+      first time it is used (so reports still show sales per table),
+    - anything else goes to the POS Profile's default customer, or a shared
+      walk-in customer.
+    """
+    customer = (customer or "").strip()
+    if customer:
+        return customer
+    if invoice.get("customer"):
+        return invoice.customer
+    if table:
+        return _ensure_customer(frappe.db.get_value("URY Table", table, "name") or table, pos_profile)
+    return pos_profile.get("customer") or _ensure_customer(WALK_IN_CUSTOMER, pos_profile)
+
+
+def _ensure_customer(customer_name, pos_profile):
+    existing = frappe.db.get_value("Customer", {"customer_name": customer_name, "disabled": 0})
+    if existing:
+        return existing
+    doc = frappe.get_doc({
+        "doctype": "Customer",
+        "customer_name": customer_name,
+        "customer_type": "Individual",
+        "customer_group": pos_profile.get("customer_group")
+            or frappe.db.get_single_value("Selling Settings", "customer_group")
+            or frappe.db.get_value("Customer Group", {"is_group": 0})
+            or "All Customer Groups",
+        "territory": frappe.db.get_single_value("Selling Settings", "territory")
+            or frappe.db.get_value("Territory", {"is_group": 0})
+            or "All Territories",
+    })
+    try:
+        doc.insert(ignore_permissions=True)
+    except frappe.DuplicateEntryError:
+        # Two tills opening the same table at once: the other one won.
+        frappe.clear_messages()
+        return frappe.db.get_value("Customer", {"customer_name": customer_name})
+    return doc.name
+
+
 @frappe.whitelist()
 def sync_order(
     items,
@@ -1747,10 +1825,8 @@ def sync_order(
             )
             return {"status": "Failure"}
 
-    if not customer:
-        frappe.throw("Please enter valid customer details")
-    else:
-        invoice.customer = customer
+    invoice.customer = resolve_order_customer(customer, table, invoice, posprofile)
+    customer = invoice.customer
 
     if order_type:
         invoice.order_type = order_type
@@ -1880,10 +1956,13 @@ def sync_order(
     for item_dict in priced_items:
         invoice.append("items", item_dict)
 
+    is_new_order = invoice.is_new()
     try:
         invoice.save()
     except Exception as e:
         frappe.throw(f"Error while updating order: {e}")   
+
+    _log_order_activity(invoice, past_item, is_new_order)
 
 
     try:
@@ -2538,6 +2617,15 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
+
+    from ury.ury.api.invoice_activity import log_activity, money, payments_summary
+    paid_text = _("Bill paid: {0}").format(money(invoice.rounded_total or invoice.grand_total, invoice.name))
+    summary = payments_summary(payments, invoice.name)
+    if summary:
+        paid_text += f" ({summary})"
+    if flt(invoice.change_amount) > 0:
+        paid_text += " — " + _("change {0}").format(money(invoice.change_amount, invoice.name))
+    log_activity(invoice.name, paid_text)
         
     # Free the table when no other open drafts remain on this table group
 
