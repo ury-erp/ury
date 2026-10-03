@@ -4,27 +4,45 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="robots" content="noindex, nofollow">
-	<title>{{ _("Not available") }}</title>
+	<meta name="theme-color" content="#f8f5f0">
+	<title>{{ _("Not available") }} · Smart Choice</title>
+	<link rel="icon" type="image/png" href="/assets/ury/Images/smart-choice-icon.png">
 	<style>
 		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFC; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
 		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2") format("woff2"); unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFC; }
-		body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font-family: "IBM Plex Sans Arabic", system-ui, sans-serif; color: #0f172a; background: radial-gradient(800px 400px at 50% -10%, #fdecea, transparent 60%), #f6f7fb; }
-		.box { max-width: 440px; text-align: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 36px 28px; box-shadow: 0 20px 40px -24px rgba(15,23,42,.25); }
-		.icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px; display: grid; place-items: center; background: #fdecea; color: #e5392f; }
-		h1 { margin: 0 0 8px; font-size: 22px; }
-		p { margin: 0 0 22px; color: #475569; line-height: 1.8; font-size: 14px; }
-		a { display: inline-block; padding: 12px 22px; border-radius: 12px; background: #e5392f; color: #fff; text-decoration: none; font-weight: 600; }
-		a:focus-visible { outline: 3px solid rgba(229,57,47,.35); outline-offset: 2px; }
+		@font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: swap; src: url("/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+		:root { --ink: #303c38; --ink-2: #65706a; --brand: #b64c32; --brand-dark: #9e3f29; --page: #f8f5f0; }
+		* { box-sizing: border-box; }
+		body {
+			margin: 0; min-height: 100vh; min-height: 100svh; display: grid; place-items: center; padding: 24px;
+			font-family: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; color: var(--ink);
+			background: radial-gradient(ellipse at 12% 18%, #f2e6d9 0, transparent 46%), radial-gradient(ellipse at 90% 88%, #e6ebe0 0, transparent 42%), var(--page);
+			-webkit-font-smoothing: antialiased;
+		}
+		.box { width: 100%; max-width: 460px; text-align: center; }
+		.brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 8px; color: var(--ink); text-decoration: none; font-weight: 600; }
+		.brand span { display: grid; place-items: center; width: 40px; height: 44px; border-radius: 13px; background: #fffefa; border: 1px solid #ede5da; }
+		.brand img { width: 24px; height: 33px; object-fit: contain; }
+		.art { display: block; width: min(100%, 360px); height: auto; margin: 0 auto -4px; animation: float 9s ease-in-out infinite; }
+		h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; line-height: 1.45; }
+		p { margin: 0 auto 24px; max-width: 380px; color: var(--ink-2); font-size: 15px; line-height: 1.85; }
+		.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 24px; border-radius: 14px; color: #fff; text-decoration: none; font-weight: 600;
+			background: linear-gradient(115deg, #bd583c, var(--brand)); box-shadow: 0 8px 20px -8px #b64c3280; transition: background .15s; }
+		.btn:hover { background: var(--brand-dark); }
+		.btn:focus-visible { outline: 2px solid var(--brand-dark); outline-offset: 4px; }
+		[dir="rtl"] .btn svg { transform: rotate(180deg); }
+		@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+		@media (prefers-reduced-motion: reduce) { .art { animation: none; } }
 	</style>
 </head>
 <body>
 	<main class="box">
-		<div class="icon" aria-hidden="true">
-			<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
-		</div>
+		<a class="brand" href="{{ home|e }}"><span><img src="/assets/ury/Images/smart-restro-logo.png" alt="" width="24" height="33"></span><bdi>Smart Choice</bdi></a>
+		<img class="art" src="/assets/ury/illustrations/unavailable.svg" alt="" width="420" height="300">
 		<h1>{{ _("This page is not available") }}</h1>
 		<p>{% if feature %}{{ _("{0} is switched off for this restaurant. Ask an administrator if you need it.").format(feature|e) }}{% else %}{{ _("This feature is switched off for this restaurant.") }}{% endif %}</p>
-		<a href="{{ home|e }}">{{ _("Go back") }}</a>
+		<a class="btn" href="{{ home|e }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>{{ _("Go back") }}</a>
 	</main>
 </body>
 </html>
