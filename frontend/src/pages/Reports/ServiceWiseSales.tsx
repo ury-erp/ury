@@ -114,7 +114,7 @@ export function ServiceWiseSales() {
               />
             </div>
             <div className="lg:col-span-3">
-              <DataTable columns={getColumns()} rows={data.by_service_type} isLoading={isLoading} />
+              <DataTable columns={getColumns()} rows={data.by_service_type} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
             </div>
           </div>
         </>
