@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Receipt, IndianRupee, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
+import { Receipt, Banknote, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
@@ -106,7 +106,7 @@ export function DaywiseSales() {
             <StatCard
               label={t('reports.daywise_sales.period_total')}
               value={formatCurrency(data.summary.period_total)}
-              icon={<IndianRupee className="w-4 h-4" />}
+              icon={<Banknote className="w-4 h-4" />}
             />
             <StatCard
               label={t('reports.daywise_sales.avg_daily_sales')}
