@@ -283,6 +283,7 @@ export const MenuPage: React.FC = () => {
         <EmptyState
           className="rounded-xl border border-gray-100 bg-white py-16"
           icon={<Utensils />}
+          illustration={hasFilters ? undefined : 'menu'}
           title={hasFilters ? t('dash.menu_page.no_match') : t('dash.menu_page.empty_title')}
           description={hasFilters ? undefined : t('dash.menu_page.empty_hint')}
           action={
