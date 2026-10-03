@@ -9,6 +9,8 @@ import SetupPage from './pages/Setup/SetupPage';
 import ConfigurePage from './pages/Setup/ConfigurePage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/Dashboard/DashboardPage';
+import { InvoiceDetailPage } from './pages/Dashboard/InvoiceDetailPage';
+import { PrintersPage } from './pages/Dashboard/PrintersPage';
 import { MenuPage } from './pages/Dashboard/MenuPage';
 import { TablePage } from './pages/Dashboard/TablePage';
 import ReservationPage from './pages/Dashboard/ReservationPage';
@@ -24,7 +26,14 @@ import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
+import { PurchasesPage } from './pages/Purchases/PurchasesPage';
+import { PurchaseFormPage } from './pages/Purchases/PurchaseFormPage';
+import { PurchaseDetailPage } from './pages/Purchases/PurchaseDetailPage';
+import { InventoryPage } from './pages/Inventory/InventoryPage';
+import { RecipesPage } from './pages/Recipes/RecipesPage';
+import { RecipeEditorPage } from './pages/Recipes/RecipeEditorPage';
 import { RoleGuard } from './components/RoleGuard';
+import { FeatureRoute } from './components/FeatureRoute';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
@@ -146,21 +155,30 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="invoices/:name" element={<InvoiceDetailPage />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
-          <Route path="reservations" element={<ReservationPage />} />
-          <Route path="website" element={<WebsiteEditorPage />} />
-          <Route path="waitlist" element={<WaitlistPage />} />
-          <Route path="feedback" element={<FeedbackPage />} />
-          <Route path="offers" element={<OffersPage />} />
-          <Route path="delivery" element={<DeliveryPage />} />
+          <Route path="reservations" element={<FeatureRoute><ReservationPage /></FeatureRoute>} />
+          <Route path="website" element={<FeatureRoute><WebsiteEditorPage /></FeatureRoute>} />
+          <Route path="waitlist" element={<FeatureRoute><WaitlistPage /></FeatureRoute>} />
+          <Route path="feedback" element={<FeatureRoute><FeedbackPage /></FeatureRoute>} />
+          <Route path="offers" element={<FeatureRoute><OffersPage /></FeatureRoute>} />
+          <Route path="delivery" element={<FeatureRoute><DeliveryPage /></FeatureRoute>} />
           <Route path="room" element={<RoomPage />} />
           <Route path="pos-profile" element={<PosProfilePage />} />
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
+          <Route path="printers" element={<PrintersPage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
+          <Route path="inventory" element={<FeatureRoute><InventoryPage /></FeatureRoute>} />
+          <Route path="recipes" element={<FeatureRoute><RecipesPage /></FeatureRoute>} />
+          <Route path="recipes/:item" element={<FeatureRoute><RecipeEditorPage /></FeatureRoute>} />
+          <Route path="purchases" element={<FeatureRoute><PurchasesPage /></FeatureRoute>} />
+          <Route path="purchases/new" element={<FeatureRoute><PurchaseFormPage key="new" /></FeatureRoute>} />
+          <Route path="purchases/:name" element={<FeatureRoute><PurchaseDetailPage /></FeatureRoute>} />
+          <Route path="purchases/:name/edit" element={<FeatureRoute><PurchaseFormPage key="edit" /></FeatureRoute>} />
 
           <Route
             path="reports/*"
