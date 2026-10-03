@@ -3,6 +3,7 @@ import { formatCurrency } from '@ury/core';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DashboardChartsData } from '../../services/dashboard';
+import { orderTypeLabel } from '../../lib/statusLabels';
 import { t } from '../../i18n';
 
 interface AnalyticsChartsProps {
@@ -57,7 +58,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
     const dashOffset = (-currentOffset).toFixed(1);
     currentOffset += strokeVal;
     return {
-      type: pm.method || 'Unknown',
+      type: pm.method || t('labels.unknown'),
       percentage,
       amount,
       color,
@@ -78,7 +79,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
     const dashOffset = (-otOffset).toFixed(1);
     otOffset += strokeVal;
     return {
-      type: ot.order_type || 'Unknown',
+      type: ot.order_type ? orderTypeLabel(ot.order_type) : t('labels.unknown'),
       percentage,
       count,
       color,
