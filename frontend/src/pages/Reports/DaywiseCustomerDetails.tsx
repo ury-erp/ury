@@ -107,7 +107,7 @@ export function DaywiseCustomerDetails() {
 
       {data && <StatCard label={t('reports.daywise_customer_details.unique_customers')} value={data.total_count} icon={<Users className="w-4 h-4" />} />}
 
-      <DataTable columns={getColumns()} rows={data?.customers ?? []} isLoading={isLoading} />
+      <DataTable columns={getColumns()} rows={data?.customers ?? []} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
     </div>
   );
 }
