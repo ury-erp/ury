@@ -52,6 +52,7 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [installationType, setInstallationType] = useState<'minimal' | 'advanced'>('minimal');
   const [setupUryDemo, setSetupUryDemo] = useState(false);
+  const [allowDemo, setAllowDemo] = useState(false);
   const [progressSteps, setProgressSteps] = useState<string[]>([]);
   const pendingSubmit = useRef<PendingSubmit | null>(null);
   const finishedRef = useRef(false);
@@ -64,6 +65,7 @@ export default function SetupPage() {
         ]);
         
         if (!defaults) return;
+        setAllowDemo(!!defaults.allow_demo);
 
         const rawLangs = Array.isArray(defaults.languages)
           ? defaults.languages
@@ -105,7 +107,7 @@ export default function SetupPage() {
         const defaultLanguage = (defaults.languages as any)?.default_language || 'English';
         formRef.current?.setFieldValue('language', defaultLanguage);
 
-        const countryToUse = defaults.detected_country || 'India';
+        const countryToUse = defaults.detected_country || 'Iraq';
         formRef.current?.setFieldValue('country', countryToUse);
         await handleCountryChange(countryToUse);
       } catch (err) {
@@ -267,20 +269,22 @@ export default function SetupPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">{t('dash.setup.set_up_with_demo_data')}</label>
-            <p className="text-sm text-muted-foreground">
-              Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
-            </p>
+        {allowDemo && (
+          <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">{t('dash.setup.set_up_with_demo_data')}</label>
+              <p className="text-sm text-muted-foreground">
+                Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
+              </p>
+            </div>
+            <Switch
+              id="setup-ury-demo"
+              checked={setupUryDemo}
+              onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
+              disabled={submitting}
+            />
           </div>
-          <Switch
-            id="setup-ury-demo"
-            checked={setupUryDemo}
-            onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
-            disabled={submitting}
-          />
-        </div>
+        )}
       </div>
       
       {submitting && (
