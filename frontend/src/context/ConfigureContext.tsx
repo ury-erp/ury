@@ -163,34 +163,32 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   );
 
   const [rooms, setRooms] = useState<RoomData[]>(
-    persisted?.rooms || [{ id: nextId('room'), name: 'Main Dining', tableCount: 4, prefix: 'MD' }]
+    persisted?.rooms || [{ id: nextId('room'), name: 'الصالة', tableCount: 4, prefix: 'T' }]
   );
 
   const [tables, setTables] = useState<TableData[]>(
     persisted?.tables ||
-      generateTableNames('MD', 4).map((name) => ({
+      generateTableNames('T', 4).map((name) => ({
         id: nextId('table'),
         name,
         seats: 4,
-        room: 'Main Dining',
+        room: 'الصالة',
         auto: true,
       }))
   );
 
   const [menuItems, setMenuItems] = useState<MenuItemData[]>(
-    persisted?.menuItems || [
-      { id: nextId('menu'), name: 'Pizza',   course: 'Main Course', price: 250 },
-      { id: nextId('menu'), name: 'Burger',  course: 'Main Course', price: 180 },
-      { id: nextId('menu'), name: 'Fries',   course: 'Starters',   price: 80  },
-      { id: nextId('menu'), name: 'Wings',   course: 'Starters',   price: 120 },
-      { id: nextId('menu'), name: 'Coffee',  course: 'Beverages',  price: 60  },
-    ]
+    // Empty on purpose: sample dishes accepted with "finish with defaults"
+    // became real items on a production menu. The restaurant adds its own
+    // here or later from the Menu page. (`course` carries the category.)
+    persisted?.menuItems || []
   );
 
   const [menuFile, setMenuFileState] = useState<File | null>(null);
 
   const [taxConfig, setTaxConfig] = useState<TaxConfigData>(
-    persisted?.taxConfig || { taxType: 'Inclusive', taxPercentage: 5 }
+    // Iraqi restaurants generally charge no VAT; a percentage is opt-in.
+    persisted?.taxConfig || { taxType: 'Inclusive', taxPercentage: 0 }
   );
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>(
@@ -198,15 +196,9 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   );
 
   const [users, setUsers] = useState<UserData[]>(
-    persisted?.users || [
-      {
-        id: nextId('user'),
-        email: 'cashier@example.com',
-        name: 'Cashier',
-        passwordPlaceholder: generateRandomPassword(),
-        role: 'URY Cashier',
-      },
-    ]
+    // No placeholder account: "cashier@example.com" with a random password
+    // was created as a real, unusable login on every site set up with defaults.
+    persisted?.users || []
   );
 
   useEffect(() => {
