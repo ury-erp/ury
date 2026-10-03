@@ -14,7 +14,8 @@ export function isSectionValid(section: SectionId, state: ConfigureValues): bool
         hasText(table.name) && Number.isInteger(table.seats) && table.seats > 0 &&
         state.rooms.some((room) => room.name === table.room));
     case 'menu':
-      return state.menuItems.length > 0 && state.menuItems.every((item) =>
+      // Optional: dishes can be added afterwards from the Menu page.
+      return state.menuItems.every((item) =>
         hasText(item.name) && hasText(item.course) && Number.isFinite(item.price) && item.price >= 0) &&
         Number.isFinite(state.taxConfig.taxPercentage) && state.taxConfig.taxPercentage >= 0;
     case 'payment':
