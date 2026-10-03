@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Percent, Coins } from 'lucide-react';
+import { useAccess } from '../hooks/useAccess';
+import { X, Percent, Coins, CheckCircle2, Printer } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call, parseFrappeError } from '@ury/core';
-import { Button, Input, Dialog, DialogContent, DialogTitle, showToast, Spinner } from '@ury/ui';
+import { Button, Input, Dialog, DialogContent, DialogTitle, Spinner } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 import { guardOnline } from '../lib/offline-guard';
@@ -27,6 +28,12 @@ interface PaymentDialogProps {
   clearSelectedOrder: () => void;
   discountPercentage?: number;
   discountAmount?: number;
+  /**
+   * Prints the settled bill. Offered after payment, never required before
+   * it: the money is taken and the invoice submitted first, and a receipt
+   * is the guest's choice.
+   */
+  onPrintReceipt?: (invoice: string) => Promise<void>;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -43,7 +50,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   fetchOrders,
   clearSelectedOrder,
   discountPercentage,
-  discountAmount
+  discountAmount,
+  onPrintReceipt,
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -103,6 +111,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setIsPreviewing(false);
     }
   };
+
+  // Declared before the totals below read `coupon`: a const read ahead of
+  // its declaration throws on render and took the whole payment screen down.
+  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
+  // Offers / loyalty switched off in the Control Center: no coupon field, no points.
+  const { access } = useAccess();
+  const couponsOff = access.pos_off.includes('coupons');
+  const loyaltyOff = access.pos_off.includes('loyalty');
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<CouponTotals | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Order summary logic
   // A discount preview already includes any coupon on the invoice, because
@@ -180,12 +201,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
    */
   const { isOffline } = useConnectivity();
 
-  const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
-  const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState<CouponTotals | null>(null);
-  const [couponBusy, setCouponBusy] = useState(false);
-  const [couponError, setCouponError] = useState<string | null>(null);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  // Set once the bill is settled: the dialog stays open on a receipt screen
+  // instead of vanishing, so the cashier sees the change to hand back and
+  // can print a receipt if the guest wants one.
+  const [settled, setSettled] = useState<{ received: number; change: number } | null>(null);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+
 
   // Looked up per customer, not cached across them: the balance changes on
   // every settled bill, and showing a stale one invites a cashier to promise
@@ -193,7 +214,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   useEffect(() => {
     let cancelled = false;
     setPointsToRedeem(0);
-    if (!customer) {
+    if (!customer || loyaltyOff) {
       setLoyalty(null);
       return;
     }
@@ -203,7 +224,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [customer, posProfile]);
+  }, [customer, posProfile, loyaltyOff]);
 
   const maxPoints = loyalty ? maxRedeemablePoints(loyalty, finalTotal) : 0;
   const redeemValue = loyalty ? pointsToRedeem * loyalty.conversion_factor : 0;
@@ -279,10 +300,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         table,
         redeem_loyalty_points: pointsToRedeem || undefined,
       });
-      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
-      onClose();
-      clearSelectedOrder();
-      await fetchOrders();
+      setSettled({ received: paymentsTotal, change: Math.max(0, paymentsTotal - finalTotal) });
+      // Refresh in the background; the receipt screen does not depend on it.
+      fetchOrders().catch(() => {});
     } catch (err) {
       console.error('Payment failed:', err);
       // parseFrappeError extracts human-readable message from _server_messages (e.g. stock validation error)
@@ -296,9 +316,53 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // Every dismissal route goes through here, so none of them can bypass the
   // in-flight guard the way three separate handlers previously did.
   const handleDismiss = () => {
-    if (paymentInFlight.current) return;
+    if (paymentInFlight.current || isPrintingReceipt) return;
+    if (settled) clearSelectedOrder();
     onClose();
   };
+
+  const handlePrintReceipt = async () => {
+    if (!onPrintReceipt || isPrintingReceipt) return;
+    setIsPrintingReceipt(true);
+    try {
+      await onPrintReceipt(invoice);
+      clearSelectedOrder();
+      onClose();
+    } catch {
+      // onPrintReceipt reports its own failure; the bill is already settled,
+      // so the cashier can retry or simply finish.
+    } finally {
+      setIsPrintingReceipt(false);
+    }
+  };
+
+  if (settled) {
+    return (
+      <Dialog open={true} onOpenChange={handleDismiss}>
+        <DialogContent className="bg-white w-full max-w-md p-8 text-center" showCloseButton={false}>
+          <CheckCircle2 className="mx-auto mb-3 h-14 w-14 text-green-600" />
+          <DialogTitle className="text-2xl font-bold text-gray-900">{t('payment.settled_title')}</DialogTitle>
+          <p className="mt-2 text-gray-600">{t('payment.success', { amount: formatCurrency(settled.received) })}</p>
+          {settled.change > 0.005 && (
+            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-xl font-bold text-amber-800">
+              {t('payment.change_due', { amount: formatCurrency(settled.change) })}
+            </p>
+          )}
+          <div className="mt-6 flex gap-3">
+            {onPrintReceipt && (
+              <Button variant="outline" className="flex-1 gap-2" onClick={handlePrintReceipt} disabled={isPrintingReceipt}>
+                {isPrintingReceipt ? <Spinner className="h-4 w-4" hideMessage message={t('common.loading')} /> : <Printer className="h-4 w-4" />}
+                {t('payment.print_receipt')}
+              </Button>
+            )}
+            <Button className="flex-1" onClick={handleDismiss} disabled={isPrintingReceipt} autoFocus>
+              {t('payment.done')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog
@@ -476,7 +540,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Coupon. The field is always present because a guest produces the
               code at the till, not before: hiding it behind a menu is how a
               promotion goes unredeemed and the restaurant hears about it. */}
-          <div className="mb-3 rounded-lg border border-gray-200 p-3">
+          {!couponsOff && (
+<div className="mb-3 rounded-lg border border-gray-200 p-3">
             {coupon?.coupon_code ? (
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -525,6 +590,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               </p>
             )}
           </div>
+          )}
 
           {/* Loyalty. Shown only when the customer actually has points to
               spend: an empty balance is noise between a cashier and the
