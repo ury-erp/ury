@@ -22,7 +22,7 @@
  "custom_blocks": [
   {
    "custom_block_name": "URY POS",
-   "label": "URY POS"
+   "label": "Restro POS"
   },
   {
    "custom_block_name": "POS V1",
@@ -786,7 +786,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-02 22:00:00.000000",
+ "modified": "2026-10-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Smart Restro",
@@ -840,7 +840,7 @@
   {
    "label": "Manager Dashboard",
    "type": "URL",
-   "url": "/ury/dashboard",
+   "url": "/restro/dashboard",
    "color": "Blue",
    "icon": "dashboard",
    "doc_view": ""
@@ -916,7 +916,7 @@
   {
    "label": "Dispatch Board",
    "type": "URL",
-   "url": "/ury/delivery",
+   "url": "/restro/delivery",
    "color": "Yellow",
    "icon": "map",
    "doc_view": ""
@@ -924,7 +924,7 @@
   {
    "label": "Waitlist",
    "type": "URL",
-   "url": "/ury/waitlist",
+   "url": "/restro/waitlist",
    "color": "Purple",
    "icon": "today",
    "doc_view": ""
@@ -932,7 +932,7 @@
   {
    "label": "Guest Feedback",
    "type": "URL",
-   "url": "/ury/feedback",
+   "url": "/restro/feedback",
    "color": "Pink",
    "icon": "review",
    "doc_view": ""
@@ -940,7 +940,7 @@
   {
    "label": "Restaurant Website",
    "type": "URL",
-   "url": "/ury/website",
+   "url": "/restro/website",
    "color": "Green",
    "icon": "website",
    "doc_view": ""
