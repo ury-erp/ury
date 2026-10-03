@@ -198,47 +198,47 @@ Row {0}: a role kept out of Desk cannot land on a Desk page,السطر {0}: ال
 "Row {0}: choose where {1} lands, since Desk is blocked for it",السطر {0}: اختار وين يدخل {1}، لأن الـ Desk ممنوع عليه
 Sign in,تسجيل الدخول
 Not available,غير متاح
-Welcome back,هلا بيك من جديد
+Welcome back,أهلاً بعودتك
 "Sign in to open your station: the POS, the captain's order pad or the restaurant dashboard.",سجّل دخولك حتى تفتح شاشتك: الكاشير، دفتر طلبات الكابتن، أو لوحة إدارة المطعم.
 Email or username,البريد الإلكتروني أو اسم المستخدم
-Caps Lock is on,زر الأحرف الكبيرة (Caps Lock) مفعّل
-Forgot password?,نسيت كلمة السر؟
-Email me a sign-in link,ارسل لي رابط دخول بالإيميل
-Password sign-in is turned off on this site. Use one of the options below.,الدخول بكلمة السر متوقف بهذا الموقع. استخدم أحد الخيارات الجاية.
-or continue with,أو كمّل باستخدام
-Verify it's you,تأكيد هويتك
+Caps Lock is on,مفتاح الأحرف الكبيرة (Caps Lock) مفعّل
+Forgot password?,نسيت كلمة المرور؟
+Email me a sign-in link,أرسل لي رابط دخول عبر البريد
+Password sign-in is turned off on this site. Use one of the options below.,تسجيل الدخول بكلمة المرور معطّل على هذا الموقع. استخدم أحد الخيارات أدناه.
+or continue with,أو تابع باستخدام
+Verify it's you,تحقّق من هويتك
 Enter the verification code.,أدخل رمز التحقق.
 Verification code,رمز التحقق
 Confirm code,تأكيد الرمز
-Back to sign in,رجوع لتسجيل الدخول
-Enter the email of your account and we'll send a link to set a new password.,أدخل إيميل حسابك ونرسلك رابط حتى تحدد كلمة سر جديدة.
+Back to sign in,العودة إلى تسجيل الدخول
+Enter the email of your account and we'll send a link to set a new password.,أدخل البريد الإلكتروني المرتبط بحسابك، وسنرسل إليك رابطاً لتعيين كلمة مرور جديدة.
 Send reset link,إرسال رابط إعادة التعيين
-Sign in with a link,الدخول برابط
-We'll email you a one-time link that signs you in. It expires shortly.,نرسلك رابط يستخدم مرة وحدة يدخلك مباشرة، وتنتهي صلاحيته بسرعة.
+Sign in with a link,الدخول عبر رابط
+We'll email you a one-time link that signs you in. It expires shortly.,سنرسل إلى بريدك رابطاً يُستخدم لمرة واحدة ويُدخلك مباشرة، وتنتهي صلاحيته خلال وقت قصير.
 Send sign-in link,إرسال رابط الدخول
-Protected sign-in · repeated failed attempts lock the account for a while,دخول محمي · تكرار المحاولات الفاشلة يقفل الحساب لفترة
+Protected sign-in · repeated failed attempts lock the account for a while,دخول آمن · يُقفَل الحساب مؤقتاً عند تكرار المحاولات الفاشلة
 Service is running,الخدمة شغّالة
 "Every order, from the table to the kitchen to the till.",كل طلب، من الطاولة للمطبخ للكاشير.
 "One system for the cashier, the captain and the kitchen — with stock, recipes and purchases kept in step behind the scenes.",نظام واحد للكاشير والكابتن والمطبخ — والمخزون والوصفات والمشتريات ماشية وياه خلف الكواليس.
 Fast checkout,دفع سريع
-"Dine-in, take-away and delivery from one screen.",صالة وسفري وتوصيل من شاشة وحدة.
+"Dine-in, take-away and delivery from one screen.",الصالة والسفري والتوصيل من شاشة واحدة.
 Kitchen in sync,مطبخ متزامن
-Tickets reach the right station the moment they're ordered.,الطلب يوصل للقسم الصحيح بنفس لحظة طلبه.
-Stock that adds up,مخزون مضبوط
-"Recipes deduct ingredients on every sale, costed from purchases.",الوصفات تصرف المكونات مع كل بيعة، بكلفة المشتريات.
-Sign-in failed. Check your details and try again.,فشل تسجيل الدخول. تأكد من بياناتك وحاول مرة ثانية.
-Can't reach the server. Check the connection and try again.,ما نكدر نوصل للسيرفر. تأكد من الاتصال وحاول مرة ثانية.
-Enter your email or username and your password.,أدخل الإيميل أو اسم المستخدم وكلمة السر.
-Too many attempts. Wait a few minutes before trying again.,محاولات كثيرة. انتظر كم دقيقة قبل ما تحاول مرة ثانية.
-"If an account exists for that email, a reset link is on its way.",إذا اكو حساب بهذا الإيميل، رابط إعادة التعيين بالطريق إليك.
-"If an account exists for that email, a sign-in link is on its way.",إذا اكو حساب بهذا الإيميل، رابط الدخول بالطريق إليك.
-Enter a valid email address.,أدخل إيميل صحيح.
+Tickets reach the right station the moment they're ordered.,تصل الطلبات إلى القسم المختص لحظة تسجيلها.
+Stock that adds up,مخزون دقيق
+"Recipes deduct ingredients on every sale, costed from purchases.",تُخصم المكونات حسب الوصفة مع كل عملية بيع، وتُحتسب كلفتها من المشتريات.
+Sign-in failed. Check your details and try again.,تعذّر تسجيل الدخول. تحقّق من بياناتك ثم حاول مجدداً.
+Can't reach the server. Check the connection and try again.,تعذّر الاتصال بالخادم. تحقّق من الاتصال ثم حاول مجدداً.
+Enter your email or username and your password.,أدخل البريد الإلكتروني أو اسم المستخدم وكلمة المرور.
+Too many attempts. Wait a few minutes before trying again.,محاولات كثيرة. يُرجى الانتظار بضع دقائق قبل المحاولة مجدداً.
+"If an account exists for that email, a reset link is on its way.",إذا كان هذا البريد مرتبطاً بحساب، فسيصلك رابط إعادة التعيين قريباً.
+"If an account exists for that email, a sign-in link is on its way.",إذا كان هذا البريد مرتبطاً بحساب، فسيصلك رابط الدخول قريباً.
+Enter a valid email address.,أدخل بريداً إلكترونياً صحيحاً.
 Enter the code.,أدخل الرمز.
-Show password,إظهار كلمة السر
-Hide password,إخفاء كلمة السر
-This page is not available,هذي الصفحة غير متاحة
-{0} is switched off for this restaurant. Ask an administrator if you need it.,{0} متوقفة بهذا المطعم. اطلب من المدير إذا تحتاجها.
-This feature is switched off for this restaurant.,هذي الميزة متوقفة بهذا المطعم.
+Show password,إظهار كلمة المرور
+Hide password,إخفاء كلمة المرور
+This page is not available,هذه الصفحة غير متاحة
+{0} is switched off for this restaurant. Ask an administrator if you need it.,تم تعطيل «{0}» لهذا المطعم. تواصل مع المدير إن احتجت إلى هذه الميزة.
+This feature is switched off for this restaurant.,هذه الميزة معطّلة لهذا المطعم.
 URY Control Center,مركز التحكم بالمطعم
 Open restaurant dashboard,فتح لوحة المطعم
 Could not load the settings.,تعذّر تحميل الإعدادات.
@@ -282,5 +282,25 @@ POS (cashier),الكاشير (POS)
 Captain order pad,دفتر طلبات الكابتن
 Restaurant dashboard,لوحة المطعم
 Kitchen display,شاشة المطبخ
-This account is locked for a while after too many failed attempts. Try again later.,هذا الحساب مقفول لفترة بسبب محاولات فاشلة كثيرة. حاول مرة ثانية بعدين.
-This account is disabled. Contact the restaurant administrator.,هذا الحساب معطّل. تواصل ويا مدير المطعم.
+This account is locked for a while after too many failed attempts. Try again later.,هذا الحساب مقفل مؤقتاً بسبب تكرار المحاولات الفاشلة. يُرجى المحاولة لاحقاً.
+This account is disabled. Contact the restaurant administrator.,هذا الحساب معطّل. يُرجى التواصل مع مدير المطعم.
+"Your team, your orders, your restaurant. All in one place.",فريقك وطلباتك ومطعمك، جميعها في مكان واحد.
+"Every detail, connected.",كل التفاصيل مترابطة،
+"Every day, a little smarter.",وإدارة أذكى كل يوم.
+From the first order to the last coffee. A calmer way to run your restaurant.,من أول طلب إلى آخر فنجان قهوة، طريقة أهدأ وأسهل لإدارة مطعمك.
+Made for your team,صُمّم لفريقك
+Connected at every step,مترابط في كل خطوة
+Password,كلمة المرور
+Back,رجوع
+Reset your password,إعادة تعيين كلمة المرور
+Email,البريد الإلكتروني
+Smart Restro · by Smart Choice,سمارت ريسترو · من سمارت تشويس
+"Something went wrong on our side. Try again in a moment.",حدث خطأ غير متوقع. يُرجى المحاولة بعد قليل.
+You're signed in,تم تسجيل الدخول بنجاح
+Getting your workspace ready…,نُجهّز مساحة عملك…
+Opening,جارٍ فتح
+Your workspace,مساحة عملك
+"Not moving? Continue",لم يتم التحويل؟ تابع من هنا
+"Welcome, {0}",أهلاً بك، {0}
+Restaurant reports,تقارير المطعم
+Go back,رجوع
