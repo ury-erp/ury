@@ -88,7 +88,7 @@ FEATURES = [
 	# System
 	{
 		"key": "custom_login", "group": "system", "icon": "log-in",
-		"label": "URY login page", "description": "The restaurant's own sign-in page instead of the standard one.",
+		"label": "Restaurant sign-in page", "description": "The restaurant's own sign-in page instead of the standard one.",
 		"api": (), "www": (), "nav": (),
 	},
 ]
