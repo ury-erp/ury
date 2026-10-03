@@ -90,7 +90,7 @@ function ConfigurePageContent() {
       setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
 
       setTimeout(() => {
-        window.location.href = '/ury/dashboard';
+        window.location.href = '/restro/dashboard';
       }, 800);
     } catch (err: unknown) {
       console.error('Failed to finish configure setup', err);
