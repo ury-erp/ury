@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { IndianRupee, Receipt, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
+import { Banknote, Receipt, TrendingUp, Trophy, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
@@ -124,7 +124,7 @@ export function TimeWiseSales() {
             <StatCard
               label={t('reports.time_wise_sales.total_sales')}
               value={formatCurrency(data.summary.total_sales)}
-              icon={<IndianRupee className="w-4 h-4" />}
+              icon={<Banknote className="w-4 h-4" />}
             />
             <StatCard label={t('reports.time_wise_sales.total_bills')} value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
             <StatCard
