@@ -95,6 +95,8 @@ def record_event(
 			}
 		)
 		doc.insert(ignore_permissions=True)
+		if reference_doctype == "POS Invoice" and reference_name:
+			_log_on_invoice(reference_name, event, amount, old_value, new_value, reason)
 		return doc.name
 	except Exception:
 		try:
@@ -102,6 +104,20 @@ def record_event(
 		except Exception:
 			pass
 		return None
+
+
+def _log_on_invoice(invoice, event, amount, old_value, new_value, reason):
+	"""Mirror a money event onto the bill's own activity timeline."""
+	from ury.ury.api.invoice_activity import log_activity, money
+
+	text = frappe._(event)
+	if amount:
+		text += f": {money(amount, invoice)}"
+	if old_value is not None and new_value is not None:
+		text += f" ({old_value} ← {new_value})" if frappe.local.lang == "ar" else f" ({old_value} → {new_value})"
+	if reason:
+		text += " — " + frappe._("reason: {0}").format(reason)
+	log_activity(invoice, text)
 
 
 class URYAuditLog(Document):
