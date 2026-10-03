@@ -49,7 +49,7 @@ function App() {
                   Cashier POS routes above, not nested under AppLayout
                   (PLAN.md §6/§10: own navigation, mobile-first, not the
                   desktop Header/Footer shell). This Router (basename
-                  "/ury") is already the outer app-nesting layer that mounts
+                  "/restro") is already the outer app-nesting layer that mounts
                   "/pos" today, so "/order" sits alongside it here rather
                   than in a separate outer router file.
                 */}
