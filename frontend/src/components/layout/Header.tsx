@@ -1,18 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useAccess } from '../../hooks/useAccess';
 import { Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { logout, getLoggedUser, getUserRoles } from '@ury/core';
 import { t } from '../../i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { NotificationMenu } from './NotificationMenu';
 import smartLogo from '../../../../smart_logo.png';
 import {
-  Bell,
   User,
   ChevronDown,
-  X,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
   LogOut,
   Store,
   Building2,
@@ -21,30 +18,16 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: string;
-  type: 'info' | 'warning' | 'success';
-  read: boolean;
-}
-
-
-
 export const Header: React.FC = () => {
+  const { access } = useAccess();
   const { activeBranchId, setActiveBranchId, branches, activeBranch } = useBranchContext();
 
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userInfo, setUserInfo] = useState({ fullName: 'Admin User', email: 'admin@smartrestro.com' });
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const branchMenuRef = useRef<HTMLDivElement>(null);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
     if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -77,36 +60,6 @@ export const Header: React.FC = () => {
     };
     fetchUser();
   }, []);
-
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await call('frappe.client.get_list', {
-          doctype: 'Notification Log',
-          fields: ['name', 'subject', 'email_content', 'creation', 'read'],
-          limit_page_length: 5
-        });
-        if (res && res.message) {
-          const mapped = res.message.map((n: any) => ({
-            id: n.name,
-            title: n.subject || t('notifications.fallback_title'),
-            message: n.email_content || '',
-            timestamp: n.creation || '',
-            type: 'info',
-            read: !!n.read
-          }));
-          setNotifications(mapped);
-        }
-      } catch (e) {
-        console.error('Failed to fetch notifications', e);
-      }
-    };
-    fetchNotifications();
-  }, []);
-
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
 
   const handleClearCache = () => {
     // Clear all local storage
@@ -202,17 +155,8 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Notifications Bell */}
-          <button
-            onClick={() => setIsNotificationOpen(true)}
-            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-            aria-label={t('notifications.open')}
-          >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 end-1.5 w-2.5 h-2.5 bg-primary rounded-full ring-2 ring-white" />
-            )}
-          </button>
+          {/* Notifications */}
+          <NotificationMenu />
 
           {/* User Menu Dropdown */}
           <div className="relative" ref={userMenuRef}>
@@ -235,7 +179,7 @@ export const Header: React.FC = () => {
                 </div>
 
                 <div className="py-2">
-                  <button
+                  {access.desk && <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
                       window.location.href = '/app';
@@ -244,7 +188,7 @@ export const Header: React.FC = () => {
                   >
                     <Monitor className="w-4 h-4" />
                     <span>{t('header.switch_to_desk')}</span>
-                  </button>
+                  </button>}
 
                   <button
                     onClick={() => {
@@ -273,83 +217,6 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Notifications Slide-over Drawer */}
-      {isNotificationOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div
-            className="absolute inset-0 bg-gray-900/30 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsNotificationOpen(false)}
-          />
-
-          <div className="fixed inset-y-0 end-0 ps-10 max-w-full flex">
-            <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-s border-gray-200">
-              {/* Drawer Header */}
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <div className="flex items-center space-x-2">
-                  <Bell className="w-5 h-5 text-primary" />
-                  <h2 className="text-base font-semibold text-gray-900">{t('notifications.title')}</h2>
-                  {unreadCount > 0 && (
-                    <span className="px-2 py-0.5 text-xs font-bold bg-primary text-white rounded-full">
-                      {unreadCount}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      {t('notifications.mark_all_read')}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setIsNotificationOpen(false)}
-                    className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200/50"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Drawer List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-                {notifications.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    {t('notifications.empty')}
-                  </div>
-                ) : (
-                  notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`p-4 transition-colors ${
-                        item.read ? 'bg-white' : 'bg-blue-50/40'
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className="mt-0.5">
-                          {item.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
-                          {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
-                          {item.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                            <span className="text-xs text-gray-400">{item.timestamp}</span>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">{item.message}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 };
