@@ -32,7 +32,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick, onItemCustomize }) => 
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
       const searchTerm = searchQuery.toLowerCase();
-      const matchesCategory = !selectedCategory || item.course === selectedCategory;
+      const matchesCategory = !selectedCategory || item.category === selectedCategory;
       const matchesSearch = !searchQuery || 
         item.name.toLowerCase().includes(searchTerm) ||
         item.item.toLowerCase().includes(searchTerm);
@@ -58,8 +58,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick, onItemCustomize }) => 
     'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4';
 
   return (
-    <div className="flex-1 overflow-auto bg-background">
-      <div className="max-w-screen-xl mx-auto p-5 pb-40">
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-background">
+      <div className="max-w-screen-xl mx-auto p-5 pb-8">
         {menuLoading ? (
           /* Skeleton cards in the real grid, rather than a centred spinner:
              the menu keeps its shape so nothing shifts under the cashier's
@@ -96,7 +96,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick, onItemCustomize }) => 
                 name={item.name}
                 price={item.price}
                 item_image={item.image}
-                course={item.course_label || item.course}
+                category={item.category_label || item.category}
                 item={item.item}
                 onClick={() => onItemClick(item)}
                 onCustomize={() => onItemCustomize(item)}
