@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, Illustration } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
@@ -292,9 +292,7 @@ export const TablePage: React.FC = () => {
         </div>
       ) : tables.length === 0 ? (
         <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Grid className="w-6 h-6 text-primary" />
-          </div>
+          <Illustration name="tables" className="mb-3" />
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.table.no_dining_tables_configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">{t('dash.table.add_dining_tables_to_configure_your_restaura')}</p>
           <Button
