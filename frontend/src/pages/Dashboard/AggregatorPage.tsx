@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Store, Edit2 } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle } from '@ury/ui';
-import { call } from '@ury/core';
+import { call, storage } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { t } from '../../i18n';
 
@@ -125,7 +125,7 @@ export const AggregatorPage: React.FC = () => {
           doctype: 'Price List',
           price_list_name: newAggregatorName,
           selling: 1,
-          currency: 'INR'
+          currency: storage.getItem('currency') || 'IQD'
         }
       }).catch((e: any) => {
         const errorMessage = e?.message || e?.responseJSON?.message || String(e);
