@@ -1,60 +1,85 @@
 <template>
-  <div class="p-6">
+  <div class="mx-auto max-w-7xl px-4 py-6 md:px-7 md:py-8">
+    <!-- Which station is this screen for? Said once, with the kitchen art. -->
+    <header class="station-hero animate-fade-in">
+      <div class="station-hero__copy">
+        <span class="station-hero__eyebrow">{{ $t('production.eyebrow') }}</span>
+        <h1 class="station-hero__title">{{ $t('production.title') }}</h1>
+        <p class="station-hero__body">{{ $t('production.subtitle') }}</p>
+      </div>
+      <img
+        class="station-hero__art"
+        :src="heroArt"
+        alt=""
+        width="420"
+        height="300"
+        decoding="async"
+      />
+    </header>
 
-    <!-- Loading: placeholder cards in the real grid, so the board keeps its
-         shape instead of collapsing and re-expanding when units land. -->
+    <!-- Loading: placeholder cards in the real grid, so the page keeps its
+         shape instead of collapsing and re-expanding when stations land. -->
     <div
       v-if="loading"
-      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+      class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
       aria-busy="true"
       :aria-label="$t('production.loading')"
     >
-      <div
-        v-for="n in 6"
-        :key="n"
-        aria-hidden="true"
-        class="h-44 rounded-2xl border border-gray-200 bg-gray-100 animate-pulse-soft"
-      />
+      <div v-for="n in 3" :key="n" aria-hidden="true" class="station-skeleton animate-pulse-soft" />
     </div>
 
-    <!-- Production Cards -->
-    <div
-      v-else
-      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+    <EmptyState
+      v-else-if="failed"
+      role="alert"
+      image="kitchen-offline"
+      :title="$t('production.load_failed')"
+      :body="$t('production.load_failed_hint')"
     >
+      <button type="button" class="btn-kitchen press" @click="loadDashboard">{{ $t('kot.retry') }}</button>
+    </EmptyState>
+
+    <EmptyState
+      v-else-if="!stations.length"
+      image="kitchen-stations"
+      :title="$t('production.none_title')"
+      :body="$t('production.none_body')"
+    />
+
+    <div v-else class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
       <ProductionCard
-        v-for="unit in dashboard"
+        v-for="(unit, i) in stations"
         :key="unit.name"
+        :style="{ '--i': i }"
         :title="unit.name"
-        :activeOrders="unit.active_orders"
-        :servedOrders="unit.served_orders"
-        :totalOrders="unit.total_orders"
-        :disabled="!!unit.disable"
-        @open="!unit.disable && openProduction(unit.name)"
+        :waiting="unit.waiting"
+        :served="unit.served"
+        :orders="unit.orders"
+        :disabled="unit.disabled"
+        @open="openProduction(unit.name)"
       />
     </div>
-
   </div>
 </template>
 
 <script>
 import ProductionCard from "./ProductionCard.vue";
-import { FrappeApp } from "frappe-js-sdk";
-
-const frappe = new FrappeApp(window.location.origin);
+import EmptyState from "../EmptyState.vue";
 
 export default {
   name: "ProductionDashboard",
 
   components: {
     ProductionCard,
+    EmptyState,
   },
 
   data() {
     return {
       loading: true,
-      dashboard: [],
-      db: frappe.db(),
+      failed: false,
+      // Served by Frappe from ury/public, shared with the other Smart Restro apps.
+      heroArt: "/assets/ury/illustrations/kitchen-stations.svg",
+      stations: [],
     };
   },
 
@@ -63,45 +88,22 @@ export default {
   },
 
   methods: {
+    // One call for every station, counted with the board's own rules, so the
+    // numbers here match what the station opens to.
     async loadDashboard() {
+      this.loading = true;
+      this.failed = false;
       try {
-        const result = await this.db.getDocList("URY Production Unit", {
-          fields: ["name", "disable"],
-          orderBy: {
-            field: "name",
-            order: "asc",
-          },
+        const res = await fetch("/api/method/ury.ury.api.ury_kot_display.station_summary", {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
         });
-
-        const units = result || [];
-
-        for (let unit of units) {
-          const [active, served, total] = await Promise.all([
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-              ["order_status", "=", "Ready For Prepare"],
-            ]),
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-              ["order_status", "=", "Served"],
-            ]),
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-            ]),
-          ]);
-
-          unit.active_orders = active;
-          unit.served_orders = served;
-          unit.total_orders = total;
-        }
-
-        console.log("Dashboard:", units);
-        this.dashboard = units;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        this.stations = data.message || [];
       } catch (error) {
         console.error(error);
+        this.failed = true;
       } finally {
         this.loading = false;
       }
