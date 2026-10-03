@@ -113,7 +113,8 @@
     "retry": "Try again",
     "stale_data": "Tickets may be out of date. The latest update failed.",
     "last_synced": "Last updated: {time}",
-    "syncing": "Updating kitchen orders…"
+    "syncing": "Updating kitchen orders…",
+    "clear_hint": "Every ticket for {{station}} is out. New orders appear here the moment they're sent."
   },
   "language": {
     "label": "Language"
@@ -149,7 +150,22 @@
     "served": "Served",
     "total": "Total",
     "unit": "Production Unit",
-    "view_kots": "Click to view KOTs"
+    "view_kots": "Click to view KOTs",
+    "eyebrow": "Kitchen display",
+    "title": "Choose your station",
+    "subtitle": "This screen follows the station you pick. Orders arrive live, the moment the floor sends them.",
+    "waiting": "Waiting",
+    "served_today": "Served today",
+    "orders_today": "Orders today",
+    "open": "Open station",
+    "live": "Orders waiting",
+    "quiet": "All clear",
+    "disabled": "Turned off",
+    "disabled_hint": "Ask a manager to turn this station back on.",
+    "none_title": "No kitchen stations yet",
+    "none_body": "Add a production unit in the restaurant setup, then come back to this screen.",
+    "load_failed": "Stations could not be loaded",
+    "load_failed_hint": "Check the connection, then try again."
   },
   "recall": {
     "close": "Close",
