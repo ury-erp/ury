@@ -23,7 +23,7 @@ const Sidebar = ({ disabled, className, onCategorySelect }: SidebarProps) => {
 
   // Count items per category
   const getCategoryCount = (category: string) => {
-    const count = menuItems.filter(item => item.course === category).length;
+    const count = menuItems.filter(item => item.category === category).length;
     return count;
   };
 
@@ -95,7 +95,7 @@ const Sidebar = ({ disabled, className, onCategorySelect }: SidebarProps) => {
                   <div className="flex items-center gap-3 ms-1">
                     <CategoryIcon
                       name={category.icon}
-                      courseName={category.name}
+                      courseName={category.label}
                       className="w-4 h-4 text-[#8f6b55] flex-shrink-0"
                     />
                     <span className="text-start">{category.label}</span>
