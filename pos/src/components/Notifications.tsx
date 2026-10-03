@@ -28,10 +28,10 @@ function recordLink(notification: Notification): string | null {
   return `/app/${type.toLowerCase().replace(/ /g, '-')}/${encodeURIComponent(name)}`;
 }
 
-function getRelativeTime(creationDate: string): string {
+function getRelativeTime(creationDate: string, serverTimeOffset: number | null): string {
   const date = new Date(creationDate.replace(' ', 'T'));
-  if (!Number.isFinite(date.getTime())) return 'Time unavailable';
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (serverTimeOffset === null || !Number.isFinite(date.getTime())) return 'Time unavailable';
+  const minutes = Math.max(0, Math.floor((Date.now() + serverTimeOffset - date.getTime()) / 60000));
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes} min ago`;
   if (minutes < 1440) return `${Math.floor(minutes / 60)} hr ago`;
@@ -54,6 +54,7 @@ export default function Notifications(props: Props) {
 
 function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }: Props & { user: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [serverTimeOffset, setServerTimeOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -85,6 +86,15 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
       controller?.abort();
       controller = new AbortController();
       setRefreshing(true);
+      // Reuse the floor-plan site clock and wall-time offset: both Frappe
+      // timestamps are site-local, so the browser timezone cancels out.
+      // Clock failures must not block the list or replace a trusted sample.
+      void call.get<{ message: string }>('ury.ury.api.ury_server_time.get_server_time').then(response => {
+        const serverNow = new Date(response.message.replace(' ', 'T')).getTime();
+        if (Number.isFinite(serverNow) && isCurrentSession() && id === requestId.current) {
+          setServerTimeOffset(serverNow - Date.now());
+        }
+      }).catch(() => {});
       try {
         // Same native, permission-filtered list as Dashboard; explicit recipient
         // filtering also prevents Administrator's broader permission from leaking rows.
@@ -187,7 +197,7 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
               {notification.email_content && <p className="break-words text-gray-600">{readableText(notification.email_content)}</p>}
               <div className="mt-1 flex flex-wrap gap-x-2 text-gray-500">
                 <span>{unread ? 'Unread' : 'Read'}</span>
-                <time dateTime={notification.creation.replace(' ', 'T')} title={notification.creation}>{getRelativeTime(notification.creation)}</time>
+                <time dateTime={notification.creation.replace(' ', 'T')} title={notification.creation}>{getRelativeTime(notification.creation, serverTimeOffset)}</time>
               </div>
               <div className="flex flex-wrap items-center gap-x-3">
                 {href ? <a className="inline-flex min-h-11 items-center text-blue-700 underline" href={href} target="_blank" rel="noopener noreferrer"
