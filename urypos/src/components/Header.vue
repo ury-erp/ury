@@ -16,7 +16,7 @@
     <nav class="pos-header">
       <div class="pos-header-inner">
         <div class="pos-brand">
-          <a href="/urypos/Table" class="pos-brand-mark" aria-label="Smart Restro">
+          <a href="/pos-mobile/Table" class="pos-brand-mark" aria-label="Smart Restro">
             <img :src="imagePath" alt="" />
           </a>
 
