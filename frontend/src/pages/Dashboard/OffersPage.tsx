@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Tags, Ticket, Sparkles, ExternalLink } from 'lucide-react';
-import { Button, Badge, Spinner } from '@ury/ui';
+import { Button, Badge, Spinner, EmptyState } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 import { promotionsService, type OfferRule } from '../../services/promotions';
@@ -105,6 +105,8 @@ export const OffersPage: React.FC = () => {
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : !loadError && automatic.length === 0 && coupon.length === 0 ? (
+        <EmptyState illustration="offers" title={t('dash.offers.none')} description={t('dash.offers.empty_hint')} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           <section>
