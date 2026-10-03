@@ -18,8 +18,27 @@ class URYMenu(Document):
         self.make_price_list()
 
     def on_trash(self):
-        """clear prices"""
-        self.clear_item_price()
+        """Take the menu's own price list with it.
+
+        This used to call get_price_list(), which *creates* a price list when
+        it cannot find one by `restaurant_menu` — so deleting a menu whose
+        price list had lost that back-link tried to create a second list with
+        the same name and failed ("Price List X already exists"). The price
+        list could not be deleted first either: the menu still linked to it.
+        Runs before Frappe's link check, so removing the list here is what
+        lets the menu go.
+        """
+        own = set(frappe.get_all("Price List", filters={"restaurant_menu": self.name}, pluck="name"))
+        if self.price_list and frappe.db.get_value("Price List", self.price_list, "restaurant_menu") in (None, "", self.name):
+            own.add(self.price_list)
+        for price_list in own:
+            remove_menu_price_list(self.name, price_list)
+
+    def clear_item_price(self, price_list=None):
+        """clear all item prices for this menu"""
+        if not price_list:
+            price_list = self.get_price_list().name
+        frappe.db.sql("delete from `tabItem Price` where price_list = %s", price_list)
 
     def clear_item_price(self, price_list=None):
         """clear all item prices for this menu"""
@@ -98,6 +117,29 @@ class URYMenu(Document):
         price_list.save()
 
         return price_list
+
+
+def remove_menu_price_list(menu, price_list):
+    """Delete a menu's price list and its prices — or, if something else
+    (a POS Profile, a customer, a delivery app) still uses the list, keep it,
+    detach it from the menu and disable it, so the menu can still be deleted.
+    """
+    if not frappe.db.exists("Price List", price_list):
+        return "missing"
+    frappe.db.delete("Item Price", {"price_list": price_list})
+    # Detach both ways first, so neither record blocks deleting the other.
+    frappe.db.set_value("Price List", price_list, "restaurant_menu", None, update_modified=False)
+    if frappe.db.exists("URY Menu", menu):
+        frappe.db.set_value("URY Menu", menu, "price_list", None, update_modified=False)
+    frappe.db.savepoint("ury_menu_price_list")
+    try:
+        frappe.delete_doc("Price List", price_list, ignore_permissions=True)
+        return "deleted"
+    except frappe.LinkExistsError:
+        frappe.db.rollback(save_point="ury_menu_price_list")
+        frappe.clear_messages()
+        frappe.db.set_value("Price List", price_list, "enabled", 0, update_modified=False)
+        return "disabled"
 
 
 @frappe.whitelist()
