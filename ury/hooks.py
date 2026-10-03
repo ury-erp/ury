@@ -31,7 +31,7 @@ add_to_apps_screen = [
     "name": "ury",
     "logo": "/assets/ury/Images/smart-restro-logo.png",
     "title": "Smart Restro",
-    "route": "/ury",
+    "route": "/restro",
     "has_permission": "ury.permission.check_app_permission"
   }
 ]
@@ -74,10 +74,15 @@ website_context = {
 }
 update_website_context = ["ury.ury.controllers.branding.update_website_context"]
 
+# The www pages keep their file names (ury.html, urypos.html are build output
+# named after the app); the public URLs are /restro and /pos-mobile. The old
+# /ury and /urypos URLs redirect to them (see website_redirects).
 website_route_rules = [
-    {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
+    {"from_route": "/pos-mobile", "to_route": "urypos"},
+    {"from_route": "/pos-mobile/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
-    {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
+    {"from_route": "/restro", "to_route": "ury"},
+    {"from_route": "/restro/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -311,9 +316,17 @@ website_path_resolver = [
 website_redirects = [
     {
         "source": "/setup-wizard",
-        "target": "/ury/setup-wizard/0",
+        "target": "/restro/setup-wizard/0",
         "redirect_http_status": 302,
     },
+    # Pre-rebrand URLs, kept for bookmarks, home-screen shortcuts and printed
+    # links. 302 until the new URLs have proven themselves: browsers cache a
+    # 301 for good. Frappe drops the query string on these redirects.
+    {"source": "/ury", "target": "/restro", "redirect_http_status": 302},
+    {"source": r"/ury/(.*)", "target": r"/restro/\1", "redirect_http_status": 302},
+    {"source": "/urypos", "target": "/pos-mobile", "redirect_http_status": 302},
+    {"source": r"/urypos/(.*)", "target": r"/pos-mobile/\1", "redirect_http_status": 302},
+    {"source": "/ury-login", "target": "/login", "redirect_http_status": 302},
     # Browsers ask for /favicon.ico on any page that does not name an icon;
     # Frappe has no such route and would answer with its 404 page.
     {
