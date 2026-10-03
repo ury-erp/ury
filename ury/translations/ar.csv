@@ -12,9 +12,9 @@ Show Our Story,إظهار حكاية المطعم
 Story Heading,عنوان الحكاية
 Our Story,حكاية المطعم
 Story Image,صورة الحكاية
-Show Menu,إظهار قائمة الطعام
-Public Menu,قائمة الطعام للزوار
-Menu Note,ملاحظة قائمة الطعام
+Show Menu,إظهار المنيو
+Public Menu,المنيو للزوار
+Menu Note,ملاحظة المنيو
 Visit & Contact,الزيارة والتواصل
 Public Address,العنوان الظاهر للزوار
 Public Phone,رقم التواصل للزوار
@@ -41,3 +41,246 @@ Terracotta,طيني
 Midnight,أزرق داكن
 Website Request ID,معرّف طلب الموقع
 This table is already reserved for the selected time.,هذه الطاولة محجوزة في الموعد المحدد.
+Item name,اسم الصنف
+Category,القسم
+The item name cannot be the same as a category name: {0},اسم الصنف ما يصير نفس اسم القسم: {0}
+Could not find the item to update,لم يتم العثور على الصنف المراد تعديله
+"An item named {0} already exists, choose another category name","اكو صنف باسم {0}، اختر اسم ثاني للقسم"
+{0} is a parent item group; items cannot be added to it directly,{0} مجموعة رئيسية وما تنضاف إلها أصناف مباشرة
+Choose the kitchen that prepares category {0},اختر المطبخ اللي يحضّر القسم {0}
+Kitchen {0} does not belong to branch {1},المطبخ {0} لا يتبع الفرع {1}
+{0} is required,{0} مطلوب
+{0} is too long,{0} طويل جداً
+Price must be greater than zero,السعر لازم يكون أكثر من صفر
+{0} is already on the menu,{0} موجود بالمنيو
+Choose a branch first,اختر الفرع أولاً
+No restaurant is set up for this branch,ماكو مطعم مضبوط لهذا الفرع
+Menu {0},منيو {0}
+Main Dishes,الأكلات الرئيسية
+Print the bill before taking payment for this table.,اطبع وصل الطاولة قبل ما تستلم الحساب.
+Require Printed Bill Before Payment,طباعة الوصل إلزامية قبل الحساب
+Table orders can only be paid after their bill has been printed,طلبات الطاولات ما تنحسب إلا بعد طباعة وصلها
+Order opened ({0}): {1},انفتح الطلب ({0}): {1}
+table {0},طاولة {0}
+Items added: {0},انضاف للطلب: {0}
+Items removed: {0},انشال من الطلب: {0}
+Bill paid: {0},انحسبت الفاتورة: {0}
+change {0},الباقي {0}
+Bill printed,انطبعت الفاتورة
+Bill reprinted,انعادت طباعة الفاتورة
+Bill printed {0},انطبعت الفاتورة {0}
+Bill reprinted {0},انعادت طباعة الفاتورة {0}
+on the branch printer,على طابعة الفرع
+from the dashboard,من لوحة التحكم
+Order created,انفتح الطلب
+Bill cancelled,انلغت الفاتورة
+reason: {0},السبب: {0}
+No bill printer is set up for this branch,ماكو طابعة فواتير مضبوطة لهذا الفرع
+A cancelled bill cannot be printed,الفاتورة الملغاة ما تنطبع
+Discount Applied,خصم على الفاتورة
+Invoice Cancelled,إلغاء الفاتورة
+Price Overridden,تعديل سعر
+Payment Refunded,إرجاع مبلغ
+Bill Split,تقسيم الفاتورة
+Bill Merged,دمج الفاتورة
+Table Transferred,نقل الطاولة
+Captain Transferred,نقل الكابتن
+Shift Closed With Difference,إغلاق شفت بفرق
+Coupon Applied,تطبيق كوبون
+Coupon Removed,إزالة كوبون
+Dine In,صالة
+Take Away,سفري
+Phone In,طلب تلفون
+Choose a printer first,اختر الطابعة أولاً
+Test page,صفحة تجربة
+on {0},على {0}
+QZ printing is not enabled for this branch,الطباعة عبر QZ مو مفعّلة لهذا الفرع
+Choose the bill printer on the Printers page first,اختر طابعة الفواتير من صفحة الطابعات أولاً
+The print station did not confirm this print,جهاز الطباعة ما أكّد هذي الطباعة
+No POS Profile is set up for this branch,ماكو إعدادات كاشير لهذا الفرع
+URY Print Job,مهمة طباعة
+QZ Printer,طابعة QZ
+QZ Bill Printer,طابعة الفواتير (QZ)
+Print Queue,طابور الطباعة
+Supplier name is required,اسم المورد مطلوب
+A supplier named {0} already exists,يوجد مورد باسم {0} مسبقاً
+Only a draft purchase can be edited,تنعدل المشتريات بس إذا كانت مسودة
+Only a draft purchase can be submitted,تترحّل المشتريات بس إذا كانت مسودة
+Only a submitted purchase can be cancelled,تنلغي بس المشتريات المرحّلة
+This purchase has payments recorded against it ({0}). Cancel the payments first.,على هذي المشتريات دفعات مسجّلة ({0}). ألغِ الدفعات أولاً.
+Cancelled: {0},أُلغيت: {0}
+Only a draft purchase can be deleted,تنحذف بس المشتريات المسودة
+Only a submitted purchase can be paid,تندفع بس المشتريات المرحّلة
+A return cannot be paid from here,المرتجع ما يندفع من هنا
+This purchase is already fully paid,هذي المشتريات مدفوعة بالكامل
+Payment amount must be greater than zero,مبلغ الدفعة لازم أكثر من صفر
+Payment amount cannot be more than the amount still owed ({0}),مبلغ الدفعة ما يصير أكثر من المبلغ المتبقي ({0})
+Choose a supplier,اختار المورد
+Add at least one item,أضف مادة وحدة على الأقل
+Choose the warehouse the goods go into,اختار المخزن اللي تدخله البضاعة
+Warehouse {0} cannot receive stock,المخزن {0} ما يستلم بضاعة
+Warehouse {0} belongs to another company,المخزن {0} تابع لشركة ثانية
+The purchase date cannot be in the future,تاريخ الشراء ما يصير بالمستقبل
+The due date cannot be before the purchase date,تاريخ الاستحقاق ما يصير قبل تاريخ الشراء
+Discount cannot be negative,الخصم ما يصير سالب
+Row {0}: choose an item,السطر {0}: اختار المادة
+Row {0}: quantity must be greater than zero,السطر {0}: الكمية لازم أكثر من صفر
+Row {0}: price cannot be negative,السطر {0}: السعر ما يصير سالب
+Row {0}: unit {1} is not set up for item {2},السطر {0}: الوحدة {1} غير معرّفة للمادة {2}
+Choose how the supplier was paid,اختار شلون انطيت المورد
+Choose a mode of payment,اختار طريقة الدفع
+Mode of payment {0} has no cash or bank account set for company {1},طريقة الدفع {0} ما مربوطة بحساب صندوق أو بنك للشركة {1}
+This purchase was changed by someone else after you opened it. Reload it and try again.,شخص ثاني عدّل هذي المشتريات بعد ما فتحتها. حدّث الصفحة وحاول مرة ثانية.
+Set up a company before recording purchases,أنشئ شركة قبل تسجيل المشتريات
+Warehouse {0} not found,المخزن {0} غير موجود
+Item {0} not found,المادة {0} غير موجودة
+{0} is disabled; enable it before giving it a recipe,{0} معطّل؛ فعّله قبل ما تعطيه وصفة
+{0} is a template; give each variant its own recipe,{0} قالب؛ أعطِ كل نوع منه وصفته الخاصة
+This recipe was changed by someone else after you opened it. Reload it and try again.,شخص ثاني عدّل هذي الوصفة بعد ما فتحتها. حدّث الصفحة وحاول مرة ثانية.
+Add at least one ingredient,أضف مكوّن واحد على الأقل
+Row {0}: choose an ingredient,السطر {0}: اختار المكوّن
+Row {0}: a product cannot be an ingredient of itself,السطر {0}: المنتج ما يصير مكوّن لنفسه
+Row {0}: {1} is a template; choose one of its variants,السطر {0}: {1} قالب؛ اختار واحد من أنواعه
+Row {0}: {1} is listed twice; put the full quantity on one row,السطر {0}: {1} مكرر؛ حط الكمية كاملة بسطر واحد
+"Row {0}: {1} is not kept in stock and has no recipe of its own, so it cannot be deducted",السطر {0}: {1} مو مادة مخزنية وما إله وصفة خاصة، فما ينصرف من المخزن
+Row {0}: {1} already contains this product; a recipe cannot contain itself,السطر {0}: {1} يحتوي هذا المنتج أصلاً؛ الوصفة ما تحتوي نفسها
+Row {0}: unit {1} has no conversion to {2} for {3},السطر {0}: الوحدة {1} ما إلها تحويل إلى {2} للمادة {3}
+"Row {0}: {1} is counted in whole {2}; enter a whole number, or keep it in stock in a divisible unit such as Kg or Litre",السطر {0}: {1} تنحسب بـ {2} كاملة؛ أدخل رقم صحيح، أو خزّنها بوحدة تتجزأ مثل الكيلو أو اللتر
+"Row {0}: {1} is kept in stock in whole {2}, so one portion must use a whole number of them",السطر {0}: {1} مخزونة بـ {2} كاملة، فالحصة الوحدة لازم تستخدم عدد صحيح منها
+Warehouse {0} cannot hold stock,المخزن {0} ما يحفظ مخزون
+Recipe {0} nests kits more than {1} levels deep,الوصفة {0} متداخلة أكثر من {1} مستويات
+Recipe consumption for {0},صرف مكونات الوصفة للفاتورة {0}
+Captain ordering,طلبات الكابتن
+Waiters take orders at the table from a phone or tablet.,الكابتن ياخذ الطلب على الطاولة من الموبايل أو التابلت.
+Kitchen display (KDS),شاشة المطبخ (KDS)
+"Kitchen screens that show tickets live, and messages from the counter to the kitchen.",شاشات المطبخ تعرض الطلبات مباشرة، ورسائل من الكاونتر للمطبخ.
+Self ordering (QR & kiosk),الطلب الذاتي (QR وكشك)
+Guests order and call the waiter from a QR code at the table or a kiosk.,الزبون يطلب وينادي الكابتن من رمز QR على الطاولة أو من الكشك.
+Reservations,الحجوزات
+Book tables ahead and see bookings on the floor plan.,حجز الطاولات مسبقاً وعرض الحجوزات على مخطط الصالة.
+Waitlist,قائمة الانتظار
+Queue walk-in guests with wait estimates and table suggestions.,تنظيم الزبائن الواصلين بدون حجز مع وقت انتظار تقديري واقتراح طاولات.
+Guest feedback,تقييم الزبائن
+Collect ratings and comments from guests after their visit.,جمع تقييمات وملاحظات الزبائن بعد زيارتهم.
+"Offers, coupons & loyalty",العروض والكوبونات والولاء
+"Discount offers, coupon codes at the POS and loyalty points.",عروض الخصم، أكواد الكوبونات بالكاشير، ونقاط الولاء.
+Delivery & drivers,التوصيل والسواق
+"Dispatch board, drivers app and delivery zones.",لوحة التوصيل، تطبيق السواق، ومناطق التوصيل.
+Restaurant website,موقع المطعم
+A public website for the restaurant with its menu and opening hours.,موقع عام للمطعم بيه المنيو وأوقات الدوام.
+"Supplier bills that receive goods into stock, and supplier payments.",فواتير الموردين اللي تدخّل البضاعة للمخزن، ودفعات الموردين.
+Warehouses dashboard,لوحة المخازن
+"Stock across warehouses, with the 3D warehouse map.",المخزون بكل المخازن، مع خريطة المخازن ثلاثية الأبعاد.
+Recipes & consumption,الوصفات والاستهلاك
+"Ingredients per product, deducted from stock on every sale and costed from purchases.",مكونات كل منتج، تنصرف من المخزن مع كل بيعة وتنحسب كلفتها من المشتريات.
+URY login page,صفحة دخول المطعم
+The restaurant's own sign-in page instead of the standard one.,صفحة تسجيل دخول خاصة بالمطعم بدل الصفحة الافتراضية.
+Guests,الزبائن
+Back office,الإدارة الخلفية
+{0} is switched off. Ask an administrator to enable it.,{0} متوقفة. اطلب من المدير يفعّلها.
+Control Center: {0},مركز التحكم: {0}
+"This would keep you out of Desk too. Leave Desk allowed for one of your roles ({0}), or ask a System Manager.",هذا راح يمنعك إنت هم من الـ Desk. خلّي الـ Desk مسموح لدور واحد من أدوارك ({0})، أو اطلب من مدير النظام.
+Not saved,ما انحفظ
+{0} enabled,تفعيل {0}
+{0} disabled,إيقاف {0}
+Desk policy enforced,تفعيل سياسة الـ Desk
+Desk policy relaxed,إيقاف سياسة الـ Desk
+"{0}: Desk {1}, lands on {2}",{0}: الـ Desk {1}، يدخل على {2}
+blocked,ممنوع
+allowed,مسموح
+{0} removed,حذف {0}
+Unknown feature {0},ميزة غير معروفة {0}
+Feature {0} is listed twice,الميزة {0} مكررة
+Role {0} is listed twice,الدور {0} مكرر
+{0} always keeps Desk access and cannot be restricted,{0} يبقى عنده وصول للـ Desk دائماً وما ينمنع
+"Row {0}: the landing page must be a path on this site, such as /pos",السطر {0}: صفحة الدخول لازم تكون مسار بهذا الموقع، مثل /pos
+Row {0}: a role kept out of Desk cannot land on a Desk page,السطر {0}: الدور الممنوع من الـ Desk ما يصير يدخل على صفحة من الـ Desk
+"Row {0}: choose where {1} lands, since Desk is blocked for it",السطر {0}: اختار وين يدخل {1}، لأن الـ Desk ممنوع عليه
+Sign in,تسجيل الدخول
+Not available,غير متاح
+Welcome back,هلا بيك من جديد
+"Sign in to open your station: the POS, the captain's order pad or the restaurant dashboard.",سجّل دخولك حتى تفتح شاشتك: الكاشير، دفتر طلبات الكابتن، أو لوحة إدارة المطعم.
+Email or username,البريد الإلكتروني أو اسم المستخدم
+Caps Lock is on,زر الأحرف الكبيرة (Caps Lock) مفعّل
+Forgot password?,نسيت كلمة السر؟
+Email me a sign-in link,ارسل لي رابط دخول بالإيميل
+Password sign-in is turned off on this site. Use one of the options below.,الدخول بكلمة السر متوقف بهذا الموقع. استخدم أحد الخيارات الجاية.
+or continue with,أو كمّل باستخدام
+Verify it's you,تأكيد هويتك
+Enter the verification code.,أدخل رمز التحقق.
+Verification code,رمز التحقق
+Confirm code,تأكيد الرمز
+Back to sign in,رجوع لتسجيل الدخول
+Enter the email of your account and we'll send a link to set a new password.,أدخل إيميل حسابك ونرسلك رابط حتى تحدد كلمة سر جديدة.
+Send reset link,إرسال رابط إعادة التعيين
+Sign in with a link,الدخول برابط
+We'll email you a one-time link that signs you in. It expires shortly.,نرسلك رابط يستخدم مرة وحدة يدخلك مباشرة، وتنتهي صلاحيته بسرعة.
+Send sign-in link,إرسال رابط الدخول
+Protected sign-in · repeated failed attempts lock the account for a while,دخول محمي · تكرار المحاولات الفاشلة يقفل الحساب لفترة
+Service is running,الخدمة شغّالة
+"Every order, from the table to the kitchen to the till.",كل طلب، من الطاولة للمطبخ للكاشير.
+"One system for the cashier, the captain and the kitchen — with stock, recipes and purchases kept in step behind the scenes.",نظام واحد للكاشير والكابتن والمطبخ — والمخزون والوصفات والمشتريات ماشية وياه خلف الكواليس.
+Fast checkout,دفع سريع
+"Dine-in, take-away and delivery from one screen.",صالة وسفري وتوصيل من شاشة وحدة.
+Kitchen in sync,مطبخ متزامن
+Tickets reach the right station the moment they're ordered.,الطلب يوصل للقسم الصحيح بنفس لحظة طلبه.
+Stock that adds up,مخزون مضبوط
+"Recipes deduct ingredients on every sale, costed from purchases.",الوصفات تصرف المكونات مع كل بيعة، بكلفة المشتريات.
+Sign-in failed. Check your details and try again.,فشل تسجيل الدخول. تأكد من بياناتك وحاول مرة ثانية.
+Can't reach the server. Check the connection and try again.,ما نكدر نوصل للسيرفر. تأكد من الاتصال وحاول مرة ثانية.
+Enter your email or username and your password.,أدخل الإيميل أو اسم المستخدم وكلمة السر.
+Too many attempts. Wait a few minutes before trying again.,محاولات كثيرة. انتظر كم دقيقة قبل ما تحاول مرة ثانية.
+"If an account exists for that email, a reset link is on its way.",إذا اكو حساب بهذا الإيميل، رابط إعادة التعيين بالطريق إليك.
+"If an account exists for that email, a sign-in link is on its way.",إذا اكو حساب بهذا الإيميل، رابط الدخول بالطريق إليك.
+Enter a valid email address.,أدخل إيميل صحيح.
+Enter the code.,أدخل الرمز.
+Show password,إظهار كلمة السر
+Hide password,إخفاء كلمة السر
+This page is not available,هذي الصفحة غير متاحة
+{0} is switched off for this restaurant. Ask an administrator if you need it.,{0} متوقفة بهذا المطعم. اطلب من المدير إذا تحتاجها.
+This feature is switched off for this restaurant.,هذي الميزة متوقفة بهذا المطعم.
+URY Control Center,مركز التحكم بالمطعم
+Open restaurant dashboard,فتح لوحة المطعم
+Could not load the settings.,تعذّر تحميل الإعدادات.
+Changes discarded,انلغت التعديلات
+Enable {0},تفعيل {0}
+Disable {0},إيقاف {0}
+Keep restaurant staff out of Desk,منع موظفي المطعم من الـ Desk
+Let restaurant staff open Desk,السماح لموظفي المطعم بفتح الـ Desk
+Update role access and landing pages,تحديث صلاحيات الأدوار وصفحات الدخول
+Its screens are hidden and its server functions refuse calls until it is enabled again. No data is deleted.,شاشاتها تختفي ووظائفها بالسيرفر ترفض الطلبات لحد ما تتفعّل مرة ثانية. ما ينحذف أي شي من البيانات.
+These changes apply to everyone on their next page load:,هذي التغييرات تنطبق على الكل من أول تحميل صفحة جاي:
+Saving changes...,جارٍ حفظ التعديلات...
+Features,الميزات
+Desk access,الوصول للـ Desk
+People,الأشخاص
+Restaurant control center,مركز التحكم بالمطعم
+"Choose which parts of the restaurant system are in use, and what each role can open.",اختار شنو الأجزاء المستخدمة من نظام المطعم، وشنو يكدر يفتح كل دور.
+Features on,الميزات المفعّلة
+Staff kept out of Desk,موظفين ممنوعين من الـ Desk
+Enforced,مفعّلة
+Desk policy,سياسة الـ Desk
+You have unsaved changes.,عندك تعديلات ما انحفظت.
+On,مفعّلة
+"Staff whose roles are all blocked below are sent to their own screen instead of Desk, and Desk's own API is refused to them.",الموظف اللي كل أدواره ممنوعة بالجدول يتحوّل لشاشته بدل الـ Desk، وواجهات الـ Desk البرمجية ترفض طلباته.
+"System Managers and Administrator always keep Desk, whatever other roles they have. You cannot save a policy that would keep yourself out of Desk.",مدير النظام والـ Administrator يبقى عندهم الـ Desk دائماً مهما كانت أدوارهم الثانية. وما تكدر تحفظ سياسة تمنعك إنت من الـ Desk.
+Desk,الـ Desk
+Lands on after sign-in,صفحة الدخول بعد التسجيل
+Move up,تحريك للأعلى
+Move down,تحريك للأسفل
+Can open Desk,يفتح الـ Desk
+Kept out,ممنوع
+Other path...,مسار آخر...
+Add role,إضافة دور
+A user with several roles lands on the page of the highest role in this list.,المستخدم اللي عنده أكثر من دور يدخل على صفحة أعلى دور بهذي القائمة.
+As saved. Unsaved changes are not reflected here.,حسب آخر حفظ. التعديلات غير المحفوظة ما تظهر هنا.
+Search people,ابحث عن شخص
+Person,الشخص
+Lands on,يدخل على
+No one has a restaurant role yet.,بعد ماكو أحد عنده دور بالمطعم.
+POS (cashier),الكاشير (POS)
+Captain order pad,دفتر طلبات الكابتن
+Restaurant dashboard,لوحة المطعم
+Kitchen display,شاشة المطبخ
+This account is locked for a while after too many failed attempts. Try again later.,هذا الحساب مقفول لفترة بسبب محاولات فاشلة كثيرة. حاول مرة ثانية بعدين.
+This account is disabled. Contact the restaurant administrator.,هذا الحساب معطّل. تواصل ويا مدير المطعم.
