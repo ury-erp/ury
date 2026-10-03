@@ -1,9 +1,16 @@
 import * as React from "react"
 import { cn } from "../lib/cn"
+import { Illustration, type IllustrationName } from "./illustration"
 
 export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Lucide icon (or any node). Rendered muted and oversized. */
   icon?: React.ReactNode
+  /**
+   * Name of a feature illustration from the shared Smart Restro set
+   * (ury/public/illustrations, e.g. "menu", "purchases"). Takes the place of
+   * `icon` for whole-page states; keep `icon` for small in-card ones.
+   */
+  illustration?: IllustrationName
   title: string
   description?: string
   /** Primary recovery action, if there is one the user can actually take. */
@@ -20,17 +27,20 @@ export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
  * something each call site improvises.
  */
 const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
-  ({ className, icon, title, description, action, size = "default", ...props }, ref) => (
+  ({ className, icon, illustration, title, description, action, size = "default", ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
         "flex flex-col items-center justify-center text-center animate-fade-in",
         size === "sm" ? "gap-2 px-4 py-8" : "gap-3 px-6 py-14",
+        illustration && (size === "sm" ? "pt-4" : "pt-6"),
         className
       )}
       {...props}
     >
-      {icon ? (
+      {illustration ? (
+        <Illustration name={illustration} size={size} />
+      ) : icon ? (
         <div
           aria-hidden="true"
           className={cn(
