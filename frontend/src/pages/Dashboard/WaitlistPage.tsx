@@ -10,7 +10,7 @@ import {
   Timer,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Button, Input, Textarea, Badge, Spinner, showToast } from '@ury/ui';
+import { Button, Input, Textarea, Badge, Spinner, showToast, EmptyState } from '@ury/ui';
 import { parseFrappeError } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -241,7 +241,7 @@ export const WaitlistPage: React.FC = () => {
           <Spinner />
         </div>
       ) : waitingGuests.length === 0 ? (
-        <p className="py-12 text-center text-sm text-gray-500">{t('dash.waitlist.empty')}</p>
+        <EmptyState illustration="reservations" title={t('dash.waitlist.empty')} />
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-start text-sm text-gray-600">
