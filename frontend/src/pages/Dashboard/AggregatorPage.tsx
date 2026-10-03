@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Plus, Store, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle } from '@ury/ui';
+import { Plus, Edit2 } from 'lucide-react';
+import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle, Illustration } from '@ury/ui';
 import { call, storage } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { t } from '../../i18n';
@@ -316,9 +316,7 @@ export const AggregatorPage: React.FC = () => {
         </div>
       ) : aggregators.length === 0 ? (
         <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Store className="w-6 h-6 text-primary" />
-          </div>
+          <Illustration name="delivery" className="mb-3" />
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.aggregator.no_aggregators_found')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">{t('dash.aggregator.add_aggregators_like_zomato_swiggy_to_config')}</p>
           <Button
