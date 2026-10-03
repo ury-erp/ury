@@ -24,6 +24,18 @@ const cases: Case[] = [
   { input: 'Grilled Fish', expected: 'Fish' },
   { input: 'Ice-Cream', expected: 'IceCreamCone' },
   { input: 'Soft Drinks', expected: 'CupSoda' },
+  // Iraqi Arabic category names
+  { input: 'مشويات', expected: 'Beef' },
+  { input: 'كص دجاج', expected: 'Sandwich' },
+  { input: 'دجاج', expected: 'Drumstick' },
+  { input: 'سمك مسكوف', expected: 'Fish' },
+  { input: 'تمن ومرق', expected: 'CookingPot' },
+  { input: 'شوربات', expected: 'Soup' },
+  { input: 'مشروبات ساخنة', expected: 'Coffee' },
+  { input: 'مشروبات باردة', expected: 'CupSoda' },
+  { input: 'عصائر', expected: 'Citrus' },
+  { input: 'برگر', expected: 'Hamburger' },
+  { input: 'حلويات', expected: 'Cake' },
 ];
 
 describe('fuzzyMatchIcon', () => {
