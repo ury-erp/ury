@@ -148,7 +148,8 @@
     "common": {
       "load_failed": "Failed to load report data.",
       "no_data": "No data",
-      "total": "Total"
+      "total": "Total",
+      "empty_hint": "Nothing was recorded in this period. Try another date range."
     },
     "completed_work_orders": {
       "completed": "Completed",
@@ -1072,7 +1073,8 @@
       "no_end_date": "No end date",
       "see_rule": "Per the rule",
       "edit_rule": "Edit rule",
-      "new_rule": "New rule"
+      "new_rule": "New rule",
+      "empty_hint": "Offers and coupons you create as pricing rules will appear here, ready for the cashier."
     },
     "delivery": {
       "title": "Dispatch board",
