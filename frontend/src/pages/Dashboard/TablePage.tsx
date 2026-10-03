@@ -8,6 +8,7 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import TableLayoutView from './TableLayoutView';
+import { tableStatusLabel } from '../../lib/statusLabels';
 import { t } from '../../i18n';
 import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 
@@ -324,7 +325,7 @@ export const TablePage: React.FC = () => {
                     {t.table_shape || 'Square'}
                   </Badge>
                   <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
-                    {t.status || 'Available'}
+                    {tableStatusLabel(t.status || 'Available')}
                   </Badge>
                 </div>
                 <h3 className="mt-3 text-xl font-bold text-gray-900 tracking-tight">{t.table_name || t.name}</h3>
@@ -370,7 +371,7 @@ export const TablePage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
-                      {t.status || 'Available'}
+                      {tableStatusLabel(t.status || 'Available')}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">
