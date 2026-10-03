@@ -61,13 +61,12 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const active = useRef(false);
-  const readLocally = useRef(new Set<string>());
+  const requestId = useRef(0);
   const refreshRef = useRef<() => void>(() => {});
   const isCurrentSession = () => active.current && getSessionUser() === user;
 
   useEffect(() => {
     active.current = true;
-    let requestId = 0;
     let controller: AbortController | undefined;
     let socket: Awaited<ReturnType<typeof getRealtimeSocket>> | undefined;
 
@@ -82,7 +81,7 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
 
     async function refresh() {
       if (!isCurrentSession()) { clearOldSession(); return; }
-      const id = ++requestId;
+      const id = ++requestId.current;
       controller?.abort();
       controller = new AbortController();
       setRefreshing(true);
@@ -99,14 +98,13 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
         const data = await response.json();
         if (!Array.isArray(data.message)) throw new Error('Invalid notification list');
         if (!isCurrentSession()) { if (active.current) clearOldSession(); return; }
-        if (id !== requestId) return;
-        setNotifications(data.message.filter((item: Notification) => item.for_user === user)
-          .map((item: Notification) => readLocally.current.has(item.name) ? { ...item, read: 1 } : item));
+        if (id !== requestId.current) return;
+        setNotifications(data.message.filter((item: Notification) => item.for_user === user));
         setFailed(false);
       } catch {
-        if (isCurrentSession() && id === requestId) setFailed(true);
+        if (isCurrentSession() && id === requestId.current) setFailed(true);
       } finally {
-        if (isCurrentSession() && id === requestId) { setLoading(false); setRefreshing(false); }
+        if (isCurrentSession() && id === requestId.current) { setLoading(false); setRefreshing(false); }
       }
     }
     const reconnect = () => { setDisconnected(false); void refresh(); };
@@ -127,7 +125,7 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
     }).catch(() => { if (isCurrentSession()) setDisconnected(true); });
     return () => {
       active.current = false;
-      ++requestId;
+      ++requestId.current;
       controller?.abort();
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
@@ -144,7 +142,10 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
     try {
       await call.post('frappe.desk.doctype.notification_log.notification_log.mark_as_read', { docname: notification.name });
       if (!isCurrentSession()) return;
-      readLocally.current.add(notification.name);
+      // Ignore lists fetched before this successful write; subsequent lists are
+      // authoritative, including native read-state changes made in Desk.
+      ++requestId.current;
+      setRefreshing(false);
       setNotifications(rows => rows.map(row => row.name === notification.name ? { ...row, read: 1 } : row));
     } catch {
       if (isCurrentSession()) setMessage('Could not mark notification read');
@@ -189,7 +190,7 @@ function UserNotifications({ user, title = 'Recent Notifications', onOpenCheck }
                 <time dateTime={notification.creation.replace(' ', 'T')} title={notification.creation}>{getRelativeTime(notification.creation)}</time>
               </div>
               <div className="flex flex-wrap items-center gap-x-3">
-                {href ? <a className="inline-flex min-h-11 items-center text-blue-700 underline" href={href}
+                {href ? <a className="inline-flex min-h-11 items-center text-blue-700 underline" href={href} target="_blank" rel="noopener noreferrer"
                   onClick={() => { if (unread) void markRead(notification); }}>Open record</a> : <span>Record link unavailable</span>}
                 {href && onOpenCheck && notification.document_type === 'URY KOT' &&
                   <button className="min-h-11 text-blue-700 underline" disabled={busy !== null} onClick={() => void openCheck(notification)}>Open check</button>}
