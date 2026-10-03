@@ -9,7 +9,7 @@ interface MenuCardProps {
   name: string;
   price: number;
   item_image: string | null;
-  course?: string;
+  category?: string;
   item: string;
   onClick?: () => void;
   /** Opens the item's detail/options panel. Rendered as its own control so
@@ -42,7 +42,7 @@ const MenuCard: FC<MenuCardProps> = ({
   name,
   price,
   item_image,
-  course,
+  category,
   onClick,
   onCustomize,
   disabled,
@@ -109,9 +109,9 @@ const MenuCard: FC<MenuCardProps> = ({
           {name}
         </h3>
 
-        {/* Reserved line so cards with and without a course still align. */}
+        {/* Reserved line so cards with and without a category still align. */}
         <p className="mt-1 h-5 truncate text-xs text-muted-foreground">
-          {course || ' '}
+          {category || ' '}
         </p>
 
         <div className="mt-auto pt-2">
