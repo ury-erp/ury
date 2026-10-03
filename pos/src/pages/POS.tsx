@@ -130,12 +130,11 @@ export default function POS() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden bg-[#f8f4eb]">
+    <div className="flex flex-1 min-h-0 overflow-hidden bg-[#f8f4eb]">
       {docked && <Sidebar disabled={isMenuInteractionDisabled()} />}
       <div
         className={cn(
-          'flex-1 flex flex-col min-w-0 overflow-hidden',
-          docked && 'pe-80 xl:pe-96'
+          'flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden'
         )}
       >
         <div className="px-5 py-4 bg-[#fffdf8] border-b border-[#eadfce]">
