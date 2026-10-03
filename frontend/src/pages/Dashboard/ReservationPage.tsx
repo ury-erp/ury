@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { CalendarClock, Plus, Check, X, UserCheck } from 'lucide-react';
-import { Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Button, Badge, Input, Spinner, showToast, EmptyState } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -179,7 +179,7 @@ export const ReservationPage: React.FC = () => {
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>
       ) : rows.length === 0 ? (
-        <p className="py-12 text-center text-sm text-gray-500">{t('dash.reservations.none_today')}</p>
+        <EmptyState illustration="reservations" title={t('dash.reservations.none_today')} />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full text-start text-sm text-gray-600">
