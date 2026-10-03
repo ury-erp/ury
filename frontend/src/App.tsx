@@ -119,7 +119,7 @@ function SetupGuard() {
   }
 
   const isSetupRoute = window.location.pathname.startsWith(
-    '/ury/setup-wizard/'
+    '/restro/setup-wizard/'
   );
 
   if (!status.step2_complete && !isSetupRoute) {
