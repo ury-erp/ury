@@ -128,7 +128,7 @@ export function CancelledInvoices() {
         </div>
       )}
 
-      <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} />
+      <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
 
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
