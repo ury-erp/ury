@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatCompactCurrency, formatCurrency, getIntlLocale, parseFrappeError } from '@ury/core';
-import { Button, Card, ErrorState, Input, Spinner, StatCard } from '@ury/ui';
+import { Button, Card, ErrorState, Input, Spinner, StatCard, Illustration } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   inventoryService,
@@ -712,6 +712,7 @@ export const InventoryPage: React.FC = () => {
                 ) : !stock || stock.rows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-12 text-center text-sm text-gray-400">
+                      {!(status || search || group) && <Illustration name="inventory" className="mx-auto mb-1" />}
                       {status || search || group ? t('dash.transactions.no_match') : t('dash.inventory.empty_warehouse')}
                     </td>
                   </tr>
