@@ -26,27 +26,20 @@ COST_SOURCE_MANUAL = "manual"    # `URY Menu Item.plate_cost`, typed by staff
 COST_SOURCE_NONE = "none"        # nobody has costed this dish
 
 
-def _bom_cost_map(item_codes):
-    """Per-unit cost from the default active BOM, for the items that have one.
+def _bom_cost_map(item_codes, branch=None):
+    """Per-unit cost of each dish that has a recipe, priced live from purchases.
 
-    One query for the whole menu rather than one per dish: a menu is a few
-    hundred rows and this report is opened on a phone behind a counter.
+    The BOM's own stored total is a snapshot from the day it was saved; the
+    recipes page and this report share one live calculation (what the
+    ingredients cost now, by FIFO valuation or last purchase) so the two
+    never disagree.
     """
     if not item_codes:
         return {}
 
-    boms = frappe.get_all(
-        "BOM",
-        filters={"item": ["in", item_codes], "is_active": 1, "is_default": 1, "docstatus": 1},
-        fields=["item", "total_cost", "quantity"],
-    )
+    from ury.ury.api.recipes import recipe_unit_costs
 
-    costs = {}
-    for bom in boms:
-        qty = flt(bom.quantity) or 1
-        # A BOM may produce several portions; the dish costs one of them.
-        costs[bom.item] = flt(bom.total_cost) / qty
-    return costs
+    return {item: c["cost"] for item, c in recipe_unit_costs(item_codes, branch=branch).items()}
 
 
 @frappe.whitelist()
@@ -68,7 +61,7 @@ def get_plate_costs(branch=None, menu=None):
         order_by="item_name asc",
     )
 
-    bom_costs = _bom_cost_map([row.item for row in rows])
+    bom_costs = _bom_cost_map([row.item for row in rows], branch)
 
     out = []
     for row in rows:
