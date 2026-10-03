@@ -72,7 +72,7 @@ export function WizardLayout({
         </div>
       </footer>
 
-      <div className="py-3 text-center text-xs text-muted-foreground">URY · {version}</div>
+      <div className="py-3 text-center text-xs text-muted-foreground">Smart Restro · {version}</div>
     </div>
   );
 }
