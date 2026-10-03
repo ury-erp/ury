@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAccess } from '../hooks/useAccess';
 import { t } from '../i18n';
 import { clearCachedStorage } from '../lib/storage-keys';
 import { Link, useLocation } from 'react-router-dom';
@@ -28,6 +29,7 @@ import smartLogo from '../../../smart_logo.png';
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showKitchenMessage, setShowKitchenMessage] = useState(false);
+  const { access } = useAccess();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -160,9 +162,10 @@ const Header = () => {
         {/* Right side actions */}
         <div className="flex items-center gap-2">
           {/* Tables calling for the bill from the self-ordering page. */}
-          <ServiceRequestBell />
+          {!access.pos_off.includes('service_requests') && <ServiceRequestBell />}
           {/* Reachable in one tap mid-service, alongside the other header
               actions, rather than buried in the user menu. */}
+{!access.pos_off.includes('kitchen_messages') && (
           <button
             onClick={() => setShowKitchenMessage(true)}
             title={t('kitchen_msg.open')}
@@ -171,6 +174,7 @@ const Header = () => {
           >
             <MessageSquare className="w-4 h-4" />
           </button>
+          )}
           <button className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg text-white/65 hover:bg-white/10 hover:text-white transition-colors" title={t('header.help')}>
             <CircleHelp className="w-4 h-4" />
           </button>
@@ -212,6 +216,7 @@ const Header = () => {
                     <Monitor className="w-4 h-4 me-3" />
                     {t('header.switch_to_dashboard')}
                   </Button>
+{access.desk && (
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -220,6 +225,7 @@ const Header = () => {
                     <Monitor className="w-4 h-4 me-3" />
                     {t('header.switch_to_desk')}
                   </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
