@@ -331,6 +331,22 @@ export default function Orders() {
   }
 
 
+  /** Prints a bill that has just been paid — optional, after settlement. */
+  async function printSettledReceipt(invoice: string) {
+    if (!posStore.posProfile || !selectedOrder) return;
+    try {
+      await printOrder({
+        orderId: invoice,
+        posProfile: posStore.posProfile,
+        printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
+      });
+      showToast.success(t('success.printed'));
+    } catch (err) {
+      showToast.error(t('errors.print_failed', { reason: err instanceof Error ? err.message : String(err) }));
+      throw err;
+    }
+  }
+
   async function handlePrintOrder() {
     if (!selectedOrder || !posStore.posProfile) return;
     setIsPrinting(true);
@@ -436,7 +452,7 @@ export default function Orders() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <ErrorState
           title={t('errors.failed_load_orders')}
           description={error}
@@ -681,7 +697,19 @@ export default function Orders() {
                   {isOrderEditable(selectedOrder.status) && (
                     <Button
                       className="flex-1"
-                      onClick={() => setShowPaymentDialog(true)}
+                      onClick={() => {
+                        // Where the restaurant requires a printed bill, say so
+                        // here — not after the cashier has counted the money.
+                        if (
+                          posStore.posProfile?.require_bill_print === 1 &&
+                          selectedOrder.restaurant_table &&
+                          String(selectedOrder.invoice_printed) !== '1'
+                        ) {
+                          showToast.error(t('order.print_before_payment'));
+                          return;
+                        }
+                        setShowPaymentDialog(true);
+                      }}
                     >
                       {t('order.payment')}
                     </Button>
@@ -718,7 +746,7 @@ export default function Orders() {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left Sidebar - Order Types */}
       {docked && (
         <OrderStatusSidebar
@@ -970,6 +998,7 @@ export default function Orders() {
           clearSelectedOrder={clearSelectedOrder}
           discountPercentage={selectedOrder.additional_discount_percentage}
           discountAmount={selectedOrder.discount_amount}
+          onPrintReceipt={printSettledReceipt}
         />
       )}
       {selectedOrder && (
