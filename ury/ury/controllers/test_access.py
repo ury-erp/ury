@@ -37,7 +37,7 @@ class TestAccessFor(FrappeTestCase):
 	def test_one_allowed_role_keeps_desk(self):
 		a = self._access(["URY Cashier", "URY Admin"])
 		self.assertTrue(a.desk)
-		self.assertEqual(a.landing, "/ury/dashboard")  # highest role in the list
+		self.assertEqual(a.landing, "/restro/dashboard")  # highest role in the list
 
 	def test_a_system_manager_is_never_blocked(self):
 		self.assertTrue(self._access(["URY Cashier", "System Manager"]).desk)
@@ -148,7 +148,7 @@ class TestRedirects(AsUser):
 		self.assertEqual(self._login(desk=False, redirect_to="/app/sales-invoice"), "/pos")
 
 	def test_a_restricted_user_keeps_a_non_desk_deep_link(self):
-		self.assertEqual(self._login(desk=False, redirect_to="/ury/invoices/X"), "/ury/invoices/X")
+		self.assertEqual(self._login(desk=False, redirect_to="/restro/invoices/X"), "/restro/invoices/X")
 
 	def test_a_desk_user_keeps_their_deep_link(self):
 		self.assertEqual(self._login(desk=True, redirect_to="/app/sales-invoice"), "/app/sales-invoice")
