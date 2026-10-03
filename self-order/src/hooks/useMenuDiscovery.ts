@@ -24,6 +24,9 @@ export interface MenuDiscovery {
  * sequenced by the kitchen — starters before mains — and sorting it
  * destroys that intent for no gain.
  */
+/** Grouped by category (Item Group), like the POS; course only for old menus. */
+const groupOf = (item: MenuItem) => item.category || item.course
+
 export function useMenuDiscovery(menu: MenuItem[]): MenuDiscovery {
   const [course, setCourse] = useState<string>(ALL_COURSES)
   const [query, setQuery] = useState('')
@@ -31,8 +34,9 @@ export function useMenuDiscovery(menu: MenuItem[]): MenuDiscovery {
   const courses = useMemo(() => {
     const seen = new Map<string, string>()
     menu.forEach((item) => {
-      if (item.course && !seen.has(item.course)) {
-        seen.set(item.course, item.course_label || item.course)
+      const key = groupOf(item)
+      if (key && !seen.has(key)) {
+        seen.set(key, item.category_label || item.course_label || key)
       }
     })
     return Array.from(seen, ([value, label]) => ({ value, label }))
@@ -41,7 +45,7 @@ export function useMenuDiscovery(menu: MenuItem[]): MenuDiscovery {
   const visibleMenu = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return menu.filter((item) => {
-      if (course !== ALL_COURSES && item.course !== course) return false
+      if (course !== ALL_COURSES && groupOf(item) !== course) return false
       if (!needle) return true
       return item.item_name.toLowerCase().includes(needle)
     })
