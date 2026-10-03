@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { MessageSquareHeart, Star, QrCode, Copy, Check, Phone, AlertTriangle } from 'lucide-react';
-import { Button, Badge, Textarea, Spinner, showToast } from '@ury/ui';
+import { Button, Badge, Textarea, Spinner, showToast, EmptyState } from '@ury/ui';
 import { parseFrappeError } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -182,7 +182,7 @@ export const FeedbackPage: React.FC = () => {
           <Spinner />
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-12 text-center text-sm text-gray-500">{t('dash.feedback.empty')}</p>
+        <EmptyState illustration="feedback" title={t('dash.feedback.empty')} />
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
