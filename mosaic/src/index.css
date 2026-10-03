@@ -167,18 +167,191 @@
 
   .header-icon-button:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
-  .empty-kitchen-icon {
+  /*
+   * Empty, error and "nothing in this filter" states. The illustration comes
+   * from the shared Smart Restro set in /assets/ury/illustrations, so the
+   * kitchen speaks the same visual language as the sign-in page.
+   */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: 2.5rem 1rem 3rem;
+    text-align: center;
+  }
+  .empty-state__art {
+    width: min(100%, 22rem);
+    height: auto;
+    margin-bottom: 0.5rem;
+    animation: empty-float 9s ease-in-out infinite;
+  }
+  .empty-state__title {
+    margin: 0;
+    color: #3f2a20;
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .empty-state__body {
+    margin: 0.375rem 0 0;
+    max-width: 26rem;
+    color: #8a6f5c;
+    font-size: 0.95rem;
+    line-height: 1.8;
+  }
+  .empty-state__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .empty-state--compact { padding: 2rem 1rem; }
+  .empty-state--compact .empty-state__title { font-size: 1.05rem; }
+
+  .btn-kitchen {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0 1.25rem;
+    border-radius: 0.875rem;
+    font-weight: 700;
+    color: #3f2a20;
+    background: #ffca4b;
+    box-shadow: 0 6px 16px -6px rgba(212, 149, 59, 0.6);
+    transition: background 160ms ease, transform 160ms ease;
+  }
+  .btn-kitchen:hover { background: #ffbf2e; }
+  .btn-kitchen:active { transform: translateY(1px); }
+  .btn-kitchen:focus-visible { outline: 3px solid #3f2a20; outline-offset: 3px; }
+  .btn-kitchen[disabled] { opacity: 0.6; cursor: progress; }
+  .btn-kitchen--quiet { background: #fffdf8; border: 1px solid #eadfce; box-shadow: none; }
+  .btn-kitchen--quiet:hover { background: #fff6e3; }
+
+  /* Station picker. */
+  .station-hero {
+    position: relative;
     display: grid;
-    width: 3.75rem;
-    height: 3.75rem;
-    margin: 0 auto 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.75rem;
+    padding: 1.75rem 2rem;
+    overflow: hidden;
+    border: 1px solid #efe4d3;
+    border-radius: 1.75rem;
+    background:
+      radial-gradient(ellipse at 85% 30%, rgba(242, 218, 196, 0.55), transparent 60%),
+      linear-gradient(120deg, #fffdf8, #fbf5ec);
+    box-shadow: 0 18px 50px -30px rgba(115, 96, 79, 0.45);
+  }
+  .station-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #a2674f;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .station-hero__eyebrow::before { content: ""; width: 1.5rem; height: 2px; border-radius: 2px; background: #dc7355; }
+  .station-hero__title { margin: 0.5rem 0 0.375rem; color: #3f2a20; font-size: clamp(1.6rem, 2.6vw, 2.25rem); font-weight: 700; line-height: 1.35; }
+  .station-hero__body { margin: 0; max-width: 34rem; color: #8a6f5c; font-size: 0.95rem; line-height: 1.85; }
+  .station-hero__art { width: clamp(13rem, 26vw, 20rem); height: auto; margin-block: -1rem -1.5rem; animation: empty-float 9s ease-in-out infinite; }
+  @media (max-width: 640px) {
+    .station-hero { grid-template-columns: 1fr; padding: 1.25rem 1.25rem 0; text-align: center; }
+    .station-hero__eyebrow { justify-content: center; }
+    .station-hero__body { margin-inline: auto; }
+    .station-hero__art { justify-self: center; width: 15rem; margin-block: 0 -0.75rem; }
+  }
+
+  .station-skeleton { height: 15rem; border-radius: 1.5rem; border: 1px solid #efe4d3; background: #fbf5ec; }
+
+  .station-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+    padding: 1.375rem;
+    text-align: start;
+    border: 1px solid #efe4d3;
+    border-radius: 1.5rem;
+    background: #fffdf8;
+    box-shadow: 0 10px 30px -18px rgba(115, 96, 79, 0.45);
+    cursor: pointer;
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+  .station-card:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: #e8c3ad;
+    box-shadow: 0 18px 40px -20px rgba(166, 82, 52, 0.45);
+  }
+  .station-card:focus-visible { outline: 3px solid #dc7355; outline-offset: 3px; }
+  .station-card__head { display: flex; align-items: center; gap: 0.875rem; }
+  .station-card__icon {
+    display: grid;
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
     place-items: center;
-    border: 1px solid #e6d5b4;
-    border-radius: 1.25rem;
-    background: #fff8e8;
-    color: #d89917;
-    font-size: 1.5rem;
-    font-weight: 800;
+    border-radius: 1rem;
+    color: #fff9f2;
+    background: linear-gradient(145deg, #f3a184, #dc7355 50%, #b5503a);
+    box-shadow: 0 8px 16px -8px rgba(173, 72, 47, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .station-card__name { display: block; overflow: hidden; color: #3f2a20; font-size: 1.15rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+  .station-card__status { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.125rem; color: #6f8a60; font-size: 0.8rem; font-weight: 600; }
+  .station-card__dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; }
+  .station-card--live .station-card__status { color: #c0553b; }
+  .station-card--live .station-card__dot { animation: station-ping 1.6s ease-out infinite; }
+
+  .station-card__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.625rem; }
+  .station-stat { display: flex; flex-direction: column; align-items: center; gap: 0.125rem; padding: 0.75rem 0.25rem; border-radius: 1rem; background: #f7f1e8; }
+  .station-stat__value { color: #5b4436; font-size: 1.75rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .station-stat__label { color: #8a6f5c; font-size: 0.75rem; font-weight: 600; text-align: center; }
+  .station-stat--waiting { background: #fcebe3; }
+  .station-stat--waiting .station-stat__value { color: #b5503a; }
+  .station-stat--served { background: #edf2e6; }
+  .station-stat--served .station-stat__value { color: #5f7a52; }
+
+  .station-card__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.875rem;
+    border-top: 1px solid #f0e6d8;
+    color: #b5503a;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  .station-card__arrow { transition: transform 180ms ease; }
+  .station-card:hover .station-card__arrow { transform: translateX(3px); }
+  [dir='rtl'] .station-card__arrow { transform: scaleX(-1); }
+  [dir='rtl'] .station-card:hover .station-card__arrow { transform: scaleX(-1) translateX(3px); }
+
+  .station-card--off { cursor: not-allowed; background: #f8f4ed; box-shadow: none; }
+  .station-card--off .station-card__icon { background: #d9cfc2; box-shadow: none; }
+  .station-card--off .station-card__status { color: #9a8a7c; }
+  .station-card--off .station-stat { opacity: 0.55; }
+  .station-card--off .station-card__foot { color: #9a8a7c; font-weight: 600; }
+
+  @keyframes station-ping {
+    0% { box-shadow: 0 0 0 0 rgba(220, 115, 85, 0.55); }
+    100% { box-shadow: 0 0 0 7px rgba(220, 115, 85, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .station-hero__art, .station-card--live .station-card__dot { animation: none; }
+  }
+
+  @keyframes empty-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .empty-state__art { animation: none; }
   }
 
   /*
