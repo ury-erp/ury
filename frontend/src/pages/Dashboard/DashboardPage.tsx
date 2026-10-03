@@ -5,17 +5,12 @@ import { useBranchContext } from '../../context/BranchContext';
 import { t } from '../../i18n';
 import KPIGrid from './KPIGrid';
 import ReportWidgets from './ReportWidgets';
-import {
-  dashboardService,
-  DashboardSummary,
-  TransactionRecord,
-} from '../../services/dashboard';
+import { dashboardService, DashboardSummary } from '../../services/dashboard';
 
 export const DashboardPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [recentTransactions, setRecentTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,15 +21,10 @@ export const DashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     setSummary(null);
-    setRecentTransactions([]);
     try {
-      const [sumRes, txRes] = await Promise.all([
-        dashboardService.getSummary(activeBranchId),
-        dashboardService.getRecentTransactions(activeBranchId, 10),
-      ]);
+      const sumRes = await dashboardService.getSummary(activeBranchId);
       if (currentRequest !== requestId.current) return;
       setSummary(sumRes);
-      setRecentTransactions(txRes);
     } catch (err) {
       // Swallowing this left the KPI tiles to render their `?? 0` fallbacks,
       // so a failed request was indistinguishable from a day with no sales —
@@ -72,8 +62,8 @@ export const DashboardPage: React.FC = () => {
       {/* 1. KPI Stat Cards Grid */}
       <KPIGrid summary={summary} loading={loading} />
 
-      {/* 3. Live Recent Transactions */}
-      <ReportWidgets recentTransactions={recentTransactions} loading={loading} />
+      {/* 3. Bills: filterable, paged, each opens its own page */}
+      <ReportWidgets />
     </div>
   );
 };
