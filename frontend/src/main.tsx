@@ -12,7 +12,7 @@ import { initI18n } from './i18n'
 initI18n().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <BrowserRouter basename="/ury">
+      <BrowserRouter basename="/restro">
         <App />
         <ToastProvider />
       </BrowserRouter>
