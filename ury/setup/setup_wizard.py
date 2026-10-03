@@ -56,6 +56,12 @@ def get_setup_stages(args=None):
 
 
 def _wants_ury_demo(args):
+	# Production sites never load demo data, whatever the request says: a
+	# stray "true" in a setup payload would otherwise fill a live restaurant
+	# with a fake branch, menu and invoices. A demo/sandbox site opts in with
+	# `bench --site <site> set-config allow_ury_demo 1`.
+	if not cint(frappe.conf.get("allow_ury_demo")):
+		return False
 	if not args:
 		return False
 	value = args.get("setup_ury_demo")
