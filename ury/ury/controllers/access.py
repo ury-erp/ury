@@ -35,8 +35,8 @@ POLICY_CACHE_KEY = "ury_access_policy"
 # Priority order: the first matching row gives a user with several roles
 # their landing page.
 DEFAULT_POLICY = [
-	{"role": "URY Admin", "block_desk": 0, "landing": "/ury/dashboard"},
-	{"role": "URY Manager", "block_desk": 1, "landing": "/ury/dashboard"},
+	{"role": "URY Admin", "block_desk": 0, "landing": "/restro/dashboard"},
+	{"role": "URY Manager", "block_desk": 1, "landing": "/restro/dashboard"},
 	{"role": "URY Cashier", "block_desk": 1, "landing": "/pos"},
 	{"role": "URY Captain", "block_desk": 1, "landing": "/pos/order"},
 ]
@@ -49,7 +49,7 @@ DESK_PAGES = {"app", "desk", "apps", "me"}
 # Desk APIs restricted users still need (the dashboard's notification bell).
 DESK_API_ALLOWED = ("frappe.desk.doctype.notification_log.",)
 
-LANDING_CHOICES = ["/pos", "/pos/order", "/ury/dashboard", "/ury/reports", "/mosaic", "/app"]
+LANDING_CHOICES = ["/pos", "/pos/order", "/restro/dashboard", "/restro/reports", "/mosaic", "/app"]
 
 
 # --------------------------------------------------------------------------- policy
