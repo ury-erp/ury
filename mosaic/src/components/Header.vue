@@ -110,7 +110,7 @@ export default {
     },
     switchToDashboard() {
       this.showUserMenu = false;
-      window.location.href = '/ury/dashboard';
+      window.location.href = '/restro/dashboard';
     },
     async logout() {
       this.showUserMenu = false;
