@@ -173,7 +173,7 @@ export default function SetupPage() {
 
     setTimeout(() => {
       if (pending.payload.setup_ury_demo) {
-        window.location.href = '/ury/dashboard';
+        window.location.href = '/restro/dashboard';
       } else if (pending.installationType === 'minimal') {
         navigate('/setup-wizard/1');
       } else {
