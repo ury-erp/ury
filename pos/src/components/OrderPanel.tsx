@@ -104,10 +104,9 @@ const OrderPanel = ({ docked = true }: OrderPanelProps) => {
           showToast.error(t('errors.select_aggregator'));
           return;
         }
-      } else if (!selectedCustomer?.name) {
-        showToast.error(t('errors.select_customer'));
-        return;
       }
+      // A customer is optional: without one the server bills the table (or a
+      // walk-in customer for takeaway) — see resolve_order_customer.
 
       // Validate table selection for dine-in orders
       if (selectedOrderType === DINE_IN && !selectedTable) {
@@ -130,7 +129,7 @@ const OrderPanel = ({ docked = true }: OrderPanelProps) => {
         order_type: selectedOrderType,
         table: selectedTable || undefined,
         room: selectedRoom || undefined,
-        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
+        customer: (selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name) || '',
         aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
@@ -234,7 +233,7 @@ const OrderPanel = ({ docked = true }: OrderPanelProps) => {
       className={cn(
         'bg-[#fffdf8] flex flex-col',
         docked
-          ? 'w-80 xl:w-96 border-s border-[#eadfce] h-[calc(100vh-4.5rem)] fixed end-0 z-10 shadow-[-10px_0_30px_rgba(74,48,30,0.06)]'
+          ? 'w-80 xl:w-96 shrink-0 h-full min-h-0 border-s border-[#eadfce] shadow-[-10px_0_30px_rgba(74,48,30,0.06)]'
           : 'w-full flex-1 min-h-0'
       )}
     >
