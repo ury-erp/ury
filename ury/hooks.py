@@ -190,9 +190,16 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
-        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
+        "on_submit": [
+            "ury.ury.hooks.ury_pos_invoice.on_submit",
+            # Recipes: take the sold products' ingredients off the shelf.
+            "ury.ury.api.consumption.on_pos_invoice_submit",
+        ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "on_cancel": [
+            "ury.ury.hooks.ury_pos_invoice.on_trash",
+            "ury.ury.api.consumption.on_pos_invoice_cancel",
+        ],
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
@@ -224,6 +231,9 @@ scheduler_events = {
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
 		]
 	},
+    "hourly": [
+        "ury.ury.api.consumption.retry_failed",
+    ],
     "daily": [
         "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests",
         "ury.ury.api.driver_app.clear_old_positions"
@@ -274,8 +284,14 @@ override_whitelisted_methods = {
 # ignore_links_on_delete = ["Communication", "ToDo"]
 
 on_session_creation = [
-    "ury.ury.controllers.setup_redirect.on_session_creation"
+    "ury.ury.controllers.setup_redirect.on_session_creation",
+    # Restaurant roles: where each lands after login (returned as redirect_to).
+    "ury.ury.controllers.access.on_session_creation",
 ]
+
+# Feature switches and the Desk policy, enforced on every request.
+before_request = ["ury.ury.controllers.access.before_request"]
+after_request = ["ury.ury.controllers.access.after_request"]
 
 # Request Events
 # ----------------
@@ -295,7 +311,8 @@ website_redirects = [
 ]
 
 extend_bootinfo = [
-    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+    "ury.ury.controllers.setup_redirect.extend_bootinfo",
+    "ury.ury.controllers.access.extend_bootinfo",
 ]
 
 # Job Events
@@ -396,6 +413,7 @@ fixtures = [
                     "POS Profile-printer_settings",
                     "POS Profile-qz_print",
                     "POS Profile-qz_host",
+                    "POS Profile-custom_qz_bill_printer",
                     "POS Profile-section_break_tjhrm",
                     "POS Profile-transfer_role_permissions",
                     "POS Profile-role_allowed_for_billing",
@@ -421,6 +439,7 @@ fixtures = [
                     "Branch-custom_no_taxes",
                     "Price List-restaurant_menu",
                     "POS Profile-custom_enable_discount",
+                    "POS Profile-custom_require_bill_print",
                     "POS Invoice-custom_comments",
                     "POS Profile-custom_multiple_cashier_configuration",
                     "POS Profile-custom_enable_multiple_cashier",
