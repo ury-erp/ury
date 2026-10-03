@@ -2,11 +2,12 @@ import React from 'react';
 import { formatCurrency } from '@ury/core';
 import { Card, StatCard } from '@ury/ui';
 import { ArrowUpRight, ChefHat, MonitorSmartphone } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { DashboardSummary } from '../../services/dashboard';
 import { t } from '../../i18n';
 
 interface LinkCardProps {
-  icon: React.ElementType;
+  icon: LucideIcon;
   label: string;
   description: string;
   href: string;
