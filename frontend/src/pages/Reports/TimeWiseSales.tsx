@@ -152,7 +152,7 @@ export function TimeWiseSales() {
             labels={{ sales: t('fields.sales') }}
           />
 
-          <DataTable columns={getColumns()} rows={data.intervals} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.intervals} isLoading={isLoading} emptyMessage={t('reports.common.no_data')} emptyHint={t('reports.common.empty_hint')} emptyIllustration="reports" />
         </>
       ) : null}
     </div>
