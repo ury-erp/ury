@@ -10,3 +10,5 @@ ury.patches.v2_0.rename_ury_workspace_to_smart_restro
 ury.patches.v2_0.add_table_close_fields
 ury.patches.v2_0.publish_menu_prices
 ury.patches.v2_0.rename_driver_position_field
+ury.patches.v2_0.course_to_item_group
+ury.patches.v2_0.iraqi_dinar_display
