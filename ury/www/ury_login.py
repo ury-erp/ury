@@ -28,8 +28,8 @@ def get_context(context):
 
 	from frappe.www.login import get_context as frappe_login_context
 
-	# Frappe's own context: social login providers, sign-up / email-link /
-	# password-login switches, logo and app name.
+	# Keep Frappe's social login providers and sign-up / email-link /
+	# password-login switches, then apply this page's Smart Choice branding.
 	frappe_login_context(context)
 
 	lang = frappe.local.lang or "en"
@@ -38,8 +38,9 @@ def get_context(context):
 	context.lang = lang
 	context.dir = "rtl" if lang.split("-")[0] in RTL_LANGS else "ltr"
 	context.title = _("Sign in")
-	context.app_name = context.get("app_name") or "Smart Restro"
-	context.logo = context.get("logo") or "/assets/ury/Images/smart-restro-logo.png"
+	context.app_name = "Smart Choice"
+	context.logo = "/assets/ury/Images/smart-restro-logo.png"
+	context.favicon = "/assets/ury/Images/smart-choice-icon.png"
 	context.restaurant = (
 		frappe.db.get_value("URY Restaurant", {}, "name")
 		or frappe.defaults.get_global_default("company")
