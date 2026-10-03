@@ -1,17 +1,38 @@
 import { storage } from './storage';
 import { getIntlLocale } from './i18n/locale-registry';
 
+/**
+ * The Iraqi dinar is written the way an Iraqi receipt writes it: whole dinars,
+ * Western digits grouped by thousands, and the symbol after the number —
+ * "25,000 د.ع". It is the default: a screen that has not been told the
+ * company currency (the dashboard never was) used to fall back to "₹".
+ */
+const DEFAULT_CURRENCY = 'IQD';
+
+function currencyDisplay(): { label: string; after: boolean; decimals: number } {
+  const code = storage.getItem('currency') || DEFAULT_CURRENCY;
+  if (code === DEFAULT_CURRENCY) {
+    const arabic = getIntlLocale().startsWith('ar');
+    return { label: arabic ? 'د.ع' : 'IQD', after: true, decimals: 0 };
+  }
+  return { label: storage.getItem('currencySymbol') || code, after: false, decimals: 2 };
+}
+
+/** The currency label alone ("د.ع"), for column headers and input labels. */
+export function currencyLabel(): string {
+  return currencyDisplay().label;
+}
+
 export function formatCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
-  const roundedAmount = flt(amount, 2);
-  // Grouping follows the active locale rather than a hardcoded 'en-IN':
-  // Indian grouping (12,34,567) is wrong outside South Asia, and an Arabic
-  // locale must still render Western digits (see getIntlLocale).
-  const formattedVal =
-    typeof roundedAmount === 'number' && !isNaN(roundedAmount)
-      ? roundedAmount.toLocaleString(getIntlLocale())
-      : roundedAmount;
-  return `${symbol} ${formattedVal}`;
+  const { label, after, decimals } = currencyDisplay();
+  const value = flt(amount, decimals);
+  // Grouping uses Western digits in every locale (see getIntlLocale), and
+  // never the Indian lakh grouping.
+  const formatted = value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  });
+  return after ? `${formatted} ${label}` : `${label} ${formatted}`;
 }
 
 /**
@@ -22,8 +43,6 @@ export const COMPACT_SUFFIXES = {
   thousand: 'k',
   million: 'M',
   billion: 'B',
-  lakh: 'L',
-  crore: 'Cr',
 };
 
 export function setCompactSuffixes(suffixes: Partial<typeof COMPACT_SUFFIXES>): void {
@@ -48,13 +67,12 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
 /**
  * Formats a number as compact currency for chart axes/labels.
  *
- * Indian locales keep the lakh/crore scale they expect (₹6L, ₹1.25Cr); every
- * other locale gets the thousand/million/billion scale, because "Cr" is not a
- * unit an Iraqi or Gulf cashier reads. Suffixes are localised via `suffixes`.
+ * Thousand/million/billion, localised via setCompactSuffixes ("25 ألف د.ع").
  */
 export function formatCompactCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol') || '₹';
-  if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
+  const { label, after } = currencyDisplay();
+  const place = (value: string) => (after ? `${value} ${label}` : `${label}${value}`);
+  if (typeof amount !== 'number' || isNaN(amount)) return place(String(amount));
 
   const sign = amount < 0 ? '-' : '';
   const abs = Math.abs(amount);
@@ -63,21 +81,14 @@ export function formatCompactCurrency(amount: number): string {
     const rounded = Math.round(value * 100) / 100;
     return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   };
+  // Arabic suffixes are words ("ألف"), so they get a space; "k"/"M" do not.
+  const unit = (value: number, suffix: string) =>
+    place(`${sign}${trim(value)}${/^[a-zA-Z]+$/.test(suffix) ? '' : ' '}${suffix}`);
 
-  const locale = getIntlLocale();
-  const usesIndianScale = locale.startsWith('en-IN') || locale.startsWith('hi');
-
-  if (usesIndianScale) {
-    if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}${COMPACT_SUFFIXES.crore}`;
-    if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}${COMPACT_SUFFIXES.lakh}`;
-    if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}${COMPACT_SUFFIXES.thousand}`;
-    return `${sign}${symbol}${trim(abs)}`;
-  }
-
-  if (abs >= 1_000_000_000) return `${sign}${symbol}${trim(abs / 1_000_000_000)}${COMPACT_SUFFIXES.billion}`;
-  if (abs >= 1_000_000) return `${sign}${symbol}${trim(abs / 1_000_000)}${COMPACT_SUFFIXES.million}`;
-  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}${COMPACT_SUFFIXES.thousand}`;
-  return `${sign}${symbol}${trim(abs)}`;
+  if (abs >= 1_000_000_000) return unit(abs / 1_000_000_000, COMPACT_SUFFIXES.billion);
+  if (abs >= 1_000_000) return unit(abs / 1_000_000, COMPACT_SUFFIXES.million);
+  if (abs >= 1_000) return unit(abs / 1_000, COMPACT_SUFFIXES.thousand);
+  return place(`${sign}${trim(abs)}`);
 }
 
 /**
