@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "../lib/cn";
+import { Illustration, type IllustrationName } from "./illustration";
 
 export interface DataTableColumn<T> {
   key: string;
@@ -18,6 +19,10 @@ export interface DataTableProps<T> {
   rows: T[];
   isLoading?: boolean;
   emptyMessage?: string;
+  /** Optional advice under the empty message, e.g. "try another date range". */
+  emptyHint?: string;
+  /** Feature illustration shown above the empty message. */
+  emptyIllustration?: IllustrationName;
   /**
    * Shown in place of skeleton rows only when `skeletonRows` is 0. Both
    * default to English here because this package has no locale of its own;
@@ -37,6 +42,8 @@ export function DataTable<T>({
   rows,
   isLoading,
   emptyMessage = "No results found.",
+  emptyHint,
+  emptyIllustration,
   loadingMessage = "Loading…",
   skeletonRows = 6,
   stickyHeader,
@@ -106,7 +113,9 @@ export function DataTable<T>({
           ) : rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="p-8 text-center text-muted-foreground">
-                {emptyMessage}
+                {emptyIllustration ? <Illustration name={emptyIllustration} className="mx-auto mb-1" /> : null}
+                <p className={cn(emptyIllustration && "font-semibold text-foreground")}>{emptyMessage}</p>
+                {emptyHint ? <p className="mt-1 text-sm">{emptyHint}</p> : null}
               </td>
             </tr>
           ) : (
