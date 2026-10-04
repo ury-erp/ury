@@ -1917,27 +1917,11 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
-        # Submitted invoice: cancel through the standard document workflow so
-        # on_cancel hooks run and GL/payment reversals and audit entries are
-        # produced (docstatus=2 on the invoice and its items).
         pos_invoice.cancel()
-        pos_invoice.db_set("cancel_reason", reason)
     else:
-        # Draft invoice: Frappe's standard workflow does not allow cancelling
-        # drafts, so update the status directly as before.
-        frappe.db.sql("""
-            UPDATE `tabPOS Invoice Item`
-            SET docstatus = 2
-            WHERE parent = %s
-        """, (invoice_id,))
-
-        frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-        frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+        pos_invoice.discard()
+    pos_invoice.db_set("cancel_reason", reason)
 
 # Roles permitted to authorize an additional discount when settling an order.
 DISCOUNT_ALLOWED_ROLES = frozenset(
