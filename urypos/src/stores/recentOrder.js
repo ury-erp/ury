@@ -8,6 +8,7 @@ import { useInvoiceDataStore } from "./invoiceData.js";
 import { useTableStore } from "./Table.js";
 import { useAlert } from "./Alert.js";
 import frappe from "./frappeSdk.js";
+import { matchOrder } from "../utils/matchOrder.js";
 
 export const usetoggleRecentOrder = defineStore("recentOrders", {
   state: () => ({
@@ -200,12 +201,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       this.getPosInvoice(this.selectedStatus, limit, startLimit);
     },
     matchesSearchOrder(order) {
-      const query = this.searchOrder.toLowerCase();
-      const name = order.name.toLowerCase();
-      const customer = order.customer.toLowerCase();
-      const mobileNumber = order.mobile_number.toLowerCase();
-
-      return name.includes(query) || customer.includes(query) || mobileNumber.includes(query);
+      return matchOrder(order, this.searchOrder);
     },
     getBadgeType(selectedOrder) {
       if (
