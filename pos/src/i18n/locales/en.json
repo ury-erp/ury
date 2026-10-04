@@ -142,7 +142,7 @@
     "error_loading": "Failed to load opening data. Please try again.",
     "error_opening": "Failed to open POS session. Please try again.",
     "opening_balance_help": "Opening Balance is the starting cash/payment amount you're declaring for this shift. It's used to reconcile against sales when you close out.",
-    "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
+    "zero_balance_warning": "You're opening with a zero balance in every payment mode. Tap \"Confirm & Open\" again to continue anyway.",
     "confirm_zero_balance": "Confirm & Open",
     "session_opened_success": "POS session opened"
   },
