@@ -185,7 +185,7 @@ export default function Orders() {
 
   async function handleCancelOrder() {
     if (!selectedOrder) return;
-    if (!cancelReason.trim()) {
+    if (cancelReason.trim().length < 4) {
       showToast.error(t('errors.enter_cancel_reason'));
       return;
     }
@@ -193,7 +193,7 @@ export default function Orders() {
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
         invoice_id: selectedOrder.name,
-        reason: cancelReason
+        reason: cancelReason.trim()
       })
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
