@@ -142,7 +142,7 @@
     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
     "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
     "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
-    "zero_balance_warning": "Vous ouvrez avec 0 ₹ sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+    "zero_balance_warning": "Vous ouvrez avec un solde nul dans chaque mode de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
     "confirm_zero_balance": "Confirmer et ouvrir",
     "session_opened_success": "Session PDV ouverte"
   },
