@@ -12,12 +12,12 @@ vi.mock('../api/checklist', async (importOriginal) => {
 const fetchMock = checklistApi.fetchOpeningChecklist as ReturnType<typeof vi.fn>
 const submitMock = checklistApi.submitOpeningChecklist as ReturnType<typeof vi.fn>
 
-describe('OpeningChecklist failed submit journey', () => {
+describe('OpeningChecklist failed-objective submission', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('failed submission keeps the dialog without reloading or proceeding', async () => {
+  it('submitting with a FAIL objective completes the gate (FAIL is valid)', async () => {
     const onReady = vi.fn()
     fetchMock.mockResolvedValue({
       items: [{ item_label: 'Check kitchen readiness', is_mandatory: 1, status: null }],
@@ -25,7 +25,7 @@ describe('OpeningChecklist failed submit journey', () => {
       logStatus: null,
       blockedBy: null,
     })
-    submitMock.mockResolvedValue({ status: 'Failed', name: null })
+    submitMock.mockResolvedValue({ status: 'Complete', name: 'LOG-8' })
 
     const user = userEvent.setup()
     render(
@@ -42,19 +42,13 @@ describe('OpeningChecklist failed submit journey', () => {
     await user.type(await screen.findByPlaceholderText(/Explain the failure/), 'test')
     await user.click(screen.getByRole('button', { name: /Submit checklist/i }))
 
-    await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1))
-    // silent: no notice, no error, gate does not complete
-    expect(onReady).not.toHaveBeenCalled()
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1))
+    // no error, no failed-items message anywhere
     expect(screen.queryByText(/Complete all mandatory/i)).toBeNull()
     expect(screen.queryByText(/submitted with failed items/i)).toBeNull()
-    // the saved rows silently reload after the failed submit (visible
-    // confirmation without any message), so fetch runs twice total
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
-    // rows remain editable
-    expect(screen.getAllByRole('radio')).toHaveLength(2)
   })
 
-  it('resolving to PASS after a failed submit completes the gate', async () => {
+  it('submitting with all PASS completes the gate', async () => {
     const onReady = vi.fn()
     fetchMock
       .mockResolvedValueOnce({

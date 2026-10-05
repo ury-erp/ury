@@ -323,7 +323,7 @@ describe('ChecklistGateDialog', () => {
   });
 
 
-  it('accepts a FAIL with remarks without showing any notice', async () => {
+  it('accepts a FAIL with remarks and completes the gate', async () => {
     mockGetChecklist.mockResolvedValue({
       items: [
         { item_label: 'Mandatory item', is_mandatory: true },
@@ -331,7 +331,7 @@ describe('ChecklistGateDialog', () => {
       logName: 'LOG-001',
       logStatus: 'Incomplete',
     });
-    mockSubmitChecklist.mockResolvedValue({ status: 'Failed' });
+    mockSubmitChecklist.mockResolvedValue({ status: 'Complete' });
     const onComplete = vi.fn();
     render(
       <ChecklistGateDialog
@@ -347,13 +347,8 @@ describe('ChecklistGateDialog', () => {
     await userEvent.type(screen.getByPlaceholderText('checklist.fail_remarks_placeholder'), 'test');
     await userEvent.click(screen.getByText('checklist.submit'));
     await waitFor(() => {
-      expect(mockSubmitChecklist).toHaveBeenCalled();
+      expect(onComplete).toHaveBeenCalled();
     });
-    // Recorded but the gate does not complete, and no notice is shown
-    // (product decision: the failed-items message stays off).
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(screen.queryByText('checklist.failed_notice')).toBeNull();
-    expect(screen.queryByText('checklist.incomplete_error')).toBeNull();
   });
 
   it('displays error message on load failure', async () => {

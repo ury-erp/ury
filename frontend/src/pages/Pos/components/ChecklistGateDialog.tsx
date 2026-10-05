@@ -190,12 +190,6 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
       if (response.status === 'Complete') {
         onComplete();
-      } else if (response.status === 'Failed') {
-        // Valid submission with failed items: recorded as failed; the gate
-        // stays open and the next role remains blocked. No notice is shown
-        // (product decision -- the failed-items message stays off); reload
-        // the saved rows so the submit is visibly confirmed.
-        void loadChecklist();
       } else {
         // Should not normally happen given the client-side button-disable
         // above, but handle it defensively rather than doing nothing.
@@ -228,20 +222,13 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
         ) : blockedBy ? (
           <div className="py-10 text-center">
             <p className="text-lg font-semibold text-foreground mb-2">
-              {blockedBy.state === 'failed'
-                ? t('checklist.blocked_failed_heading', { checklist: t(titleKey) })
-                : t('checklist.blocked_heading', { checklist: t(titleKey) })}
+              {t('checklist.blocked_heading', { checklist: t(titleKey) })}
             </p>
             <p className="text-sm text-muted-foreground">
-              {blockedBy.state === 'failed'
-                ? t('checklist.blocked_failed_message', {
-                    role: blockedBy.role_label,
-                    checklist: t(titleKey),
-                  })
-                : t('checklist.blocked_message', {
-                    role: blockedBy.role_label,
-                    checklist: t(titleKey),
-                  })}
+              {t('checklist.blocked_message', {
+                role: blockedBy.role_label,
+                checklist: t(titleKey),
+              })}
             </p>
           </div>
         ) : (

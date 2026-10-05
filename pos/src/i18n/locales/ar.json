@@ -268,9 +268,6 @@
     "fail_remarks_required": "الملاحظات مطلوبة للعناصر الفاشلة.",
     "incomplete_error": "يجب تحديد PASS أو FAIL لكل عنصر قبل إكمال القائمة.",
     "blocked_heading": "مطلوب: {{checklist}}",
-    "blocked_message": "لم يكمل {{role}} {{checklist}} بعد. يُرجى مطالبة {{role}} بإكماله قبل المتابعة.",
-    "failed_notice": "تم حفظ القائمة بعناصر فاشلة. يجب معالجتها قبل أن يتمكن الدور التالي من المتابعة.",
-    "blocked_failed_heading": "{{checklist}} فاشلة",
-    "blocked_failed_message": "تحتوي {{checklist}} على عناصر فاشلة. يجب على {{role}} معالجتها قبل أن تتمكن من المتابعة."
+    "blocked_message": "لم يكمل {{role}} {{checklist}} بعد. يُرجى مطالبة {{role}} بإكماله قبل المتابعة."
   }
 }

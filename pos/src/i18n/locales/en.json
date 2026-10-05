@@ -159,10 +159,7 @@
     "fail_remarks_placeholder": "Explain the failure (required)",
     "fail_remarks_required": "Remarks are required for failed items.",
     "blocked_heading": "{{checklist}} Required",
-    "blocked_message": "{{role}} has not completed the {{checklist}} yet. Please ask the {{role}} to complete it before continuing.",
-    "failed_notice": "Checklist submitted with failed items. Resolve them before the next role can continue.",
-    "blocked_failed_heading": "{{checklist}} Failed",
-    "blocked_failed_message": "The {{checklist}} has failed items. The {{role}} must resolve them before you can continue."
+    "blocked_message": "{{role}} has not completed the {{checklist}} yet. Please ask the {{role}} to complete it before continuing."
   },
   "customer": {
     "search_placeholder": "Search customer...",

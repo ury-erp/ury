@@ -249,11 +249,6 @@ export function OpeningChecklist({
       if (!isLive(generation)) return
       if (response.status === 'Complete') {
         fireReady(generation)
-      } else if (response.status === 'Failed') {
-        // Valid submission with failed items: recorded as failed; the gate
-        // stays open. No notice shown (product decision -- message stays
-        // off) -- reload the saved rows so the submit is visibly confirmed.
-        if (isLive(generation)) void load()
       } else {
         setSubmitError('Complete all mandatory items before continuing.')
       }
@@ -325,15 +320,9 @@ export function OpeningChecklist({
 
           {!loading && !loadError && blockedBy && (
             <Alert variant="warning">
-              <p className="font-medium">
-                {blockedBy.state === 'failed'
-                  ? 'Opening checklist failed'
-                  : 'Opening checklist required'}
-              </p>
+              <p className="font-medium">Opening checklist required</p>
               <p className="text-sm">
-                {blockedBy.state === 'failed'
-                  ? `The Opening Checklist has failed items. The ${blockedBy.role_label} must resolve them before you can continue.`
-                  : `${blockedBy.role_label} has not completed the Opening Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
+                {`${blockedBy.role_label} has not completed the Opening Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
               </p>
             </Alert>
           )}
