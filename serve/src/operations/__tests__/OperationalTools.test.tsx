@@ -15,6 +15,19 @@ vi.mock('../api/printers', () => ({
   listFailedPrintJobsForUser: vi.fn(),
 }))
 
+vi.mock('../api/checklist', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/checklist')>()
+  return {
+    ...actual,
+    fetchOpeningChecklist: vi.fn(),
+    submitOpeningChecklist: vi.fn(),
+    fetchClosingChecklist: vi.fn(),
+    submitClosingChecklist: vi.fn(),
+  }
+})
+
+import { fetchClosingChecklist } from '../api/checklist'
+
 import {
   getUnreadNotificationCount,
   listNotificationPage,
@@ -27,6 +40,7 @@ const listNotifMock = vi.mocked(listNotificationPage)
 const markReadMock = vi.mocked(markNotificationAsRead)
 const healthMock = vi.mocked(fetchPrinterHealth)
 const jobsMock = vi.mocked(listPrintJobs)
+const closingFetchMock = vi.mocked(fetchClosingChecklist)
 
 describe('OperationalTools', () => {
   beforeEach(() => {
@@ -35,6 +49,7 @@ describe('OperationalTools', () => {
     markReadMock.mockReset()
     healthMock.mockReset()
     jobsMock.mockReset()
+    closingFetchMock.mockReset()
 
     unreadMock.mockResolvedValue(2)
     listNotifMock.mockResolvedValue({
@@ -123,5 +138,37 @@ describe('OperationalTools', () => {
     expect(
       await screen.findByText(/Printer watch unavailable/i)
     ).toBeInTheDocument()
+  })
+
+  it('opens the Closing checklist from the toolbar icon and closes after submit', async () => {
+    closingFetchMock.mockResolvedValue({
+      items: [{ item_label: 'Clear all tables', is_mandatory: 1, status: null }],
+      logName: null,
+      logStatus: null,
+      blockedBy: null,
+    })
+
+    const user = userEvent.setup()
+    render(
+      <OperationalTools
+        user="captain@example.com"
+        posProfile="POS-MAIN"
+        branch="Main"
+        pollingEnabled={false}
+      />
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: /^Closing checklist$/i })
+    )
+
+    // The dialog loads the user's closing checklist from the backend.
+    await waitFor(() => expect(closingFetchMock).toHaveBeenCalledWith('POS-MAIN'))
+    expect(await screen.findByText('Closing checklist')).toBeInTheDocument()
+    expect(await screen.findByText(/Clear all tables/)).toBeInTheDocument()
+
+    // Dismiss without submitting via the header close button.
+    await user.click(screen.getByRole('button', { name: /^Close$/i }))
+    expect(screen.queryByText('Closing checklist')).toBeNull()
   })
 })

@@ -12,21 +12,47 @@ import {
   cn,
 } from '@ury/ui'
 import {
+  fetchClosingChecklist,
   fetchOpeningChecklist,
   isMandatory,
+  submitClosingChecklist,
   submitOpeningChecklist,
   type ChecklistBlocker,
   type ChecklistItem,
+  type ChecklistType,
   type SubmitChecklistItem,
 } from '../api/checklist'
 import type { OperationsIdentityProps } from '../types'
 import { extractServerErrorMessage } from '../types'
+
+export interface ChecklistGateProps extends OperationsIdentityProps {
+  /** Opening gate (RM → Cashier → Order Taker) or Closing (OT → Cashier → RM). */
+  checklistType: ChecklistType
+  /** Called only after checklist is Complete (or empty with no blockers). */
+  onReady: () => void
+  /** Optional POS Opening Entry name for the log link. */
+  posOpeningEntry?: string
+  className?: string
+  /**
+   * Dismissible dialogs (user-triggered, e.g. the Closing icon) show a Close
+   * button and react to overlay / Escape; non-dismissible gates ignore them.
+   */
+  dismissible?: boolean
+  /** Dismiss handler for dismissible dialogs. */
+  onClose?: () => void
+}
 
 export interface OpeningChecklistProps extends OperationsIdentityProps {
   /** Called only after checklist is Complete (or empty with no blockers). */
   onReady: () => void
   /** Optional POS Opening Entry name for the log link. */
   posOpeningEntry?: string
+  className?: string
+}
+
+export interface ClosingChecklistProps extends OperationsIdentityProps {
+  /** Called after the closing checklist is submitted (or already complete). */
+  onClose: () => void
   className?: string
 }
 
@@ -50,20 +76,40 @@ function toRows(items: ChecklistItem[]): RowState[] {
   }))
 }
 
+const PHASE_COPY = {
+  Opening: {
+    title: 'Opening checklist',
+    subtitle: 'Complete mandatory items before taking orders',
+    blockedHeading: 'Opening checklist required',
+  },
+  Closing: {
+    title: 'Closing checklist',
+    subtitle: 'Complete mandatory items before closing',
+    blockedHeading: 'Closing checklist required',
+  },
+} as const
+
 /**
- * Non-dismissible Opening checklist gate (shared Dialog focus trap).
- * Fail-closed on load/submit errors. Invokes onReady only when status is Complete.
+ * Checklist gate dialog shared by the Opening gate and the Closing entry
+ * point. Non-dismissible on load/submit errors; invokes onReady only when
+ * status is Complete. Dismissible variants (Closing) additionally render a
+ * Close button and close via onClose.
  */
-export function OpeningChecklist({
+export function ChecklistGate({
   user,
   posProfile,
   branch,
+  checklistType,
   onReady,
   posOpeningEntry,
   className,
-}: OpeningChecklistProps) {
+  dismissible = false,
+  onClose,
+}: ChecklistGateProps) {
+  const copy = PHASE_COPY[checklistType]
   const [rows, setRows] = useState<RowState[]>([])
   const [blockedBy, setBlockedBy] = useState<ChecklistBlocker | null>(null)
+  const [alreadyComplete, setAlreadyComplete] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -122,13 +168,17 @@ export function OpeningChecklist({
     setHasAttemptedAutoSubmit(false)
     setGateSatisfied(false)
     setBlockedBy(null)
+    setAlreadyComplete(false)
 
     try {
-      const { items, logStatus, blockedBy } = await fetchOpeningChecklist(posProfile)
+      const { items, logStatus, blockedBy } =
+        checklistType === 'Opening'
+          ? await fetchOpeningChecklist(posProfile)
+          : await fetchClosingChecklist(posProfile)
       if (!isLive(generation)) return
 
       if (blockedBy) {
-        // A predecessor role has not finished the opening checklist; the
+        // A predecessor role has not finished this phase's checklist; the
         // gate stays closed with a specific message instead of the form.
         setBlockedBy(blockedBy)
         setRows([])
@@ -138,22 +188,32 @@ export function OpeningChecklist({
 
       if (logStatus === 'Complete') {
         setRows([])
-        setHasAttemptedAutoSubmit(true)
+        if (dismissible) {
+          // Nothing pending: let the user acknowledge instead of instantly
+          // dismissing the dialog they just opened.
+          setAlreadyComplete(true)
+          setHasAttemptedAutoSubmit(true)
+        } else {
+          setHasAttemptedAutoSubmit(true)
+          fireReady(generation)
+        }
         setLoading(false)
-        fireReady(generation)
         return
       }
       setRows(toRows(items))
     } catch (error) {
       if (!isLive(generation)) return
       setLoadError(
-        extractServerErrorMessage(error, 'Failed to load opening checklist')
+        extractServerErrorMessage(
+          error,
+          `Failed to load ${checklistType.toLowerCase()} checklist`
+        )
       )
       setRows([])
     } finally {
       if (isLive(generation)) setLoading(false)
     }
-  }, [posProfile, user, fireReady, isLive])
+  }, [posProfile, user, checklistType, dismissible, fireReady, isLive])
 
   useEffect(() => {
     void load()
@@ -164,11 +224,10 @@ export function OpeningChecklist({
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const response = await submitOpeningChecklist(
-        posProfile,
-        [],
-        posOpeningEntry
-      )
+      const response =
+        checklistType === 'Opening'
+          ? await submitOpeningChecklist(posProfile, [], posOpeningEntry)
+          : await submitClosingChecklist(posProfile, [])
       if (!isLive(generation)) return
       if (response.status === 'Complete') {
         fireReady(generation)
@@ -180,7 +239,10 @@ export function OpeningChecklist({
     } catch (error) {
       if (!isLive(generation)) return
       setSubmitError(
-        extractServerErrorMessage(error, 'Failed to submit opening checklist')
+        extractServerErrorMessage(
+          error,
+          `Failed to submit ${checklistType.toLowerCase()} checklist`
+        )
       )
     } finally {
       if (isLive(generation)) {
@@ -188,7 +250,7 @@ export function OpeningChecklist({
         setHasAttemptedAutoSubmit(true)
       }
     }
-  }, [posProfile, posOpeningEntry, fireReady, isLive])
+  }, [posProfile, posOpeningEntry, checklistType, fireReady, isLive])
 
   useEffect(() => {
     if (
@@ -196,6 +258,7 @@ export function OpeningChecklist({
       loadError ||
       gateSatisfied ||
       blockedBy ||
+      alreadyComplete ||
       rows.length > 0 ||
       submitting ||
       hasAttemptedAutoSubmit
@@ -208,6 +271,7 @@ export function OpeningChecklist({
     loadError,
     gateSatisfied,
     blockedBy,
+    alreadyComplete,
     rows.length,
     submitting,
     hasAttemptedAutoSubmit,
@@ -241,11 +305,10 @@ export function OpeningChecklist({
       goal: row.goal,
     }))
     try {
-      const response = await submitOpeningChecklist(
-        posProfile,
-        items,
-        posOpeningEntry
-      )
+      const response =
+        checklistType === 'Opening'
+          ? await submitOpeningChecklist(posProfile, items, posOpeningEntry)
+          : await submitClosingChecklist(posProfile, items)
       if (!isLive(generation)) return
       if (response.status === 'Complete') {
         fireReady(generation)
@@ -255,7 +318,10 @@ export function OpeningChecklist({
     } catch (error) {
       if (!isLive(generation)) return
       setSubmitError(
-        extractServerErrorMessage(error, 'Failed to submit opening checklist')
+        extractServerErrorMessage(
+          error,
+          `Failed to submit ${checklistType.toLowerCase()} checklist`
+        )
       )
     } finally {
       if (isLive(generation)) setSubmitting(false)
@@ -276,26 +342,33 @@ export function OpeningChecklist({
     return null
   }
 
+  const close = () => {
+    if (submitting) return
+    onClose?.()
+  }
+
   return (
     <Dialog
       open
-      // Non-dismissible gate: ignore dismiss requests from overlay / Escape.
-      onOpenChange={() => undefined}
-      closeOnEscape={false}
+      onOpenChange={(next) => {
+        if (!next && dismissible) close()
+      }}
+      closeOnEscape={dismissible}
       className={className}
     >
       <DialogContent
         variant="large"
-        showCloseButton={false}
+        showCloseButton={dismissible}
+        onClose={dismissible ? close : undefined}
         className={cn(
           'flex max-h-[90vh] w-full max-w-lg flex-col gap-0 p-0',
           className
         )}
       >
         <DialogHeader className="border-b border-border px-4 py-3 text-left sm:text-left">
-          <DialogTitle>Opening checklist</DialogTitle>
+          <DialogTitle>{copy.title}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Complete mandatory items before taking orders
+            {copy.subtitle}
             {branch ? ` · ${branch}` : ''}
           </p>
         </DialogHeader>
@@ -318,11 +391,21 @@ export function OpeningChecklist({
             </Alert>
           )}
 
+          {!loading && !loadError && alreadyComplete && (
+            <Alert variant="success">
+              <p className="font-medium">{copy.title} completed</p>
+              <p className="text-sm">
+                Your {checklistType.toLowerCase()} checklist has already been
+                submitted for this business day.
+              </p>
+            </Alert>
+          )}
+
           {!loading && !loadError && blockedBy && (
             <Alert variant="warning">
-              <p className="font-medium">Opening checklist required</p>
+              <p className="font-medium">{copy.blockedHeading}</p>
               <p className="text-sm">
-                {`${blockedBy.role_label} has not completed the Opening Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
+                {`${blockedBy.role_label} has not completed the ${checklistType} Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
               </p>
             </Alert>
           )}
@@ -330,6 +413,7 @@ export function OpeningChecklist({
           {!loading &&
             !loadError &&
             !blockedBy &&
+            !alreadyComplete &&
             rows.map((row, index) => (
               <div
                 key={`${row.item_label}-${index}`}
@@ -422,6 +506,16 @@ export function OpeningChecklist({
         </div>
 
         <DialogFooter className="border-t border-border px-4 py-3 sm:justify-end">
+          {dismissible && (blockedBy || alreadyComplete || loadError) && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={close}
+            >
+              Close
+            </Button>
+          )}
           <Button
             type="button"
             disabled={
@@ -438,5 +532,59 @@ export function OpeningChecklist({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Non-dismissible Opening checklist gate (shared Dialog focus trap).
+ * Fail-closed on load/submit errors. Invokes onReady only when status is Complete.
+ */
+export function OpeningChecklist({
+  user,
+  posProfile,
+  branch,
+  onReady,
+  posOpeningEntry,
+  className,
+}: OpeningChecklistProps) {
+  return (
+    <ChecklistGate
+      user={user}
+      posProfile={posProfile}
+      branch={branch}
+      checklistType="Opening"
+      onReady={onReady}
+      posOpeningEntry={posOpeningEntry}
+      className={className}
+    />
+  )
+}
+
+/**
+ * Dismissible Closing checklist dialog — the Serve entry point into the
+ * Order Taker → Cashier → Restaurant Manager closing sequence. The backend
+ * (get_checklist / submit_checklist) determines the current role's checklist
+ * and enforces the predecessor hierarchy; a FAIL objective with a remark is a
+ * valid submission and never blocks. Invokes onClose after the checklist is
+ * submitted (or when it was already complete).
+ */
+export function ClosingChecklist({
+  user,
+  posProfile,
+  branch,
+  onClose,
+  className,
+}: ClosingChecklistProps) {
+  return (
+    <ChecklistGate
+      user={user}
+      posProfile={posProfile}
+      branch={branch}
+      checklistType="Closing"
+      onReady={onClose}
+      onClose={onClose}
+      dismissible
+      className={className}
+    />
   )
 }
