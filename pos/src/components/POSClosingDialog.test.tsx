@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import POSClosingDialog from "./POSClosingDialog";
 
@@ -11,6 +11,19 @@ const submitSubPosClosingMock = vi.fn();
 const createPosClosingEntryMock = vi.fn();
 const submitPosClosingEntryMock = vi.fn();
 const getChecklistMock = vi.fn();
+
+// Stable identities: fresh objects per render would re-trigger the
+// loadClosingDetails effect on every state change, resetting rows and
+// touchedModes mid-test.
+const { mockPosProfile, mockUser } = vi.hoisted(() => ({
+  mockPosProfile: {
+    name: "POS-1",
+    company: "Test Company",
+    owner: "test_user",
+    multiple_cashier: 0,
+  },
+  mockUser: { name: "test_user", full_name: "Test User" },
+}));
 
 vi.mock("../lib/pos-closing-api", () => ({
   getOpenPosOpeningEntries: (...args: any[]) => getOpenPosOpeningEntriesMock(...args),
@@ -46,21 +59,13 @@ vi.mock("@ury/core", () => ({
 
 vi.mock("../store/pos-store", () => ({
   usePOSStore: () => ({
-    posProfile: {
-      name: "POS-1",
-      company: "Test Company",
-      owner: "test_user",
-      multiple_cashier: 0,
-    },
+    posProfile: mockPosProfile,
   }),
 }));
 
 vi.mock("../store/root-store", () => ({
   useRootStore: () => ({
-    user: {
-      name: "test_user",
-      full_name: "Test User",
-    },
+    user: mockUser,
   }),
 }));
 
@@ -239,5 +244,57 @@ describe("POSClosingDialog", () => {
     await userEvent.click(cancelButton);
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("gates closing submission on a pending Closing checklist before creating the doc", async () => {
+    // First poll: checklist pending (role-based Dependent Checklist goal
+    // without a Quality Review). After completion: Complete.
+    getChecklistMock
+      .mockResolvedValueOnce({ logStatus: null })
+      .mockResolvedValue({ logStatus: "Complete" });
+
+    render(
+      <POSClosingDialog
+        open={true}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("Cash")).toBeInTheDocument();
+    });
+
+    // Touch every row with a non-zero total so the submit validates.
+    await userEvent.type(screen.getByTestId("Cash"), "1000");
+    // Card starts at 0: typing "0" onto the same value fires no change event,
+    // so clear it first to make the touch register.
+    await userEvent.clear(screen.getByTestId("Card"));
+    await userEvent.type(screen.getByTestId("Card"), "0");
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("pos_closing.validation_missing_rows")
+      ).not.toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "pos_closing.submit" })
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "pos_closing.confirm_submit" })
+    );
+
+    // The checklist gate fires BEFORE any closing doc is created.
+    await screen.findByRole("button", { name: "Complete Checklist" });
+    expect(createPosClosingEntryMock).not.toHaveBeenCalled();
+    expect(createSubPosClosingMock).not.toHaveBeenCalled();
+
+    // Completing the checklist resumes the close submission.
+    await userEvent.click(
+      screen.getByRole("button", { name: "Complete Checklist" })
+    );
+    await waitFor(() => {
+      expect(createPosClosingEntryMock).toHaveBeenCalled();
+    });
   });
 });

@@ -613,8 +613,9 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
             MagicMock(item_label="Stock Count", is_mandatory=True),
         ]
 
-        # Mock existing log query returns empty (no existing log)
-        mock_get_all.side_effect = [mock_configured_items, []]
+        # Mock existing log query returns empty (no existing log).
+        # Call order: URY Checklist Item, Dependent Checklist, URY POS Checklist Log.
+        mock_get_all.side_effect = [mock_configured_items, [], []]
 
         # Mock new document creation with properly-configured mock
         mock_log_doc = self._create_mock_log_doc()
@@ -671,8 +672,9 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
             MagicMock(item_label="Optional Verification", is_mandatory=False),
         ]
 
-        # Mock existing log query returns empty (no existing log)
-        mock_get_all.side_effect = [mock_configured_items, []]
+        # Mock existing log query returns empty (no existing log).
+        # Call order: URY Checklist Item, Dependent Checklist, URY POS Checklist Log.
+        mock_get_all.side_effect = [mock_configured_items, [], []]
 
         # Mock new document creation with properly-configured mock
         mock_log_doc = self._create_mock_log_doc()
@@ -750,3 +752,229 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
                 checklist_type="Opening",
                 items=items
             )
+
+
+class TestDependentChecklistBridge(FrappeTestCase):
+    """Role-based Dependent Checklist (grillax port) surfaced through the
+    legacy get_checklist/submit_checklist contract used by all POS frontends."""
+
+    def _dependent_rows(self, goal="Opening Checklist Goal", option="POS Opening Entry", role="Cashier"):
+        return [frappe._dict({"quality_checklist": goal, "select_2": option, "role": role})]
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_get_checklist_surfaces_pending_goal_as_mandatory_item(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """A role-matched Dependent Checklist goal with no Quality Review yet
+        shows up as a mandatory item and the gate stays open."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = None  # no Quality Review yet
+        # Call order: URY Checklist Item, Dependent Checklist,
+        # POS Opening Entry (period date), URY POS Checklist Log
+        mock_get_all.side_effect = [[], self._dependent_rows(), [], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["item_label"], "Opening Checklist Goal")
+        self.assertEqual(result["items"][0]["is_mandatory"], 1)
+        self.assertNotEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_get_checklist_complete_when_review_exists(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """When the user already has a Quality Review for the goal, the gate
+        reports Complete and no item is surfaced."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = "QR-0001"  # review exists
+        mock_get_all.side_effect = [[], self._dependent_rows(), [frappe._dict({"posting_date": date.today()})], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_get_checklist_ignores_goals_for_other_roles(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """Goals whose Role is not assigned to the user never surface."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "waiter@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Waiter", "All"]
+        mock_get_all.side_effect = [[], self._dependent_rows(role="Cashier"), [], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_creates_quality_review(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists,
+        mock_get_roles, mock_new_doc, mock_get_doc
+    ):
+        """Submitting a checked goal item creates a Quality Review (grillax
+        model) and reports Complete once no goal is pending."""
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        # First exists() call (pending check before create) -> None; the
+        # post-create goals_pending re-check -> truthy.
+        mock_db_exists.side_effect = [None, "QR-0001"]
+        mock_get_all.side_effect = [
+            [],  # URY Checklist Item
+            self._dependent_rows(),  # Dependent Checklist
+            [],  # POS Opening Entry (period date -> today)
+            [],  # URY POS Checklist Log
+        ]
+
+        review_doc = MagicMock()
+        mock_new_doc.return_value = review_doc
+        goal_doc = MagicMock()
+        goal_doc.objectives = []
+        mock_get_doc.return_value = goal_doc
+
+        items = json.dumps([
+            {"item_label": "Opening Checklist Goal", "is_checked": True, "remarks": "All good"},
+        ])
+        result = submit_checklist("POS-Profile-001", "Opening", items)
+
+        mock_new_doc.assert_called_once_with("Quality Review")
+        self.assertEqual(review_doc.goal, "Opening Checklist Goal")
+        self.assertEqual(review_doc.branch, "Branch A")
+        self.assertEqual(review_doc.employee, "cashier@example.com")
+        review_doc.insert.assert_called_once()
+        self.assertEqual(result["status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_unchecked_goal_stays_pending(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists,
+        mock_get_roles, mock_new_doc, mock_get_doc
+    ):
+        """An unchecked goal must not produce a Quality Review and keeps the
+        overall status In Progress."""
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = None  # still pending on re-check
+        mock_get_all.side_effect = [
+            [],  # URY Checklist Item
+            self._dependent_rows(),  # Dependent Checklist
+            [],  # POS Opening Entry
+            [],  # URY POS Checklist Log
+        ]
+
+        items = json.dumps([
+            {"item_label": "Opening Checklist Goal", "is_checked": False, "remarks": ""},
+        ])
+        result = submit_checklist("POS-Profile-001", "Opening", items)
+
+        mock_new_doc.assert_not_called()
+        self.assertEqual(result["status"], "In Progress")
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_dependent_option_maps_to_checklist_type(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """'POS Opening Entry' and 'Order Taking' rows surface for the Opening
+        checklist; 'POS Closing Entry' and 'RM Checklist' rows surface for the
+        Closing checklist — nothing leaks across types."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = None  # no Quality Review yet
+        rows = [
+            frappe._dict({"quality_checklist": "Closing Goal", "select_2": "POS Closing Entry", "role": "Cashier"}),
+            frappe._dict({"quality_checklist": "Order Taker Goal", "select_2": "Order Taking", "role": "Cashier"}),
+            frappe._dict({"quality_checklist": "RM Goal", "select_2": "RM Checklist", "role": "Cashier"}),
+        ]
+        mock_get_all.side_effect = [
+            [], rows, [], [],  # Opening fetch
+            [], rows, [], [],  # Closing fetch
+        ]
+
+        opening = get_checklist("POS-Profile-001", "Opening")
+        self.assertEqual(
+            [item["item_label"] for item in opening["items"]], ["Order Taker Goal"]
+        )
+        self.assertNotEqual(opening["log_status"], "Complete")
+
+        closing = get_checklist("POS-Profile-001", "Closing")
+        self.assertEqual(
+            sorted(item["item_label"] for item in closing["items"]),
+            ["Closing Goal", "RM Goal"],
+        )
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_order_taking_goal_ignored_for_other_roles(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """An 'Order Taking' goal must not surface for users without the
+        configured role, even though the option now maps to Opening."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "waiter@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Waiter", "All"]
+        rows = [
+            frappe._dict({"quality_checklist": "Order Taker Goal", "select_2": "Order Taking", "role": "Cashier"}),
+        ]
+        mock_get_all.side_effect = [[], rows, [], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["log_status"], "Complete")

@@ -16,6 +16,7 @@ import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
 import ChecklistGateDialog from './ChecklistGateDialog';
+import { getChecklist } from '../../../lib/pos/checklist-api';
 import {
   getOpenPosOpeningEntries,
   getSubCashierPosInvoices,
@@ -183,6 +184,11 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   // this success -- not off validatePOSClose() -- so it renders in place of
   // the closing form until the cashier clears it.
   const [showClosingChecklist, setShowClosingChecklist] = useState(false);
+  // True when the Closing checklist gate fired BEFORE the close submission:
+  // completing the checklist must resume the submission (the grillax
+  // validations reject closing doc creation while role-based goals are
+  // pending, so the checklist is a hard precondition in this mode).
+  const [preCloseGate, setPreCloseGate] = useState(false);
 
   const loadClosingDetails = useCallback(async () => {
     if (!posProfile || !user) return;
@@ -247,11 +253,35 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
 
   const handleOpenChange = (next: boolean) => {
     if (isSubmitting) return;
+    if (!next) {
+      setPreCloseGate(false);
+    }
     onOpenChange(next);
   };
 
   const handleSubmit = async () => {
     if (!openingEntry || !posProfile || !user) return;
+
+    // Gate on the Closing checklist BEFORE creating the closing doc: the
+    // role-based Dependent Checklist validations (grillax port) throw on
+    // POS Closing Entry creation while pending goals have no Quality
+    // Review, so collecting the checklist first is the only UI path that
+    // lets the cashier actually clear the block.
+    if (posProfile.name) {
+      try {
+        const { logStatus } = await getChecklist(posProfile.name, 'Closing');
+        if (logStatus !== 'Complete') {
+          setPreCloseGate(true);
+          setShowClosingChecklist(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to check closing checklist status:', error);
+        setPreCloseGate(true);
+        setShowClosingChecklist(true);
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -318,6 +348,14 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     onOpenChange(false);
   };
 
+  // Pre-close gate: the close submission hasn't fired yet, so finishing the
+  // checklist resumes it instead of dismissing the dialog.
+  const handlePreCloseChecklistComplete = () => {
+    setShowClosingChecklist(false);
+    setPreCloseGate(false);
+    void handleSubmit();
+  };
+
   const hasRows = useMemo(() => rows.length > 0, [rows]);
 
   if (showClosingChecklist && posProfile?.name) {
@@ -325,7 +363,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       <ChecklistGateDialog
         posProfile={posProfile.name}
         checklistType="Closing"
-        onComplete={handleClosingChecklistComplete}
+        onComplete={preCloseGate ? handlePreCloseChecklistComplete : handleClosingChecklistComplete}
       />
     );
   }
