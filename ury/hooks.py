@@ -669,6 +669,9 @@ fixtures = [
             ]
         ],
     },
+    {
+        "dt": "Quality Goal",
+    },
     # A single merged entry, not two separate ones: frappe.utils.fixtures.
     # export_fixtures() runs every hooks.fixtures entry independently and
     # writes each straight to app_path/fixtures/<scrub(doctype)>.json --
