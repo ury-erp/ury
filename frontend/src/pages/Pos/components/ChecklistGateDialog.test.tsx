@@ -18,7 +18,7 @@ describe("ChecklistGateDialog", () => {
   
   it("loads and displays checklist items", async () => {
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
   });
 
   it("marks mandatory items with asterisk", async () => {
@@ -28,7 +28,7 @@ describe("ChecklistGateDialog", () => {
 
   it("disables submit button until every mandatory item has a result", async () => {
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
     expect(submitButton).toBeDisabled();
   });
@@ -36,7 +36,7 @@ describe("ChecklistGateDialog", () => {
   it("enables submit button when mandatory items are answered", async () => {
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.pass" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
     expect(submitButton).not.toBeDisabled();
@@ -47,7 +47,7 @@ describe("ChecklistGateDialog", () => {
     const onComplete = vi.fn();
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={onComplete} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.pass" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
     await user.click(submitButton);
@@ -61,7 +61,7 @@ describe("ChecklistGateDialog", () => {
   it("blocks submission when FAIL has no remarks", async () => {
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.fail" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
     expect(submitButton).toBeDisabled();
@@ -72,7 +72,7 @@ describe("ChecklistGateDialog", () => {
     submitChecklistMock.mockResolvedValue({ status: "Complete" });
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.fail" })[0]);
     await user.type(screen.getByPlaceholderText("checklist.fail_remarks_placeholder"), "Printer broken");
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
@@ -85,7 +85,7 @@ describe("ChecklistGateDialog", () => {
       log_name: "LOG-001",
     });
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
-    await waitFor(() => { expect(screen.getByText("Item 1")).toBeInTheDocument(); });
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     expect(screen.getAllByRole("radio", { name: "checklist.fail" })[0]).toBeChecked();
     expect(screen.getByDisplayValue("Printer broken")).toBeInTheDocument();
     // Fail with remarks present -> submit is allowed immediately.

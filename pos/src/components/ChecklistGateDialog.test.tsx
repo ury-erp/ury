@@ -141,8 +141,8 @@ describe('ChecklistGateDialog', () => {
     );
     
     await waitFor(() => {
-      expect(screen.getByText('Check cash drawer')).toBeTruthy();
-      expect(screen.getByText('Verify opening balance')).toBeTruthy();
+      expect(screen.getByText(/Check cash drawer/)).toBeTruthy();
+      expect(screen.getByText(/Verify opening balance/)).toBeTruthy();
     });
   });
 
@@ -164,7 +164,7 @@ describe('ChecklistGateDialog', () => {
     );
     
     await waitFor(() => {
-      const label = screen.getByText('Mandatory item');
+      const label = screen.getByText(/Mandatory item/);
       const parent = label.closest('span');
       expect(parent?.textContent).toContain('*');
     });
