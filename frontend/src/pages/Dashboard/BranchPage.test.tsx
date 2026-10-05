@@ -8,6 +8,9 @@ const mockBranches = Object.freeze([
     branch_name: 'Kozhikode',
     address: 'Kozhikode, Kerala',
     custom_no_taxes: 0,
+    custom_invoice_series_prefix: 'INV-KZK-',
+    custom_aggregator_series_prefix: 'AGG-KZK-',
+    tax_id: 'TAX-998877',
   },
 ]);
 
@@ -16,7 +19,18 @@ const mockMenus = Object.freeze([
 ]);
 
 const mockRooms = Object.freeze([
-  { name: 'Room1', room_name: 'Hall 1' },
+  { name: 'Room1' },
+]);
+
+const mockRestaurants = Object.freeze([
+  {
+    name: 'Kozhikode Restaurant',
+    branch: 'Kozhikode',
+    company: 'Default Company',
+    invoice_series_prefix: 'INV-KZK-',
+    aggregator_series_prefix: 'AGG-KZK-',
+    active_menu: 'Main Menu',
+  },
 ]);
 
 vi.mock('../../context/BranchContext', () => ({
@@ -52,8 +66,17 @@ vi.mock('@ury/core', async (importOriginal) => {
       if (method === 'frappe.client.get_list' && params.doctype === 'Branch') {
         return { message: mockBranches };
       }
+      if (method === 'frappe.client.get_list' && params.doctype === 'URY Restaurant') {
+        return { message: mockRestaurants };
+      }
       if (method === 'frappe.client.get_list' && params.doctype === 'Company') {
-        return { message: [{ name: 'Default Company' }] };
+        return { message: [{ name: 'Default Company', tax_id: 'TAX-998877' }] };
+      }
+      if (method === 'frappe.client.get' && params.doctype === 'Branch') {
+        return { message: mockBranches[0] };
+      }
+      if (method === 'frappe.client.get' && params.doctype === 'URY Restaurant') {
+        return { message: mockRestaurants[0] };
       }
       return { message: [] };
     }),
@@ -101,11 +124,15 @@ describe('BranchPage', () => {
     }, { timeout: 5000 });
   });
 
-  it('displays branch city information', async () => {
+  it('displays branch fiscal identification headers and values in table list', async () => {
     render(<BranchPage />);
     await waitFor(() => {
-      const kozhikodeElements = screen.getAllByText('Kozhikode');
-      expect(kozhikodeElements.length).toBeGreaterThan(0);
+      expect(screen.getByText('Invoice Prefix')).toBeInTheDocument();
+      expect(screen.getByText('Aggregator Prefix')).toBeInTheDocument();
+      expect(screen.getByText('Tax ID')).toBeInTheDocument();
+      expect(screen.getByText('INV-KZK-')).toBeInTheDocument();
+      expect(screen.getByText('AGG-KZK-')).toBeInTheDocument();
+      expect(screen.getByText('TAX-998877')).toBeInTheDocument();
     }, { timeout: 5000 });
   });
 });

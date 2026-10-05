@@ -279,6 +279,9 @@ def _ensure_items():
 	created = []
 	image_url = lambda name: f"https://picsum.photos/seed/{_image_slug(name)}/400/400"
 
+	meta = frappe.get_meta("Item")
+	has_hsn = meta.has_field("gst_hsn_code") or frappe.db.has_column("Item", "gst_hsn_code")
+
 	for item_name, item_group, rate in MENU_ITEMS:
 		if frappe.db.exists("Item", item_name):
 			# Backfill image for existing items that don't have one
@@ -286,20 +289,40 @@ def _ensure_items():
 				frappe.db.set_value("Item", item_name, "image", image_url(item_name))
 				print(f"Added image to existing Item: {item_name}")
 			continue
-		doc = frappe.get_doc(
-			{
-				"doctype": "Item",
-				"item_code": item_name,
-				"item_name": item_name,
-				"item_group": item_group,
-				"stock_uom": UOM,
-				"standard_rate": rate,
-				"is_stock_item": 0,
-				"is_sales_item": 1,
-				"image": image_url(item_name),
-			}
-		)
-		doc.insert(ignore_permissions=True)
+
+		item_dict = {
+			"doctype": "Item",
+			"item_code": item_name,
+			"item_name": item_name,
+			"item_group": item_group,
+			"stock_uom": UOM,
+			"standard_rate": rate,
+			"is_stock_item": 0,
+			"is_sales_item": 1,
+			"image": image_url(item_name),
+		}
+		if has_hsn:
+			item_dict["gst_hsn_code"] = "999512"
+			if frappe.db.exists("DocType", "GST HSN Code") and not frappe.db.exists("GST HSN Code", "999512"):
+				try:
+					frappe.get_doc({
+						"doctype": "GST HSN Code",
+						"hsn_code": "999512",
+						"description": "Services"
+					}).insert(ignore_permissions=True)
+				except Exception:
+					pass
+
+		doc = frappe.get_doc(item_dict)
+		try:
+			doc.insert(ignore_permissions=True)
+		except frappe.ValidationError as e:
+			err_msg = str(e)
+			if "HSN" in err_msg or "SAC" in err_msg:
+				doc.flags.ignore_mandatory = True
+				doc.insert(ignore_permissions=True)
+			else:
+				raise
 		created.append(doc.name)
 		print(f"Created Item: {doc.name}")
 	return created

@@ -36,7 +36,23 @@ def get_branches():
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
     
     branches = frappe.get_all("Branch", fields=["name", "branch"])
-    return [{"id": b.name, "name": b.branch, "tax_id": tax_id} for b in branches]
+    restaurants = frappe.get_all("URY Restaurant", fields=["branch", "invoice_series_prefix", "aggregator_series_prefix"])
+    rest_map = {}
+    for r in restaurants:
+        if r.get("branch"):
+            rest_map[r.get("branch")] = r
+
+    res = []
+    for b in branches:
+        r = rest_map.get(b.name) or rest_map.get(b.branch)
+        res.append({
+            "id": b.name,
+            "name": b.branch,
+            "tax_id": tax_id,
+            "invoice_series_prefix": r.get("invoice_series_prefix") if r else None,
+            "aggregator_series_prefix": r.get("aggregator_series_prefix") if r else None
+        })
+    return res
 
 @frappe.whitelist()
 def update_business_setup(branch=None, restaurant=None):
@@ -194,6 +210,47 @@ def submit_configure_data(data):
             message=frappe.get_traceback(),
         )
         raise
+
+
+def _prepare_and_insert_item(item_data):
+    """Safely insert an Item, handling india_compliance/GST HSN code requirements if present."""
+    meta = frappe.get_meta("Item")
+    hsn_code = item_data.get("gst_hsn_code") or "999512"
+
+    if meta.has_field("gst_hsn_code") or frappe.db.has_column("Item", "gst_hsn_code"):
+        item_data["gst_hsn_code"] = hsn_code
+        if frappe.db.exists("DocType", "GST HSN Code") and not frappe.db.exists("GST HSN Code", hsn_code):
+            try:
+                frappe.get_doc({
+                    "doctype": "GST HSN Code",
+                    "hsn_code": hsn_code,
+                    "description": "Services"
+                }).insert(ignore_permissions=True)
+            except Exception:
+                pass
+
+    doc = frappe.get_doc(item_data)
+    try:
+        doc.insert(ignore_permissions=True)
+    except frappe.ValidationError as e:
+        err_msg = str(e)
+        if "HSN" in err_msg or "SAC" in err_msg:
+            if meta.has_field("gst_hsn_code"):
+                doc.gst_hsn_code = hsn_code
+                if frappe.db.exists("DocType", "GST HSN Code") and not frappe.db.exists("GST HSN Code", hsn_code):
+                    try:
+                        frappe.get_doc({
+                            "doctype": "GST HSN Code",
+                            "hsn_code": hsn_code,
+                            "description": "Services"
+                        }).insert(ignore_permissions=True)
+                    except Exception:
+                        pass
+            doc.flags.ignore_mandatory = True
+            doc.insert(ignore_permissions=True)
+        else:
+            raise
+    return doc
 
 
 def _run_configure_data(data, results, user):
@@ -361,7 +418,7 @@ def _run_configure_data(data, results, user):
 
         # 5b. PASS 1: Create ERPNext Item DocType record with Maintain Stock (is_stock_item) = 0!
         if not frappe.db.exists("Item", item_title):
-            item_doc = frappe.get_doc({
+            item_doc = _prepare_and_insert_item({
                 "doctype": "Item",
                 "item_code": item_title,
                 "item_name": item_title,
@@ -371,7 +428,6 @@ def _run_configure_data(data, results, user):
                 "is_stock_item": 0,  # Maintain Stock == 0
                 "is_sales_item": 1
             })
-            item_doc.insert(ignore_permissions=True)
             results["created_items"].append(item_doc.name)
 
         # Build child table row referencing the created ERPNext Item
