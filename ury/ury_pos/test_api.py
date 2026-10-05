@@ -841,9 +841,8 @@ class TestDependentChecklistBridge(FrappeTestCase):
     def test_get_checklist_resurfaces_failed_alongside_unanswered(
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """While any objective is still unanswered, a Failed one resurfaces
-        next to it with its saved status and remarks -- so reopening shows
-        the previous result."""
+        """A Failed objective does not resurface; only objectives with no
+        explicit result come back (unanswered first)."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
@@ -857,13 +856,12 @@ class TestDependentChecklistBridge(FrappeTestCase):
 
         result = get_checklist("POS-Profile-001", "Opening")
 
+        # Only the objective with no explicit result resurfaces; the Failed
+        # one is a valid final response and stays hidden.
         self.assertEqual(
-            [item["item_label"] for item in result["items"]],
-            ["Objective 1", "Objective 2"],
+            [item["item_label"] for item in result["items"]], ["Objective 2"]
         )
-        self.assertEqual(result["items"][0]["status"], "Failed")
-        self.assertEqual(result["items"][0]["remarks"], "Printer broken")
-        self.assertIsNone(result["items"][1]["status"])
+        self.assertIsNone(result["items"][0]["status"])
         self.assertNotEqual(result["log_status"], "Complete")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
@@ -873,12 +871,12 @@ class TestDependentChecklistBridge(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_get_checklist_failure_keeps_goal_pending(
+    def test_get_checklist_submitted_with_failures_completes_gate(
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """A recorded failure does NOT complete the goal: the failed
-        objective resurfaces prefilled and the gate stays open until it is
-        resolved and re-submitted as Passed."""
+        """A submitted checklist completes the gate even with failed
+        objectives -- FAIL is a valid final response and must not resurface
+        or keep the user in the gate."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
@@ -892,11 +890,8 @@ class TestDependentChecklistBridge(FrappeTestCase):
 
         result = get_checklist("POS-Profile-001", "Opening")
 
-        self.assertEqual(
-            [item["item_label"] for item in result["items"]], ["Objective 1"]
-        )
-        self.assertEqual(result["items"][0]["status"], "Failed")
-        self.assertNotEqual(result["log_status"], "Complete")
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["log_status"], "Complete")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
@@ -1102,9 +1097,9 @@ class TestDependentChecklistBridge(FrappeTestCase):
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        # exists() calls: submit-loop review lookup -> none; final state
-        # Passed-check -> none; Failed-check -> the recorded review.
-        mock_db_exists.side_effect = [None, None, "QR-0001"]
+        # exists() calls: submit-loop review lookup -> none; final
+        # submitted-check -> the recorded review.
+        mock_db_exists.side_effect = [None, "QR-0001"]
         mock_get_all.side_effect = [
             [],  # URY Checklist Item
             self._dependent_rows(),  # Dependent Checklist
@@ -1130,9 +1125,9 @@ class TestDependentChecklistBridge(FrappeTestCase):
             [(row["objective"], row["status"]) for row in rows],
             [("Objective 1", "Passed"), ("Objective 2", "Failed")],
         )
-        # FAIL is a VALID submission: recorded as Failed (not "incomplete"),
-        # and the next role stays blocked until the item is re-passed.
-        self.assertEqual(result["status"], "Failed")
+        # FAIL is a VALID response: the submission succeeds and the
+        # checklist counts as submitted/completed for the user.
+        self.assertEqual(result["status"], "Complete")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.new_doc")
@@ -1337,8 +1332,9 @@ class TestDependentChecklistBridge(FrappeTestCase):
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        # exists() calls: RM goal (Passed) -> own review (none yet).
-        mock_db_exists.side_effect = ["QR-RM", None]
+        # exists() calls: RM goal submitted -> own goal pending -> own
+        # review lookup (none yet).
+        mock_db_exists.side_effect = ["QR-RM", None, None]
         mock_get_doc.side_effect = self._get_doc_side_effect()
         mock_get_all.side_effect = [
             [], self._sequence_rows(), [frappe._dict({"posting_date": date.today()})], [],
@@ -1420,31 +1416,34 @@ class TestDependentChecklistBridge(FrappeTestCase):
         self.assertIsNone(result["blocked_by"])
 
 
+    @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
     @patch("ury.ury_pos.api.frappe.db.exists")
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_opening_blocker_marks_failed_predecessor(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    def test_opening_failed_predecessor_does_not_block(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """When the predecessor's checklist was submitted with failures, the
-        blocker says so (state="failed") instead of "not completed yet"."""
+        """A predecessor checklist SUBMITTED with failures (any PASS/FAIL
+        mix) satisfies the hierarchy -- the next role proceeds."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        # RM goal: not Passed, but a Failed review exists.
-        def exists_side_effect(doctype, filters=None):
-            if isinstance(filters, dict) and filters.get("status") == "Failed":
-                return "QR-FAILED"
-            return None
-        mock_db_exists.side_effect = exists_side_effect
-        mock_get_all.side_effect = [[], self._sequence_rows(), []]
+        # RM goal: a submitted (Failed) review exists -> hierarchy satisfied.
+        mock_db_exists.side_effect = ["QR-FAILED", None, None]
+        mock_get_all.side_effect = [[], self._sequence_rows(), [frappe._dict({"posting_date": date.today()})], []]
+        mock_get_doc.side_effect = self._get_doc_side_effect()
 
         result = get_checklist("POS-Profile-001", "Opening")
 
-        self.assertEqual(result["blocked_by"]["state"], "failed")
-        self.assertEqual(result["blocked_by"]["role_label"], "Restaurant Manager")
+        self.assertIsNone(result["blocked_by"])
+        # The cashier's own objectives surface: the hierarchy moved on even
+        # though the RM checklist contained a failure.
+        self.assertEqual(
+            [item["item_label"] for item in result["items"]],
+            ["Objective 1", "Objective 2"],
+        )

@@ -93,8 +93,8 @@ describe("ChecklistGateDialog", () => {
   });
 
 
-  it("accepts a FAIL with remarks without showing any notice", async () => {
-    submitChecklistMock.mockResolvedValue({ status: "Failed" });
+  it("accepts a FAIL with remarks and completes the gate", async () => {
+    submitChecklistMock.mockResolvedValue({ status: "Complete" });
     const onComplete = vi.fn();
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={onComplete} />);
@@ -103,13 +103,8 @@ describe("ChecklistGateDialog", () => {
     await user.type(screen.getByPlaceholderText("checklist.fail_remarks_placeholder"), "test");
     await user.click(screen.getByRole("button", { name: /checklist.submit/ }));
     await waitFor(() => {
-      expect(submitChecklistMock).toHaveBeenCalled();
+      expect(onComplete).toHaveBeenCalled();
     });
-    // A failed checklist is recorded but does NOT complete the gate, and no
-    // failed-items notice is shown (product decision: message stays off).
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(screen.queryByText("checklist.failed_notice")).not.toBeInTheDocument();
-    expect(screen.queryByText("checklist.incomplete_error")).not.toBeInTheDocument();
   });
 
   it("handles empty checklists by auto-submitting", async () => {

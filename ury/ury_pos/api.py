@@ -1525,41 +1525,45 @@ def _phase_dependent_rows(pos_profile, checklist_type):
     return [row for row in rows if row.select_2 in mapped_options]
 
 
-def _goal_review_passed(goal, branch, period_date):
-    """True when any user's review for this goal/branch/day is fully Passed.
-    ERPNext derives the review's doc status from its rows, so status
-    "Passed" is exactly the all-rows-Passed condition. A recorded failure
-    never unlocks the next role."""
+def _goal_submitted(goal, branch, period_date, owner=None):
+    """True when the goal's checklist has been SUBMITTED for this
+    branch/business day: a review exists whose objectives all carry an
+    explicit result. PASS and FAIL are both valid responses -- a failed
+    objective records the failure but never blocks submission or the role
+    hierarchy."""
+    filters = {"goal": goal, "branch": branch, "date": period_date}
+    if owner:
+        filters["owner"] = owner
     return bool(
         frappe.db.exists(
             "Quality Review",
-            {"goal": goal, "branch": branch, "date": period_date, "status": "Passed"},
+            {**filters, "status": ["in", ["Passed", "Failed"]]},
         )
     )
 
 
-def _goal_review_state(goal, branch, period_date, owner=None):
-    """Three-way state of a goal's checklist for one user (or any user when
-    owner is None), derived from the live review's doc status:
-
-    passed  -- review exists and every objective is Passed (unlocks things)
-    failed  -- review exists with only answered rows but at least one Fail
-               (a VALID, submitted checklist that did not pass; recorded,
-               resurfaces for resolve, does not unlock the next role)
-    pending -- no review yet, or some objective still has no explicit result
-    """
-    filters = {"goal": goal, "branch": branch, "date": period_date}
-    if owner:
-        filters["owner"] = owner
-    if frappe.db.exists("Quality Review", {**filters, "status": "Passed"}):
-        return "passed"
-    if frappe.db.exists("Quality Review", {**filters, "status": "Failed"}):
-        return "failed"
-    return "pending"
+def _goal_submitted_since(goal, branch, since):
+    """True when a submitted checklist (any PASS/FAIL mix) exists created at
+    or after `since` -- the closing flow anchors on the shift period start."""
+    return bool(
+        frappe.get_all(
+            "Quality Review",
+            filters={
+                "goal": goal,
+                "branch": branch,
+                "creation": [">=", since],
+                "status": ["in", ["Passed", "Failed"]],
+            },
+            pluck="name",
+            limit=1,
+        )
+    )
 
 
 def _checklist_blocker(rows, checklist_type, branch, period_date, user_roles):
-    """Earliest role in the phase sequence whose goals are not all Passed.
+    """Earliest role in the phase sequence whose checklists are not all
+    SUBMITTED (a submitted checklist may contain FAIL objectives -- that is
+    a valid response, not a blocker).
 
     Opening runs ascending rank (RM -> Cashier -> Order Taker); Closing runs
     descending (Order Taker -> Cashier -> RM). A user acts at their lowest
@@ -1592,28 +1596,15 @@ def _checklist_blocker(rows, checklist_type, branch, period_date, user_roles):
 
     for rank in predecessors:
         for role, goals in ranked[rank].items():
-            incomplete = [
-                goal for goal in goals if not _goal_review_passed(goal, branch, period_date)
+            unsubmitted = [
+                goal for goal in goals if not _goal_submitted(goal, branch, period_date)
             ]
-            if incomplete:
-                failed = any(
-                    frappe.db.exists(
-                        "Quality Review",
-                        {
-                            "goal": goal,
-                            "branch": branch,
-                            "date": period_date,
-                            "status": "Failed",
-                        },
-                    )
-                    for goal in incomplete
-                )
+            if unsubmitted:
                 return {
                     "role": role,
                     "role_label": _role_label(role),
                     "rank": rank,
-                    "goals": incomplete,
-                    "state": "failed" if failed else "pending",
+                    "goals": unsubmitted,
                 }
     return None
 
@@ -1690,27 +1681,11 @@ def _throw_blocked(blocked_by, checklist_type):
     )
 
 
-def _goal_review_passed_since(goal, branch, since):
-    """True when a fully-Passed review exists created at/after `since`
-    (the closing flow anchors on the shift's period start)."""
-    for name in frappe.get_all(
-        "Quality Review",
-        filters={"goal": goal, "branch": branch, "creation": [">=", since]},
-        pluck="name",
-    ):
-        if frappe.get_doc("Quality Review", name).status == "Passed":
-            return True
-    return False
-
-
 def _goal_review_pending(goal, branch, period_date):
-    """A goal is done for THIS user only when their review exists and every
-    objective is Passed -- a recorded failure stays pending so the user must
-    resolve and re-submit it."""
-    review = _existing_goal_review(goal, branch, period_date)
-    if not review:
-        return True
-    return any(row.status != "Passed" for row in review.reviews or [])
+    """A goal is pending for THIS user until they have SUBMITTED its
+    checklist. PASS and FAIL both count as submitted; only objectives with
+    no explicit result keep the goal pending."""
+    return not _goal_submitted(goal, branch, period_date, owner=frappe.session.user)
 
 
 def _item_status(state):
@@ -1825,6 +1800,8 @@ def get_checklist(pos_profile, checklist_type):
     goal_items = []
     pending_goals = []
     for goal in goals:
+        if _goal_review_pending(goal, branch, period_date):
+            pending_goals.append(goal)
         review = _existing_goal_review(goal, branch, period_date)
         states = (
             {row.objective: row for row in review.reviews or []} if review else {}
@@ -1833,7 +1810,6 @@ def get_checklist(pos_profile, checklist_type):
         if not objectives:
             # Goal without configured objectives: the goal name is the item.
             if not review:
-                pending_goals.append(goal)
                 goal_items.append(
                     {
                         "item_label": goal,
@@ -1845,15 +1821,13 @@ def get_checklist(pos_profile, checklist_type):
                     }
                 )
             continue
-        # An objective is answered once its review row is Passed. Unanswered
-        # and Failed rows keep the goal pending (a failure must be resolved
-        # and re-submitted), so both resurface prefilled with their last
-        # result -- a fully-Passed goal stays hidden and completes the gate.
+        # Only objectives with NO explicit result resurface. FAIL is a valid
+        # final response: it is recorded on the review and must not keep the
+        # item (or the user) in the gate.
         remaining = [
-            o for o in objectives if states.get(o) is None or states[o].status != "Passed"
+            o for o in objectives if states.get(o) is None or states[o].status == "Open"
         ]
         if remaining:
-            pending_goals.append(goal)
             goal_items += [
                 {
                     "item_label": o,
@@ -2017,24 +1991,14 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
     )
 
     def _goal_submission_status():
-        """Three-way completion for the role-based goals, from THIS user's
-        saved reviews:
-
-        - "pending": some objective still has no explicit result -> the
-          checklist is unsubmitted/incomplete ("In Progress").
-        - "failed": every objective answered but at least one Failed -> the
-          checklist was VALIDLY submitted and did not pass; it is recorded
-          and must not read as "incomplete", but it does not unlock anyone.
-        - None: all goals Passed -> the legacy log status decides.
-        """
-        states = [
-            _goal_review_state(goal, branch, period_date, owner=frappe.session.user)
+        """Incomplete only while some objective still has no explicit result.
+        A submitted checklist -- any PASS/FAIL mix -- is Complete and closes
+        the gate; the role hierarchy likewise only requires submission."""
+        if any(
+            not _goal_submitted(goal, branch, period_date, owner=frappe.session.user)
             for goal in goals
-        ]
-        if any(state == "pending" for state in states):
+        ):
             return "In Progress"
-        if any(state == "failed" for state in states):
-            return "Failed"
         return None
 
     if not configured_items:
@@ -2093,17 +2057,12 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
     all_mandatory_answered = all(
         _row_answered(row) for row in log_doc.items if row.is_mandatory
     )
-    any_mandatory_failed = any(
-        (row.status or ("Passed" if row.is_checked else None)) == "Failed"
-        for row in log_doc.items
-        if row.is_mandatory
-    )
 
     if all_mandatory_answered:
-        # A FAIL is a valid, submitted result: the log is recorded as Failed
-        # (not "incomplete") so downstream code can tell submission validity
-        # apart from workflow completion.
-        log_doc.status = "Failed" if any_mandatory_failed else "Complete"
+        # PASS and FAIL are both valid responses: once every mandatory item
+        # has a result the checklist is Complete (submitted). Individual
+        # failures stay recorded on the rows for reporting.
+        log_doc.status = "Complete"
         log_doc.completed_by = frappe.session.user
         log_doc.completed_at = frappe.utils.now()
     else:

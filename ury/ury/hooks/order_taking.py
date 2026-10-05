@@ -3,7 +3,7 @@ from frappe import _
 
 from ury.ury_pos.api import (
 	_checklist_blocker,
-	_goal_review_state,
+	_goal_submitted,
 	_own_position_goals,
 	_phase_dependent_rows,
 )
@@ -50,7 +50,7 @@ def ordertaker_checklist(branch, employee):
 		return 2, frappe.conf.url
 
 	for goal in _own_position_goals(rows, user_roles):
-		if _goal_review_state(goal, branch, period_date, owner=employee) != "passed":
+		if not _goal_submitted(goal, branch, period_date, owner=employee):
 			frappe.msgprint(
 				title="Message",
 				indicator="red",

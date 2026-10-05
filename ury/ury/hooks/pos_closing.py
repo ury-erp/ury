@@ -4,7 +4,7 @@ from datetime import datetime
 
 from ury.ury_pos.api import (
 	POS_EVENT_ROLE_RANK,
-	_goal_review_passed_since,
+	_goal_submitted_since,
 	_phase_dependent_rows,
 	_role_rank,
 )
@@ -13,10 +13,11 @@ from ury.ury_pos.api import (
 def validate_daily_checklists(doc, method):
 	"""Closing runs Order Taker -> Cashier -> RM. The POS Closing Entry is
 	created at the Cashier step, so every role BEFORE the cashier in the
-	closing sequence -- the Order Taker -- must have a fully-Passed closing
+	closing sequence -- the Order Taker -- must have SUBMITTED its closing
 	checklist (review created since the shift opened) before the shift can
-	close. Roles after the cashier (RM) close later and do not gate this
-	document."""
+	close. A submitted checklist may contain FAIL objectives -- valid
+	response, not a blocker. Roles after the cashier (RM) close later and do
+	not gate this document."""
 	pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
 	branch = pos_profile.branch
 
@@ -37,7 +38,7 @@ def validate_daily_checklists(doc, method):
 
 	for row in _phase_dependent_rows(doc.pos_profile, "Closing"):
 		rank = _role_rank(row.role)
-		if _goal_review_passed_since(row.quality_checklist, branch, start_date):
+		if _goal_submitted_since(row.quality_checklist, branch, start_date):
 			doc.append(
 				"quality_checklist",
 				{"checklist": row.quality_checklist, "check_2": 1},

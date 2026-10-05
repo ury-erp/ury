@@ -2,7 +2,7 @@ import frappe
 
 from ury.ury_pos.api import (
 	POS_EVENT_ROLE_RANK,
-	_goal_review_passed,
+	_goal_submitted,
 	_phase_dependent_rows,
 	_role_rank,
 )
@@ -11,8 +11,9 @@ from ury.ury_pos.api import (
 def update_daily_checklists(doc, event):
 	"""POS Opening Entry is created at the Cashier step of the opening
 	sequence (RM -> Cashier -> Order Taker): every role BEFORE the cashier --
-	the Restaurant Manager -- must have a fully-Passed opening checklist for
-	this branch/business day before the shift can open."""
+	the Restaurant Manager -- must have SUBMITTED its opening checklist for
+	this branch/business day before the shift can open. A submitted checklist
+	may contain FAIL objectives -- that is a valid response, not a blocker."""
 	pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
 	branch = pos_profile.branch
 
@@ -21,7 +22,7 @@ def update_daily_checklists(doc, event):
 		rank = _role_rank(row.role)
 		if rank is None or rank >= POS_EVENT_ROLE_RANK:
 			continue
-		if not _goal_review_passed(row.quality_checklist, branch, doc.posting_date):
+		if not _goal_submitted(row.quality_checklist, branch, doc.posting_date):
 			pending.append(row.quality_checklist)
 
 	if pending:
