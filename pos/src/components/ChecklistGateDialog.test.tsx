@@ -188,12 +188,11 @@ describe('ChecklistGateDialog', () => {
     );
     
     await waitFor(() => {
-      const checkbox = screen.getByRole('checkbox');
-      expect(checkbox).toBeTruthy();
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
     });
   });
 
-  it('disables submit button when mandatory items are not checked', async () => {
+  it('disables submit button when mandatory items have no result', async () => {
     mockGetChecklist.mockResolvedValueOnce({
       items: [
         { item_label: 'Mandatory item', is_mandatory: true },
@@ -216,7 +215,7 @@ describe('ChecklistGateDialog', () => {
     });
   });
 
-  it('enables submit button when all mandatory items are checked', async () => {
+  it('enables submit button when all mandatory items are answered', async () => {
     mockGetChecklist.mockResolvedValueOnce({
       items: [
         { item_label: 'Mandatory item', is_mandatory: true },
@@ -234,14 +233,70 @@ describe('ChecklistGateDialog', () => {
     );
     
     await waitFor(() => {
-      const checkbox = screen.getByRole('checkbox');
-      userEvent.click(checkbox);
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
     });
+    userEvent.click(screen.getAllByRole('radio')[0]);
     
     await waitFor(() => {
       const submitButton = screen.getByText('checklist.submit');
       expect(submitButton.closest('button')?.hasAttribute('disabled')).toBe(false);
     });
+  });
+
+  it('blocks submit when FAIL has no remarks', async () => {
+    mockGetChecklist.mockResolvedValueOnce({
+      items: [
+        { item_label: 'Mandatory item', is_mandatory: true },
+      ],
+      logName: 'LOG-001',
+      logStatus: 'Incomplete',
+    });
+    
+    render(
+      <ChecklistGateDialog
+        posProfile="POS-001"
+        checklistType="Opening"
+        onComplete={vi.fn()}
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
+    });
+    await userEvent.click(screen.getAllByRole('radio')[1]); // FAIL
+    
+    await waitFor(() => {
+      expect(screen.getByText('checklist.fail_remarks_required')).toBeTruthy();
+    });
+    const submitButton = screen.getByText('checklist.submit');
+    expect(submitButton.closest('button')?.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('prefills a previously saved FAIL result and remarks on reopen', async () => {
+    mockGetChecklist.mockResolvedValueOnce({
+      items: [
+        { item_label: 'Mandatory item', is_mandatory: true, status: 'Failed', remarks: 'Printer broken' },
+      ],
+      logName: 'LOG-001',
+      logStatus: 'Incomplete',
+    });
+    
+    render(
+      <ChecklistGateDialog
+        posProfile="POS-001"
+        checklistType="Opening"
+        onComplete={vi.fn()}
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
+    });
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    expect(radios[1].checked).toBe(true); // FAIL preselected
+    expect(screen.getByDisplayValue('Printer broken')).toBeTruthy();
+    const submitButton = screen.getByText('checklist.submit');
+    expect(submitButton.closest('button')?.hasAttribute('disabled')).toBe(false);
   });
 
   it('displays error message on load failure', async () => {
@@ -260,7 +315,7 @@ describe('ChecklistGateDialog', () => {
     });
   });
 
-  it('submits checklist with checked items', async () => {
+  it('submits checklist with explicit PASS results', async () => {
     const onComplete = vi.fn();
     mockGetChecklist.mockResolvedValueOnce({
       items: [
@@ -280,17 +335,22 @@ describe('ChecklistGateDialog', () => {
     );
     
     await waitFor(() => {
-      const checkbox = screen.getByRole('checkbox');
-      userEvent.click(checkbox);
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
     });
+    userEvent.click(screen.getAllByRole('radio')[0]); // PASS
     
     await waitFor(() => {
       const submitButton = screen.getByText('checklist.submit');
-      userEvent.click(submitButton);
+      expect(submitButton.closest('button')?.hasAttribute('disabled')).toBe(false);
     });
+    userEvent.click(screen.getByText('checklist.submit'));
     
     await waitFor(() => {
       expect(mockSubmitChecklist).toHaveBeenCalled();
     });
+    const submitted = mockSubmitChecklist.mock.calls[0][2];
+    expect(submitted[0]).toEqual(
+      expect.objectContaining({ item_label: 'Item 1', status: 'Passed' })
+    );
   });
 });

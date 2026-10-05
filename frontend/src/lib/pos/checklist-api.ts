@@ -3,6 +3,11 @@ import { call } from '@ury/core';
 export interface ChecklistItem {
   item_label: string;
   is_mandatory: boolean;
+  /** Previously saved result; null/undefined when not answered yet. */
+  status?: 'Passed' | 'Failed' | null;
+  remarks?: string;
+  /** Quality Goal this item belongs to (Dependent Checklist items only). */
+  goal?: string | null;
 }
 
 export interface ChecklistResponse {
@@ -15,8 +20,12 @@ export interface ChecklistResponse {
 
 export interface SubmitChecklistItem {
   item_label: string;
-  is_checked: boolean;
+  /** Explicit result; is_checked (True -> Passed, False -> Open) is still
+   * accepted from older clients. */
+  status?: 'Passed' | 'Failed';
+  is_checked?: boolean;
   remarks: string;
+  goal?: string | null;
 }
 
 export interface SubmitChecklistResponse {

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
-  Checkbox,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -33,16 +32,20 @@ export interface OpeningChecklistProps extends OperationsIdentityProps {
 interface RowState {
   item_label: string
   is_mandatory: boolean
-  is_checked: boolean
+  status: 'Passed' | 'Failed' | null
   remarks: string
+  goal?: string | null
 }
 
 function toRows(items: ChecklistItem[]): RowState[] {
   return items.map((item) => ({
     item_label: item.item_label,
     is_mandatory: isMandatory(item),
-    is_checked: false,
-    remarks: '',
+    // Prefill the result the user saved last time (failed items resurface
+    // with their previous selection so they can review or correct it).
+    status: item.status === 'Passed' || item.status === 'Failed' ? item.status : null,
+    remarks: item.remarks ?? '',
+    goal: item.goal ?? null,
   }))
 }
 
@@ -197,20 +200,31 @@ export function OpeningChecklist({
     runEmptySubmit,
   ])
 
-  const allMandatoryChecked = useMemo(
-    () => rows.every((row) => !row.is_mandatory || row.is_checked),
+  // Every mandatory item needs an explicit result, and a FAIL must carry a
+  // remark explaining it.
+  const allMandatoryAnswered = useMemo(
+    () => rows.every((row) => !row.is_mandatory || row.status),
     [rows]
   )
+  const failuresExplained = useMemo(
+    () =>
+      rows.every(
+        (row) => row.status !== 'Failed' || row.remarks.trim().length > 0
+      ),
+    [rows]
+  )
+  const canSubmit = allMandatoryAnswered && failuresExplained
 
   const handleSubmit = async () => {
-    if (!allMandatoryChecked || submitting) return
+    if (!canSubmit || submitting) return
     const generation = requestGenRef.current
     setSubmitting(true)
     setSubmitError(null)
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
-      is_checked: row.is_checked,
+      status: row.status ?? undefined,
       remarks: row.remarks,
+      goal: row.goal,
     }))
     try {
       const response = await submitOpeningChecklist(
@@ -293,48 +307,78 @@ export function OpeningChecklist({
           {!loading &&
             !loadError &&
             rows.map((row, index) => (
-              <label
+              <div
                 key={`${row.item_label}-${index}`}
-                className="flex cursor-pointer flex-col gap-2 rounded-lg border border-border p-3"
+                className="flex flex-col gap-2 rounded-lg border border-border p-3"
               >
-                <span className="flex items-start gap-3">
-                  <Checkbox
-                    checked={row.is_checked}
+                <span className="min-w-0 flex-1 text-sm">
+                  {row.item_label}
+                  {row.is_mandatory ? (
+                    <span className="ml-1 text-destructive" aria-hidden>
+                      *
+                    </span>
+                  ) : null}
+                </span>
+                <span className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`checklist-result-${index}`}
+                      checked={row.status === 'Passed'}
+                      disabled={submitting}
+                      onChange={() =>
+                        setRows((prev) =>
+                          prev.map((item, i) =>
+                            i === index ? { ...item, status: 'Passed' as const } : item
+                          )
+                        )
+                      }
+                    />
+                    PASS
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`checklist-result-${index}`}
+                      checked={row.status === 'Failed'}
+                      disabled={submitting}
+                      onChange={() =>
+                        setRows((prev) =>
+                          prev.map((item, i) =>
+                            i === index ? { ...item, status: 'Failed' as const } : item
+                          )
+                        )
+                      }
+                    />
+                    FAIL
+                  </label>
+                </span>
+                {row.status && (
+                  <Input
+                    aria-label={`Remarks for ${row.item_label}`}
+                    placeholder={
+                      row.status === 'Failed'
+                        ? 'Explain the failure (required)'
+                        : 'Remarks (optional)'
+                    }
+                    value={row.remarks}
                     disabled={submitting}
-                    aria-required={row.is_mandatory}
                     onChange={(event) => {
-                      const checked = event.target.checked
+                      const remarks = event.target.value
                       setRows((prev) =>
                         prev.map((item, i) =>
-                          i === index ? { ...item, is_checked: checked } : item
+                          i === index ? { ...item, remarks } : item
                         )
                       )
                     }}
                   />
-                  <span className="min-w-0 flex-1 text-sm">
-                    {row.item_label}
-                    {row.is_mandatory ? (
-                      <span className="ml-1 text-destructive" aria-hidden>
-                        *
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-                <Input
-                  aria-label={`Remarks for ${row.item_label}`}
-                  placeholder="Remarks (optional)"
-                  value={row.remarks}
-                  disabled={submitting}
-                  onChange={(event) => {
-                    const remarks = event.target.value
-                    setRows((prev) =>
-                      prev.map((item, i) =>
-                        i === index ? { ...item, remarks } : item
-                      )
-                    )
-                  }}
-                />
-              </label>
+                )}
+                {row.status === 'Failed' && !row.remarks.trim() && (
+                  <p className="text-xs text-destructive">
+                    Remarks are required for failed items.
+                  </p>
+                )}
+              </div>
             ))}
 
           {submitError && (
@@ -361,7 +405,7 @@ export function OpeningChecklist({
               Boolean(loadError) ||
               submitting ||
               rows.length === 0 ||
-              !allMandatoryChecked
+              !canSubmit
             }
             onClick={() => void handleSubmit()}
           >
