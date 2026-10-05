@@ -251,7 +251,9 @@ export function OpeningChecklist({
         fireReady(generation)
       } else if (response.status === 'Failed') {
         // Valid submission with failed items: recorded as failed; the gate
-        // stays open. No notice shown (product decision -- message stays off).
+        // stays open. No notice shown (product decision -- message stays
+        // off) -- reload the saved rows so the submit is visibly confirmed.
+        if (isLive(generation)) void load()
       } else {
         setSubmitError('Complete all mandatory items before continuing.')
       }
