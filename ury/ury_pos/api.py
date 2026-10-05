@@ -1510,14 +1510,17 @@ def _checklist_period_date(branch):
 
 
 def _existing_goal_review(goal, branch, period_date):
-    """The session user's live Quality Review for this goal/period, if any."""
+    """The session user's live Quality Review for this goal/period, if any.
+
+    No document-status filter: ERPNext derives the review's doc-level status
+    from its rows, so a review recording a failure has status "Failed" -- it
+    is still the user's live review and must be found for updates/resume."""
     name = frappe.db.exists(
         "Quality Review",
         {
             "goal": goal,
             "branch": branch,
             "date": period_date,
-            "status": ["in", ["Open", "Passed"]],
             "owner": frappe.session.user,
         },
     )
@@ -1529,13 +1532,33 @@ def _goal_objectives(goal):
 
 
 def _goal_review_pending(goal, branch, period_date):
-    """A goal counts as completed only when the session user has a Quality
-    Review whose objectives are all Passed (the grillax POS Opening/Closing
-    hooks only require the review itself to exist)."""
+    """A goal is done once the session user's review exists and every
+    objective has an explicit result -- Passed or Failed both count (a
+    recorded failure is a final answer, not an incomplete one). Rows still
+    Open (or written before this flow existed) keep the goal pending."""
     review = _existing_goal_review(goal, branch, period_date)
     if not review:
         return True
-    return any(row.status != "Passed" for row in review.reviews or [])
+    return any(row.status not in ("Passed", "Failed") for row in review.reviews or [])
+
+
+def _item_status(state):
+    """Resolve a submitted item's explicit status. New frontends send
+    status="Passed"/"Failed"; the legacy is_checked contract maps
+    True -> Passed and False/omitted -> Open."""
+    status = state.get("status")
+    if status in ("Passed", "Failed"):
+        return status
+    return "Passed" if state.get("is_checked") else "Open"
+
+
+def _require_remarks_for_failures(item_states):
+    for label, state in item_states.items():
+        if _item_status(state) == "Failed" and not (state.get("remarks") or "").strip():
+            frappe.throw(
+                _("Remarks are required for failed checklist items: {0}").format(label),
+                frappe.ValidationError,
+            )
 
 
 def _review_row(objective, state):
@@ -1543,7 +1566,7 @@ def _review_row(objective, state):
         "objective": objective.objective,
         "target": objective.target,
         "uom": objective.uom,
-        "status": "Passed" if state.get("is_checked") else "Open",
+        "status": _item_status(state),
         "review": state.get("remarks") or "",
     }
 
@@ -1580,7 +1603,7 @@ def _update_goal_review(review, item_states):
         state = item_states.get(row.objective)
         if state is None:
             continue
-        row.status = "Passed" if state.get("is_checked") else "Open"
+        row.status = _item_status(state)
         if state.get("remarks"):
             row.review = state["remarks"]
 
@@ -1610,7 +1633,9 @@ def get_checklist(pos_profile, checklist_type):
     # Merge in the role-based Dependent Checklist (grillax port): pending
     # goals expand into their individual Quality Goal objectives so the UI
     # lists checkable tasks instead of the goal's document name. The goal name
-    # rides along on each item for submit-time Quality Review creation.
+    # rides along on each item for submit-time Quality Review creation, and
+    # each item carries its previously saved result so reopening the gate
+    # restores the user's last PASS/FAIL selection.
     branch = getBranch()
     goals = _role_matched_dependent_goals(pos_profile, checklist_type)
     period_date = _checklist_period_date(branch) if goals else None
@@ -1618,10 +1643,8 @@ def get_checklist(pos_profile, checklist_type):
     pending_goals = []
     for goal in goals:
         review = _existing_goal_review(goal, branch, period_date)
-        passed = (
-            {row.objective for row in review.reviews if row.status == "Passed"}
-            if review
-            else set()
+        states = (
+            {row.objective: row for row in review.reviews or []} if review else {}
         )
         objectives = [o.objective for o in _goal_objectives(goal)]
         if not objectives:
@@ -1629,14 +1652,37 @@ def get_checklist(pos_profile, checklist_type):
             if not review:
                 pending_goals.append(goal)
                 goal_items.append(
-                    {"item_label": goal, "is_mandatory": 1, "applies_to": checklist_type, "goal": goal}
+                    {
+                        "item_label": goal,
+                        "is_mandatory": 1,
+                        "applies_to": checklist_type,
+                        "goal": goal,
+                        "status": None,
+                        "remarks": "",
+                    }
                 )
             continue
-        remaining = [o for o in objectives if o not in passed]
+        # Passed objectives are done and stay hidden; Open and Failed ones
+        # resurface (prefilled with whatever was saved) so a recorded failure
+        # remains visible and correctable instead of silently passing the gate.
+        remaining = [
+            o for o in objectives if states.get(o) is None or states[o].status != "Passed"
+        ]
         if remaining:
             pending_goals.append(goal)
             goal_items += [
-                {"item_label": o, "is_mandatory": 1, "applies_to": checklist_type, "goal": goal}
+                {
+                    "item_label": o,
+                    "is_mandatory": 1,
+                    "applies_to": checklist_type,
+                    "goal": goal,
+                    "status": (
+                        states[o].status
+                        if states.get(o) and states[o].status in ("Passed", "Failed")
+                        else None
+                    ),
+                    "remarks": (states[o].review or "") if states.get(o) else "",
+                }
                 for o in remaining
             ]
 
@@ -1657,6 +1703,25 @@ def get_checklist(pos_profile, checklist_type):
         },
         limit=1,
     )
+
+    # Prefill legacy items with the user's previously saved result so
+    # reopening an in-progress log restores the last PASS/FAIL selection.
+    if existing_log:
+        log_rows = frappe.get_all(
+            "URY Checklist Log Item",
+            fields=["item_label", "is_checked", "status", "remarks"],
+            filters={"parent": existing_log[0].name},
+        )
+        log_states = {row.item_label: row for row in log_rows}
+        for item in configured_items:
+            saved = log_states.get(item.item_label)
+            if not saved:
+                continue
+            saved_status = saved.status or ("Passed" if saved.is_checked else None)
+            item["status"] = (
+                saved_status if saved_status in ("Passed", "Failed") else None
+            )
+            item["remarks"] = saved.remarks or ""
 
     items = list(configured_items) + goal_items
 
@@ -1699,6 +1764,12 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         }
 
     items = json.loads(items)
+
+    # A FAIL without a reason is not submittable -- enforced server-side in
+    # addition to the frontend gate.
+    _require_remarks_for_failures(
+        {item.get("item_label"): item for item in items if item.get("item_label")}
+    )
 
     # Persist role-based checklist completions as Quality Reviews (grillax
     # model) so the POS Opening/Closing validations and the desk flows all
@@ -1775,6 +1846,7 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
 
     log_doc.set("items", [])
     for item in items:
+        status = _item_status(item)
         log_doc.append(
             "items",
             {
@@ -1784,16 +1856,26 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
                 "is_mandatory": 1
                 if item.get("item_label") in goals
                 else mandatory_by_label.get(item.get("item_label"), 0),
-                "is_checked": item.get("is_checked"),
+                # is_checked is kept in sync with the explicit status so
+                # pre-change consumers (and pre-change rows, read back via
+                # the is_checked fallback below) keep working.
+                "is_checked": 1 if status == "Passed" else 0,
+                "status": status,
                 "remarks": item.get("remarks"),
             },
         )
 
-    all_mandatory_checked = all(
-        row.is_checked for row in log_doc.items if row.is_mandatory
+    def _row_answered(row):
+        # Rows written before the status field existed have status=None and
+        # fall back to is_checked.
+        saved = row.status or ("Passed" if row.is_checked else None)
+        return saved in ("Passed", "Failed")
+
+    all_mandatory_answered = all(
+        _row_answered(row) for row in log_doc.items if row.is_mandatory
     )
 
-    if all_mandatory_checked:
+    if all_mandatory_answered:
         log_doc.status = "Complete"
         log_doc.completed_by = frappe.session.user
         log_doc.completed_at = frappe.utils.now()

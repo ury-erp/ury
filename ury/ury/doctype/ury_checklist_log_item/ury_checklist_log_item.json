@@ -9,6 +9,7 @@
   "item_label",
   "is_mandatory",
   "is_checked",
+  "status",
   "remarks"
  ],
  "fields": [
@@ -32,6 +33,14 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Is Checked"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nPassed\nFailed"
   },
   {
    "fieldname": "remarks",

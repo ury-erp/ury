@@ -17,8 +17,9 @@ interface ChecklistGateDialogProps {
 interface ChecklistRowState {
   item_label: string;
   is_mandatory: boolean;
-  is_checked: boolean;
+  status: 'Passed' | 'Failed' | null;
   remarks: string;
+  goal?: string | null;
 }
 
 /**
@@ -47,8 +48,11 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
   items.map((item) => ({
     item_label: item.item_label,
     is_mandatory: item.is_mandatory,
-    is_checked: false,
-    remarks: '',
+    // Prefill the result the user saved last time (failed items resurface
+    // with their previous selection so they can review or correct it).
+    status: item.status === 'Passed' || item.status === 'Failed' ? item.status : null,
+    remarks: item.remarks ?? '',
+    goal: item.goal ?? null,
   }));
 
 /**
@@ -134,31 +138,37 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     }
   }, [isLoading, loadError, rows.length, isSubmitting, hasAttemptedAutoSubmit, posProfile, checklistType, logName, onComplete]);
 
-  const handleCheckedChange = (index: number, isChecked: boolean) => {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, is_checked: isChecked } : row)));
+  const handleStatusChange = (index: number, status: 'Passed' | 'Failed') => {
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, status } : row)));
   };
 
   const handleRemarksChange = (index: number, remarks: string) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, remarks } : row)));
   };
 
-  // Mirrors the backend's completion rule: every mandatory item must be
-  // checked before the checklist can be submitted as Complete.
-  const allMandatoryChecked = useMemo(
-    () => rows.every((row) => !row.is_mandatory || row.is_checked),
+  // Mirrors the backend's completion rule: every mandatory item must have an
+  // explicit result, and a FAIL must carry a remark explaining it.
+  const allMandatoryAnswered = useMemo(
+    () => rows.every((row) => !row.is_mandatory || row.status),
     [rows]
   );
+  const failuresExplained = useMemo(
+    () => rows.every((row) => row.status !== 'Failed' || row.remarks.trim().length > 0),
+    [rows]
+  );
+  const canSubmit = allMandatoryAnswered && failuresExplained;
 
   const handleSubmit = async () => {
-    if (!allMandatoryChecked) return;
+    if (!canSubmit) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
-      is_checked: row.is_checked,
+      status: row.status,
       remarks: row.remarks,
+      goal: row.goal,
     }));
 
     try {
@@ -196,27 +206,50 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
               {rows.map((row, index) => (
                 <div key={`${row.item_label}-${index}`}>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={row.is_checked}
-                      onChange={(e) => handleCheckedChange(index, e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">
-                      {row.item_label}
-                      {!!row.is_mandatory && <span className="text-red-600 ml-1">*</span>}
-                    </span>
-                  </label>
-                  {row.is_checked && (
+                  <span className="text-sm font-medium text-gray-900">
+                    {row.item_label}
+                    {!!row.is_mandatory && <span className="text-red-600 ml-1">*</span>}
+                  </span>
+                  <div className="flex items-center gap-4 mt-2">
+                    <label className="flex items-center gap-1.5 text-sm text-gray-900 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`checklist-result-${index}`}
+                        checked={row.status === 'Passed'}
+                        onChange={() => handleStatusChange(index, 'Passed')}
+                        className="h-4 w-4"
+                      />
+                      {t('checklist.pass')}
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-900 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`checklist-result-${index}`}
+                        checked={row.status === 'Failed'}
+                        onChange={() => handleStatusChange(index, 'Failed')}
+                        className="h-4 w-4"
+                      />
+                      {t('checklist.fail')}
+                    </label>
+                  </div>
+                  {row.status && (
                     <Input
                       type="text"
                       value={row.remarks}
                       onChange={(e) => handleRemarksChange(index, e.target.value)}
-                      placeholder={t('checklist.remarks_placeholder')}
+                      placeholder={
+                        row.status === 'Failed'
+                          ? t('checklist.fail_remarks_placeholder')
+                          : t('checklist.remarks_placeholder')
+                      }
                       size="sm"
-                      className="mt-2 ml-7 w-[calc(100%-1.75rem)]"
+                      className="mt-2 w-full"
                     />
+                  )}
+                  {row.status === 'Failed' && !row.remarks.trim() && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {t('checklist.fail_remarks_required')}
+                    </p>
                   )}
                 </div>
               ))}
@@ -228,10 +261,10 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
             <Button
               onClick={handleSubmit}
-              disabled={!allMandatoryChecked || isSubmitting}
+              disabled={!canSubmit || isSubmitting}
               className={cn(
                 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200',
-                (!allMandatoryChecked || isSubmitting) && 'opacity-50 cursor-not-allowed'
+                (!canSubmit || isSubmitting) && 'opacity-50 cursor-not-allowed'
               )}
             >
               {isSubmitting ? t('checklist.submitting') : t('checklist.submit')}

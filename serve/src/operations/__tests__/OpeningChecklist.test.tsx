@@ -76,7 +76,7 @@ describe('OpeningChecklist', () => {
     await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1))
   })
 
-  it('submits only after mandatory items are checked', async () => {
+  it('submits only after mandatory items have an explicit result', async () => {
     const onReady = vi.fn()
     fetchMock.mockResolvedValue({
       items: [
@@ -103,8 +103,7 @@ describe('OpeningChecklist', () => {
     })
     expect(submit).toBeDisabled()
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    await user.click(checkboxes[0])
+    await user.click(screen.getAllByRole('radio')[0]) // PASS
     expect(submit).not.toBeDisabled()
 
     await user.click(submit)
@@ -114,17 +113,49 @@ describe('OpeningChecklist', () => {
       [
         {
           item_label: 'Sanitize station',
-          is_checked: true,
+          status: 'Passed',
           remarks: '',
+          goal: null,
         },
         {
           item_label: 'Optional note',
-          is_checked: false,
+          status: undefined,
           remarks: '',
+          goal: null,
         },
       ],
       undefined
     )
+  })
+
+  it('blocks submit when FAIL has no remarks', async () => {
+    const onReady = vi.fn()
+    fetchMock.mockResolvedValue({
+      items: [{ item_label: 'Sanitize station', is_mandatory: 1 }],
+      logName: null,
+      logStatus: null,
+    })
+    submitMock.mockResolvedValue({ status: 'Complete', name: 'LOG-2' })
+
+    const user = userEvent.setup()
+    render(
+      <OpeningChecklist
+        user="captain@example.com"
+        posProfile="POS-MAIN"
+        branch="Main"
+        onReady={onReady}
+      />
+    )
+
+    const submit = await screen.findByRole('button', {
+      name: /Submit checklist/i,
+    })
+    await user.click(screen.getAllByRole('radio')[1]) // FAIL
+    expect(submit).toBeDisabled()
+    expect(
+      await screen.findByText(/Remarks are required for failed items/i)
+    ).toBeInTheDocument()
+    expect(submitMock).not.toHaveBeenCalled()
   })
 
   it('shows Retry after empty auto-submit failure and retries successfully', async () => {
