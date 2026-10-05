@@ -253,6 +253,9 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_item.validate",
         "on_update": "ury.ury.hooks.ury_item.on_update"
     },
+    "Purchase Receipt": {
+        "validate": "ury.ury.hooks.ury_purchase_receipt.validate_receiving_secondary_measure",
+    },
     "POS Opening Entry": {
         "validate":[
             "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
@@ -629,7 +632,28 @@ fixtures = [
                     "Stock Entry-branch",
                     "Stock Entry-custom_ury_posting_intent",
                     "POS Profile-cash_discount_account",
-                    "Sales Invoice-cash_discount_journal_entry"
+                    "Sales Invoice-cash_discount_journal_entry",
+                    # Receiving Secondary-Measure Variance (Phase 1) -- Count-vs-Weight
+                    # dual measurement at Purchase Receipt. See ury_workspaces track
+                    # yield-purchase-uom-bom-problem/PLAN.md.
+                    "Item-custom_rcv_section",
+                    "Item-custom_rcv_secondary_measure",
+                    "Item-custom_rcv_secondary_uom",
+                    "Item-custom_rcv_std_secondary_per_stock_unit",
+                    "Item-custom_rcv_tolerance_lower_pct",
+                    "Item-custom_rcv_tolerance_upper_pct",
+                    "Item-custom_rcv_pricing_basis",
+                    "Item-custom_rcv_avg_secondary_per_stock_unit",
+                    "Item-custom_rcv_avg_updated_on",
+                    "Purchase Receipt Item-custom_rcv_section",
+                    "Purchase Receipt Item-custom_rcv_item_secondary_measure",
+                    "Purchase Receipt Item-custom_rcv_secondary_qty",
+                    "Purchase Receipt Item-custom_rcv_std_secondary_snapshot",
+                    "Purchase Receipt Item-custom_rcv_expected_secondary_qty",
+                    "Purchase Receipt Item-custom_rcv_actual_secondary_per_stock_unit",
+                    "Purchase Receipt Item-custom_rcv_variance_pct",
+                    "Purchase Receipt Item-custom_rcv_off_spec",
+                    "Purchase Receipt Item-custom_rcv_variance_reason"
                 },
             ]
         ],
