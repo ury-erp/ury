@@ -1509,10 +1509,9 @@ def _checklist_period_date(branch):
     return date.today()
 
 
-def _goal_review_pending(goal, branch, period_date):
-    """A goal counts as completed only when the session user has a Quality
-    Review for it (same rule as ury.ury.hooks.check_list.checklist)."""
-    return not frappe.db.exists(
+def _existing_goal_review(goal, branch, period_date):
+    """The session user's live Quality Review for this goal/period, if any."""
+    name = frappe.db.exists(
         "Quality Review",
         {
             "goal": goal,
@@ -1522,33 +1521,78 @@ def _goal_review_pending(goal, branch, period_date):
             "owner": frappe.session.user,
         },
     )
+    return frappe.get_doc("Quality Review", name) if name else None
 
 
-def _create_goal_review(goal, branch, period_date, remarks=None):
+def _goal_objectives(goal):
+    return frappe.get_doc("Quality Goal", goal).objectives or []
+
+
+def _goal_review_pending(goal, branch, period_date):
+    """A goal counts as completed only when the session user has a Quality
+    Review whose objectives are all Passed (the grillax POS Opening/Closing
+    hooks only require the review itself to exist)."""
+    review = _existing_goal_review(goal, branch, period_date)
+    if not review:
+        return True
+    return any(row.status != "Passed" for row in review.reviews or [])
+
+
+def _review_row(objective, state):
+    return {
+        "objective": objective.objective,
+        "target": objective.target,
+        "uom": objective.uom,
+        "status": "Passed" if state.get("is_checked") else "Open",
+        "review": state.get("remarks") or "",
+    }
+
+
+def _create_goal_review(goal, branch, period_date, item_states):
     """Create the Quality Review that satisfies the grillax checklist
     validations (POS Opening/Closing hooks) for one Dependent Checklist goal.
-    Objectives are copied from the goal and marked Passed, mirroring what the
-    desk flow produces when a user completes a checklist manually."""
+    Each objective's status mirrors the checkbox the user actually ticked in
+    the POS checklist UI."""
     review = frappe.new_doc("Quality Review")
     review.goal = goal
     review.date = period_date
     review.branch = branch
     review.employee = frappe.session.user
+    remarks = next(
+        (state.get("remarks") for state in item_states.values() if state.get("remarks")),
+        None,
+    )
     if remarks:
         review.additional_information = remarks
 
-    for objective in frappe.get_doc("Quality Goal", goal).objectives or []:
-        review.append(
-            "reviews",
-            {
-                "objective": objective.objective,
-                "target": objective.target,
-                "uom": objective.uom,
-                "status": "Passed",
-            },
-        )
+    for objective in _goal_objectives(goal):
+        review.append("reviews", _review_row(objective, item_states.get(objective.objective, {})))
 
     review.insert()
+    return review.name
+
+
+def _update_goal_review(review, item_states):
+    """Fold a resubmitted checklist into the existing review: update statuses
+    for objectives already on it, append rows for objectives it doesn't have."""
+    seen = {row.objective for row in review.reviews or []}
+    for row in review.reviews or []:
+        state = item_states.get(row.objective)
+        if state is None:
+            continue
+        row.status = "Passed" if state.get("is_checked") else "Open"
+        if state.get("remarks"):
+            row.review = state["remarks"]
+
+    for objective in _goal_objectives(review.goal):
+        if objective.objective in seen:
+            continue
+        review.append(
+            "reviews",
+            _review_row(objective, item_states.get(objective.objective, {})),
+        )
+
+    review.save()
     return review.name
 
 
@@ -1563,14 +1607,38 @@ def get_checklist(pos_profile, checklist_type):
         parent_doctype="POS Profile",
     )
 
-    # Merge in the role-based Dependent Checklist (grillax port): goals that
-    # still lack a Quality Review from this user surface as mandatory items so
-    # the POS UI can collect them instead of the server-side validation
-    # hard-blocking opening/closing with no UI path.
+    # Merge in the role-based Dependent Checklist (grillax port): pending
+    # goals expand into their individual Quality Goal objectives so the UI
+    # lists checkable tasks instead of the goal's document name. The goal name
+    # rides along on each item for submit-time Quality Review creation.
     branch = getBranch()
     goals = _role_matched_dependent_goals(pos_profile, checklist_type)
     period_date = _checklist_period_date(branch) if goals else None
-    pending_goals = [g for g in goals if _goal_review_pending(g, branch, period_date)]
+    goal_items = []
+    pending_goals = []
+    for goal in goals:
+        review = _existing_goal_review(goal, branch, period_date)
+        passed = (
+            {row.objective for row in review.reviews if row.status == "Passed"}
+            if review
+            else set()
+        )
+        objectives = [o.objective for o in _goal_objectives(goal)]
+        if not objectives:
+            # Goal without configured objectives: the goal name is the item.
+            if not review:
+                pending_goals.append(goal)
+                goal_items.append(
+                    {"item_label": goal, "is_mandatory": 1, "applies_to": checklist_type, "goal": goal}
+                )
+            continue
+        remaining = [o for o in objectives if o not in passed]
+        if remaining:
+            pending_goals.append(goal)
+            goal_items += [
+                {"item_label": o, "is_mandatory": 1, "applies_to": checklist_type, "goal": goal}
+                for o in remaining
+            ]
 
     if not configured_items and not goals:
         return {
@@ -1590,11 +1658,7 @@ def get_checklist(pos_profile, checklist_type):
         limit=1,
     )
 
-    items = list(configured_items)
-    items += [
-        {"item_label": goal, "is_mandatory": 1, "applies_to": checklist_type}
-        for goal in pending_goals
-    ]
+    items = list(configured_items) + goal_items
 
     log_name = None
     log_status = None
@@ -1638,21 +1702,36 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
 
     # Persist role-based checklist completions as Quality Reviews (grillax
     # model) so the POS Opening/Closing validations and the desk flows all
-    # see the same completion state. Goals whose checkbox wasn't ticked stay
-    # pending and keep the overall status below "In Progress".
+    # see the same completion state. Items carry the goal they belong to
+    # (falling back to matching the objective text against the role-matched
+    # goals); each objective's review row mirrors the user's checkbox, and a
+    # resubmission updates the existing review instead of duplicating it.
     branch = getBranch()
     period_date = _checklist_period_date(branch) if goals else None
-    checked_labels = {
-        item.get("item_label")
-        for item in items
-        if item.get("is_checked") and item.get("item_label")
-    }
+    objective_goal = {}
     for goal in goals:
-        if goal in checked_labels and _goal_review_pending(goal, branch, period_date):
-            remarks = next(
-                (i.get("remarks") for i in items if i.get("item_label") == goal), None
-            )
-            _create_goal_review(goal, branch, period_date, remarks)
+        for objective in _goal_objectives(goal):
+            objective_goal[objective.objective] = goal
+
+    items_by_goal = {}
+    for item in items:
+        label = item.get("item_label")
+        if not label:
+            continue
+        goal = (
+            item.get("goal")
+            if item.get("goal") in goals
+            else objective_goal.get(label)
+        )
+        if goal:
+            items_by_goal.setdefault(goal, {})[label] = item
+
+    for goal, item_states in items_by_goal.items():
+        review = _existing_goal_review(goal, branch, period_date)
+        if review:
+            _update_goal_review(review, item_states)
+        else:
+            _create_goal_review(goal, branch, period_date, item_states)
 
     existing_log = frappe.get_all(
         "URY POS Checklist Log",

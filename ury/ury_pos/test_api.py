@@ -756,56 +756,128 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
 
 class TestDependentChecklistBridge(FrappeTestCase):
     """Role-based Dependent Checklist (grillax port) surfaced through the
-    legacy get_checklist/submit_checklist contract used by all POS frontends."""
+    legacy get_checklist/submit_checklist contract used by all POS frontends.
+    Goals expand into their Quality Goal objectives; submissions create (or
+    update) the user's Quality Review with per-objective statuses."""
 
-    def _dependent_rows(self, goal="Opening Checklist Goal", option="POS Opening Entry", role="Cashier"):
-        return [frappe._dict({"quality_checklist": goal, "select_2": option, "role": role})]
+    GOAL = "Opening Checklist Goal"
 
+    def _dependent_rows(self, goal=None, option="POS Opening Entry", role="Cashier"):
+        return [frappe._dict({
+            "quality_checklist": goal or self.GOAL,
+            "select_2": option,
+            "role": role,
+        })]
+
+    def _goal_doc(self, goal=None, objectives=("Objective 1", "Objective 2")):
+        doc = MagicMock()
+        doc.objectives = [
+            frappe._dict({"objective": o, "target": None, "uom": None})
+            for o in objectives
+        ]
+        return doc
+
+    def _review_doc(self, rows):
+        doc = MagicMock()
+        doc.reviews = [frappe._dict({"objective": o, "status": s}) for o, s in rows]
+        return doc
+
+    def _get_doc_side_effect(self, goal_objectives=None, review_rows=None):
+        goal_objectives = goal_objectives or {}
+        def side_effect(doctype, name=None):
+            if doctype == "Quality Review":
+                return self._review_doc(review_rows or [])
+            return self._goal_doc(
+                objectives=goal_objectives.get(name, ("Objective 1", "Objective 2"))
+            )
+        return side_effect
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
     @patch("ury.ury_pos.api.frappe.db.exists")
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_get_checklist_surfaces_pending_goal_as_mandatory_item(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    def test_get_checklist_surfaces_objectives_as_items(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """A role-matched Dependent Checklist goal with no Quality Review yet
-        shows up as a mandatory item and the gate stays open."""
+        """A role-matched goal with no Quality Review yet expands into one
+        mandatory item per Quality Goal objective (not the goal doc name),
+        each carrying the goal for submit-time review creation."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
         mock_db_exists.return_value = None  # no Quality Review yet
+        mock_get_doc.side_effect = self._get_doc_side_effect()
         # Call order: URY Checklist Item, Dependent Checklist,
         # POS Opening Entry (period date), URY POS Checklist Log
         mock_get_all.side_effect = [[], self._dependent_rows(), [], []]
 
         result = get_checklist("POS-Profile-001", "Opening")
 
-        self.assertEqual(len(result["items"]), 1)
-        self.assertEqual(result["items"][0]["item_label"], "Opening Checklist Goal")
-        self.assertEqual(result["items"][0]["is_mandatory"], 1)
+        self.assertEqual(
+            [item["item_label"] for item in result["items"]],
+            ["Objective 1", "Objective 2"],
+        )
+        for item in result["items"]:
+            self.assertEqual(item["is_mandatory"], 1)
+            self.assertEqual(item["goal"], self.GOAL)
         self.assertNotEqual(result["log_status"], "Complete")
 
+    @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
     @patch("ury.ury_pos.api.frappe.db.exists")
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_get_checklist_complete_when_review_exists(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    def test_get_checklist_only_resurfaces_unpassed_objectives(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """When the user already has a Quality Review for the goal, the gate
-        reports Complete and no item is surfaced."""
+        """Objectives already marked Passed on the user's review no longer
+        show; the still-Open one keeps the gate open."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        mock_db_exists.return_value = "QR-0001"  # review exists
+        mock_db_exists.return_value = "QR-0001"
+        mock_get_doc.side_effect = self._get_doc_side_effect(
+            review_rows=[("Objective 1", "Passed"), ("Objective 2", "Open")]
+        )
+        mock_get_all.side_effect = [[], self._dependent_rows(), [frappe._dict({"posting_date": date.today()})], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(
+            [item["item_label"] for item in result["items"]], ["Objective 2"]
+        )
+        self.assertNotEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_get_checklist_complete_when_all_objectives_passed(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
+    ):
+        """When every objective on the user's review is Passed, nothing
+        surfaces and the gate reports Complete."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = "QR-0001"
+        mock_get_doc.side_effect = self._get_doc_side_effect(
+            review_rows=[("Objective 1", "Passed"), ("Objective 2", "Passed")]
+        )
         mock_get_all.side_effect = [[], self._dependent_rows(), [frappe._dict({"posting_date": date.today()})], []]
 
         result = get_checklist("POS-Profile-001", "Opening")
@@ -828,7 +900,7 @@ class TestDependentChecklistBridge(FrappeTestCase):
         mock_session.user = "waiter@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Waiter", "All"]
-        mock_get_all.side_effect = [[], self._dependent_rows(role="Cashier"), [], []]
+        mock_get_all.side_effect = [[], self._dependent_rows(role="Cashier"), []]
 
         result = get_checklist("POS-Profile-001", "Opening")
 
@@ -847,13 +919,15 @@ class TestDependentChecklistBridge(FrappeTestCase):
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists,
         mock_get_roles, mock_new_doc, mock_get_doc
     ):
-        """Submitting a checked goal item creates a Quality Review (grillax
-        model) and reports Complete once no goal is pending."""
+        """Submitting checked objective items creates a Quality Review whose
+        review rows mirror the user's checkboxes."""
+        from ury.ury_pos.api import submit_checklist
+
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        # First exists() call (pending check before create) -> None; the
-        # post-create goals_pending re-check -> truthy.
+        # exists() during submit -> no review yet; final goals_pending
+        # re-check -> the just-created review.
         mock_db_exists.side_effect = [None, "QR-0001"]
         mock_get_all.side_effect = [
             [],  # URY Checklist Item
@@ -863,20 +937,27 @@ class TestDependentChecklistBridge(FrappeTestCase):
         ]
 
         review_doc = MagicMock()
+        review_doc.reviews = []
         mock_new_doc.return_value = review_doc
-        goal_doc = MagicMock()
-        goal_doc.objectives = []
-        mock_get_doc.return_value = goal_doc
+        mock_get_doc.side_effect = self._get_doc_side_effect(
+            review_rows=[("Objective 1", "Passed"), ("Objective 2", "Passed")]
+        )
 
         items = json.dumps([
-            {"item_label": "Opening Checklist Goal", "is_checked": True, "remarks": "All good"},
+            {"item_label": "Objective 1", "goal": self.GOAL, "is_checked": True, "remarks": "Done"},
+            {"item_label": "Objective 2", "goal": self.GOAL, "is_checked": True, "remarks": ""},
         ])
         result = submit_checklist("POS-Profile-001", "Opening", items)
 
         mock_new_doc.assert_called_once_with("Quality Review")
-        self.assertEqual(review_doc.goal, "Opening Checklist Goal")
+        self.assertEqual(review_doc.goal, self.GOAL)
         self.assertEqual(review_doc.branch, "Branch A")
         self.assertEqual(review_doc.employee, "cashier@example.com")
+        rows = [call.args[1] for call in review_doc.append.call_args_list if call.args[0] == "reviews"]
+        self.assertEqual(
+            [(row["objective"], row["status"]) for row in rows],
+            [("Objective 1", "Passed"), ("Objective 2", "Passed")],
+        )
         review_doc.insert.assert_called_once()
         self.assertEqual(result["status"], "Complete")
 
@@ -888,16 +969,19 @@ class TestDependentChecklistBridge(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_submit_checklist_unchecked_goal_stays_pending(
+    def test_submit_checklist_updates_existing_review(
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists,
         mock_get_roles, mock_new_doc, mock_get_doc
     ):
-        """An unchecked goal must not produce a Quality Review and keeps the
-        overall status In Progress."""
+        """A resubmission must update the existing Quality Review (statuses
+        folded into existing rows, missing objectives appended) instead of
+        creating a duplicate."""
+        from ury.ury_pos.api import submit_checklist
+
         mock_session.user = "cashier@example.com"
         mock_get_branch.return_value = "Branch A"
         mock_get_roles.return_value = ["Cashier", "All"]
-        mock_db_exists.return_value = None  # still pending on re-check
+        mock_db_exists.side_effect = ["QR-0001", "QR-0001"]
         mock_get_all.side_effect = [
             [],  # URY Checklist Item
             self._dependent_rows(),  # Dependent Checklist
@@ -905,14 +989,76 @@ class TestDependentChecklistBridge(FrappeTestCase):
             [],  # URY POS Checklist Log
         ]
 
+        existing = self._review_doc([("Objective 1", "Open"), ("Objective 2", "Passed")])
+        existing.append = MagicMock()
+        mock_get_doc.side_effect = lambda doctype, name=None: (
+            existing if doctype == "Quality Review" else self._goal_doc()
+        )
+
+        # Resubmit only ONE objective -- objectives already on the review that
+        # aren't in this payload must be left alone, not re-appended.
         items = json.dumps([
-            {"item_label": "Opening Checklist Goal", "is_checked": False, "remarks": ""},
+            {"item_label": "Objective 1", "goal": self.GOAL, "is_checked": True, "remarks": "Fixed"},
         ])
         result = submit_checklist("POS-Profile-001", "Opening", items)
 
         mock_new_doc.assert_not_called()
+        existing.append.assert_not_called()
+        self.assertEqual(
+            [(row.objective, row.status) for row in existing.reviews],
+            [("Objective 1", "Passed"), ("Objective 2", "Passed")],
+        )
+        existing.save.assert_called_once()
+        self.assertEqual(result["status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_unchecked_objective_stays_pending(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists,
+        mock_get_roles, mock_new_doc, mock_get_doc
+    ):
+        """An unchecked objective is written as Open on the review and keeps
+        the overall status In Progress."""
+        from ury.ury_pos.api import submit_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.side_effect = [None, "QR-0001"]
+        mock_get_all.side_effect = [
+            [],  # URY Checklist Item
+            self._dependent_rows(),  # Dependent Checklist
+            [],  # POS Opening Entry
+            [],  # URY POS Checklist Log
+        ]
+
+        review_doc = MagicMock()
+        review_doc.reviews = []
+        mock_new_doc.return_value = review_doc
+        mock_get_doc.side_effect = self._get_doc_side_effect(
+            review_rows=[("Objective 1", "Passed"), ("Objective 2", "Open")]
+        )
+
+        items = json.dumps([
+            {"item_label": "Objective 1", "goal": self.GOAL, "is_checked": True, "remarks": ""},
+            {"item_label": "Objective 2", "goal": self.GOAL, "is_checked": False, "remarks": ""},
+        ])
+        result = submit_checklist("POS-Profile-001", "Opening", items)
+
+        rows = [call.args[1] for call in review_doc.append.call_args_list if call.args[0] == "reviews"]
+        self.assertEqual(
+            [(row["objective"], row["status"]) for row in rows],
+            [("Objective 1", "Passed"), ("Objective 2", "Open")],
+        )
         self.assertEqual(result["status"], "In Progress")
 
+    @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
     @patch("ury.ury_pos.api.frappe.db.exists")
     @patch("ury.ury_pos.api.frappe.get_all")
@@ -920,11 +1066,11 @@ class TestDependentChecklistBridge(FrappeTestCase):
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
     def test_dependent_option_maps_to_checklist_type(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
         """'POS Opening Entry' and 'Order Taking' rows surface for the Opening
         checklist; 'POS Closing Entry' and 'RM Checklist' rows surface for the
-        Closing checklist — nothing leaks across types."""
+        Closing checklist -- as objective items, nothing leaks across types."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
@@ -941,16 +1087,22 @@ class TestDependentChecklistBridge(FrappeTestCase):
             [], rows, [], [],  # Closing fetch
         ]
 
+        def get_doc_side_effect(doctype, name=None):
+            doc = MagicMock()
+            doc.objectives = [frappe._dict({"objective": f"{name} Objective", "target": None, "uom": None})]
+            return doc
+        mock_get_doc.side_effect = get_doc_side_effect
+
         opening = get_checklist("POS-Profile-001", "Opening")
         self.assertEqual(
-            [item["item_label"] for item in opening["items"]], ["Order Taker Goal"]
+            [item["item_label"] for item in opening["items"]], ["Order Taker Goal Objective"]
         )
         self.assertNotEqual(opening["log_status"], "Complete")
 
         closing = get_checklist("POS-Profile-001", "Closing")
         self.assertEqual(
             sorted(item["item_label"] for item in closing["items"]),
-            ["Closing Goal", "RM Goal"],
+            ["Closing Goal Objective", "RM Goal Objective"],
         )
 
     @patch("ury.ury_pos.api.frappe.get_roles")
@@ -972,7 +1124,7 @@ class TestDependentChecklistBridge(FrappeTestCase):
         rows = [
             frappe._dict({"quality_checklist": "Order Taker Goal", "select_2": "Order Taking", "role": "Cashier"}),
         ]
-        mock_get_all.side_effect = [[], rows, [], []]
+        mock_get_all.side_effect = [[], rows, []]
 
         result = get_checklist("POS-Profile-001", "Opening")
 
