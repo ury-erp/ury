@@ -350,6 +350,9 @@
     "fail_remarks_required": "Des remarques sont requises pour les éléments en échec.",
     "incomplete_error": "Chaque élément doit être marqué PASS ou FAIL avant de terminer la checklist.",
     "blocked_heading": "{{checklist}} requis",
-    "blocked_message": "{{role}} n'a pas encore terminé {{checklist}}. Veuillez demander à {{role}} de la terminer avant de continuer."
+    "blocked_message": "{{role}} n'a pas encore terminé {{checklist}}. Veuillez demander à {{role}} de la terminer avant de continuer.",
+    "failed_notice": "Checklist enregistrée avec des éléments en échec. Résolvez-les avant de laisser le rôle suivant continuer.",
+    "blocked_failed_heading": "{{checklist}} échouée",
+    "blocked_failed_message": "{{checklist}} contient des éléments en échec. {{role}} doit les résoudre avant que vous puissiez continuer."
   }
 }

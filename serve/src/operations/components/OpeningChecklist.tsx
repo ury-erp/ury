@@ -68,6 +68,7 @@ export function OpeningChecklist({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitNotice, setSubmitNotice] = useState<string | null>(null)
   const [hasAttemptedAutoSubmit, setHasAttemptedAutoSubmit] = useState(false)
   const [gateSatisfied, setGateSatisfied] = useState(false)
 
@@ -234,6 +235,7 @@ export function OpeningChecklist({
     const generation = requestGenRef.current
     setSubmitting(true)
     setSubmitError(null)
+    setSubmitNotice(null)
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
       status: row.status ?? undefined,
@@ -249,6 +251,12 @@ export function OpeningChecklist({
       if (!isLive(generation)) return
       if (response.status === 'Complete') {
         fireReady(generation)
+      } else if (response.status === 'Failed') {
+        // Valid submission with failed items: recorded as failed; the gate
+        // stays open for resolve-and-resubmit. NOT an "incomplete" state.
+        setSubmitNotice(
+          'Checklist submitted with failed items. Resolve them before the next role can continue.'
+        )
       } else {
         setSubmitError('Complete all mandatory items before continuing.')
       }
@@ -320,11 +328,15 @@ export function OpeningChecklist({
 
           {!loading && !loadError && blockedBy && (
             <Alert variant="warning">
-              <p className="font-medium">Opening checklist required</p>
+              <p className="font-medium">
+                {blockedBy.state === 'failed'
+                  ? 'Opening checklist failed'
+                  : 'Opening checklist required'}
+              </p>
               <p className="text-sm">
-                {blockedBy.role_label} has not completed the Opening Checklist
-                yet. Please ask the {blockedBy.role_label} to complete it before
-                continuing.
+                {blockedBy.state === 'failed'
+                  ? `The Opening Checklist has failed items. The ${blockedBy.role_label} must resolve them before you can continue.`
+                  : `${blockedBy.role_label} has not completed the Opening Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
               </p>
             </Alert>
           )}
@@ -406,6 +418,12 @@ export function OpeningChecklist({
                 )}
               </div>
             ))}
+
+          {submitNotice && (
+            <Alert variant="warning">
+              <p className="text-sm">{submitNotice}</p>
+            </Alert>
+          )}
 
           {submitError && (
             <Alert variant="danger">
