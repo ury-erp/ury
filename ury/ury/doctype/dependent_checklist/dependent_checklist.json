@@ -24,7 +24,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Option",
-   "options": "POS Opening Entry\nPOS Closing Entry\nOrder Taking\nRM Checklist"
+   "options": "POS Opening Entry\nPOS Closing Entry\nOrder Taking\nRM Checklist\nRM Opening Checklist\nRM Closing Checklist\nOrder Taker Opening Checklist\nOrder Taker Closing Checklist"
   },
   {
    "fieldname": "role",

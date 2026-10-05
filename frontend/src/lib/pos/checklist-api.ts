@@ -15,6 +15,7 @@ export interface ChecklistResponse {
     items: ChecklistItem[];
     logName: string | null;
     logStatus: string | null;
+    blockedBy?: ChecklistBlocker | null;
   };
 }
 
@@ -35,6 +36,12 @@ export interface SubmitChecklistResponse {
   };
 }
 
+export interface ChecklistBlocker {
+  role: string;
+  role_label: string;
+  goals: string[];
+}
+
 export const getChecklist = async (
   posProfile: string,
   checklistType: 'Opening' | 'Closing'
@@ -42,6 +49,7 @@ export const getChecklist = async (
   items: ChecklistItem[];
   logName: string | null;
   logStatus: string | null;
+  blockedBy: ChecklistBlocker | null;
 }> => {
   try {
     const response = await call.get<{
@@ -49,6 +57,7 @@ export const getChecklist = async (
         items: ChecklistItem[];
         log_name: string | null;
         log_status: string | null;
+        blocked_by?: ChecklistBlocker | null;
       };
     }>(
       'ury.ury_pos.api.get_checklist',
@@ -63,6 +72,7 @@ export const getChecklist = async (
       items: response.message.items,
       logName: response.message.log_name,
       logStatus: response.message.log_status,
+      blockedBy: response.message.blocked_by ?? null,
     };
   } catch (error) {
     console.error('Error fetching checklist:', error);

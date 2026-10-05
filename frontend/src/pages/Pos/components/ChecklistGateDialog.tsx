@@ -15,6 +15,7 @@ import { t } from '../i18n';
 import {
   getChecklist,
   submitChecklist,
+  type ChecklistBlocker,
   type ChecklistItem,
   type SubmitChecklistItem,
 } from '../../../lib/pos/checklist-api';
@@ -83,6 +84,7 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
 const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: ChecklistGateDialogProps) => {
   const [rows, setRows] = useState<ChecklistRowState[]>([]);
   const [logName, setLogName] = useState<string | null>(null);
+  const [blockedBy, setBlockedBy] = useState<ChecklistBlocker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,13 +95,17 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   const loadChecklist = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
+    setBlockedBy(null);
 
     try {
-      // getChecklist's declared camelCase fields (logName/logStatus) don't
-      // actually match what the backend returns (log_name/log_status), so
-      // fetchedLogName was always undefined here. Read both casings
-      // defensively until the shared api layer is fixed.
       const checklistResult: any = await getChecklist(posProfile, checklistType);
+      if (checklistResult.blockedBy) {
+        // A predecessor role has not finished this phase's checklist; the
+        // gate stays closed with a specific message instead of the form.
+        setBlockedBy(checklistResult.blockedBy);
+        setRows([]);
+        return;
+      }
       const fetchedLogName = checklistResult.logName ?? checklistResult.log_name ?? null;
       setRows(toRowState(checklistResult.items));
       setLogName(fetchedLogName);
@@ -122,7 +128,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   // a gate with a Submit button but no items to interact with.
   useEffect(() => {
     // Only auto-submit once when: finished loading, no load error, no items, and not already submitting
-    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting) {
+    if (!isLoading && !loadError && !blockedBy && rows.length === 0 && !isSubmitting) {
       const autoSubmit = async () => {
         setIsSubmitting(true);
         setSubmitError(null);
@@ -144,7 +150,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
       autoSubmit();
     }
-  }, [isLoading, loadError, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
+  }, [isLoading, loadError, blockedBy, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
 
   const handleStatusChange = (index: number, status: 'Passed' | 'Failed') => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, status } : row)));
@@ -213,6 +219,18 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           </div>
         ) : loadError ? (
           <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
+        ) : blockedBy ? (
+          <div className="py-10 text-center">
+            <p className="text-lg font-semibold text-foreground mb-2">
+              {t('checklist.blocked_heading', { checklist: t(titleKey) })}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t('checklist.blocked_message', {
+                role: blockedBy.role_label,
+                checklist: t(titleKey),
+              })}
+            </p>
+          </div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">

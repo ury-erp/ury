@@ -1460,39 +1460,129 @@ def _validate_checklist_branch(pos_profile):
 
 
 # Dependent Checklist Option -> the checklist-type gates that collect it.
-# "Order Taking" and "RM Checklist" have no dedicated frontend checklist type
-# of their own: they ride along with the Opening gate (captain route entry)
-# and the Closing gate (manager shift close) so that every configured row has
-# a UI path through the same ChecklistGateDialog card flow instead of being
-# silently dropped (the desk APIs that used to own them are gone/unwired).
+# Opening runs RM -> Cashier -> Order Taker; Closing runs the reverse. The
+# phase-explicit options let each role have distinct opening and closing
+# goals; the legacy names keep their original phase binding so existing
+# configurations do not break.
 OPTIONS_BY_CHECKLIST_TYPE = {
-    "Opening": ["POS Opening Entry", "Order Taking"],
-    "Closing": ["POS Closing Entry", "RM Checklist"],
+    "Opening": [
+        "POS Opening Entry",
+        "Order Taking",  # legacy: binds order-taker goals to the opening gate
+        "RM Opening Checklist",
+        "Order Taker Opening Checklist",
+    ],
+    "Closing": [
+        "POS Closing Entry",
+        "RM Checklist",  # legacy: binds RM goals to the closing gate
+        "RM Closing Checklist",
+        "Order Taker Closing Checklist",
+    ],
 }
 
+# Canonical role order for the checklist sequence. Names are matched by
+# substring (case-insensitive) so custom role names ("Restaurant Manager",
+# "URY Manager", ...) classify without hardcoding exact names.
+_ROLE_RANK_TOKENS = (
+    ("manager", 0),
+    ("cashier", 1),
+    ("captain", 2),
+    ("order", 2),
+    ("waiter", 2),
+)
 
-def _role_matched_dependent_goals(pos_profile, checklist_type):
-    """Quality Goals from the POS Profile's Dependent Checklist (grillax port)
-    whose Option belongs to this checklist type and whose Role is assigned to
-    the session user."""
-    mapped_options = OPTIONS_BY_CHECKLIST_TYPE.get(checklist_type)
+ROLE_RANK_LABELS = {0: "Restaurant Manager", 1: "Cashier", 2: "Order Taker"}
+
+# The shift open/close event (POS Opening/Closing Entry creation) sits at the
+# Cashier step of each sequence: opening requires earlier ranks (RM), closing
+# requires earlier-in-closing ranks (Order Taker).
+POS_EVENT_ROLE_RANK = 1
+
+
+def _role_rank(role):
+    name = (role or "").lower()
+    for token, rank in _ROLE_RANK_TOKENS:
+        if token in name:
+            return rank
+    return None
+
+
+def _role_label(role):
+    rank = _role_rank(role)
+    return ROLE_RANK_LABELS.get(rank, role)
+
+
+def _phase_dependent_rows(pos_profile, checklist_type):
+    """Dependent Checklist rows of this POS Profile that belong to the given
+    checklist phase (opening or closing)."""
+    mapped_options = OPTIONS_BY_CHECKLIST_TYPE.get(checklist_type) or []
     if not mapped_options:
         return []
-
     rows = frappe.get_all(
         "Dependent Checklist",
         fields=["quality_checklist", "select_2", "role"],
         filters={"parent": pos_profile, "parenttype": "POS Profile"},
     )
-    if not rows:
-        return []
+    return [row for row in rows if row.select_2 in mapped_options]
 
-    user_roles = set(frappe.get_roles())
-    return [
-        row.quality_checklist
-        for row in rows
-        if row.select_2 in mapped_options and row.role in user_roles
-    ]
+
+def _goal_review_passed(goal, branch, period_date):
+    """True when any user's review for this goal/branch/day is fully Passed.
+    ERPNext derives the review's doc status from its rows, so status
+    "Passed" is exactly the all-rows-Passed condition. A recorded failure
+    never unlocks the next role."""
+    return bool(
+        frappe.db.exists(
+            "Quality Review",
+            {"goal": goal, "branch": branch, "date": period_date, "status": "Passed"},
+        )
+    )
+
+
+def _checklist_blocker(rows, checklist_type, branch, period_date, user_roles):
+    """Earliest role in the phase sequence whose goals are not all Passed.
+
+    Opening runs ascending rank (RM -> Cashier -> Order Taker); Closing runs
+    descending (Order Taker -> Cashier -> RM). A user acts at their lowest
+    configured rank and is blocked by the roles that must finish before that
+    step. Returns {"role", "role_label", "goals"} or None.
+    """
+    if not rows:
+        return None
+    ranked = {}
+    for row in rows:
+        rank = _role_rank(row.role)
+        if rank is None:
+            continue
+        ranked.setdefault(rank, {}).setdefault(row.role, [])
+        if row.quality_checklist not in ranked[rank][row.role]:
+            ranked[rank][row.role].append(row.quality_checklist)
+
+    position = _user_position_rank(rows, user_roles)
+    if position is None:
+        return None
+    if checklist_type == "Opening":
+        # RM first: lower ranks must finish before the user's step.
+        predecessors = sorted(rank for rank in ranked if rank < position)
+    else:
+        # Closing runs in reverse (Order Taker first): higher ranks must
+        # finish before the user's step.
+        predecessors = sorted(
+            (rank for rank in ranked if rank > position), reverse=True
+        )
+
+    for rank in predecessors:
+        for role, goals in ranked[rank].items():
+            incomplete = [
+                goal for goal in goals if not _goal_review_passed(goal, branch, period_date)
+            ]
+            if incomplete:
+                return {
+                    "role": role,
+                    "role_label": _role_label(role),
+                    "rank": rank,
+                    "goals": incomplete,
+                }
+    return None
 
 
 def _checklist_period_date(branch):
@@ -1531,15 +1621,63 @@ def _goal_objectives(goal):
     return frappe.get_doc("Quality Goal", goal).objectives or []
 
 
+def _user_position_rank(rows, user_roles):
+    """The user's step in the phase sequence: their lowest rank among the
+    roles actually configured on this POS Profile. None when the user has no
+    ranked role here."""
+    configured_ranks = {
+        _role_rank(row.role) for row in rows if row.role in set(user_roles)
+    }
+    configured_ranks.discard(None)
+    return min(configured_ranks) if configured_ranks else None
+
+
+def _own_position_goals(rows, user_roles):
+    """Goals the user must complete themselves: rows whose role is one of
+    theirs at their sequence position."""
+    if not rows:
+        return []
+    position = _user_position_rank(rows, user_roles)
+    if position is None:
+        return []
+    return [
+        row.quality_checklist
+        for row in rows
+        if row.role in set(user_roles) and _role_rank(row.role) == position
+    ]
+
+
+def _throw_blocked(blocked_by, checklist_type):
+    phase = _("Opening") if checklist_type == "Opening" else _("Closing")
+    frappe.throw(
+        _(
+            "{0} {1} Checklist is not completed yet. Please ask the {2} to complete it before continuing."
+        ).format(blocked_by["role_label"], phase, blocked_by["role_label"]),
+        frappe.PermissionError,
+    )
+
+
+def _goal_review_passed_since(goal, branch, since):
+    """True when a fully-Passed review exists created at/after `since`
+    (the closing flow anchors on the shift's period start)."""
+    for name in frappe.get_all(
+        "Quality Review",
+        filters={"goal": goal, "branch": branch, "creation": [">=", since]},
+        pluck="name",
+    ):
+        if frappe.get_doc("Quality Review", name).status == "Passed":
+            return True
+    return False
+
+
 def _goal_review_pending(goal, branch, period_date):
-    """A goal is done once the session user's review exists and every
-    objective has an explicit result -- Passed or Failed both count (a
-    recorded failure is a final answer, not an incomplete one). Rows still
-    Open (or written before this flow existed) keep the goal pending."""
+    """A goal is done for THIS user only when their review exists and every
+    objective is Passed -- a recorded failure stays pending so the user must
+    resolve and re-submit it."""
     review = _existing_goal_review(goal, branch, period_date)
     if not review:
         return True
-    return any(row.status not in ("Passed", "Failed") for row in review.reviews or [])
+    return any(row.status != "Passed" for row in review.reviews or [])
 
 
 def _item_status(state):
@@ -1630,15 +1768,27 @@ def get_checklist(pos_profile, checklist_type):
         parent_doctype="POS Profile",
     )
 
-    # Merge in the role-based Dependent Checklist (grillax port): pending
-    # goals expand into their individual Quality Goal objectives so the UI
-    # lists checkable tasks instead of the goal's document name. The goal name
-    # rides along on each item for submit-time Quality Review creation, and
-    # each item carries its previously saved result so reopening the gate
-    # restores the user's last PASS/FAIL selection.
+    # Role-based sequence (grillax port): Opening runs RM -> Cashier ->
+    # Order Taker, Closing the reverse. The gate stays closed -- with a
+    # specific blocker message -- until every role before the user's step has
+    # a fully-Passed checklist for this branch/business day.
     branch = getBranch()
-    goals = _role_matched_dependent_goals(pos_profile, checklist_type)
-    period_date = _checklist_period_date(branch) if goals else None
+    rows = _phase_dependent_rows(pos_profile, checklist_type)
+    user_roles = frappe.get_roles()
+    period_date = _checklist_period_date(branch) if rows else None
+    blocked_by = (
+        _checklist_blocker(rows, checklist_type, branch, period_date, user_roles)
+        if rows
+        else None
+    )
+    if blocked_by:
+        return {
+            "items": [],
+            "log_name": None,
+            "log_status": None,
+            "blocked_by": blocked_by,
+        }
+    goals = _own_position_goals(rows, user_roles)
     goal_items = []
     pending_goals = []
     for goal in goals:
@@ -1662,25 +1812,12 @@ def get_checklist(pos_profile, checklist_type):
                     }
                 )
             continue
-        # An objective is answered once its review row is Passed or Failed.
-        # While ANY objective is still unanswered (no row / Open), the
-        # unanswered ones resurface for completion and the answered Failed
-        # ones resurface alongside them -- prefilled -- so the failure stays
-        # visible and correctable. Once EVERY objective is answered, nothing
-        # resurfaces: a recorded failure is final and must not reopen the
-        # gate on every status re-check (which looped the UI after submit).
-        unanswered = {
-            o
-            for o in objectives
-            if states.get(o) is None or states[o].status not in ("Passed", "Failed")
-        }
-        if not unanswered:
-            continue
+        # An objective is answered once its review row is Passed. Unanswered
+        # and Failed rows keep the goal pending (a failure must be resolved
+        # and re-submitted), so both resurface prefilled with their last
+        # result -- a fully-Passed goal stays hidden and completes the gate.
         remaining = [
-            o
-            for o in objectives
-            if o in unanswered
-            or (states.get(o) is not None and states[o].status == "Failed")
+            o for o in objectives if states.get(o) is None or states[o].status != "Passed"
         ]
         if remaining:
             pending_goals.append(goal)
@@ -1700,11 +1837,14 @@ def get_checklist(pos_profile, checklist_type):
                 for o in remaining
             ]
 
-    if not configured_items and not goals:
+    # Nothing to collect (no legacy items and no pending goals for this
+    # user's role) -> the gate is complete for them.
+    if not configured_items and not goal_items:
         return {
             "items": [],
             "log_name": None,
             "log_status": "Complete",
+            "blocked_by": None,
         }
 
     existing_log = frappe.get_all(
@@ -1756,6 +1896,7 @@ def get_checklist(pos_profile, checklist_type):
         "items": items,
         "log_name": log_name,
         "log_status": log_status,
+        "blocked_by": None,
     }
 
 
@@ -1769,7 +1910,22 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
         parent_doctype="POS Profile",
     )
-    goals = _role_matched_dependent_goals(pos_profile, checklist_type)
+
+    # Same role-sequence gate as get_checklist, enforced server-side so the
+    # order cannot be bypassed by calling the API directly.
+    branch = getBranch()
+    rows = _phase_dependent_rows(pos_profile, checklist_type)
+    user_roles = frappe.get_roles()
+    period_date = _checklist_period_date(branch) if rows else None
+    blocked_by = (
+        _checklist_blocker(rows, checklist_type, branch, period_date, user_roles)
+        if rows
+        else None
+    )
+    if blocked_by:
+        _throw_blocked(blocked_by, checklist_type)
+
+    goals = _own_position_goals(rows, user_roles)
 
     if not configured_items and not goals:
         return {
@@ -1789,10 +1945,8 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
     # model) so the POS Opening/Closing validations and the desk flows all
     # see the same completion state. Items carry the goal they belong to
     # (falling back to matching the objective text against the role-matched
-    # goals); each objective's review row mirrors the user's checkbox, and a
+    # goals); each objective's review row mirrors the user's result, and a
     # resubmission updates the existing review instead of duplicating it.
-    branch = getBranch()
-    period_date = _checklist_period_date(branch) if goals else None
     objective_goal = {}
     for goal in goals:
         for objective in _goal_objectives(goal):

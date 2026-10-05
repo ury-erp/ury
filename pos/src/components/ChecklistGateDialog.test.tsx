@@ -299,6 +299,29 @@ describe('ChecklistGateDialog', () => {
     expect(submitButton.closest('button')?.hasAttribute('disabled')).toBe(false);
   });
 
+
+  it('shows the blocking role message when a predecessor checklist is unfinished', async () => {
+    mockGetChecklist.mockResolvedValueOnce({
+      items: [],
+      logName: null,
+      logStatus: null,
+      blockedBy: { role: 'Restaurant Manager', role_label: 'Restaurant Manager', goals: ['RM Opening Checklist'] },
+    });
+    render(
+      <ChecklistGateDialog
+        posProfile="POS-001"
+        checklistType="Opening"
+        onComplete={vi.fn()}
+      />
+    );
+    await waitFor(() => {
+      expect(screen.getByText('checklist.blocked_heading')).toBeTruthy();
+    });
+    expect(screen.getByText('checklist.blocked_message')).toBeTruthy();
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByText('checklist.submit')).toBeNull();
+  });
+
   it('displays error message on load failure', async () => {
     mockGetChecklist.mockRejectedValueOnce(new Error('Network error'));
     
