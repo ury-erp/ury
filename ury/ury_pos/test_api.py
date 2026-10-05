@@ -838,11 +838,12 @@ class TestDependentChecklistBridge(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_get_checklist_resurfaces_failed_objectives_with_saved_result(
+    def test_get_checklist_resurfaces_failed_alongside_unanswered(
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """Passed objectives stay hidden; a Failed one resurfaces with its
-        saved status and remarks so reopening shows the previous result."""
+        """While any objective is still unanswered, a Failed one resurfaces
+        next to it with its saved status and remarks -- so reopening shows
+        the previous result."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
@@ -850,18 +851,50 @@ class TestDependentChecklistBridge(FrappeTestCase):
         mock_get_roles.return_value = ["Cashier", "All"]
         mock_db_exists.return_value = "QR-0001"
         mock_get_doc.side_effect = self._get_doc_side_effect(
-            review_rows=[("Objective 1", "Passed"), ("Objective 2", "Failed", "Printer broken")]
+            review_rows=[("Objective 1", "Failed", "Printer broken"), ("Objective 2", "Open")]
         )
         mock_get_all.side_effect = [[], self._dependent_rows(), [frappe._dict({"posting_date": date.today()})], []]
 
         result = get_checklist("POS-Profile-001", "Opening")
 
         self.assertEqual(
-            [item["item_label"] for item in result["items"]], ["Objective 2"]
+            [item["item_label"] for item in result["items"]],
+            ["Objective 1", "Objective 2"],
         )
         self.assertEqual(result["items"][0]["status"], "Failed")
         self.assertEqual(result["items"][0]["remarks"], "Printer broken")
+        self.assertIsNone(result["items"][1]["status"])
         self.assertNotEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_get_checklist_complete_when_all_answered_even_with_failures(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
+    ):
+        """Once EVERY objective has an explicit result (Passed or Failed),
+        nothing resurfaces and the gate reports Complete -- a recorded
+        failure must not reopen the gate on the post-submit status
+        re-check (that looped the checklist popup in the UI)."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = "QR-0001"
+        mock_get_doc.side_effect = self._get_doc_side_effect(
+            review_rows=[("Objective 1", "Failed", "Printer broken"), ("Objective 2", "Passed")]
+        )
+        mock_get_all.side_effect = [[], self._dependent_rows(), [frappe._dict({"posting_date": date.today()})], []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["log_status"], "Complete")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
