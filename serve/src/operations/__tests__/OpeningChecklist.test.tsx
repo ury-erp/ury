@@ -233,7 +233,7 @@ describe('OpeningChecklist', () => {
     })
 
     await waitFor(() =>
-      expect(screen.getByText('Wipe counters')).toBeInTheDocument()
+      expect(screen.getByText(/Wipe counters/)).toBeInTheDocument()
     )
     expect(onReady).not.toHaveBeenCalled()
   })

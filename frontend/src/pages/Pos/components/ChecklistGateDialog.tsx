@@ -219,7 +219,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
               {rows.map((row, index) => (
                 <div key={`${row.item_label}-${index}`} className="border border-border rounded-lg p-3">
                   <span className="text-sm font-medium text-foreground">
-                    {row.item_label}
+                    {index + 1}. {row.item_label}
                     {!!row.is_mandatory && <span className="text-destructive ml-1">*</span>}
                   </span>
                   <div className="flex items-center gap-4 mt-2">

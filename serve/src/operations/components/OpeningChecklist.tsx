@@ -312,7 +312,7 @@ export function OpeningChecklist({
                 className="flex flex-col gap-2 rounded-lg border border-border p-3"
               >
                 <span className="min-w-0 flex-1 text-sm">
-                  {row.item_label}
+                  {index + 1}. {row.item_label}
                   {row.is_mandatory ? (
                     <span className="ml-1 text-destructive" aria-hidden>
                       *
