@@ -323,7 +323,7 @@ describe('ChecklistGateDialog', () => {
   });
 
 
-  it('accepts a FAIL with remarks and reports a failed submission notice', async () => {
+  it('accepts a FAIL with remarks without showing any notice', async () => {
     mockGetChecklist.mockResolvedValue({
       items: [
         { item_label: 'Mandatory item', is_mandatory: true },
@@ -347,9 +347,12 @@ describe('ChecklistGateDialog', () => {
     await userEvent.type(screen.getByPlaceholderText('checklist.fail_remarks_placeholder'), 'test');
     await userEvent.click(screen.getByText('checklist.submit'));
     await waitFor(() => {
-      expect(screen.getByText('checklist.failed_notice')).toBeTruthy();
+      expect(mockSubmitChecklist).toHaveBeenCalled();
     });
+    // Recorded but the gate does not complete, and no notice is shown
+    // (product decision: the failed-items message stays off).
     expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.queryByText('checklist.failed_notice')).toBeNull();
     expect(screen.queryByText('checklist.incomplete_error')).toBeNull();
   });
 

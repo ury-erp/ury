@@ -89,7 +89,6 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitNotice, setSubmitNotice] = useState<string | null>(null);
 
   const titleKey = checklistType === 'Opening' ? 'checklist.title_opening' : 'checklist.title_closing';
 
@@ -178,7 +177,6 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
     setIsSubmitting(true);
     setSubmitError(null);
-    setSubmitNotice(null);
 
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
@@ -193,10 +191,9 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
       if (response.status === 'Complete') {
         onComplete();
       } else if (response.status === 'Failed') {
-        // Valid submission with failed items: recorded as failed, the gate
-        // stays open for resolve-and-resubmit, and the next role remains
-        // blocked. This is NOT an "incomplete" state.
-        setSubmitNotice(t('checklist.failed_notice'));
+        // Valid submission with failed items: recorded as failed; the gate
+        // stays open and the next role remains blocked. No notice is shown
+        // here (product decision -- the failed-items message stays off).
       } else {
         // Should not normally happen given the client-side button-disable
         // above, but handle it defensively rather than doing nothing.
@@ -298,10 +295,6 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
                 </div>
               ))}
             </div>
-
-            {submitNotice && (
-              <p className="mb-4 text-center text-sm text-amber-600">{submitNotice}</p>
-            )}
 
             {submitError && (
               <p className="mb-4 text-center text-sm text-destructive">{submitError}</p>
