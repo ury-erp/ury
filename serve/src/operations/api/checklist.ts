@@ -11,10 +11,17 @@ export interface ChecklistItem {
   goal?: string | null
 }
 
+export interface ChecklistBlocker {
+  role: string
+  role_label: string
+  goals: string[]
+}
+
 export interface ChecklistFetchResult {
   items: ChecklistItem[]
   logName: string | null
   logStatus: string | null
+  blockedBy: ChecklistBlocker | null
 }
 
 export interface SubmitChecklistItem {
@@ -37,6 +44,7 @@ type ChecklistApiResponse = {
     items?: ChecklistItem[]
     log_name?: string | null
     log_status?: string | null
+    blocked_by?: ChecklistBlocker | null
     status?: string
     name?: string | null
   }
@@ -58,6 +66,7 @@ export async function fetchOpeningChecklist(
     items: Array.isArray(message.items) ? message.items : [],
     logName: message.log_name ?? null,
     logStatus: message.log_status ?? null,
+    blockedBy: message.blocked_by ?? null,
   }
 }
 

@@ -873,13 +873,12 @@ class TestDependentChecklistBridge(FrappeTestCase):
     @patch("ury.ury_pos.api.frappe.session")
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
-    def test_get_checklist_complete_when_all_answered_even_with_failures(
+    def test_get_checklist_failure_keeps_goal_pending(
         self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
     ):
-        """Once EVERY objective has an explicit result (Passed or Failed),
-        nothing resurfaces and the gate reports Complete -- a recorded
-        failure must not reopen the gate on the post-submit status
-        re-check (that looped the checklist popup in the UI)."""
+        """A recorded failure does NOT complete the goal: the failed
+        objective resurfaces prefilled and the gate stays open until it is
+        resolved and re-submitted as Passed."""
         from ury.ury_pos.api import get_checklist
 
         mock_session.user = "cashier@example.com"
@@ -893,8 +892,11 @@ class TestDependentChecklistBridge(FrappeTestCase):
 
         result = get_checklist("POS-Profile-001", "Opening")
 
-        self.assertEqual(result["items"], [])
-        self.assertEqual(result["log_status"], "Complete")
+        self.assertEqual(
+            [item["item_label"] for item in result["items"]], ["Objective 1"]
+        )
+        self.assertEqual(result["items"][0]["status"], "Failed")
+        self.assertNotEqual(result["log_status"], "Complete")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.get_roles")
@@ -1126,7 +1128,9 @@ class TestDependentChecklistBridge(FrappeTestCase):
             [(row["objective"], row["status"]) for row in rows],
             [("Objective 1", "Passed"), ("Objective 2", "Failed")],
         )
-        self.assertEqual(result["status"], "Complete")
+        # The failure is recorded but the checklist is NOT complete: the next
+        # role stays blocked until the item is resolved and re-passed.
+        self.assertEqual(result["status"], "In Progress")
 
     @patch("ury.ury_pos.api.frappe.get_doc")
     @patch("ury.ury_pos.api.frappe.new_doc")
@@ -1278,3 +1282,137 @@ class TestDependentChecklistBridge(FrappeTestCase):
 
         self.assertEqual(result["items"], [])
         self.assertEqual(result["log_status"], "Complete")
+
+    # ---- Role sequence (RM -> Cashier -> Order Taker; reverse for closing) ----
+
+    def _sequence_rows(self):
+        return [
+            frappe._dict({"quality_checklist": "RM Opening Goal", "select_2": "RM Opening Checklist", "role": "Restaurant Manager"}),
+            frappe._dict({"quality_checklist": self.GOAL, "select_2": "POS Opening Entry", "role": "Cashier"}),
+            frappe._dict({"quality_checklist": "OT Opening Goal", "select_2": "Order Taker Opening Checklist", "role": "URY Captain"}),
+        ]
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_opening_blocked_until_rm_checklist_passed(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """Cashier's opening gate stays closed -- with the RM named as the
+        blocker -- until the RM checklist has a fully-Passed review."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = None  # nothing Passed yet
+        mock_get_all.side_effect = [[], self._sequence_rows(), []]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertEqual(result["items"], [])
+        self.assertIsNone(result["log_status"])
+        self.assertEqual(result["blocked_by"]["role_label"], "Restaurant Manager")
+        self.assertEqual(result["blocked_by"]["goals"], ["RM Opening Goal"])
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_opening_unblocked_once_rm_passed(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
+    ):
+        """With the RM review Passed, the blocker clears and the cashier's
+        own goal surfaces."""
+        from ury.ury_pos.api import get_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        # exists() calls: RM goal (Passed) -> own review (none yet).
+        mock_db_exists.side_effect = ["QR-RM", None]
+        mock_get_doc.side_effect = self._get_doc_side_effect()
+        mock_get_all.side_effect = [
+            [], self._sequence_rows(), [frappe._dict({"posting_date": date.today()})], [],
+        ]
+
+        result = get_checklist("POS-Profile-001", "Opening")
+
+        self.assertIsNone(result["blocked_by"])
+        self.assertEqual(
+            [item["item_label"] for item in result["items"]], ["Objective 1", "Objective 2"]
+        )
+        self.assertNotEqual(result["log_status"], "Complete")
+
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_blocked_until_predecessor_passed(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles
+    ):
+        """The API itself refuses submissions while a predecessor role's
+        checklist is unfinished (no frontend bypass)."""
+        from ury.ury_pos.api import submit_checklist
+
+        mock_session.user = "cashier@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_get_roles.return_value = ["Cashier", "All"]
+        mock_db_exists.return_value = None
+        mock_get_all.side_effect = [[], self._sequence_rows(), []]
+
+        items = json.dumps([
+            {"item_label": "Objective 1", "status": "Passed", "remarks": ""},
+        ])
+        self.assertRaises(
+            frappe.PermissionError, submit_checklist, "POS-Profile-001", "Opening", items
+        )
+
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    @patch("ury.ury_pos.api.frappe.db.exists")
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_closing_blocker_runs_in_reverse(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_get_all, mock_db_exists, mock_get_roles, mock_get_doc
+    ):
+        """Closing runs Order Taker -> Cashier -> RM: the RM is blocked by
+        the (descending-rank) predecessors, the Order Taker is not."""
+        from ury.ury_pos.api import get_checklist
+
+        rows = [
+            frappe._dict({"quality_checklist": "OT Closing Goal", "select_2": "Order Taker Closing Checklist", "role": "URY Captain"}),
+            frappe._dict({"quality_checklist": "Cashier Closing Goal", "select_2": "POS Closing Entry", "role": "Cashier"}),
+            frappe._dict({"quality_checklist": "RM Closing Goal", "select_2": "RM Closing Checklist", "role": "Restaurant Manager"}),
+        ]
+        mock_get_branch.return_value = "Branch A"
+        mock_get_all.side_effect = [
+            [], rows, [], [],  # RM fetch
+            [], rows, [], [],  # Order Taker fetch
+        ]
+        mock_get_doc.side_effect = self._get_doc_side_effect()
+        mock_db_exists.return_value = None
+
+        # RM: both Order Taker and Cashier steps must finish first.
+        mock_session.user = "rm@example.com"
+        mock_get_roles.return_value = ["Restaurant Manager"]
+        mock_db_exists.return_value = None
+        result = get_checklist("POS-Profile-001", "Closing")
+        self.assertEqual(result["blocked_by"]["role_label"], "Order Taker")
+
+        # Order Taker: no predecessors in the closing sequence.
+        mock_session.user = "captain@example.com"
+        mock_get_roles.return_value = ["URY Captain"]
+        mock_db_exists.return_value = None
+        result = get_checklist("POS-Profile-001", "Closing")
+        self.assertIsNone(result["blocked_by"])

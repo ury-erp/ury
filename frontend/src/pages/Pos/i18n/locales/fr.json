@@ -348,6 +348,8 @@
     "fail": "FAIL",
     "fail_remarks_placeholder": "Expliquez l'échec (requis)",
     "fail_remarks_required": "Des remarques sont requises pour les éléments en échec.",
-    "incomplete_error": "Chaque élément doit être marqué PASS ou FAIL avant de terminer la checklist."
+    "incomplete_error": "Chaque élément doit être marqué PASS ou FAIL avant de terminer la checklist.",
+    "blocked_heading": "{checklist} requis",
+    "blocked_message": "{role} n'a pas encore terminé {checklist}. Veuillez demander à {role} de la terminer avant de continuer."
   }
 }

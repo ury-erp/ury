@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import {
   getChecklist,
   submitChecklist,
+  type ChecklistBlocker,
   type ChecklistItem,
   type SubmitChecklistItem,
 } from '../lib/checklist-api';
@@ -65,6 +66,7 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
 const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: ChecklistGateDialogProps) => {
   const [rows, setRows] = useState<ChecklistRowState[]>([]);
   const [logName, setLogName] = useState<string | null>(null);
+  const [blockedBy, setBlockedBy] = useState<ChecklistBlocker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,9 +79,19 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     setIsLoading(true);
     setLoadError(null);
     setHasAttemptedAutoSubmit(false);
+    setBlockedBy(null);
 
     try {
-      const { items, logName: fetchedLogName, logStatus } = await getChecklist(posProfile, checklistType);
+      const { items, logName: fetchedLogName, logStatus, blockedBy: blocker } = await getChecklist(posProfile, checklistType);
+
+      if (blocker) {
+        // A predecessor role has not finished this phase's checklist; the
+        // gate stays closed with a specific message instead of the form.
+        setBlockedBy(blocker);
+        setRows([]);
+        setIsLoading(false);
+        return;
+      }
 
       if (logStatus === 'Complete') {
         onComplete();
@@ -113,7 +125,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     // see ury_pos/api.py::submit_checklist) flips isSubmitting back to false
     // and this effect would fire again indefinitely, reproducing the exact
     // "Checking POS status..." infinite loop this dialog exists to prevent.
-    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting && !hasAttemptedAutoSubmit) {
+    if (!isLoading && !loadError && !blockedBy && rows.length === 0 && !isSubmitting && !hasAttemptedAutoSubmit) {
       const autoSubmit = async () => {
         setIsSubmitting(true);
         setSubmitError(null);
@@ -136,7 +148,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
       autoSubmit();
     }
-  }, [isLoading, loadError, rows.length, isSubmitting, hasAttemptedAutoSubmit, posProfile, checklistType, logName, onComplete]);
+  }, [isLoading, loadError, blockedBy, rows.length, isSubmitting, hasAttemptedAutoSubmit, posProfile, checklistType, logName, onComplete]);
 
   const handleStatusChange = (index: number, status: 'Passed' | 'Failed') => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, status } : row)));
@@ -201,6 +213,18 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           </div>
         ) : loadError ? (
           <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
+        ) : blockedBy ? (
+          <div className="py-10 text-center">
+            <p className="text-lg font-semibold text-gray-900 mb-2">
+              {t('checklist.blocked_heading', { checklist: t(titleKey) })}
+            </p>
+            <p className="text-sm text-gray-600">
+              {t('checklist.blocked_message', {
+                role: blockedBy.role_label,
+                checklist: t(titleKey),
+              })}
+            </p>
+          </div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">

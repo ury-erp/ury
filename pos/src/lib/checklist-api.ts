@@ -10,11 +10,18 @@ export interface ChecklistItem {
   goal?: string | null;
 }
 
+export interface ChecklistBlocker {
+  role: string;
+  role_label: string;
+  goals: string[];
+}
+
 export interface ChecklistResponse {
   message: {
     items: ChecklistItem[];
     log_name: string | null;
     log_status: string | null;
+    blocked_by?: ChecklistBlocker | null;
   };
 }
 
@@ -42,6 +49,7 @@ export const getChecklist = async (
   items: ChecklistItem[];
   logName: string | null;
   logStatus: string | null;
+  blockedBy: ChecklistBlocker | null;
 }> => {
   try {
     const response = await call.get<ChecklistResponse>(
@@ -57,6 +65,7 @@ export const getChecklist = async (
       items: response.message.items,
       logName: response.message.log_name,
       logStatus: response.message.log_status,
+      blockedBy: response.message.blocked_by ?? null,
     };
   } catch (error) {
     console.error('Error fetching checklist:', error);

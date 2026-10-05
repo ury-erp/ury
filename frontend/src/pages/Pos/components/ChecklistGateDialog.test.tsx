@@ -100,6 +100,21 @@ describe("ChecklistGateDialog", () => {
     await waitFor(() => { expect(onComplete).toHaveBeenCalled(); });
   });
 
+
+  it("shows the blocking role message when a predecessor checklist is unfinished", async () => {
+    getChecklistMock.mockResolvedValue({
+      items: [],
+      log_name: null,
+      log_status: null,
+      blockedBy: { role: "Restaurant Manager", role_label: "Restaurant Manager", goals: ["RM Opening Checklist"] },
+    });
+    render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await waitFor(() => { expect(screen.getByText("checklist.blocked_heading")).toBeInTheDocument(); });
+    expect(screen.getByText("checklist.blocked_message")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /checklist.submit/ })).not.toBeInTheDocument();
+  });
+
   it("displays title based on checklist type", async () => {
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
     await waitFor(() => { expect(screen.getByText("checklist.title_opening")).toBeInTheDocument(); });

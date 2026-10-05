@@ -15,6 +15,7 @@ import {
   fetchOpeningChecklist,
   isMandatory,
   submitOpeningChecklist,
+  type ChecklistBlocker,
   type ChecklistItem,
   type SubmitChecklistItem,
 } from '../api/checklist'
@@ -62,6 +63,7 @@ export function OpeningChecklist({
   className,
 }: OpeningChecklistProps) {
   const [rows, setRows] = useState<RowState[]>([])
+  const [blockedBy, setBlockedBy] = useState<ChecklistBlocker | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -119,10 +121,20 @@ export function OpeningChecklist({
     setSubmitError(null)
     setHasAttemptedAutoSubmit(false)
     setGateSatisfied(false)
+    setBlockedBy(null)
 
     try {
-      const { items, logStatus } = await fetchOpeningChecklist(posProfile)
+      const { items, logStatus, blockedBy } = await fetchOpeningChecklist(posProfile)
       if (!isLive(generation)) return
+
+      if (blockedBy) {
+        // A predecessor role has not finished the opening checklist; the
+        // gate stays closed with a specific message instead of the form.
+        setBlockedBy(blockedBy)
+        setRows([])
+        setLoading(false)
+        return
+      }
 
       if (logStatus === 'Complete') {
         setRows([])
@@ -183,6 +195,7 @@ export function OpeningChecklist({
       loading ||
       loadError ||
       gateSatisfied ||
+      blockedBy ||
       rows.length > 0 ||
       submitting ||
       hasAttemptedAutoSubmit
@@ -194,6 +207,7 @@ export function OpeningChecklist({
     loading,
     loadError,
     gateSatisfied,
+    blockedBy,
     rows.length,
     submitting,
     hasAttemptedAutoSubmit,
@@ -304,8 +318,20 @@ export function OpeningChecklist({
             </Alert>
           )}
 
+          {!loading && !loadError && blockedBy && (
+            <Alert variant="warning">
+              <p className="font-medium">Opening checklist required</p>
+              <p className="text-sm">
+                {blockedBy.role_label} has not completed the Opening Checklist
+                yet. Please ask the {blockedBy.role_label} to complete it before
+                continuing.
+              </p>
+            </Alert>
+          )}
+
           {!loading &&
             !loadError &&
+            !blockedBy &&
             rows.map((row, index) => (
               <div
                 key={`${row.item_label}-${index}`}
