@@ -68,7 +68,6 @@ export function OpeningChecklist({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [submitNotice, setSubmitNotice] = useState<string | null>(null)
   const [hasAttemptedAutoSubmit, setHasAttemptedAutoSubmit] = useState(false)
   const [gateSatisfied, setGateSatisfied] = useState(false)
 
@@ -235,7 +234,6 @@ export function OpeningChecklist({
     const generation = requestGenRef.current
     setSubmitting(true)
     setSubmitError(null)
-    setSubmitNotice(null)
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
       status: row.status ?? undefined,
@@ -253,10 +251,7 @@ export function OpeningChecklist({
         fireReady(generation)
       } else if (response.status === 'Failed') {
         // Valid submission with failed items: recorded as failed; the gate
-        // stays open for resolve-and-resubmit. NOT an "incomplete" state.
-        setSubmitNotice(
-          'Checklist submitted with failed items. Resolve them before the next role can continue.'
-        )
+        // stays open. No notice shown (product decision -- message stays off).
       } else {
         setSubmitError('Complete all mandatory items before continuing.')
       }
@@ -418,12 +413,6 @@ export function OpeningChecklist({
                 )}
               </div>
             ))}
-
-          {submitNotice && (
-            <Alert variant="warning">
-              <p className="text-sm">{submitNotice}</p>
-            </Alert>
-          )}
 
           {submitError && (
             <Alert variant="danger">
