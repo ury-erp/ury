@@ -1538,6 +1538,26 @@ def _goal_review_passed(goal, branch, period_date):
     )
 
 
+def _goal_review_state(goal, branch, period_date, owner=None):
+    """Three-way state of a goal's checklist for one user (or any user when
+    owner is None), derived from the live review's doc status:
+
+    passed  -- review exists and every objective is Passed (unlocks things)
+    failed  -- review exists with only answered rows but at least one Fail
+               (a VALID, submitted checklist that did not pass; recorded,
+               resurfaces for resolve, does not unlock the next role)
+    pending -- no review yet, or some objective still has no explicit result
+    """
+    filters = {"goal": goal, "branch": branch, "date": period_date}
+    if owner:
+        filters["owner"] = owner
+    if frappe.db.exists("Quality Review", {**filters, "status": "Passed"}):
+        return "passed"
+    if frappe.db.exists("Quality Review", {**filters, "status": "Failed"}):
+        return "failed"
+    return "pending"
+
+
 def _checklist_blocker(rows, checklist_type, branch, period_date, user_roles):
     """Earliest role in the phase sequence whose goals are not all Passed.
 
@@ -1576,11 +1596,24 @@ def _checklist_blocker(rows, checklist_type, branch, period_date, user_roles):
                 goal for goal in goals if not _goal_review_passed(goal, branch, period_date)
             ]
             if incomplete:
+                failed = any(
+                    frappe.db.exists(
+                        "Quality Review",
+                        {
+                            "goal": goal,
+                            "branch": branch,
+                            "date": period_date,
+                            "status": "Failed",
+                        },
+                    )
+                    for goal in incomplete
+                )
                 return {
                     "role": role,
                     "role_label": _role_label(role),
                     "rank": rank,
                     "goals": incomplete,
+                    "state": "failed" if failed else "pending",
                 }
     return None
 
@@ -1983,6 +2016,27 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         limit=1,
     )
 
+    def _goal_submission_status():
+        """Three-way completion for the role-based goals, from THIS user's
+        saved reviews:
+
+        - "pending": some objective still has no explicit result -> the
+          checklist is unsubmitted/incomplete ("In Progress").
+        - "failed": every objective answered but at least one Failed -> the
+          checklist was VALIDLY submitted and did not pass; it is recorded
+          and must not read as "incomplete", but it does not unlock anyone.
+        - None: all goals Passed -> the legacy log status decides.
+        """
+        states = [
+            _goal_review_state(goal, branch, period_date, owner=frappe.session.user)
+            for goal in goals
+        ]
+        if any(state == "pending" for state in states):
+            return "In Progress"
+        if any(state == "failed" for state in states):
+            return "Failed"
+        return None
+
     if not configured_items:
         # No legacy items: completion is driven purely by Quality Reviews.
         if existing_log:
@@ -1990,11 +2044,8 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
                 "status": existing_log[0].status,
                 "name": existing_log[0].name,
             }
-        goals_pending = any(
-            _goal_review_pending(goal, branch, period_date) for goal in goals
-        )
         return {
-            "status": "In Progress" if goals_pending else "Complete",
+            "status": _goal_submission_status() or "Complete",
             "name": None,
         }
 
@@ -2042,9 +2093,17 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
     all_mandatory_answered = all(
         _row_answered(row) for row in log_doc.items if row.is_mandatory
     )
+    any_mandatory_failed = any(
+        (row.status or ("Passed" if row.is_checked else None)) == "Failed"
+        for row in log_doc.items
+        if row.is_mandatory
+    )
 
     if all_mandatory_answered:
-        log_doc.status = "Complete"
+        # A FAIL is a valid, submitted result: the log is recorded as Failed
+        # (not "incomplete") so downstream code can tell submission validity
+        # apart from workflow completion.
+        log_doc.status = "Failed" if any_mandatory_failed else "Complete"
         log_doc.completed_by = frappe.session.user
         log_doc.completed_at = frappe.utils.now()
     else:
@@ -2052,13 +2111,12 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
 
     log_doc.save()
 
-    # A complete legacy log does not override still-pending Quality Reviews.
-    goals_pending = any(
-        _goal_review_pending(goal, branch, period_date) for goal in goals
-    )
-    if goals_pending:
+    # Role-based goal states take precedence: pending/failed goals keep the
+    # submission below Complete regardless of the legacy log status.
+    goal_status = _goal_submission_status()
+    if goal_status:
         return {
-            "status": "In Progress",
+            "status": goal_status,
             "name": log_doc.name,
         }
 

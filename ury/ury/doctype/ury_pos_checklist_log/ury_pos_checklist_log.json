@@ -58,7 +58,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "In Progress\nComplete"
+   "options": "In Progress\nComplete\nFailed"
   },
   {
    "fieldname": "completed_by",

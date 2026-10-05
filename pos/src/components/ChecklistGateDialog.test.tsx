@@ -322,6 +322,37 @@ describe('ChecklistGateDialog', () => {
     expect(screen.queryByText('checklist.submit')).toBeNull();
   });
 
+
+  it('accepts a FAIL with remarks and reports a failed submission notice', async () => {
+    mockGetChecklist.mockResolvedValue({
+      items: [
+        { item_label: 'Mandatory item', is_mandatory: true },
+      ],
+      logName: 'LOG-001',
+      logStatus: 'Incomplete',
+    });
+    mockSubmitChecklist.mockResolvedValue({ status: 'Failed' });
+    const onComplete = vi.fn();
+    render(
+      <ChecklistGateDialog
+        posProfile="POS-001"
+        checklistType="Opening"
+        onComplete={onComplete}
+      />
+    );
+    await waitFor(() => {
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
+    });
+    await userEvent.click(screen.getAllByRole('radio')[1]); // FAIL
+    await userEvent.type(screen.getByPlaceholderText('checklist.fail_remarks_placeholder'), 'test');
+    await userEvent.click(screen.getByText('checklist.submit'));
+    await waitFor(() => {
+      expect(screen.getByText('checklist.failed_notice')).toBeTruthy();
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.queryByText('checklist.incomplete_error')).toBeNull();
+  });
+
   it('displays error message on load failure', async () => {
     mockGetChecklist.mockRejectedValueOnce(new Error('Network error'));
     
