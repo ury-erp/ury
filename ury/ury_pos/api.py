@@ -1662,11 +1662,25 @@ def get_checklist(pos_profile, checklist_type):
                     }
                 )
             continue
-        # Passed objectives are done and stay hidden; Open and Failed ones
-        # resurface (prefilled with whatever was saved) so a recorded failure
-        # remains visible and correctable instead of silently passing the gate.
+        # An objective is answered once its review row is Passed or Failed.
+        # While ANY objective is still unanswered (no row / Open), the
+        # unanswered ones resurface for completion and the answered Failed
+        # ones resurface alongside them -- prefilled -- so the failure stays
+        # visible and correctable. Once EVERY objective is answered, nothing
+        # resurfaces: a recorded failure is final and must not reopen the
+        # gate on every status re-check (which looped the UI after submit).
+        unanswered = {
+            o
+            for o in objectives
+            if states.get(o) is None or states[o].status not in ("Passed", "Failed")
+        }
+        if not unanswered:
+            continue
         remaining = [
-            o for o in objectives if states.get(o) is None or states[o].status != "Passed"
+            o
+            for o in objectives
+            if o in unanswered
+            or (states.get(o) is not None and states[o].status == "Failed")
         ]
         if remaining:
             pending_goals.append(goal)
