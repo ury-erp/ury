@@ -54,7 +54,7 @@ const POSOpeningDialog = ({
   onCloseNow,
 }: POSOpeningDialogProps) => {
   const handleSwitchToDesk = () => {
-    window.open(`${window.location.origin}/app`, '_blank');
+    window.open(`${window.location.origin}/desk`, '_blank');
   };
 
   const stateConfig: Record<OpeningBlockingState, StateConfig> = {

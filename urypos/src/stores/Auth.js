@@ -155,7 +155,7 @@ export const useAuthStore = defineStore("auth", {
     },
     routeToHome() {
       var currentDomain = window.location.protocol + "//" + window.location.hostname;
-      window.location.href = currentDomain + "/app/";
+      window.location.href = currentDomain + "/desk/";
     },
 
     isPosOpenChecking() {
@@ -166,7 +166,7 @@ export const useAuthStore = defineStore("auth", {
             var currentDomain = window.location.origin;
             if (!result.message.opening_exists) {
               this.alert.createAlert("Message", "POS Opening Entry is not created", "OK").then(() => {
-                window.location.href = currentDomain + "/app/";
+                window.location.href = currentDomain + "/desk/";
               });
             }
 
@@ -178,7 +178,7 @@ export const useAuthStore = defineStore("auth", {
             const innerMessage = JSON.parse(innerMessageString);
             const message = innerMessage.message;
             this.alert.createAlert("Message", message, "OK").then(() => {
-              window.location.href = currentDomain + "/app/";
+              window.location.href = currentDomain + "/desk/";
             });
 
           });
@@ -198,7 +198,7 @@ export const useAuthStore = defineStore("auth", {
             // } else {
             var currentDomain = window.location.origin;
             this.alert.createAlert("Message", message, "OK").then(() => {
-              window.location.href = currentDomain + "/app/";
+              window.location.href = currentDomain + "/desk/";
             });
             // }
           })
@@ -219,7 +219,7 @@ export const useAuthStore = defineStore("auth", {
             this.alert
               .createAlert("Message", "Please close previous POS Entry", "OK")
               .then(() => {
-                window.location.href = currentDomain + "/app/";
+                window.location.href = currentDomain + "/desk/";
               });
           }
         })
