@@ -2538,25 +2538,18 @@ def cancel_order(invoice_id, reason):
             message=f"Failed to send fraud alert for invoice {invoice_id}: {str(e)}"
         )
 
-    # Use standard Frappe cancel workflow instead of raw SQL
-    if pos_invoice.docstatus == 1:
-        # Submitted invoice: cancel through the standard document workflow so
-        # on_cancel hooks run and GL/payment reversals and audit entries are
-        # produced (docstatus=2 on the invoice and its items).
-        pos_invoice.cancel()
-        pos_invoice.db_set("cancel_reason", reason)
-    else:
-        # Draft invoice: Frappe's standard workflow does not allow cancelling
-        # drafts, so update the status directly as before.
-        frappe.db.sql("""
-            UPDATE `tabPOS Invoice Item`
-            SET docstatus = 2
-            WHERE parent = %s
-        """, (invoice_id,))
+    # Ensure invoice is not already cancelled
+    if pos_invoice.docstatus == 2:
+        frappe.throw(_("Invoice {0} is already cancelled.").format(invoice_id))
 
-        frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-        frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+    # Draft invoice: submit first so it can follow standard document lifecycle cancellation
+    if pos_invoice.docstatus == 0:
+        pos_invoice.flags.ignore_mandatory = True
+        pos_invoice.submit()
+
+    # Cancel through standard document workflow so on_cancel hooks run and docstatus=2 is set
+    pos_invoice.cancel()
+    pos_invoice.db_set("cancel_reason", reason)
 
 # Roles permitted to authorize an additional discount when settling an order.
 DISCOUNT_ALLOWED_ROLES = frozenset(

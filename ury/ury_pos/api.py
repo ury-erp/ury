@@ -1003,16 +1003,16 @@ def getAggregatorMOP(aggregator):
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
     if not frappe.has_permission("Customer", "create"):
-        frappe.throw("Not permitted to create customers", frappe.PermissionError)
-        
+        frappe.throw(_("Not permitted to create customers"), frappe.PermissionError)
+
     if not customer_name:
-        frappe.throw("Customer name is required")
+        frappe.throw(_("Customer name is required"))
     if not mobile_number:
-        frappe.throw("Mobile Number is required")
+        frappe.throw(_("Mobile Number is required"))
     try:
         validate_phone_number(mobile_number, throw=True)
     except Exception:
-        frappe.throw("Invalid mobile number format")
+        frappe.throw(_("Invalid mobile number format"))
 
     """Create a new customer"""
     try:
@@ -1030,7 +1030,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert()
+        customer.insert(ignore_permissions=False)
         frappe.db.commit()
 
         return {
