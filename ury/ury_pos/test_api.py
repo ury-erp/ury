@@ -1687,6 +1687,11 @@ class TestPhaseHierarchyHooks(FrappeTestCase):
 			"period_start_date": datetime(2026, 10, 6, 8, 0, 0),
 			"posting_date": date(2026, 10, 6),
 		})
+		# Link validation runs before the before_submit hooks this test
+		# targets, and the placeholder company/profile/user above only exist
+		# on the authoring dev site -- skip link integrity here (the subject
+		# is hook firing, not references).
+		doc._validate_links = lambda: None
 		self.submitted = {"RM Opening Checklist", "Cashier Opening Checklist"}
 		# Patch only around submit(): get_doc is also used by frappe internals
 		# during insert, so mock just the hook's POS Profile lookup.
