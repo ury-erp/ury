@@ -51,3 +51,21 @@ def validate_daily_checklists(doc, method):
 			)
 
 	validate_and_throw(non_completed_checklists)
+
+def validate_stock_correction(closing_entry, method=None):
+    pos_profile = closing_entry.get("pos_profile")
+    if not pos_profile:
+        return
+        
+    submit_stock_correction_enabled = frappe.db.get_value("POS Profile", pos_profile, "submit_stock_correction")
+    if submit_stock_correction_enabled:
+        stock_corrections = closing_entry.get("draft_stock_correction")
+        if not stock_corrections:
+            frappe.throw(
+                "No draft Stock Correction found for this shift. Please ensure a Stock Correction is created before saving the POS Closing Entry.",
+                title="Stock Correction Missing"
+            )
+
+
+
+
