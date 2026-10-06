@@ -19,9 +19,4 @@ def validate_bill_check(doc, method):
                     )
             
 def validate_cost_center(doc, method):
-    if not doc.cost_center:
-       frappe.throw(
-                _(
-                    "Cost center is mandatory."
-                )
-            )
+    pass
