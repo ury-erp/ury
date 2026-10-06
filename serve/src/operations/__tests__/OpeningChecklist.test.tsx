@@ -18,6 +18,12 @@ import {
 const fetchMock = vi.mocked(fetchOpeningChecklist)
 const submitMock = vi.mocked(submitOpeningChecklist)
 
+// STATE 2 of the gate UX: an eligible user lands on a "Start Checklist"
+// screen first -- tests that interact with the form click through it.
+const startChecklist = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(await screen.findByRole('button', { name: /Start Checklist/i }))
+}
+
 describe('OpeningChecklist', () => {
   beforeEach(() => {
     fetchMock.mockReset()
@@ -76,7 +82,75 @@ describe('OpeningChecklist', () => {
     await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1))
   })
 
-  it('submits only after mandatory items are checked', async () => {
+  it('offers Start Checklist to an eligible user before showing the form', async () => {
+    fetchMock.mockResolvedValue({
+      items: [{ item_label: 'Sanitize station', is_mandatory: 1 }],
+      logName: null,
+      logStatus: null,
+    })
+
+    const user = userEvent.setup()
+    render(
+      <OpeningChecklist
+        user="captain@example.com"
+        posProfile="POS-MAIN"
+        branch="Main"
+        onReady={vi.fn()}
+      />
+    )
+
+    // STATE 2: required-heading + Start action, but no form yet.
+    expect(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+
+    await startChecklist(user)
+    expect(await screen.findByText(/Sanitize station/)).toBeInTheDocument()
+  })
+
+  it('rechecks from the blocked state when the predecessor finishes', async () => {
+    const onReady = vi.fn()
+    fetchMock
+      .mockResolvedValueOnce({
+        items: [],
+        logName: null,
+        logStatus: null,
+        blockedBy: { role: 'Cashier', role_label: 'Cashier', goals: ['Cashier Opening Checklist'] },
+      })
+      .mockResolvedValue({
+        items: [{ item_label: 'Sanitize station', is_mandatory: 1 }],
+        logName: null,
+        logStatus: null,
+      })
+
+    const user = userEvent.setup()
+    render(
+      <OpeningChecklist
+        user="captain@example.com"
+        posProfile="POS-MAIN"
+        branch="Main"
+        onReady={onReady}
+      />
+    )
+
+    // STATE 1: blocked -- no Start action, but a Recheck path.
+    expect(
+      await screen.findByText(/Cashier has not completed the Opening Checklist yet/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Recheck/i })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Start Checklist/i })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /Recheck/i }))
+    expect(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    ).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('submits only after mandatory items have an explicit result', async () => {
     const onReady = vi.fn()
     fetchMock.mockResolvedValue({
       items: [
@@ -98,13 +172,13 @@ describe('OpeningChecklist', () => {
       />
     )
 
+    await startChecklist(user)
     const submit = await screen.findByRole('button', {
       name: /Submit checklist/i,
     })
     expect(submit).toBeDisabled()
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    await user.click(checkboxes[0])
+    await user.click(screen.getAllByRole('radio')[0]) // PASS
     expect(submit).not.toBeDisabled()
 
     await user.click(submit)
@@ -114,17 +188,50 @@ describe('OpeningChecklist', () => {
       [
         {
           item_label: 'Sanitize station',
-          is_checked: true,
+          status: 'Passed',
           remarks: '',
+          goal: null,
         },
         {
           item_label: 'Optional note',
-          is_checked: false,
+          status: undefined,
           remarks: '',
+          goal: null,
         },
       ],
       undefined
     )
+  })
+
+  it('blocks submit when FAIL has no remarks', async () => {
+    const onReady = vi.fn()
+    fetchMock.mockResolvedValue({
+      items: [{ item_label: 'Sanitize station', is_mandatory: 1 }],
+      logName: null,
+      logStatus: null,
+    })
+    submitMock.mockResolvedValue({ status: 'Complete', name: 'LOG-2' })
+
+    const user = userEvent.setup()
+    render(
+      <OpeningChecklist
+        user="captain@example.com"
+        posProfile="POS-MAIN"
+        branch="Main"
+        onReady={onReady}
+      />
+    )
+
+    await startChecklist(user)
+    const submit = await screen.findByRole('button', {
+      name: /Submit checklist/i,
+    })
+    await user.click(screen.getAllByRole('radio')[1]) // FAIL
+    expect(submit).toBeDisabled()
+    expect(
+      await screen.findByText(/Remarks are required for failed items/i)
+    ).toBeInTheDocument()
+    expect(submitMock).not.toHaveBeenCalled()
   })
 
   it('shows Retry after empty auto-submit failure and retries successfully', async () => {
@@ -201,8 +308,13 @@ describe('OpeningChecklist', () => {
       logStatus: 'Complete',
     })
 
+    await startChecklist(
+      // A fresh userEvent is fine here -- the assertion only needs the form
+      // to appear for the NEW profile, proving the stale fetch was dropped.
+      userEvent.setup()
+    )
     await waitFor(() =>
-      expect(screen.getByText('Wipe counters')).toBeInTheDocument()
+      expect(screen.getByText(/Wipe counters/)).toBeInTheDocument()
     )
     expect(onReady).not.toHaveBeenCalled()
   })

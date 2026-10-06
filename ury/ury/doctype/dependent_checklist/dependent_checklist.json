@@ -24,7 +24,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Option",
-   "options": "POS Opening Entry\nPOS Closing Entry\nOrder Taking\nRM Checklist"
+   "options": "POS Opening Entry\nPOS Closing Entry\nOrder Taking\nRM Checklist\nRM Opening Checklist\nRM Closing Checklist\nOrder Taker Opening Checklist\nOrder Taker Closing Checklist"
   },
   {
    "fieldname": "role",
@@ -36,12 +36,13 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-02 00:00:00.000000",
+ "modified": "2026-10-05 18:36:50.393738",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Dependent Checklist",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

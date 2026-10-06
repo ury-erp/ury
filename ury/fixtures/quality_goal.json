@@ -1,0 +1,186 @@
+[
+ {
+  "custom_role": "Cashier",
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "None",
+  "goal": "Cashier Closing Checklist",
+  "modified": "2026-10-05 12:29:25.633532",
+  "name": "Cashier Closing Checklist",
+  "objectives": [
+   {
+    "objective": "If There Is Any Complaint From The Customers, Note In The Complaint Book And Intimate Superior",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Check The Behavior Of Waiters And Cpatains As Per Company Standards, If Not Communicate To Superior",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "If There Is Any Bill Cancellations, Make Narration And Authorised Signatory",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Assure Timely Delivery Of Parcel & Home Delivery, If Not Intimate Superior",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ },
+ {
+  "custom_role": "Order Taker",
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "None",
+  "goal": "Order Taker Closing Checklist",
+  "modified": "2026-10-05 12:31:59.041169",
+  "name": "Order Taker Closing Checklist",
+  "objectives": [
+   {
+    "objective": "Feedback Collection From Customers Done 100%",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "On Duty Hours, Avoid Unnecessary Mobile Phone Usage & Chit Chat With Collegues",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Daily Invetory For Cutlery Crockery And Glass Ware",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Make Sure All The Bills Are Rised And Submitted",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ },
+ {
+  "custom_role": "Restaurant Manager",
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "None",
+  "goal": "Restaurant Manager Closing Checklist",
+  "modified": "2026-10-05 12:32:33.346083",
+  "name": "Restaurant Manager Closing Checklist",
+  "objectives": [
+   {
+    "objective": "Next day order request finalisation",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Closing stock verification",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Check whole restaurant is clean and tidy",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Verify closing cash",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ },
+ {
+  "custom_role": null,
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "None",
+  "goal": "RM Opening Checklist",
+  "modified": "2026-10-05 18:34:22.109773",
+  "name": "RM Opening Checklist",
+  "objectives": [
+   {
+    "objective": "Check kitchen readiness",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Verify staff allocation",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ },
+ {
+  "custom_role": null,
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "Daily",
+  "goal": "Order Taker Opening Checklist",
+  "modified": "2026-10-05 18:22:00.452448",
+  "name": "Order Taker Opening Checklist",
+  "objectives": [
+   {
+    "objective": "Check table availability",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Review menu of the day",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ },
+ {
+  "custom_role": "Cashier",
+  "date": "1",
+  "docstatus": 0,
+  "doctype": "Quality Goal",
+  "frequency": "None",
+  "goal": "Cashier Opening Checklist",
+  "modified": "2026-10-05 12:29:00.589344",
+  "name": "Cashier Opening Checklist",
+  "objectives": [
+   {
+    "objective": "Check The Computer Functioning, Wifi, Software Are In Proper",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Check The Phone ,Printer ,Edc Machine Etc",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Check If There Is Any Advance Order Or Not For The Day",
+    "target": null,
+    "uom": null
+   },
+   {
+    "objective": "Count Petty Cash And Keep Change For The Day",
+    "target": null,
+    "uom": null
+   }
+  ],
+  "procedure": null,
+  "weekday": "Monday"
+ }
+]
