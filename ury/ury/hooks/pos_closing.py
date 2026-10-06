@@ -66,6 +66,93 @@ def validate_stock_correction(closing_entry, method=None):
                 title="Stock Correction Missing"
             )
 
+def submit_stock_correction(closing_entry, method=None):
+    """Separate function to enqueue stock correction submission"""
+    stock_corrections = closing_entry.get("draft_stock_correction")  
+    if not stock_corrections:
+        return
+        
+    frappe.enqueue(
+        "ury.ury.hooks.pos_closing.process_stock_corrections_background",
+        queue="long",
+        closing_entry=closing_entry.name,
+        now=frappe.flags.in_test
+    )
+
+def process_stock_corrections_background(closing_entry):
+    closing_entry_doc = frappe.get_doc("POS Closing Entry", closing_entry)
+    stock_corrections = closing_entry_doc.get("draft_stock_correction")
+    if not stock_corrections:
+        return
+
+    from frappe.utils import getdate, get_time, now_datetime
+    from datetime import timedelta
+    
+    date_time = now_datetime()
+    date = date_time.date()
+    time = date_time.time()
+
+    for row in stock_corrections:
+        if not row.stock_correction:
+            continue
+            
+        try:
+            sstock_correcton_doc = frappe.get_doc("Stock Correction", row.stock_correction)
+            if sstock_correcton_doc.docstatus != 0:
+                continue
+                
+            owner = sstock_correcton_doc.owner
+            sstock_correcton_doc.db_set("edit_posting_date", 1)
+            sstock_correcton_doc.posting_date = date
+            sstock_correcton_doc.posting_time = time
+            sstock_correcton_doc.save()
+            sstock_correcton_doc.submit()
+            frappe.db.set_value(
+                "Stock Correction",
+                row.stock_correction,
+                "modified_by",
+                owner,
+                update_modified=False,
+            )
+            frappe.db.commit()
+        except Exception as e:
+            frappe.log_error(title="Failed to submit Stock Correction", message=frappe.get_traceback())
+
+@frappe.whitelist()
+def get_draft_stock_correction(pos_profile, period_end_date, period_start_date, closing_entry = None):
+    # Fetching branch from POS profile
+    branch = frappe.get_value("POS Profile", pos_profile, "branch")
+    if not branch:
+        frappe.throw("Branch not found for the given POS profile")
+    
+    submit_stock_correction = frappe.get_value("POS Profile", pos_profile, "submit_stock_correction")
+    warehouse = frappe.get_value("POS Profile", pos_profile, "warehouse")
+    
+    start_date = period_start_date
+    end_date = period_end_date
+
+    # Getting all created stock correction documents for the branch
+    stock_corrections = []
+    try:
+        stock_corrections = frappe.get_all(
+            "Stock Correction", 
+            filters={
+                "docstatus": 0, 
+                "branch": branch, 
+                "period_end_date": ["between", [start_date, end_date]]
+            },
+            pluck="name"
+        )
+    except:
+       pass
+
+    if submit_stock_correction == 1:
+        if stock_corrections:
+            return [{"stock_correction": sc} for sc in stock_corrections]
+        else:
+            return False
+    else:
+        return True
 
 
 

@@ -284,6 +284,9 @@ doc_events = {
             "ury.ury.hooks.pos_closing.validate_daily_checklists",
             "ury.ury.hooks.pos_closing.validate_stock_correction",
         ],
+        "on_submit": [
+            "ury.ury.hooks.pos_closing.submit_stock_correction",
+        ],
         },
     "Quality Review": {
         "on_update": "ury.ury.hooks.update_accounts.checklist",
