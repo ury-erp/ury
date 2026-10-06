@@ -207,9 +207,9 @@ permission_query_conditions = {
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+}
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
 # on every migrate. Safe to define even when huf is not installed — the
@@ -243,6 +243,7 @@ doc_events = {
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
     "Sales Invoice": {
+        "validate": "ury.ury.hooks.ury_sales_invoice.validate",
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
         "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
         "on_submit": [
@@ -634,6 +635,9 @@ fixtures = [
                     "POS Profile-high_volume",
                     "POS Profile-low_volume",
                     "POS Profile-high_food_cost",
+                    "POS Profile-custom_wastage_real_time_stock",
+                    "POS Profile-custom_enable_opening_date",
+                    "POS Profile-custom_wastage_time",
                     "Cost Center-branch",
                     "Journal Entry-branch",
                     "Employee-payment_amount",
