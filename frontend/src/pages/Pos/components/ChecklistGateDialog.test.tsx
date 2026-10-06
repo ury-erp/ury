@@ -15,19 +15,64 @@ const mockChecklistItems = [
 
 describe("ChecklistGateDialog", () => {
   beforeEach(() => { cleanup(); vi.clearAllMocks(); getChecklistMock.mockResolvedValue({ items: mockChecklistItems, log_name: "LOG-001" }); });
-  
+
+  // STATE 2 of the gate UX: an eligible user lands on a "Start Checklist"
+  // screen first -- tests that interact with the form click through it.
+  const start = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole("button", { name: "checklist.start" }));
+  };
+
   it("loads and displays checklist items", async () => {
+    const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
   });
 
-  it("marks mandatory items with asterisk", async () => {
+  it("offers Start Checklist to an eligible user before showing the form", async () => {
+    const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByText("checklist.blocked_heading")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "checklist.start" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    await start(user);
+    await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
+  });
+
+  it("rechecks the gate from the blocked state when the predecessor finishes", async () => {
+    const user = userEvent.setup();
+    getChecklistMock
+      .mockResolvedValueOnce({
+        items: [],
+        log_name: null,
+        log_status: null,
+        blockedBy: { role: "Restaurant Manager", role_label: "Restaurant Manager", goals: ["RM Opening Checklist"] },
+      })
+      .mockResolvedValue({ items: mockChecklistItems, log_name: "LOG-001" });
+    render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    // STATE 1: blocked -- no Start action, but a Recheck path.
+    await waitFor(() => { expect(screen.getByText("checklist.blocked_message")).toBeInTheDocument(); });
+    expect(screen.getByRole("button", { name: "checklist.recheck" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "checklist.start" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "checklist.recheck" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "checklist.start" })).toBeInTheDocument();
+    });
+  });
+
+  it("marks mandatory items with asterisk", async () => {
+    const user = userEvent.setup();
+    render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/).textContent).toContain("*"); });
   });
 
   it("disables submit button until every mandatory item has a result", async () => {
+    const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
     expect(submitButton).toBeDisabled();
@@ -36,6 +81,7 @@ describe("ChecklistGateDialog", () => {
   it("enables submit button when mandatory items are answered", async () => {
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.pass" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
@@ -47,6 +93,7 @@ describe("ChecklistGateDialog", () => {
     const onComplete = vi.fn();
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={onComplete} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.pass" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
@@ -61,6 +108,7 @@ describe("ChecklistGateDialog", () => {
   it("blocks submission when FAIL has no remarks", async () => {
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.fail" })[0]);
     const submitButton = screen.getByRole("button", { name: /checklist.submit/ });
@@ -72,6 +120,7 @@ describe("ChecklistGateDialog", () => {
     submitChecklistMock.mockResolvedValue({ status: "Complete" });
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.fail" })[0]);
     await user.type(screen.getByPlaceholderText("checklist.fail_remarks_placeholder"), "Printer broken");
@@ -84,7 +133,9 @@ describe("ChecklistGateDialog", () => {
       items: [{ item_label: "Item 1", is_mandatory: true, status: "Failed", remarks: "Printer broken" }],
       log_name: "LOG-001",
     });
+    const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     expect(screen.getAllByRole("radio", { name: "checklist.fail" })[0]).toBeChecked();
     expect(screen.getByDisplayValue("Printer broken")).toBeInTheDocument();
@@ -98,6 +149,7 @@ describe("ChecklistGateDialog", () => {
     const onComplete = vi.fn();
     const user = userEvent.setup();
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={onComplete} />);
+    await start(user);
     await waitFor(() => { expect(screen.getByText(/Item 1/)).toBeInTheDocument(); });
     await user.click(screen.getAllByRole("radio", { name: "checklist.fail" })[0]);
     await user.type(screen.getByPlaceholderText("checklist.fail_remarks_placeholder"), "test");
@@ -126,8 +178,10 @@ describe("ChecklistGateDialog", () => {
     render(<ChecklistGateDialog posProfile="POS-001" checklistType="Opening" onComplete={vi.fn()} />);
     await waitFor(() => { expect(screen.getByText("checklist.blocked_heading")).toBeInTheDocument(); });
     expect(screen.getByText("checklist.blocked_message")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "checklist.recheck" })).toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /checklist.submit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "checklist.start" })).not.toBeInTheDocument();
   });
 
   it("displays title based on checklist type", async () => {

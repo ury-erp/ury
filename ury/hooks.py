@@ -269,6 +269,12 @@ doc_events = {
             "ury.ury.hooks.ury_pos_opening_entry.before_save",
             "ury.ury.hooks.pos_opening.update_daily_checklists",
         ],
+        # v16 runs `before_save` hooks ONLY for the save action: the POS
+        # opening screen creates the entry with .submit() (action "submit"
+        # runs validate + before_submit, skipping before_save), so the
+        # checklist gate must also be wired to before_submit -- otherwise
+        # the cashier can open the shift before the Order Taker submitted.
+        "before_submit": "ury.ury.hooks.pos_opening.update_daily_checklists",
         "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
         },
     "POS Closing Entry": {
@@ -627,6 +633,9 @@ fixtures = [
                     "POS Profile-high_volume",
                     "POS Profile-low_volume",
                     "POS Profile-high_food_cost",
+                    "POS Profile-custom_wastage_real_time_stock",
+                    "POS Profile-custom_enable_opening_date",
+                    "POS Profile-custom_wastage_time",
                     "Cost Center-branch",
                     "Journal Entry-branch",
                     "Employee-payment_amount",

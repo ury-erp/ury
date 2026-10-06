@@ -3,7 +3,6 @@ from frappe import _
 from datetime import datetime
 
 from ury.ury_pos.api import (
-	POS_EVENT_ROLE_RANK,
 	_goal_submitted_since,
 	_phase_dependent_rows,
 	_role_rank,
@@ -11,13 +10,12 @@ from ury.ury_pos.api import (
 
 
 def validate_daily_checklists(doc, method):
-	"""Closing runs Order Taker -> Cashier -> RM. The POS Closing Entry is
-	created at the Cashier step, so every role BEFORE the cashier in the
-	closing sequence -- the Order Taker -- must have SUBMITTED its closing
-	checklist (review created since the shift opened) before the shift can
-	close. A submitted checklist may contain FAIL objectives -- valid
-	response, not a blocker. Roles after the cashier (RM) close later and do
-	not gate this document."""
+	"""Closing runs Order Taker -> Cashier -> Restaurant Manager, and the
+	POS Closing Entry is the FINAL step -- the cashier may close only after
+	all three submitted their closing checklist for this shift (each review
+	created since the shift opened). Role-level: one submission per role
+	suffices no matter how many users hold it. A submitted checklist may
+	contain FAIL objectives -- valid response, not a blocker."""
 	pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
 	branch = pos_profile.branch
 
@@ -37,14 +35,14 @@ def validate_daily_checklists(doc, method):
 			frappe.throw(error_list, title=_("Validation Error"), as_list=True)
 
 	for row in _phase_dependent_rows(doc.pos_profile, "Closing"):
-		rank = _role_rank(row.role)
 		if _goal_submitted_since(row.quality_checklist, branch, start_date):
 			doc.append(
 				"quality_checklist",
 				{"checklist": row.quality_checklist, "check_2": 1},
 			)
-		elif rank is not None and rank > POS_EVENT_ROLE_RANK:
-			# Only roles before the Cashier step block the closing document.
+		elif _role_rank(row.role) is not None:
+			# Every ranked role in the closing sequence gates the closing
+			# document: Order Taker AND Cashier AND Restaurant Manager.
 			non_completed_checklists.append(
 				_("Pending checklist: {} ").format(
 					frappe.bold(row.quality_checklist)

@@ -127,6 +127,34 @@ const ServeRouteGuard: React.FC<Props> = ({ children }) => {
     )
   }
 
+  if (!capabilities?.canTakeTableOrders) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="text-center">
+          <h2 className="mb-2 text-xl font-semibold text-gray-800">Not permitted</h2>
+          <p className="text-gray-600">You do not have permission to take table orders.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Opening checklist BEFORE the pos_open / daily-close blocks: the role
+  // hierarchy (RM -> Cashier -> Order Taker) is part of the opening sequence
+  // itself -- the POS Opening Entry is only ready once every step is
+  // submitted -- so the user's own checklist must be collectible here while
+  // the POS is still closed. Placed after the capability check so users
+  // without table-order permission still get "Not permitted" first.
+  if (!checklistDone) {
+    return (
+      <OpeningChecklist
+        user={userName}
+        posProfile={profileName}
+        branch={branch ?? undefined}
+        onReady={() => setChecklistDone(true)}
+      />
+    )
+  }
+
   if (openingState.pos_open === false) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -157,28 +185,6 @@ const ServeRouteGuard: React.FC<Props> = ({ children }) => {
           </Button>
         </div>
       </div>
-    )
-  }
-
-  if (!capabilities?.canTakeTableOrders) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="text-center">
-          <h2 className="mb-2 text-xl font-semibold text-gray-800">Not permitted</h2>
-          <p className="text-gray-600">You do not have permission to take table orders.</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!checklistDone) {
-    return (
-      <OpeningChecklist
-        user={userName}
-        posProfile={profileName}
-        branch={branch ?? undefined}
-        onReady={() => setChecklistDone(true)}
-      />
     )
   }
 

@@ -1,34 +1,29 @@
 {
  "actions": [],
- "allow_rename": 0,
- "autoname": "hash",
- "creation": "2026-08-28 00:00:00.000000",
+ "autoname": "WSTG-.FY.-.#####",
+ "creation": "2026-08-28 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "issue_authorization",
-  "plan",
+  "posting_date",
+  "posting_time",
+  "edit_posting_date",
   "branch",
   "company",
   "department",
   "production_unit",
+  "warehouse",
   "column_break_scope",
-  "component_item",
-  "stock_uom",
+  "issue_authorization",
+  "plan",
   "status",
-  "section_break_qty",
-  "held_qty_before",
-  "wasted_qty",
-  "column_break_qty",
   "reason_category",
   "reason_notes",
-  "section_break_valuation",
-  "valuation_rate",
-  "valuation_amount",
-  "valuation_is_estimated",
   "section_break_approval",
+  "items",
+  "section_break_mgsh",
   "captured_by",
   "captured_on",
   "column_break_approval",
@@ -36,26 +31,25 @@
   "approved_on",
   "approval_permission_basis",
   "section_break_audit",
-  "audit_log"
+  "audit_log",
+  "amended_from",
+  "stock_entry"
  ],
  "fields": [
   {
    "fieldname": "issue_authorization",
    "fieldtype": "Link",
+   "hidden": 1,
    "in_list_view": 1,
    "label": "Issue Authorization",
-   "options": "URY Issue Authorization",
-   "read_only": 1,
-   "reqd": 1
+   "options": "URY Issue Authorization"
   },
   {
    "fieldname": "plan",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Sales Plan",
-   "options": "URY Sales Plan",
-   "read_only": 1,
-   "reqd": 1
+   "options": "URY Sales Plan"
   },
   {
    "fieldname": "branch",
@@ -63,7 +57,6 @@
    "in_list_view": 1,
    "label": "Branch",
    "options": "Branch",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -71,7 +64,6 @@
    "fieldtype": "Link",
    "label": "Company",
    "options": "Company",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -79,36 +71,17 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Department",
-   "options": "URY Production Department",
-   "read_only": 1,
-   "reqd": 1
+   "options": "URY Production Department"
   },
   {
    "fieldname": "production_unit",
    "fieldtype": "Link",
    "label": "Production Unit",
-   "options": "URY Production Unit",
-   "read_only": 1
+   "options": "URY Production Unit"
   },
   {
    "fieldname": "column_break_scope",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "component_item",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Component Item",
-   "options": "Item",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "stock_uom",
-   "fieldtype": "Link",
-   "label": "Stock UOM",
-   "options": "UOM",
-   "read_only": 1
   },
   {
    "fieldname": "status",
@@ -119,62 +92,15 @@
    "read_only": 1
   },
   {
-   "fieldname": "section_break_qty",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "held_qty_before",
-   "fieldtype": "Float",
-   "label": "Held Qty Before Wastage",
-   "read_only": 1
-  },
-  {
-   "fieldname": "wasted_qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Wasted Qty",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_qty",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "reason_category",
    "fieldtype": "Select",
    "label": "Reason Category",
-   "options": "Spoilage\nPreparation Error\nDropped/Damaged\nExpired\nOther",
-   "read_only": 1
+   "options": "Spoilage\nPreparation Error\nDropped/Damaged\nExpired\nOther"
   },
   {
    "fieldname": "reason_notes",
    "fieldtype": "Small Text",
-   "label": "Reason Notes",
-   "read_only": 1
-  },
-  {
-   "fieldname": "section_break_valuation",
-   "fieldtype": "Section Break",
-   "label": "Valuation"
-  },
-  {
-   "fieldname": "valuation_rate",
-   "fieldtype": "Float",
-   "label": "Valuation Rate",
-   "read_only": 1
-  },
-  {
-   "fieldname": "valuation_amount",
-   "fieldtype": "Float",
-   "label": "Valuation Amount",
-   "read_only": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "valuation_is_estimated",
-   "fieldtype": "Check",
-   "label": "Valuation Is Estimated (Future Work: Real ERPNext Valuation Rate)",
-   "read_only": 1
+   "label": "Reason Notes"
   },
   {
    "fieldname": "section_break_approval",
@@ -223,15 +149,68 @@
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
    "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Wastage Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "URY Wastage",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_mgsh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "edit_posting_date",
+   "fieldtype": "Check",
+   "label": "Edit Posting Date and Time"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "default": "Now",
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "label": "Time"
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 0,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-08-28 00:00:00.000000",
+ "modified": "2026-10-05 18:44:15.308146",
  "modified_by": "Administrator",
  "module": "URY",
- "name": "URY Issue Wastage",
+ "name": "URY Wastage",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -268,8 +247,21 @@
    "read": 1,
    "report": 1,
    "role": "URY Manager"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Admin",
+   "share": 1,
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

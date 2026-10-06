@@ -1003,16 +1003,16 @@ def getAggregatorMOP(aggregator):
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
     if not frappe.has_permission("Customer", "create"):
-        frappe.throw("Not permitted to create customers", frappe.PermissionError)
-        
+        frappe.throw(_("Not permitted to create customers"), frappe.PermissionError)
+
     if not customer_name:
-        frappe.throw("Customer name is required")
+        frappe.throw(_("Customer name is required"))
     if not mobile_number:
-        frappe.throw("Mobile Number is required")
+        frappe.throw(_("Mobile Number is required"))
     try:
         validate_phone_number(mobile_number, throw=True)
     except Exception:
-        frappe.throw("Invalid mobile number format")
+        frappe.throw(_("Invalid mobile number format"))
 
     """Create a new customer"""
     try:
@@ -1030,7 +1030,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert()
+        customer.insert(ignore_permissions=False)
         frappe.db.commit()
 
         return {
@@ -1492,11 +1492,6 @@ _ROLE_RANK_TOKENS = (
 
 ROLE_RANK_LABELS = {0: "Restaurant Manager", 1: "Cashier", 2: "Order Taker"}
 
-# The shift open/close event (POS Opening/Closing Entry creation) sits at the
-# Cashier step of each sequence: opening requires earlier ranks (RM), closing
-# requires earlier-in-closing ranks (Order Taker).
-POS_EVENT_ROLE_RANK = 1
-
 
 def _role_rank(role):
     name = (role or "").lower()
@@ -1779,7 +1774,8 @@ def get_checklist(pos_profile, checklist_type):
     # Role-based sequence (grillax port): Opening runs RM -> Cashier ->
     # Order Taker, Closing the reverse. The gate stays closed -- with a
     # specific blocker message -- until every role before the user's step has
-    # a fully-Passed checklist for this branch/business day.
+    # SUBMITTED its checklist for this branch/business day (any PASS/FAIL
+    # mix; submission, not passing, is what unlocks the next role).
     branch = getBranch()
     rows = _phase_dependent_rows(pos_profile, checklist_type)
     user_roles = frappe.get_roles()

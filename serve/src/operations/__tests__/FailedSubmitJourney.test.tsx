@@ -38,6 +38,9 @@ describe('OpeningChecklist failed-objective submission', () => {
     )
 
     // answer FAIL + remark and submit
+    await user.click(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    )
     await user.click((await screen.findAllByRole('radio'))[1])
     await user.type(await screen.findByPlaceholderText(/Explain the failure/), 'test')
     await user.click(screen.getByRole('button', { name: /Submit checklist/i }))
@@ -76,6 +79,9 @@ describe('OpeningChecklist failed-objective submission', () => {
     )
 
     // prefilled FAIL + remark; flip to PASS and submit
+    await user.click(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    )
     const radios = await screen.findAllByRole('radio')
     expect((radios[1] as HTMLInputElement).checked).toBe(true)
     await user.click(radios[0])

@@ -50,16 +50,19 @@ type ChecklistApiResponse = {
   }
 }
 
+export type ChecklistType = 'Opening' | 'Closing'
+
 /**
  * URY opening/closing checklist (not Grillax Quality Goal).
  * Methods: ury.ury_pos.api.get_checklist / submit_checklist
  */
-export async function fetchOpeningChecklist(
-  posProfile: string
+async function fetchChecklist(
+  posProfile: string,
+  checklistType: ChecklistType
 ): Promise<ChecklistFetchResult> {
   const response = await call.get<ChecklistApiResponse>('ury.ury_pos.api.get_checklist', {
     pos_profile: posProfile,
-    checklist_type: 'Opening',
+    checklist_type: checklistType,
   })
   const message = response?.message ?? {}
   return {
@@ -70,14 +73,15 @@ export async function fetchOpeningChecklist(
   }
 }
 
-export async function submitOpeningChecklist(
+async function submitChecklist(
   posProfile: string,
+  checklistType: ChecklistType,
   items: SubmitChecklistItem[],
   posOpeningEntry?: string
 ): Promise<SubmitChecklistResult> {
   const payload: Record<string, unknown> = {
     pos_profile: posProfile,
-    checklist_type: 'Opening',
+    checklist_type: checklistType,
     items: JSON.stringify(items),
   }
   if (posOpeningEntry) {
@@ -93,6 +97,33 @@ export async function submitOpeningChecklist(
     status: message.status ?? 'In Progress',
     name: message.name ?? null,
   }
+}
+
+export function fetchOpeningChecklist(
+  posProfile: string
+): Promise<ChecklistFetchResult> {
+  return fetchChecklist(posProfile, 'Opening')
+}
+
+export function submitOpeningChecklist(
+  posProfile: string,
+  items: SubmitChecklistItem[],
+  posOpeningEntry?: string
+): Promise<SubmitChecklistResult> {
+  return submitChecklist(posProfile, 'Opening', items, posOpeningEntry)
+}
+
+export function fetchClosingChecklist(
+  posProfile: string
+): Promise<ChecklistFetchResult> {
+  return fetchChecklist(posProfile, 'Closing')
+}
+
+export function submitClosingChecklist(
+  posProfile: string,
+  items: SubmitChecklistItem[]
+): Promise<SubmitChecklistResult> {
+  return submitChecklist(posProfile, 'Closing', items)
 }
 
 export function isMandatory(item: { is_mandatory?: boolean | number }): boolean {

@@ -10,7 +10,7 @@ from ury.ury_pos.api import get_split_group, getPosInvoiceItems
 from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
 from ury.ury_pos.api import submit_checklist
 import json
-from datetime import date
+from datetime import date, datetime
 
 
 class TestGetRestaurantMenuPhase1(unittest.TestCase):
@@ -1447,3 +1447,278 @@ class TestDependentChecklistBridge(FrappeTestCase):
             [item["item_label"] for item in result["items"]],
             ["Objective 1", "Objective 2"],
         )
+
+
+class TestPhaseHierarchyHooks(FrappeTestCase):
+	"""The POS Opening/Closing Entry documents are the LAST step of each
+	checklist sequence -- every configured role goal must be SUBMITTED
+	(role-level, any PASS/FAIL mix) before the document passes its hook:
+
+	- Opening: RM -> Cashier -> Order Taker all submitted, then open.
+	- Closing: Order Taker -> Cashier -> RM all submitted, then close.
+	"""
+
+	OPENING_ROWS = [
+		frappe._dict({
+			"quality_checklist": "RM Opening Checklist",
+			"select_2": "RM Opening Checklist",
+			"role": "Restaurant Manager",
+		}),
+		frappe._dict({
+			"quality_checklist": "Cashier Opening Checklist",
+			"select_2": "Order Taking",
+			"role": "Cashier",
+		}),
+		frappe._dict({
+			"quality_checklist": "OT Opening Checklist",
+			"select_2": "Order Taker Opening Checklist",
+			"role": "Order Taker",
+		}),
+	]
+
+	CLOSING_ROWS = [
+		frappe._dict({
+			"quality_checklist": "OT Closing Checklist",
+			"select_2": "Order Taker Closing Checklist",
+			"role": "Order Taker",
+		}),
+		frappe._dict({
+			"quality_checklist": "Cashier Closing Checklist",
+			"select_2": "POS Closing Entry",
+			"role": "Cashier",
+		}),
+		frappe._dict({
+			"quality_checklist": "RM Closing Checklist",
+			"select_2": "RM Closing Checklist",
+			"role": "Restaurant Manager",
+		}),
+		frappe._dict({
+			"quality_checklist": "Unranked Side Quest",
+			"select_2": "RM Closing Checklist",
+			"role": "Accounts User",
+		}),
+	]
+
+	def setUp(self):
+		self.submitted = set()
+
+	def _exists_side_effect(self, doctype=None, filters=None, *args, **kwargs):
+		# Real _goal_submitted: frappe.db.exists("Quality Review", {goal,
+		# branch, date, status in [Passed, Failed]}). Role-level: no owner.
+		# frappe internals also call exists(doctype, name) during insert --
+		# pretend those references resolve.
+		if isinstance(filters, dict):
+			return filters.get("goal") in self.submitted
+		return True
+
+	def _get_all_side_effect(self, doctype, **kwargs):
+		# Real _goal_submitted_since: frappe.get_all(..., pluck="name").
+		filters = kwargs.get("filters") or {}
+		return ["QR-1"] if filters.get("goal") in self.submitted else []
+
+	class _ClosingDoc:
+		pos_profile = "POS-MAIN"
+		period_start_date = datetime(2026, 10, 6, 8, 0, 0)
+
+		def __init__(self):
+			self.quality_checklist = []
+
+		def append(self, field, row):
+			self.assert_field = field
+			self.quality_checklist.append(row)
+
+	# -- Opening hook ------------------------------------------------------
+
+	@patch("ury.ury.hooks.pos_opening.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_opening._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.db.exists")
+	def test_opening_blocked_until_cashier_submitted(
+		self, mock_exists, mock_rows, mock_get_doc
+	):
+		"""RM submitted is no longer enough: the Cashier and Order Taker
+		steps must be submitted too before the POS Opening Entry saves."""
+		from ury.ury.hooks.pos_opening import update_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.OPENING_ROWS
+		mock_exists.side_effect = self._exists_side_effect
+		self.submitted = {"RM Opening Checklist"}
+
+		doc = frappe._dict(pos_profile="POS-MAIN", posting_date=date.today())
+		with self.assertRaises(frappe.ValidationError) as cm:
+			update_daily_checklists(doc, None)
+		self.assertIn("Cashier Opening Checklist", str(cm.exception))
+		self.assertIn("OT Opening Checklist", str(cm.exception))
+
+	@patch("ury.ury.hooks.pos_opening.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_opening._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.db.exists")
+	def test_opening_blocked_until_one_ot_submitted(
+		self, mock_exists, mock_rows, mock_get_doc
+	):
+		from ury.ury.hooks.pos_opening import update_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.OPENING_ROWS
+		mock_exists.side_effect = self._exists_side_effect
+		self.submitted = {"RM Opening Checklist", "Cashier Opening Checklist"}
+
+		doc = frappe._dict(pos_profile="POS-MAIN", posting_date=date.today())
+		with self.assertRaises(frappe.ValidationError) as cm:
+			update_daily_checklists(doc, None)
+		self.assertIn("OT Opening Checklist", str(cm.exception))
+
+	@patch("ury.ury.hooks.pos_opening.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_opening._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.db.exists")
+	def test_opening_passes_when_full_hierarchy_submitted(
+		self, mock_exists, mock_rows, mock_get_doc
+	):
+		"""RM + Cashier + Order Taker all submitted -> the shift can open.
+		One OT review satisfies the OT step (role-level gate)."""
+		from ury.ury.hooks.pos_opening import update_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.OPENING_ROWS
+		mock_exists.side_effect = self._exists_side_effect
+		self.submitted = {
+			"RM Opening Checklist",
+			"Cashier Opening Checklist",
+			"OT Opening Checklist",
+		}
+
+		doc = frappe._dict(pos_profile="POS-MAIN", posting_date=date.today())
+		update_daily_checklists(doc, None)  # must not raise
+
+	# -- Closing hook ------------------------------------------------------
+
+	@patch("ury.ury.hooks.pos_closing.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_closing._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.get_all")
+	def test_closing_blocked_until_cashier_and_rm_submitted(
+		self, mock_get_all, mock_rows, mock_get_doc
+	):
+		"""Order Taker submitted is no longer enough: the Cashier AND the
+		RM closing steps must be submitted before the POS Closing Entry
+		validates."""
+		from ury.ury.hooks.pos_closing import validate_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.CLOSING_ROWS
+		mock_get_all.side_effect = self._get_all_side_effect
+		self.submitted = {"OT Closing Checklist"}
+
+		doc = self._ClosingDoc()
+		with self.assertRaises(frappe.ValidationError) as cm:
+			validate_daily_checklists(doc, None)
+		self.assertIn("Cashier Closing Checklist", str(cm.exception))
+		self.assertIn("RM Closing Checklist", str(cm.exception))
+
+	@patch("ury.ury.hooks.pos_closing.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_closing._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.get_all")
+	def test_closing_blocked_until_rm_submitted(
+		self, mock_get_all, mock_rows, mock_get_doc
+	):
+		from ury.ury.hooks.pos_closing import validate_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.CLOSING_ROWS
+		mock_get_all.side_effect = self._get_all_side_effect
+		self.submitted = {"OT Closing Checklist", "Cashier Closing Checklist"}
+
+		doc = self._ClosingDoc()
+		with self.assertRaises(frappe.ValidationError) as cm:
+			validate_daily_checklists(doc, None)
+		self.assertIn("RM Closing Checklist", str(cm.exception))
+
+	@patch("ury.ury.hooks.pos_closing.frappe.get_doc")
+	@patch("ury.ury.hooks.pos_closing._phase_dependent_rows")
+	@patch("ury.ury_pos.api.frappe.get_all")
+	def test_closing_passes_when_full_hierarchy_submitted(
+		self, mock_get_all, mock_rows, mock_get_doc
+	):
+		"""OT + Cashier + RM submitted -> the shift can close. Submitted
+		goals are recorded on the document; unranked roles stay outside
+		the sequence."""
+		from ury.ury.hooks.pos_closing import validate_daily_checklists
+
+		mock_get_doc.return_value = frappe._dict(branch="Branch A")
+		mock_rows.return_value = self.CLOSING_ROWS
+		mock_get_all.side_effect = self._get_all_side_effect
+		self.submitted = {
+			"OT Closing Checklist",
+			"Cashier Closing Checklist",
+			"RM Closing Checklist",
+		}
+
+		doc = self._ClosingDoc()
+		validate_daily_checklists(doc, None)  # must not raise
+
+		recorded = [row["checklist"] for row in doc.quality_checklist]
+		self.assertEqual(
+			recorded,
+			[
+				"OT Closing Checklist",
+				"Cashier Closing Checklist",
+				"RM Closing Checklist",
+			],
+		)
+		self.assertTrue(
+			all(row["check_2"] == 1 for row in doc.quality_checklist)
+		)
+
+	def test_submit_action_also_enforces_checklist_gate(self):
+		"""Regression for the real bypass: the POS opening screen creates the
+		entry with .submit(), and frappe v16 runs `before_save` hooks ONLY
+		for the save action -- the submit action runs `validate` +
+		`before_submit`. The gate must therefore fire on before_submit too
+		(wired in ury/hooks.py), or the cashier can open the shift before
+		the Order Taker submitted."""
+		# Real profile name: the other validate hooks (set_cashier_room,
+		# stock_count_gate) resolve it through cached paths the mock cannot
+		# cover; the checklist assertions below only depend on the rows and
+		# review-existence mocks.
+		doc = frappe.get_doc({
+			"doctype": "POS Opening Entry",
+			"company": "URY",
+			"pos_profile": "URY",
+			"user": "cashier@example.com",
+			"period_start_date": datetime(2026, 10, 6, 8, 0, 0),
+			"posting_date": date(2026, 10, 6),
+		})
+		self.submitted = {"RM Opening Checklist", "Cashier Opening Checklist"}
+		# Patch only around submit(): get_doc is also used by frappe internals
+		# during insert, so mock just the hook's POS Profile lookup.
+		real_get_doc = frappe.get_doc
+
+		def fake_get_doc(doctype, name=None, *args, **kwargs):
+			if doctype == "POS Profile":
+				return frappe._dict(branch="Branch A")
+			if name is None and not args and not kwargs:
+				return real_get_doc(doctype)
+			return real_get_doc(doctype, name, *args, **kwargs)
+
+		with patch("ury.ury.hooks.pos_opening.frappe.get_doc") as mock_get_doc, \
+			patch("ury.ury.hooks.pos_opening._phase_dependent_rows") as mock_rows, \
+			patch("ury.ury_pos.api.frappe.db.exists") as mock_exists:
+			mock_get_doc.side_effect = fake_get_doc
+			mock_rows.return_value = self.OPENING_ROWS
+			mock_exists.side_effect = self._exists_side_effect
+			with self.assertRaises(frappe.ValidationError) as cm:
+				doc.submit()
+		self.assertIn("OT Opening Checklist", str(cm.exception))
+
+	def test_opening_hook_wired_to_save_and_submit_actions(self):
+		"""Guard the wiring itself: if the gate is dropped from either
+		action, one of the two creation paths (desk save vs POS submit)
+		bypasses the hierarchy."""
+		from ury import hooks as ury_hooks
+
+		events = ury_hooks.doc_events["POS Opening Entry"]
+		for action in ("before_save", "before_submit"):
+			wired = events.get(action)
+			wired = [wired] if isinstance(wired, str) else (wired or [])
+			self.assertIn(
+				"ury.ury.hooks.pos_opening.update_daily_checklists", wired
+			)

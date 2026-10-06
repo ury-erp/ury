@@ -12,10 +12,11 @@ from ury.ury_pos.api import (
 @frappe.whitelist()
 def ordertaker_checklist(branch, employee):
 	"""Desk URY Order gate -- mirrors the POS/serve opening sequence so the
-	desk flow cannot bypass it: every role before the user's must have a
-	fully-Passed opening checklist for this branch/business day, and the
-	user's own goals must be Passed too. A recorded FAIL is a valid
-	submission but must NOT let the order taker through."""
+	desk flow cannot bypass it: every role before the user's must have
+	SUBMITTED its opening checklist for this branch/business day, and the
+	user's own goals must be submitted too. Submission means every objective
+	carries an explicit result -- PASS or FAIL both count; a recorded FAIL
+	with a remark is a completed checklist, never a blocker."""
 	open_shift = frappe.get_all(
 		"POS Opening Entry",
 		fields=["posting_date"],
@@ -27,8 +28,6 @@ def ordertaker_checklist(branch, employee):
 		return 0, frappe.conf.url
 
 	user = frappe.get_doc("User", employee)
-	if user.role_profile_name == "Restaurant Manager":
-		return 0, frappe.conf.url
 
 	pos_profile_name = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
 	if not pos_profile_name:
@@ -36,6 +35,9 @@ def ordertaker_checklist(branch, employee):
 
 	period_date = open_shift[0].posting_date
 	rows = _phase_dependent_rows(pos_profile_name, "Opening")
+	if not rows:
+		return 0, frappe.conf.url
+
 	user_roles = [role.role for role in user.roles]
 
 	blocker = _checklist_blocker(rows, "Opening", branch, period_date, user_roles)
