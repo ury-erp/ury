@@ -662,7 +662,12 @@ fixtures = [
                     "POS Profile-validate_stock_correction",
                     "POS Profile-validate_daily_p_and_l",
                     "POS Profile-validate_attendance",
-                    "POS Profile-validate_wastage"
+                    "POS Profile-validate_wastage",
+                    "POS Profile-custom_column_break_ydn1v",
+                    "POS Profile-custom_disposables",
+                    "POS Profile-custom_column_break_bgzjv",
+                    "POS Profile-custom_section_break_bmczy",
+                    "POS Profile-custom_ury_pos_configurations"
                 },
             ]
         ],
