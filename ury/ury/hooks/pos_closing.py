@@ -85,12 +85,24 @@ def process_stock_corrections_background(closing_entry):
     if not stock_corrections:
         return
 
-    from frappe.utils import getdate, get_time, now_datetime
-    from datetime import timedelta
+    pos_profile = closing_entry_doc.get("pos_profile")
+    wstg_time = frappe.db.get_value("POS Profile", pos_profile, "custom_wastage_time")
+    sales_time = frappe.db.get_value("POS Profile", pos_profile, "custom_sales_closing_time")
+    p_time = wstg_time if wstg_time else sales_time
     
-    date_time = now_datetime()
-    date = date_time.date()
-    time = date_time.time()
+    from frappe.utils import getdate, get_time
+    from datetime import datetime, timedelta
+    p_date = getdate(closing_entry_doc.get("period_start_date"))
+    if not p_time:
+        date_time = datetime.now()
+    else:
+        date_time = datetime.combine(p_date, get_time(p_time))
+    
+    # 10 mins delay
+    delay_minutes = 10
+    new_date_time = date_time + timedelta(minutes=delay_minutes)
+    date = new_date_time.date()
+    time = new_date_time.time()
 
     for row in stock_corrections:
         if not row.stock_correction:
