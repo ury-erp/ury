@@ -1690,8 +1690,10 @@ class TestPhaseHierarchyHooks(FrappeTestCase):
 		# Link validation runs before the before_submit hooks this test
 		# targets, and the placeholder company/profile/user above only exist
 		# on the authoring dev site -- skip link integrity here (the subject
-		# is hook firing, not references).
+		# is hook firing, not references). ERPNext's own validate hook unpacks
+		# a POS Profile row that equally doesn't exist on a bare CI site.
 		doc._validate_links = lambda: None
+		doc.validate_pos_profile_and_cashier = lambda: None
 		self.submitted = {"RM Opening Checklist", "Cashier Opening Checklist"}
 		# Patch only around submit(): get_doc is also used by frappe internals
 		# during insert, so mock just the hook's POS Profile lookup.
