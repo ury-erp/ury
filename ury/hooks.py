@@ -55,7 +55,7 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 
 # include js in doctype views
 doctype_js = {
-    "POS Closing Entry": "ury/public/js/pos_closing_entry_clock_integrity.js",
+    "POS Closing Entry": "ury/public/js/pos_closing_entry.js",
     "Production Plan": [
         "public/js/production_plan_cancel_guard.js",
         "public/js/production_plan_prepare.js",
@@ -289,6 +289,10 @@ doc_events = {
             # the branch has `closing_reconciliation_enabled` (tier gate 3).
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
             "ury.ury.hooks.pos_closing.validate_daily_checklists",
+            "ury.ury.hooks.pos_closing.validate_stock_correction",
+        ],
+        "on_submit": [
+            "ury.ury.hooks.pos_closing.submit_stock_correction",
         ],
         },
     "Quality Review": {
@@ -607,6 +611,10 @@ fixtures = [
                     "Printer Settings-kot",
                     "POS Profile-kot_naming_series",
                     "POS Profile-custom_kot_settings",
+                    "POS Profile-submit_stock_correction",
+                    "POS Closing Entry-draft_stock_correction",
+                    "POS Profile-custom_sales_closing_time",
+                    "POS Profile-custom_wastage_time",
                     "POS Profile-custom_kot_alert",
                     "POS Profile-custom_kot_alert_sound",
                     "POS Profile-custom_kot_warning_time",
@@ -660,7 +668,16 @@ fixtures = [
                     "Stock Entry-branch",
                     "Stock Entry-custom_ury_posting_intent",
                     "POS Profile-cash_discount_account",
-                    "Sales Invoice-cash_discount_journal_entry"
+                    "Sales Invoice-cash_discount_journal_entry",
+                    "POS Profile-validate_stock_correction",
+                    "POS Profile-validate_daily_p_and_l",
+                    "POS Profile-validate_attendance",
+                    "POS Profile-validate_wastage",
+                    "POS Profile-custom_column_break_ydn1v",
+                    "POS Profile-custom_disposables",
+                    "POS Profile-custom_column_break_bgzjv",
+                    "POS Profile-custom_section_break_bmczy",
+                    "POS Profile-custom_ury_pos_configurations"
                 },
             ]
         ],

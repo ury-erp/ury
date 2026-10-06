@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2026-09-08 00:00:00.000000",
+ "creation": "2024-03-22 19:10:44.233770",
  "default_view": "List",
  "doctype": "DocType",
  "document_type": "Other",
@@ -27,11 +27,15 @@
    "fetch_from": "item_code.item_name",
    "fieldname": "item_name",
    "fieldtype": "Data",
-   "in_global_search": 1,
    "label": "Item Name",
-   "no_copy": 1,
-   "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.item_group",
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
   },
   {
    "columns": 3,
@@ -39,15 +43,12 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Warehouse",
-   "options": "Warehouse"
+   "options": "Warehouse",
+   "reqd": 1
   },
   {
-   "columns": 2,
-   "description": "Corrective delta to apply on top of the referenced Stock Reconciliation's recorded quantity. Positive = quantity found in excess (posted as a Material Receipt); negative = quantity found short (posted as a Material Issue).",
-   "fieldname": "qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Correction Qty (Delta)"
+   "fieldname": "column_break_6",
+   "fieldtype": "Column Break"
   },
   {
    "columns": 2,
@@ -56,17 +57,106 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "UOM",
-   "options": "UOM"
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Quantity"
+  },
+  {
+   "columns": 1,
+   "fieldname": "valuation_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Valuation Rate",
+   "options": "Company:company:default_currency",
+   "read_only_depends_on": "eval:doc.edit_valuation_rate == 0"
+  },
+  {
+   "columns": 2,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Before Correction"
+  },
+  {
+   "fieldname": "current_qty",
+   "fieldtype": "Float",
+   "label": "Current Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "current_amount",
+   "fieldtype": "Currency",
+   "label": "Current Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_9",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_valuation_rate",
+   "fieldtype": "Currency",
+   "label": "Current Valuation Rate",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "current_serial_no",
+   "fieldtype": "Long Text",
+   "label": "Current Serial No",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_14",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "quantity_difference",
+   "fieldtype": "Read Only",
+   "label": "Quantity Difference"
+  },
+  {
+   "fieldname": "column_break_16",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amount_difference",
+   "fieldtype": "Currency",
+   "label": "Amount Difference",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "edit_valuation_rate",
+   "fieldtype": "Check",
+   "label": "Edit Valuation Rate"
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-08 00:00:00.000000",
+ "modified": "2024-03-22 19:10:44.233770",
  "modified_by": "Administrator",
- "module": "URY",
+ "module": "Ury",
  "name": "Stock Correction Item",
  "owner": "Administrator",
  "permissions": [],
+ "quick_entry": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

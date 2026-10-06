@@ -1,0 +1,40 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-04-07 11:38:54.447891",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "stock_entry"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "width": "3"
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Stock Entry",
+   "width": "3"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-04-07 11:40:06.844706",
+ "modified_by": "Administrator",
+ "module": "Ury",
+ "name": "Cancelled Stock Correction Entry",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

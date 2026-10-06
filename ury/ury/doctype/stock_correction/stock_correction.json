@@ -1,117 +1,309 @@
 {
  "actions": [],
- "allow_rename": 0,
- "autoname": "hash",
- "creation": "2026-09-08 00:00:00.000000",
- "default_view": "List",
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2024-10-25 10:28:17.590338",
+ "description": "This tool helps you to update or fix the quantity and valuation of stock in the system. It is typically used to synchronise the system values and what actually exists in your warehouses.",
  "doctype": "DocType",
- "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "reference_stock_reconciliation",
-  "branch",
-  "warehouse",
-  "column_break_posting",
+  "naming_series",
+  "company",
   "posting_date",
+  "col1",
+  "period_end_date",
   "posting_time",
-  "section_break_items",
-  "items",
-  "section_break_reason",
+  "edit_posting_date",
+  "section_break_8",
+  "column_break_pr0l",
+  "branch",
+  "column_break_nlca",
+  "set_warehouse",
+  "section_break_zbxn",
+  "reference_stock_correction",
   "reason",
+  "column_break_omej",
   "remarks",
-  "section_break_result",
-  "stock_entry"
+  "section_break_22",
+  "items",
+  "section_break_9",
+  "expense_account",
+  "column_break_13",
+  "difference_amount",
+  "accounting_dimensions_section",
+  "cost_center",
+  "amended_from",
+  "correction_stock_entries_section",
+  "correction_stock_entries",
+  "cancelled_stock_entries_section",
+  "cancelled_stock_correction_entry",
+  "revised_correction_items_section",
+  "reference_revised_correction",
+  "revised_correction_items",
+  "section_break_pdni",
+  "status",
+  "error",
+  "notified"
  ],
  "fields": [
   {
-   "fieldname": "reference_stock_reconciliation",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "STK-CORR-.YYYY.-",
+   "print_hide": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "company",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Reference Stock Reconciliation",
-   "options": "Stock Reconciliation",
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
    "reqd": 1
   },
   {
-   "fieldname": "branch",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Branch",
-   "options": "Branch",
-   "reqd": 1
-  },
-  {
-   "fieldname": "warehouse",
-   "fieldtype": "Link",
-   "label": "Warehouse",
-   "options": "Warehouse"
-  },
-  {
-   "fieldname": "column_break_posting",
+   "fieldname": "col1",
    "fieldtype": "Column Break"
   },
   {
    "default": "Today",
    "fieldname": "posting_date",
    "fieldtype": "Date",
-   "label": "Posting Date"
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "read_only_depends_on": "eval:doc.edit_posting_date == 0",
+   "reqd": 1
   },
   {
    "fieldname": "posting_time",
    "fieldtype": "Time",
-   "label": "Posting Time"
+   "in_list_view": 1,
+   "label": "Posting Time",
+   "read_only_depends_on": "eval:doc.edit_posting_date == 0",
+   "reqd": 1
   },
   {
-   "fieldname": "section_break_items",
-   "fieldtype": "Section Break",
-   "label": "Items"
+   "default": "0",
+   "fieldname": "edit_posting_date",
+   "fieldtype": "Check",
+   "label": "Edit Posting Date",
+   "permlevel": 1
   },
   {
+   "fieldname": "section_break_8",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_pr0l",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "column_break_nlca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "set_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_break_zbxn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "reference_stock_correction",
+   "fieldtype": "Link",
+   "label": "Reference Stock Correction",
+   "options": "Stock Correction",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.reference_stock_correction",
+   "fieldname": "reason",
+   "fieldtype": "Select",
+   "label": "Reason",
+   "mandatory_depends_on": "eval:doc.reference_stock_correction",
+   "options": "\nCounting Mistake\nOthers"
+  },
+  {
+   "fieldname": "column_break_omej",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.reference_stock_correction",
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks",
+   "mandatory_depends_on": "eval:doc.reference_stock_correction"
+  },
+  {
+   "fieldname": "section_break_22",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_bulk_edit": 1,
    "fieldname": "items",
    "fieldtype": "Table",
-   "label": "Correction Items",
+   "label": "Items",
    "options": "Stock Correction Item",
    "reqd": 1
   },
   {
-   "fieldname": "section_break_reason",
-   "fieldtype": "Section Break",
-   "label": "Reason"
+   "fieldname": "section_break_9",
+   "fieldtype": "Section Break"
   },
   {
-   "fieldname": "reason",
-   "fieldtype": "Small Text",
-   "label": "Reason"
-  },
-  {
-   "fieldname": "remarks",
-   "fieldtype": "Text",
-   "label": "Remarks"
-  },
-  {
-   "fieldname": "section_break_result",
-   "fieldtype": "Section Break",
-   "label": "Result"
-  },
-  {
-   "fieldname": "stock_entry",
+   "fieldname": "expense_account",
    "fieldtype": "Link",
-   "label": "Stock Entry",
-   "options": "Stock Entry",
+   "in_standard_filter": 1,
+   "label": "Difference Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_13",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "difference_amount",
+   "fieldtype": "Currency",
+   "label": "Difference Amount",
+   "options": "Company:company:default_currency",
    "read_only": 1
+  },
+  {
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Stock Correction",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "correction_stock_entries_section",
+   "fieldtype": "Section Break",
+   "label": "Correction Stock Entries"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "correction_stock_entries",
+   "fieldtype": "Table",
+   "label": "Correction Stock Entries",
+   "no_copy": 1,
+   "options": "Correction Stock Entries"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "revised_correction_items_section",
+   "fieldtype": "Section Break",
+   "label": "Revised Correction Items"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "reference_revised_correction",
+   "fieldtype": "Data",
+   "label": "Reference Revised Correction",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "revised_correction_items",
+   "fieldtype": "Table",
+   "label": "Revised Correction Items",
+   "no_copy": 1,
+   "options": "Revised Correction Items",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_pdni",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "no_copy": 1,
+   "options": "\nDraft\nSubmitted\nQueued\nFailed\nCancelled",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "error",
+   "fieldtype": "Long Text",
+   "label": "Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "cancelled_stock_correction_entry",
+   "fieldtype": "Table",
+   "label": "Cancelled Stock Correction Entry",
+   "no_copy": 1,
+   "options": "Cancelled Stock Correction Entry"
+  },
+  {
+   "fieldname": "cancelled_stock_entries_section",
+   "fieldtype": "Section Break",
+   "label": "Cancelled Stock Entries"
+  },
+  {
+   "default": "Today",
+   "fieldname": "period_end_date",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "in_list_view": 1,
+   "label": "Period End Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_stock_reconciliation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Reference Stock Reconciliation",
+   "options": "Stock Reconciliation",
+   "reqd": 0
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "istable": 0,
  "links": [],
- "modified": "2026-09-08 00:00:00.000000",
+ "modified": "2025-05-21 10:19:27.909325",
  "modified_by": "Administrator",
- "module": "URY",
+ "module": "Ury",
  "name": "Stock Correction",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
-   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -119,29 +311,23 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "System Manager",
+   "role": "Stock Manager",
    "share": 1,
    "submit": 1,
    "write": 1
-  },
-  {
-   "cancel": 1,
-   "create": 1,
-   "email": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Stock Manager",
-   "submit": 1,
-   "write": 1
-  },
-  {
-   "read": 1,
-   "report": 1,
-   "role": "Stock User"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Orange",
+   "title": "Queued"
+  },
+  {
+   "color": "Red",
+   "title": "Failed"
+  }
+ ]
 }

@@ -80,7 +80,7 @@ function formatTime(date: Date): string {
  * The server returns `now_datetime().isoformat()`, e.g.
  * "2026-09-08T10:15:23.123456" -- already in the site's system timezone, no
  * client-side tz conversion needed. Microseconds are dropped before parsing
- * (mirrors pos_closing_entry_clock_integrity.js) since `Date` parsing of
+ * (mirrors pos_closing_entry.js) since `Date` parsing of
  * fractional seconds beyond milliseconds is inconsistent across browsers.
  */
 async function getServerNow(): Promise<Date> {

@@ -65,7 +65,7 @@ export default function CaptainTables() {
   // misconfigured device clock). Reusing the same
   // `ury.ury.api.ury_server_time.get_server_time` endpoint the POS Closing
   // Entry clock-integrity check already uses for this exact class of
-  // problem (see `pos_closing_entry_clock_integrity.js`) avoids inventing a
+  // problem (see `pos_closing_entry.js`) avoids inventing a
   // second mechanism. Fetched once per screen load and applied as a fixed
   // offset against the browser's own `Date.now()` ticking forward, rather
   // than re-fetched every render.

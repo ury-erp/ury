@@ -4,5 +4,6 @@
 # import frappe
 from frappe.model.document import Document
 
-class StockCorrectionItem(Document):
+
+class CorrectionStockEntries(Document):
 	pass

@@ -8,6 +8,60 @@ def validate(doc, method):
     populate_pos_transactions(doc, method)
     calculate_closing_amount(doc, method)
     validate_cashier(doc, method)
+    validate_ported_checks(doc, method)
+
+def validate_ported_checks(doc, method):
+    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
+    branch = pos_profile.branch
+    warehouse = pos_profile.warehouse
+    errors = []
+
+    start_date = doc.period_start_date
+    end_date = doc.period_end_date
+    period_start_date = get_datetime(start_date).date()
+
+    if pos_profile.validate_stock_correction:
+        stock_correction = frappe.db.get_value(
+            "Stock Correction", 
+            {"branch": branch, "set_warehouse": warehouse, "period_end_date": ["between", [start_date, end_date]]}, 
+            "name"
+        )
+        if not stock_correction:
+            errors.append("Stock Correction: not generated for today")
+
+    if pos_profile.validate_daily_p_and_l:
+        daily_p_and_l = frappe.db.get_value(
+            "URY Daily P and L", 
+            {"docstatus": 0, "branch": branch, "date": period_start_date}, 
+            "name"
+        )
+        if not daily_p_and_l:
+            errors.append("Daily P and L: No entries today")
+
+    if pos_profile.validate_attendance:
+        attnd_query = """
+            SELECT a.name
+            FROM `tabAttendance` a
+            INNER JOIN `tabEmployee` b ON b.name = a.employee
+            WHERE b.branch = %s AND a.docstatus = 1 AND a.attendance_date = %s
+        """
+        attendance = frappe.db.sql(attnd_query, (branch, period_start_date), as_dict=True)
+        if not attendance:
+            errors.append("Attendance: Not marked for today")
+
+    if pos_profile.validate_wastage:
+        wtg_query = """
+            SELECT name
+            FROM `tabURY Wastage`
+            WHERE docstatus = 1 AND branch = %s AND posting_datetime >= %s AND posting_datetime <= %s
+        """
+        wastage = frappe.db.sql(wtg_query, (branch, start_date, end_date), as_dict=True)
+        if not wastage:
+            errors.append("Wastage: No recording for today")
+
+    if errors:
+        frappe.throw(errors, title="Validation Error", as_list=True)
+
 
 
 def populate_pos_transactions(doc, method):
