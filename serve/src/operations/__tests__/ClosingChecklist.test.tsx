@@ -42,6 +42,9 @@ describe('ClosingChecklist', () => {
     render(<ClosingChecklist {...identity} onClose={onClose} />)
 
     expect(await screen.findByText('Closing checklist')).toBeInTheDocument()
+    await user.click(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    )
 
     // Objective 1 -> PASS, objective 2 -> FAIL + remark.
     const radios = await screen.findAllByRole('radio')
@@ -90,8 +93,10 @@ describe('ClosingChecklist', () => {
         /Order Taker has not completed the Closing Checklist yet/
       )
     ).toBeInTheDocument()
-    // Blocked gate: no items and no way to submit.
+    // Blocked gate: no items, no Start action, but a Recheck path; no way to submit.
     expect(screen.queryByRole('radio')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Start Checklist/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /Recheck/i })).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /Submit checklist/i })
     ).toBeDisabled()

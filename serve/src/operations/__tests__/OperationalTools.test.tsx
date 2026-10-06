@@ -162,9 +162,16 @@ describe('OperationalTools', () => {
       screen.getByRole('button', { name: /^Closing checklist$/i })
     )
 
-    // The dialog loads the user's closing checklist from the backend.
+    // The dialog loads the user's closing checklist from the backend and
+    // offers the Start action before the form.
     await waitFor(() => expect(closingFetchMock).toHaveBeenCalledWith('POS-MAIN'))
     expect(await screen.findByText('Closing checklist')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: /Start Checklist/i })
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Clear all tables/)).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /Start Checklist/i }))
     expect(await screen.findByText(/Clear all tables/)).toBeInTheDocument()
 
     // Dismiss without submitting via the header close button.

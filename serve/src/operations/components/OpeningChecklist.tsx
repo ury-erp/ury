@@ -116,6 +116,10 @@ export function ChecklistGate({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [hasAttemptedAutoSubmit, setHasAttemptedAutoSubmit] = useState(false)
   const [gateSatisfied, setGateSatisfied] = useState(false)
+  // STATE 2 of the gate UX: the user is eligible (no predecessor block) but
+  // has not started their checklist yet. The form stays hidden until they
+  // press Start Checklist so the screen always offers a clear action.
+  const [started, setStarted] = useState(false)
 
   const onReadyRef = useRef(onReady)
   const readyFiredRef = useRef(false)
@@ -169,6 +173,7 @@ export function ChecklistGate({
     setGateSatisfied(false)
     setBlockedBy(null)
     setAlreadyComplete(false)
+    setStarted(false)
 
     try {
       const { items, logStatus, blockedBy } =
@@ -407,6 +412,20 @@ export function ChecklistGate({
               <p className="text-sm">
                 {`${blockedBy.role_label} has not completed the ${checklistType} Checklist yet. Please ask the ${blockedBy.role_label} to complete it before continuing.`}
               </p>
+              {/*
+                STATE 1: the user is not eligible yet, so there is deliberately
+                no Start Checklist here -- but the predecessor may submit while
+                this screen is open, so offer a recheck instead of stranding the
+                user on a dead-end message.
+              */}
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => void load()}
+              >
+                Recheck
+              </Button>
             </Alert>
           )}
 
@@ -414,6 +433,32 @@ export function ChecklistGate({
             !loadError &&
             !blockedBy &&
             !alreadyComplete &&
+            !started &&
+            rows.length > 0 && (
+              <div className="py-6 text-center">
+                <p className="font-medium">{copy.blockedHeading}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {copy.subtitle}
+                </p>
+                {/*
+                  STATE 2: the user is the eligible role -- the checklist has
+                  not been started yet, so the only action here is Start.
+                */}
+                <Button
+                  type="button"
+                  className="mt-4"
+                  onClick={() => setStarted(true)}
+                >
+                  Start Checklist
+                </Button>
+              </div>
+            )}
+
+          {!loading &&
+            !loadError &&
+            !blockedBy &&
+            !alreadyComplete &&
+            started &&
             rows.map((row, index) => (
               <div
                 key={`${row.item_label}-${index}`}

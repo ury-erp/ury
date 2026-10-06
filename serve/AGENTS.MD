@@ -95,8 +95,7 @@ Entry stack: `AuthGuard` → `ServeRouteGuard` → `AppBoot` → router.
 **ServeRouteGuard**
 
 - Loads captain context (`canTakeTableOrders`, opening state, profile, user).
-- Blocks when POS is not open, prior day is not closed, or table-order capability is false.
-- Shows `OpeningChecklist` (`ury.ury_pos.api.get_checklist` / `submit_checklist`, type `Opening`) until ready.
+- Order of gates: loading/error → session incomplete → opening state unknown → table-order capability (`Not permitted`) → **Opening checklist** (`OpeningChecklist`, `ury.ury_pos.api.get_checklist` / `submit_checklist`, type `Opening`) → POS-not-open → prior-day-close. The checklist runs BEFORE the POS-open/close blocks on purpose: the role hierarchy (RM → Cashier → Order Taker) is part of the opening sequence and must be submittable while the POS is still closed.
 - Mounts `ServiceRequestPanel` after the checklist clears.
 
 ## 7. Orders: online only
