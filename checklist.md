@@ -90,8 +90,8 @@ other phase's checklist never satisfies anything.
 | Area | Location |
 | --- | --- |
 | Gate/status API | `ury/ury_pos/api.py` — `get_checklist`, `submit_checklist`, `_checklist_blocker`, `_goal_submitted`, `_own_position_goals`, `_phase_dependent_rows`, `_role_rank` |
-| POS Opening Entry hook | `ury/ury/hooks/pos_opening.py` (requires RM step **submitted**) |
-| POS Closing Entry hook | `ury/ury/hooks/pos_closing.py` (requires Order Taker step **submitted**) |
+| POS Opening Entry hook | `ury/ury/hooks/pos_opening.py` (requires the FULL opening hierarchy submitted: RM + Cashier + Order Taker) |
+| POS Closing Entry hook | `ury/ury/hooks/pos_closing.py` (requires the FULL closing hierarchy submitted: Order Taker + Cashier + RM) |
 | Desk URY Order form gate | `ury/ury/hooks/order_taking.py` (`ordertaker_checklist`) |
 | Option values | `ury/ury/doctype/dependent_checklist/dependent_checklist.json` |
 | Dialogs (PASS/FAIL radios) | `pos/src/components/ChecklistGateDialog.tsx`, `frontend/src/pages/Pos/components/ChecklistGateDialog.tsx`, `serve/src/operations/components/OpeningChecklist.tsx` |
@@ -134,12 +134,36 @@ FAIL without remarks, `PermissionError` when a predecessor has not submitted.
 5. FAIL treated as a valid submitted state — the all-Passed unlock, the
    `Failed` response state, and all failed-specific blocker UI were removed.
 
+## Change History (follow-up: user-flow fix)
+
+1. Gate dialogs (pos/frontend/serve) implement the three-state UX explicitly:
+   STATE 1 blocked-by-predecessor (message + **Recheck** — no Start action),
+   STATE 2 eligible (**Start Checklist** button reveals the existing form),
+   STATE 3 already-submitted (auto-continues). Load failures get a Retry.
+2. `ServeRouteGuard` runs the Opening checklist gate BEFORE the
+   "POS is not open" / prior-day-close blocks — the hierarchy is part of the
+   opening sequence, so it must be submittable while the POS is still closed.
+3. `pos_opening.py` / `pos_closing.py` gate the shift documents on the FULL
+   role hierarchy (previously only the step before the Cashier):
+   opening needs RM + Cashier + Order Taker submitted; closing needs
+   Order Taker + Cashier + RM submitted.
+4. `order_taking.ordertaker_checklist` exempts by Role (was Role Profile).
+
 ## Gotchas
 
 - ERPNext derives the **Quality Review doc status** from its rows
   (`validate` → `set_status`): any Open row → `Open`, any Failed → `Failed`,
   else `Passed`. Never filter reviews by `status: ["in", ["Open", "Passed"]]`
   expecting to find failed ones — a failed review has status `Failed`.
+- **Frappe v16 gates `run_before_save_methods` by action**: the `save` action
+  runs `validate` + `before_save` hooks, the `submit` action runs `validate` +
+  `before_submit` — and never `before_save`. The POS opening screen creates
+  POS Opening Entries with `.submit()` on a new doc, so any hook registered
+  only under `before_save` is silently skipped on that path. The checklist
+  gate is therefore wired to BOTH `before_save` and `before_submit`
+  (`ury/hooks.py`). The closing flow is safe because it inserts a draft
+  (save action) before submitting, and its gate lives under `validate`
+  (which runs for both actions).
 - ERPNext v16's `check_opening_entry` returns `[]` (not `1`) when no entry is
   open — both `POSOpeningProvider` copies treat `1` or an empty list as
   "not opened".
