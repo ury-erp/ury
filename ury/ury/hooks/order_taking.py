@@ -1,53 +1,63 @@
 import frappe
+from frappe import _
+
+from ury.ury_pos.api import (
+	_checklist_blocker,
+	_goal_submitted,
+	_own_position_goals,
+	_phase_dependent_rows,
+)
 
 
 @frappe.whitelist()
 def ordertaker_checklist(branch, employee):
-    date = ""
-    pos_opening_list = frappe.get_all(
-        "POS Opening Entry",
-        fields=["name", "docstatus", "status", "posting_date"],
-        filters={"branch": branch},
-    )
-    flag = 0
-    for pos_opening in pos_opening_list:
-        if pos_opening.status == "Open" and pos_opening.docstatus == 1:
-            date = pos_opening.posting_date
-    user = frappe.get_doc("User", employee)
-    if user.role_profile_name == "Restaurant Manager":
-        return flag, frappe.conf.url
+	"""Desk URY Order gate -- mirrors the POS/serve opening sequence so the
+	desk flow cannot bypass it: every role before the user's must have
+	SUBMITTED its opening checklist for this branch/business day, and the
+	user's own goals must be submitted too. Submission means every objective
+	carries an explicit result -- PASS or FAIL both count; a recorded FAIL
+	with a remark is a completed checklist, never a blocker."""
+	open_shift = frappe.get_all(
+		"POS Opening Entry",
+		fields=["posting_date"],
+		filters={"branch": branch, "docstatus": 1, "status": "Open"},
+		limit=1,
+	)
+	if not open_shift:
+		# POS not open: the desk form's own rules apply.
+		return 0, frappe.conf.url
 
-    # Block only on the branch's own "Order Taking" Dependent Checklist goals
-    # (grillax port) that match the user's roles -- the previous hard-coded
-    # "Order Taker Opening Checklist" goal name never matched any real
-    # configuration, so the gate either blocked everyone or no one.
-    pos_profile_name = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
-    goals = []
-    if pos_profile_name:
-        pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
-        user_roles = {role.role for role in user.roles}
-        goals = [
-            row.quality_checklist
-            for row in pos_profile.dependent_checklist
-            if row.select_2 == "Order Taking" and row.role in user_roles
-        ]
+	user = frappe.get_doc("User", employee)
 
-    for goal in goals:
-        quality_review_list = frappe.db.sql(
-            """
-			SELECT *
-			FROM `tabQuality Review`
-			WHERE `employee` = %s
-			AND `goal` = %s
-			AND `date` >= %s
-			""",
-            (employee, goal, date),
-            as_dict=True,
-        )
-        if len(quality_review_list) == 0:
-            flag = 2
-            frappe.msgprint(
-                title="Message", indicator="red", msg=("Complete Order Taker Checklist")
-            )
-            break
-    return flag, frappe.conf.url
+	pos_profile_name = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
+	if not pos_profile_name:
+		return 0, frappe.conf.url
+
+	period_date = open_shift[0].posting_date
+	rows = _phase_dependent_rows(pos_profile_name, "Opening")
+	if not rows:
+		return 0, frappe.conf.url
+
+	user_roles = [role.role for role in user.roles]
+
+	blocker = _checklist_blocker(rows, "Opening", branch, period_date, user_roles)
+	if blocker:
+		frappe.msgprint(
+			title="Message",
+			indicator="red",
+			msg=_("{0} Opening Checklist is not completed yet.").format(
+				blocker["role_label"]
+			),
+		)
+		return 2, frappe.conf.url
+
+	for goal in _own_position_goals(rows, user_roles):
+		if not _goal_submitted(goal, branch, period_date, owner=employee):
+			frappe.msgprint(
+				title="Message",
+				indicator="red",
+				msg=_("Complete Order Taker Checklist"),
+			)
+			return 2, frappe.conf.url
+
+	return 0, frappe.conf.url

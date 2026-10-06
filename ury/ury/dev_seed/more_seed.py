@@ -11,13 +11,15 @@ creates one, "Main Dining", holding all 12 tables — see
 Doctype/field contracts confirmed by reading actual code (cited inline
 below, not guessed):
 
-- `URY Issue Wastage` — `ury/ury/doctype/ury_issue_wastage/ury_issue_wastage.json`.
-  `status` Select options are literally `Draft\\nAuthorized\\nRejected`.
+- `URY Wastage` — `ury/ury/doctype/ury_wastage/ury_wastage.json` (renamed from
+  `URY Issue Wastage` by the V3-31 restructure).
+  `status` Select options are literally `Draft\nAuthorized\nRejected`.
   `reason_category` Select options are literally
-  `Spoilage\\nPreparation Error\\nDropped/Damaged\\nExpired\\nOther`.
-  Required links: `issue_authorization` (-> `URY Issue Authorization`),
+  `Spoilage\nPreparation Error\nDropped/Damaged\nExpired\nOther`.
+  Quantities live in the `items` (`Wastage Item`) child table; links:
+  `issue_authorization` (-> `URY Issue Authorization`),
   `plan` (-> `URY Sales Plan`), `branch`, `company`, `department`
-  (-> `URY Production Department`), `component_item` (-> `Item`).
+  (-> `URY Production Department`), `warehouse` (-> `Warehouse`).
 - The REAL whitelisted flow, `capture_wastage`/`approve_wastage` in
   `ury/ury/api/ury_wastage.py`, requires a real `URY Issue Authorization`
   with `status == "Authorized"` (see `_validate_authorization_scope`) and
@@ -270,9 +272,18 @@ def _seed_wastage(branch_name, company_name, departments, items, actor):
         print("more_seed.seed: could not create demo URY Sales Plan — skipping wastage.")
         return 0
 
-    existing = frappe.db.count("URY Issue Wastage", {"plan": plan_name})
+    # V3-31 restructured the doctype: "URY Issue Wastage" -> "URY Wastage",
+    # with quantities moved from the removed `wasted_qty` field into the
+    # `items` (Wastage Item) child table and a real warehouse link that
+    # validate_item_stock() requires unless negative stock is allowed.
+    warehouse = _get_warehouse(company_name)
+    if not warehouse:
+        print("more_seed.seed: no Warehouse found for company — skipping wastage.")
+        return 0
+
+    existing = frappe.db.count("URY Wastage", {"plan": plan_name})
     if existing >= WASTAGE_ROW_COUNT:
-        print(f"more_seed.seed: {existing} demo URY Issue Wastage row(s) already exist — skipping wastage.")
+        print(f"more_seed.seed: {existing} demo URY Wastage row(s) already exist — skipping wastage.")
         return 0
 
     created = 0
@@ -291,49 +302,55 @@ def _seed_wastage(branch_name, company_name, departments, items, actor):
             continue
 
         # Skip if this exact demo row was already seeded (idempotency for a
-        # re-run, keyed on the (authorization, wasted_qty, status) triple
-        # since URY Issue Wastage autonames by hash and has no natural key).
+        # re-run). The old natural key included `wasted_qty`, which V3-31
+        # moved into the items child table (not directly filterable); one
+        # wastage row per authorization in this seed makes
+        # (authorization, status) an equivalent key here.
         if frappe.db.exists(
-            "URY Issue Wastage",
-            {"issue_authorization": issue_authorization, "wasted_qty": wasted_qty, "status": status},
+            "URY Wastage",
+            {"issue_authorization": issue_authorization, "status": status},
         ):
             continue
 
         try:
+            uom = frappe.db.get_value("Item", component_item, "stock_uom")
             doc = frappe.get_doc(
                 {
-                    "doctype": "URY Issue Wastage",
+                    "doctype": "URY Wastage",
                     "issue_authorization": issue_authorization,
                     "plan": plan_name,
                     "branch": branch_name,
                     "company": company_name,
                     "department": department,
-                    "component_item": component_item,
+                    "warehouse": warehouse,
                     "status": status,
-                    "held_qty_before": authorized_qty,
-                    "wasted_qty": wasted_qty,
                     "reason_category": reason_category,
                     "reason_notes": f"Dev-seed demo wastage ({reason_category.lower()})",
                     "captured_by": actor,
                     "captured_on": now_datetime(),
+                    "items": [
+                        {
+                            "item_code": component_item,
+                            "qty": wasted_qty,
+                            "uom": uom,
+                            "rate": 45,
+                            "amount": wasted_qty * 45,
+                        }
+                    ],
                 }
             )
             if status in ("Authorized", "Rejected"):
                 doc.approved_by = actor
                 doc.approved_on = now_datetime()
                 doc.approval_permission_basis = "Stock Manager" if status == "Authorized" else "System Manager"
-                if status == "Authorized":
-                    doc.valuation_rate = 45
-                    doc.valuation_amount = wasted_qty * 45
-                    doc.valuation_is_estimated = 1
             doc.audit_log = json.dumps(
                 [{"event": "dev_seed", "actor": actor, "status": status}], sort_keys=True, default=str
             )
             doc.insert(ignore_permissions=True, ignore_mandatory=True)
             created += 1
-            print(f"Created URY Issue Wastage: {doc.name} ({department}/{component_item}, status={status})")
+            print(f"Created URY Wastage: {doc.name} ({department}/{component_item}, status={status})")
         except Exception as e:
-            print(f"  ! Failed to seed URY Issue Wastage for {department}/{component_item}: {e}")
+            print(f"  ! Failed to seed URY Wastage for {department}/{component_item}: {e}")
 
     return created
 

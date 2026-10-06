@@ -213,9 +213,15 @@ class URYYieldCheck(Document):
 		if not self.issue_authorization:
 			return
 
-		# Check if any URY Issue Wastage record references this authorization
+		# Check if any URY Wastage record references this authorization. The
+		# doctype was renamed from "URY Issue Wastage" by the V3-31 wastage
+		# restructure (issue_authorization/docstatus fields unchanged); skip
+		# the lookup while a pulled-not-yet-migrated site still lacks the new
+		# table (mirrors _sum_live_if_exists in ury.ury.api.ury_wastage).
+		if not frappe.db.exists("DocType", "URY Wastage"):
+			return
 		existing_wastage = frappe.get_all(
-			"URY Issue Wastage",
+			"URY Wastage",
 			filters={
 				"issue_authorization": self.issue_authorization,
 				"docstatus": ["!=", 2]

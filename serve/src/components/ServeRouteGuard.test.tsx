@@ -115,12 +115,19 @@ describe('ServeRouteGuard', () => {
   })
 
   it('fails closed on malformed close response', async () => {
+    const user = userEvent.setup()
     validatePOSCloseMock.mockResolvedValue({ message: { unexpected: true } })
 
     render(
       <ServeRouteGuard>
         <div>Protected</div>
       </ServeRouteGuard>
+    )
+
+    // The opening checklist gate now runs BEFORE the prior-day-close block,
+    // so the checklist is offered first; the close block surfaces after it.
+    await user.click(
+      await screen.findByRole('button', { name: /Complete checklist/i })
     )
 
     expect(await screen.findByText(/POS close required/i)).toBeInTheDocument()
@@ -131,6 +138,7 @@ describe('ServeRouteGuard', () => {
   })
 
   it('blocks when prior day close Failed', async () => {
+    const user = userEvent.setup()
     validatePOSCloseMock.mockResolvedValue({ message: 'Failed' })
 
     render(
@@ -139,19 +147,47 @@ describe('ServeRouteGuard', () => {
       </ServeRouteGuard>
     )
 
+    await user.click(
+      await screen.findByRole('button', { name: /Complete checklist/i })
+    )
+
     expect(await screen.findByText(/POS close required/i)).toBeInTheDocument()
     expect(
       screen.getByText(/Previous POS day is not closed/i)
     ).toBeInTheDocument()
   })
 
-  it('blocks when POS is not open (multi-cashier room gate surfaces here)', async () => {
+  it('offers the opening checklist before the POS is open (checklist is part of opening)', async () => {
+    // The opening hierarchy (RM -> Cashier -> Order Taker) must be submittable
+    // while the POS is still closed -- the user can never reach their own
+    // checklist if the "POS is not open" block runs first.
     mockCaptain({ openingState: { pos_open: false } })
 
     render(
       <ServeRouteGuard>
         <div>Protected</div>
       </ServeRouteGuard>
+    )
+
+    expect(
+      await screen.findByText('Checklist for captain@example.com / POS-MAIN')
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/POS is not open/i)).not.toBeInTheDocument()
+  })
+
+  it('blocks when POS is not open (multi-cashier room gate surfaces here)', async () => {
+    const user = userEvent.setup()
+    mockCaptain({ openingState: { pos_open: false } })
+
+    render(
+      <ServeRouteGuard>
+        <div>Protected</div>
+      </ServeRouteGuard>
+    )
+
+    // Checklist first; once it is complete the not-open block surfaces.
+    await user.click(
+      await screen.findByRole('button', { name: /Complete checklist/i })
     )
 
     expect(await screen.findByText(/POS is not open/i)).toBeInTheDocument()

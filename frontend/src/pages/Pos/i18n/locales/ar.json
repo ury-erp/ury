@@ -272,7 +272,10 @@
     "fail_remarks_placeholder": "اشرح سبب الفشل (مطلوب)",
     "fail_remarks_required": "الملاحظات مطلوبة للعناصر الفاشلة.",
     "incomplete_error": "يجب تحديد PASS أو FAIL لكل عنصر قبل إكمال القائمة.",
-    "blocked_heading": "مطلوب: {checklist}",
-    "blocked_message": "لم يكمل {role} {checklist} بعد. يُرجى مطالبة {role} بإكماله قبل المتابعة."
+    "blocked_heading": "مطلوب: {{checklist}}",
+    "blocked_message": "لم يكمل {{role}} {{checklist}} بعد. يُرجى مطالبة {{role}} بإكماله قبل المتابعة.",
+    "start": "بدء قائمة التحقق",
+    "recheck": "إعادة التحقق",
+    "retry": "إعادة المحاولة"
   }
 }

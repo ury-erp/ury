@@ -66,7 +66,10 @@ def _get_demo_restaurant(branch_name):
     # business_setup.py names the restaurant "<branch> Restaurant"; fall back to any
     # URY Restaurant linked to this branch, then to any URY Restaurant at all.
     conventional_name = f"{branch_name} Restaurant"
-    if frappe.db.exists("URY Restaurant", conventional_name):
+    # NB: frappe.db.exists("<X>", "<X>") short-circuits True in v16 ("single
+    # always exists"), so a branch named exactly "URY" would fool an
+    # exists() check for the conventional name -- look the row up instead.
+    if frappe.db.get_value("URY Restaurant", conventional_name, "name"):
         return conventional_name
 
     linked = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")

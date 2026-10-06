@@ -122,8 +122,11 @@
     "fail": "FAIL",
     "fail_remarks_placeholder": "Explain the failure (required)",
     "fail_remarks_required": "Remarks are required for failed items.",
-    "blocked_heading": "{checklist} Required",
-    "blocked_message": "{role} has not completed the {checklist} yet. Please ask the {role} to complete it before continuing."
+    "blocked_heading": "{{checklist}} Required",
+    "blocked_message": "{{role}} has not completed the {{checklist}} yet. Please ask the {{role}} to complete it before continuing.",
+    "start": "Start Checklist",
+    "recheck": "Recheck",
+    "retry": "Retry"
   },
   "customer": {
     "search_placeholder": "Search customer...",

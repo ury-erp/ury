@@ -15,6 +15,7 @@ import type { PrintJobRow } from '../api/printers'
 import { useNotifications } from '../hooks/useNotifications'
 import { usePrinterHealth } from '../hooks/usePrinterHealth'
 import type { OperationsIdentityProps } from '../types'
+import { ClosingChecklist } from './OpeningChecklist'
 import {
   filterPrintJobs,
   formatLastUpdated,
@@ -25,7 +26,7 @@ import {
   isPrinterOffline,
   isPrinterOnline,
 } from '../utils/printerStatus'
-import { Bell, Printer } from 'lucide-react'
+import { Bell, ClipboardCheck, Printer } from 'lucide-react'
 
 export interface OperationalToolsProps extends OperationsIdentityProps {
   className?: string
@@ -51,6 +52,7 @@ export function OperationalTools({
 }: OperationalToolsProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [printersOpen, setPrintersOpen] = useState(false)
+  const [closingOpen, setClosingOpen] = useState(false)
   const [jobsOpen, setJobsOpen] = useState(false)
   const [jobFilterPrinter, setJobFilterPrinter] = useState<string | null>(null)
   const [jobFilterStatus, setJobFilterStatus] = useState<string | null>(null)
@@ -152,6 +154,26 @@ export function OperationalTools({
           />
         </span>
       </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="Closing checklist"
+        title="Closing checklist"
+        onClick={() => setClosingOpen(true)}
+      >
+        <ClipboardCheck className="h-5 w-5" aria-hidden />
+      </Button>
+
+      {closingOpen && user && posProfile ? (
+        <ClosingChecklist
+          user={user}
+          posProfile={posProfile}
+          branch={branch}
+          onClose={() => setClosingOpen(false)}
+        />
+      ) : null}
 
       <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <DialogContent

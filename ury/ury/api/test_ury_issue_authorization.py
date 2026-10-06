@@ -362,7 +362,7 @@ class TestAttachYieldCheckAndWastageFlags(FrappeTestCase):
         def get_all_dispatch(doctype, *args, **kwargs):
             if doctype == "URY Yield Check":
                 return [{"issue_authorization": "IA-1"}]
-            if doctype == "URY Issue Wastage":
+            if doctype == "URY Wastage":
                 return [{"issue_authorization": "IA-2"}]
             raise AssertionError(f"unexpected doctype {doctype}")
 
