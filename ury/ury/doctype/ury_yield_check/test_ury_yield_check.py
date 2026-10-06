@@ -563,8 +563,9 @@ class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
 		# Should not raise
 		doc.validate_no_duplicate_wastage()
 
+	@patch(f"{MODULE}.frappe.db.exists", return_value=True)
 	@patch(f"{MODULE}.frappe.get_all")
-	def test_passes_when_no_existing_wastage_for_authorization(self, mock_get_all):
+	def test_passes_when_no_existing_wastage_for_authorization(self, mock_get_all, mock_exists):
 		"""Validation passes when issue_authorization has no Issue Wastage records."""
 		mock_get_all.return_value = []  # No wastage records
 
@@ -572,9 +573,10 @@ class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
 		# Should not raise
 		doc.validate_no_duplicate_wastage()
 
+	@patch(f"{MODULE}.frappe.db.exists", return_value=True)
 	@patch(f"{MODULE}.frappe.get_all")
 	@patch(f"{MODULE}.frappe.throw")
-	def test_throws_when_wastage_already_exists(self, mock_throw, mock_get_all):
+	def test_throws_when_wastage_already_exists(self, mock_throw, mock_get_all, mock_exists):
 		"""Validation fails when Issue Wastage already references this authorization."""
 		mock_get_all.return_value = [
 			frappe._dict(name="WASTAGE-001")
@@ -590,8 +592,9 @@ class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
 		self.assertIn("already has an Issue Wastage record", str(call_args[0]))
 		self.assertIn("WASTAGE-001", str(call_args[0]))
 
+	@patch(f"{MODULE}.frappe.db.exists", return_value=True)
 	@patch(f"{MODULE}.frappe.get_all")
-	def test_filters_by_issue_authorization(self, mock_get_all):
+	def test_filters_by_issue_authorization(self, mock_get_all, mock_exists):
 		"""Query filters for the specific issue_authorization."""
 		mock_get_all.return_value = []
 
@@ -602,16 +605,18 @@ class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
 		call_kwargs = mock_get_all.call_args[1]
 		self.assertEqual(call_kwargs["filters"]["issue_authorization"], "AUTH-001")
 
+	@patch(f"{MODULE}.frappe.db.exists", return_value=True)
 	@patch(f"{MODULE}.frappe.get_all")
-	def test_searches_ury_issue_wastage_doctype(self, mock_get_all):
-		"""Query targets URY Issue Wastage doctype."""
+	def test_searches_ury_wastage_doctype(self, mock_get_all, mock_exists):
+		"""Query targets URY Wastage doctype (renamed from URY Issue Wastage
+		by the V3-31 wastage restructure)."""
 		mock_get_all.return_value = []
 
 		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
 		doc.validate_no_duplicate_wastage()
 
 		call_args = mock_get_all.call_args[0]
-		self.assertEqual(call_args[0], "URY Issue Wastage")
+		self.assertEqual(call_args[0], "URY Wastage")
 
 
 class TestYieldCheckIntegrationFullValidate(FrappeTestCase):

@@ -68,7 +68,7 @@ def get_close_day_checklist(branch, service_date):
 		)
 
 	wastage_unsigned = frappe.db.count(
-		"URY Issue Wastage",
+		"URY Wastage",
 		{"branch": branch, "status": "Draft"},
 	)
 

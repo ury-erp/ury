@@ -307,7 +307,7 @@ def _attach_yield_check_and_wastage_flags(rows):
     )
     wasted_names = _pluck_issue_authorization(
         frappe.get_all(
-            "URY Issue Wastage",
+            "URY Wastage",
             filters={"issue_authorization": ["in", names], "docstatus": ["!=", 2]},
             fields=["issue_authorization"],
         )
