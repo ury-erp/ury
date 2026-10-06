@@ -89,6 +89,10 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // STATE 2 of the gate UX: the user is eligible (no predecessor block) but
+  // has not started their checklist yet. The form stays hidden until they
+  // press Start Checklist so the screen always offers a clear action.
+  const [started, setStarted] = useState(false);
 
   const titleKey = checklistType === 'Opening' ? 'checklist.title_opening' : 'checklist.title_closing';
 
@@ -96,6 +100,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     setIsLoading(true);
     setLoadError(null);
     setBlockedBy(null);
+    setStarted(false);
 
     try {
       const checklistResult: any = await getChecklist(posProfile, checklistType);
@@ -218,7 +223,12 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             <Spinner message={t('checklist.loading')} />
           </div>
         ) : loadError ? (
-          <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
+          <div className="py-8 text-center">
+            <p className="text-sm text-destructive mb-4">{loadError}</p>
+            <Button onClick={() => void loadChecklist()} variant="outline">
+              {t('checklist.retry')}
+            </Button>
+          </div>
         ) : blockedBy ? (
           <div className="py-10 text-center">
             <p className="text-lg font-semibold text-foreground mb-2">
@@ -230,6 +240,29 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
                 checklist: t(titleKey),
               })}
             </p>
+            {/*
+              STATE 1: the user is not eligible yet, so there is deliberately
+              no Start Checklist here -- but the predecessor may submit while
+              this screen is open, so offer a recheck instead of stranding the
+              user on a dead-end message.
+            */}
+            <Button onClick={() => void loadChecklist()} variant="outline" className="mt-6">
+              {t('checklist.recheck')}
+            </Button>
+          </div>
+        ) : !started && rows.length > 0 ? (
+          <div className="py-10 text-center">
+            <p className="text-lg font-semibold text-foreground mb-2">
+              {t('checklist.blocked_heading', { checklist: t(titleKey) })}
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">{t('checklist.description')}</p>
+            {/*
+              STATE 2: the user is the eligible role -- the checklist has not
+              been started yet, so the only action on this screen is Start.
+            */}
+            <Button onClick={() => setStarted(true)} className="font-medium py-3 px-6 rounded-lg">
+              {t('checklist.start')}
+            </Button>
           </div>
         ) : (
           <>
