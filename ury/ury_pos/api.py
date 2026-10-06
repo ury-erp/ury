@@ -2004,9 +2004,6 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
                 "status": existing_log[0].status,
                 "name": existing_log[0].name,
             }
-        goals_pending = any(
-            _goal_review_pending(goal, branch, period_date) for goal in goals
-        )
         return {
             "status": _goal_submission_status() or "Complete",
             "name": None,
