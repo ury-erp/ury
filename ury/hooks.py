@@ -34,7 +34,9 @@ app_include_js = [
     "/assets/ury/js/remove_duplicates.js",
     "/assets/ury/js/journal_entry.js",
     "/assets/ury/js/round_off_limit_exceed.js",
-    "/assets/ury/js/restrict_customer_group_change.js"
+    "/assets/ury/js/restrict_customer_group_change.js",
+    "/assets/ury/js/ury_order_checklist.js",
+    "/assets/ury/js/autofetch_fields.js",
 ]
 
 # include js, css files in header of web template
@@ -197,6 +199,10 @@ before_uninstall = "ury.uninstall.uninstall"
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+permission_query_conditions = {
+    "Quality Review": "ury.ury.hooks.checklist.permission_checklists",
+}
+
 # DocType Class
 # ---------------
 # Override standard doctype classes
@@ -258,7 +264,10 @@ doc_events = {
             "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
             "ury.ury.utils.stock_count_gate.validate_pos_opening_entry",
         ],
-        "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
+        "before_save": [
+            "ury.ury.hooks.ury_pos_opening_entry.before_save",
+            "ury.ury.hooks.pos_opening.update_daily_checklists",
+        ],
         "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
         },
     "POS Closing Entry": {
@@ -272,8 +281,12 @@ doc_events = {
             # handler reads that table, so the order matters. No-op unless
             # the branch has `closing_reconciliation_enabled` (tier gate 3).
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
+            "ury.ury.hooks.pos_closing.validate_daily_checklists",
         ],
         },
+    "Quality Review": {
+        "on_update": "ury.ury.hooks.update_accounts.checklist",
+    },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
 	},
@@ -555,6 +568,8 @@ fixtures = [
                     "POS Profile-show_image",
                     "POS Profile-custom_daily_pos_close",
                     "POS Profile-custom_checklist_items",
+                    "POS Profile-section_break_wp1tv",
+                    "POS Profile-dependent_checklist",
                     "POS Profile-paid_limit",
                     "POS Profile-table_attention_time",
                     "POS Opening Entry-restaurant_info",
@@ -576,6 +591,8 @@ fixtures = [
                     "POS Profile User-custom_main_cashier",
                     "POS Opening Entry-custom_rooms",
                     "POS Opening Entry-custom_sub_pos_close_entry",
+                    "POS Opening Entry-quality_checklist",
+                    "POS Closing Entry-quality_checklist",
                     "POS Closing Entry Detail-custom_closing_amount",
                     "POS Closing Entry-branch",
                     "POS Profile-custom_edit_order_type",
@@ -613,6 +630,10 @@ fixtures = [
                     "Journal Entry-branch",
                     "Employee-payment_amount",
                     "Employee-payment_type",
+                    "Employee-permit_to_view",
+                    "Quality Goal-custom_role",
+                    "Quality Review-branch",
+                    "Quality Review-employee",
                     "Item-custom_yield_check_cadence",
                     "Item-custom_yield_check_interval_days",
                     "Item-custom_yield_percent",
@@ -647,6 +668,9 @@ fixtures = [
                 }
             ]
         ],
+    },
+    {
+        "dt": "Quality Goal",
     },
     # A single merged entry, not two separate ones: frappe.utils.fixtures.
     # export_fixtures() runs every hooks.fixtures entry independently and

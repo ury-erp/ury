@@ -3,6 +3,11 @@ import { call } from '@ury/core';
 export interface ChecklistItem {
   item_label: string;
   is_mandatory: boolean;
+  /** Previously saved result; null/undefined when not answered yet. */
+  status?: 'Passed' | 'Failed' | null;
+  remarks?: string;
+  /** Quality Goal this item belongs to (Dependent Checklist items only). */
+  goal?: string | null;
 }
 
 export interface ChecklistResponse {
@@ -10,13 +15,18 @@ export interface ChecklistResponse {
     items: ChecklistItem[];
     logName: string | null;
     logStatus: string | null;
+    blockedBy?: ChecklistBlocker | null;
   };
 }
 
 export interface SubmitChecklistItem {
   item_label: string;
-  is_checked: boolean;
+  /** Explicit result; is_checked (True -> Passed, False -> Open) is still
+   * accepted from older clients. */
+  status?: 'Passed' | 'Failed';
+  is_checked?: boolean;
   remarks: string;
+  goal?: string | null;
 }
 
 export interface SubmitChecklistResponse {
@@ -26,6 +36,12 @@ export interface SubmitChecklistResponse {
   };
 }
 
+export interface ChecklistBlocker {
+  role: string;
+  role_label: string;
+  goals: string[];
+}
+
 export const getChecklist = async (
   posProfile: string,
   checklistType: 'Opening' | 'Closing'
@@ -33,6 +49,7 @@ export const getChecklist = async (
   items: ChecklistItem[];
   logName: string | null;
   logStatus: string | null;
+  blockedBy: ChecklistBlocker | null;
 }> => {
   try {
     const response = await call.get<{
@@ -40,6 +57,7 @@ export const getChecklist = async (
         items: ChecklistItem[];
         log_name: string | null;
         log_status: string | null;
+        blocked_by?: ChecklistBlocker | null;
       };
     }>(
       'ury.ury_pos.api.get_checklist',
@@ -54,6 +72,7 @@ export const getChecklist = async (
       items: response.message.items,
       logName: response.message.log_name,
       logStatus: response.message.log_status,
+      blockedBy: response.message.blocked_by ?? null,
     };
   } catch (error) {
     console.error('Error fetching checklist:', error);

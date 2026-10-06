@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-  Checkbox,
   Spinner,
   cn,
   messageToPlainText,
@@ -16,6 +15,7 @@ import { t } from '../i18n';
 import {
   getChecklist,
   submitChecklist,
+  type ChecklistBlocker,
   type ChecklistItem,
   type SubmitChecklistItem,
 } from '../../../lib/pos/checklist-api';
@@ -29,8 +29,9 @@ interface ChecklistGateDialogProps {
 interface ChecklistRowState {
   item_label: string;
   is_mandatory: boolean;
-  is_checked: boolean;
+  status: 'Passed' | 'Failed' | null;
   remarks: string;
+  goal?: string | null;
 }
 
 /**
@@ -59,8 +60,11 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
   items.map((item) => ({
     item_label: item.item_label,
     is_mandatory: item.is_mandatory,
-    is_checked: false,
-    remarks: '',
+    // Prefill the result the user saved last time (failed items resurface
+    // with their previous selection so they can review or correct it).
+    status: item.status === 'Passed' || item.status === 'Failed' ? item.status : null,
+    remarks: item.remarks ?? '',
+    goal: item.goal ?? null,
   }));
 
 /**
@@ -80,6 +84,7 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
 const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: ChecklistGateDialogProps) => {
   const [rows, setRows] = useState<ChecklistRowState[]>([]);
   const [logName, setLogName] = useState<string | null>(null);
+  const [blockedBy, setBlockedBy] = useState<ChecklistBlocker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,13 +95,17 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   const loadChecklist = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
+    setBlockedBy(null);
 
     try {
-      // getChecklist's declared camelCase fields (logName/logStatus) don't
-      // actually match what the backend returns (log_name/log_status), so
-      // fetchedLogName was always undefined here. Read both casings
-      // defensively until the shared api layer is fixed.
       const checklistResult: any = await getChecklist(posProfile, checklistType);
+      if (checklistResult.blockedBy) {
+        // A predecessor role has not finished this phase's checklist; the
+        // gate stays closed with a specific message instead of the form.
+        setBlockedBy(checklistResult.blockedBy);
+        setRows([]);
+        return;
+      }
       const fetchedLogName = checklistResult.logName ?? checklistResult.log_name ?? null;
       setRows(toRowState(checklistResult.items));
       setLogName(fetchedLogName);
@@ -119,7 +128,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   // a gate with a Submit button but no items to interact with.
   useEffect(() => {
     // Only auto-submit once when: finished loading, no load error, no items, and not already submitting
-    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting) {
+    if (!isLoading && !loadError && !blockedBy && rows.length === 0 && !isSubmitting) {
       const autoSubmit = async () => {
         setIsSubmitting(true);
         setSubmitError(null);
@@ -141,33 +150,39 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
       autoSubmit();
     }
-  }, [isLoading, loadError, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
+  }, [isLoading, loadError, blockedBy, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
 
-  const handleCheckedChange = (index: number, isChecked: boolean) => {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, is_checked: isChecked } : row)));
+  const handleStatusChange = (index: number, status: 'Passed' | 'Failed') => {
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, status } : row)));
   };
 
   const handleRemarksChange = (index: number, remarks: string) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, remarks } : row)));
   };
 
-  // Mirrors the backend's completion rule: every mandatory item must be
-  // checked before the checklist can be submitted as Complete.
-  const allMandatoryChecked = useMemo(
-    () => rows.every((row) => !row.is_mandatory || row.is_checked),
+  // Mirrors the backend's completion rule: every mandatory item must have an
+  // explicit result, and a FAIL must carry a remark explaining it.
+  const allMandatoryAnswered = useMemo(
+    () => rows.every((row) => !row.is_mandatory || row.status),
     [rows]
   );
+  const failuresExplained = useMemo(
+    () => rows.every((row) => row.status !== 'Failed' || row.remarks.trim().length > 0),
+    [rows]
+  );
+  const canSubmit = allMandatoryAnswered && failuresExplained;
 
   const handleSubmit = async () => {
-    if (!allMandatoryChecked) return;
+    if (!canSubmit) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
     const items: SubmitChecklistItem[] = rows.map((row) => ({
       item_label: row.item_label,
-      is_checked: row.is_checked,
+      status: row.status,
       remarks: row.remarks,
+      goal: row.goal,
     }));
 
     try {
@@ -204,32 +219,67 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           </div>
         ) : loadError ? (
           <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
+        ) : blockedBy ? (
+          <div className="py-10 text-center">
+            <p className="text-lg font-semibold text-foreground mb-2">
+              {t('checklist.blocked_heading', { checklist: t(titleKey) })}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t('checklist.blocked_message', {
+                role: blockedBy.role_label,
+                checklist: t(titleKey),
+              })}
+            </p>
+          </div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
               {rows.map((row, index) => (
                 <div key={`${row.item_label}-${index}`} className="border border-border rounded-lg p-3">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <Checkbox
-                      size="sm"
-                      checked={row.is_checked}
-                      onChange={(e) => handleCheckedChange(index, e.target.checked)}
-                      className="mt-1"
-                    />
-                    <span className="text-sm font-medium text-foreground">
-                      {row.item_label}
-                      {!!row.is_mandatory && <span className="text-destructive ml-1">*</span>}
-                    </span>
-                  </label>
-                  {row.is_checked && (
+                  <span className="text-sm font-medium text-foreground">
+                    {index + 1}. {row.item_label}
+                    {!!row.is_mandatory && <span className="text-destructive ml-1">*</span>}
+                  </span>
+                  <div className="flex items-center gap-4 mt-2">
+                    <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`checklist-result-${index}`}
+                        checked={row.status === 'Passed'}
+                        onChange={() => handleStatusChange(index, 'Passed')}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      {t('checklist.pass')}
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`checklist-result-${index}`}
+                        checked={row.status === 'Failed'}
+                        onChange={() => handleStatusChange(index, 'Failed')}
+                        className="h-4 w-4 accent-destructive"
+                      />
+                      {t('checklist.fail')}
+                    </label>
+                  </div>
+                  {row.status && (
                     <Input
                       type="text"
                       value={row.remarks}
                       onChange={(e) => handleRemarksChange(index, e.target.value)}
-                      placeholder={t('checklist.remarks_placeholder')}
+                      placeholder={
+                        row.status === 'Failed'
+                          ? t('checklist.fail_remarks_placeholder')
+                          : t('checklist.remarks_placeholder')
+                      }
                       size="sm"
-                      className="mt-2 ml-7 w-[calc(100%-1.75rem)]"
+                      className="mt-2 w-full"
                     />
+                  )}
+                  {row.status === 'Failed' && !row.remarks.trim() && (
+                    <p className="text-xs text-destructive mt-1">
+                      {t('checklist.fail_remarks_required')}
+                    </p>
                   )}
                 </div>
               ))}
@@ -241,10 +291,10 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
             <Button
               onClick={handleSubmit}
-              disabled={!allMandatoryChecked || isSubmitting}
+              disabled={!canSubmit || isSubmitting}
               className={cn(
                 'w-full font-medium py-3 px-6 rounded-lg transition-colors duration-200',
-                (!allMandatoryChecked || isSubmitting) && 'opacity-50 cursor-not-allowed'
+                (!canSubmit || isSubmitting) && 'opacity-50 cursor-not-allowed'
               )}
             >
               {isSubmitting ? t('checklist.submitting') : t('checklist.submit')}

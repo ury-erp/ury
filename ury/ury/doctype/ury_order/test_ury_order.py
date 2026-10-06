@@ -206,12 +206,52 @@ class TestURYOrder(FrappeTestCase):
         )
         mock_invoice.cancel.assert_called_once()
 
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_cancel_order_unauthorized_permission_error(
+        self, mock_has_permission, mock_get_doc
+    ):
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-999"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.docstatus = 1
+        mock_get_doc.return_value = mock_invoice
+        mock_has_permission.return_value = False
+
+        with self.assertRaises(frappe.PermissionError):
+            cancel_order("POS-INV-999", "Unauthorized test")
+
+        mock_invoice.cancel.assert_not_called()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.release_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.cancel_kot")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_cancel_order_draft_uses_lifecycle_methods(
+        self, mock_has_permission, mock_get_doc, mock_cancel_kot, mock_release
+    ):
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-DRAFT"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.restaurant_table = None
+        mock_invoice.docstatus = 0
+        mock_get_doc.return_value = mock_invoice
+        mock_has_permission.return_value = True
+
+        cancel_order("POS-INV-DRAFT", "draft cancellation")
+
+        mock_invoice.submit.assert_called_once()
+        mock_invoice.cancel.assert_called_once()
+        mock_invoice.db_set.assert_called_once_with("cancel_reason", "draft cancellation")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.cache")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice):
+    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice, mock_cache):
+        mock_get_value.return_value = ("Branch 1", "Room 1")
         # Setup new invoice
         mock_invoice = MagicMock()
         mock_invoice.name = None # New invoice

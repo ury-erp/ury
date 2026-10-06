@@ -4,18 +4,34 @@ export interface ChecklistItem {
   item_label: string
   is_mandatory: boolean | number
   applies_to?: string
+  /** Previously saved result; null/undefined when not answered yet. */
+  status?: 'Passed' | 'Failed' | null
+  remarks?: string
+  /** Quality Goal this item belongs to (Dependent Checklist items only). */
+  goal?: string | null
+}
+
+export interface ChecklistBlocker {
+  role: string
+  role_label: string
+  goals: string[]
 }
 
 export interface ChecklistFetchResult {
   items: ChecklistItem[]
   logName: string | null
   logStatus: string | null
+  blockedBy: ChecklistBlocker | null
 }
 
 export interface SubmitChecklistItem {
   item_label: string
-  is_checked: boolean
+  /** Explicit result; is_checked (True -> Passed, False -> Open) is still
+   * accepted from older clients. */
+  status?: 'Passed' | 'Failed'
+  is_checked?: boolean
   remarks: string
+  goal?: string | null
 }
 
 export interface SubmitChecklistResult {
@@ -28,6 +44,7 @@ type ChecklistApiResponse = {
     items?: ChecklistItem[]
     log_name?: string | null
     log_status?: string | null
+    blocked_by?: ChecklistBlocker | null
     status?: string
     name?: string | null
   }
@@ -49,6 +66,7 @@ export async function fetchOpeningChecklist(
     items: Array.isArray(message.items) ? message.items : [],
     logName: message.log_name ?? null,
     logStatus: message.log_status ?? null,
+    blockedBy: message.blocked_by ?? null,
   }
 }
 

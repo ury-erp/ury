@@ -260,5 +260,14 @@
     "closed_title": "تم إغلاق الجلسة",
     "closed_description": "تم إغلاق جلسة نقاط البيع بنجاح.",
     "back_to_dashboard": "العودة إلى لوحة التحكم"
+  },
+  "checklist": {
+    "pass": "PASS",
+    "fail": "FAIL",
+    "fail_remarks_placeholder": "اشرح سبب الفشل (مطلوب)",
+    "fail_remarks_required": "الملاحظات مطلوبة للعناصر الفاشلة.",
+    "incomplete_error": "يجب تحديد PASS أو FAIL لكل عنصر قبل إكمال القائمة.",
+    "blocked_heading": "مطلوب: {checklist}",
+    "blocked_message": "لم يكمل {role} {checklist} بعد. يُرجى مطالبة {role} بإكماله قبل المتابعة."
   }
 }

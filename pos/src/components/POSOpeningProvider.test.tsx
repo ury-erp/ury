@@ -1,10 +1,15 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import POSOpeningProvider from "./POSOpeningProvider";
 
-const { mockCheckPOSOpening, mockValidatePOSClose } = vi.hoisted(() => ({
+const { mockCheckPOSOpening, mockValidatePOSClose, mockGetChecklist, mockPosProfile } = vi.hoisted(() => ({
   mockCheckPOSOpening: vi.fn(),
   mockValidatePOSClose: vi.fn(),
+  mockGetChecklist: vi.fn(),
+  // Stable identity: a fresh object per render would re-trigger the
+  // provider's posProfile effect on every state change and re-run
+  // checkPOSStatus mid-assertion.
+  mockPosProfile: { name: "POS-001", company: "Test", custom_daily_pos_close: 0 },
 }));
 
 vi.mock("../lib/pos-opening-api", () => ({
@@ -18,7 +23,7 @@ vi.mock("../lib/pos-opening-api", () => ({
 }));
 
 vi.mock("../lib/checklist-api", () => ({
-  getChecklist: vi.fn().mockResolvedValue({ logStatus: "Complete" }),
+  getChecklist: mockGetChecklist,
 }));
 
 vi.mock("./POSOpeningDialog", () => ({
@@ -47,7 +52,7 @@ vi.mock("./POSClosingDialog", () => ({
 
 vi.mock("../store/pos-store", () => ({
   usePOSStore: () => ({
-    posProfile: { name: "POS-001", company: "Test", custom_daily_pos_close: 0 },
+    posProfile: mockPosProfile,
     showVoluntaryClosing: false,
     setShowVoluntaryClosing: vi.fn(),
   }),
@@ -66,6 +71,7 @@ vi.mock("../i18n", () => ({
 describe("POSOpeningProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetChecklist.mockResolvedValue({ logStatus: "Complete" });
   });
 
   it("renders loading state initially", () => {
@@ -107,6 +113,75 @@ describe("POSOpeningProvider", () => {
       </POSOpeningProvider>
     );
 
+    await waitFor(() => {
+      expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
+    });
+  });
+
+  it("shows opening screen when check_opening_entry returns an empty list (ERPNext v16)", async () => {
+    // v16's check_opening_entry returns [] where older versions returned 1;
+    // both must land on the opening screen, not on a bare content render.
+    mockCheckPOSOpening.mockResolvedValueOnce({ message: [] });
+    mockValidatePOSClose.mockResolvedValueOnce({ message: "Success" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Test Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Test Content")).not.toBeInTheDocument();
+  });
+
+  it("gates the opening screen on a pending Opening checklist when check_opening_entry returns [] (ERPNext v16)", async () => {
+    mockCheckPOSOpening.mockResolvedValue({ message: [] });
+    mockValidatePOSClose.mockResolvedValue({ message: "Success" });
+    mockGetChecklist
+      .mockResolvedValueOnce({ logStatus: null })
+      .mockResolvedValue({ logStatus: "Complete" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Test Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("checklist-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Complete" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
+    });
+  });
+
+  it("gates the opening screen on a pending Opening checklist (no entry yet)", async () => {
+    mockCheckPOSOpening.mockResolvedValue({ message: 1 });
+    mockValidatePOSClose.mockResolvedValue({ message: "Success" });
+    // First poll: checklist pending (role-based Dependent Checklist goal
+    // without a Quality Review). After completion: Complete.
+    mockGetChecklist
+      .mockResolvedValueOnce({ logStatus: null })
+      .mockResolvedValue({ logStatus: "Complete" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Test Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("checklist-dialog")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("opening-screen")).not.toBeInTheDocument();
+
+    // Completing the checklist re-runs the status check and lands on the
+    // opening screen.
+    fireEvent.click(await screen.findByRole("button", { name: "Complete" }));
     await waitFor(() => {
       expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
     });
