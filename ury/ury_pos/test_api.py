@@ -614,8 +614,7 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
         ]
 
         # Mock existing log query returns empty (no existing log).
-        # Call order: URY Checklist Item, Dependent Checklist, URY POS Checklist Log.
-        mock_get_all.side_effect = [mock_configured_items, [], []]
+        mock_get_all.side_effect = [mock_configured_items, [], [], [], []]
 
         # Mock new document creation with properly-configured mock
         mock_log_doc = self._create_mock_log_doc()

@@ -381,12 +381,8 @@ def validate_invoice(doc, method):
 
 
 def validate_customer(doc, method):
-    if doc.customer_name == None or doc.customer_name == "":
-        frappe.throw(
-            (" Failed to load data , Please Refresh the page ").format(
-                doc.customer_name
-            )
-        )
+    if not doc.customer and not doc.customer_name:
+        frappe.throw(_("Customer is required."))
 
 
 def calculate_and_set_times(doc, method=None):
@@ -425,18 +421,30 @@ def table_status_delete(doc, method):
 
 
 def pos_invoice_naming(doc, method):
-    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
-    restaurant = pos_profile.restaurant
+    if not getattr(doc, "pos_profile", None):
+        return
+    if not frappe.db.exists("POS Profile", doc.pos_profile):
+        return
+
+    pos_profile = frappe.db.get_value("POS Profile", doc.pos_profile, ["restaurant"], as_dict=True)
+    if not pos_profile or not pos_profile.get("restaurant"):
+        return
+
+    restaurant = pos_profile.get("restaurant")
 
     if not doc.restaurant_table:
-        doc.naming_series = frappe.db.get_value(
+        prefix = frappe.db.get_value(
             "URY Restaurant", restaurant, "invoice_series_prefix"
         )
-        
+        if prefix:
+            doc.naming_series = prefix
+
         if doc.order_type == "Aggregators":
-            doc.naming_series = frappe.db.get_value(
+            agg_prefix = frappe.db.get_value(
                 "URY Restaurant", restaurant, "aggregator_series_prefix"
             )
+            if agg_prefix:
+                doc.naming_series = agg_prefix
     
 
 
