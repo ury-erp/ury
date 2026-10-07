@@ -1,0 +1,63 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Mercury",
+ "name": "URY RU Mercury Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Меркурий включён",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер",
+   "options": "Simulated\nVetis",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "api_url",
+   "fieldtype": "Data",
+   "label": "ВетИС.API URL"
+  },
+  {
+   "fieldname": "login",
+   "fieldtype": "Data",
+   "label": "Логин"
+  },
+  {
+   "fieldname": "certificate_section",
+   "fieldtype": "Section Break",
+   "label": "ЭЦП"
+  },
+  {
+   "fieldname": "certificate",
+   "fieldtype": "Attach",
+   "label": "Сертификат ЭЦП"
+  },
+  {
+   "fieldname": "controlled_product_group",
+   "fieldtype": "Link",
+   "label": "Группа подконтрольной продукции",
+   "options": "Item Group"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -1,0 +1,70 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU KKT",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "kkt_model",
+   "fieldtype": "Data",
+   "label": "Модель ККТ"
+  },
+  {
+   "fieldname": "serial_number",
+   "fieldtype": "Data",
+   "label": "Заводской номер (ЗН)"
+  },
+  {
+   "fieldname": "fiscal_accumulator",
+   "fieldtype": "Data",
+   "label": "Фискальный накопитель (ФН)"
+  },
+  {
+   "fieldname": "reg_number",
+   "fieldtype": "Data",
+   "label": "Регистрационный номер (РНМ)"
+  },
+  {
+   "fieldname": "connection",
+   "fieldtype": "Data",
+   "label": "Адрес драйвера (host:port)"
+  },
+  {
+   "fieldname": "ofd",
+   "fieldtype": "Data",
+   "label": "ОФД"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Data",
+   "label": "Адрес расчёта"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile"
+  },
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "label": "Ресторан",
+   "options": "URY Restaurant"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -1,0 +1,46 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_1C",
+ "name": "URY RU 1C Sync Log",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "operation",
+   "fieldtype": "Select",
+   "label": "Операция",
+   "options": "import_items\nimport_prices\nimport_stock\nexport_orders\nexport_revenue\nsync",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Success\nFailed",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "detail",
+   "fieldtype": "Small Text",
+   "label": "Детали"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Ошибка"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

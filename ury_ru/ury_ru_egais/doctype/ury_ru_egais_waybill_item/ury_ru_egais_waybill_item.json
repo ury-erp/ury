@@ -1,0 +1,33 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_EGAIS",
+ "name": "URY RU EGAIS Waybill Item",
+ "istable": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "alc_code",
+   "fieldtype": "Data",
+   "label": "Код АП (алкогольной продукции)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Наименование",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Кол-во"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC"
+}

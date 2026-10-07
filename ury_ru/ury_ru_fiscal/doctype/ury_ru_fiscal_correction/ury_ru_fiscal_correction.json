@@ -1,0 +1,89 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Fiscal",
+ "name": "URY RU Fiscal Correction",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "correction_type",
+   "fieldtype": "Select",
+   "label": "Тип коррекции",
+   "options": "self\ninstruction",
+   "in_list_view": 1,
+   "reqd": 1,
+   "description": "self — самостоятельная коррекция; instruction — по предписанию ФНС"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Сумма коррекции",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "vat_rate",
+   "fieldtype": "Select",
+   "label": "Ставка НДС",
+   "options": "vat20\nvat10\nvat0\nnone\nvat20_120\nvat10_110",
+   "default": "none"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Основание коррекции",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pos_invoice",
+   "fieldtype": "Link",
+   "label": "Связанный POS Invoice",
+   "options": "POS Invoice"
+  },
+  {
+   "fieldname": "kkt",
+   "fieldtype": "Link",
+   "label": "ККТ",
+   "options": "URY RU KKT"
+  },
+  {
+   "fieldname": "section_break_result",
+   "fieldtype": "Section Break",
+   "label": "Результат"
+  },
+  {
+   "fieldname": "fiscal_document_number",
+   "fieldtype": "Int",
+   "label": "ФД"
+  },
+  {
+   "fieldname": "fiscal_sign",
+   "fieldtype": "Data",
+   "label": "ФПД"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Draft\nSent\nFailed",
+   "default": "Draft",
+   "in_list_view": 1
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

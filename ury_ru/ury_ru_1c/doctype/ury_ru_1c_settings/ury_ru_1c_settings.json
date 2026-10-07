@@ -1,0 +1,72 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_1C",
+ "name": "URY RU 1C Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Обмен с 1С включён",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер обмена",
+   "options": "Simulated\nCommerceML\nREST",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "exchange_mode",
+   "fieldtype": "Select",
+   "label": "Режим обмена",
+   "options": "File\nHTTP",
+   "default": "File"
+  },
+  {
+   "fieldname": "exchange_dir",
+   "fieldtype": "Data",
+   "label": "Каталог обмена (File-режим)"
+  },
+  {
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "URL 1С (HTTP-режим)"
+  },
+  {
+   "fieldname": "sync_interval",
+   "fieldtype": "Select",
+   "label": "Периодичность синка",
+   "options": "Manual\nEvery 5 min\nEvery 15 min\nEvery hour\nDaily",
+   "default": "Manual"
+  },
+  {
+   "fieldname": "warehouse_map_section",
+   "fieldtype": "Section Break",
+   "label": "Сопоставление складов"
+  },
+  {
+   "fieldname": "warehouse_map",
+   "fieldtype": "Table",
+   "label": "Склады",
+   "options": "URY RU 1C Warehouse Map"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

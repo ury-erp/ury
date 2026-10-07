@@ -1,0 +1,66 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Deepseek",
+ "name": "URY RU Deepseek Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "ИИ-аналитика включена",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер ИИ",
+   "options": "Simulated\nDeepSeek API",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API-ключ DeepSeek"
+  },
+  {
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Базовый URL API",
+   "default": "https://api.deepseek.com"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Модель",
+   "default": "deepseek-chat"
+  },
+  {
+   "fieldname": "analysis_days",
+   "fieldtype": "Int",
+   "label": "Период анализа (дней)",
+   "default": "30"
+  },
+  {
+   "fieldname": "forecast_days",
+   "fieldtype": "Int",
+   "label": "Горизонт прогноза (дней)",
+   "default": "7"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

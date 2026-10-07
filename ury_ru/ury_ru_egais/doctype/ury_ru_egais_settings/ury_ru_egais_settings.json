@@ -1,0 +1,53 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_EGAIS",
+ "name": "URY RU EGAIS Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "ЕГАИС включён",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер",
+   "options": "Simulated\nUTM",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "utm_url",
+   "fieldtype": "Data",
+   "label": "URL УТМ"
+  },
+  {
+   "fieldname": "fsrar_id",
+   "fieldtype": "Data",
+   "label": "ФСРАР ID"
+  },
+  {
+   "fieldname": "alcohol_product_group",
+   "fieldtype": "Link",
+   "label": "Группа алкогольной продукции",
+   "options": "Item Group"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

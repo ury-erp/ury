@@ -1,0 +1,86 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Delivery",
+ "name": "URY RU Delivery Order",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "aggregator",
+   "fieldtype": "Select",
+   "label": "Агрегатор",
+   "options": "Yandex Eda\nMarket Delivery",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "external_order_id",
+   "fieldtype": "Data",
+   "label": "Внешний ID заказа",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "New\nAccepted\nRejected\nIn Progress\nCompleted\nCancelled",
+   "in_list_view": 1,
+   "default": "New"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Клиент"
+  },
+  {
+   "fieldname": "customer_phone",
+   "fieldtype": "Data",
+   "label": "Телефон"
+  },
+  {
+   "fieldname": "delivery_address",
+   "fieldtype": "Small Text",
+   "label": "Адрес доставки"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Сумма"
+  },
+  {
+   "fieldname": "pos_invoice",
+   "fieldtype": "Link",
+   "label": "POS Invoice",
+   "options": "POS Invoice"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Состав заказа"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Позиции",
+   "options": "URY RU Delivery Order Item"
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "label": "Сырой payload (отладка)"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

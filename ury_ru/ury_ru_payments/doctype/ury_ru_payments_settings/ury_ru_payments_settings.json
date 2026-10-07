@@ -1,0 +1,77 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Payments",
+ "name": "URY RU Payments Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Эквайринг включён",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер",
+   "options": "Simulated\nT-Bank\nSber\nSBP",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "section_break_tbank",
+   "fieldtype": "Section Break",
+   "label": "Т-Банк"
+  },
+  {
+   "fieldname": "tbank_terminal_key",
+   "fieldtype": "Data",
+   "label": "Terminal Key"
+  },
+  {
+   "fieldname": "tbank_password",
+   "fieldtype": "Password",
+   "label": "Пароль"
+  },
+  {
+   "fieldname": "section_break_sber",
+   "fieldtype": "Section Break",
+   "label": "Сбер"
+  },
+  {
+   "fieldname": "sber_shop_id",
+   "fieldtype": "Data",
+   "label": "Shop ID"
+  },
+  {
+   "fieldname": "sber_secret_key",
+   "fieldtype": "Password",
+   "label": "Secret Key"
+  },
+  {
+   "fieldname": "section_break_sbp",
+   "fieldtype": "Section Break",
+   "label": "СБП"
+  },
+  {
+   "fieldname": "sbp_merchant_id",
+   "fieldtype": "Data",
+   "label": "Merchant ID"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

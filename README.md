@@ -1,135 +1,135 @@
-
-# URY - Open Source Restaurant Management System
-
-URY is an open source ERP designed to simplify and streamline restaurant operations. It is built on top of  world's best free and open source ERP, ERPNext.
-
 <div align="center">
-	<a href="https://frappecloud.com/dashboard/signup?product=ury" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
-			<img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
-		</picture>
-	</a>
+
+# URY-RU 🍽️
+
+**Открытая система управления рестораном для российского рынка**
+*Open-source restaurant management system for the Russian market*
+Описание проекта https://habr.com/ru/articles/1073824/
+Базируется на [URY](https://github.com/ury-erp/ury) · ERPNext · Frappe Framework
+
 </div>
 
+---
 
-> :warning: Warning : 
-> URY is currently in active development, and we are continuously making changes, updates, and working on new features and improvements. Please be aware that until a stable release is reached, backward compatibility is not guaranteed. We make every effort to maintain compatibility.
+## О проекте / About
 
-> :information_source: Note :
-> Our system has been successfully running at scale, serving over 10+ outlets for the past 10 months.
+**URY-RU** — форк открытой системы управления рестораном [URY](https://github.com/ury-erp/ury) (построена на базе [ERPNext](https://erpnext.com) и [Frappe Framework](https://frappeframework.com)), адаптированный под российский рынок.
 
+Основная цель — создать открытый аналог **iiko**, не уступающий по функционалу, с поддержкой обязательных российских интеграций: 1С, фискализация (54-ФЗ), эквайринг, агрегаторы доставки, «Честный знак», ЕГАИС и «Меркурий».
 
-## What It Includes
-- **POS**: Dine‑in, takeaway, delivery, offline mode, printer management  
-- **Kitchen Display**: Real‑time order queues, KOT printing  
-- **Analytics**: P&L dashboard, consumption reports, item trends  
+**URY-RU** is a fork of the open-source restaurant management system [URY](https://github.com/ury-erp/ury) (built on [ERPNext](https://erpnext.com) and [Frappe Framework](https://frappeframework.com)), adapted for the Russian market.
 
-Given below is the list of features of URY app. 
+The goal is an open-source alternative to **iiko** with full support for mandatory Russian integrations: 1C, fiscalization (54-FZ), acquiring, delivery aggregators, Chestny Znak, EGAIS and Mercury.
 
-### URY POS
+> ⚠️ Проект в активной разработке. Обратная совместимость до стабильного релиза не гарантируется.
+> ⚠️ The project is under active development. Backward compatibility is not guaranteed until a stable release.
 
-**URY POS** is a light weight and easy to use web-based application designed for streamlined order management. It serves as an efficient tool for both cashiers and captains, facilitating order processing at the cash counter and tables.It supports various order types, including dine-in, delivery, takeout and Aggregator. URY POS is compatibile with a wide range of devices, including desktops, tablets, and smartphones. 
+---
 
-:information_source: **Note:**  
-> To access the previous version of the separate URY POS app, [click here](https://github.com/ury-erp/pos).  
-> **Use the URY branch `v1` to access these separate apps.**
-> **Support for this version will end in December 2025.**
+## Что внутри / What's inside
 
-### URY MOSAIC
+URY — монорепо из нескольких приложений / a monorepo of several apps:
 
-**URY MOSAIC** is an interactive Kitchen Display System (KDS) designed to simplify order management in both single and multi-kitchen restaurants. Additionally, it offers optional Kitchen Order Ticket (KOT) printing support for added convenience.
+| Директория / Directory | Назначение / Purpose |
+|---|---|
+| `ury/` | Основное Frappe-приложение: POS, KDS, отчёты, API / Core Frappe app: POS, KDS, reports, API |
+| `pos/` | POS-фронтенд (Vite/React) / POS frontend |
+| `mosaic/` | Kitchen Display System (KDS) |
+| `self-order/` | Самообслуживание (QR-меню) / Self-ordering (QR menu) |
+| `urypos/` | Устаревший POS (legacy) / Legacy POS |
+| `packages/` | Общие core/ui пакеты / Shared core/ui packages |
+| **`ury_ru/`** | **🇷🇺 Российская локализация и интеграции / Russian localization & integrations** |
 
-:information_source: **Note:**  
-> To access the previous version of the separate URY MOSAIC app, [click here](https://github.com/ury-erp/mosaic).  
-> **Use the URY branch `v1` to access these separate apps.**
-> **Support for this version will end in December 2025.**
+### Модули `ury_ru` / `ury_ru` modules
 
-### Daily P & L and Reports
- URY has daily P & L and various reports. It helps restaurants to monitor daily Profit and Loss (P&L), utility consumption, disposables usage, and other key metrics with precision and ease. It provides restaurants with crucial data, enabling timely decision-making by presenting essential information and insights.
- 
-:information_source: **Note:**  
-> To access the previous version of the separate URY PULSE app, [click here](https://github.com/ury-erp/pulse).  
-> **Use the URY branch `v1` to access these separate apps.**
-> **Support for this version will end in December 2025.**
+7 изолированных Frappe-модулей, каждый подключается через `hooks.py` / 7 isolated Frappe modules, each wired via `hooks.py`:
 
-## Features
+| Модуль / Module | Назначение / Purpose | Интеграции / Integrations |
+|---|---|---|
+| `URY_RU_1C` | Обмен с 1С / 1C exchange | 1С:Предприятие (CommerceML / REST / файлы) |
+| `URY_RU_Fiscal` | Фискализация / Fiscalization | АТОЛ, ШТРИХ-М, ОФД, 54-ФЗ |
+| `URY_RU_Payments` | Эквайринг / Acquiring | Т-Банк, Сбер, СБП |
+| `URY_RU_Delivery` | Доставка / Delivery | Яндекс Еда, Маркет Деливери |
+| `URY_RU_Marking` | Маркировка / Product marking | «Честный знак» |
+| `URY_RU_EGAIS` | Алкоголь / Alcohol | ЕГАИС |
+| `URY_RU_Mercury` | Ветконтроль / Veterinary control | «Меркурий» |
 
-### POS & Billing
-* Role-based access with strict operational controls
-* Pre-billing checklists to enforce compliance (e.g., stock check, hygiene checklist)
-* Linked with stock and accounting modules
-* Multi-format support: Table service, QSR, and takeaway
-* Multi-cashier handling and terminal controls
-* Advanced filters for order and bill management
-* Modern, fast UI with guided flow
-* Shift opening, closing, and cash reconciliation built-in
+По умолчанию во всех модулях активен честный **NoOp**-провайдер; реальный или simulated-драйвер подключается только после выбора в настройках модуля.
+By default every module uses an honest **NoOp** provider; the real or simulated driver is only activated when selected in the module's settings.
 
+---
 
-###  Menu & Recipe Management
-* Centralized menu with outlet-level control
-* Recipe mapping using Bill of Materials (BOM)
-* Control pricing, availability, and portions per outlet
-* Supports combos, modifiers, and item bundles
-* Integrated with production planning for daily prep
+## Возможности URY / URY features
 
-### Table Order Management
-* Mobile-first order taking for waitstaff
-* Live sync with kitchen and cashier
-* Real-time inventory checks before order placement
-* Supports modifiers, course sequencing, and notes
-* Seamless integration with billing and KDS
+- **POS** — зал, на вынос, доставка, офлайн-режим, управление принтерами
+- **Kitchen Display (MOSAIC)** — живые очереди заказов, печать KOT
+- **Аналитика** — P&L-дашборд, отчёты по расходу, тренды по позициям
+- **Меню и техкарты** — централизованное меню, рецепты через BOM, комбо и модификаторы
+- **Столы** — визуальное управление залом, merge/split счетов
+- **Мультикассир, смены, сверка наличных**
 
+Подробнее — [FEATURES.md](FEATURES.md). Дорожная карта — [ROADMAP.md](ROADMAP.md).
 
-### Kitchen Display & KOT Management
-* Supports multiple kitchens with advanced printer routing
-* Interactive KDS with live status updates (Preparing, Ready, Served)
-* Delay, cancellation, and modification tracking
-* Real-time kitchen analytics
-* Seamless flow from order to service across stations
+---
 
+## Установка / Installation
 
-### Operational Red Flags & Alerts
-* Delayed orders and preparation time breaches
-* KOT not started after order placement
-* Unclosed bills and prolonged table occupancy
-* Excessive KOT cancellations and modifications
-* Real-time alerts for operational exceptions
-* Dashboard view for quick issue resolution across outlets
+### Требования / Requirements
 
+- Frappe Bench + [ERPNext v15](https://github.com/frappe/erpnext) (`version-15`)
+- [Frappe HR](https://github.com/frappe/hrms) (для отчётов по сотрудникам)
+- Node.js ≥ 18
 
+### Шаги / Steps
 
-### Reports & Analytics
-* Daily Profit & Loss
-* Shortage and Excess reporting
-* Course-wise and item-wise performance
-* Captain and staff performance tracking
-* Branch-wise and outlet-wise comparisons
-* Customer-wise sales trends
-* Detailed sales, production, and stock reports
-* Real-time operational insights for better decision-making
+```bash
+# 1. Получить приложения
+bench get-app --branch version-15 erpnext https://github.com/frappe/erpnext.git
+bench get-app --branch version-15 hrms https://github.com/frappe/hrms.git
+bench get-app ury https://github.com/ury-erp/ury.git
+bench get-app ury_ru https://github.com/webzuweb/URY-RU.git
 
-For more comprehensive list of features [go here.](FEATURES.md)
+# 2. Создать сайт и установить приложения
+bench new-site <sitename>
+bench --site <sitename> install-app erpnext
+bench --site <sitename> install-app hrms
+bench --site <sitename> install-app ury
+bench --site <sitename> install-app ury_ru
 
+# 3. Собрать и мигрировать
+bench --site <sitename> build
+bench --site <sitename> migrate
+```
 
-## Getting Started
+> ⚠️ Приложение `ury_ru` зависит от `ury` и `erpnext` — устанавливайте их в указанном порядке.
+> ⚠️ `ury_ru` requires `ury` and `erpnext` — install in the order above.
 
-To start using URY, you need to first install URY and then setup your first restaurant.
+Подробная инструкция по настройке ресторана — [SETUP.md](SETUP.md) (англ.) / см. [INSTALLATION.md](INSTALLATION.md).
 
-1. [URY Installation Guide](INSTALLATION.md).
+---
 
-2. [URY Setup Instructions](SETUP.md).
+## Разработка / Development
 
-## Looking for other versions 	
+Правила / Rules (подробно в [ROADMAP.md](ROADMAP.md)):
 
-1. Use branch `v1` to use ury [v0.1.0]
+- Код RU-локализации **не меняет** файлы апстрима `ury/` без необходимости — всё новое в `ury_ru/`.
+- Каждый модуль изолирован: настройки в отдельном `Doctype Settings`, подключение через `hooks.py`.
+- Периодически синхронизировать `upstream/develop`.
+- RU-localization code **does not modify** upstream `ury/` unless necessary — everything new lives in `ury_ru/`.
+- Each module is isolated: its own `Doctype Settings`, wired through `hooks.py`.
 
-## About
+---
 
-URY is developed by [Tridz Technologies Pvt Ltd](https://tridz.com) and supported by [Frappe](http://frappe.io).
+## Лицензия / License
 
-## Terms and Conditions
+[AGPL-3.0](LICENSE) — та же лицензия, что и у апстрима URY / same license as upstream URY.
 
-By using the URY, you agree to use it responsibly and in compliance with applicable laws. URY is built on open-source technology and is provided for your convenience to manage restaurant operations. While we strive to keep the app reliable, it is provided “as is” without any guarantees, and we are not responsible for any misuse or resulting issues.
+---
 
-[Read More](TERMS.md)
+## Авторство / Credits
+
+Апстрим URY разработан [Tridz Technologies Pvt Ltd](https://tridz.com) при поддержке [Frappe](http://frappe.io). URY-RU — форк и адаптация для РФ.
+
+Upstream URY is developed by [Tridz Technologies Pvt Ltd](https://tridz.com) and supported by [Frappe](http://frappe.io). URY-RU is a fork adapted for Russia.
+
+[Terms / Условия](TERMS.md)

@@ -1,0 +1,59 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Mercury",
+ "name": "URY RU VSD",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Направление",
+   "options": "Incoming\nOutgoing",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "vsd_id",
+   "fieldtype": "Data",
+   "label": "Номер ВСД (внешний)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Data",
+   "label": "Контрагент"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Received\nAccepted\nReturned\nIssued",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Позиции"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Продукция",
+   "options": "URY RU VSD Item"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

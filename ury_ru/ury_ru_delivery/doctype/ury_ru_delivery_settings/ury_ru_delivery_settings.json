@@ -1,0 +1,77 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Delivery",
+ "name": "URY RU Delivery Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Доставка включена",
+   "default": "0"
+  },
+  {
+   "fieldname": "aggregator",
+   "fieldtype": "Select",
+   "label": "Агрегатор",
+   "options": "Simulated\nYandex Eda\nMarket Delivery",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "section_break_yandex",
+   "fieldtype": "Section Break",
+   "label": "Яндекс Еда"
+  },
+  {
+   "fieldname": "yandex_api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "yandex_restaurant_id",
+   "fieldtype": "Data",
+   "label": "Restaurant ID"
+  },
+  {
+   "fieldname": "section_break_market",
+   "fieldtype": "Section Break",
+   "label": "Маркет Деливери"
+  },
+  {
+   "fieldname": "market_api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "market_store_id",
+   "fieldtype": "Data",
+   "label": "Store ID"
+  },
+  {
+   "fieldname": "webhook_section",
+   "fieldtype": "Section Break",
+   "label": "Вебхуки"
+  },
+  {
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Секрет вебхука"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

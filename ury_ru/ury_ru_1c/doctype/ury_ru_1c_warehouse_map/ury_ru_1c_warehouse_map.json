@@ -1,0 +1,31 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_1C",
+ "name": "URY RU 1C Warehouse Map",
+ "istable": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "warehouse_1c",
+   "fieldtype": "Data",
+   "label": "Склад в 1С",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "warehouse_erp",
+   "fieldtype": "Link",
+   "label": "Склад в URY",
+   "options": "Warehouse",
+   "in_list_view": 1,
+   "reqd": 1
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC"
+}

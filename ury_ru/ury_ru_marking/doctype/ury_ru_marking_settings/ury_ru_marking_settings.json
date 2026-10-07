@@ -1,0 +1,65 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_Marking",
+ "name": "URY RU Marking Settings",
+ "is_single": 1,
+ "issingle": 1,
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Маркировка включена",
+   "default": "0"
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Провайдер",
+   "options": "Simulated\nChestny Znak",
+   "default": "Simulated"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "inn",
+   "fieldtype": "Data",
+   "label": "ИНН организации"
+  },
+  {
+   "fieldname": "enable_fiscal_format_12",
+   "fieldtype": "Check",
+   "label": "Включить ФФД 1.2 в фискализации",
+   "default": "1",
+   "description": "Маркированные товары требуют ФФД 1.2 (см. URY_RU_Fiscal)"
+  },
+  {
+   "fieldname": "product_groups_section",
+   "fieldtype": "Section Break",
+   "label": "Товарные группы"
+  },
+  {
+   "fieldname": "product_groups",
+   "fieldtype": "Table",
+   "label": "Группы",
+   "options": "URY RU Marking Product Group"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

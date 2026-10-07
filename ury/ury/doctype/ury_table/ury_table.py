@@ -7,5 +7,7 @@ from frappe.model.naming import make_autoname
 import re
 class URYTable(Document):
     def autoname(self):
-        prefix = re.sub("-+", "-", self.restaurant.replace(" ", "-"))
+        prefix = re.sub(
+            "-+", "-", re.sub(r"[^a-zA-Z0-9-]", "", self.restaurant.replace(" ", "-"))
+        )
         self.name = make_autoname(prefix + "-.##")

@@ -1,0 +1,64 @@
+{
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "URY_RU_EGAIS",
+ "name": "URY RU EGAIS Waybill",
+ "custom": 0,
+ "fields": [
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Направление",
+   "options": "Incoming\nOutgoing",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "waybill_id",
+   "fieldtype": "Data",
+   "label": "Номер ТТН (внешний)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "counterparty",
+   "fieldtype": "Data",
+   "label": "Контрагент"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Статус",
+   "options": "Received\nAccepted\nRejected\nSent",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "total_quantity",
+   "fieldtype": "Float",
+   "label": "Кол-во (дал)"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Позиции"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Алкогольная продукция",
+   "options": "URY RU EGAIS Waybill Item"
+  }
+ ],
+ "modified": "2026-08-24 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
