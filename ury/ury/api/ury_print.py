@@ -193,6 +193,8 @@ def print_pos_page(doctype, name, print_format):
 
 @frappe.whitelist()
 def qz_certificate():
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
     site_config = frappe.get_site_config()
     qz_key_value = site_config.get("qz_cert")
 
