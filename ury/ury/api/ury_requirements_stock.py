@@ -27,7 +27,7 @@ from ury.ury.api.ury_inventory_projection import get_allocatable_qty
 from ury.ury.report_api.utils import require_manager
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_plan_stock_on_hand(branch=None, items=None):
 	"""Return stock-on-hand data for a list of items, grouped by department.
 
