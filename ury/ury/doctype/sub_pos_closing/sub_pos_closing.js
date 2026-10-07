@@ -16,54 +16,79 @@ function padNumber(num) {
 frappe.ui.form.on("Sub POS Closing", {
 
 
-	onload: function (frm) {
-        	
-		frm.set_value("user", frappe.session.user);
-        frappe.call({
-            method: 'ury.ury.doctype.sub_pos_closing.sub_pos_closing.get_pos_profile',
-            callback: function(r) {
-                if (r.message) {
-                    frm.set_value('pos_profile', r.message);
-                }
-            }
-        });
+	onload: async function (frm) {
+		if (!frm.is_new()) {
+			return;
+		}
+
+		const user = frappe.session.user;
+
+		await frm.set_value("user", user);
+
+		try {
+			const r = await frappe.call({
+				method: "ury.ury.doctype.sub_pos_closing.sub_pos_closing.get_pos_profile",
+				args: {
+					user: user
+				}
+			});
+
+			if (r.message) {
+				await frm.set_value("pos_profile", r.message);
+			} else {
+				frappe.msgprint(
+					__("No POS Profile found for user {0}", [user])
+				);
+			}
+		} catch (error) {
+			console.error("Failed to get POS Profile:", error);
+
+			frappe.msgprint({
+				title: __("POS Profile Error"),
+				message: __("Unable to determine POS Profile for {0}", [user]),
+				indicator: "red"
+			});
+		}
+
 		frm.set_query("user", function (doc) {
 			return {
 				query: "ury.ury.doctype.sub_pos_closing.sub_pos_closing.get_cashiers",
-				filters: { parent: doc.pos_profile },
+				filters: {
+					parent: doc.pos_profile
+				}
 			};
 		});
-        user = frappe.session.user
+
 		frm.set_query("pos_opening_entry", function (doc) {
-			return { filters: { status: 'Open', docstatus: 1,user:user } };
+			return {
+				filters: {
+					status: "Open",
+					docstatus: 1,
+					user: doc.user,
+					pos_profile: doc.pos_profile
+				}
+			};
 		});
 
-		if (frm.doc.docstatus === 0 && !frm.doc.amended_from)
-			frm.set_value("period_end_date", frappe.datetime.now_datetime());
+		if (frm.doc.docstatus === 0 && !frm.doc.amended_from) {
+			await frm.set_value(
+				"period_end_date",
+				frappe.datetime.now_datetime()
+			);
+		}
 
-		frappe.realtime.on("closing_process_complete", async function (data) {
+		frappe.realtime.on("closing_process_complete", async function () {
 			await frm.reload_doc();
-			if (frm.doc.status == "Failed" && frm.doc.error_message) {
+
+			if (frm.doc.status === "Failed" && frm.doc.error_message) {
 				frappe.msgprint({
 					title: __("Sub POS Closing Failed"),
 					message: frm.doc.error_message,
 					indicator: "orange",
-					clear: true,
+					clear: true
 				});
 			}
 		});
-
-
-		if (frm.doc.docstatus == 1) {
-			if (!frm.doc.posting_date) {
-				frm.set_value("posting_date", frappe.datetime.nowdate());
-			}
-			if (!frm.doc.posting_time) {
-				frm.set_value("posting_time", frappe.datetime.now_time());
-			}
-		}
-
-
 	},
 
 	refresh: function (frm) {
