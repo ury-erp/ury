@@ -78,11 +78,13 @@ export const dashboardService = {
    * endpoint, which itself reuses ``get_dashboard_stats`` for live sales/table
    * numbers (same source as the POS dashboard).
    */
-  async getSummary(branch?: string): Promise<DashboardSummary> {
+  async getSummary(branch?: string, company?: string): Promise<DashboardSummary> {
     const branchArg = !branch || branch === 'all' ? undefined : branch;
+    const companyArg = !company || company === 'all' ? undefined : company;
     try {
       const res = await call.get<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', {
         branch: branchArg,
+        company: companyArg,
       });
       const summary = unwrap<DashboardSummary>(res);
       return {
@@ -109,9 +111,11 @@ export const dashboardService = {
     }
   },
 
-  async getCharts(branch?: string): Promise<DashboardChartsData> {
+  async getCharts(branch?: string, company?: string): Promise<DashboardChartsData> {
     try {
-      let res = await call<DashboardChartsData>('ury.ury.api.dashboard.get_dashboard_charts', { branch });
+      const branchArg = !branch || branch === 'all' ? undefined : branch;
+      const companyArg = !company || company === 'all' ? undefined : company;
+      let res = await call<DashboardChartsData>('ury.ury.api.dashboard.get_dashboard_charts', { branch: branchArg, company: companyArg });
       res = (res as any)?.message || res;
       return res || {
         sales_trend: [],
@@ -135,9 +139,11 @@ export const dashboardService = {
     }
   },
 
-  async getRecentTransactions(branch?: string, limit: number = 10): Promise<TransactionRecord[]> {
+  async getRecentTransactions(branch?: string, limit: number = 10, company?: string): Promise<TransactionRecord[]> {
     try {
-      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch, limit });
+      const branchArg = !branch || branch === 'all' ? undefined : branch;
+      const companyArg = !company || company === 'all' ? undefined : company;
+      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch: branchArg, limit, company: companyArg });
       return Array.isArray(res) ? res : ((res as any)?.message || []);
     } catch {
       return [];

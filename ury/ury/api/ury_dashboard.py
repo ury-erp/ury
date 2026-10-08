@@ -297,43 +297,32 @@ def search_branch_items(branch, company=None, query="", limit=25):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_dashboard_stats(branch=None):
-	cache_key = f"ury_dashboard_stats:{branch}"
+def get_dashboard_stats(branch=None, company=None):
+	cache_key = f"ury_dashboard_stats:{branch}:{company}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:
 		return cached
 
+	filters_dict = {}
+	where_clause = ""
 	if branch:
+		where_clause += " AND b.`branch` = %(branch)s"
+		filters_dict["branch"] = branch
+	if company:
+		where_clause += " AND b.`company` = %(company)s"
+		filters_dict["company"] = company
+
+	if True:
 		result = frappe.db.sql(
-			"""
+			f"""
 			SELECT
 				COUNT(b.`name`) AS total_invoices,
 				ROUND(SUM(b.`grand_total`), 2) AS grand_total
 			FROM `tabPOS Invoice` b
-			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` = %(branch)s)
-			WHERE
-				b.`branch` = %(branch)s
-				AND b.`docstatus` = 1
-				AND b.`status` IN ("Consolidated", "Paid")
-				AND (
-					((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
-					OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-					OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
-				)
-			""",
-			{"branch": branch},
-			as_dict=True,
-		)[0]
-	else:
-		result = frappe.db.sql(
-			"""
-			SELECT
-				COUNT(b.`name`) AS total_invoices,
-				ROUND(SUM(b.`grand_total`), 2) AS grand_total
-			FROM `tabPOS Invoice` b
-			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` IS NULL)
+			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` = b.`branch`)
 			WHERE
 				b.`docstatus` = 1
+				{where_clause}
 				AND b.`status` IN ("Consolidated", "Paid")
 				AND (
 					((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
@@ -341,7 +330,7 @@ def get_dashboard_stats(branch=None):
 					OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
 				)
 			""",
-			{},
+			filters_dict,
 			as_dict=True,
 		)[0]
 
@@ -349,12 +338,14 @@ def get_dashboard_stats(branch=None):
 	total_invoices = result.total_invoices or 0
 	avg_order_value = round(grand_total / total_invoices, 2) if total_invoices else 0
 
+	table_filters = {}
 	if branch:
-		occupied_count = frappe.db.count("URY Table", {"branch": branch, "occupied": 1})
-		total_count = frappe.db.count("URY Table", {"branch": branch})
-	else:
-		occupied_count = frappe.db.count("URY Table", {"occupied": 1})
-		total_count = frappe.db.count("URY Table", {})
+		table_filters["branch"] = branch
+	if company:
+		table_filters["company"] = company
+
+	occupied_count = frappe.db.count("URY Table", {**table_filters, "occupied": 1})
+	total_count = frappe.db.count("URY Table", table_filters)
 
 	result_dict = {
 		"todays_sales": grand_total,

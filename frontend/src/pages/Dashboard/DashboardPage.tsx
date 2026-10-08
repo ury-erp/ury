@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCompanyContext } from '../../context/CompanyContext';
 import KPIGrid from './KPIGrid';
 import AnalyticsCharts from './AnalyticsCharts';
 import ReportWidgets from './ReportWidgets';
@@ -13,6 +14,7 @@ import {
 
 export const DashboardPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
+  const { activeCompanyId } = useCompanyContext();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [chartsData, setChartsData] = useState<DashboardChartsData | null>(null);
@@ -23,9 +25,9 @@ export const DashboardPage: React.FC = () => {
     setLoading(true);
     try {
       const [sumRes, chartRes, txRes] = await Promise.all([
-        dashboardService.getSummary(activeBranchId),
-        dashboardService.getCharts(activeBranchId),
-        dashboardService.getRecentTransactions(activeBranchId, 10),
+        dashboardService.getSummary(activeBranchId, activeCompanyId),
+        dashboardService.getCharts(activeBranchId, activeCompanyId),
+        dashboardService.getRecentTransactions(activeBranchId, 10, activeCompanyId),
       ]);
       setSummary(sumRes);
       setChartsData(chartRes);
@@ -39,7 +41,7 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [activeBranchId]);
+  }, [activeBranchId, activeCompanyId]);
 
   return (
     <Page>
