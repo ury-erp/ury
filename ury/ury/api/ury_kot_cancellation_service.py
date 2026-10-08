@@ -632,8 +632,15 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 		)
 	else:
 		department = None
+		warehouse = None
 		if production_unit:
-			department = frappe.db.get_value("URY Production Unit", production_unit, "department")
+			pu_data = frappe.db.get_value("URY Production Unit", production_unit, ["department", "warehouse"], as_dict=True)
+			if pu_data:
+				department = pu_data.get("department")
+				warehouse = pu_data.get("warehouse")
+		
+		if not warehouse:
+			warehouse = frappe.db.get_value("POS Profile", {"company": company}, "warehouse")
 
 		reason_category = reason if reason in _WASTAGE_REASON_CATEGORIES else "Other"
 
@@ -643,10 +650,15 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 				"branch": branch,
 				"company": company,
 				"department": department,
+				"warehouse": warehouse,
 				"production_unit": production_unit,
-				"component_item": row.get("item"),
+				"items": [
+					{
+						"item_code": row.get("item"),
+						"qty": qty
+					}
+				],
 				"status": "Draft",
-				"wasted_qty": qty,
 				"reason_category": reason_category,
 				"reason_notes": reason,
 				"captured_by": actor,
