@@ -235,7 +235,7 @@
     "invalid_discount": "Please enter a valid discount value",
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
-    "enter_cancel_reason": "Please enter a reason for cancellation.",
+    "enter_cancel_reason": "Enter a reason for voiding this order (at least 4 characters).",
     "dine_in_restricted": "Dine In is not available for your role",
     "payment_failed": "Payment could not be completed. Please try again.",
     "order_modified": "This order has been modified. Please reload the page to retrieve the latest edits.",

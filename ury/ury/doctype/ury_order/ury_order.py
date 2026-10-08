@@ -1906,6 +1906,13 @@ def cancel_order(invoice_id, reason):
                 frappe.PermissionError,
             )
 
+    if not isinstance(reason, str) or len(reason.strip()) < 4:
+        frappe.throw(
+            _("Enter a reason for voiding this order (at least 4 characters)."),
+            title=_("Invalid void reason"),
+        )
+    reason = reason.strip()
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
