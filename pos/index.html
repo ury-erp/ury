@@ -4,17 +4,20 @@
 <html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/ury.ico" />
+    <link rel="icon" href="{{ (brand.favicon if brand and brand.favicon else '/ury.ico') | e }}" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <title>URY POS</title>
+    <title>{{ (brand.name if brand and brand.name else 'URY POS') | e }}</title>
   </head>
   <body>
     <div id="root"></div>
+    <footer class="py-2 text-center text-xs text-muted-foreground">
+      {{ (brand.name if brand and brand.name else 'URY POS') | e }} · built on URY (AGPL-3.0) · <a href="{{ brand_source_url | e }}" class="underline">Source</a>
+    </footer>
     <script>
       window.csrf_token = "{{ csrf_token }}";
       if (!window.frappe) window.frappe = {};
-      window.app_name = "{{ app_name }}";
+      window.app_name = {{ app_name | default('') | tojson }};
       frappe.boot = JSON.parse({{ boot }});
     </script>
     <script type="module" src="/src/main.tsx"></script>

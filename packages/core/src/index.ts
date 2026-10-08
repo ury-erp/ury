@@ -1,5 +1,7 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
+export { resolveBrand } from './brand';
+export type { Brand } from './brand';
 export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
 export type { POSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
