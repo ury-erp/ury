@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import frappe
+from frappe.utils import cint
 
 from ury.ury.api.ury_chat import DEFAULT_URY_HUF_AGENT_NAME
 
@@ -46,7 +47,7 @@ PREFERRED_MODELS = [
 ]
 _NON_CHAT_MARKERS = ("embedding", "whisper", "dall-e", "gpt-image", "tts", "image", "alternate")
 
-# The 6 read-only tools this agent should have attached (kept in sync with
+# The read-only tools this agent should have attached (kept in sync with
 # ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS, which is the source of
 # truth for the tool set).
 _URY_TOOL_NAMES = None
@@ -172,6 +173,37 @@ def _attach_ury_tools(agent_doc):
 	return added
 
 
+# sha256 of earlier seeded `instructions` texts. An existing agent whose
+# instructions still match one of these was never customised by an operator,
+# so it is safe to upgrade it to the current seed on migrate.
+_PREVIOUS_SEED_INSTRUCTION_HASHES = {
+	"50574c714975d082be155ac9fa77b483fa4302dbb3783ae8f95d4c6446a20d82",
+	"b3b0c720a4af878aba161803ba267990384afb3d888ccc0c72dc27bf8b392431",
+	"d672e29541e3da9eab665b7676d7f43fde5f894743bfe1340fc792936c910851",
+	"4a41b68e253d6f486095183440721c1084f758183d636078fd97a51711a98c5c",
+}
+
+
+def _upgrade_seeded_instructions(agent_doc):
+	"""Move an un-customised agent to the current seed's instructions,
+	description and starter prompts. Returns whether anything changed."""
+	import hashlib
+
+	current = agent_doc.get("instructions") or ""
+	if hashlib.sha256(current.encode()).hexdigest() not in _PREVIOUS_SEED_INSTRUCTION_HASHES:
+		return False
+	seed = _load_seed()
+	if current == seed["instructions"]:
+		return False
+	agent_doc.instructions = seed["instructions"]
+	if seed.get("max_context_chars") and cint(agent_doc.get("max_context_chars")) < cint(seed["max_context_chars"]):
+		agent_doc.max_context_chars = seed["max_context_chars"]
+	agent_doc.description = seed.get("description") or agent_doc.description
+	if seed.get("starter_prompts"):
+		agent_doc.set("starter_prompts", seed["starter_prompts"])
+	return True
+
+
 @contextmanager
 def _seeding_flag():
 	previous = getattr(frappe.flags, "in_seeding", None)
@@ -191,7 +223,8 @@ def create_ury_dashboard_agent():
 	if frappe.db.exists("Agent", agent_name):
 		provision_ury_agent()
 		agent_doc = frappe.get_doc("Agent", agent_name)
-		if _attach_ury_tools(agent_doc):
+		tools_added = _attach_ury_tools(agent_doc)
+		if _upgrade_seeded_instructions(agent_doc) or tools_added:
 			with _seeding_flag():
 				agent_doc.save(ignore_permissions=True)
 		return False
