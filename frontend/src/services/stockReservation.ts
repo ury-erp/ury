@@ -67,7 +67,7 @@ export const stockReservationService = {
         'audit_log',
         'creation',
       ],
-      order_by: 'expires_at desc, status asc',
+      order_by: 'creation desc',
       limit_page_length: 0,
     });
     return normalizeList<any>(res).map(normalizeStockReservation);

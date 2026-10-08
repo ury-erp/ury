@@ -1,10 +1,16 @@
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, type CurrencyInfo } from '@ury/core';
 import type { KpiItemProps } from '@ury/ui';
 import type { DashboardStats } from '../services/dashboard';
 
 export type BuildDashboardStatsKpiOptions = {
   /** When true, return em-dash placeholders instead of numbers. */
   loading?: boolean;
+  /**
+   * Maps a response currency code to a symbol-aware ``CurrencyInfo``. Money is
+   * always formatted in the currency the stats came back in, so figures can
+   * never pick up another company's symbol mid-switch.
+   */
+  currencyFor?: (code: string | null | undefined) => CurrencyInfo | string | null | undefined;
 };
 
 const LOADING_ITEMS: KpiItemProps[] = [
@@ -31,11 +37,26 @@ export function buildDashboardStatsKpiItems(
   const totalTables = stats?.total_tables ?? 0;
   const occupancy = totalTables ? activeTables / totalTables : 0;
 
+  const toCurrency = (code: string | null | undefined) =>
+    options.currencyFor ? options.currencyFor(code) : code || undefined;
+  const money = (amount: number, code: string | null | undefined) => formatCurrency(amount, toCurrency(code));
+
+  // Mixed-currency scope: one figure per currency instead of a meaningless sum.
+  const breakdown = stats?.currency_breakdown ?? [];
+  const isMixed = breakdown.length > 1;
+  const salesValue = isMixed
+    ? breakdown.map((row) => money(row.sales, row.currency)).join(' · ')
+    : money(todaysSales, stats?.currency);
+  const avgValue = isMixed
+    ? breakdown.map((row) => money(row.avg_order_value, row.currency)).join(' · ')
+    : money(avgOrderValue, stats?.currency);
+
   return [
     {
       label: "Today's Sales",
-      value: formatCurrency(todaysSales),
+      value: salesValue,
       tone: 'success',
+      hint: isMixed ? 'Multiple currencies — not summed' : undefined,
     },
     {
       label: 'Orders Today',
@@ -43,7 +64,7 @@ export function buildDashboardStatsKpiItems(
     },
     {
       label: 'Avg. Order Value',
-      value: formatCurrency(avgOrderValue),
+      value: avgValue,
     },
     {
       label: 'Active Tables',
@@ -84,5 +105,7 @@ export function summaryToDashboardStats(summary?: DashboardSummary | null): Dash
     avg_order_value: summary.avg_order_value ?? 0,
     active_tables: summary.occupied_tables ?? 0,
     total_tables: summary.total_tables ?? 0,
+    currency: summary.currency ?? null,
+    currency_breakdown: summary.currency_breakdown ?? [],
   };
 }

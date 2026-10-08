@@ -41,6 +41,8 @@ def get_dashboard_summary(branch=None, company=None):
 		"occupied_tables": stats.get("active_tables") or 0,
 		"total_tables": total_tables or 0,
 		"avg_order_value": stats.get("avg_order_value") or 0,
+		"currency": stats.get("currency"),
+		"currency_breakdown": stats.get("currency_breakdown") or [],
 		"active_cashiers": frappe.db.count("User", user_filters),
 		"pending_kitchen_orders": pending_kitchen_orders,
 		"total_menu_items": (
@@ -83,6 +85,7 @@ def get_recent_transactions(branch=None, limit=10, company=None):
 					"posting_date",
 					"posting_time",
 					"grand_total",
+					"currency",
 					"status",
 					"order_type",
 					"restaurant_table as restaurant_table",
