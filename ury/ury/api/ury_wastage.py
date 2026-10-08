@@ -14,9 +14,9 @@ changing V3-31, which is out of scope for this task):
             "company": company, "component_item": component_item,
             "status": "Authorized",
         }
-        wasted_qty = _sum_live_if_exists("URY Issue Wastage", dict(filters), "wasted_qty")
+        wasted_qty = _sum_live_if_exists("URY Wastage", dict(filters), "wasted_qty")
 
-    So V3-31 only counts a "URY Issue Wastage" row toward `wasted_qty` when
+    So V3-31 only counts a "URY Wastage" row toward `wasted_qty` when
     that row's `status` field is literally the string "Authorized" and it
     carries matching plan/department/branch/company/component_item fields
     plus a `wasted_qty` field. Everything else (issue_authorization link,
@@ -36,7 +36,7 @@ from frappe import _
 from ury.ury.api.ury_issue_authorization import ISSUE_AUTH_DOCTYPE
 
 
-WASTAGE_DOCTYPE = "URY Issue Wastage"
+WASTAGE_DOCTYPE = "URY Wastage"
 
 # Roles permitted to capture (create) a wastage record.
 CAPTURE_ROLES = {"System Manager", "Production Manager"}
@@ -88,7 +88,7 @@ def capture_wastage(
     if wasted_qty > held_qty:
         frappe.throw(
             _("Wasted quantity {0} exceeds currently-held quantity {1} for {2}").format(
-                wasted_qty, held_qty, auth_doc.get("component_item")
+                wasted_qty, held_qty, auth_doc.items[0].item_code if getattr(doc, "items", None) else ""
             ),
             frappe.ValidationError,
         )
@@ -102,11 +102,12 @@ def capture_wastage(
             "company": auth_doc.get("company"),
             "department": auth_doc.get("department"),
             "production_unit": auth_doc.get("production_unit"),
-            "component_item": auth_doc.get("component_item"),
-            "stock_uom": auth_doc.get("stock_uom"),
+            "items": [{
+                "item_code": auth_doc.get("component_item"),
+                "qty": wasted_qty,
+                "uom": auth_doc.get("stock_uom"),
+            }],
             "status": "Draft",
-            "held_qty_before": held_qty,
-            "wasted_qty": wasted_qty,
             "reason_category": reason_category,
             "reason_notes": reason_notes,
             "captured_by": actor,
@@ -149,10 +150,11 @@ def _resolve_wastage(wastage, actor, approve):
     if approve:
         auth_doc = frappe.get_doc(ISSUE_AUTH_DOCTYPE, doc.get("issue_authorization"))
         held_qty = held_quantity(auth_doc, exclude_wastage=doc.get("name"))
-        if doc.get("wasted_qty") > held_qty:
+        qty = doc.items[0].qty if doc.items else 0
+        if qty > held_qty:
             frappe.throw(
                 _("Wasted quantity {0} exceeds currently-held quantity {1} for {2} (re-validated at approval)").format(
-                    doc.get("wasted_qty"), held_qty, auth_doc.get("component_item")
+                    qty, held_qty, auth_doc.items[0].item_code if getattr(doc, "items", None) else ""
                 ),
                 frappe.ValidationError,
             )
@@ -169,7 +171,7 @@ def _resolve_wastage(wastage, actor, approve):
         doc,
         "approved" if approve else "rejected",
         actor,
-        {"wasted_qty": doc.get("wasted_qty"), "permission_basis": permission_basis},
+        {"wasted_qty": qty if approve else 0, "permission_basis": permission_basis},
     )
     doc.save(ignore_permissions=False)
     return doc
@@ -188,12 +190,14 @@ def compute_wastage_valuation(wastage_doc, valuation_rate=None):
     available. `valuation_is_estimated` stays 1 to flag that this number is
     not sourced from a real valuation ledger yet.
     """
-    rate = valuation_rate if valuation_rate is not None else (wastage_doc.get("valuation_rate") or 0)
-    qty = wastage_doc.get("wasted_qty") or 0
-    wastage_doc.valuation_rate = rate
-    wastage_doc.valuation_amount = qty * rate
-    wastage_doc.valuation_is_estimated = 1
-    return wastage_doc.valuation_amount
+    total = 0
+    for item in wastage_doc.items:
+        # If an explicit rate is passed, use it. Otherwise fall back to the item's existing rate.
+        rate = valuation_rate if valuation_rate is not None else (item.rate or 0)
+        item.rate = rate
+        item.amount = item.qty * rate
+        total += item.amount
+    return total
 
 
 def held_quantity(auth_doc, exclude_wastage=None):
@@ -232,6 +236,28 @@ def _sum_authorized(doctype, filters, fieldname, exclude_name=None):
 def _sum_live_if_exists(doctype, filters, fieldname):
     if not frappe.db.exists("DocType", doctype):
         return 0
+    # URY Wastage stores items in child table now
+    if doctype == WASTAGE_DOCTYPE and fieldname == "wasted_qty":
+        query_filters = {k: v for k, v in filters.items() if k != "component_item"}
+        component_item = filters.get("component_item")
+        
+        conditions = []
+        for k, v in query_filters.items():
+            conditions.append(f"w.`{k}` = %({k})s")
+        if component_item:
+            conditions.append("i.`item_code` = %(component_item)s")
+            query_filters["component_item"] = component_item
+            
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        query = f"""
+            SELECT SUM(i.qty)
+            FROM `tab{WASTAGE_DOCTYPE}` w
+            JOIN `tabWastage Item` i ON w.name = i.parent
+            {where_clause}
+        """
+        res = frappe.db.sql(query, query_filters)
+        return res[0][0] or 0
+
     rows = frappe.get_all(doctype, filters=filters, pluck=fieldname)
     return sum(row or 0 for row in rows)
 
@@ -303,7 +329,7 @@ def append_audit(doc, event, actor, details):
         "branch": doc.get("branch"),
         "company": doc.get("company"),
         "department": doc.get("department"),
-        "component_item": doc.get("component_item"),
+        "component_item": doc.items[0].item_code if getattr(doc, "items", None) else "",
     }
     entry.update(details or {})
     entries.append(entry)
@@ -312,7 +338,7 @@ def append_audit(doc, event, actor, details):
 
 @frappe.whitelist()
 def list_wastage(branch, department=None, company=None, from_date=None, to_date=None):
-    """Read-only list of URY Issue Wastage records scoped by branch.
+    """Read-only list of URY Wastage records scoped by branch.
 
     Fails closed if branch is missing/blank. Pure frappe.get_all read; never
     creates or approves any wastage record.
@@ -334,25 +360,54 @@ def list_wastage(branch, department=None, company=None, from_date=None, to_date=
     elif to_date:
         filters["creation"] = ["<=", to_date]
 
-    return frappe.get_all(
-        WASTAGE_DOCTYPE,
-        filters=filters,
-        fields=[
-            "name",
-            "component_item",
-            "wasted_qty",
-            "status",
-            "reason_category",
-            "reason_notes",
-            "captured_by",
-            "captured_on",
-            "approved_by",
-            "approved_on",
-            "department",
-            "branch",
-            "company",
-            "valuation_rate",
-            "valuation_amount",
-        ],
-        order_by="creation desc",
-    )
+    # Rewrite using SQL to join child table
+    conditions = []
+    values = {}
+    for k, v in filters.items():
+        if k == "creation":
+            if isinstance(v, list):
+                if v[0] == "between":
+                    conditions.append("w.creation BETWEEN %(from_date)s AND %(to_date)s")
+                    values["from_date"] = v[1][0]
+                    
+                    to_date_val = v[1][1]
+                    if isinstance(to_date_val, str) and len(to_date_val) == 10:
+                        to_date_val += " 23:59:59.999999"
+                    values["to_date"] = to_date_val
+                elif v[0] == ">=":
+                    conditions.append("w.creation >= %(from_date)s")
+                    values["from_date"] = v[1]
+                elif v[0] == "<=":
+                    conditions.append("w.creation <= %(to_date)s")
+                    to_date_val = v[1]
+                    if isinstance(to_date_val, str) and len(to_date_val) == 10:
+                        to_date_val += " 23:59:59.999999"
+                    values["to_date"] = to_date_val
+        else:
+            conditions.append(f"w.`{k}` = %({k})s")
+            values[k] = v
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    query = f"""
+        SELECT 
+            w.name, 
+            i.item_code AS component_item, 
+            i.qty AS wasted_qty, 
+            w.status, 
+            w.reason_category, 
+            w.reason_notes, 
+            w.captured_by, 
+            w.captured_on, 
+            w.approved_by, 
+            w.approved_on, 
+            w.department, 
+            w.branch, 
+            w.company, 
+            i.rate AS valuation_rate, 
+            i.amount AS valuation_amount
+        FROM `tab{WASTAGE_DOCTYPE}` w
+        LEFT JOIN `tabWastage Item` i ON w.name = i.parent
+        {where_clause}
+        ORDER BY w.creation DESC
+    """
+    return frappe.db.sql(query, values, as_dict=True)

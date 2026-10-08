@@ -40,7 +40,7 @@ def get_branches(company=None):
     rest_filters = {}
     if company:
         rest_filters["company"] = company
-    restaurants = frappe.get_all("URY Restaurant", filters=rest_filters, fields=["branch", "invoice_series_prefix", "aggregator_series_prefix"])
+    restaurants = frappe.get_all("URY Restaurant", filters=rest_filters, fields=["branch", "company", "invoice_series_prefix", "aggregator_series_prefix"])
     rest_map = {}
     for r in restaurants:
         if r.get("branch"):
@@ -55,6 +55,7 @@ def get_branches(company=None):
             "id": b.name,
             "name": b.branch,
             "tax_id": tax_id,
+            "company": r.get("company") if r else None,
             "invoice_series_prefix": r.get("invoice_series_prefix") if r else None,
             "aggregator_series_prefix": r.get("aggregator_series_prefix") if r else None
         })

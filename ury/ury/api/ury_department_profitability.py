@@ -7,10 +7,11 @@ Read-only reporting/attribution layer composed over accepted V3 sources:
   quantities used by `get_plan_vs_actual`. A live/default BOM or a plan that
   has not reached ``Approved``/``Locked for Production`` is never read as
   authoritative demand.
-- `ury.ury.api.ury_cost_variance_attribution` (V3-74): posted/theoretical
-  cost attribution for one item/qty/company. This module calls into it
-  rather than re-deriving cost, per the prep-doc instruction to compose cost
-  figures from V3-74's contract.
+- `ury.ury.api.ury_cost_variance_attribution` (V3-74): theoretical cost
+  attribution for one item/qty/company.
+- Submitted fulfilment Stock Entries linked through KOT to the source
+  invoice: posted cost, only when fulfilment quantities cover the sold
+  quantity exactly. Incomplete or shared posting evidence is omitted.
 - Submitted `POS Invoice` / `POS Invoice Item` rows (ERPNext ledger
   evidence): revenue source, scoped to company/branch/service period and
   ``status in (Consolidated, Paid)`` / ``docstatus = 1`` -- the same
@@ -40,8 +41,7 @@ Snapshot` row when explicitly asked to (this module never passes
     MISSING_APPROVED_PLAN, MISSING_COST_ATTRIBUTION
 
 ``UNATTRIBUTED_COST`` is the row-level code for "revenue attributed, cost
-not". V3-74's `compute_variance` returns ``posted_cost=None`` until a
-fulfilment Stock Entry is posted to ERPNext, so such a row carries
+not". Without complete, invoice-linked fulfilment postings, a row carries
 theoretical cost/GP plus this code, and OMITS posted_cost /
 posted_gross_profit / variance. It is never a zero.
 
@@ -66,6 +66,7 @@ import frappe
 from frappe import _
 
 from ury.ury.api.ury_cost_variance_attribution import compute_variance
+from ury.ury.api.ury_profitability_posted_cost import load_posted_costs
 
 
 SALES_PLAN_DOCTYPE = "URY Sales Plan"
@@ -103,7 +104,7 @@ def get_department_profitability(company, branch, service_date_or_period, depart
     """Department-level posted/theoretical/variance profitability rows.
 
     Read-only. Composes revenue from submitted POS Invoice lines and cost
-    from V3-74's `compute_variance`, both scoped to the deterministic grain.
+    from theoretical attribution and invoice-linked fulfilment postings.
     Fails closed with a reason code (see module docstring) rather than
     silently aggregating or guessing when required scope/data is missing.
     """
@@ -120,6 +121,7 @@ def get_department_profitability(company, branch, service_date_or_period, depart
 
     item_map = _item_department_map(plan_rows)
     invoice_lines = _read_pos_invoice_lines(company, branch, service_date_or_period)
+    posted_costs = load_posted_costs(company, branch, invoice_lines) if not quantity_only else {}
 
     rows = []
     unattributed_revenue = []
@@ -142,6 +144,10 @@ def get_department_profitability(company, branch, service_date_or_period, depart
             "net_revenue": line["net_revenue"],
         }
 
+        evidence_cost = posted_costs.get((line["parent"], line["item_code"]))
+        if evidence_cost is not None:
+            row.update({"posted_cost": evidence_cost, "posted_gross_profit": line["net_revenue"] - evidence_cost})
+
         try:
             variance = compute_variance(line["item_code"], line["qty"], company)
         except frappe.ValidationError:
@@ -150,7 +156,7 @@ def get_department_profitability(company, branch, service_date_or_period, depart
             rows.append(_strip_cost_fields(row) if quantity_only else row)
             continue
 
-        posted_cost = variance["posted_cost"]
+        posted_cost = evidence_cost
         theoretical_cost = variance["theoretical_cost"]
 
         if theoretical_cost is None:
@@ -167,12 +173,7 @@ def get_department_profitability(company, branch, service_date_or_period, depart
         )
 
         if posted_cost is None:
-            # V3-74 returns posted_cost=None whenever no fulfilment Stock
-            # Entry has been posted for this item/qty grain -- which, until
-            # the issue/fulfilment chain posts to ERPNext, is ALWAYS. Omit
-            # the posted keys entirely (same convention as the quantity-only
-            # tier: absent, not zero, not null) and flag the row provisional
-            # rather than arithmetic on None.
+            # Missing or incomplete posting evidence is not zero cost.
             row["reason"] = UNATTRIBUTED_COST
             row["provisional"] = True
         else:

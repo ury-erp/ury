@@ -270,7 +270,7 @@ class TestApproveWastage(FrappeTestCase):
         auth_doc = _auth_doc()
 
         def get_doc_dispatch(*args, **kwargs):
-            if args and args[0] == "URY Issue Wastage":
+            if args and args[0] == "URY Wastage":
                 return draft
             if args and args[0] == "URY Issue Authorization":
                 return auth_doc

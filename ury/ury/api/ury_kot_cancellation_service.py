@@ -139,7 +139,7 @@ DISPOSITION_WASTED = "Wasted"
 _RETURN_TO_STOCK = "return_to_stock"
 _WASTE = "waste"
 
-# `URY Issue Wastage.reason_category` Select options (see
+# `URY Wastage.reason_category` Select options (see
 # doctype/ury_issue_wastage/ury_issue_wastage.json). A `reason` that does not
 # match one of these falls back to "Other".
 _WASTAGE_REASON_CATEGORIES = {
@@ -544,11 +544,11 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 	the disposition step for rows produced by the qty-reduction partial
 	cancel-KOT flow (`ury_pos_invoice_qty_reduction.reduce_order_item_qty`).
 
-	- `disposition="waste"`: creates a Draft `URY Issue Wastage` record
+	- `disposition="waste"`: creates a Draft `URY Wastage` record
 	  (`wasted_qty=qty`, `component_item`=this row's `item`, `department`
 	  derived from the KOT's production unit, `reason_category` from
 	  `reason` when it matches one of that doctype's Select options else
-	  "Other", `captured_by`=actor). `URY Issue Wastage.issue_authorization`
+	  "Other", `captured_by`=actor). `URY Wastage.issue_authorization`
 	  and `.plan` are mandatory fields on that doctype, but they exist to
 	  tie a wastage record to a pre-authorized `URY Issue Authorization`
 	  scoped to a `URY Sales Plan` (see `ury_wastage.capture_wastage`) --
@@ -639,7 +639,7 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 
 		wastage_doc = frappe.get_doc(
 			{
-				"doctype": "URY Issue Wastage",
+				"doctype": "URY Wastage",
 				"branch": branch,
 				"company": company,
 				"department": department,
@@ -664,7 +664,7 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 		result["disposition"] = DISPOSITION_WASTED
 		result["wastage_record"] = wastage_doc.name
 		result["note"] = (
-			"Draft URY Issue Wastage {0} created (status=Draft, does not "
+			"Draft URY Wastage {0} created (status=Draft, does not "
 			"reduce any entitlement until separately approved via "
 			"ury_wastage.approve_wastage, per that module's own documented "
 			"Draft-vs-Authorized semantics)."

@@ -135,7 +135,7 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 
 	plan_by_department = _live_plan_by_department(sales_plan)
 
-	store_warehouse = get_store_warehouse()
+	store_warehouse = get_store_warehouse(company)
 	readiness = compute_readiness(departments, store_warehouse=store_warehouse)
 	blockers.extend(readiness["blockers"])
 
