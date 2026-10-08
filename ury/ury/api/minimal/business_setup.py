@@ -28,15 +28,19 @@ def get_business_setup():
     }
 
 @frappe.whitelist()
-def get_branches():
+def get_branches(company=None):
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
 
-    comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+    comp = company or frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
     
     branches = frappe.get_all("Branch", fields=["name", "branch"])
-    restaurants = frappe.get_all("URY Restaurant", fields=["branch", "invoice_series_prefix", "aggregator_series_prefix"])
+    
+    rest_filters = {}
+    if company:
+        rest_filters["company"] = company
+    restaurants = frappe.get_all("URY Restaurant", filters=rest_filters, fields=["branch", "invoice_series_prefix", "aggregator_series_prefix"])
     rest_map = {}
     for r in restaurants:
         if r.get("branch"):
@@ -45,6 +49,8 @@ def get_branches():
     res = []
     for b in branches:
         r = rest_map.get(b.name) or rest_map.get(b.branch)
+        if company and not r:
+            continue
         res.append({
             "id": b.name,
             "name": b.branch,

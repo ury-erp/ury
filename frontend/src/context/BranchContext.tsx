@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { call } from '@ury/core';
+import { useCompanyContext } from './CompanyContext';
 
 export interface Branch {
   id: string;
@@ -68,6 +69,7 @@ function writeStoredBranchId(id: string) {
 }
 
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { activeCompanyId } = useCompanyContext();
   const [activeBranchId, setActiveBranchIdState] = useState<string>(readStoredBranchId);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -88,7 +90,9 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const fetchBranches = async () => {
       setIsLoading(true);
       try {
-        const res = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
+        const res = await call<any>('ury.ury.api.minimal.business_setup.get_branches', {
+          company: activeCompanyId === 'all' ? undefined : activeCompanyId
+        });
         let fetched: Branch[] = [];
         if (res && Array.isArray(res)) {
           fetched = res;
@@ -112,9 +116,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     fetchBranches();
-    // Intentionally once on mount — branch list refresh is explicit elsewhere.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeCompanyId]);
 
   const activeBranch = activeBranchId === 'all'
     ? null
