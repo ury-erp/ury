@@ -1,7 +1,7 @@
 """Permission probe backing the frontend's "Open in Desk" links.
 
 Several `/ury` screens are read-only views over documents that remain fully
-editable in the Frappe desk (`URY Issue Wastage`, `URY Stock Movement`,
+editable in the Frappe desk (`URY Wastage`, `URY Stock Movement`,
 `POS Invoice`, `Work Order`, ...). Those screens offer a link straight to
 `/app/<doctype>/<name>`, but only for users who can actually open the document
 -- showing a link that lands on "Not Permitted" is worse than showing nothing.
