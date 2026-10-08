@@ -12,6 +12,8 @@ import { getPaymentModes } from '../lib/payment-api';
 // Constants
 const MAX_QUANTITY = 99;
 const MIN_QUANTITY = 0;
+/** Currency code the cached `currencySymbol` belongs to. */
+const CURRENCY_SYMBOL_CODE_KEY = 'currencySymbolCode';
 
 // Custom error class for cart operations
 class CartError extends Error {
@@ -148,6 +150,7 @@ interface POSStore extends POSState {
   fetchCustomerGroups: () => Promise<void>;
   fetchTerritories: () => Promise<void>;
   fetchCurrencySymbol: () => Promise<void>;
+  ensureCurrencySymbol: () => Promise<void>;
   getCartTotals: () => CartTotals;
   itemExistsInCart: (uniqueId: string) => boolean;
   validateQuantity: (quantity: number) => boolean;
@@ -262,9 +265,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           profileLoading: false,
           currency: profile.currency || 'INR'
         });
-        if (!storage.getItem('currencySymbol')) {
-          await get().fetchCurrencySymbol();
-        }
+        await get().ensureCurrencySymbol();
         return;
       }
 
@@ -277,10 +278,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         profileLoading: false,
         currency: combinedProfile.currency || 'INR'
       });
-      
-      if (!storage.getItem('currencySymbol')) {
-        await get().fetchCurrencySymbol();
-      }
+
+      await get().ensureCurrencySymbol();
     } catch (error) {
       console.error('Error fetching POS profile:', error);
       set({ 
@@ -290,19 +289,32 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
+  // The cached symbol is tagged with the currency it belongs to, so loading a
+  // profile in a different currency (another company) refetches it instead of
+  // reusing the previous company's symbol.
+  ensureCurrencySymbol: async () => {
+    const currency = get().currency;
+    const cachedSymbol = storage.getItem('currencySymbol');
+    if (cachedSymbol && storage.getItem(CURRENCY_SYMBOL_CODE_KEY) === currency) {
+      if (get().currencySymbol !== cachedSymbol) set({ currencySymbol: cachedSymbol });
+      return;
+    }
+    await get().fetchCurrencySymbol();
+  },
+
   fetchCurrencySymbol: async () => {
+    const currency = get().currency;
+    let symbol: string;
     try {
-      const currency = get().currency;
       const response = await getCurrencyInfo(currency);
-      const { symbol } = response;
-      
-      set({ currencySymbol: symbol });
-      storage.setItem('currencySymbol', symbol);
+      symbol = response.symbol || currency;
     } catch (error) {
       console.error('Error fetching currency symbol:', error);
-      set({ currencySymbol: get().currency });
-      storage.setItem('currencySymbol', get().currency);
+      symbol = currency;
     }
+    set({ currencySymbol: symbol });
+    storage.setItem('currencySymbol', symbol);
+    storage.setItem(CURRENCY_SYMBOL_CODE_KEY, currency);
   },
 
   fetchMenuItems: async () => {
