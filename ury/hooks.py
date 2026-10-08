@@ -288,11 +288,10 @@ doc_events = {
             # handler reads that table, so the order matters. No-op unless
             # the branch has `closing_reconciliation_enabled` (tier gate 3).
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
-            "ury.ury.hooks.pos_closing.validate_daily_checklists",
-            "ury.ury.hooks.pos_closing.validate_stock_correction",
+            "ury.ury.hooks.ury_pos_closing_entry.validate_daily_checklists",
         ],
         "on_submit": [
-            "ury.ury.hooks.pos_closing.submit_stock_correction",
+            "ury.ury.hooks.ury_pos_closing_entry.submit_stock_correction",
         ],
         },
     "Quality Review": {
