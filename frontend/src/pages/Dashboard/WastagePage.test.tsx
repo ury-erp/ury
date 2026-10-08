@@ -29,6 +29,7 @@ vi.mock('../../services/departmentStock', () => ({
 }));
 
 vi.mock('@ury/core', () => ({
+  formatCurrency: (amount: number) => String(amount),
   getLoggedUser: vi.fn().mockResolvedValue('user@test.com'),
   getUserRoles: vi.fn().mockResolvedValue({
     roles: ['Stock Manager'],

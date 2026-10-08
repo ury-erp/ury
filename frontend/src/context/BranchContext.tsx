@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { call } from '@ury/core';
 import { useCompanyContext } from './CompanyContext';
+import { readTabScoped, writeTabScoped } from '../lib/tabScopedStorage';
 
 export interface Branch {
   id: string;
@@ -8,6 +9,8 @@ export interface Branch {
   code?: string;
   is_active?: boolean;
   address?: string;
+  /** Owning company (via its URY Restaurant); drives currency in "All companies". */
+  company?: string | null;
 }
 
 export interface BranchFilterContext {
@@ -53,19 +56,11 @@ export function resolveActiveBranchId(
 }
 
 function readStoredBranchId(): string {
-  try {
-    return localStorage.getItem(BRANCH_STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
+  return readTabScoped(BRANCH_STORAGE_KEY);
 }
 
 function writeStoredBranchId(id: string) {
-  try {
-    localStorage.setItem(BRANCH_STORAGE_KEY, id);
-  } catch {
-    // Private mode / quota — selection still works in-memory for the session.
-  }
+  writeTabScoped(BRANCH_STORAGE_KEY, id);
 }
 
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

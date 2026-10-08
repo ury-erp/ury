@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCurrency, withCurrencyLabel } from '../../context/CurrencyContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
@@ -37,6 +38,7 @@ type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course';
 
 export const MenuPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
+  const { symbol: currencySymbol } = useCurrency();
   const [menus, setMenus] = useState<URYMenuRecord[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<string>('');
   const [availableCourses, setAvailableCourses] = useState<{ name: string }[]>([]);
@@ -1029,7 +1031,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-foreground mb-1.5">Standard Rate (₹) <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">{withCurrencyLabel('Standard Rate', currencySymbol)} <span className="text-red-500">*</span></label>
             <Input
               type="number"
               value={newItem.rate}
@@ -1091,7 +1093,7 @@ export const MenuPage: React.FC = () => {
               {/* Header Row */}
               <div className="flex gap-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="flex-[3]">Item</div>
-                <div className="flex-[1.5]">Price (₹)</div>
+                <div className="flex-[1.5]">{withCurrencyLabel('Price', currencySymbol)}</div>
                 {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
               </div>
 
