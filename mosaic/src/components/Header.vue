@@ -1,9 +1,13 @@
 <template>
-  <header class="sticky top-0 z-40 bg-[var(--panel)] h-12 px-4 md:px-6 flex justify-between items-center border-b border-[var(--hair)]">
+  <header class="sticky top-0 z-40 bg-[var(--panel)] min-h-12 py-2 px-4 md:px-6 flex flex-wrap gap-2 justify-between items-center border-b border-[var(--hair)]">
     <router-link to="/" class="flex items-center cursor-pointer">
-      <img :src="imagePath" alt="Logo" class="ml-20 h-8 w-auto mr-2">
+      <img :src="imagePath" alt="Logo" class="h-8 w-auto mr-2">
     </router-link>
     <div class="flex items-center gap-3">
+      <template v-if="$route.name === 'Home'">
+        <ScopeSelector v-model="scope.company" label="Company" all-label="All Companies" :options="companyOptions" :disabled="scope.loading" />
+        <ScopeSelector v-model="scope.branch" label="Branch" all-label="All Branches" :options="branchOptions" :disabled="scope.loading" />
+      </template>
       <button
         class="flex justify-center items-center h-7 w-7 rounded-[7px] hover:bg-[var(--hover)] transition-colors text-[var(--ac)]"
         @click="reloadKOT"
@@ -69,9 +73,21 @@
 
 <script>
 import urimosaicImage from "@/assets/logos/mosaic.jpg";
+import ScopeSelector from "./ScopeSelector.vue";
+import { productionScopeKey } from "../composables/productionScope";
 
 export default {
   name: "Header",
+  components: { ScopeSelector },
+  inject: { scope: { from: productionScopeKey } },
+  computed: {
+    companyOptions() {
+      return this.scope.companies.map((company) => ({ value: company.name, label: company.company_name || company.name }));
+    },
+    branchOptions() {
+      return this.scope.branches.map((branch) => ({ value: branch.name, label: branch.branch || branch.name }));
+    },
+  },
   data() {
     return {
       imagePath: urimosaicImage,
