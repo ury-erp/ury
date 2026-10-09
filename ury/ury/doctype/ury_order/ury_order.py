@@ -365,7 +365,8 @@ TABLE_RELEASE_FIELDS = {
 }
 
 
-def release_merge_cluster_tables(table_or_tables):
+def release_merge_cluster_tables(table_or_tables, commit=True):
+    # Pass commit=False from document hooks: Frappe v16 forbids commits inside doc events.
 
     if isinstance(table_or_tables, (list, tuple, set)):
         cluster = list(table_or_tables)
@@ -380,7 +381,8 @@ def release_merge_cluster_tables(table_or_tables):
             update_modified=False,
         )
 
-    frappe.db.commit()
+    if commit:
+        frappe.db.commit()
 
 @frappe.whitelist()
 def release_tables_after_print(invoice):
