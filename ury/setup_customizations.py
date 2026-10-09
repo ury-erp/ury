@@ -8,6 +8,47 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 def after_install():
     create_custom_fields(get_custom_fields())
     add_roles_to_administrator()
+    hide_setup_sidebar_options()
+
+def hide_setup_sidebar_options():
+	"""Hide Access, Email, Data, and Integrations options from the Setup sidebar."""
+	items_to_hide = (
+		# Access
+		"Access",
+		"Role",
+		"Role Permissions",
+		"User Permissions",
+		"Authorization Rule",
+		# Email
+		"Email",
+		"Email Account",
+		"Email Template",
+		"Email Digest",
+		# Data
+		"Data",
+		"Data Import",
+		"Rename Tool",
+		"Bulk Transaction Log",
+		"Transaction Deletion Record",
+		# Integrations
+		"Integrations",
+		"Incoming Call Settings",
+		"Voice Call Settings",
+		"Call Log",
+		"Telephony Call Type",
+		"Communication Medium",
+		"Code List",
+		"Common Code",
+	)
+	frappe.db.sql(
+		"""
+		UPDATE `tabSidebar Item`
+		SET hidden = 1
+		WHERE parent = 'Setup' AND label IN %s
+		""",
+		(items_to_hide,),
+	)
+	frappe.clear_cache()
 
 def add_roles_to_administrator():
     try:
