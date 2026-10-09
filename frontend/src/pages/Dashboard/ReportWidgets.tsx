@@ -3,6 +3,7 @@ import { DataTable, DataTableColumn, Badge, Spinner, numericCellClass } from '@u
 import { useBranchContext } from '../../context/BranchContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { TransactionRecord } from '../../services/dashboard';
+import { format as formatDate } from 'date-fns';
 
 interface ReportWidgetsProps {
   recentTransactions: TransactionRecord[];
@@ -46,7 +47,13 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
     {
       key: 'posting_date',
       header: 'Date & Time',
-      render: (row) => <span>{row.posting_date} {row.posting_time}</span>,
+      render: (row) => {
+        try {
+          return <span>{formatDate(new Date(`${row.posting_date} ${row.posting_time}`), 'yyyy-MM-dd hh:mm:ss a')}</span>;
+        } catch {
+          return <span>{row.posting_date} {row.posting_time}</span>;
+        }
+      },
     },
     {
       key: 'status',
