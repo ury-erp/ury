@@ -19,14 +19,7 @@ interface UserRecord {
   roles?: Array<{ role: string }>;
 }
 
-const URY_ROLE_OPTIONS = [
-  { value: 'URY Admin', label: 'URY Admin' },
-  { value: 'URY Manager', label: 'URY Manager' },
-  { value: 'URY Captain', label: 'URY Captain' },
-  { value: 'URY Cashier', label: 'URY Cashier' },
-];
 
-const URY_ROLE_NAMES = URY_ROLE_OPTIONS.map((r) => r.value);
 
 export const UserPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
@@ -50,11 +43,44 @@ export const UserPage: React.FC = () => {
     enabled: true,
   });
   const [originalUser, setOriginalUser] = useState<any>(null);
+  const [allRoles, setAllRoles] = useState<{name: string}[]>([]);
+
+  const fetchRoles = async () => {
+    try {
+      const res = await call<any>('frappe.client.get_list', { doctype: 'Role', fields: ['name'], limit_page_length: 1000 });
+      const records = res.message || res;
+      setAllRoles(Array.isArray(records) ? records : []);
+    } catch (err) {
+      console.error('Failed to fetch roles', err);
+      setAllRoles([]);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const records = await dashboardService.getModuleRecords<UserRecord>('User', activeBranchId);
+      
+      const userNames = records.map(r => r.name);
+      if (userNames.length > 0) {
+        try {
+          const rolesRes = await call<any>('frappe.client.get_list', {
+            doctype: 'Has Role',
+            filters: [['parenttype', '=', 'User'], ['parent', 'in', userNames]],
+            fields: ['parent', 'role'],
+            limit_page_length: 5000
+          });
+          const hasRoles = Array.isArray(rolesRes.message) ? rolesRes.message : (Array.isArray(rolesRes) ? rolesRes : []);
+          records.forEach(user => {
+            user.roles = hasRoles
+              .filter((hr: any) => hr.parent === user.name)
+              .map((hr: any) => ({ role: hr.role }));
+          });
+        } catch (e) {
+          console.error('Failed to fetch user roles for list', e);
+        }
+      }
+
       setUsers(records);
     } catch {
       setUsers([]);
@@ -65,19 +91,15 @@ export const UserPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, [activeBranchId]);
 
   const getDisplayRoles = (user: UserRecord): string[] => {
-    const roles: string[] = [];
-    if (user.roles && Array.isArray(user.roles)) {
-      for (const roleObj of user.roles) {
-        if (roleObj.role === 'URY Admin') roles.push('Admin');
-        else if (roleObj.role === 'URY Manager') roles.push('Manager');
-        else if (roleObj.role === 'URY Captain') roles.push('Captain');
-        else if (roleObj.role === 'URY Cashier') roles.push('Cashier');
-      }
+    if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+      const uryRole = user.roles.find(r => r.role.startsWith('URY '));
+      return [uryRole ? uryRole.role : user.roles[0].role];
     }
-    return roles.length > 0 ? roles : ['User'];
+    return ['User'];
   };
 
   const openAddDrawer = () => {
@@ -98,9 +120,7 @@ export const UserPage: React.FC = () => {
       const fullUser = (fullUserRes as any).message || fullUserRes;
 
       if (fullUser.roles && Array.isArray(fullUser.roles)) {
-        userRoles = fullUser.roles
-          .map((r: any) => r.role)
-          .filter((r: string) => URY_ROLE_NAMES.includes(r));
+        userRoles = fullUser.roles.map((r: any) => r.role);
       }
     } catch (err) {
       console.error('Failed to fetch user roles', err);
@@ -163,18 +183,7 @@ export const UserPage: React.FC = () => {
           },
         });
 
-        const fullUserRes = await call('frappe.client.get', {
-          doctype: 'User',
-          name: editingUser.name,
-        });
-        const fullUser = (fullUserRes as any).message || fullUserRes;
-
-        let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
-        updatedRoles = updatedRoles.filter((roleObj: any) => !URY_ROLE_NAMES.includes(roleObj.role));
-
-        newUser.roles.forEach((r) => {
-          updatedRoles.push({ role: r });
-        });
+        const updatedRoles = newUser.roles.map((r) => ({ role: r }));
 
         await call('frappe.client.set_value', {
           doctype: 'User',
@@ -350,7 +359,7 @@ export const UserPage: React.FC = () => {
             <MultiSelect
               id="user-roles"
               values={newUser.roles}
-              options={URY_ROLE_OPTIONS}
+              options={allRoles.map(r => ({ value: r.name, label: r.name }))}
               placeholder="Select roles..."
               onChange={(selectedRoles) => setNewUser({ ...newUser, roles: selectedRoles })}
             />
