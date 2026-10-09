@@ -296,65 +296,105 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	return result
 
 
+def resolve_scope_currency(branch=None, company=None):
+	"""Currency of a dashboard scope, or None when the scope spans several.
+
+	A branch belongs to a company through its URY Restaurant, so a branch-only
+	scope (e.g. "All companies" + one branch) still has a single currency.
+	"""
+	if not company and branch:
+		company = frappe.db.get_value("URY Restaurant", {"branch": branch}, "company")
+	if company:
+		return frappe.get_cached_value("Company", company, "default_currency")
+
+	currencies = {
+		c for c in frappe.get_all("Company", filters={"is_group": 0}, pluck="default_currency") if c
+	}
+	return currencies.pop() if len(currencies) == 1 else None
+
+
 @frappe.whitelist(methods=["GET"])
-def get_dashboard_stats(branch=None):
-	cache_key = f"ury_dashboard_stats:{branch}"
+def get_dashboard_stats(branch=None, company=None):
+	cache_key = f"ury_dashboard_stats:{branch}:{company}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:
 		return cached
 
+	filters_dict = {}
+	where_clause = ""
 	if branch:
-		result = frappe.db.sql(
-			"""
+		where_clause += " AND b.`branch` = %(branch)s"
+		filters_dict["branch"] = branch
+	if company:
+		where_clause += " AND b.`company` = %(company)s"
+		filters_dict["company"] = company
+
+	# Grouped by invoice currency: an "all companies" scope can span AED and
+	# OMR, and summing those into one number would be meaningless.
+	if True:
+		rows = frappe.db.sql(
+			f"""
 			SELECT
+				b.`currency` AS currency,
 				COUNT(b.`name`) AS total_invoices,
 				ROUND(SUM(b.`grand_total`), 2) AS grand_total
 			FROM `tabPOS Invoice` b
-			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` = %(branch)s)
-			WHERE
-				b.`branch` = %(branch)s
-				AND b.`docstatus` = 1
-				AND b.`status` IN ("Consolidated", "Paid")
-				AND (
-					((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
-					OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-					OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
-				)
-			""",
-			{"branch": branch},
-			as_dict=True,
-		)[0]
-	else:
-		result = frappe.db.sql(
-			"""
-			SELECT
-				COUNT(b.`name`) AS total_invoices,
-				ROUND(SUM(b.`grand_total`), 2) AS grand_total
-			FROM `tabPOS Invoice` b
-			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` IS NULL)
+			LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` = b.`branch`)
 			WHERE
 				b.`docstatus` = 1
+				{where_clause}
 				AND b.`status` IN ("Consolidated", "Paid")
 				AND (
 					((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
 					OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
 					OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
 				)
+			GROUP BY b.`currency`
 			""",
-			{},
+			filters_dict,
 			as_dict=True,
-		)[0]
+		)
 
-	grand_total = result.grand_total or 0
-	total_invoices = result.total_invoices or 0
-	avg_order_value = round(grand_total / total_invoices, 2) if total_invoices else 0
+	breakdown = []
+	for row in rows:
+		orders = row.get("total_invoices") or 0
+		if not orders:
+			continue
+		sales = row.get("grand_total") or 0
+		breakdown.append({
+			"currency": row.get("currency"),
+			"sales": sales,
+			"orders": orders,
+			"avg_order_value": round(sales / orders, 2),
+		})
 
-	if branch:
-		occupied_count = frappe.db.count("URY Table", {"branch": branch, "occupied": 1})
-		total_count = frappe.db.count("URY Table", {"branch": branch})
+	total_invoices = sum(r["orders"] for r in breakdown)
+	if len(breakdown) > 1:
+		# Mixed currencies: no single total exists; callers render the breakdown.
+		currency = None
+		grand_total = None
+		avg_order_value = None
+	elif breakdown:
+		currency = breakdown[0]["currency"] or resolve_scope_currency(branch, company)
+		grand_total = breakdown[0]["sales"]
+		avg_order_value = breakdown[0]["avg_order_value"]
 	else:
-		occupied_count = frappe.db.count("URY Table", {"occupied": 1})
-		total_count = frappe.db.count("URY Table", {})
+		currency = resolve_scope_currency(branch, company)
+		grand_total = 0
+		avg_order_value = 0
+
+	table_filters = {}
+	if branch:
+		table_filters["branch"] = branch
+	if company:
+		branch_filters = {"company": company}
+		if branch:
+			branch_filters["name"] = branch
+		# Tables belong to a company through their branch; they have no company field.
+		table_filters["branch"] = ["in", frappe.get_all("Branch", filters=branch_filters, pluck="name")]
+
+	occupied_count = frappe.db.count("URY Table", {**table_filters, "occupied": 1})
+	total_count = frappe.db.count("URY Table", table_filters)
 
 	result_dict = {
 		"todays_sales": grand_total,
@@ -362,6 +402,8 @@ def get_dashboard_stats(branch=None):
 		"avg_order_value": avg_order_value,
 		"active_tables": occupied_count,
 		"total_tables": total_count,
+		"currency": currency,
+		"currency_breakdown": breakdown if len(breakdown) > 1 else [],
 	}
 
 	frappe.cache().set_value(cache_key, result_dict, expires_in_sec=30)

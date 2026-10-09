@@ -148,15 +148,18 @@ def _get_cancel_confirmed_original_kots(branch):
     link field, so it has to be matched with LIKE and split in Python rather
     than joined in the query.
     """
+    filters = {
+        "type": ["in", ["Cancelled", "Partially cancelled"]],
+        "verified": 1,
+        "docstatus": 1,
+    }
+    if branch:
+        filters["branch"] = branch
+
     cancel_rows = frappe.get_all(
         "URY KOT",
         fields=["original_kot"],
-        filters={
-            "branch": branch,
-            "type": ["in", ["Cancelled", "Partially cancelled"]],
-            "verified": 1,
-            "docstatus": 1,
-        },
+        filters=filters,
     )
     original_names = set()
     for row in cancel_rows:
@@ -169,37 +172,53 @@ def _get_cancel_confirmed_original_kots(branch):
 @frappe.whitelist()
 def kot_list():
     today = frappe.utils.now()
-    branch = getBranch()
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    is_admin = user == "Administrator" or "URY Admin" in roles
+
+    if is_admin:
+        branch = None
+    else:
+        branch = getBranch()
+
+    pos_profile_filters = {}
+    if branch:
+        pos_profile_filters["branch"] = branch
+
     kot_alert_time = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_warning_time"
+        "POS Profile", pos_profile_filters, "custom_kot_warning_time"
     )
     daily_order_number = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_reset_order_number_daily"
+        "POS Profile", pos_profile_filters, "custom_reset_order_number_daily"
     )
     three_hours_ago = frappe.utils.add_to_date(today, hours=-3)
     audio_alert = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_alert"
+        "POS Profile", pos_profile_filters, "custom_kot_alert"
     )
+
+    filters = {
+        "order_status": "Ready For Prepare",
+        "type": [
+            "in",
+            [
+                "New Order",
+                "Order Modified",
+                "Duplicate",
+                "Cancelled",
+                "Partially cancelled",
+            ],
+        ],
+        "docstatus": 1,
+        "verified": 0,
+        "creation": (">=", three_hours_ago),
+    }
+    if branch:
+        filters["branch"] = branch
+
     kotList = frappe.get_list(
         "URY KOT",
         fields=["name"],
-        filters={
-            "order_status": "Ready For Prepare",
-            "branch": branch,
-            "type": [
-                "in",
-                [
-                    "New Order",
-                    "Order Modified",
-                    "Duplicate",
-                    "Cancelled",
-                    "Partially cancelled",
-                ],
-            ],
-            "docstatus": 1,
-            "verified": 0,
-            "creation": (">=", three_hours_ago),
-        },
+        filters=filters,
         order_by="creation desc",
     )
     cancelled_original_kots = _get_cancel_confirmed_original_kots(branch)
@@ -240,37 +259,53 @@ def kot_list():
 @frappe.whitelist()
 def served_kot_list():
     today = frappe.utils.now()
-    branch = getBranch()
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    is_admin = user == "Administrator" or "URY Admin" in roles
+
+    if is_admin:
+        branch = None
+    else:
+        branch = getBranch()
+
+    pos_profile_filters = {}
+    if branch:
+        pos_profile_filters["branch"] = branch
+
     kot_alert_time = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_warning_time"
+        "POS Profile", pos_profile_filters, "custom_kot_warning_time"
     )
     daily_order_number = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_reset_order_number_daily"
+        "POS Profile", pos_profile_filters, "custom_reset_order_number_daily"
     )
     three_hours_ago = frappe.utils.add_to_date(today, hours=-3)
     audio_alert = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_alert"
+        "POS Profile", pos_profile_filters, "custom_kot_alert"
     )
+
+    filters = {
+        "order_status": "Served",
+        "type": [
+            "in",
+            [
+                "New Order",
+                "Order Modified",
+                "Duplicate",
+                "Cancelled",
+                "Partially cancelled",
+            ],
+        ],
+        "docstatus": 1,
+        "verified": 0,
+        "creation": (">=", three_hours_ago),
+    }
+    if branch:
+        filters["branch"] = branch
+
     kotList = frappe.get_list(
         "URY KOT",
         fields=["name"],
-        filters={
-            "order_status": "Served",
-            "branch": branch,
-            "type": [
-                "in",
-                [
-                    "New Order",
-                    "Order Modified",
-                    "Duplicate",
-                    "Cancelled",
-                    "Partially cancelled",
-                ],
-            ],
-            "docstatus": 1,
-            "verified": 0,
-            "creation": (">=", three_hours_ago),
-        },
+        filters=filters,
         order_by="creation desc",
     )
     production_filters = {}

@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCurrency, withCurrencyLabel } from '../../context/CurrencyContext';
 
 type ModalType = 'menu' | 'table' | 'room' | 'branch' | 'user' | null;
 
 export const QuickActions: React.FC = () => {
   const navigate = useNavigate();
   const { refreshDashboard } = useBranchContext();
+  const { symbol: currencySymbol } = useCurrency();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -254,7 +256,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Price (₹)</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{withCurrencyLabel('Price', currencySymbol)}</label>
               <Input
                 type="number"
                 placeholder="280"

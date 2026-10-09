@@ -1,4 +1,4 @@
-name: V3 UAT
+name: URY V16
 
 on:
  workflow_dispatch: 
@@ -31,6 +31,6 @@ jobs:
           SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
         run: |
           ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "/home/beta/v3-deploy.sh \
+            "/home/ury/v16-deploy.sh \
             '${GITHUB_REF_NAME}' \
             '${GITHUB_SHA}'"

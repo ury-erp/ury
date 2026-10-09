@@ -44,7 +44,7 @@ transition checklist, "V3-74 adds cost/variance attribution") distinguishes:
 
 `compute_variance` optionally persists its result dict to a new
 storage-only doctype, `URY Cost Variance Snapshot`, mirroring the pattern
-established by `URY Fulfilment Record` / `URY Issue Wastage`: a plain
+established by `URY Fulfilment Record` / `URY Wastage`: a plain
 `frappe.get_doc({...}).insert()` with no submit/cancel workflow, no ledger
 side effects, and no controller logic beyond field storage. Persistence is
 opt-in via `persist=True` so pure computation (e.g. in the fixture example

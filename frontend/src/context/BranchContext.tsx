@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { call } from '@ury/core';
+import { useCompanyContext } from './CompanyContext';
+import { readTabScoped, writeTabScoped } from '../lib/tabScopedStorage';
 
 export interface Branch {
   id: string;
@@ -7,6 +9,8 @@ export interface Branch {
   code?: string;
   is_active?: boolean;
   address?: string;
+  /** Owning company (via its URY Restaurant); drives currency in "All companies". */
+  company?: string | null;
 }
 
 export interface BranchFilterContext {
@@ -52,22 +56,15 @@ export function resolveActiveBranchId(
 }
 
 function readStoredBranchId(): string {
-  try {
-    return localStorage.getItem(BRANCH_STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
+  return readTabScoped(BRANCH_STORAGE_KEY);
 }
 
 function writeStoredBranchId(id: string) {
-  try {
-    localStorage.setItem(BRANCH_STORAGE_KEY, id);
-  } catch {
-    // Private mode / quota — selection still works in-memory for the session.
-  }
+  writeTabScoped(BRANCH_STORAGE_KEY, id);
 }
 
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { activeCompanyId } = useCompanyContext();
   const [activeBranchId, setActiveBranchIdState] = useState<string>(readStoredBranchId);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -88,7 +85,9 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const fetchBranches = async () => {
       setIsLoading(true);
       try {
-        const res = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
+        const res = await call<any>('ury.ury.api.minimal.business_setup.get_branches', {
+          company: activeCompanyId === 'all' ? undefined : activeCompanyId
+        });
         let fetched: Branch[] = [];
         if (res && Array.isArray(res)) {
           fetched = res;
@@ -112,9 +111,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     fetchBranches();
-    // Intentionally once on mount — branch list refresh is explicit elsewhere.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeCompanyId]);
 
   const activeBranch = activeBranchId === 'all'
     ? null

@@ -53,6 +53,8 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "dompurify": "^3.4.15"
+    "dompurify": "^3.4.15",
+    "react-markdown": "9.0.3",
+    "remark-gfm": "4.0.0"
   }
 }

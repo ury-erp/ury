@@ -8,8 +8,8 @@ import {
   useImperativeHandle,
   type ReactNode,
 } from 'react';
-import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
-import { cn, buttonVariants } from '@ury/ui';
+import { MessageCircle, X, Send, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { cn, buttonVariants, ChatMarkdown } from '@ury/ui';
 import { useActiveReportContext } from './ActiveReportContext';
 import { resolveReportNavigation, navigateToReportSlug } from './reportNavigation';
 
@@ -63,6 +63,23 @@ export function useAiEnabled() {
   return useContext(AiEnabledContext);
 }
 
+/**
+ * Page context sent with every message: the report being viewed plus the
+ * POS profile's branch (pos-store caches the combined profile in
+ * sessionStorage). The agent uses it as the default scope when the user
+ * doesn't name a branch.
+ */
+function buildChatContext(activeReport: ReturnType<typeof useActiveReportContext>['activeReport']) {
+  const ctx: Record<string, unknown> = { ...(activeReport ?? {}) };
+  try {
+    const profile = JSON.parse(window.sessionStorage.getItem('posProfile') || 'null');
+    if (profile?.branch) ctx.selected_branch = profile.branch;
+  } catch {
+    // storage unavailable or malformed — send report context only
+  }
+  return Object.keys(ctx).length ? JSON.stringify(ctx) : undefined;
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -88,6 +105,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
   const { activeReport } = useActiveReportContext();
 
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [hasMounted, setHasMounted] = useState(false); // lazy-mount gate
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [available, setAvailable] = useState<boolean | null>(null); // null = not yet known
@@ -98,6 +116,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
   const [initializing, setInitializing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   // Guards against double-starting the init fetch. Deliberately a ref, not
   // the `initializing` state: putting `initializing` in the effect's own
   // dependency array below causes the state update it makes to retrigger
@@ -130,7 +149,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
         // POST, not GET: this can create a new Agent Conversation record,
         // and a GET request's DB transaction is never committed by Frappe.
         const res = await call.post('ury.ury.api.ury_chat.get_or_create_conversation', {
-          report_context: activeReport ? JSON.stringify(activeReport) : undefined,
+          report_context: buildChatContext(activeReport),
         });
         const data = res.message;
         if (cancelled) return;
@@ -162,6 +181,12 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
     };
   }, [hasMounted, conversationId, activeReport]);
 
+  // Keep the latest message (or the typing indicator) in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, sending]);
+
   const handleOpen = () => {
     setOpen(true);
     setHasMounted(true);
@@ -181,7 +206,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
       const res = await call.post('ury.ury.api.ury_chat.send_chat_message', {
         conversation_id: conversationId,
         message: text,
-        report_context: activeReport ? JSON.stringify(activeReport) : undefined,
+        report_context: buildChatContext(activeReport),
       });
       const data = res.message;
 
@@ -243,10 +268,11 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
       {open && (
         <div
           className={cn(
-            'flex w-[360px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-lg',
-            'border border-border bg-card shadow-lg'
+            'flex max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-lg',
+            'border border-border bg-card shadow-lg',
+            expanded ? 'w-[640px]' : 'w-[420px]'
           )}
-          style={{ height: 460 }}
+          style={{ height: expanded ? 'min(720px, calc(100vh - 2.5rem))' : 520 }}
         >
           {/* Header — mirrors the mockup's HUF-branded "ask" chrome */}
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -258,18 +284,28 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 {activeReport ? activeReport.label : 'Ask about tonight'}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded p-1 text-muted-foreground hover:bg-muted"
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="rounded p-1 text-muted-foreground hover:bg-muted"
+                aria-label={expanded ? 'Shrink chat' : 'Expand chat'}
+              >
+                {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded p-1 text-muted-foreground hover:bg-muted"
+                aria-label="Close chat"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-3">
             {available === false ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -299,15 +335,26 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                   <div
                     key={m.id}
                     className={cn(
-                      'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+                      'min-w-0 rounded-lg px-3 py-2 text-sm leading-relaxed',
                       m.role === 'user'
-                        ? 'ml-auto bg-primary text-primary-foreground'
-                        : 'mr-auto bg-muted text-foreground'
+                        ? 'ml-auto max-w-[85%] whitespace-pre-wrap break-words bg-primary text-primary-foreground [overflow-wrap:anywhere]'
+                        : 'mr-auto max-w-[95%] bg-muted text-foreground'
                     )}
                   >
-                    {m.text}
+                    {m.role === 'assistant' ? <ChatMarkdown>{m.text}</ChatMarkdown> : m.text}
                   </div>
                 ))}
+                {sending && (
+                  <div
+                    className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-2.5"
+                    aria-label="Assistant is typing"
+                    role="status"
+                  >
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+                  </div>
+                )}
               </div>
             )}
           </div>

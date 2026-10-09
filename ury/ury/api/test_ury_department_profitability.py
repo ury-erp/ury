@@ -79,7 +79,7 @@ class _RolesPatch:
             p.stop()
 
 
-def _base_patches(plans=None, invoice_lines=None, employee=None):
+def _base_patches(plans=None, invoice_lines=None, employee=None, posted_costs=None):
     """Common set of patches shared by most tests below.
 
     `plans` -> frappe.get_all(SALES_PLAN...) return value.
@@ -100,6 +100,7 @@ def _base_patches(plans=None, invoice_lines=None, employee=None):
         patch(f"{MOD}.frappe.get_all", return_value=plans),
         patch(f"{MOD}.frappe.db.get_value", side_effect=get_value_side_effect),
         patch(f"{MOD}._read_pos_invoice_lines", return_value=invoice_lines),
+        patch(f"{MOD}.load_posted_costs", return_value=posted_costs or {}),
     ]
 
 
@@ -179,7 +180,7 @@ class TestPermissionTiers(unittest.TestCase):
             "theoretical_cost": 100.0,
             "posted_cost": 100.0,
         }
-        patches = _base_patches()
+        patches = _base_patches(posted_costs={("POS-INV-001", "Burger"): 120.0})
         _start_all(patches)
         try:
             with _RolesPatch(["Finance"]):
@@ -188,9 +189,39 @@ class TestPermissionTiers(unittest.TestCase):
             _stop_all(patches)
 
         row = result["rows"][0]
-        self.assertEqual(row["posted_cost"], 100.0)
-        self.assertEqual(row["posted_gross_profit"], 500.0 - 100.0)
-        self.assertEqual(row["variance"], 0.0)
+        self.assertEqual(row["posted_cost"], 120.0)
+        self.assertEqual(row["posted_gross_profit"], 380.0)
+        self.assertEqual(row["variance"], 20.0)
+
+    @patch(f"{MOD}.compute_variance", return_value={"theoretical_cost": 100.0, "posted_cost": None})
+    def test_posted_evidence_is_used_when_generic_variance_has_no_posted_cost(self, mock_variance):
+        patches = _base_patches(posted_costs={("POS-INV-001", "Burger"): 120.0})
+        _start_all(patches)
+        try:
+            with _RolesPatch(["Finance"]):
+                result = get_department_profitability("URY Co", "URY Branch", "2026-08-28")
+        finally:
+            _stop_all(patches)
+        row = result["rows"][0]
+        self.assertEqual(row["posted_cost"], 120.0)
+        self.assertEqual(row["posted_gross_profit"], 380.0)
+        self.assertEqual(row["variance"], 20.0)
+        self.assertNotIn("reason", row)
+
+    @patch(f"{MOD}.compute_variance", side_effect=frappe.ValidationError("No active BOM"))
+    def test_posted_cost_survives_missing_theoretical_cost(self, mock_variance):
+        patches = _base_patches(posted_costs={("POS-INV-001", "Burger"): 120.0})
+        _start_all(patches)
+        try:
+            with _RolesPatch(["Finance"]):
+                result = get_department_profitability("URY Co", "URY Branch", "2026-08-28")
+        finally:
+            _stop_all(patches)
+        row = result["rows"][0]
+        self.assertEqual(row["posted_cost"], 120.0)
+        self.assertEqual(row["posted_gross_profit"], 380.0)
+        self.assertEqual(row["reason"], MISSING_COST_ATTRIBUTION)
+        self.assertNotIn("variance", row)
 
     @patch(f"{MOD}.compute_variance")
     def test_unposted_cost_yields_theoretical_only_not_a_crash(self, mock_variance):

@@ -18,6 +18,8 @@ EXPECTED_TOOL_FUNCTIONS = {
     "get_baseline",
     "get_report_snapshot",
     "list_reports",
+    "describe_report",
+    "compare_periods",
 }
 
 # Calls that would indicate a tool function performs a write/mutation

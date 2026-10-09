@@ -70,6 +70,15 @@ def _format_report_context(report_context):
 	return f"[report_context]\n{lines}\n[/report_context]\n\n"
 
 
+def _with_session_context(report_context):
+	"""Add today's business date (the agent can't otherwise know it) under
+	whatever page context the frontend sent (selected branch, report)."""
+	ctx = {"today": frappe.utils.today()}
+	if isinstance(report_context, dict):
+		ctx.update({k: v for k, v in report_context.items() if v not in (None, "")})
+	return ctx
+
+
 @frappe.whitelist(methods=["POST"])
 def get_or_create_conversation(report_context=None):
 	"""Return an existing (cached) or newly-created HUF Agent Conversation id
@@ -156,7 +165,7 @@ def send_chat_message(conversation_id, message, report_context=None):
 	try:
 		agent_chat = _get_agent_chat_module()
 
-		full_message = _format_report_context(report_context) + message
+		full_message = _format_report_context(_with_session_context(report_context)) + message
 
 		response = agent_chat.send_message_to_conversation(
 			conversation=conversation_id,

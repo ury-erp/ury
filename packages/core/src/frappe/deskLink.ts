@@ -106,7 +106,7 @@ export interface BuildDeskUrlOptions {
  * carrying the return context that `return_to_app.js` turns into a floating
  * "Back to <App>" chip.
  *
- * @example buildDeskUrl('URY Issue Wastage', 'WST-0001')
+ * @example buildDeskUrl('URY Wastage', 'WST-0001')
  *          // '/app/ury-issue-wastage/WST-0001?ury_return_to=%2Fury%2Fwastage&ury_return_label=URY'
  */
 export const buildDeskUrl = (

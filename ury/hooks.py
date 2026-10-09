@@ -214,7 +214,10 @@ override_doctype_class = {
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
 # on every migrate. Safe to define even when huf is not installed — the
 # function itself no-ops when "huf" isn't in the installed apps list.
-after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
+after_migrate = [
+    "ury.ury.ai_tools.agent_seeding.after_migrate",
+    "ury.setup_customizations.hide_setup_sidebar_options",
+]
 
 # The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)
 # links to Workflow State / Workflow Action Master records that frappe core does
@@ -288,11 +291,10 @@ doc_events = {
             # handler reads that table, so the order matters. No-op unless
             # the branch has `closing_reconciliation_enabled` (tier gate 3).
             "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
-            "ury.ury.hooks.pos_closing.validate_daily_checklists",
-            "ury.ury.hooks.pos_closing.validate_stock_correction",
+            "ury.ury.hooks.ury_pos_closing_entry.validate_daily_checklists",
         ],
         "on_submit": [
-            "ury.ury.hooks.pos_closing.submit_stock_correction",
+            "ury.ury.hooks.ury_pos_closing_entry.submit_stock_correction",
         ],
         },
     "Quality Review": {

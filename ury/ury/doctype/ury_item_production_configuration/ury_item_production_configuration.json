@@ -1,8 +1,10 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "format:UIPC-{item}-{branch}",
- "creation": "2023-10-01 00:00:00.000000",
+ "creation": "2023-10-01 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -89,11 +91,11 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:doc.controlled_by_sales_plan==1",
    "description": "When checked and plan is exhausted, allows selling/producing beyond the approved plan quantity if stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) is available. Only applicable when Controlled by Sales Plan is enabled.",
    "fieldname": "allow_over_plan_sale",
    "fieldtype": "Check",
-   "label": "Allow Over-Plan Sale",
-   "depends_on": "eval:doc.controlled_by_sales_plan==1"
+   "label": "Allow Over-Plan Sale"
   },
   {
    "default": "Plan Available",
@@ -120,11 +122,11 @@
   }
  ],
  "links": [],
- "modified": "2023-10-01 00:00:00.000000",
+ "modified": "2026-10-08 13:59:10.183421",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Item Production Configuration",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
@@ -149,6 +151,7 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

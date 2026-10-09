@@ -38,6 +38,24 @@ describe('buildDashboardStatsKpiItems', () => {
     expect(items[3].hint).toBe('Floor nearly full');
   });
 
+  it('lists each currency instead of summing a mixed-currency scope', () => {
+    const items = buildDashboardStatsKpiItems({
+      todays_sales: null,
+      orders_today: 5,
+      avg_order_value: null,
+      active_tables: 0,
+      total_tables: 0,
+      currency: null,
+      currency_breakdown: [
+        { currency: 'AED', sales: 300, orders: 3, avg_order_value: 100 },
+        { currency: 'OMR', sales: 40, orders: 2, avg_order_value: 20 },
+      ],
+    });
+    expect(items[0].value).toBe('Rs. 300 · Rs. 40');
+    expect(items[0].hint).toBe('Multiple currencies — not summed');
+    expect(items[2].value).toBe('Rs. 100 · Rs. 20');
+  });
+
   it('returns placeholders while loading', () => {
     const items = buildDashboardStatsKpiItems(null, { loading: true });
     expect(items.every((item) => item.value === '—')).toBe(true);
@@ -63,6 +81,8 @@ describe('summaryToDashboardStats', () => {
       avg_order_value: 200,
       active_tables: 8,
       total_tables: 12,
+      currency: null,
+      currency_breakdown: [],
     });
   });
 });

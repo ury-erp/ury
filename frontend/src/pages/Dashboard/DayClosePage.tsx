@@ -16,7 +16,7 @@ import { uryDashboardService, DailyPnlSummary, PlanStatus, CloseDayChecklist } f
  *    and visual language as DepartmentProfitabilityPage.tsx)
  *  - a real close-day blocker checklist from `getCloseDayChecklist`,
  *    assembled from existing data (URY Table occupancy, Work Order status,
- *    POS Closing Entry, URY Issue Wastage sign-off) -- see
+ *    POS Closing Entry, URY Wastage sign-off) -- see
  *    ury/ury/report_api/day_close.py for the exact sourcing.
  *  - one HONEST "coming soon" section: carrying today's variance into
  *    tomorrow's sales plan. That is a real product feature requiring

@@ -11,6 +11,8 @@ vi.mock("lucide-react", () => ({
   X: () => <span>X</span>,
   Send: () => <span>Send</span>,
   Sparkles: () => <span>Sparkles</span>,
+  Maximize2: () => <span>Maximize2</span>,
+  Minimize2: () => <span>Minimize2</span>,
   CheckCircle: () => <span>CheckCircle</span>,
   XCircle: () => <span>XCircle</span>,
   Info: () => <span>Info</span>,
@@ -29,6 +31,9 @@ vi.mock("lucide-react", () => ({
 vi.mock("@ury/ui", () => ({
   cn: (...args: any[]) => args.filter(Boolean).join(" "),
   buttonVariants: () => "button-variant",
+  ChatMarkdown: ({ children }: { children: string }) => (
+    <div data-testid="chat-markdown">{children}</div>
+  ),
 }));
 
 // Mock @ury/core
@@ -125,5 +130,34 @@ describe("ChatWidget", () => {
   it("displays floating button with message icon", () => {
     render(<ChatWidgetTestWrapper aiEnabled={true} />);
     expect(screen.getByTestId("message-circle")).toBeInTheDocument();
+  });
+
+  it("renders assistant replies through ChatMarkdown and user text as plain text", async () => {
+    const user = userEvent.setup();
+    mockCall.post.mockImplementation(async (method: string) => {
+      if (method.endsWith("send_chat_message")) {
+        return { message: { available: true, response: { success: true, response: "**Sales** are up" } } };
+      }
+      return { message: { available: true, conversation_id: "conv-123" } };
+    });
+    render(<ChatWidgetTestWrapper aiEnabled={true} />);
+
+    await user.click(screen.getByLabelText("Open assistant chat"));
+    const input = await screen.findByPlaceholderText("Ask HUF about tonight…");
+    await waitFor(() => expect(input).not.toBeDisabled());
+    await waitFor(() => expect(screen.queryByText("Connecting…")).not.toBeInTheDocument());
+    await user.type(input, "how are sales?{Enter}");
+
+    const md = await screen.findByTestId("chat-markdown");
+    expect(md).toHaveTextContent("**Sales** are up");
+    expect(screen.getByText("how are sales?")).not.toHaveAttribute("data-testid", "chat-markdown");
+  });
+
+  it("toggles expanded size from the header", async () => {
+    const user = userEvent.setup();
+    render(<ChatWidgetTestWrapper aiEnabled={true} />);
+    await user.click(screen.getByLabelText("Open assistant chat"));
+    await user.click(await screen.findByLabelText("Expand chat"));
+    expect(screen.getByLabelText("Shrink chat")).toBeInTheDocument();
   });
 });
