@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner } from '@ury/ui';
 import MenuCard from '../../components/MenuCard';
+import { t } from '../../i18n';
 
 interface CaptainMenuProps {
   /** From the per-table permission map (`get_table_order_context`). When
@@ -65,7 +66,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search menu"
+            placeholder={t('captain.search_menu')}
             className="w-full ps-9 pe-3 py-3 rounded-lg border border-gray-200 bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -79,9 +80,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 ? 'bg-blue-600 text-white border-blue-600'
                 : 'bg-white text-gray-700 border-gray-200'
             )}
-          >
-            All
-          </button>
+          >{t('common.all')}</button>
           {categories.map((category) => (
             <button
               key={category.name}
@@ -109,7 +108,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
         {menuLoading ? (
           <Spinner message="Loading menu…" />
         ) : filteredItems.length === 0 ? (
-          <p className="text-center text-gray-500 text-sm mt-8">No items found.</p>
+          <p className="text-center text-gray-500 text-sm mt-8">{t('captain.no_items_found')}</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 pb-8">
             {filteredItems.map((item) => (

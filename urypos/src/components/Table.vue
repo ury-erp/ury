@@ -1,20 +1,17 @@
 <template>
-  <div
-    class="grid grid-cols-2 md:grid-cols-4"
-    :class="[
-      {
-        'gap-4 lg:grid-cols-6': !this.auth.cashier,
-        'lg:grid-cols-4': this.auth.cashier,
-      },
-    ]"
-  >
-    <div class="relative">
-      <label for="first" class="absolute z-50 ml-2 mt-0.5 bg-white px-2 text-xs"
-        >Select Room</label
-      >
+  <!--
+    Room / order-type filters.
+
+    These were four sibling divs inside one grid, each carrying its own
+    `ml-5` and `mb-3` to push itself into place, which fell apart in RTL and
+    at tablet width. A flex row of labelled fields lets each control size to
+    its content and wrap instead.
+  -->
+  <div class="mb-5 flex flex-wrap items-end gap-3">
+    <div class="pos-field min-w-[10rem] flex-1">
+      <label for="room">{{ $t('tables.select_room') }}</label>
       <select
-        class="relative mt-2 w-full rounded border border-gray-300 bg-gray-50"
-        :class="{ 'mb-3': this.auth.cashier }"
+        class="pos-select"
         id="room"
         v-model="table.selectedRoom"
         @change="table.handleRoomChange"
@@ -28,56 +25,59 @@
         </option>
       </select>
     </div>
+
+    <!--
+      Dine-in / takeaway.
+
+      Was a hand-built sliding switch: an absolutely positioned white knob
+      driven by an inline `transform`, with the label sitting on top of it.
+      It gave no hint that it was a two-way choice and inverted in RTL. A
+      segmented control states both options and marks the live one.
+    -->
     <div
       v-if="!this.auth.cashier"
-      @click="this.table.toggleTableTypeSwitch"
-      class="relative mb-3 mt-2 inline-block h-10 w-28 cursor-pointer rounded bg-blue-700"
+      class="inline-flex rounded-xl bg-muted p-1"
+      role="group"
+      :aria-label="$t('tables.title')"
     >
-      <span
-        class="absolute w-full py-2 text-base text-white"
-        :class="this.table.tableTypeClass"
-        >{{ this.table.tableTypeLabel }}</span
+      <button
+        v-for="option in tableTypeOptions"
+        :key="option.takeaway"
+        type="button"
+        class="press min-h-[2.25rem] rounded-lg px-4 text-sm font-bold transition-colors duration-fast"
+        :class="table.isTakeaeay === option.takeaway
+          ? 'bg-card text-foreground shadow-card'
+          : 'text-muted-foreground hover:text-foreground'"
+        :aria-pressed="table.isTakeaeay === option.takeaway"
+        @click="table.isTakeaeay !== option.takeaway && table.toggleTableTypeSwitch()"
       >
-      <div
-        :style="{ transform: this.table.toggleTableType }"
-        class="absolute left-0 h-10 w-9 rounded border bg-white transition-transform duration-300 ease-in-out"
-      ></div>
+        {{ option.label }}
+      </button>
     </div>
-    <div class="relative ml-5" v-if="this.auth.cashier">
-      <div class="relative">
-        <label
-          for="first"
-          class="absolute z-50 ml-2 mt-0.5 bg-white px-2 text-xs"
-          >Order Type</label
-        >
-        <select
-          class="relative mt-2 w-full rounded border border-gray-300 bg-gray-50"
-          :class="{ 'mb-3': this.auth.cashier }"
-          id="room"
-          v-model="menu.selectedOrderType"
-          @change="menu.orderTypeSelection()"
-          :disabled="recentOrders.pastOrderType !== null && recentOrders.pastOrderType !== ''"
-        >
-          <option
-            v-for="(type, index) in menu.orderType"
-            :key="index"
-           >
-            {{ type.name }}
-          </option>
-        </select>
-      </div>
+
+    <div class="pos-field min-w-[10rem] flex-1" v-if="this.auth.cashier">
+      <label for="orderType">{{ $t('order.type') }}</label>
+      <select
+        class="pos-select"
+        id="orderType"
+        v-model="menu.selectedOrderType"
+        @change="menu.orderTypeSelection()"
+        :disabled="recentOrders.pastOrderType !== null && recentOrders.pastOrderType !== ''"
+      >
+        <option v-for="(type, index) in menu.orderType" :key="index">
+          {{ type.name }}
+        </option>
+      </select>
     </div>
+
     <div
-      class="relative ml-5"
+      class="pos-field min-w-[10rem] flex-1"
       v-if="this.menu.selectedOrderType === 'Aggregators' && this.auth.cashier"
     >
-      <label for="first" class="absolute z-50 ml-2 mt-0.5 bg-white px-2 text-xs"
-        >Aggregators List</label
-      >
+      <label for="aggregator">{{ $t('order.aggregators_list') }}</label>
       <select
-        class="relative mt-2 w-full rounded border border-gray-300 bg-gray-50"
-        :class="{ 'mb-3': auth.cashier }"
-        id="room"
+        class="pos-select"
+        id="aggregator"
         v-model="menu.selectedAggregator"
         @change="menu.handleAggregatorChange"
         :disabled="menu.cartHasValue || recentOrders.pastOrderType !== null && recentOrders.pastOrderType !== ''"
@@ -92,213 +92,175 @@
       </select>
     </div>
   </div>
+
   <div v-if="!this.table.isTakeaeay" class="m-auto">
     <div class="flow-root">
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-border bg-opacity-50 text-lg"
         v-if="this.invoiceData.isPrinting"
       >
-        Printing Invoice
+        {{ $t('order.printing_invoice') }}
       </div>
-      <div class="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-        <div
-          w-full
-          class="w-full max-w-sm rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-800"
-          v-for="table in auth.cashier
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <!--
+          A table tile.
+
+          Redesigned around how the screen is actually read: a waiter scans a
+          room for "which table needs me", so state is carried by a coloured
+          rail down the tile's leading edge and a word, not by a small pale
+          badge the old card tucked in a corner. The table's own name is the
+          largest thing on the tile, and how long it has been seated sits
+          directly under it.
+        -->
+        <article
+          v-for="(table, tableIndex) in auth.cashier
             ? this.table.tables
             : this.table.filteredTables"
           :key="table.name"
+          :style="{ '--i': tableIndex }"
+          class="pos-card animate-fade-in-up stagger-fast relative flex flex-col overflow-hidden"
         >
-          <div class="flex justify-between">
-            <div class="flex justify-start px-2 pt-2">
-              <span
-                class="me-2 rounded px-2.5 py-0.5 text-sm font-medium"
-                :class="{
-                  'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300':
-                    this.table.getBadgeType(table) === 'red',
-                  'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300':
-                    this.table.getBadgeType(table) === 'default',
+          <span
+            class="absolute inset-y-0 start-0 w-1.5"
+            :class="railClass(table)"
+            aria-hidden="true"
+          ></span>
 
-                  'bg-yellow-100 text-yellow-800':
-                    this.table.getBadgeType(table) === 'yellow',
-                  'bg-green-100 text-green-800':
-                    this.table.getBadgeType(table) === 'green',
-                }"
-              >
-                {{ this.table.getBadgeText(table) }}
-              </span>
-            </div>
+          <header class="flex items-start justify-between gap-1 ps-4 pe-1 pt-3">
+            <span :class="badgeClass(table)">
+              <span class="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"></span>
+              {{ this.table.getBadgeText(table) }}
+            </span>
+
             <div class="relative" v-if="table.occupied !== 1">
               <button
-                class="inline-block rounded p-1.5 text-sm text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
+                class="press inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-muted"
                 type="button"
+                :aria-label="$t('tables.table_merge')"
                 @click="this.table.toggleDropdown(table.name)"
               >
-                <svg
-                  class="h-6 w-6"
-                  aria-hidden="true"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"
-                  ></path>
+                <svg class="h-5 w-5" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z"></path>
                 </svg>
               </button>
+
               <div
-                class="absolute right-0 z-10 w-36 divide-y divide-gray-100 rounded bg-white shadow dark:bg-gray-700"
+                class="absolute end-0 z-10 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-popover shadow-raised animate-scale-in"
                 v-show="this.table.activeDropdown === table.name"
               >
-                <ul class="py-2">
-                  <li v-if="table.occupied !== 1">
-                    <a
-                      href="#"
-                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
-                      @click="this.table.openMergeFreeModal(table)"
-                      >Table Merge</a
-                    >
-                  </li>
-                  <li v-if="table.occupied === 1">
-                    <a
-                      href="#"
-                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
-                      @click="this.table.showModal = true"
-                      >Table Transfer</a
-                    >
-                  </li>
-                  <li v-if="table.occupied === 1 && this.auth.hasAccess">
-                    <a
-                      href="#"
-                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
-                      @click="this.table.showModalCaptainTransfer = true"
-                      >Captain Transfer</a
-                    >
-                  </li>
-                </ul>
+                <button
+                  v-if="table.occupied !== 1"
+                  type="button"
+                  class="block w-full px-4 py-2.5 text-start text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
+                  @click="this.table.openMergeFreeModal(table)"
+                >{{ $t('tables.table_merge') }}</button>
+                <button
+                  v-if="table.occupied === 1"
+                  type="button"
+                  class="block w-full px-4 py-2.5 text-start text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
+                  @click="this.table.showModal = true"
+                >{{ $t('tables.table_transfer') }}</button>
+                <button
+                  v-if="table.occupied === 1 && this.auth.hasAccess"
+                  type="button"
+                  class="block w-full px-4 py-2.5 text-start text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
+                  @click="this.table.showModalCaptainTransfer = true"
+                >{{ $t('tables.captain_transfer') }}</button>
               </div>
             </div>
+          </header>
+
+          <!-- Identity. Tapping an occupied tile opens its order, which is the
+               single most common action on this screen. -->
+          <div
+            class="flex-1 px-4 pt-2 text-center"
+            :class="table.occupied === 1 && !this.auth.restrictTableOrder ? 'cursor-pointer' : ''"
+            @click="
+              table.occupied === 1 && !this.auth.restrictTableOrder
+                ? this.table.routeToMenu(table)
+                : ''
+            "
+          >
+            <h2 class="flex items-center justify-center gap-1.5 text-2xl font-bold leading-tight text-foreground">
+              <span class="truncate">{{ table.name }}</span>
+              <svg
+                v-if="table.merged_with"
+                class="h-4 w-4 shrink-0 text-muted-foreground"
+                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                :aria-label="$t('tables.merged_table')"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </h2>
+
+            <p
+              v-if="table.occupied === 1"
+              class="mt-1 text-sm font-semibold tabular-nums bidi-isolate"
+              :class="this.table.getBadgeType(table) === 'red' ? 'text-destructive' : 'text-muted-foreground'"
+            >
+              {{ this.table.getTimeDifference(table) }}
+            </p>
+            <p v-else class="mt-1 text-sm text-muted-foreground">
+              {{ table.no_of_seats ? $t('tables.seats', { count: table.no_of_seats }) : '&nbsp;' }}
+            </p>
           </div>
-          <div class="flex flex-col pb-4">
-            <div
-              class="mt-1 text-center"
+
+          <!-- Actions -->
+          <footer class="p-3">
+            <button
+              v-if="table.occupied != 1"
+              type="button"
+              class="pos-btn-primary w-full"
+              :disabled="this.auth.restrictTableOrder"
               @click="
-                table.occupied === 1 && !this.auth.restrictTableOrder
-                  ? this.table.routeToMenu(table)
-                  : ''
+                !this.auth.restrictTableOrder &&
+                  this.table.addToSelectedTables(table)
               "
             >
-              <h5
-                class="mt-2 text-xl font-medium text-gray-900 dark:text-white flex justify-center items-center gap-2"
-                :class="{ 'mt-3': table.occupied === 0 }"
-              >
-                {{ table.name }}
-                <svg v-if="table.merged_with" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="Merged Table">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                </svg>
-              </h5>
-              <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{
-                  table.occupied === 1
-                    ? this.table.getTimeDifference(table)
-                    : ""
-                }}</span
-              >
-            </div>
-            <div class="mt-8 flex justify-center gap-2" v-if="table.occupied != 1">
+              {{ $t('tables.open_table') }}
+              <svg class="h-4 w-4 rtl-flip" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
+
+            <div v-else class="flex items-center gap-2">
               <button
                 type="button"
-                class="inline-flex items-center rounded px-2 py-2.5 text-center text-sm font-medium text-white hover:bg-[#2557D6]/90 focus:outline-none focus:ring-4 focus:ring-[#2557D6]/50 dark:focus:ring-[#2557D6]/50"
-                :class="[
-                  {
-                    'bg-blue-700': !this.auth.restrictTableOrder,
-                    'pointer-events-none bg-blue-400':
-                      this.auth.restrictTableOrder,
-                  },
-                ]"
-                @click="
-                  !this.auth.restrictTableOrder &&
-                    this.table.addToSelectedTables(table)
-                "
-              >
-                Open Table
-                <svg
-                  class="ml-2 h-6 w-6 dark:text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <div class="mt-2 flex justify-center" v-if="table.occupied === 1">
-              <button
-                type="button"
-                class="mb-2 me-2 inline-flex items-center rounded bg-blue-700 px-5 py-2.5 text-center text-sm font-medium text-white hover:bg-[#2557D6]/90 focus:outline-none focus:ring-4 focus:ring-[#2557D6]/50 dark:focus:ring-[#2557D6]/50"
+                class="pos-btn-primary flex-1"
                 @click="this.invoiceData.billing(table)"
               >
-                <svg
-                  class="svg-icon mr-2"
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  fill="white"
-                >
-                  <path
-                    d="M6 19H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v4h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm0-2v-1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1h2V9H4v8h2zM8 4v3h8V4H8zm0 13v3h8v-3H8zm-3-7h3v2H5v-2z"
-                  />
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M6 19H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v4h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm0-2v-1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1h2V9H4v8h2zM8 4v3h8V4H8zm0 13v3h8v-3H8zm-3-7h3v2H5v-2z" />
                 </svg>
-
-                Bill
+                {{ $t('order.bill') }}
               </button>
 
-              <div
-                class="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border hover:bg-blue-700 hover:text-white focus:outline-none focus:ring-4 focus:ring-blue-300 dark:border-blue-500 dark:text-blue-500 dark:hover:bg-blue-500 dark:hover:text-white dark:focus:ring-blue-800"
-                :class="[
-                  {
-                    'border-blue-700 text-blue-700':
-                      !this.auth.restrictTableOrder,
-                    'pointer-events-none border-blue-400 text-blue-400':
-                      this.auth.restrictTableOrder,
-                  },
-                ]"
+              <button
+                type="button"
+                class="pos-btn-ghost shrink-0 px-3"
+                :disabled="this.auth.restrictTableOrder"
+                :aria-label="$t('order.view_order')"
                 @click="
                   !this.auth.restrictTableOrder && this.table.routeToCart(table)
                 "
               >
-                <svg
-                  aria-hidden="true"
-                  class="h-10 w-6"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
+                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                   <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
-                  <path
-                    fill-rule="evenodd"
-                    d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                    clip-rule="evenodd"
-                  ></path>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"></path>
                 </svg>
-              </div>
+              </button>
             </div>
-          </div>
-        </div>
+          </footer>
+        </article>
       </div>
     </div>
+
     <div
       v-if="this.table.tables.length === 0"
-      class="inset-0 mt-72 flex items-center justify-center"
+      class="inset-0 mt-16 flex items-center justify-center"
     >
       <div class="text-center">
-        Tables not found. Please set tables for the room
+        {{ $t('tables.none_for_room') }}
         <span class="font-medium">{{ this.table.selectedRoom }}.</span>
       </div>
     </div>
@@ -309,12 +271,12 @@
 
   <div
     v-if="table.showModal"
-    class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+    class="fixed inset-0 z-10 overflow-y-auto bg-muted"
   >
     <div class="mt-20 flex items-center justify-center">
-      <div class="mt-10 w-full rounded bg-white p-6 shadow-lg md:max-w-md">
+      <div class="mt-10 w-full rounded-xl bg-card p-6 shadow-raised md:max-w-md">
         <div class="flex justify-end">
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ $t('common.close') }}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-5 w-5"
@@ -333,20 +295,20 @@
         </div>
 
         <h2
-          class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white"
+          class="mt-1 block text-left text-xl font-medium text-foreground"
         >
-          Table Transfer
+          {{ $t('tables.table_transfer') }}
         </h2>
         <div class="relative" ref="container">
           <label
             for="newTable"
-            class="mt-6 block text-left text-gray-900 dark:text-white"
+            class="mt-6 block text-left text-foreground"
           >
-            New Table
+            {{ $t('tables.new_table') }}
           </label>
           <input
             type="text"
-            class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+            class="mt-4 w-full appearance-none rounded-xl border p-2 leading-tight text-foreground shadow focus:outline-none"
             v-model="table.newTable"
             @click="
               this.table.showTable = true;
@@ -355,11 +317,11 @@
           />
           <div
             v-if="this.table.showTable"
-            class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded bg-white shadow"
+            class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded-xl bg-card shadow"
             ref="dropdown"
           >
             <div
-              class="h-16 w-full rounded p-4 hover:bg-gray-100"
+              class="h-16 w-full rounded-xl p-4 hover:bg-muted"
               v-for="(tables, index) in this.table.searchTable"
               :key="index"
               @click="this.table.selectTable(tables)"
@@ -372,14 +334,14 @@
         </div>
         <label
           for="newTable"
-          class="mt-6 block text-left text-gray-900 dark:text-white"
+          class="mt-6 block text-left text-foreground"
         >
-          Current Table
+          {{ $t('tables.current_table') }}
         </label>
         <input
           type="text"
           id="newTable"
-          class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+          class="mt-4 w-full appearance-none rounded-xl border p-2 leading-tight text-foreground shadow focus:outline-none"
           :value="table.tableName"
           readonly
         />
@@ -389,9 +351,9 @@
               this.table.showModal = false;
               this.table.tableTransfer(table);
             "
-            class="mt-8 rounded bg-blue-700 px-3 py-2 text-white hover:bg-blue-600"
+            class="mt-8 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
           >
-            Transfer
+            {{ $t('tables.transfer') }}
           </button>
         </div>
       </div>
@@ -400,12 +362,12 @@
 
   <div
     v-if="table.showModalMergeFree"
-    class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+    class="fixed inset-0 z-10 overflow-y-auto bg-muted"
   >
     <div class="mt-20 flex items-center justify-center">
-      <div class="mt-10 w-full rounded bg-white p-6 shadow-lg md:max-w-md">
+      <div class="mt-10 w-full rounded-xl bg-card p-6 shadow-raised md:max-w-md">
         <div class="flex justify-end">
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ $t('common.close') }}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-5 w-5 cursor-pointer"
@@ -417,13 +379,13 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </div>
-        <h2 class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white">
+        <h2 class="mt-1 block text-left text-xl font-medium text-foreground">
           Merge with {{ table.mergeSourceTable }}
         </h2>
         <div class="mt-4 text-left">
-          <label for="mergeSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Table to Merge</label>
-          <select id="mergeSelect" v-model="table.selectedMergedTable" class="mt-1 block w-full rounded border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-            <option value="" disabled>Select a table</option>
+          <label for="mergeSelect" class="block text-sm font-medium text-foreground">{{ $t('tables.select_to_merge') }}</label>
+          <select id="mergeSelect" v-model="table.selectedMergedTable" class="mt-1 block w-full rounded-xl border-input py-2 pl-3 pr-10 text-base focus:border-ring focus:outline-none focus:ring-ring sm:text-sm">
+            <option value="" disabled>{{ $t('tables.select_table') }}</option>
             <option v-for="(t, index) in table.transferTable" :key="index" :value="t.name">{{t.name}}</option>
           </select>
         </div>
@@ -433,11 +395,11 @@
               this.table.showModalMergeFree = false;
               this.table.mergeFreeTablesAction();
             "
-            class="mt-8 rounded bg-blue-700 px-3 py-2 text-white hover:bg-blue-600"
+            class="mt-8 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
             :disabled="!table.selectedMergedTable"
             :class="{'opacity-50 cursor-not-allowed': !table.selectedMergedTable}"
           >
-            Merge Tables
+            {{ $t('tables.merge_tables') }}
           </button>
         </div>
       </div>
@@ -446,12 +408,12 @@
 
   <div
     v-if="table.showModalCaptainTransfer"
-    class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+    class="fixed inset-0 z-10 overflow-y-auto bg-muted"
   >
     <div class="mt-20 flex items-center justify-center">
-      <div class="mt-10 w-full rounded bg-white p-6 shadow-lg md:max-w-md">
+      <div class="mt-10 w-full rounded-xl bg-card p-6 shadow-raised md:max-w-md">
         <div class="flex justify-end">
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ $t('common.close') }}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-5 w-5"
@@ -469,20 +431,20 @@
           </svg>
         </div>
         <h2
-          class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white"
+          class="mt-1 block text-left text-xl font-medium text-foreground"
         >
-          Captain Transfer
+          {{ $t('tables.captain_transfer') }}
         </h2>
         <div class="relative" ref="container">
           <label
             for="newTable"
-            class="mt-6 block text-left text-gray-900 dark:text-white"
+            class="mt-6 block text-left text-foreground"
           >
-            New Captain
+            {{ $t('tables.new_captain') }}
           </label>
           <input
             type="text"
-            class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+            class="mt-4 w-full appearance-none rounded-xl border p-2 leading-tight text-foreground shadow focus:outline-none"
             @click="
               this.table.showCaptain = true;
               this.table.fetchCaptain();
@@ -491,11 +453,11 @@
           />
           <div
             v-if="this.table.showCaptain"
-            class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded bg-white shadow"
+            class="absolute left-0 top-full z-10 max-h-64 w-full overflow-y-scroll rounded-xl bg-card shadow"
             ref="dropdown"
           >
             <div
-              class="h-16 w-full rounded p-4 hover:bg-gray-100"
+              class="h-16 w-full rounded-xl p-4 hover:bg-muted"
               v-for="(captain, index) in this.table.searchCaptian"
               :key="index"
               @click="this.table.selectcaptain(captain)"
@@ -508,14 +470,14 @@
         </div>
         <label
           for="newTable"
-          class="mt-6 block text-left text-gray-900 dark:text-white"
+          class="mt-6 block text-left text-foreground"
         >
-          Current Captain
+          {{ $t('tables.current_captain') }}
         </label>
         <input
           type="text"
           id="newTable"
-          class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+          class="mt-4 w-full appearance-none rounded-xl border p-2 leading-tight text-foreground shadow focus:outline-none"
           :value="this.table.currentCaptain"
           readonly
         />
@@ -525,9 +487,9 @@
               this.table.showModalCaptainTransfer = false;
               this.table.captianTransfer();
             "
-            class="mt-8 rounded bg-blue-700 px-3 py-2 text-white hover:bg-blue-600"
+            class="mt-8 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
           >
-            Transfer
+            {{ $t('tables.transfer') }}
           </button>
         </div>
       </div>
@@ -556,6 +518,60 @@ export default {
     const recentOrders = usetoggleRecentOrder();
     
     return { table, invoiceData, auth, menu,recentOrders };
+  },
+  computed: {
+    /**
+     * Dine-in / takeaway as two labelled options.
+     *
+     * The store's `tableTypeLabel` returns a hardcoded English string, so it
+     * cannot be shown on an Arabic floor. The labels are resolved here and
+     * the store keeps owning the state.
+     */
+    tableTypeOptions() {
+      return [
+        { takeaway: false, label: this.$t("tables.dine_in") },
+        { takeaway: true, label: this.$t("tables.takeaway") },
+      ];
+    },
+  },
+  methods: {
+    /**
+     * Table state, mapped once.
+     *
+     * The store returns a colour name ("red", "yellow", "green", "default")
+     * rather than a state, which is backwards — the view should not be told
+     * which hue to paint. Rather than change the store and every caller, the
+     * mapping is pinned here so the tile has exactly one place deciding how a
+     * state looks.
+     */
+    stateOf(table) {
+      return {
+        green: "free",
+        default: "active",
+        yellow: "occupied",
+        red: "attention",
+      }[this.table.getBadgeType(table)] || "free";
+    },
+
+    railClass(table) {
+      return {
+        free: "bg-success",
+        active: "bg-primary",
+        occupied: "bg-warning",
+        // The one state that needs a waiter to move; it pulses so it is
+        // findable in a room of thirty tiles.
+        attention: "bg-destructive animate-pulse-soft",
+      }[this.stateOf(table)];
+    },
+
+    badgeClass(table) {
+      return {
+        free: "pos-badge-success",
+        active: "pos-badge-accent",
+        occupied: "pos-badge-warning",
+        attention: "pos-badge-danger",
+      }[this.stateOf(table)];
+    },
   },
 };
 </script>

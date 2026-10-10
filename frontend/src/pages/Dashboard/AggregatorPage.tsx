@@ -4,6 +4,7 @@ import { Plus, Store, Edit2 } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
 
 interface AggregatorSetting {
   name?: string;
@@ -183,7 +184,7 @@ export const AggregatorPage: React.FC = () => {
       await fetchDropdownOptions();
       setIsAddOpen(false);
       setNewAggregatorName('');
-      showToast.success('Aggregator created successfully');
+      showToast.success(t('dash.aggregator.aggregator_created_successfully'));
     } catch (err: any) {
       console.error('Failed to create aggregator:', err);
       const errorMessage = err?.message || err?.responseJSON?.message || String(err);
@@ -217,7 +218,7 @@ export const AggregatorPage: React.FC = () => {
     if (!branchToUpdate) return;
 
     if (!editForm.aggregator || !editForm.aggregator.trim()) {
-      showToast.error('Aggregator Name is required');
+      showToast.error(t('dash.aggregator.aggregator_name_is_required'));
       return;
     }
 
@@ -232,7 +233,7 @@ export const AggregatorPage: React.FC = () => {
       mode_of_payment: editForm.mode_of_payment || '',
     };
     if (JSON.stringify(original) === JSON.stringify(current)) {
-      showToast.warning('No changes in document');
+      showToast.warning(t('dash.aggregator.no_changes_in_document'));
       return;
     }
 
@@ -280,7 +281,7 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      showToast.success('Aggregator updated successfully');
+      showToast.success(t('dash.aggregator.aggregator_updated_successfully'));
       setEditingIndex(null);
       await fetchBranchAggregators();
       await fetchDropdownOptions();
@@ -304,7 +305,7 @@ export const AggregatorPage: React.FC = () => {
           disabled={!hasBranch}
         >
           <Plus className="w-4 h-4" />
-          <span>Add Aggregator</span>
+          <span>{t('dash.aggregator.add_aggregator')}</span>
         </Button>
       </div>
 
@@ -318,28 +319,26 @@ export const AggregatorPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Store className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Aggregators Found</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Add aggregators like Zomato, Swiggy to configure aggregator settings.
-          </p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.aggregator.no_aggregators_found')}</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">{t('dash.aggregator.add_aggregators_like_zomato_swiggy_to_config')}</p>
           <Button
             onClick={handleOpenAddModal}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
             disabled={!hasBranch}
           >
             <Plus className="w-4 h-4" />
-            <span>Add Aggregator</span>
+            <span>{t('dash.aggregator.add_aggregator')}</span>
           </Button>
         </Card>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-start text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">Aggregator</th>
-                <th className="px-6 py-4">Price List</th>
-                <th className="px-6 py-4">Mode of Payment</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.aggregator.aggregator')}</th>
+                <th className="px-6 py-4">{t('dash.aggregator.price_list')}</th>
+                <th className="px-6 py-4">{t('dash.aggregator.mode_of_payment')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.aggregator.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -352,13 +351,13 @@ export const AggregatorPage: React.FC = () => {
                     <td className="px-6 py-4 font-semibold text-gray-900">{name}</td>
                     <td className="px-6 py-4">{pl}</td>
                     <td className="px-6 py-4">{mop}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-end">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditAggregator(item, idx)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Aggregator"
+                        title={t('dash.aggregator.edit_aggregator')}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
@@ -375,12 +374,11 @@ export const AggregatorPage: React.FC = () => {
       <Dialog open={isAddOpen} onOpenChange={(open) => !open && setIsAddOpen(false)}>
         <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setIsAddOpen(false)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900">{t('dash.aggregator.add_aggregator')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateAggregator} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">
-                Aggregator Name <span className="text-red-500">*</span>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.aggregator.aggregator_name')}<span className="text-red-500">*</span>
               </label>
               <Input
                 placeholder="e.g. Swiggy, Zomato"
@@ -391,11 +389,9 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">{t('dash.aggregator.cancel')}</Button>
               <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>Save</span>
+                <span>{t('dash.aggregator.save')}</span>
               </Button>
             </div>
           </form>
@@ -406,12 +402,11 @@ export const AggregatorPage: React.FC = () => {
       <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && setEditingIndex(null)}>
         <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setEditingIndex(null)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Edit Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-gray-900">{t('dash.aggregator.edit_aggregator')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">
-                Aggregator Name <span className="text-red-500">*</span>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.aggregator.aggregator_name')}<span className="text-red-500">*</span>
               </label>
               <Input
                 value={editForm.aggregator}
@@ -421,7 +416,7 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.aggregator.price_list')}</label>
               <SearchableSelect
                 id="edit_price_list"
                 value={editForm.price_list || ''}
@@ -430,12 +425,12 @@ export const AggregatorPage: React.FC = () => {
                   { value: '', label: 'Select Price List...' },
                   ...priceLists.map(pl => ({ value: pl.name, label: pl.name }))
                 ]}
-                placeholder="Select Price List..."
+                placeholder={t('dash.aggregator.select_price_list')}
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.aggregator.mode_of_payment')}</label>
               <SearchableSelect
                 id="edit_mode_of_payment"
                 value={editForm.mode_of_payment || ''}
@@ -444,16 +439,14 @@ export const AggregatorPage: React.FC = () => {
                   { value: '', label: 'Select Mode of Payment...' },
                   ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
                 ]}
-                placeholder="Select Mode of Payment..."
+                placeholder={t('dash.aggregator.select_mode_of_payment')}
               />
             </div>
 
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
-              <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">{t('dash.aggregator.cancel')}</Button>
               <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>Save</span>
+                <span>{t('dash.aggregator.save')}</span>
               </Button>
             </div>
           </form>

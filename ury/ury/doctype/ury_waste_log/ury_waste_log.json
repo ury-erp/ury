@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-20 21:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series", "branch", "posting_date", "column_break_head", "reason", "recorded_by",
+  "items_section", "items", "totals_section", "total_value", "stock_entry"
+ ],
+ "fields": [
+  {"default": "WASTE-.YYYY.-", "fieldname": "naming_series", "fieldtype": "Select", "label": "Series", "options": "WASTE-.YYYY.-", "reqd": 1},
+  {"fieldname": "branch", "fieldtype": "Link", "in_standard_filter": 1, "label": "Branch", "options": "Branch", "reqd": 1},
+  {"default": "Today", "fieldname": "posting_date", "fieldtype": "Date", "in_list_view": 1, "label": "Date", "reqd": 1},
+  {"fieldname": "column_break_head", "fieldtype": "Column Break"},
+  {"description": "Why this was thrown away. The reason is the whole value of the record: a total without one tells a manager that money was lost and nothing about how to stop it.", "fieldname": "reason", "fieldtype": "Select", "in_list_view": 1, "in_standard_filter": 1, "label": "Reason", "options": "Spoilage\nOverproduction\nPreparation Error\nCustomer Return\nBreakage\nStaff Meal\nOther", "reqd": 1},
+  {"fieldname": "recorded_by", "fieldtype": "Link", "label": "Recorded By", "options": "User", "read_only": 1},
+  {"fieldname": "items_section", "fieldtype": "Section Break", "label": "Items"},
+  {"fieldname": "items", "fieldtype": "Table", "label": "Items", "options": "URY Waste Log Item", "reqd": 1},
+  {"fieldname": "totals_section", "fieldtype": "Section Break"},
+  {"fieldname": "total_value", "fieldtype": "Currency", "in_list_view": 1, "label": "Total Value", "read_only": 1},
+  {"description": "The ERPNext Material Issue this produced, when the wasted items are stock-tracked.", "fieldname": "stock_entry", "fieldtype": "Link", "label": "Stock Entry", "options": "Stock Entry", "read_only": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-20 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Waste Log",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "URY Manager", "share": 1, "write": 1, "submit": 1, "cancel": 1, "amend": 1},
+  {"create": 1, "print": 1, "read": 1, "report": 1, "role": "URY Cashier", "write": 1, "submit": 1}
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

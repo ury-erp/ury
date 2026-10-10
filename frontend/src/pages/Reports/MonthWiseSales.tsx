@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { IndianRupee, TrendingUp, Trophy, TrendingDown } from 'lucide-react';
+import { IndianRupee, TrendingUp, Trophy, TrendingDown, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface MonthRow {
   year: number;
@@ -29,14 +31,14 @@ interface MonthWiseSalesData {
   };
 }
 
-const columns: DataTableColumn<MonthRow>[] = [
-  { key: 'month', header: 'Month' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'taxes', header: 'Taxes', render: (r) => formatCurrency(r.taxes), align: 'right' },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
+const getColumns = (): DataTableColumn<MonthRow>[] => [
+  { key: 'month', header: t('fields.month') },
+  { key: 'item_total', header: t('fields.item_total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'taxes', header: t('fields.taxes'), render: (r) => formatCurrency(r.taxes), align: 'right' },
+  { key: 'grand_total', header: t('fields.grand_total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
   {
     key: 'growth_percentage',
-    header: 'Growth',
+    header: t('fields.growth'),
     align: 'right',
     render: (r) =>
       r.growth_percentage === null ? '—' : `${r.growth_percentage > 0 ? '+' : ''}${r.growth_percentage}%`,
@@ -63,7 +65,7 @@ export function MonthWiseSales() {
       });
       setData(res.message ?? (res as unknown as MonthWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +79,7 @@ export function MonthWiseSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Month Wise Sales</h1>
+          <h1 className="text-xl font-semibold">{t('reports.month_wise_sales.month_wise_sales')}</h1>
           <p className="text-sm text-muted-foreground">
             Monthly revenue trend {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -97,43 +99,47 @@ export function MonthWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton chart />
       ) : data ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Revenue"
+              label={t('reports.month_wise_sales.total_revenue')}
               value={formatCurrency(data.summary.total_revenue)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
             <StatCard
-              label="Avg Monthly"
+              label={t('reports.month_wise_sales.avg_monthly')}
               value={formatCurrency(data.summary.average_monthly_revenue)}
               icon={<TrendingUp className="w-4 h-4" />}
             />
-            <StatCard label="Best Month" value={data.summary.best_month ?? '—'} icon={<Trophy className="w-4 h-4" />} />
+            <StatCard label={t('reports.month_wise_sales.best_month')} value={data.summary.best_month ?? '—'} icon={<Trophy className="w-4 h-4" />} />
             <StatCard
-              label="Weakest Month"
+              label={t('reports.month_wise_sales.weakest_month')}
               value={data.summary.worst_month ?? '—'}
               icon={<TrendingDown className="w-4 h-4" />}
             />
           </div>
 
           <BarChartCard
-            title="Monthly Grand Total"
+            title={t('reports.month_wise_sales.monthly_grand_total')}
             data={data.data}
             xKey="month"
             yKeys={['grand_total']}
-            labels={{ grand_total: 'Grand Total' }}
+            labels={{ grand_total: t('fields.grand_total') }}
           />
 
-          <DataTable columns={columns} rows={data.data} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.data} isLoading={isLoading} />
         </>
       ) : null}
     </div>

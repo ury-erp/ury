@@ -1,0 +1,59 @@
+/* The guest feedback page.
+   Its own stylesheet rather than the restaurant site's: this page is opened
+   on a phone, one-handed, by someone who is leaving — it needs large targets
+   and nothing else, not a theme system. */
+
+@font-face{font-family:FeedbackArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2') format('woff2');font-weight:400;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:FeedbackArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2') format('woff2');font-weight:400;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD}
+@font-face{font-family:FeedbackArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2') format('woff2');font-weight:600;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:FeedbackArabic;src:url('/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2') format('woff2');font-weight:600;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122,U+FEFF,U+FFFD}
+
+:root{--ink:#243d32;--accent:#b77948;--paper:#faf8f2;--muted:#6e746b;--line:#dedfd3;--white:#fff;--danger:#a22f24}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:FeedbackArabic,'Segoe UI',Arial,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased;display:flex;justify-content:center;padding:24px 16px 56px}
+.card{width:min(560px,100%);background:var(--white);border:1px solid var(--line);border-radius:18px;padding:28px 24px 32px;box-shadow:0 18px 50px #0000000d}
+h1{font-size:26px;margin:4px 0 8px;font-weight:600;line-height:1.35}
+h2{font-size:22px;margin:12px 0 6px;font-weight:600}
+.eyebrow{margin:0;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--accent)}
+.intro{margin:0;color:var(--muted);font-size:14px}
+
+fieldset{border:0;margin:26px 0 0;padding:0}
+legend{padding:0;font-size:15px;font-weight:600;margin-bottom:10px}
+.stars.small legend{font-size:13px;font-weight:400;color:var(--muted)}
+
+.star-row{display:flex;gap:6px}
+.star{font-size:34px;line-height:1;background:none;border:0;padding:6px 4px;color:var(--line);cursor:pointer;transition:transform .12s,color .12s;min-width:48px;min-height:48px}
+.stars.small .star{font-size:24px;min-width:40px;min-height:40px}
+.star[data-on="1"]{color:var(--accent)}
+.star:active{transform:scale(.92)}
+
+.scale{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
+.score{min-height:44px;border:1px solid var(--line);background:var(--white);border-radius:8px;font-size:13px;color:var(--ink);cursor:pointer;padding:0}
+.score[aria-checked="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px}
+
+.field{display:block;margin-top:24px}
+.field>span{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+textarea,input{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;font-size:15px;background:var(--white);color:var(--ink);min-height:48px}
+textarea{resize:vertical}
+
+.submit{margin-top:26px;width:100%;min-height:52px;border:0;border-radius:10px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:600;cursor:pointer}
+.submit[disabled]{opacity:.6;cursor:not-allowed}
+
+.status{min-height:22px;margin:14px 0 0;font-size:13px;color:var(--muted)}
+.status.error{color:var(--danger)}
+.notice{background:#fff1c9;color:#604810;border-radius:10px;padding:14px 16px;font-size:14px;margin-top:20px}
+
+#done{text-align:center;padding:18px 0 6px}
+.tick{display:inline-grid;place-items:center;width:64px;height:64px;border-radius:50%;background:#eef4ef;color:#2f6b45;font-size:30px;margin:0 auto}
+
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+[hidden]{display:none!important}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:420px){
+  .card{padding:22px 16px 26px;border-radius:14px}
+  h1{font-size:23px}
+  .scale{grid-template-columns:repeat(6,minmax(0,1fr))}
+}

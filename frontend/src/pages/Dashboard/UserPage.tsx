@@ -7,6 +7,8 @@ import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { t } from '../../i18n';
+import { LoadErrorBanner } from '../../components/common/LoadErrorBanner';
 
 interface UserRecord {
   name: string;
@@ -23,6 +25,7 @@ export const UserPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
@@ -55,8 +58,9 @@ export const UserPage: React.FC = () => {
     try {
       const records = await dashboardService.getModuleRecords<UserRecord>('User', activeBranchId);
       setUsers(records);
+      setLoadError(false);
     } catch {
-      setUsers([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -132,7 +136,7 @@ export const UserPage: React.FC = () => {
         enabled: newUser.enabled ? 1 : 0,
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
-        showToast.warning('No changes in document');
+        showToast.warning(t('dash.user.no_changes_in_document'));
         return;
       }
     }
@@ -216,9 +220,11 @@ export const UserPage: React.FC = () => {
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add User</span>
+          <span>{t('dash.user.add_user')}</span>
         </Button>
       </div>
+
+      {loadError && <LoadErrorBanner onRetry={fetchUsers} />}
 
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
@@ -229,27 +235,25 @@ export const UserPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Users className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Users Configured</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Add staff users and assign them roles for this branch.
-          </p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.user.no_users_configured')}</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">{t('dash.user.add_staff_users_and_assign_them_roles_for_th')}</p>
           <Button
             onClick={openAddDrawer}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add User</span>
+            <span>{t('dash.user.add_user')}</span>
           </Button>
         </Card>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-start text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">User ID</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.user.user')}</th>
+                <th className="px-6 py-4">{t('dash.user.user_id')}</th>
+                <th className="px-6 py-4">{t('dash.user.role')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.user.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -270,11 +274,11 @@ export const UserPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                      <ShieldCheck className="w-3 h-3 mr-1" />
+                      <ShieldCheck className="w-3 h-3 me-1" />
                       {getDisplayRole(user)}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-end">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(user)} className="text-gray-500 hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -295,7 +299,7 @@ export const UserPage: React.FC = () => {
         <form onSubmit={handleSaveUser} className="space-y-5 text-sm">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">First Name</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.user.first_name')}</label>
               <Input
                 value={newUser.first_name}
                 onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
@@ -303,7 +307,7 @@ export const UserPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Last Name</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.user.last_name')}</label>
               <Input
                 value={newUser.last_name}
                 onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
@@ -312,7 +316,7 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">User ID</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.user.user_id')}</label>
             <Input
               type="email"
               value={newUser.email}
@@ -323,7 +327,7 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Role</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.user.role')}</label>
             <SearchableSelect
               id="role"
               value={newUser.role}
@@ -341,9 +345,7 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-4 border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>{t('dash.user.cancel')}</Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6 flex items-center gap-2" disabled={saving}>
               {editingUser ? 'Save Changes' : 'Create User'}
             </Button>

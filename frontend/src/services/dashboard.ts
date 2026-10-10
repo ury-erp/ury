@@ -1,4 +1,5 @@
 import { call } from '@ury/core';
+import { readDashboardSummary, readListResponse } from '../lib/managementValidation';
 
 export interface DashboardSummary {
   today_sales: number;
@@ -72,31 +73,8 @@ export interface TransactionRecord {
 
 export const dashboardService = {
   async getSummary(branch?: string): Promise<DashboardSummary> {
-    try {
-      let res = await call<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', { branch });
-      res = (res as any)?.message || res;
-      return res || {
-        today_sales: 0,
-        today_orders: 0,
-        occupied_tables: 0,
-        total_tables: 0,
-        avg_order_value: 0,
-        active_cashiers: 0,
-        pending_kitchen_orders: 0,
-        total_menu_items: 0,
-      };
-    } catch {
-      return {
-        today_sales: 0,
-        today_orders: 0,
-        occupied_tables: 0,
-        total_tables: 0,
-        avg_order_value: 0,
-        active_cashiers: 0,
-        pending_kitchen_orders: 0,
-        total_menu_items: 0,
-      };
-    }
+    const res = await call<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', { branch });
+    return readDashboardSummary(res);
   },
 
   async getCharts(branch?: string): Promise<DashboardChartsData> {
@@ -126,20 +104,20 @@ export const dashboardService = {
   },
 
   async getRecentTransactions(branch?: string, limit: number = 10): Promise<TransactionRecord[]> {
-    try {
-      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch, limit });
-      return Array.isArray(res) ? res : ((res as any)?.message || []);
-    } catch {
-      return [];
-    }
+    const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch, limit });
+    return readListResponse<TransactionRecord>(res);
   },
 
+  /**
+   * Throws on failure rather than resolving to [].
+   *
+   * An empty array is a valid answer ("this branch has no tables yet"), so
+   * swallowing the error here made a broken backend look like an empty
+   * module — and invited someone to re-create records that already exist.
+   * Callers are responsible for showing the failure.
+   */
   async getModuleRecords<T = any>(doctype: string, branch?: string): Promise<T[]> {
-    try {
-      const res = await call<T[]>('ury.ury.api.dashboard.get_module_records', { doctype, branch });
-      return Array.isArray(res) ? res : ((res as any)?.message || []);
-    } catch {
-      return [];
-    }
+    const res = await call<T[]>('ury.ury.api.dashboard.get_module_records', { doctype, branch });
+    return Array.isArray(res) ? res : ((res as any)?.message || []);
   },
 };

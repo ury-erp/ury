@@ -42,7 +42,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     addToOrder, 
     removeFromOrder, 
     setSelectedItem, 
-    getItemQuantityFromCart,
     activeOrders,
     menuItems
   } = usePOSStore();
@@ -321,7 +320,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
+              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-s-lg md:rounded-tr-none filter saturate-75 brightness-95"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -336,7 +335,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               }}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-s-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -344,7 +343,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             onClick={handleClose}
             variant="outline"
             size="icon"
-            className="absolute top-4 right-4 bg-white shadow-lg"
+            className="absolute top-4 end-4 bg-white shadow-lg"
           >
             <X className="w-5 h-5" />
           </Button>
@@ -422,7 +421,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       key={variant.id}
                       onClick={() => handleVariantClick(variant.id)}
                       className={cn(
-                        'p-2 rounded-lg border text-left w-full flex justify-between items-center',
+                        'p-2 rounded-lg border text-start w-full flex justify-between items-center',
                         variant.id === itemDoc?.item
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-200'
@@ -440,7 +439,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
 
         {/* Right Column - Add-ons and Order Button */}
-        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
+        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-s border-gray-200 overflow-y-auto flex flex-col">
           <div className="overflow-y-auto mb-6">
             {isAddonLoading ? (
               <div className="mb-6 flex items-center justify-center text-gray-500">{t('product_dialog.loading_addons')}</div>
@@ -455,7 +454,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       key={addon.id}
                       onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}
                       className={cn(
-                        'w-full p-3 rounded-lg border text-left',
+                        'w-full p-3 rounded-lg border text-start',
                         selectedAddons.some(item => item.id === addon.id)
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-200'

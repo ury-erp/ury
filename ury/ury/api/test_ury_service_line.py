@@ -8,7 +8,66 @@ from ury.ury.api.ury_service_line import (
 )
 
 
+def _fake_get_datetime(now):
+    """A stand-in for frappe.utils.get_datetime for these tests.
+
+    The source normalises with `get_datetime(str(value))`, so the argument
+    that arrives here is always a string — never the datetime the caller
+    put in the fixture. The previous stub returned that argument unchanged,
+    which handed a str back to a datetime subtraction and raised a TypeError
+    that looked like a product bug and was not one.
+    """
+    def fake(*args):
+        if not args:
+            return now
+        value = args[0]
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromisoformat(str(value))
+
+    return fake
+
+
 class TestGetServiceLine(FrappeTestCase):
+
+    @patch("ury.ury.api.ury_service_line.frappe.db.sql")
+    @patch("ury.ury.api.ury_service_line.frappe.get_all")
+    @patch("ury.ury.api.ury_service_line.get_datetime")
+    @patch("ury.ury.api.ury_service_line.frappe.cache")
+    def test_a_table_seated_before_midnight_is_not_reported_as_negative(
+        self, mock_cache_obj, mock_get_datetime, mock_get_all, mock_sql
+    ):
+        """`latest_invoice_time` is a Time field, so it has no date on it.
+
+        A table seated at 23:30 and looked at 00:10 used to come out at
+        -1400 minutes, which read on the service line as a table nobody had
+        sat at yet — the exact opposite of a table that needs attention.
+        """
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+
+        now = datetime(2026, 8, 20, 0, 10, 0)
+        mock_get_datetime.side_effect = _fake_get_datetime(now)
+
+        mock_get_all.return_value = [
+            frappe._dict({
+                "name": "Table 9",
+                "occupied": 1,
+                # Same calendar day as `now` because a Time field carries no
+                # date: this is what get_datetime() produces from "23:30".
+                "latest_invoice_time": datetime(2026, 8, 20, 23, 30, 0),
+                "is_take_away": 0,
+            })
+        ]
+        mock_sql.side_effect = [
+            [frappe._dict({"name": "INV-009"})],
+            [frappe._dict({"order_status": "Served"})],
+        ]
+
+        result = get_service_line(branch="URY Branch")
+
+        self.assertEqual(result[0]["minutes"], 40)
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     def test_cache_hit_returns_immediately(self, mock_cache_obj):
@@ -58,9 +117,8 @@ class TestGetServiceLine(FrappeTestCase):
         # get_datetime() is called twice in source with different args: once
         # bare for "now", once with t.latest_invoice_time to normalize it.
         # A plain return_value would collapse both calls to the same value
-        # and always yield a zero minute delta, so use side_effect to mimic
-        # real get_datetime's passthrough-on-datetime-arg behavior.
-        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
+        # and always yield a zero minute delta.
+        mock_get_datetime.side_effect = _fake_get_datetime(now)
 
         mock_get_all.return_value = [
             frappe._dict({
@@ -175,7 +233,7 @@ class TestGetServiceLine(FrappeTestCase):
         mock_cache_instance.get_value.return_value = None
 
         now = datetime(2026, 8, 19, 15, 45, 0)
-        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
+        mock_get_datetime.side_effect = _fake_get_datetime(now)
 
         mock_get_all.return_value = [
             frappe._dict({

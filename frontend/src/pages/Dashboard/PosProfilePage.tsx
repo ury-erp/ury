@@ -6,6 +6,7 @@ import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
 
 interface PosProfileRecord {
   name: string;
@@ -155,7 +156,7 @@ export const PosProfilePage: React.FC = () => {
           payments: addForm.payments.filter(p => p.mode_of_payment).map(p => ({ mode_of_payment: p.mode_of_payment, default: p.default }))
         }
       });
-      showToast.success('POS Profile created successfully');
+      showToast.success(t('dash.pos_profile.pos_profile_created_successfully'));
       setIsAddDrawerOpen(false);
       fetchProfiles();
     } catch (err: any) {
@@ -267,7 +268,7 @@ export const PosProfilePage: React.FC = () => {
     const currentNorm = getNormalizedProfileData(profileForm);
 
     if (JSON.stringify(originalNorm) === JSON.stringify(currentNorm)) {
-      showToast.warning('No changes in document');
+      showToast.warning(t('dash.pos_profile.no_changes_in_document'));
       return;
     }
 
@@ -311,7 +312,7 @@ export const PosProfilePage: React.FC = () => {
         });
       }
 
-      showToast.success('POS Profile saved successfully');
+      showToast.success(t('dash.pos_profile.pos_profile_saved_successfully'));
       fetchProfiles();
       setIsEditMode(false); // Return to read-only View Mode after successful save
     } catch (err: any) {
@@ -336,7 +337,7 @@ export const PosProfilePage: React.FC = () => {
               className="text-gray-700 hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
+              <span>{t('dash.pos_profile.back')}</span>
             </Button>
             <div className="h-5 w-px bg-gray-200" />
             <div>
@@ -353,8 +354,8 @@ export const PosProfilePage: React.FC = () => {
               disabled={saving}
               className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              <Save className="w-4 h-4 mr-1.5 shrink-0" />
-              <span>Save</span>
+              <Save className="w-4 h-4 me-1.5 shrink-0" />
+              <span>{t('dash.pos_profile.save')}</span>
             </Button>
           ) : (
             <Button
@@ -362,8 +363,8 @@ export const PosProfilePage: React.FC = () => {
               onClick={() => setIsEditMode(true)}
               className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              <Edit2 className="w-4 h-4 mr-1.5 shrink-0" />
-              <span>Edit</span>
+              <Edit2 className="w-4 h-4 me-1.5 shrink-0" />
+              <span>{t('dash.pos_profile.edit')}</span>
             </Button>
           )}
         </div>
@@ -377,7 +378,7 @@ export const PosProfilePage: React.FC = () => {
             }`}
           >
             <Settings2 className="w-4 h-4" />
-            <span>Details</span>
+            <span>{t('dash.pos_profile.details')}</span>
           </button>
           <button
             onClick={() => setActiveDetailTab('print_settings')}
@@ -386,7 +387,7 @@ export const PosProfilePage: React.FC = () => {
             }`}
           >
             <Printer className="w-4 h-4" />
-            <span>Print Settings</span>
+            <span>{t('dash.pos_profile.print_settings')}</span>
           </button>
           <button
             onClick={() => setActiveDetailTab('users_payments')}
@@ -395,7 +396,7 @@ export const PosProfilePage: React.FC = () => {
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Users & Payments</span>
+            <span>{t('dash.pos_profile.users_payments')}</span>
           </button>
         </div>
 
@@ -406,12 +407,10 @@ export const PosProfilePage: React.FC = () => {
             {activeDetailTab === 'details' && (
               <div className="space-y-6">
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    General Settings
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.general_settings')}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
+                      <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.company')}</label>
                       <SearchableSelect
                         id="profile_company"
                         disabled={!isEditMode}
@@ -421,11 +420,11 @@ export const PosProfilePage: React.FC = () => {
                           { value: '', label: 'Select Company' },
                           ...options.companies.map((c: any) => ({ value: c.name, label: c.name }))
                         ]}
-                        placeholder="Select Company"
+                        placeholder={t('dash.pos_profile.select_company')}
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
+                      <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.warehouse')}</label>
                       <SearchableSelect
                         id="profile_warehouse"
                         disabled={!isEditMode}
@@ -435,13 +434,13 @@ export const PosProfilePage: React.FC = () => {
                           { value: '', label: 'Select Warehouse' },
                           ...options.warehouses.map((w: any) => ({ value: w.name, label: w.name }))
                         ]}
-                        placeholder="Select Warehouse"
+                        placeholder={t('dash.pos_profile.select_warehouse')}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+                      <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.price_list')}</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.selling_price_list || ''}
@@ -450,21 +449,19 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
+                      <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.print_format')}</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.print_format || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
-                        placeholder="Default"
+                        placeholder={t('dash.pos_profile.default')}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    Feature Toggles
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.feature_toggles')}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { key: 'custom_enable_discount', label: 'Enable Item Discounts' },
@@ -488,9 +485,7 @@ export const PosProfilePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    Numeric Settings
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.numeric_settings')}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
@@ -521,29 +516,23 @@ export const PosProfilePage: React.FC = () => {
             {activeDetailTab === 'print_settings' && (
               <div className="space-y-6">
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    Printer & QZ Configuration
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.printer_qz_configuration')}</h4>
                   <div className="space-y-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Default Print Format</label>
+                      <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.default_print_format')}</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.print_format || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
-                        placeholder="Default"
+                        placeholder={t('dash.pos_profile.default')}
                       />
                     </div>
 
                     <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-xs space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 flex items-center gap-1.5">
-                          <Printer className="w-4 h-4 text-primary" />
-                          QZ Tray Hardware Printing & KOT Routing
-                        </span>
-                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                          Direct Thermal Ready
-                        </Badge>
+                          <Printer className="w-4 h-4 text-primary" />{t('dash.pos_profile.qz_tray_hardware_printing_kot_routing')}</span>
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">{t('dash.pos_profile.direct_thermal_ready')}</Badge>
                       </div>
                       <p className="text-gray-600">
                         Bill printer and KOT kitchen printer configuration are loaded automatically from POS Profile events and URY Printer Mappings.
@@ -559,9 +548,7 @@ export const PosProfilePage: React.FC = () => {
               <div className="space-y-6">
                 {/* Applicable For Users */}
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    Applicable For Users
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.applicable_for_users')}</h4>
                   <div className="space-y-2 mb-3">
                     {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
@@ -579,7 +566,7 @@ export const PosProfilePage: React.FC = () => {
                               { value: '', label: 'Select User' },
                               ...options.users.map((u: any) => ({ value: u.name, label: u.full_name || u.name }))
                             ]}
-                            placeholder="Select User"
+                            placeholder={t('dash.pos_profile.select_user')}
                           />
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -592,7 +579,7 @@ export const PosProfilePage: React.FC = () => {
                               setProfileForm({...profileForm, applicable_for_users: newRows});
                             }}
                           />
-                          <span>Default</span>
+                          <span>{t('dash.pos_profile.default')}</span>
                         </div>
                         {isEditMode && (
                           <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
@@ -614,16 +601,14 @@ export const PosProfilePage: React.FC = () => {
                       onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Add User</span>
+                      <span>{t('dash.pos_profile.add_user')}</span>
                     </Button>
                   )}
                 </div>
 
                 {/* Mode of Payment */}
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
-                    Mode of Payment
-                  </h4>
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{t('dash.pos_profile.mode_of_payment')}</h4>
                   <div className="space-y-2 mb-3">
                     {(profileForm.payments || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
@@ -641,7 +626,7 @@ export const PosProfilePage: React.FC = () => {
                               { value: '', label: 'Select Payment Mode' },
                               ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
                             ]}
-                            placeholder="Select Payment Mode"
+                            placeholder={t('dash.pos_profile.select_payment_mode')}
                           />
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -654,7 +639,7 @@ export const PosProfilePage: React.FC = () => {
                               setProfileForm({...profileForm, payments: newRows});
                             }}
                           />
-                          <span>Default</span>
+                          <span>{t('dash.pos_profile.default')}</span>
                         </div>
                         {isEditMode && (
                           <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
@@ -676,7 +661,7 @@ export const PosProfilePage: React.FC = () => {
                       onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Add Payment</span>
+                      <span>{t('dash.pos_profile.add_payment')}</span>
                     </Button>
                   )}
                 </div>
@@ -698,7 +683,7 @@ export const PosProfilePage: React.FC = () => {
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Profile</span>
+          <span>{t('dash.pos_profile.add_profile')}</span>
         </Button>
       </div>
 
@@ -712,7 +697,7 @@ export const PosProfilePage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Layers className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No POS Profiles Configured</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.pos_profile.no_pos_profiles_configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">
             Create a POS Profile to manage billing terminals and cashier permissions.
           </p>
@@ -721,19 +706,19 @@ export const PosProfilePage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Profile</span>
+            <span>{t('dash.pos_profile.add_profile')}</span>
           </Button>
         </Card>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-start text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">POS Profile</th>
-                <th className="px-6 py-4">Warehouse</th>
-                <th className="px-6 py-4">Price List</th>
-                <th className="px-6 py-4">Activation Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.pos_profile.pos_profile')}</th>
+                <th className="px-6 py-4">{t('dash.pos_profile.warehouse')}</th>
+                <th className="px-6 py-4">{t('dash.pos_profile.price_list')}</th>
+                <th className="px-6 py-4">{t('dash.pos_profile.activation_status')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.pos_profile.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -750,14 +735,14 @@ export const PosProfilePage: React.FC = () => {
                       {!p.disabled ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-end">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleProfileView(p)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="View Profile"
+                        title={t('dash.pos_profile.view_profile')}
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -766,7 +751,7 @@ export const PosProfilePage: React.FC = () => {
                         size="sm"
                         onClick={() => handleProfileEdit(p)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Profile"
+                        title={t('dash.pos_profile.edit_profile')}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
@@ -783,16 +768,16 @@ export const PosProfilePage: React.FC = () => {
       <SideDrawer
         isOpen={isAddDrawerOpen}
         onClose={() => setIsAddDrawerOpen(false)}
-        title="Add POS Profile"
+        title={t('dash.pos_profile.add_pos_profile')}
       >
         <form onSubmit={handleAddProfile} className="space-y-6 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Profile Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.profile_name')}<span className="text-red-500">*</span></label>
             <Input required value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.company')}<span className="text-red-500">*</span></label>
               <SearchableSelect
                 id="add_profile_company"
                 value={addForm.company}
@@ -801,11 +786,11 @@ export const PosProfilePage: React.FC = () => {
                   { value: '', label: 'Select Company' },
                   ...options.companies.map((c: any) => ({ value: c.name, label: c.name }))
                 ]}
-                placeholder="Select Company"
+                placeholder={t('dash.pos_profile.select_company')}
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.branch')}</label>
               {activeBranchId === 'all' ? (
                 <SearchableSelect
                   id="add_profile_branch"
@@ -815,7 +800,7 @@ export const PosProfilePage: React.FC = () => {
                     { value: '', label: 'Select Branch' },
                     ...branches.map((b: any) => ({ value: b.name, label: b.name }))
                   ]}
-                  placeholder="Select Branch"
+                  placeholder={t('dash.pos_profile.select_branch')}
                 />
               ) : (
                 <Input value={addForm.branch} disabled />
@@ -824,7 +809,7 @@ export const PosProfilePage: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.warehouse')}</label>
               <SearchableSelect
                 id="add_profile_warehouse"
                 value={addForm.warehouse}
@@ -833,28 +818,28 @@ export const PosProfilePage: React.FC = () => {
                   { value: '', label: 'Select Warehouse' },
                   ...options.warehouses.map((w: any) => ({ value: w.name, label: w.name }))
                 ]}
-                placeholder="Select Warehouse"
+                placeholder={t('dash.pos_profile.select_warehouse')}
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">KOT Naming Series</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.kot_naming_series')}</label>
               <Input value={addForm.custom_kot_naming_series} onChange={e => setAddForm({...addForm, custom_kot_naming_series: e.target.value})} placeholder="e.g. KOT-.YYYY.-" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.price_list')}</label>
               <Input value={addForm.selling_price_list} onChange={e => setAddForm({...addForm, selling_price_list: e.target.value})} placeholder="Standard Selling" />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
-              <Input value={addForm.print_format} onChange={e => setAddForm({...addForm, print_format: e.target.value})} placeholder="Default" />
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.pos_profile.print_format')}</label>
+              <Input value={addForm.print_format} onChange={e => setAddForm({...addForm, print_format: e.target.value})} placeholder={t('dash.pos_profile.default')} />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Applicable For Users</label>
+              <label className="font-semibold text-gray-700">{t('dash.pos_profile.applicable_for_users')}</label>
             </div>
             <div className="space-y-2 mb-3">
               {addForm.applicable_for_users.map((row, idx) => (
@@ -872,7 +857,7 @@ export const PosProfilePage: React.FC = () => {
                         { value: '', label: 'Select User' },
                         ...options.users.map((u: any) => ({ value: u.name, label: u.full_name || u.name }))
                       ]}
-                      placeholder="Select User"
+                      placeholder={t('dash.pos_profile.select_user')}
                     />
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -884,7 +869,7 @@ export const PosProfilePage: React.FC = () => {
                         setAddForm({...addForm, applicable_for_users: newRows});
                       }}
                     />
-                    <span>Default</span>
+                    <span>{t('dash.pos_profile.default')}</span>
                   </div>
                   <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
@@ -901,13 +886,13 @@ export const PosProfilePage: React.FC = () => {
               onClick={() => setAddForm({...addForm, applicable_for_users: [...addForm.applicable_for_users, {user:'', default:0}]})}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add User</span>
+              <span>{t('dash.pos_profile.add_user')}</span>
             </Button>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Mode of Payment</label>
+              <label className="font-semibold text-gray-700">{t('dash.pos_profile.mode_of_payment')}</label>
             </div>
             <div className="space-y-2 mb-3">
               {addForm.payments.map((row, idx) => (
@@ -925,7 +910,7 @@ export const PosProfilePage: React.FC = () => {
                         { value: '', label: 'Select Payment Mode' },
                         ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
                       ]}
-                      placeholder="Select Payment Mode"
+                      placeholder={t('dash.pos_profile.select_payment_mode')}
                     />
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -937,7 +922,7 @@ export const PosProfilePage: React.FC = () => {
                         setAddForm({...addForm, payments: newRows});
                       }}
                     />
-                    <span>Default</span>
+                    <span>{t('dash.pos_profile.default')}</span>
                   </div>
                   <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
@@ -954,15 +939,13 @@ export const PosProfilePage: React.FC = () => {
               onClick={() => setAddForm({...addForm, payments: [...addForm.payments, {mode_of_payment:'', default:0}]})}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Payment</span>
+              <span>{t('dash.pos_profile.add_payment')}</span>
             </Button>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              Save
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>{t('dash.pos_profile.cancel')}</Button>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">{t('dash.pos_profile.save')}</Button>
           </div>
         </form>
       </SideDrawer>

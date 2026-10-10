@@ -15,7 +15,6 @@ import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
-import { getActiveLanguage } from './i18n';
 
 function App() {
   const {
@@ -26,12 +25,6 @@ function App() {
     initializeApp();
   }, [initializeApp]);
 
-  useEffect(() => {
-    const lang = getActiveLanguage();
-    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang || 'en';
-  }, []);
   return (
     <>
       <ToastProvider />

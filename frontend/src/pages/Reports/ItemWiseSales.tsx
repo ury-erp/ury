@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
-import { Package, IndianRupee, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, IndianRupee, Hash, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
 
 interface ItemRow {
   item_code: string;
@@ -25,13 +26,13 @@ interface ItemWiseSalesData {
 
 const PAGE_SIZE = 50;
 
-const columns: DataTableColumn<ItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty', align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
-  { key: 'avg_price', header: 'Avg Price', render: (r) => formatCurrency(r.avg_price), align: 'right' },
-  { key: 'pct_of_total_amount', header: '% of Total', render: (r) => `${r.pct_of_total_amount}%`, align: 'right' },
+const getColumns = (): DataTableColumn<ItemRow>[] => [
+  { key: 'item_name', header: t('fields.item') },
+  { key: 'item_group', header: t('fields.group'), render: (r) => r.item_group || '—' },
+  { key: 'qty', header: t('fields.qty'), align: 'right' },
+  { key: 'amount', header: t('fields.amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'avg_price', header: t('fields.avg_price'), render: (r) => formatCurrency(r.avg_price), align: 'right' },
+  { key: 'pct_of_total_amount', header: t('fields.of_total'), render: (r) => `${r.pct_of_total_amount}%`, align: 'right' },
 ];
 
 export function ItemWiseSales() {
@@ -61,7 +62,7 @@ export function ItemWiseSales() {
       });
       setData(res.message ?? (res as unknown as ItemWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +82,7 @@ export function ItemWiseSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Item Wise Sales</h1>
+          <h1 className="text-xl font-semibold">{t('reports.item_wise_sales.item_wise_sales')}</h1>
           <p className="text-sm text-muted-foreground">
             Best-selling items {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -89,7 +90,7 @@ export function ItemWiseSales() {
         <div className="flex items-center gap-3">
           <input
             type="text"
-            placeholder="Search items..."
+            placeholder={t('reports.item_wise_sales.search_items')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border border-input rounded-md px-3 py-1.5 text-sm w-40"
@@ -99,24 +100,28 @@ export function ItemWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Unique Items Sold" value={data.summary.unique_items} icon={<Package className="w-4 h-4" />} />
-          <StatCard label="Total Qty" value={data.summary.total_qty} icon={<Hash className="w-4 h-4" />} />
+          <StatCard label={t('reports.item_wise_sales.unique_items_sold')} value={data.summary.unique_items} icon={<Package className="w-4 h-4" />} />
+          <StatCard label={t('reports.item_wise_sales.total_qty')} value={data.summary.total_qty} icon={<Hash className="w-4 h-4" />} />
           <StatCard
-            label="Total Amount"
+            label={t('reports.item_wise_sales.total_amount')}
             value={formatCurrency(data.summary.total_amount)}
             icon={<IndianRupee className="w-4 h-4" />}
           />
         </div>
       )}
 
-      <DataTable columns={columns} rows={data?.items ?? []} isLoading={isLoading} />
+      <DataTable columns={getColumns()} rows={data?.items ?? []} isLoading={isLoading} />
 
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
@@ -125,15 +130,13 @@ export function ItemWiseSales() {
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="w-4 h-4" /> Prev
-            </Button>
+              <ChevronLeft className="w-4 h-4" />{t('common.prev')}</Button>
             <Button
               variant="outline"
               size="sm"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
-            >
-              Next <ChevronRight className="w-4 h-4" />
+            >{t('common.next')}<ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>

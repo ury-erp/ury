@@ -1,6 +1,24 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Apply the stored in-app language choice to <html> before the first
+      // paint. Without this, a page whose server-rendered dir comes from
+      // frappe.lang (or is a static "ltr") shows a flash of mirrored layout
+      // for an Arabic user until the bundle boots. Kept inline and dependency
+      // free so it runs ahead of the stylesheet.
+      (function () {
+        try {
+          var lang = localStorage.getItem('ury_language');
+          if (!lang) return;
+          document.documentElement.lang = lang;
+          document.documentElement.dir =
+            ['ar', 'he', 'fa', 'ur', 'ku'].indexOf(lang) !== -1 ? 'rtl' : 'ltr';
+        } catch (e) {
+          /* private mode / blocked storage — the bundle sets dir on boot */
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" href="/ury.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />

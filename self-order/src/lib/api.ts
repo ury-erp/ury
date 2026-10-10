@@ -8,6 +8,7 @@ export interface OrderingCapabilities {
   show_item_descriptions: boolean
   item_notes_enabled: boolean
   request_bill_enabled: boolean
+  call_waiter_enabled: boolean
   customer_payment_enabled: boolean
   payment_link_enabled: boolean
   pay_at_counter_enabled: boolean
@@ -64,12 +65,27 @@ export interface CustomerOrder {
   billed: boolean
 }
 
+/**
+ * How far along the customer's bill request is, as the backend sees it:
+ * they asked, a cashier picked the alert up, or the bill has been printed.
+ */
+export type BillStatus = 'requested' | 'acknowledged' | 'printed'
+
+/** The table has called for help ('called'), and staff have seen it ('coming'). */
+export type WaiterStatus = 'called' | 'coming'
+
+/** How far the kitchen has got with the order, least-advanced ticket first. */
+export type KitchenStatus = 'queued' | 'preparing' | 'ready'
+
 export interface OrderStatus {
   session_status: string
   invoice: string | null
   billed?: boolean
   submitted?: boolean
   open_requests?: { name: string; request_type: string; status: string }[]
+  bill_status?: BillStatus | null
+  waiter_status?: WaiterStatus | null
+  kitchen_status?: KitchenStatus | null
 }
 
 // Persist the full ordering context (not just the opaque session token)
@@ -79,24 +95,29 @@ export interface OrderStatus {
 // round trip the backend doesn't offer for an already-open session).
 const SESSION_KEY = 'ury_order_session'
 const CONTEXT_KEY = 'ury_order_context'
+const QR_TOKEN_KEY = 'ury_order_qr_token'
 
 export function getStoredSession(): string | null {
   return sessionStorage.getItem(SESSION_KEY)
 }
 
-export function getStoredContext(): OrderingContext | null {
-  const raw = sessionStorage.getItem(CONTEXT_KEY)
-  if (!raw) return null
+export function getStoredContext(qrToken?: string | null): OrderingContext | null {
   try {
+    // A newly scanned table must not resume a different table's session.
+    if (qrToken && sessionStorage.getItem(QR_TOKEN_KEY) !== qrToken) return null
+    const raw = sessionStorage.getItem(CONTEXT_KEY)
+    if (!raw) return null
     return JSON.parse(raw) as OrderingContext
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-function storeContext(context: OrderingContext) {
-  sessionStorage.setItem(SESSION_KEY, context.session)
-  sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
+function storeContext(context: OrderingContext, qrToken?: string) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, context.session)
+    sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
+    if (qrToken) sessionStorage.setItem(QR_TOKEN_KEY, qrToken)
+    else sessionStorage.removeItem(QR_TOKEN_KEY)
+  } catch { /* Storage restrictions must not prevent ordering. */ }
 }
 
 // Every whitelisted Frappe method response is wrapped as {"message": <actual
@@ -115,7 +136,7 @@ interface FrappeResponse<T> {
 
 export async function bootstrap(token: string): Promise<OrderingContext> {
   const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { token })
-  storeContext(response.message)
+  storeContext(response.message, token)
   return response.message
 }
 
@@ -167,6 +188,11 @@ export async function addItems(
 
 export async function requestBill(session: string): Promise<{ status: string; request: string }> {
   const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { session })
+  return response.message
+}
+
+export async function callWaiter(session: string): Promise<{ status: string; request: string }> {
+  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.call_waiter`, { session })
   return response.message
 }
 

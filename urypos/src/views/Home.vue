@@ -1,8 +1,8 @@
 <template>
   <div>
-    <h1>Home Page</h1>
+    <h1>{{ $t('home.title') }}</h1>
     <!-- Fetch the resource on click -->
-    <button @click="$resources.ping.fetch()">Ping</button>
+    <button @click="$resources.ping.fetch()">{{ $t('home.ping') }}</button>
   </div>
 </template>
 

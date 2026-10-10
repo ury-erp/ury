@@ -1,107 +1,144 @@
 <template>
-  <div >
-    <nav
-      class="fixed left-0 top-0 z-20 w-full border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-900"
-    >
-      <div
-        class="mx-auto flex max-w-screen-2xl items-center justify-between p-4"
-      >
-        <!-- Logo/Title Section -->
-        <div class="flex items-center">
-          <template
-            v-if="
-              this.tabClick.currentTab === '/Table' ||
-              this.auth.cashier ||
-              this.tabClick.isLoginPage
-            "
-          >
-            <a href="/urypos/Table" class="flex-shrink-0">
-              <img :src="imagePath" alt="URY POS logo" class="w-32 lg:w-44" />
-            </a>
-          </template>
-          <template v-else>
-            <h3
-              class="mb-2 mt-2 p-1 text-2xl font-medium text-gray-900 dark:text-white lg:text-3xl"
-            >
-              {{ this.table.selectedTable }}
-            </h3>
-          </template>
+  <header>
+    <!--
+      Brand bar.
+
+      Deep brown, the same surface the kitchen display uses, so a floor tablet
+      and a kitchen screen in the same restaurant read as one product. It is
+      the only dark band in the app, which is what makes it findable without
+      being looked for.
+
+      It carries three things, in the order a waiter needs them: who this is,
+      what they are working on, and who they are signed in as. The old bar
+      carried only a logo and an avatar circle — the table being served was
+      rendered as a bare 3xl `<h3>` in place of the logo, unlabelled.
+    -->
+    <nav class="pos-header">
+      <div class="pos-header-inner">
+        <div class="pos-brand">
+          <a href="/urypos/Table" class="pos-brand-mark" aria-label="Smart Restro">
+            <img :src="imagePath" alt="" />
+          </a>
+
+          <span class="hidden pos-brand-name sm:block">
+            Smart <strong>Restro</strong>
+          </span>
+
+          <span class="pos-brand-divider hidden sm:block" aria-hidden="true"></span>
+
+          <!-- The table, or the till. Never nothing: an unlabelled bar gives
+               a waiter no way to notice they are on the wrong table. -->
+          <div class="pos-context">
+            <span class="pos-context-label">{{ contextLabel }}</span>
+            <span class="pos-context-value">{{ contextValue }}</span>
+          </div>
         </div>
 
-        <!-- User Menu Section -->
-        <div
-          v-if="!this.tabClick.isLoginPage"
-          class="relative ml-4 flex-shrink-0"
-        >
+        <!-- User menu -->
+        <div v-if="!this.tabClick.isLoginPage" class="relative flex-shrink-0">
           <button
             type="button"
-            class="flex items-center rounded-full bg-gray-100 p-1 text-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+            class="pos-header-button press"
             id="user-menu-button"
-            aria-expanded="false"
+            :aria-expanded="this.auth.activeDropdown ? 'true' : 'false'"
+            aria-haspopup="menu"
             @click="this.auth.toggleDropdown()"
             ref="dropdownButton"
           >
-            <div
-              class="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600 sm:h-8 sm:w-8"
-            >
-              <span
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                {{ this.auth.sessionUser.charAt(0).toUpperCase() }}
-              </span>
-            </div>
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
+              {{ this.auth.sessionUser.charAt(0).toUpperCase() }}
+            </span>
+            <span class="hidden max-w-[10rem] truncate md:block">
+              {{ this.auth.sessionUser }}
+            </span>
+            <svg class="h-4 w-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
 
-          <!-- New Dropdown Menu Style -->
           <div
             v-show="this.auth.activeDropdown"
-            class="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+            class="absolute end-0 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-popover shadow-raised animate-scale-in"
+            role="menu"
           >
-            <div class="py-1">
-              <a
-                href="#"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
+            <div class="border-b border-border bg-muted px-4 py-3">
+              <p class="truncate text-sm font-bold text-foreground">
                 {{ this.auth.getLoginAvatar() }}
-              </a>
-              <a
-                href="#"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              </p>
+            </div>
+
+            <div class="py-1">
+              <button
+                type="button"
+                role="menuitem"
+                class="flex min-h-[2.75rem] w-full items-center gap-3 px-4 text-start text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
                 @click="reload"
               >
-                Reload
-              </a>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+                </svg>
+                {{ $t('common.reload') }}
+              </button>
 
-              <a
-                href="#"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              <button
+                type="button"
+                role="menuitem"
+                class="flex min-h-[2.75rem] w-full items-center gap-3 px-4 text-start text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
                 @click="this.auth.routeToHome()"
-                >Switch To Desk
-              </a>
-              <div class="border-t border-gray-200"></div>
-              <a
-                href="#"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect width="20" height="14" x="2" y="3" rx="2" /><path d="M8 21h8M12 17v4" />
+                </svg>
+                {{ $t('header.switch_to_desk') }}
+              </button>
+
+              <div class="my-1 border-t border-border"></div>
+
+              <button
+                type="button"
+                role="menuitem"
+                class="flex min-h-[2.75rem] w-full items-center gap-3 px-4 text-start text-sm font-semibold text-destructive transition-colors duration-fast hover:bg-destructive/10"
                 @click="this.auth.logOut"
               >
-                Log out
-              </a>
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
+                </svg>
+                {{ $t('header.logout') }}
+              </button>
+
+              <div class="my-1 border-t border-border"></div>
+
+              <!-- Each option is labelled in its own script, so a cashier who
+                   cannot read the current language can still switch away. -->
+              <p class="px-4 pb-1 pt-1 pos-label">{{ $t('language.label') }}</p>
+              <button
+                v-for="(label, code) in $lang.supported"
+                :key="code"
+                type="button"
+                role="menuitem"
+                :lang="code"
+                class="flex min-h-[2.75rem] w-full items-center justify-between px-4 text-sm font-semibold text-foreground transition-colors duration-fast hover:bg-muted"
+                @click="$lang.set(code)"
+              >
+                <span>{{ label }}</span>
+                <span v-if="code === $lang.active()" class="text-primary" aria-hidden="true">&#10003;</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
     </nav>
-
-    <!-- Spacer for Fixed Header -->
-    <div class="h-16 sm:h-20"></div>
-  </div>
+  </header>
 </template>
 
 <script>
 import { useAuthStore } from "@/stores/Auth.js";
 import { posOpening } from "@/stores/posOpening.js";
 import { posClosing } from "@/stores/posClosing.js";
-import uriPosImage from "@/assets/logos/URY_POS.jpg";
+// The suite's mark, shared with the kitchen display rather than urypos
+// carrying its own separate JPEG wordmark.
+import smartLogo from "../../../smart_logo.png";
 import { tabFunctions } from "@/stores/bottomTabs.js";
 import { useTableStore } from "@/stores/Table.js";
 
@@ -118,8 +155,32 @@ export default {
   },
   data() {
     return {
-      imagePath: uriPosImage,
+      imagePath: smartLogo,
     };
+  },
+  computed: {
+    /**
+     * What this screen is working on.
+     *
+     * The brand and the context now coexist instead of replacing each other,
+     * so the bar never loses its identity and never loses the table either.
+     * A cashier is not "on" a table, so they get the till instead.
+     */
+    contextLabel() {
+      if (this.auth.cashier) return this.$t("header.station");
+      return this.table.selectedTable
+        ? this.$t("tables.title")
+        : this.$t("header.station");
+    },
+
+    contextValue() {
+      if (!this.auth.cashier && this.table.selectedTable) {
+        return this.table.selectedTable;
+      }
+      return this.auth.cashier
+        ? this.$t("header.till")
+        : this.$t("tables.select_table");
+    },
   },
   methods: {
     reload() {

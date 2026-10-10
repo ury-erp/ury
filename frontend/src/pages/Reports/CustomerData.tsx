@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Receipt, IndianRupee, TrendingUp, Search } from 'lucide-react';
+import { Receipt, IndianRupee, TrendingUp, Search, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface CustomerSuggestion {
   name: string;
@@ -31,10 +33,10 @@ interface CustomerDataResult {
   };
 }
 
-const columns: DataTableColumn<InvoiceRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'invoice', header: 'Invoice' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+const getColumns = (): DataTableColumn<InvoiceRow>[] => [
+  { key: 'date', header: t('fields.date') },
+  { key: 'invoice', header: t('fields.invoice') },
+  { key: 'amount', header: t('fields.amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 export function CustomerData() {
@@ -82,7 +84,7 @@ export function CustomerData() {
       });
       setData(res.message ?? (res as unknown as CustomerDataResult));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -96,8 +98,8 @@ export function CustomerData() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Customer Data</h1>
-          <p className="text-sm text-muted-foreground">Per-customer purchase history</p>
+          <h1 className="text-xl font-semibold">{t('reports.customer_data.customer_data')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.customer_data.subtitle')}</p>
         </div>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
@@ -107,7 +109,7 @@ export function CustomerData() {
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
-            placeholder="Search customer by name..."
+            placeholder={t('reports.customer_data.search_customer_by_name')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -127,7 +129,7 @@ export function CustomerData() {
                   setQuery(s.customer_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
+                className="w-full text-start px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
               >
                 <span>{s.customer_name}</span>
                 {s.mobile_no && <span className="text-xs text-muted-foreground">{s.mobile_no}</span>}
@@ -138,33 +140,37 @@ export function CustomerData() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {!selectedCustomer && !error && (
-        <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
+        <div className="text-sm text-muted-foreground">{t('reports.customer_data.empty_prompt')}</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <ReportSkeleton />}
 
       {data && !isLoading && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Visits" value={data.summary.visit_count} icon={<Receipt className="w-4 h-4" />} />
+            <StatCard label={t('reports.customer_data.visits')} value={data.summary.visit_count} icon={<Receipt className="w-4 h-4" />} />
             <StatCard
-              label="Total Spend"
+              label={t('reports.customer_data.total_spend')}
               value={formatCurrency(data.summary.total_spend)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
             <StatCard
-              label="Avg Spend / Visit"
+              label={t('reports.customer_data.avg_spend_visit')}
               value={formatCurrency(data.summary.avg_spend)}
               icon={<TrendingUp className="w-4 h-4" />}
             />
           </div>
-          <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.invoices} isLoading={isLoading} />
         </>
       )}
     </div>

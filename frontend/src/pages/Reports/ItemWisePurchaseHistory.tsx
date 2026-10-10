@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Package, IndianRupee } from 'lucide-react';
+import { Package, IndianRupee, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
 
 interface PurchaseItemRow {
   item_code: string;
@@ -22,13 +23,13 @@ interface ItemWisePurchaseHistoryData {
   summary: { total_qty: number; total_amount: number };
 }
 
-const columns: DataTableColumn<PurchaseItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'qty', header: 'Qty Purchased', align: 'right' },
-  { key: 'avg_rate', header: 'Avg Rate', render: (r) => formatCurrency(r.avg_rate), align: 'right' },
-  { key: 'amount', header: 'Total Spend', render: (r) => formatCurrency(r.amount), align: 'right' },
-  { key: 'purchase_count', header: '# Purchases', align: 'right' },
-  { key: 'supplier_count', header: '# Suppliers', align: 'right' },
+const getColumns = (): DataTableColumn<PurchaseItemRow>[] => [
+  { key: 'item_name', header: t('fields.item') },
+  { key: 'qty', header: t('fields.qty_purchased'), align: 'right' },
+  { key: 'avg_rate', header: t('fields.avg_rate'), render: (r) => formatCurrency(r.avg_rate), align: 'right' },
+  { key: 'amount', header: t('fields.total_spend'), render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'purchase_count', header: t('fields.purchases'), align: 'right' },
+  { key: 'supplier_count', header: t('fields.suppliers'), align: 'right' },
 ];
 
 export function ItemWisePurchaseHistory() {
@@ -52,7 +53,7 @@ export function ItemWisePurchaseHistory() {
       );
       setData(res.message ?? (res as unknown as ItemWisePurchaseHistoryData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +67,7 @@ export function ItemWisePurchaseHistory() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Item-wise Purchase History</h1>
+          <h1 className="text-xl font-semibold">{t('reports.item_wise_purchase_history.item_wise_purchase_history')}</h1>
           <p className="text-sm text-muted-foreground">
             Procurement by item {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -75,16 +76,20 @@ export function ItemWisePurchaseHistory() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatCard label="Total Qty Purchased" value={data.summary.total_qty} icon={<Package className="w-4 h-4" />} />
+          <StatCard label={t('reports.item_wise_purchase_history.total_qty_purchased')} value={data.summary.total_qty} icon={<Package className="w-4 h-4" />} />
           <StatCard
-            label="Total Spend"
+            label={t('reports.item_wise_purchase_history.total_spend')}
             value={formatCurrency(data.summary.total_amount)}
             icon={<IndianRupee className="w-4 h-4" />}
           />
@@ -92,7 +97,7 @@ export function ItemWisePurchaseHistory() {
       )}
 
       <DataTable
-        columns={columns}
+        columns={getColumns()}
         rows={data?.items ?? []}
         isLoading={isLoading}
         emptyMessage="No purchase records in this range — Purchase Invoices are created via standard ERPNext Desk, not a URY-specific workflow, so this may legitimately be sparse."

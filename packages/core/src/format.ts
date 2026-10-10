@@ -1,10 +1,33 @@
 import { storage } from './storage';
+import { getIntlLocale } from './i18n/locale-registry';
 
 export function formatCurrency(amount: number): string {
   const symbol = storage.getItem('currencySymbol') || '₹';
   const roundedAmount = flt(amount, 2);
-  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString('en-IN') : roundedAmount;
+  // Grouping follows the active locale rather than a hardcoded 'en-IN':
+  // Indian grouping (12,34,567) is wrong outside South Asia, and an Arabic
+  // locale must still render Western digits (see getIntlLocale).
+  const formattedVal =
+    typeof roundedAmount === 'number' && !isNaN(roundedAmount)
+      ? roundedAmount.toLocaleString(getIntlLocale())
+      : roundedAmount;
   return `${symbol} ${formattedVal}`;
+}
+
+/**
+ * Compact-scale suffixes. Apps override these after i18n init so chart labels
+ * read in the active language (e.g. "ألف" / "مليون" for Arabic).
+ */
+export const COMPACT_SUFFIXES = {
+  thousand: 'k',
+  million: 'M',
+  billion: 'B',
+  lakh: 'L',
+  crore: 'Cr',
+};
+
+export function setCompactSuffixes(suffixes: Partial<typeof COMPACT_SUFFIXES>): void {
+  Object.assign(COMPACT_SUFFIXES, suffixes);
 }
 
 export function flt(v: number | string | null | undefined, decimals: number = 2): number {
@@ -23,8 +46,11 @@ export function flt(v: number | string | null | undefined, decimals: number = 2)
 }
 
 /**
- * Formats a number as compact Indian-style currency for chart axes/labels,
- * e.g. 600000 -> "₹6L", 12500000 -> "₹1.25Cr", 8200 -> "₹8.2k".
+ * Formats a number as compact currency for chart axes/labels.
+ *
+ * Indian locales keep the lakh/crore scale they expect (₹6L, ₹1.25Cr); every
+ * other locale gets the thousand/million/billion scale, because "Cr" is not a
+ * unit an Iraqi or Gulf cashier reads. Suffixes are localised via `suffixes`.
  */
 export function formatCompactCurrency(amount: number): string {
   const symbol = storage.getItem('currencySymbol') || '₹';
@@ -38,18 +64,34 @@ export function formatCompactCurrency(amount: number): string {
     return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   };
 
-  if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}Cr`;
-  if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}L`;
-  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}k`;
+  const locale = getIntlLocale();
+  const usesIndianScale = locale.startsWith('en-IN') || locale.startsWith('hi');
+
+  if (usesIndianScale) {
+    if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}${COMPACT_SUFFIXES.crore}`;
+    if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}${COMPACT_SUFFIXES.lakh}`;
+    if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}${COMPACT_SUFFIXES.thousand}`;
+    return `${sign}${symbol}${trim(abs)}`;
+  }
+
+  if (abs >= 1_000_000_000) return `${sign}${symbol}${trim(abs / 1_000_000_000)}${COMPACT_SUFFIXES.billion}`;
+  if (abs >= 1_000_000) return `${sign}${symbol}${trim(abs / 1_000_000)}${COMPACT_SUFFIXES.million}`;
+  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}${COMPACT_SUFFIXES.thousand}`;
   return `${sign}${symbol}${trim(abs)}`;
 }
 
-export const formatInvoiceTime = (timestamp: string | null) => {
-    if (!timestamp) return 'No bill activity yet';
+/**
+ * Formats an invoice timestamp as a short time-of-day.
+ *
+ * `emptyLabel` lets the caller pass an already-translated string for the
+ * "nothing yet" case; the English default keeps existing call sites working.
+ */
+export const formatInvoiceTime = (timestamp: string | null, emptyLabel = 'No bill activity yet') => {
+    if (!timestamp) return emptyLabel;
 
     const parsedDate = new Date(timestamp);
     if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
+      return parsedDate.toLocaleTimeString(getIntlLocale(), { hour: 'numeric', minute: 'numeric' });
     }
 
     const timeOnlyMatch = timestamp.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
@@ -57,7 +99,7 @@ export const formatInvoiceTime = (timestamp: string | null) => {
       const [, hours, minutes, seconds] = timeOnlyMatch;
       const date = new Date();
       date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
-      const formatted = date.toLocaleTimeString(undefined, {
+      const formatted = date.toLocaleTimeString(getIntlLocale(), {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,

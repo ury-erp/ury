@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useModalFocus } from '../../hooks/useModalFocus';
 import { X } from 'lucide-react';
 import { cn } from '@ury/ui';
+import { t } from '../../i18n';
 
 export interface DrawerProps {
   isOpen: boolean;
@@ -31,21 +33,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   size = 'lg',
   className,
 }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const panelRef = useModalFocus(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -63,8 +51,13 @@ export const Drawer: React.FC<DrawerProps> = ({
       />
 
       {/* Slide-over panel container */}
-      <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+      <div className="fixed inset-y-0 end-0 flex max-w-full ps-10">
         <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          tabIndex={-1}
           className={cn(
             'w-screen transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
             sizeClasses[size],
@@ -79,7 +72,7 @@ export const Drawer: React.FC<DrawerProps> = ({
                 <h2 className="text-xl font-bold text-gray-900 tracking-tight">{title}</h2>
               </div>
               {subtitle && (
-                <p className="text-xs text-gray-500 mt-1 pl-4">{subtitle}</p>
+                <p className="text-xs text-gray-500 mt-1 ps-4">{subtitle}</p>
               )}
             </div>
 
@@ -87,7 +80,7 @@ export const Drawer: React.FC<DrawerProps> = ({
               type="button"
               onClick={onClose}
               className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-              aria-label="Close panel"
+              aria-label={t('dash.drawer.close_panel')}
             >
               <X className="w-5 h-5" />
             </button>

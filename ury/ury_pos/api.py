@@ -1,4 +1,6 @@
 import frappe
+
+from ury.ury.doctype.ury_audit_log.ury_audit_log import record_event
 import json
 from frappe import _
 from datetime import date, datetime, timedelta
@@ -135,11 +137,36 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
+        # Administrator is not required to have a URY User branch assignment.
+        # Use the first enabled POS Profile as the supervisor context so the
+        # POS bootstrap APIs can still load for the system administrator.
+        if user == "Administrator":
+            admin_branch = frappe.db.get_value(
+                "POS Profile",
+                {"disabled": 0},
+                "branch",
+            )
+            if admin_branch:
+                return admin_branch
         frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
     branch_name = branch_array[0].get("branch")
 
     return branch_name
+
+
+@frappe.whitelist()
+def get_production_units_for_branch():
+    """Return production units available to the current POS branch."""
+    branch_name = getBranch()
+    return {
+        "production_units": frappe.get_all(
+            "URY Production Unit",
+            filters={"branch": branch_name},
+            pluck="name",
+            order_by="name asc",
+        )
+    }
 
 @frappe.whitelist()
 def getBranchRoom():
@@ -477,9 +504,62 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 
 
 
+# The column list every order-log query returns. It was written out five
+# times inside getPosInvoice alone, with two of the copies already out of step
+# on the order of `additional_discount_percentage` / `discount_amount`.
+POS_INVOICE_LOG_FIELDS = """
+    name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+    cashier, waiter, net_total, posting_time,
+    total_taxes_and_charges, customer, status, mobile_number,
+    posting_date, rounded_total, order_type,
+    additional_discount_percentage, discount_amount,
+    custom_split_group, custom_split_from,
+    custom_merged_pos_invoice, custom_merged_total
+"""
+
+
+def _order_log_permissions(branch):
+    """What the caller is allowed to see in the order log.
+
+    `view_all_status` and `paid_limit` live on the POS Profile and were read
+    only by the client, which decided on its own which options to offer. The
+    endpoint trusted whatever `status` arrived, so a cashier without the
+    permission could still read every paid invoice in the branch by asking
+    for one. Resolving it here makes the profile the authority.
+    """
+    profile = frappe.db.get_value(
+        "POS Profile",
+        {"branch": branch},
+        ["name", "view_all_status", "paid_limit"],
+        as_dict=True,
+    ) or frappe._dict()
+
+    return frappe._dict(
+        view_all=frappe.utils.cint(profile.get("view_all_status")),
+        paid_limit=frappe.utils.cint(profile.get("paid_limit")),
+    )
+
+
+def _assert_status_allowed(status, perms):
+    """Blocks a status the caller's POS Profile does not grant."""
+    privileged = {"Paid", "Consolidated", "Return"}
+    if status in privileged and not perms.view_all:
+        frappe.throw(
+            _("You are not permitted to view {0} invoices").format(_(status)),
+            frappe.PermissionError,
+        )
+    if status == "Recently Paid" and not perms.paid_limit:
+        frappe.throw(
+            _("Recently paid invoices are not enabled for this POS Profile"),
+            frappe.PermissionError,
+        )
+
+
 @frappe.whitelist()
 def getPosInvoice(status, limit, limit_start):
     branch = getBranch()
+    perms = _order_log_permissions(branch)
+    _assert_status_allowed(status, perms)
     updatedlist = []
     limit = int(limit)+1
     limit_start = int(limit_start)
@@ -546,7 +626,59 @@ def getPosInvoice(status, limit, limit_start):
             (branch, docstatus, limit, limit_start),
             as_dict=True,
         )
-        updatedlist.extend(invoices)    
+        updatedlist.extend(invoices)
+    elif status == "All":
+        #
+        # Everything the caller may see, in one list.
+        #
+        # The log could previously only ever show one status at a time and it
+        # opened on "Draft", so a waiter looking for the order they had just
+        # sent had to know which bucket it landed in before they could find
+        # it. "All" is the default now; picking a status narrows the list
+        # rather than being the price of admission.
+        #
+        # Every Draft invoice qualifies: the old "Draft" and "Unbilled"
+        # buckets were two halves of the same status, split on
+        # `invoice_printed` and whether a table was attached, and together
+        # they cover it exactly.
+        #
+        conditions = ["status = 'Draft'"]
+        params = [branch]
+
+        if perms.view_all:
+            conditions.append("status IN ('Paid', 'Consolidated', 'Return')")
+        elif perms.paid_limit:
+            # No blanket permission, but the profile allows a short tail of
+            # recent paid invoices — the same allowance "Recently Paid" grants,
+            # applied here as a bounded subquery so "All" cannot become a way
+            # to read the whole day's takings.
+            conditions.append(
+                """name IN (
+                    SELECT name FROM (
+                        SELECT name FROM `tabPOS Invoice`
+                        WHERE branch = %s AND status = 'Paid'
+                        ORDER BY modified DESC
+                        LIMIT %s
+                    ) AS recent_paid
+                )"""
+            )
+            params.extend([branch, perms.paid_limit])
+
+        invoices = frappe.db.sql(
+            """
+            SELECT {fields}
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND ({conditions})
+            ORDER BY modified DESC
+            LIMIT %s OFFSET %s
+            """.format(
+                fields=POS_INVOICE_LOG_FIELDS,
+                conditions=" OR ".join(conditions),
+            ),
+            tuple(params + [limit, limit_start]),
+            as_dict=True,
+        )
+        updatedlist.extend(invoices)
     else:
         
         invoices = frappe.db.sql(
@@ -582,8 +714,7 @@ def searchPosInvoice(query,status):
     if not query:
         return {"data": [], "next": False}
     query = query.lower()
-    filters = {"status": "Paid" if status == "Recently Paid" else status}
-    
+
     try:
         branch = getBranch()
     except frappe.ValidationError:
@@ -591,7 +722,23 @@ def searchPosInvoice(query,status):
             branch = None
         else:
             raise
-            
+
+    perms = _order_log_permissions(branch) if branch else frappe._dict(view_all=1, paid_limit=0)
+    _assert_status_allowed(status, perms)
+
+    if status == "All":
+        # Search has to honour the same scope as the list it filters, or
+        # typing a table number into an "All" log would silently return
+        # nothing for statuses the list is showing.
+        allowed = ["Draft"]
+        if perms.view_all:
+            allowed += ["Paid", "Consolidated", "Return"]
+        elif perms.paid_limit:
+            allowed += ["Paid"]
+        filters = {"status": ["in", allowed]}
+    else:
+        filters = {"status": "Paid" if status == "Recently Paid" else status}
+
     if branch:
         filters["branch"] = branch
 
@@ -705,6 +852,49 @@ def getCashier(room):
     return cashier       
     
 
+def resolve_pos_profile_for_branch(branch, user=None):
+    """Return the POS Profile name the given user should use for a branch.
+
+    A branch can have several POS Profiles (e.g. one per counter). Picking an
+    arbitrary one leaves the POS bootstrap on a profile the user is not
+    assigned to, so prefer the profile the user is listed in, then any
+    profile that has applicable users, and only then fall back to any
+    enabled profile of the branch.
+    """
+    user = user or frappe.session.user
+
+    profiles = frappe.get_all(
+        "POS Profile",
+        filters={"branch": branch, "disabled": 0},
+        pluck="name",
+        order_by="modified desc",
+    )
+    if not profiles:
+        frappe.throw(
+            _("No enabled POS Profile is configured for Branch {0}.").format(branch)
+        )
+
+    user_profiles = frappe.get_all(
+        "POS Profile User",
+        filters={"parent": ["in", profiles], "parenttype": "POS Profile", "user": user},
+        pluck="parent",
+    )
+    for profile in profiles:
+        if profile in user_profiles:
+            return profile
+
+    staffed_profiles = frappe.get_all(
+        "POS Profile User",
+        filters={"parent": ["in", profiles], "parenttype": "POS Profile"},
+        pluck="parent",
+    )
+    for profile in profiles:
+        if profile in staffed_profiles:
+            return profile
+
+    return profiles[0]
+
+
 @frappe.whitelist()
 def getPosProfile():
     branchName = getBranch()
@@ -714,7 +904,7 @@ def getPosProfile():
     printer = None
     cashier = None
     owner = None
-    posProfile = frappe.db.exists("POS Profile", {"branch": branchName})
+    posProfile = resolve_pos_profile_for_branch(branchName)
     pos_profiles = frappe.get_doc("POS Profile", posProfile)
     global_defaults = frappe.get_single('Global Defaults')
     disable_rounded_total = global_defaults.disable_rounded_total
@@ -764,9 +954,14 @@ def getPosProfile():
                 else:
                     cashier = pos_opened_cashier    
                 
-        else:    
+        elif get_cashier.applicable_for_users:
             cashier = get_cashier.applicable_for_users[0].user
             owner = get_cashier.applicable_for_users[0].user
+        else:
+            # POS Profile has no "Applicable for Users" row. Fall back to the
+            # logged in user so the POS can still load instead of erroring out.
+            cashier = frappe.session.user
+            owner = frappe.session.user
         
         qz_print = pos_profiles.qz_print
         print_type = None
@@ -924,7 +1119,7 @@ def getAggregatorMOP(aggregator):
     )
     return modeOfPaymentsList
 @frappe.whitelist()
-def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+def create_customer(customer_name, mobile_number=None, customer_group=None, territory=None):
     if not frappe.has_permission("Customer", "create"):
         frappe.throw("Not permitted to create customers", frappe.PermissionError)
         
@@ -937,11 +1132,27 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
     except Exception:
         frappe.throw("Invalid mobile number format")
 
+    customer_group = customer_group or frappe.db.get_default("Customer Group")
+    if not customer_group or not frappe.db.exists("Customer Group", customer_group):
+        customer_group = frappe.db.get_value("Customer Group", {}, "name", order_by="name asc")
+
+    territory = territory or frappe.db.get_default("Territory")
+    if territory and not frappe.db.exists("Territory", territory):
+        territory = None
+    if not territory:
+        territory = frappe.db.get_value("Territory", {}, "name", order_by="name asc")
+
+    if not customer_group:
+        frappe.throw("No Customer Group is configured")
+    if not territory:
+        frappe.throw("No Territory is configured")
+
     """Create a new customer"""
     try:
         customer = frappe.get_doc({
             "doctype": "Customer",
             "customer_name": customer_name,
+            "customer_type": "Individual",
             "mobile_number": mobile_number,
             "customer_group": customer_group,
             "territory": territory
@@ -952,6 +1163,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         return {
             "status": "success",
             "message": "Customer created successfully",
+            "name": customer.name,
             "customer_name": customer_name,
             "mobile_number": mobile_number,
             "customer_group": customer_group,
@@ -1557,6 +1769,21 @@ def merge_bills(primary_invoice, secondary_invoice):
 
         update_merge_details(secondary_doc.name,primary_doc,)
 
+
+        record_event(
+            "Bill Merged",
+            reference_doctype="POS Invoice",
+            reference_name=primary_doc.name,
+            amount=primary_doc.grand_total,
+            old_value=secondary_doc.name,
+            new_value=primary_doc.name,
+            details={
+                "secondary_table": secondary_doc.restaurant_table,
+                "primary_table": primary_doc.restaurant_table,
+            },
+            branch=primary_doc.branch,
+            pos_profile=primary_doc.pos_profile,
+        )
 
         frappe.db.commit()
 

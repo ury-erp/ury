@@ -129,16 +129,16 @@ function NewCustomerForm({
             onChange={(e) => setNewCustomerPhone(e.target.value)}
             required
             disabled={isCreatingCustomer}
-            className="pl-10"
+            className="ps-10"
           />
-          <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          <Phone className="absolute start-3 top-2.5 h-5 w-5 text-gray-400" />
         </div>
       </div>
       <div className="flex gap-3 mt-6">
         <Button type="submit" variant="default" className="flex-1" disabled={isCreatingCustomer}>
           {isCreatingCustomer ? (
             <>
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              <Loader className="me-2 h-4 w-4 animate-spin" />
               {t('customer.adding')}
             </>
           ) : (
@@ -255,12 +255,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
             className="h-10 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             autoComplete="off"
           />
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           {isOpen && (
             <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-sm text-gray-500">
-                  <Loader className="mr-2 h-4 w-4 animate-spin" /> {t('common.searching')}
+                  <Loader className="me-2 h-4 w-4 animate-spin" /> {t('common.searching')}
                 </div>
               )}
               {searchError && <div className="p-4 text-center text-sm text-red-500">{searchError}</div>}
@@ -270,7 +270,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
                   <button
                     key={customer.name}
                     type="button"
-                    className={`w-full px-4 py-2 text-left text-sm ${
+                    className={`w-full px-4 py-2 text-start text-sm ${
                       idx === highlightedIndex ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
                     }`}
                     onMouseDown={() => {

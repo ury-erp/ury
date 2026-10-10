@@ -1,11 +1,20 @@
 <template>
   <div class="p-6">
 
-    <!-- Loading -->
-    <div v-if="loading" class="text-center py-10">
-      <h2 class="text-lg font-semibold text-gray-500">
-        Loading Production Dashboard...
-      </h2>
+    <!-- Loading: placeholder cards in the real grid, so the board keeps its
+         shape instead of collapsing and re-expanding when units land. -->
+    <div
+      v-if="loading"
+      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+      aria-busy="true"
+      :aria-label="$t('production.loading')"
+    >
+      <div
+        v-for="n in 6"
+        :key="n"
+        aria-hidden="true"
+        class="h-44 rounded-2xl border border-gray-200 bg-gray-100 animate-pulse-soft"
+      />
     </div>
 
     <!-- Production Cards -->
