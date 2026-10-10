@@ -81,7 +81,7 @@ def ensure_master_records_exist():
                     "enabled": 1,
                     "buying": 1 if "Buying" in pl else 0,
                     "selling": 1 if "Selling" in pl else 0,
-                    "currency": frappe.defaults.get_global_default("currency") or "INR"
+                    "currency": frappe.defaults.get_global_default("currency") or "IQD"
                 }).insert(ignore_permissions=True)
             except frappe.DuplicateEntryError:
                 pass

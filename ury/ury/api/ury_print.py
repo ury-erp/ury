@@ -15,6 +15,11 @@ base_template_path = "www/printview.html"
 standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
+from ury.ury.api.invoice_activity import log_activity
+
+
+def _log_print(invoice, already_printed):
+    log_activity(invoice, _("Bill reprinted") if already_printed else _("Bill printed"))
 
 
 @frappe.whitelist()
@@ -130,6 +135,7 @@ def qz_print_update(invoice):
         invoice_doc = frappe.get_doc("POS Invoice", invoice)
         if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
             frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
+        _log_print(invoice, invoice_doc.invoice_printed)
 
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
         
@@ -183,6 +189,7 @@ def print_pos_page(doctype, name, print_format):
     frappe.publish_realtime(print_channel, {"data": data})
 
     invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
+    _log_print(name, invoice_printed)
 
     if invoice_printed == 0:
         frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)

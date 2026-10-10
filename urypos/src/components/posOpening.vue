@@ -1,16 +1,16 @@
 <template>
   <div class="mt-10 flex items-center justify-between">
     <div class="flex items-center">
-      <h3 class="mr-3 text-lg font-semibold text-gray-900 dark:text-white">
-        POS Opening Entry
+      <h3 class="mr-3 text-lg font-semibold text-foreground">
+        {{ $t('pos.opening_entry') }}
       </h3>
       <span
-        class="me-2 rounded px-2.5 py-0.5 text-sm font-medium"
+        class="me-2 rounded-xl px-2.5 py-0.5 text-sm font-medium"
         :class="{
-          'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300':
+          'bg-destructive/10 text-destructive':
             this.posOpen.getBadgeType() === 'red',
 
-          'bg-yellow-100 text-yellow-800':
+          'bg-warning/10 text-warning':
             this.posOpen.getBadgeType() === 'yellow',
         }"
       >
@@ -20,17 +20,17 @@
     <div class="flex space-x-4">
       <button
         @click="this.posOpen.savePosOpening()"
-        class="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+        class="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary focus:outline-none"
         v-if="this.posOpen.posOpencreation"
       >
-        Save
+        {{ $t('common.save') }}
       </button>
       <button
         v-if="this.posOpen.posOpenSaved"
         @click="this.posOpen.showSumbitPosOpenModal()"
-        class="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 focus:outline-none"
+        class="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary focus:outline-none"
       >
-        Submit
+        {{ $t('common.submit') }}
       </button>
     </div>
   </div>
@@ -39,8 +39,8 @@
     <div>
       <label
         for="startDate"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Period Start Date</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.period_start') }}</label
       >
       <date-picker
         v-model:value="this.posOpen.startDate"
@@ -52,62 +52,62 @@
     <div>
       <label
         for="postingDate"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
+        class="mb-2 block text-sm font-medium text-foreground"
       >
         <label
           for="postingDate"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-          >Posting Date</label
+          class="mb-2 block text-sm font-medium text-foreground"
+          >{{ $t('pos.posting_date') }}</label
         >
       </label>
       <input
         v-model="this.posOpen.postingDate"
         readonly
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         type="text"
       />
     </div>
   </div>
-  <hr class="my-6 border-t border-gray-300" />
+  <hr class="my-6 border-t border-input" />
   <div class="mb-6 mt-6 grid gap-6 md:grid-cols-2">
     <div>
       <label
         for="company"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Company</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.company') }}</label
       >
       <input
         type="text"
         id="company"
         v-model="this.invoiceData.company"
-        class="b block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="b block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         required
       />
     </div>
     <div>
       <label
         for="cashier"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Cashier</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.cashier') }}</label
       >
       <input
         type="text"
         id="cashier"
         v-model="this.invoiceData.cashier"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         required
       />
     </div>
     <div>
       <label
         for="posProfile"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >POS Profile</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.profile') }}</label
       >
       <input
         type="text"
         id="posProfile"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         v-model="this.invoiceData.posProfile"
         required
       />
@@ -115,48 +115,48 @@
     <div>
       <label
         for="branch"
-        class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >Branch</label
+        class="mb-2 block text-sm font-medium text-foreground"
+        >{{ $t('pos.branch') }}</label
       >
       <input
         type="text"
         id="branch"
-        class="block w-full rounded-md border border-gray-300 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+        class="block w-full rounded-md border border-input text-sm text-foreground focus:border-ring focus:ring-ring"
         v-model="this.invoiceData.branch"
         required
       />
     </div>
   </div>
-  <hr class="my-6 border-t border-gray-300" />
-  <h3 class="mb-3 text-base font-semibold text-gray-900 dark:text-white">
-    Opening Balance Details
+  <hr class="my-6 border-t border-input" />
+  <h3 class="mb-3 text-base font-semibold text-foreground">
+    {{ $t('pos.opening_balance_details') }}
   </h3>
 
   <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+    <table class="w-full text-left text-sm text-muted-foreground">
       <thead
-        class="bg-gray-50 text-base font-semibold uppercase text-gray-900 dark:text-white"
+        class="bg-muted text-base font-semibold uppercase text-foreground"
       >
         <tr>
-          <th scope="col" class="px-6 py-3">Mode of Payment</th>
-          <th scope="col" class="px-6 py-3 text-center">Opening Amount</th>
+          <th scope="col" class="px-6 py-3">{{ $t('payment.mode') }}</th>
+          <th scope="col" class="px-6 py-3 text-center">{{ $t('pos.opening_amount') }}</th>
           <th scope="col" class="px-6 py-3"></th>
         </tr>
       </thead>
       <tbody>
         <tr
-          class="border-b bg-white dark:border-gray-700 dark:bg-gray-900"
+          class="border-b bg-card"
           v-for="(modeOfPayment, index) in invoiceData.modeOfPaymentList"
           :key="index"
         >
           <th
             scope="row"
-            class="whitespace-nowrap px-6 py-4 font-medium text-gray-900 dark:text-white"
+            class="whitespace-nowrap px-6 py-4 font-medium text-foreground"
           >
             {{ modeOfPayment.mode_of_payment }}
           </th>
           <td
-            class="px-6 py-4 text-center font-medium text-gray-900 dark:text-white"
+            class="px-6 py-4 text-center font-medium text-foreground"
           >
             <input
               type="number"
@@ -196,17 +196,17 @@
     </table>
   </div>
 
-  <hr class="my-6 border-t border-gray-300" />
+  <hr class="my-6 border-t border-input" />
 
   <div
     v-if="this.posOpen.showSumbitPosOpen"
-    class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-gray-100"
+    class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-muted"
   >
     <div class="mt-5 flex items-center justify-center">
-      <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
+      <div class="w-full rounded-lg bg-card p-6 shadow-raised md:max-w-md">
         <div class="flex items-center justify-between">
-          <h3 class="text-xl text-gray-900 dark:text-white">Confirm</h3>
-          <span class="sr-only">Close</span>
+          <h3 class="text-xl text-foreground">{{ $t('common.confirm') }}</h3>
+          <span class="sr-only">{{ $t('common.close') }}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-5 w-5 cursor-pointer"
@@ -225,22 +225,22 @@
         </div>
 
         <h3
-          class="mt-5 block text-left text-base text-gray-900 dark:text-white"
+          class="mt-5 block text-left text-base text-foreground"
         >
           Permanently Submit{{ this.posOpen.posOpenEntryName }}?
         </h3>
         <div class="flex justify-end">
           <button
             @click="this.posOpen.showSumbitPosOpen = false"
-            class="mr-3 mt-6 rounded border border-gray-300 bg-gray-50 px-3 py-2"
+            class="mr-3 mt-6 rounded-xl border border-input bg-muted px-3 py-2"
           >
-            No
+            {{ $t('common.no') }}
           </button>
           <button
             @click="this.posOpen.sumbitPosOpening()"
-            class="mt-6 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+            class="mt-6 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
           >
-            Yes
+            {{ $t('common.yes') }}
           </button>
         </div>
       </div>

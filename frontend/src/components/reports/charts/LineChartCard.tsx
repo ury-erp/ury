@@ -15,7 +15,7 @@ const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "
 
 export interface LineChartCardProps {
   title: string;
-  data: Record<string, unknown>[];
+  data: object[];
   xKey: string;
   yKeys: string[];
   colors?: string[];

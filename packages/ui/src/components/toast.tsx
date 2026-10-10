@@ -15,7 +15,6 @@ const toastIcons = {
 export const showToast = {
   success: (message: string) => {
     toast.success(message, {
-      position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
       closeOnClick: true,
@@ -27,10 +26,17 @@ export const showToast = {
       className: 'toast-success',
     });
   },
+  /**
+   * Errors stay until dismissed.
+   *
+   * They shared the 2s timer with success messages, so the one message a
+   * user must act on was the one most likely to be gone before they looked
+   * up — and a cashier mid-transaction is by definition looking somewhere
+   * else (UX-11). Success can expire; a failure has to be read.
+   */
   error: (message: string) => {
     toast.error(message, {
-      position: 'top-right',
-      autoClose: 2000,
+      autoClose: false,
       hideProgressBar: false,
       closeOnClick: true,
       pauseOnHover: true,
@@ -43,7 +49,6 @@ export const showToast = {
   },
   warning: (message: string) => {
     toast.warning(message, {
-      position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
       closeOnClick: true,
@@ -57,7 +62,6 @@ export const showToast = {
   },
   info: (message: string) => {
     toast.info(message, {
-      position: 'top-right',
       autoClose: 2000,
       hideProgressBar: false,
       closeOnClick: true,
@@ -72,14 +76,21 @@ export const showToast = {
 };
 
 export const ToastProvider = () => {
+  // `rtl` was pinned false, so under Arabic the toast laid itself out against
+  // the direction of everything around it. Read from <html dir>, which the
+  // i18n engine already sets before first paint, rather than from a language
+  // list this package would then have to keep in sync.
+  const isRtl =
+    typeof document !== 'undefined' && document.documentElement.dir === 'rtl'
+
   return (
     <ToastContainer
-      position="top-right"
+      position={isRtl ? 'top-left' : 'top-right'}
       autoClose={2000}
       hideProgressBar={false}
       newestOnTop
       closeOnClick
-      rtl={false}
+      rtl={isRtl}
       pauseOnFocusLoss
       draggable
       pauseOnHover

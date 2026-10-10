@@ -7,6 +7,7 @@ import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 import { Switch } from '../../components/ui/switch';
+import { t } from '../../i18n';
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -51,6 +52,7 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [installationType, setInstallationType] = useState<'minimal' | 'advanced'>('minimal');
   const [setupUryDemo, setSetupUryDemo] = useState(false);
+  const [allowDemo, setAllowDemo] = useState(false);
   const [progressSteps, setProgressSteps] = useState<string[]>([]);
   const pendingSubmit = useRef<PendingSubmit | null>(null);
   const finishedRef = useRef(false);
@@ -63,6 +65,7 @@ export default function SetupPage() {
         ]);
         
         if (!defaults) return;
+        setAllowDemo(!!defaults.allow_demo);
 
         const rawLangs = Array.isArray(defaults.languages)
           ? defaults.languages
@@ -104,7 +107,7 @@ export default function SetupPage() {
         const defaultLanguage = (defaults.languages as any)?.default_language || 'English';
         formRef.current?.setFieldValue('language', defaultLanguage);
 
-        const countryToUse = defaults.detected_country || 'India';
+        const countryToUse = defaults.detected_country || 'Iraq';
         formRef.current?.setFieldValue('country', countryToUse);
         await handleCountryChange(countryToUse);
       } catch (err) {
@@ -170,7 +173,7 @@ export default function SetupPage() {
 
     setTimeout(() => {
       if (pending.payload.setup_ury_demo) {
-        window.location.href = '/ury/dashboard';
+        window.location.href = '/restro/dashboard';
       } else if (pending.installationType === 'minimal') {
         navigate('/setup-wizard/1');
       } else {
@@ -253,7 +256,7 @@ export default function SetupPage() {
         />
         
         <div>
-          <h3 className="text-lg font-semibold text-foreground mb-4">Installation Type</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">{t('dash.setup.installation_type')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {setupSchema.installationTypes?.map((type: any) => (
               <InstallationTypeCard 
@@ -266,22 +269,22 @@ export default function SetupPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">
-              Set up with demo data
-            </label>
-            <p className="text-sm text-muted-foreground">
-              Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
-            </p>
+        {allowDemo && (
+          <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">{t('dash.setup.set_up_with_demo_data')}</label>
+              <p className="text-sm text-muted-foreground">
+                Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
+              </p>
+            </div>
+            <Switch
+              id="setup-ury-demo"
+              checked={setupUryDemo}
+              onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
+              disabled={submitting}
+            />
           </div>
-          <Switch
-            id="setup-ury-demo"
-            checked={setupUryDemo}
-            onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
-            disabled={submitting}
-          />
-        </div>
+        )}
       </div>
       
       {submitting && (

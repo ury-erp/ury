@@ -13,6 +13,7 @@ import {
 import { Button, Input, Select, SelectItem, Card, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { t } from '../../i18n';
 
 interface FixedExpenseItem {
   id: string;
@@ -193,7 +194,7 @@ export const ReportSettingsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to fetch report settings:', err);
-      showToast.error('Failed to load report settings');
+      showToast.error(t('dash.report_settings.failed_to_load_report_settings'));
     } finally {
       setLoading(false);
     }
@@ -252,7 +253,7 @@ export const ReportSettingsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!branchToFetch) {
-      showToast.error('No branch selected');
+      showToast.error(t('dash.report_settings.no_branch_selected'));
       return;
     }
 
@@ -324,7 +325,7 @@ export const ReportSettingsPage: React.FC = () => {
       };
 
       if (JSON.stringify(original) === JSON.stringify(current)) {
-        showToast.warning('No changes in document');
+        showToast.warning(t('dash.report_settings.no_changes_in_document'));
         return;
       }
     }
@@ -395,7 +396,7 @@ export const ReportSettingsPage: React.FC = () => {
         await call('frappe.client.insert', { doc: docToSave });
       }
 
-      showToast.success('Report settings saved successfully');
+      showToast.success(t('dash.report_settings.report_settings_saved_successfully'));
       await fetchReportSettings();
     } catch (err: any) {
       showToast.error(err.message || 'Failed to save report settings');
@@ -424,7 +425,7 @@ export const ReportSettingsPage: React.FC = () => {
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Daily P&L Settings</h1>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{t('dash.report_settings.daily_p_l_settings')}</h1>
               <p className="text-sm text-gray-500">Configure financial parameters, overhead cost basis, and operational shifts for <span className="font-semibold text-primary">{branchLabel}</span></p>
             </div>
           </div>
@@ -433,9 +434,7 @@ export const ReportSettingsPage: React.FC = () => {
             disabled={saving}
             className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
           >
-            <Save className="w-4 h-4" />
-            Save
-          </Button>
+            <Save className="w-4 h-4" />{t('dash.report_settings.save')}</Button>
         </div>
 
         {/* Expandable Accordion Cards Container */}
@@ -445,7 +444,7 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('businessHours')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-50 text-primary flex items-center justify-center">
@@ -453,7 +452,7 @@ export const ReportSettingsPage: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">1. Business Hours & Shift Cutoffs</h2>
-                  <p className="text-xs text-gray-500">Extended operating hours and reporting cut-off time offsets.</p>
+                  <p className="text-xs text-gray-500">{t('dash.report_settings.extended_operating_hours_and_reporting_cut_o')}</p>
                 </div>
               </div>
               {openSections.businessHours ? (
@@ -468,7 +467,7 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
                     <div>
-                      <span className="text-sm font-semibold text-gray-900 block">Extended Hours</span>
+                      <span className="text-sm font-semibold text-gray-900 block">{t('dash.report_settings.extended_hours')}</span>
                       <span className="text-xs text-gray-500">Enable shift calculation beyond midnight (00:00).</span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -478,7 +477,7 @@ export const ReportSettingsPage: React.FC = () => {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExtendedHours(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
 
@@ -505,7 +504,7 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('costConfig')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -527,9 +526,7 @@ export const ReportSettingsPage: React.FC = () => {
               <div className="p-6 space-y-6 bg-white">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Buying Price List
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('dash.report_settings.buying_price_list')}</label>
                     <Select value={buyingPriceList} onValueChange={(val: string) => setBuyingPriceList(val)}>
                       <SelectItem value="Standard Buying">Standard Buying</SelectItem>
                       <SelectItem value="Wholesale Price List">Wholesale Price List</SelectItem>
@@ -568,7 +565,7 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('expenses')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -593,21 +590,20 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Direct Fixed Expenses</h3>
-                      <p className="text-xs text-gray-500">Kitchen gas, raw material logistics, and direct production costs.</p>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.direct_fixed_expenses')}</h3>
+                      <p className="text-xs text-gray-500">{t('dash.report_settings.kitchen_gas_raw_material_logistics_and_direc')}</p>
                     </div>
                     <Button size="sm" onClick={addDirectFixed} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Expense</th>
+                          <th className="p-3.5">{t('dash.report_settings.expense')}</th>
                           <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -638,7 +634,7 @@ export const ReportSettingsPage: React.FC = () => {
                                 }
                               />
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setDirectFixedExpenses(directFixedExpenses.filter((item) => item.id !== row.id))
@@ -659,21 +655,20 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Indirect Fixed Expenses</h3>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.indirect_fixed_expenses')}</h3>
                       <p className="text-xs text-gray-500">Building leases, software subscriptions, insurance, and administrative fees.</p>
                     </div>
                     <Button size="sm" onClick={addIndirectFixed} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Expense</th>
+                          <th className="p-3.5">{t('dash.report_settings.expense')}</th>
                           <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -704,7 +699,7 @@ export const ReportSettingsPage: React.FC = () => {
                                 }
                               />
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setIndirectFixedExpenses(indirectFixedExpenses.filter((item) => item.id !== row.id))
@@ -725,22 +720,21 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Percentage Expenses</h3>
-                      <p className="text-xs text-gray-500">Payment processor rates, delivery aggregator cuts, and royalties.</p>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.percentage_expenses')}</h3>
+                      <p className="text-xs text-gray-500">{t('dash.report_settings.payment_processor_rates_delivery_aggregator_')}</p>
                     </div>
                     <Button size="sm" onClick={addPercentageExpense} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Expense</th>
+                          <th className="p-3.5">{t('dash.report_settings.expense')}</th>
                           <th className="p-3.5">Percentage (%)</th>
-                          <th className="p-3.5">Percentage Type</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5">{t('dash.report_settings.percentage_type')}</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -783,12 +777,12 @@ export const ReportSettingsPage: React.FC = () => {
                                   )
                                 }
                               >
-                                <SelectItem value="Gross Sales">Gross Sales</SelectItem>
-                                <SelectItem value="Net Sales">Net Sales</SelectItem>
-                                <SelectItem value="Online Orders">Online Orders</SelectItem>
+                                <SelectItem value="Gross Sales">{t('dash.report_settings.gross_sales')}</SelectItem>
+                                <SelectItem value="Net Sales">{t('dash.report_settings.net_sales')}</SelectItem>
+                                <SelectItem value="Online Orders">{t('dash.report_settings.online_orders')}</SelectItem>
                               </Select>
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setPercentageExpenses(percentageExpenses.filter((item) => item.id !== row.id))
@@ -809,21 +803,20 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Employee Costs</h3>
-                      <p className="text-xs text-gray-500">Staff role monthly compensation and headcount count.</p>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.employee_costs')}</h3>
+                      <p className="text-xs text-gray-500">{t('dash.report_settings.staff_role_monthly_compensation_and_headcoun')}</p>
                     </div>
                     <Button size="sm" onClick={addEmployeeCost} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Expense</th>
+                          <th className="p-3.5">{t('dash.report_settings.expense')}</th>
                           <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -854,7 +847,7 @@ export const ReportSettingsPage: React.FC = () => {
                                 }
                               />
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setEmployeeCosts(employeeCosts.filter((item) => item.id !== row.id))
@@ -875,21 +868,20 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Monthly Fixed Expenses</h3>
-                      <p className="text-xs text-gray-500">Recurring monthly telecom, maintenance, and sanitation overheads.</p>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.monthly_fixed_expenses')}</h3>
+                      <p className="text-xs text-gray-500">{t('dash.report_settings.recurring_monthly_telecom_maintenance_and_sa')}</p>
                     </div>
                     <Button size="sm" onClick={addMonthlyExpense} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Expense</th>
+                          <th className="p-3.5">{t('dash.report_settings.expense')}</th>
                           <th className="p-3.5">Amount ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -920,7 +912,7 @@ export const ReportSettingsPage: React.FC = () => {
                                 }
                               />
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setMonthlyFixedExpenses(monthlyFixedExpenses.filter((item) => item.id !== row.id))
@@ -941,21 +933,20 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Consumables Budget</h3>
-                      <p className="text-xs text-gray-500">Thermal paper rolls, take-away packaging, and disposable supplies.</p>
+                      <h3 className="text-sm font-bold text-gray-900">{t('dash.report_settings.consumables_budget')}</h3>
+                      <p className="text-xs text-gray-500">{t('dash.report_settings.thermal_paper_rolls_take_away_packaging_and_')}</p>
                     </div>
                     <Button size="sm" onClick={addConsumable} className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
-                    </Button>
+                      <Plus className="w-4 h-4 me-1" />{t('dash.report_settings.add_row')}</Button>
                   </div>
 
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm text-gray-600">
+                    <table className="w-full text-start text-sm text-gray-600">
                       <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                         <tr>
-                          <th className="p-3.5">Material</th>
+                          <th className="p-3.5">{t('dash.report_settings.material')}</th>
                           <th className="p-3.5">Cost Per Unit ($)</th>
-                          <th className="p-3.5 text-right">Action</th>
+                          <th className="p-3.5 text-end">{t('dash.report_settings.action')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -986,7 +977,7 @@ export const ReportSettingsPage: React.FC = () => {
                                 }
                               />
                             </td>
-                            <td className="p-3.5 text-right">
+                            <td className="p-3.5 text-end">
                               <button
                                 onClick={() =>
                                   setConsumables(consumables.filter((item) => item.id !== row.id))

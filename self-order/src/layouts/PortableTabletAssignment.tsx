@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { assignDeviceTable, type OrderingContext } from '../lib/api'
 import TabletLayout from './TabletLayout'
+import { t } from '../i18n'
+import { LanguageToggle } from '../components/LanguageToggle'
 
 type Step = 'pin' | 'table'
 
@@ -63,7 +65,7 @@ function PortableTabletAssignment() {
     const deviceId = localStorage.getItem(DEVICE_ID_KEY)
     const deviceCredential = localStorage.getItem(DEVICE_CREDENTIAL_KEY)
     if (!deviceId || !deviceCredential) {
-      setError('This tablet is not provisioned. Please contact staff.')
+      setError(t('device.not_provisioned'))
       return
     }
 
@@ -87,7 +89,11 @@ function PortableTabletAssignment() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <h1 className="text-xl font-semibold">Assign This Tablet</h1>
+      <h1 className="text-xl font-semibold">{t('assign.title')}</h1>
+
+      {/* Staff provisioning happens before any diner touches the device, so
+          this is the natural place to set the language the shell will use. */}
+      <LanguageToggle />
 
       {error && (
         <div className="w-full max-w-xs rounded-md bg-destructive/10 p-3 text-center text-sm text-destructive">
@@ -97,8 +103,8 @@ function PortableTabletAssignment() {
 
       {step === 'pin' && (
         <div className="flex w-full max-w-xs flex-col items-center gap-4">
-          <p className="text-sm text-muted-foreground">Enter staff PIN</p>
-          <div className="flex gap-2" aria-label="PIN entry">
+          <p className="text-sm text-muted-foreground">{t('assign.enter_pin')}</p>
+          <div className="flex gap-2" aria-label={t('assign.pin_entry')}>
             {Array.from({ length: MAX_PIN_LENGTH }).map((_, idx) => (
               <div
                 key={idx}
@@ -129,15 +135,13 @@ function PortableTabletAssignment() {
             onClick={handlePinSubmit}
             disabled={pin.length < MIN_PIN_LENGTH}
             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
-          >
-            Continue
-          </button>
+          >{t('common.continue')}</button>
         </div>
       )}
 
       {step === 'table' && (
         <div className="flex w-full max-w-xs flex-col gap-4">
-          <p className="text-sm text-muted-foreground">Enter table name or code</p>
+          <p className="text-sm text-muted-foreground">{t('assign.enter_table')}</p>
           <input
             value={table}
             onChange={(event) => setTable(event.target.value)}
@@ -149,15 +153,13 @@ function PortableTabletAssignment() {
             disabled={!table.trim() || submitting}
             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
           >
-            {submitting ? 'Assigning…' : 'Assign Table'}
+            {submitting ? t('assign.submitting') : t('assign.submit')}
           </button>
           <button
             onClick={() => setStep('pin')}
             disabled={submitting}
             className="w-full rounded-md border py-3 text-sm font-medium"
-          >
-            Back
-          </button>
+          >{t('common.back')}</button>
         </div>
       )}
     </div>

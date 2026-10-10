@@ -18,6 +18,8 @@ export interface PosProfileLimited {
   paid_limit: number;
   disable_rounded_total: number;
   enable_discount: number;
+  require_bill_print?: number;
+  qz_bill_printer?: string | null;
   multiple_cashier: number;
   owner: string;
   edit_order_type?: number;
@@ -81,6 +83,10 @@ export interface PosProfileCombined extends PosProfileFull {
   paid_limit: number;
   disable_rounded_total: number;
   enable_discount: number;
+  /** Table bills must be printed before payment (POS Profile setting). */
+  require_bill_print?: number;
+  /** QZ printer for bills; empty = the QZ station's default printer. */
+  qz_bill_printer?: string | null;
   multiple_cashier: number;
   edit_order_type?: number;
   view_all_status?: number;
@@ -133,6 +139,8 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     paid_limit: limitedProfile.paid_limit,
     disable_rounded_total: limitedProfile.disable_rounded_total,
     enable_discount: limitedProfile.enable_discount,
+    require_bill_print: limitedProfile.require_bill_print || 0,
+    qz_bill_printer: limitedProfile.qz_bill_printer || null,
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
   };

@@ -26,7 +26,10 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     currentPage: 1,
     paymentMethod: 0,
     editPrintedInvoice: 0,
-    selectedStatus: "Draft",
+    // The log opens on everything the profile allows, not on one bucket.
+    // Defaulting to "Draft" meant a waiter had to already know which status
+    // their order had landed in before the list could show it to them.
+    selectedStatus: "All",
     posProfile: "",
     searchOrder: "",
     mobileNumber: "",
@@ -60,6 +63,10 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     showPayment: false,
     showDiscount: false,
     cancelInvoiceFlag: false,
+    // "Close table without printing" — see closeTable() below.
+    closeTableFlag: false,
+    closeTableReason: "",
+    closingTable: false,
     alert: useAlert(),
     call: frappe.call(),
     menu: useMenuStore(),
@@ -586,6 +593,45 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
         .catch((error) => {
           // console.error(error)
         });
+    },
+
+    showCloseTableModal() {
+      this.closeTableReason = "";
+      this.closeTableFlag = true;
+    },
+
+    /**
+     * Free the table without printing a receipt.
+     *
+     * Releasing the table used to be a side effect of printing: the only way
+     * to get a table back was to put paper through the printer, so a bill
+     * settled without a receipt had one printed purely to clear the floor.
+     *
+     * The server does the real work — it closes the bill out in the same
+     * breath as the table, so no draft invoice is ever left attached to
+     * nothing — and records that no receipt was produced. See
+     * `ury.ury.doctype.ury_order.ury_order.close_table`.
+     */
+    closeTable: async function () {
+      this.closingTable = true;
+      try {
+        await this.call.post(
+          "ury.ury.doctype.ury_order.ury_order.close_table",
+          {
+            invoice: this.invoiceNumber,
+            reason: this.closeTableReason,
+          }
+        );
+        this.closeTableFlag = false;
+        this.notification.createNotification("Table closed");
+        this.tables.fetchTable();
+        this.handleStatusChange();
+        this.showOrder = false;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.closingTable = false;
+      }
     },
 
     cancelInvoice: async function () {

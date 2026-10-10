@@ -1,0 +1,32 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-20 21:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["item_code", "item_name", "qty", "uom", "column_break_1", "valuation_rate", "amount", "reason"],
+ "fields": [
+  {"fieldname": "item_code", "fieldtype": "Link", "in_list_view": 1, "label": "Item", "options": "Item", "reqd": 1},
+  {"fetch_from": "item_code.item_name", "fieldname": "item_name", "fieldtype": "Data", "label": "Item Name", "read_only": 1},
+  {"default": "1", "fieldname": "qty", "fieldtype": "Float", "in_list_view": 1, "label": "Qty", "reqd": 1},
+  {"fetch_from": "item_code.stock_uom", "fieldname": "uom", "fieldtype": "Link", "label": "UOM", "options": "UOM", "read_only": 1},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"description": "Taken from the item's valuation at the time of writing off, so a later price change cannot rewrite what last month's waste cost.", "fieldname": "valuation_rate", "fieldtype": "Currency", "in_list_view": 1, "label": "Rate", "read_only": 1},
+  {"fieldname": "amount", "fieldtype": "Currency", "in_list_view": 1, "label": "Amount", "read_only": 1},
+  {"fieldname": "reason", "fieldtype": "Data", "label": "Note"}
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-20 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Waste Log Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "idx",
+ "sort_order": "ASC",
+ "states": []
+}

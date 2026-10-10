@@ -5,15 +5,16 @@ import { cn } from "../lib/cn";
 export const sidebarItemVariants = cva(
   [
     "w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium",
-    "transition-all duration-200 group relative rounded-md text-start",
+    "transition-[background-color,color,box-shadow] duration-fast ease-out group relative rounded-lg text-start",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
     "select-none touch-manipulation",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
   ],
   {
     variants: {
       active: {
-        true: "bg-white text-gray-900 shadow-sm font-semibold hover:bg-accent hover:text-accent-foreground",
-        false: "text-gray-700 hover:bg-white/60 hover:text-gray-900",
+        true: "bg-primary-50 text-primary-800 shadow-sm font-semibold hover:bg-primary-100 hover:text-primary-900",
+        false: "text-gray-700 hover:bg-white/80 hover:text-gray-900",
       },
     },
     defaultVariants: {
@@ -31,7 +32,7 @@ export const SidebarContainer = React.forwardRef<HTMLDivElement, SidebarContaine
     <div
       ref={ref}
       className={cn(
-        "w-64 bg-white border-e border-gray-200 h-full flex flex-col shrink-0 font-inter",
+        "w-64 bg-[#fffdf8] border-e border-[#eadfce] h-full flex flex-col shrink-0",
         disabled && "opacity-50 pointer-events-none",
         className
       )}
@@ -47,7 +48,7 @@ export const SidebarCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes
   ({ className, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("bg-gray-50 border border-gray-200 rounded-lg p-4", className)}
+      className={cn("bg-[#fffaf0] border border-[#eadfce] rounded-xl p-4", className)}
       {...props}
     >
       {children}
@@ -56,8 +57,22 @@ export const SidebarCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes
 );
 SidebarCard.displayName = "SidebarCard";
 
+/**
+ * The bar marking the active nav item.
+ *
+ * Positioned on the logical start edge so it stays on the reading-start side
+ * in Arabic. It grows from the centre on mount, which gives the eye something
+ * to follow when the selection moves between items — the alternative is the
+ * marker teleporting, which is the main reason nav changes feel abrupt.
+ */
 export const SidebarActiveIndicator = () => (
-  <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
+  <span
+    aria-hidden="true"
+    className={cn(
+      "absolute start-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-e-full bg-primary",
+      "origin-center animate-[scale-in_var(--duration-base)_var(--ease-out)_both]"
+    )}
+  />
 );
 
 export interface SidebarItemProps
