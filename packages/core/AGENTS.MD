@@ -59,7 +59,7 @@ All take the shared `User` and `PosProfileCombined` types from `types.ts` (struc
 `storage` object over `localStorage`: generic `setItem`/`getItem`/`removeItem` plus `savePosProfileFull`/`getPosProfileFull` (JSON round-trip under the `pos_profile` key).
 
 ### Formatting (`format.ts`)
-- `formatCurrency(amount)` — prefixes the symbol stored under the `currencySymbol` localStorage key (apps must seed it, e.g. after loading the POS profile).
+- `formatCurrency(amount)` — prefixes the symbol stored under the `currencySymbol` localStorage key (seeded by the POS after loading the profile). When nothing is stored (e.g. the guest self-order page), it falls back to the site currency in `window.frappe.boot.sysdefaults.currency`, resolved like Frappe Desk (`:Currency` boot doc symbol, else the currency code), and groups digits per `sysdefaults.number_format`. `₹` remains the default only when neither exists. Tests: `npx tsx packages/core/src/format.test.ts`.
 - `formatInvoiceTime(timestamp)` — locale time for ISO datetimes, handles bare `HH:MM:SS` strings, returns `'No bill activity yet'` for null.
 
 ### QZ-Tray printing (`print/qz.ts`)
