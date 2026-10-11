@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import UserPage from "./UserPage";
 import { dashboardService } from "../../services/dashboard";
 
@@ -47,7 +47,10 @@ const users = [
     last_name: "User",
     full_name: "Test User",
     enabled: 1,
-    roles: [],
+    roles: [
+      { role: "URY Admin" },
+      { role: "URY Manager" }
+    ],
   },
 ];
 
@@ -67,22 +70,44 @@ describe("UserPage", () => {
     });
   });
 
-  it("displays user email", async () => {
+  it("displays user email and multiple role badges", async () => {
     vi.mocked(dashboardService.getModuleRecords).mockResolvedValue(users);
 
     render(<UserPage />);
     await waitFor(() => {
       expect(screen.getByText("user@ury.test")).toBeInTheDocument();
+      expect(screen.getByText("Admin")).toBeInTheDocument();
+      expect(screen.getByText("Manager")).toBeInTheDocument();
     });
   });
 
-  it("renders page structure", async () => {
+  it("renders multi-select role dropdown including URY Admin when opening Add User drawer", async () => {
     vi.mocked(dashboardService.getModuleRecords).mockResolvedValue([]);
 
     render(<UserPage />);
     await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBeGreaterThan(0);
+      const addButtons = screen.getAllByText("Add User");
+      expect(addButtons.length).toBeGreaterThan(0);
+    });
+
+    const addButton = screen.getAllByText("Add User")[0];
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Roles / Access Level")).toBeInTheDocument();
+      expect(screen.getByText("URY Cashier")).toBeInTheDocument();
+    });
+
+    // Click the MultiSelect dropdown trigger
+    const selectTrigger = screen.getByText("URY Cashier").closest("div");
+    if (selectTrigger) {
+      fireEvent.click(selectTrigger);
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText("URY Admin")).toBeInTheDocument();
+      expect(screen.getByText("URY Manager")).toBeInTheDocument();
+      expect(screen.getByText("URY Captain")).toBeInTheDocument();
     });
   });
 });

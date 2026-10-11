@@ -18,27 +18,29 @@ def apply_yield_back_calculation(doc, method):
     for row in doc.items:
         # Check if yield tracking is enabled for this item using a cheap single-field lookup.
         # frappe.get_cached_value is preferred for Item master data (matches codebase pattern).
-        is_yield_tracked = frappe.get_cached_value("Item", row.item_code, "custom_yield_tracked")
+        is_yield_tracked = frappe.utils.cint(frappe.get_cached_value("Item", row.item_code, "custom_yield_tracked"))
 
         # Skip if yield tracking is not enabled for this item
         if not is_yield_tracked:
             continue
 
-        # Fallback for legacy BOMs or partial entries: if yield_qty is missing but qty exists
-        if not row.custom_yield_qty and row.qty:
-            if not row.custom_yield_percent:
-                row.custom_yield_percent = frappe.get_cached_value("Item", row.item_code, "custom_yield_percent") or 100
-            row.custom_yield_qty = row.qty * (row.custom_yield_percent / 100)
-
         # At this point, the item is yield-tracked, so it must have required fields set
-        if not row.custom_yield_qty:
-            frappe.throw(_("Yield-tracked item {0} requires custom_yield_qty to be set on BOM row {1}").format(
-                row.item_code, row.idx))
+        if row.custom_yield_qty is None or row.custom_yield_qty == 0 or row.custom_yield_qty == "":
+            frappe.throw(
+                _("Yield-tracked item {0} requires custom_yield_qty to be set on BOM row {1}").format(
+                    row.item_code, row.idx
+                ),
+                exc=frappe.ValidationError,
+            )
 
         # Check if yield percent is set and non-zero
         if not row.custom_yield_percent or row.custom_yield_percent == 0:
-            frappe.throw(_("Yield percent for item {0} is missing or zero on BOM row {1}. Check the Item's custom_yield_percent setting.").format(
-                row.item_code, row.idx))
+            frappe.throw(
+                _("Yield percent for item {0} is missing or zero on BOM row {1}. Check the Item's custom_yield_percent setting.").format(
+                    row.item_code, row.idx
+                ),
+                exc=frappe.ValidationError,
+            )
 
         # Back-calculate qty from yield_qty and yield_percent
         # Formula: qty = custom_yield_qty / (custom_yield_percent / 100)

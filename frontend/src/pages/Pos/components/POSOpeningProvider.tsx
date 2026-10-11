@@ -32,10 +32,39 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       setIsLoading(true);
       setNeedsOpeningChecklist(false);
 
-      // First check if POS is opened
+      // First check if POS is opened. ERPNext v16's check_opening_entry
+      // returns an empty list when nothing is open (older versions returned
+      // 1) -- either shape means "not opened". Without the empty-list arm the
+      // branches below misclassify a never-opened POS as "opened": the
+      // opening-entry dialog is never shown and the cashier lands in the POS
+      // with no POS Opening Entry behind it.
       const openingResponse = await checkPOSOpening();
-      if (openingResponse.message === 1) {
-        // POS is not opened
+      const openEntries = Array.isArray(openingResponse.message)
+        ? openingResponse.message
+        : null;
+      if (openingResponse.message === 1 || !openEntries || openEntries.length === 0) {
+        // POS is not opened -- gate on the Opening checklist BEFORE the
+        // opening dialog: the role-based Dependent Checklist validations
+        // (grillax port) block POS Opening Entry creation server-side while
+        // pending goals have no Quality Review, so the checklist must be
+        // collected here first -- otherwise the cashier hits a hard server
+        // error with no UI path to clear it.
+        if (posProfile?.name) {
+          try {
+            const checklistResult = await getChecklist(posProfile.name, 'Opening');
+            if (checklistResult.logStatus !== 'Complete') {
+              setValidationType(null);
+              setNeedsOpeningChecklist(true);
+              return;
+            }
+          } catch (error) {
+            console.error('Failed to check opening checklist status:', error);
+            // On error, block on the checklist for safety.
+            setValidationType(null);
+            setNeedsOpeningChecklist(true);
+            return;
+          }
+        }
         setValidationType('opening');
         return;
       }
@@ -120,6 +149,22 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
+  // Block on the Opening checklist until it's submitted as Complete. Rendered
+  // before the opening dialog: a pending role-based checklist must be
+  // collected before POS Opening Entry creation is attempted.
+  if (needsOpeningChecklist && posProfile?.name) {
+    return (
+      <ChecklistGateDialog
+        posProfile={posProfile.name}
+        checklistType="Opening"
+        onComplete={() => {
+          setNeedsOpeningChecklist(false);
+          checkPOSStatus();
+        }}
+      />
+    );
+  }
+
   // Show opening entry creation dialog when POS needs to be opened
   if (validationType === 'opening') {
     return (
@@ -155,20 +200,6 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         onClosingSubmitted={async () => {
           setValidationType(null);
           await checkPOSStatus();
-        }}
-      />
-    );
-  }
-
-  // Block on the Opening checklist until it's submitted as Complete.
-  if (needsOpeningChecklist && posProfile?.name) {
-    return (
-      <ChecklistGateDialog
-        posProfile={posProfile.name}
-        checklistType="Opening"
-        onComplete={() => {
-          setNeedsOpeningChecklist(false);
-          checkPOSStatus();
         }}
       />
     );

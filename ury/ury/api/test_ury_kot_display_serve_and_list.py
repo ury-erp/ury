@@ -107,3 +107,54 @@ class TestServeKot(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.request", mock_request):
 			with self.assertRaises(frappe.PermissionError):
 				serve_kot("KOT-0001")
+
+
+class TestServeKotEnsuresReadyBeforeServe(FrappeTestCase):
+	"""Regression: an order must never reach "Served" while its item
+	execution rows never went READY. The READY transition is what attaches
+	the real-time production posting intent -- without it, MTO Work Orders
+	stay "In Process" forever and the Manufacture Stock Entry is never
+	posted (CBTEST / MFG-WO-2026-00092 incident: KOT-URY-00091 was served
+	from a surface that only flipped order_status, leaving the execution
+	row QUEUED and the linked Work Order unmanufactured)."""
+
+	def _serve(self):
+		mock_kot_doc = MagicMock()
+		mock_kot_doc.creation = datetime(2026, 1, 1, 12, 0, 0)
+		with patch(f"{MODULE}.frappe.request", None), \
+			patch(f"{MODULE}.frappe.get_doc", return_value=mock_kot_doc), \
+			patch(f"{MODULE}.frappe.has_permission", return_value=True), \
+			patch(f"{MODULE}.get_datetime", return_value=datetime(2026, 1, 1, 12, 15, 0)), \
+			patch(f"{MODULE}.frappe.db.set_value") as mock_set_value:
+			serve_kot("KOT-0001")
+		return {call.args[2]: call.args[3] for call in mock_set_value.call_args_list}
+
+	def test_pending_rows_are_marked_ready_before_serve(self):
+		with patch(f"{MODULE}.frappe.get_all", return_value=["URYKOTITM00180"]), \
+			patch("ury.ury.api.ury_kot_item_execution_service.mark_item_ready") as mock_ready:
+			calls = self._serve()
+
+		mock_ready.assert_called_once_with(
+			"URYKOTITM00180", "serve-auto-ready:KOT-0001:URYKOTITM00180"
+		)
+		self.assertEqual(calls["order_status"], "Served")
+
+	def test_no_pending_rows_skips_ready_transition(self):
+		with patch(f"{MODULE}.frappe.get_all", return_value=[]), \
+			patch("ury.ury.api.ury_kot_item_execution_service.mark_item_ready") as mock_ready:
+			calls = self._serve()
+
+		mock_ready.assert_not_called()
+		self.assertEqual(calls["order_status"], "Served")
+
+	def test_ready_failure_does_not_block_serve(self):
+		# Serving the customer must never be blocked by a production-posting
+		# hiccup; the failure is logged (the READY transition's own savepoint
+		# guarantees it never half-applies).
+		with patch(f"{MODULE}.frappe.get_all", return_value=["URYKOTITM00180"]), \
+			patch("ury.ury.api.ury_kot_item_execution_service.mark_item_ready", side_effect=Exception("boom")), \
+			patch(f"{MODULE}.frappe.log_error") as mock_log_error:
+			calls = self._serve()
+
+		mock_log_error.assert_called_once()
+		self.assertEqual(calls["order_status"], "Served")

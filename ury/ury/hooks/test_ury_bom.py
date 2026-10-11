@@ -412,6 +412,9 @@ class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
 
 	def _ensure_item(self, item_code, **overrides):
 		if frappe.db.exists("Item", item_code):
+			if overrides:
+				frappe.db.set_value("Item", item_code, overrides)
+				frappe.clear_document_cache("Item", item_code)
 			return
 		fields = {
 			"doctype": "Item",
@@ -423,6 +426,7 @@ class TestApplyYieldBackCalculationRealDocumentIntegration(FrappeTestCase):
 		}
 		fields.update(overrides)
 		frappe.get_doc(fields).insert(ignore_permissions=True)
+		frappe.clear_document_cache("Item", item_code)
 
 	def setUp(self):
 		self.company = "F9 BOM Test Co"

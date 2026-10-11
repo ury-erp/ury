@@ -10,7 +10,6 @@ import SideDrawer from '../../components/layout/SideDrawer';
 
 interface UryRoomRecord {
   name: string;
-  room_name?: string;
   room_type?: string;
   branch?: string;
   kot_printing?: number;
@@ -167,11 +166,9 @@ export const RoomPage: React.FC = () => {
         let currentName = editingRoom.name;
         // Only rename if the user actually changed the room name field
         if (newRoom.room_name !== originalRoomDisplayName) {
-          // Construct new and old document names consistently using the stored display name
-          const oldDocName = editingRoom.branch ? `${originalRoomDisplayName} - ${editingRoom.branch}` : originalRoomDisplayName;
-          const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+          const newDocName = newRoom.room_name;
 
-          if (newDocName !== oldDocName) {
+          if (newDocName !== currentName) {
             await call('frappe.client.rename_doc', {
               doctype: 'URY Room',
               old_name: editingRoom.name,
@@ -197,7 +194,7 @@ export const RoomPage: React.FC = () => {
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Room',
-            name: `${newRoom.room_name} - ${newRoom.branch}`,
+            name: newRoom.room_name,
             room_type: newRoom.room_type,
             branch: newRoom.branch || undefined,
             kot_printing: newRoom.kot_printing ? 1 : 0,
