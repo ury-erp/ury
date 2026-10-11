@@ -98,9 +98,37 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
 
     try {
       const response = await checkPOSOpening(user?.name);
+      const entries = normalizeOpenEntries(response.message);
 
       // No open entry for this user -> show the native opening screen.
-      if (response.message === 1) {
+      // ERPNext v16's check_opening_entry returns an empty list here; older
+      // versions returned 1. Either shape means "not opened" -- without the
+      // empty-list arm the opening-checklist gate below is skipped entirely
+      // and the cashier hits the server-side Dependent Checklist validation
+      // as a hard error with no UI path to clear it.
+      if (response.message === 1 || !entries || entries.length === 0) {
+        // Gate on the Opening checklist BEFORE the opening screen: the
+        // role-based Dependent Checklist validations (grillax port) block
+        // POS Opening Entry creation server-side while pending goals have
+        // no Quality Review, so the checklist must be collected here first
+        // -- otherwise the cashier hits a hard server error with no UI path
+        // to clear it.
+        if (posProfile.name) {
+          try {
+            const { logStatus } = await getChecklist(posProfile.name, 'Opening');
+            if (logStatus !== 'Complete') {
+              setNeedsOpeningChecklist(true);
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.error('Failed to check opening checklist status:', error);
+            // On error, block on the checklist for safety.
+            setNeedsOpeningChecklist(true);
+            setIsLoading(false);
+            return;
+          }
+        }
         if (posProfile.custom_daily_pos_close === 1) {
           const closeResponse = await validatePOSClose(posProfile.name);
           if (closeResponse.message === 'Failed') {
@@ -109,12 +137,6 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
             return;
           }
         }
-        setIsLoading(false);
-        return;
-      }
-
-      const entries = normalizeOpenEntries(response.message);
-      if (!entries || entries.length === 0) {
         setIsLoading(false);
         return;
       }

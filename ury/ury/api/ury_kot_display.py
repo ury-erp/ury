@@ -17,17 +17,50 @@ def serve_kot(name, time=None):
     if kot_doc.type in ("Cancelled", "Partially cancelled"):
         frappe.throw(_("KOT has been cancelled and cannot be served"), frappe.ValidationError)
 
+    _ensure_ready_before_serve(name)
+
     current_time = get_datetime()
     creation_time = kot_doc.creation
 
     production_time = current_time - creation_time
     production_time_minutes = production_time.total_seconds() / 60
-    
+
     server_time_str = current_time.strftime("%H:%M:%S")
-    
+
     frappe.db.set_value("URY KOT", name, "start_time_serv", server_time_str)
     frappe.db.set_value("URY KOT", name, "production_time", production_time_minutes)
     frappe.db.set_value("URY KOT", name, "order_status", "Served")
+
+
+def _ensure_ready_before_serve(kot_name):
+    """Fire the READY transition -- which attaches the real-time production
+    posting intent -- for any item execution row still QUEUED or
+    IN_PREPARATION.
+
+    Every serve surface funnels through :func:`serve_kot` for the final
+    ``order_status`` flip, but only the Mosaic kitchen display calls
+    ``mark_item_ready`` on the way. Served without READY, an order never
+    creates its posting intent: MTO Work Orders stay "In Process" forever
+    and the Manufacture Stock Entry is never posted. Rows already READY
+    (the normal kitchen-display path) are untouched, and a failure here is
+    logged without blocking the customer-facing serve -- the transition's
+    own savepoint guarantees a failed READY never half-applies.
+    """
+    from ury.ury.api.ury_kot_item_execution_service import mark_item_ready
+
+    pending_rows = frappe.get_all(
+        "URY KOT Item Execution",
+        filters={"kot": kot_name, "state": ["in", ("QUEUED", "IN_PREPARATION")]},
+        pluck="kot_item",
+    )
+    for kot_item in pending_rows:
+        try:
+            mark_item_ready(kot_item, f"serve-auto-ready:{kot_name}:{kot_item}")
+        except Exception:
+            frappe.log_error(
+                title="ury_kot_display._ensure_ready_before_serve",
+                message=frappe.get_traceback(),
+            )
 
 
 # Function to mark it as verified in a cancel type KOT.
