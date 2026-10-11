@@ -1,0 +1,2 @@
+# Run inside the Linux container; CRLF breaks bash.
+* text=auto eol=lf
