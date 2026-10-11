@@ -208,7 +208,7 @@ permission_query_conditions = {
 # Override standard doctype classes
 
 override_doctype_class = {
-	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+	"POS Invoice Merge Log": "ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
 }
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
