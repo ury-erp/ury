@@ -435,7 +435,12 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "POS Profile-custom_ury_pos_configurations",
+                    "POS Profile-custom_kot_setup",
+                    "POS Profile-custom_user__payment_configurations",
+                    "POS Profile-custom_print_settings",
+                    "POS Profile-custom_accounting_configuration",
                 },
             ]
         ],
@@ -455,4 +460,19 @@ fixtures = [
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
+
+
+    {
+        "dt": "Property Setter",
+        "filters": [
+            [
+                "name",
+                "in",
+                {
+                    "POS Closing Entry Detail-closing_amount-label",
+                    "POS Profile-main-field_order"
+                }
+            ]
+        ],
+    },
 ]
