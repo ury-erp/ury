@@ -243,9 +243,12 @@ class TestGetRunningLow(FrappeTestCase):
             })
         ]
 
-        mock_get_value.side_effect = ["Kitchen - U", 50]
+        mock_get_value.return_value = "Kitchen - U"
 
-        result = get_running_low(branch="URY Branch")
+        with patch("ury.ury.api.ury_service_line._get_actual_qty", return_value=50) as mock_qty:
+            result = get_running_low(branch="URY Branch")
+
+        mock_qty.assert_called_once_with("ITEM1", "Kitchen - U")
 
         self.assertGreater(len(result), 0)
         first_item = result[0]
@@ -279,9 +282,10 @@ class TestGetRunningLow(FrappeTestCase):
             })
         ]
 
-        mock_get_value.side_effect = ["Kitchen - U", -20]
+        mock_get_value.return_value = "Kitchen - U"
 
-        result = get_running_low(branch="URY Branch")
+        with patch("ury.ury.api.ury_service_line._get_actual_qty", return_value=-20):
+            result = get_running_low(branch="URY Branch")
 
         first_item = result[0]
         self.assertTrue(first_item["data_quality_issue"])
@@ -309,8 +313,7 @@ class TestGetRunningLow(FrappeTestCase):
         self.assertEqual(result, [])
         # The POS Profile warehouse lookup is gated only on `branch` being
         # truthy, not on whether any items sold — it always fires once here
-        # since branch="URY Branch". The per-item Bin lookup inside the sold
-        # items loop is what's skipped when there's nothing sold.
+        # since branch="URY Branch".
         mock_get_value.assert_called_once_with("POS Profile", {"branch": "URY Branch"}, "warehouse")
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
@@ -338,10 +341,12 @@ class TestGetRunningLow(FrappeTestCase):
 
         # branch=None skips the POS Profile warehouse lookup entirely (see
         # `if branch:` guard in get_running_low), so only the per-item Bin
-        # lookup fires — a single call, not two.
-        mock_get_value.side_effect = [100]
+        # lookup fires, unscoped by warehouse.
+        with patch("ury.ury.api.ury_service_line._get_actual_qty", return_value=100) as mock_qty:
+            result = get_running_low(branch=None)
 
-        result = get_running_low(branch=None)
+        mock_get_value.assert_not_called()
+        mock_qty.assert_called_once_with("ITEM3", None)
 
         self.assertGreater(len(result), 0)
         first_item = result[0]

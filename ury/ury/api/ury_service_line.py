@@ -1,6 +1,7 @@
 import frappe
 
-from frappe.utils import get_datetime, add_to_date, today
+from frappe.query_builder.functions import Sum
+from frappe.utils import get_datetime, add_to_date, flt, today
 
 
 @frappe.whitelist(methods=["GET"])
@@ -104,10 +105,7 @@ def get_running_low(branch=None):
 
 	result = []
 	for row in sold_rows:
-		bin_filters = {"item_code": row.item_code}
-		if warehouse:
-			bin_filters["warehouse"] = warehouse
-		actual_qty = frappe.db.get_value("Bin", bin_filters, "sum(actual_qty)") or 0
+		actual_qty = _get_actual_qty(row.item_code, warehouse)
 
 		data_quality_issue = actual_qty < 0
 		remaining = max(actual_qty, 0)
@@ -128,3 +126,12 @@ def get_running_low(branch=None):
 
 	frappe.cache().set_value(cache_key, result[:6], expires_in_sec=60)
 	return result[:6]
+
+
+def _get_actual_qty(item_code, warehouse=None):
+	# Frappe v16 rejects SQL function strings like "sum(actual_qty)" in get_value fields
+	Bin = frappe.qb.DocType("Bin")
+	query = frappe.qb.from_(Bin).select(Sum(Bin.actual_qty)).where(Bin.item_code == item_code)
+	if warehouse:
+		query = query.where(Bin.warehouse == warehouse)
+	return flt(query.run()[0][0])

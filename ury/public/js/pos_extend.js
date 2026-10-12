@@ -1,9 +1,17 @@
 frappe.provide("erpnext.PointOfSale");
+
+// ERPNext v16 POS events take (doctype, name); v15 takes (name) only.
+const ury_pos_doc_args = (doc) =>
+  cint((frappe.boot.versions?.erpnext || "").split(".")[0]) >= 16
+    ? [doc.doctype, doc.name]
+    : [doc.name];
+
 frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
   frappe.ui.make_app_page({
     parent: wrapper,
     title: __("Point of Sale"),
     single_column: true,
+    hide_sidebar: true,
   });
 
   frappe.require("point-of-sale.bundle.js", function () {
@@ -92,7 +100,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
       cancel_order() {
         if (!this.$components_wrapper.is(":visible")) return;
 
-        if (this.frm.doc.name.startsWith("new-pos")) {
+        if (this.frm.doc.__islocal) {
             frappe.show_alert({
                 message: __("You must save document as draft to cancel."),
                 indicator: 'red'
@@ -170,7 +178,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         const posting_datetime = moment(
           invoice.posting_date + " " + invoice.posting_time
         ).format("Do MMMM, h:mma");
-        return `<div class="invoice-wrapper" data-invoice-name="${escape(
+        return `<div class="invoice-wrapper" data-invoice-doctype="POS Invoice" data-invoice-name="${escape(
           invoice.name
         )}">
 						<div class="invoice-name-date">
@@ -203,8 +211,19 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         super(wrapper);
       }
       bind_events() {
-        this.$summary_container.on("click", ".return-btn", () => {
-          this.events.process_return(this.doc.name);
+        this.$summary_container.on("click", ".return-btn", async () => {
+          if (this.is_invoice_returnable) {
+            const returnable = await this.is_invoice_returnable(this.doc.doctype, this.doc.name);
+            if (!returnable) {
+              frappe.msgprint({
+                title: __("Invalid Return"),
+                indicator: "orange",
+                message: __("All the items have been already returned."),
+              });
+              return;
+            }
+          }
+          this.events.process_return(...ury_pos_doc_args(this.doc));
           this.toggle_component(false);
           this.$component
             .find(".no-summary-placeholder")
@@ -217,7 +236,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
             ".add-comment-wrapper"
           );
           addCommentWrapper.style.display = "flex";
-          this.events.edit_order(this.doc.name);
+          this.events.edit_order(...ury_pos_doc_args(this.doc));
           // this.check();
           this.toggle_component(false);
           this.$component
@@ -241,12 +260,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         });
 
         this.$summary_container.on("click", ".delete-btn", () => {
-          this.events.delete_order(this.doc.name);
-          this.show_summary_placeholder();
-        });
-
-        this.$summary_container.on("click", ".delete-btn", () => {
-          this.events.delete_order(this.doc.name);
+          this.events.delete_order(...ury_pos_doc_args(this.doc));
           this.show_summary_placeholder();
           // this.toggle_component(false);
           // this.$component.find('.no-summary-placeholder').removeClass('d-none');
@@ -276,6 +290,11 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 
         this.$summary_container.on("click", ".print-btn", () => {
           this.print_receipt();
+        });
+
+        // v16 only: "Open" button in the order summary
+        this.$summary_container.on("click", ".open-btn", () => {
+          this.events.open_in_form_view?.(this.doc.doctype, this.doc.name);
         });
       }
     };

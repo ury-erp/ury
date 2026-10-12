@@ -56,7 +56,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-02 19:26:35.695361",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu",
@@ -120,7 +120,7 @@
  ],
  "quick_entry": 1,
  "row_format": "Dynamic",
- "sort_field": "modified",
+ "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1

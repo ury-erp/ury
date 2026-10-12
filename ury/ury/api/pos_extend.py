@@ -53,14 +53,14 @@ def overrided_past_order_list(search_term, status, limit=20):
         invoices_by_customer = frappe.db.get_all(
             "POS Invoice",
             filters={
-                "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
+                "customer": ["like", f"%{search_term}%"],
                 "status": status,
             },
             fields=fields,
         )
         invoices_by_name = frappe.db.get_all(
             "POS Invoice",
-            filters={"name": ["like", "%{}%".format(frappe.db.escape(search_term))], "status": status},
+            filters={"name": ["like", f"%{search_term}%"], "status": status},
             fields=fields,
         )
         print("invoices by customer",invoices_by_customer)

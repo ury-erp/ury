@@ -1,0 +1,35 @@
+# Local development only. Isolated from other Frappe stacks on this machine.
+name: ury-dev
+services:
+  db:
+    image: mariadb:11.8@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+    environment:
+      MARIADB_ROOT_PASSWORD: ury-local-db
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  redis:
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+  backend:
+    image: frappe/bench:latest@sha256:c18a8a67e611b3d6c9ce66303c6a5d82cb0cd2a5f70de772086e15e5cfe35c40
+    command: ["bash", "-lc", "sudo chown frappe:frappe /workspace && sleep infinity"]
+    working_dir: /workspace
+    volumes:
+      - bench:/workspace
+      - ../..:/source/ury:ro
+    ports:
+      - "127.0.0.1:18100:8000"
+      - "127.0.0.1:19100:9000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+volumes:
+  database:
+  bench:

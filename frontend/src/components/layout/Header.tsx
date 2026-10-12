@@ -237,7 +237,7 @@ export const Header: React.FC = () => {
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      window.location.href = '/app';
+                      window.location.href = '/desk';
                     }}
                     className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                   >

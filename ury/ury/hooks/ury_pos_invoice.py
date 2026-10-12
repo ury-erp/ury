@@ -116,7 +116,7 @@ def validate_invoice_print(doc, method):
 
 def table_status_delete(doc, method):
     if doc.restaurant_table:
-        release_merge_cluster_tables(doc.restaurant_table)
+        release_merge_cluster_tables(doc.restaurant_table, commit=False)
 
 
 def pos_invoice_naming(doc, method):

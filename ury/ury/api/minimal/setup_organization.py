@@ -1,5 +1,12 @@
 import frappe
-from frappe.desk.page.setup_wizard.setup_wizard import load_languages, load_country, setup_complete
+from frappe.desk.page.setup_wizard.setup_wizard import load_languages, setup_complete
+
+try:
+    from frappe.desk.page.setup_wizard.setup_wizard import load_country
+except ImportError:
+    # Frappe v16 removed GeoIP-based country detection
+    def load_country():
+        return None
 from frappe.geo.country_info import get_country_info, get_all
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 import pytz
