@@ -1,0 +1,186 @@
+{
+  "_meta": {
+    "direction": "rtl",
+    "glossary": "docs/i18n/arabic-glossary.md",
+    "human_verified": false,
+    "language_code": "ar",
+    "last_updated": "2026-09-17",
+    "register": "fusha_grammar_iraqi_terminology"
+  },
+  "a11y": {
+    "breadcrumb": "مسار التنقل"
+  },
+  "cart": {
+    "add_plus": "إضافة +",
+    "decrease": "إنقاص الكمية",
+    "empty_body": "أضف أصنافاً من المنيو وستظهر هنا.",
+    "empty_title": "لا توجد أصناف في هذا الطلب",
+    "increase": "زيادة الكمية",
+    "items_count": "{{count}} صنف",
+    "pax": "عدد الأشخاص",
+    "quantity": "الكمية",
+    "title": "سلة الطلب"
+  },
+  "common": {
+    "add": "إضافة",
+    "additional_details": "تفاصيل إضافية",
+    "all": "الكل",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "enter_details": "أدخل التفاصيل",
+    "next": "التالي",
+    "no": "لا",
+    "nothing_to_show": "لا يوجد ما يُعرض هنا",
+    "previous": "السابق",
+    "reload": "إعادة تحميل",
+    "save": "حفظ",
+    "submit": "ترحيل",
+    "update": "تحديث",
+    "yes": "نعم"
+  },
+  "customer": {
+    "create_new": "إنشاء زبون جديد",
+    "group": "مجموعة الزبائن",
+    "mobile": "رقم الهاتف",
+    "name": "اسم الزبون",
+    "new": "زبون جديد",
+    "pax_count": "{{count}} ضيف",
+    "search": "بحث عن الزبائن",
+    "territory": "المنطقة",
+    "title": "الزبون"
+  },
+  "header": {
+    "logout": "تسجيل الخروج",
+    "station": "المحطة",
+    "switch_to_desk": "الانتقال إلى المكتب",
+    "till": "الكاشير"
+  },
+  "home": {
+    "ping": "اختبار الاتصال",
+    "title": "الصفحة الرئيسية"
+  },
+  "language": {
+    "label": "اللغة"
+  },
+  "login": {
+    "password": "كلمة المرور:",
+    "sign_in": "تسجيل الدخول",
+    "title": "تسجيل الدخول",
+    "username": "اسم المستخدم:"
+  },
+  "menu": {
+    "favourite_items": "الأصناف المفضلة",
+    "item_name": "اسم الصنف",
+    "item_search": "بحث عن صنف",
+    "items": "الأصناف",
+    "items_not_found": "لم يتم العثور على أصناف.",
+    "items_not_found_hint": "لم يتم العثور على أصناف. يرجى اختيار طاولة أو تعيين قائمة طعام نشطة.",
+    "quantity": "الكمية",
+    "select_course": "اختر الوجبة",
+    "title": "قائمة الطعام"
+  },
+  "nav": {
+    "primary": "التنقّل الرئيسي"
+  },
+  "order": {
+    "aggregator_id": "معرّف تطبيق التوصيل",
+    "aggregators_list": "قائمة تطبيقات التوصيل",
+    "bill": "الفاتورة",
+    "cancel_order": "إلغاء الطلب",
+    "close_table": "إغلاق الطاولة",
+    "close_table_body": "سيتم إقفال الفاتورة وتحرير الطاولة. لن تُطبع أي إيصال، ويُسجَّل الطلب كمُغلق بدون إيصال.",
+    "close_table_reason_hint": "مثال: دفع نقداً، الزبون لم يطلب إيصالاً",
+    "close_table_title": "إغلاق الطاولة بدون طباعة؟",
+    "closing": "جارٍ الإغلاق...",
+    "comments": "التعليقات",
+    "confirm_cancel": "هل أنت متأكد من الإلغاء",
+    "invoice": "الفاتورة",
+    "kot_reprint": "إعادة طباعة أمر المطبخ",
+    "kot_reprinting": "جارٍ إعادة طباعة أمر المطبخ...",
+    "order_log": "سجل الطلبات",
+    "print_receipt": "طباعة الفاتورة",
+    "printing_invoice": "جارٍ طباعة الفاتورة",
+    "priority": "الأولوية",
+    "reason": "السبب",
+    "recent_orders": "الطلبات الأخيرة",
+    "search_placeholder": "ابحث برقم الفاتورة أو اسم الزبون أو رقم الهاتف",
+    "send_order": "إرسال الطلب",
+    "title": "الطلب",
+    "type": "نوع الطلب",
+    "updating": "جارٍ تحديث الطلب...",
+    "view_order": "عرض الطلب"
+  },
+  "payment": {
+    "add_discount": "إضافة خصم",
+    "change_amount": "الباقي:",
+    "enter_discount_pct": "أدخل نسبة الخصم",
+    "make_payment": "إتمام الدفع",
+    "mode": "طريقة الدفع",
+    "modes": "طرق الدفع",
+    "processing": "جارٍ معالجة الدفع",
+    "reconciliation": "تسوية المدفوعات",
+    "select_mode": "اختر طريقة الدفع"
+  },
+  "pos": {
+    "branch": "الفرع",
+    "cashier": "أمين الصندوق",
+    "closing_amount": "المبلغ الختامي",
+    "closing_entry": "قيد إغلاق نقطة البيع",
+    "company": "الشركة",
+    "opening_amount": "المبلغ الافتتاحي",
+    "opening_balance_details": "تفاصيل الرصيد الافتتاحي",
+    "opening_entry": "قيد فتح نقطة البيع",
+    "period_details": "تفاصيل المدة",
+    "period_end": "تاريخ نهاية المدة",
+    "period_start": "تاريخ بداية المدة",
+    "posting_date": "تاريخ الترحيل",
+    "posting_time": "وقت الترحيل",
+    "profile": "ملف نقطة البيع",
+    "user_details": "تفاصيل المستخدم"
+  },
+  "status": {
+    "all": "كل الطلبات",
+    "consolidated": "موحّدة",
+    "draft": "مسودة",
+    "paid": "مدفوعة",
+    "recently_paid": "مدفوعة حديثاً",
+    "return": "مرتجع",
+    "unbilled": "غير مفوترة"
+  },
+  "steps": {
+    "label": "مراحل الطلب"
+  },
+  "tables": {
+    "captain_transfer": "نقل الكابتن",
+    "current_captain": "الكابتن الحالي",
+    "current_table": "الطاولة الحالية",
+    "dine_in": "داخل المطعم",
+    "merge_tables": "دمج الطاولات",
+    "merged_table": "الطاولة المدموجة",
+    "new_captain": "الكابتن الجديد",
+    "new_table": "طاولة جديدة",
+    "none_for_room": "لم يتم العثور على طاولات. يرجى تعيين طاولات لهذه القاعة",
+    "none_takeaway_for_room": "لم يتم العثور على طاولات. يرجى تعيين طاولات طلبات خارجية لهذه القاعة",
+    "open_table": "فتح الطاولة",
+    "seats": "{{count}} مقعد",
+    "select_room": "اختر القاعة",
+    "select_table": "اختر طاولة",
+    "select_to_merge": "اختر طاولة للدمج",
+    "table_merge": "دمج الطاولات",
+    "table_transfer": "نقل الطاولة",
+    "takeaway": "طلب خارجي",
+    "title": "الطاولة",
+    "transfer": "نقل",
+    "waiter": "الكابتن"
+  },
+  "totals": {
+    "grand_total": "المجموع الكلي",
+    "net_total": "صافي المجموع",
+    "title": "الإجماليات",
+    "total_invoices": "إجمالي الفواتير",
+    "total_quantity": "إجمالي الكمية"
+  }
+}

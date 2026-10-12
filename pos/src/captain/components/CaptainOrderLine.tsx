@@ -2,6 +2,7 @@ import { Minus, Plus, MessageSquare, RotateCcw, Trash2 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import type { OrderDeltaLine } from '../hooks/useTableOrderContext';
+import { t } from '../../i18n';
 
 interface CaptainOrderLineProps {
   line: OrderDeltaLine;
@@ -78,7 +79,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               onClick={onDecrement}
               disabled={disabled}
               className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
-              aria-label="Decrease"
+              aria-label={t('common.decrease')}
             >
               <Minus className="w-4 h-4" />
             </button>
@@ -87,7 +88,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               onClick={onIncrement}
               disabled={disabled}
               className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
-              aria-label="Increase"
+              aria-label={t('common.increase')}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -100,8 +101,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             onClick={onDecrement}
             disabled={disabled}
             className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
-            aria-label="Reduce quantity"
-            title="Reduce quantity"
+            aria-label={t('captain.reduce_quantity')}
+            title={t('captain.reduce_quantity')}
           >
             <Minus className="w-4 h-4" />
           </button>
@@ -113,8 +114,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             onClick={onRemove}
             disabled={disabled}
             className="w-9 h-9 rounded-full border border-red-200 text-red-600 flex items-center justify-center disabled:opacity-40"
-            aria-label="Remove item"
-            title="Remove item"
+            aria-label={t('captain.remove_item')}
+            title={t('captain.remove_item')}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -126,8 +127,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             onClick={onRestore}
             disabled={disabled}
             className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
-            aria-label="Undo reduction"
-            title="Undo"
+            aria-label={t('captain.undo_reduction')}
+            title={t('common.undo')}
           >
             <RotateCcw className="w-4 h-4" />
           </button>

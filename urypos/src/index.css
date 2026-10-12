@@ -1,4 +1,615 @@
+/**
+ * IBM Plex Sans Arabic — self-hosted.
+ *
+ * Self-hosted rather than loaded from Google Fonts on purpose: a POS terminal
+ * in a restaurant is frequently offline or on a throttled connection, and a
+ * CDN font that fails to load would drop the whole UI to a default serif.
+ * The files live in `ury/public/fonts/`, which Frappe serves at
+ * `/assets/ury/fonts/`, so all five frontends share one copy regardless of
+ * which bundle they ship in.
+ *
+ * Only the `arabic` and `latin` subsets are included — the browser fetches a
+ * subset only when the page actually contains glyphs in its unicode-range, so
+ * an English user never downloads the Arabic file (or vice versa).
+ *
+ * `font-display: swap` keeps text visible while the face loads; the system
+ * fallback stack in rtl.css covers the swap window and the offline case.
+ *
+ * Generated — do not hand-edit. See docs/i18n/README.md.
+ */
+
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-400-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-500-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-600-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* arabic */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-700-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/assets/ury/fonts/ibm-plex-sans-arabic-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===================================================================
+ * Design tokens.
+ *
+ * A one-for-one mirror of `packages/ui/src/styles/theme.css`. urypos is
+ * outside the yarn workspace and cannot import `@ury/ui`, so the values are
+ * re-declared rather than imported — changing one means changing both.
+ * `tailwind.config.js` reads these, which is what makes `bg-card`,
+ * `text-muted-foreground` and friends resolve.
+ *
+ * Channels, not colours (`20 24% 16%`, not `hsl(20 24% 16%)`), so Tailwind can
+ * inject an alpha channel for `bg-card/70`.
+ *
+ * The palette is warm on purpose: this is a restaurant floor app, and the rest
+ * of the suite — the kitchen board, the dashboard, the till — already reads as
+ * paper and amber rather than the grey-and-blue admin default urypos had.
+ * =================================================================== */
+
+:root {
+  --background: 42 43% 97%;
+  --foreground: 20 24% 16%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 20 24% 16%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 24% 16%;
+
+  --primary: 5 78% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 44 100% 92%;
+  --secondary-foreground: 28 63% 23%;
+
+  --muted: 40 30% 93%;
+  --muted-foreground: 25 12% 45%;
+
+  --accent: 45 100% 58%;
+  --accent-foreground: 28 63% 20%;
+
+  --destructive: 0 72% 46%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Not in theme.css yet: a floor app needs "this table is fine" and "this
+     table needs you soon" as first-class states, not ad-hoc greens. */
+  --success: 152 55% 34%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 45%;
+  --warning-foreground: 28 63% 20%;
+
+  --border: 35 24% 87%;
+  --input: 35 24% 83%;
+  --ring: 5 78% 50%;
+
+  --radius: 0.75rem;
+
+  /*
+   * The type stack, and the only place it is declared.
+   *
+   * IBM Plex Sans Arabic was self-hosted and @font-face'd at the top of this
+   * file, and then never applied: nothing set `font-family` on the document,
+   * so Tailwind's preflight left the UI on `system-ui`, and the RTL block
+   * below actively pinned Arabic to Segoe UI / Tahoma. Eight woff2 subsets
+   * were being shipped to every terminal and not one glyph was rendered in
+   * them. One family covers both scripts, which is the whole point of
+   * choosing this one — see docs/design/README.md.
+   */
+  --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, 'Noto Sans Arabic',
+    'Geeza Pro', system-ui, sans-serif;
+  --font-numeric: var(--font-sans);
+}
+
+/* ===================================================================
+ * Component layer.
+ *
+ * Every rule here existed as a copied-and-pasted Tailwind string in three or
+ * more components before it was named. Sizes assume the real device: a phone
+ * held one-handed by a waiter crossing a room, so controls clear 44px and
+ * nothing depends on a precise tap.
+ * =================================================================== */
+
+@layer components {
+  /* --- Surfaces ---------------------------------------------------- */
+
+  .pos-card {
+    @apply rounded-2xl border border-border bg-card shadow-card;
+  }
+
+  /* A card that is itself a control: a table tile, a menu item. */
+  .pos-card-interactive {
+    @apply pos-card cursor-pointer text-start transition-shadow duration-fast;
+  }
+
+  .pos-card-interactive:hover {
+    box-shadow: 0 8px 24px rgba(74, 48, 30, 0.12);
+  }
+
+  .pos-card-interactive:active {
+    transform: scale(0.985);
+  }
+
+  .pos-panel {
+    @apply rounded-2xl border border-border bg-muted/60 p-4;
+  }
+
+  /* --- Controls ---------------------------------------------------- */
+
+  /*
+   * 44px is the floor, not the target: it is the smallest control a thumb
+   * hits reliably on a moving phone. `lg` is for the primary action of a
+   * screen, which is often pressed without looking.
+   */
+  .pos-btn {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2
+           rounded-xl px-5 text-sm font-bold
+           transition-colors duration-fast
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .pos-btn-lg { @apply min-h-[3.25rem] px-6 text-base; }
+  .pos-btn-sm { @apply min-h-[2.25rem] px-3.5 text-xs; }
+
+  .pos-btn-primary {
+    @apply pos-btn bg-primary text-primary-foreground shadow-card
+           hover:brightness-95;
+  }
+
+  .pos-btn-accent {
+    @apply pos-btn bg-accent text-accent-foreground shadow-card
+           hover:brightness-95;
+  }
+
+  .pos-btn-secondary {
+    @apply pos-btn bg-secondary text-secondary-foreground hover:brightness-95;
+  }
+
+  .pos-btn-ghost {
+    @apply pos-btn border border-border bg-card text-foreground hover:bg-muted;
+  }
+
+  .pos-btn-danger {
+    @apply pos-btn bg-destructive text-destructive-foreground hover:brightness-95;
+  }
+
+  .pos-input,
+  .pos-select {
+    @apply h-11 w-full rounded-xl border border-input bg-card px-3.5
+           text-base text-foreground
+           transition-colors duration-fast
+           placeholder:text-muted-foreground
+           focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/25;
+  }
+
+  .pos-select { @apply pe-9; }
+
+  /*
+   * Floating label. The old markup positioned a label absolutely over the
+   * control with a hard `bg-white`, which broke the moment the surface behind
+   * it was not white — so it carries the token instead.
+   */
+  .pos-field { @apply relative; }
+
+  .pos-field > label {
+    @apply absolute -top-2 z-10 rounded bg-card px-1.5 text-[11px]
+           font-semibold uppercase tracking-wider text-muted-foreground;
+    inset-inline-start: 0.65rem;
+  }
+
+  /* --- Status ------------------------------------------------------ */
+
+  .pos-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
+           text-xs font-bold;
+  }
+
+  .pos-badge-neutral { @apply pos-badge bg-muted text-muted-foreground; }
+  .pos-badge-success { @apply pos-badge bg-success/10 text-success; }
+  .pos-badge-warning { @apply pos-badge bg-warning/10 text-warning; }
+  .pos-badge-danger  { @apply pos-badge bg-destructive/10 text-destructive; }
+  .pos-badge-accent  { @apply pos-badge bg-secondary text-secondary-foreground; }
+
+  /* --- Chrome ------------------------------------------------------
+   *
+   * Two form factors, one component set. A phone gets a top bar and a bottom
+   * tab bar, both within thumb reach. A tablet — which is what a POS station
+   * actually is, propped on a stand and used two-handed — gets the same top
+   * bar and a side rail, because a 10" screen wastes its width on a bottom
+   * bar and its height on nothing.
+   *
+   * `env(safe-area-inset-*)` throughout: an iPad's home indicator and an
+   * iPhone's notch both overlap fixed chrome otherwise.
+   * ------------------------------------------------------------------ */
+
+  /*
+   * Brand bar.
+   *
+   * Deep brown rather than another white surface, matching the kitchen
+   * display's header, so the suite reads as one product from across a room.
+   * It is also the only dark surface in the app, which makes it the anchor:
+   * a waiter's eye finds the top of the screen without looking for it.
+   */
+  .pos-header {
+    @apply fixed inset-x-0 top-0 z-40;
+    background: hsl(20 32% 11%);
+    border-bottom: 1px solid hsl(20 28% 18%);
+    box-shadow: 0 4px 18px rgba(36, 25, 20, 0.18);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pos-header-inner {
+    @apply mx-auto flex items-center justify-between gap-3 px-4 sm:px-6;
+    height: 3.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .pos-header-inner { height: 4rem; }
+  }
+
+  /* --- Brand ------------------------------------------------------- */
+
+  .pos-brand { @apply flex min-w-0 items-center gap-3; }
+
+  .pos-brand-mark {
+    @apply grid shrink-0 place-items-center rounded-xl bg-white;
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .pos-brand-mark img {
+    width: 1.65rem;
+    height: 1.65rem;
+    object-fit: contain;
+  }
+
+  .pos-brand-name {
+    @apply text-base font-bold leading-none tracking-tight text-white;
+  }
+
+  .pos-brand-name strong { color: hsl(var(--accent)); font-weight: 800; }
+
+  .pos-brand-divider {
+    width: 1px;
+    height: 1.5rem;
+    background: rgb(255 255 255 / 0.18);
+  }
+
+  /* What this screen is about: the table, or the till. */
+  .pos-context {
+    @apply min-w-0 leading-tight;
+  }
+
+  .pos-context-label {
+    @apply block text-[10px] font-bold uppercase tracking-widest;
+    color: rgb(255 255 255 / 0.5);
+  }
+
+  .pos-context-value {
+    @apply block truncate text-base font-bold text-white;
+  }
+
+  /* A control sitting on the dark bar. */
+  .pos-header-button {
+    @apply inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl px-2.5
+           text-sm font-semibold text-white
+           transition-colors duration-fast;
+  }
+
+  .pos-header-button:hover { background: rgb(255 255 255 / 0.1); }
+
+  /* --- Navigation -------------------------------------------------- */
+
+  /* Phone: a bottom bar. Hidden once there is room for the rail. */
+  .pos-tabbar {
+    @apply fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card md:hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -4px 16px rgba(74, 48, 30, 0.07);
+  }
+
+  /* Tablet: a rail on the leading edge, under the brand bar. */
+  .pos-rail {
+    @apply fixed bottom-0 start-0 z-30 hidden border-e border-border bg-card
+           md:flex md:flex-col md:gap-1 md:py-4;
+    top: calc(4rem + env(safe-area-inset-top));
+    width: 6rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .pos-tab {
+    @apply relative inline-flex flex-col items-center justify-center gap-1
+           px-2 py-2 text-[11px] font-semibold text-muted-foreground
+           transition-colors duration-fast;
+  }
+
+  .pos-rail .pos-tab {
+    @apply mx-2 rounded-xl py-3 text-[12px];
+  }
+
+  .pos-rail .pos-tab-active { @apply bg-secondary; }
+
+  .pos-tab-active { @apply text-primary; }
+
+  /*
+   * Content offsets. Every screen sits inside this, so no page has to know
+   * how tall the chrome is.
+   */
+  .pos-shell {
+    padding-top: calc(3.5rem + env(safe-area-inset-top));
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .pos-shell {
+      padding-top: calc(4rem + env(safe-area-inset-top));
+      padding-bottom: 2rem;
+      padding-inline-start: 6rem;
+    }
+  }
+
+  /* The bar carrying a screen's main action, above the phone tab bar and
+     flush to the bottom on a tablet. */
+  .pos-actionbar {
+    @apply fixed inset-x-0 z-20 border-t border-border bg-card/95 px-4 py-3;
+    bottom: calc(4rem + env(safe-area-inset-bottom));
+    backdrop-filter: blur(8px);
+  }
+
+  @media (min-width: 768px) {
+    .pos-actionbar {
+      bottom: 0;
+      inset-inline-start: 6rem;
+      padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  .pos-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-border
+           bg-card shadow-sheet;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pos-overlay {
+    @apply fixed inset-0 z-40;
+    background: hsl(20 24% 16% / 0.55);
+    backdrop-filter: blur(3px);
+  }
+
+  /* --- Text -------------------------------------------------------- */
+
+  .pos-title { @apply text-lg font-bold leading-tight text-foreground; }
+
+  .pos-label {
+    @apply text-[11px] font-bold uppercase tracking-wider text-muted-foreground;
+  }
+
+  .pos-money {
+    @apply font-bold tabular-nums;
+    unicode-bidi: isolate;
+  }
+
+  /* --- Skeleton ---------------------------------------------------- */
+
+  .pos-skeleton {
+    @apply rounded-lg;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--background)) 37%,
+      hsl(var(--muted)) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
 	
+/*
+ * RTL + Arabic typography. Mirrors packages/ui/src/styles/rtl.css, inlined
+ * because urypos sits outside the yarn workspace. Inert unless dir="rtl".
+ */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+   * Only the metrics differ by script — the family is `--font-sans` and is
+   * shared, exactly as packages/ui/src/styles/rtl.css intends. This block
+   * used to re-declare `font-family` with a system stack, which is what
+   * stopped the self-hosted face from ever being used.
+   *
+   * Arabic glyphs sit lower and taller than Latin at the same size, so the
+   * default leading crowds diacritics and descenders.
+   */
+  [dir='rtl'] body {
+    line-height: 1.7;
+  }
+}
+
+@layer utilities {
+  /* Keep invoice ids, amounts and times from reordering under bidi. */
+  .bidi-isolate {
+    unicode-bidi: isolate;
+  }
+}
+
+/* ===================================================================
+ * Motion + RTL for the Vue apps.
+ *
+ * urypos and mosaic sit outside the yarn workspace, so they cannot use the
+ * @ury/ui Tailwind preset or import its stylesheets. These are hand-written
+ * equivalents of the utilities the React apps get from the preset, so the two
+ * stacks share one motion vocabulary instead of drifting apart.
+ *
+ * Plain CSS on purpose: Tailwind would purge `@layer utilities` rules whose
+ * class names it cannot find, and several of these are referenced from Vue
+ * `:class` bindings that the scanner does not reliably see.
+ *
+ * Keep the durations and easing in sync with packages/ui/src/styles/theme.css.
+ * =================================================================== */
+
+:root {
+  --duration-instant: 90ms;
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --slide-from: 8px;
+}
+
+[dir='rtl'] {
+  --slide-from: -8px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(var(--slide-from)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes check-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in { animation: fade-in var(--duration-base) var(--ease-out) both; }
+.animate-fade-in-up { animation: fade-in-up var(--duration-base) var(--ease-out) both; }
+.animate-slide-in { animation: slide-in var(--duration-base) var(--ease-out) both; }
+.animate-scale-in { animation: scale-in var(--duration-base) var(--ease-out) both; }
+.animate-pulse-soft { animation: pulse-soft 2s var(--ease-in-out) infinite; }
+.animate-check-in { animation: check-in 320ms var(--ease-emphasis) both; }
+
+/* Staggered entrance. Set --i to the item index; capped at 8 steps so a long
+   ticket rail still finishes arriving quickly. */
+.stagger { animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
+.stagger-fast { animation-delay: calc(min(var(--i, 0), 8) * 24ms); }
+
+/* Press feedback — the only confirmation a touchscreen can give. */
+.press { transition: transform var(--duration-instant) var(--ease-out); }
+.press:active { transform: scale(0.97); }
+
+.lift {
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.lift:hover { transform: translateY(-1px); }
+
+/*
+ * Motion is a garnish, never a gate: anyone who asked their OS to reduce
+ * motion gets the same interface without it. The spinner is exempt because it
+ * is a status indicator, not decoration.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+@keyframes shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
+}

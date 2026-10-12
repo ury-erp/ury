@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="{{ lang | e }}" dir="{{ 'rtl' if lang == 'ar' else 'ltr' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ text.title | e }}{% if restaurant_name %} — {{ restaurant_name | e }}{% endif %}</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#243d32">
+  <link rel="stylesheet" href="/assets/ury/css/feedback.css">
+  <script id="feedback-boot" type="application/json">{{ boot_json | safe }}</script>
+  <script src="/assets/ury/js/feedback.js" defer></script>
+</head>
+<body>
+  <main class="card" id="main">
+    <header>
+      {% if restaurant_name %}<p class="eyebrow">{{ restaurant_name | e }}</p>{% endif %}
+      <h1>{{ text.title | e }}</h1>
+      <p class="intro">{{ text.intro | e }}</p>
+    </header>
+
+    <noscript><p class="notice">{{ text.javascript | e }}</p></noscript>
+
+    {% if already_submitted %}
+      <p class="notice" role="status">{{ text.already | e }}</p>
+    {% else %}
+      <form id="feedback-form" novalidate>
+        <fieldset class="stars" data-field="overall" aria-label="{{ text.overall | e }}">
+          <legend>{{ text.overall | e }}</legend>
+          <div class="star-row" role="radiogroup" aria-label="{{ text.overall | e }}">
+            {% for value in [1, 2, 3, 4, 5] %}
+            <button type="button" class="star" role="radio" aria-checked="false"
+                    data-value="{{ value }}"
+                    aria-label="{{ value }} {{ text.stars | e }}">★</button>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        {% for aspect in ['food', 'service', 'cleanliness'] %}
+        <fieldset class="stars small" data-field="{{ aspect }}">
+          <legend>{{ text[aspect] | e }}</legend>
+          <div class="star-row" role="radiogroup" aria-label="{{ text[aspect] | e }}">
+            {% for value in [1, 2, 3, 4, 5] %}
+            <button type="button" class="star" role="radio" aria-checked="false"
+                    data-value="{{ value }}"
+                    aria-label="{{ value }} {{ text.stars | e }}">★</button>
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% endfor %}
+
+        <fieldset class="recommend" data-field="recommend_score">
+          <legend>{{ text.recommend | e }}</legend>
+          <div class="scale" role="radiogroup" aria-label="{{ text.recommend | e }}">
+            {% for value in range(0, 11) %}
+            <button type="button" class="score" role="radio" aria-checked="false"
+                    data-value="{{ value }}">{{ value }}</button>
+            {% endfor %}
+          </div>
+          <div class="scale-ends">
+            <span>{{ text.not_likely | e }}</span>
+            <span>{{ text.very_likely | e }}</span>
+          </div>
+        </fieldset>
+
+        <label class="field">
+          <span>{{ text.comment | e }}</span>
+          <textarea id="comment" rows="3" maxlength="1000"></textarea>
+        </label>
+
+        <label class="field" id="contact-field" hidden>
+          <span>{{ text.contact | e }}</span>
+          <input id="contact" type="tel" inputmode="tel" maxlength="20" dir="ltr">
+        </label>
+
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+
+        <button type="submit" class="submit" id="submit">{{ text.submit | e }}</button>
+      </form>
+
+      <div id="done" hidden>
+        <p class="tick" aria-hidden="true">✓</p>
+        <h2>{{ text.thanks | e }}</h2>
+        <p class="intro" id="done-note">{{ text.thanks_note | e }}</p>
+      </div>
+    {% endif %}
+  </main>
+</body>
+</html>

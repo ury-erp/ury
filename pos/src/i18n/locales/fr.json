@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "language_code": "fr",
+    "direction": "ltr"
+  },
   "common": {
     "loading": "Chargement...",
     "cancel": "Annuler",
@@ -21,7 +25,9 @@
     "cancelling": "Annulation en cours...",
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
+    "close": "Fermer",
+    "retry": "Réessayer"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -29,11 +35,16 @@
     "search_placeholder_menu": "Rechercher dans le menu",
     "close_shift": "Clôturer la session",
     "switch_to_desk": "Accéder au bureau",
+    "switch_to_dashboard": "Accéder au tableau de bord",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "search_placeholder_tables": "Rechercher une table par numéro ou salle"
   },
   "menu": {
-    "special_items": "Plats spéciaux"
+    "special_items": "Plats spéciaux",
+    "add_item": "Ajouter {{item}}",
+    "customize_item": "Personnaliser {{item}}",
+    "customize": "Personnaliser"
   },
   "pos_sidebar": {
     "categories": "Catégories",
@@ -64,7 +75,9 @@
     "enter_cancel_reason": "Saisir le motif d'annulation",
     "print": "Imprimer",
     "payment": "Paiement",
-    "order_actions": "Actions sur la commande"
+    "order_actions": "Actions sur la commande",
+    "close_table": "Fermer la table",
+    "close_table_confirm": "Toutes les additions de la table {{table}} sont réglées. La fermer et la rendre disponible ?"
   },
   "payment": {
     "title": "Paiement",
@@ -82,7 +95,21 @@
     "processing": "Traitement...",
     "short_by": "Manque {{amount}}",
     "change_due": "Monnaie à rendre : {{amount}}",
-    "success": "Paiement réussi : {{amount}} reçu"
+    "success": "Paiement réussi : {{amount}} reçu",
+    "processing_title": "Encaissement de {{amount}}…",
+    "processing_hint": "Ne fermez pas cette fenêtre. Le résultat s'affichera ici.",
+    "coupon_placeholder": "Code promo",
+    "coupon_apply": "Appliquer",
+    "coupon_remove": "Retirer",
+    "coupon_saved": "Économisé {{amount}}",
+    "coupon_failed": "Impossible d'appliquer le code",
+    "coupon_reason": {
+      "unknown": "Code inconnu. Vérifiez les caractères.",
+      "not_started": "Ce code n'est pas encore valable.",
+      "expired": "Ce code a expiré.",
+      "exhausted": "Ce code a été entièrement utilisé.",
+      "other_customer": "Ce code appartient à un autre client."
+    }
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",
@@ -142,7 +169,7 @@
     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
     "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
     "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
-    "zero_balance_warning": "Vous ouvrez avec 0 ₹ sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+    "zero_balance_warning": "Vous ouvrez avec un solde nul sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
     "confirm_zero_balance": "Confirmer et ouvrir",
     "session_opened_success": "Session PDV ouverte"
   },
@@ -207,7 +234,6 @@
     "print_failed": "Échec d'impression : {{reason}}",
     "invalid_discount": "Veuillez entrer une valeur de remise valide",
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
-    "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
     "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
     "payment_failed": "Le paiement n'a pas pu être effectué. Veuillez réessayer.",
@@ -224,7 +250,8 @@
       "session_elsewhere": "Vous avez déjà une session ouverte ailleurs.",
       "generic": "Impossible d'ouvrir la session PDV. {{message}}",
       "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
-    }
+    },
+    "failed_close_table": "Échec de la fermeture de la table"
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -232,7 +259,8 @@
     "order_updated": "Commande mise à jour avec succès",
     "printed": "Imprimé avec succès",
     "payment_successful": "Paiement réussi",
-    "order_moved_to_draft": "Commande déplacée en brouillon après impression."
+    "order_moved_to_draft": "Commande déplacée en brouillon après impression.",
+    "table_closed": "Table fermée"
   },
   "orders": {
     "no_orders_found": "Aucune commande trouvée",
@@ -322,7 +350,9 @@
     "no_destination_tables": "Aucune table libre disponible dans cet établissement",
     "transfer_not_for_merged": "Le transfert de table n'est pas autorisé pour les tables fusionnées. Séparez d'abord les tables.",
     "order_already_billed": "Cette commande a déjà été facturée",
-    "no_captains_found": "Aucun capitaine trouvé"
+    "no_captains_found": "Aucun capitaine trouvé",
+    "open_table": "Ouvrir la table {{table}}",
+    "refreshing": "Vérification des changements…"
   },
   "bill_split": {
     "split_bill": "Diviser l'addition",
@@ -400,5 +430,31 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "language": {
+    "label": "Langue",
+    "change_language": "Changer de langue",
+    "switched": "Langue modifiée"
+  },
+  "captain": {
+    "errors": {
+      "no_pos_profile": "Profil de caisse introuvable.",
+      "not_logged_in": "Vous n'êtes pas connecté.",
+      "no_permission": "Vous n'avez pas la permission de modifier cette commande.",
+      "empty_order": "Ajoutez au moins un article avant d'envoyer la commande.",
+      "no_customer": "Sélectionnez un client avant d'envoyer la commande.",
+      "api_error": "Le serveur a rejeté la requête.",
+      "send_failed": "Échec de l'envoi de la commande.",
+      "no_order_reprint": "Aucune commande active à réimprimer.",
+      "no_order_print": "Aucune commande active à imprimer.",
+      "no_order_transfer": "Aucune commande active à transférer.",
+      "transfer_unavailable": "Impossible de transférer cette table."
+    },
+    "success": {
+      "kot_reprinted": "Bon de cuisine réimprimé.",
+      "printed": "Impression réussie.",
+      "table_transferred": "Table transférée.",
+      "captain_transferred": "Capitaine transféré."
+    }
   }
 }

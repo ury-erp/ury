@@ -11,7 +11,10 @@
       "import": "./src/index.ts"
     },
     "./tailwind-preset": "./tailwind-preset.js",
-    "./styles/theme.css": "./src/styles/theme.css"
+    "./styles/theme.css": "./src/styles/theme.css",
+    "./styles/rtl.css": "./src/styles/rtl.css",
+    "./styles/fonts.css": "./src/styles/fonts.css",
+    "./styles/motion.css": "./src/styles/motion.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

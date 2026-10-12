@@ -26,6 +26,19 @@ def _is_takeaway_table(restaurant_table):
 
 
 def _aggregate_kot_items(kot_docs):
+	"""Collapse several KOTs into one slip's worth of lines.
+
+	Quantities are SUMMED across tickets, not taken from whichever ticket
+	happened to come first. Printing KOT-1 (Pizza x1) and KOT-2 (Pizza x2)
+	together used to put "1" on the combined slip, which then read through
+	_enrich_item_display_fields as "was 2, now 3" — a waiter carrying three
+	pizzas handed a slip describing an increase that never happened. The
+	right answer is the three pizzas these two tickets add between them.
+
+	Written back as a string because `URY KOT Items.quantity` is a Data
+	field: an int here would make an in-memory combined doc differ in type
+	from the same doc loaded from the database.
+	"""
 	add_items = {}
 	cancel_items = {}
 
@@ -33,26 +46,31 @@ def _aggregate_kot_items(kot_docs):
 		for row in kot.kot_items:
 			key = (row.item, row.comments or "")
 			if kot.type in CANCEL_KOT_TYPES:
-				if key not in cancel_items:
-					cancel_items[key] = {
-					"item": row.item,
-					"item_name": row.item_name,
-					"quantity": int(row.quantity or 0),
-					"cancelled_qty": int(row.cancelled_qty or 0),
-					"comments": row.comments,
-					"course": row.course,
-					}
+				bucket, extra = cancel_items, {"cancelled_qty": 0}
 			elif kot.type in ADD_KOT_TYPES:
-				if key not in add_items:
-					add_items[key] = {
+				bucket, extra = add_items, {}
+			else:
+				continue
+
+			if key not in bucket:
+				bucket[key] = {
 					"item": row.item,
 					"item_name": row.item_name,
-					"quantity": int(row.quantity or 0),
+					"quantity": 0,
 					"comments": row.comments,
 					"course": row.course,
-					}
+					**extra,
+				}
 
-	return list(add_items.values()) + list(cancel_items.values())
+			bucket[key]["quantity"] += int(row.quantity or 0)
+			if "cancelled_qty" in bucket[key]:
+				bucket[key]["cancelled_qty"] += int(row.cancelled_qty or 0)
+
+	items = list(add_items.values()) + list(cancel_items.values())
+	for item in items:
+		item["quantity"] = str(item["quantity"])
+
+	return items
 
 
 def _get_invoice_item_qty_map(invoice_id):

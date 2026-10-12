@@ -1,0 +1,123 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - v3-test
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No --frozen-lockfile and no yarn cache: `.gitignore` excludes `*.lock`,
+      # so there is no committed yarn.lock for either to work from. That means
+      # CI resolves dependency ranges fresh on every run and can legitimately
+      # install versions no developer has — worth fixing, but un-ignoring a
+      # lockfile is a repo-wide decision, not one to slip into a test workflow.
+      #
+      # --ignore-scripts skips the postinstall that installs the two Vue apps
+      # (mosaic, urypos). They sit outside the yarn workspace by design and
+      # carry no tests, so pulling them in would only make this slower.
+      - name: Install
+        run: yarn install --ignore-scripts
+
+      - name: Test
+        run: yarn test
+
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ury
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mariadb-client libmariadb-dev
+          npm install -g yarn
+          pip install frappe-bench
+
+      - name: Configure MariaDB for Frappe
+        run: |
+          mysql -h 127.0.0.1 -u root -proot -e "
+            SET GLOBAL character_set_server = 'utf8mb4';
+            SET GLOBAL collation_server = 'utf8mb4_unicode_ci';"
+
+      # frappe and erpnext are pinned to version-15, the line ury targets
+      # (pyproject.toml: requires frappe ~=15). hrms is deliberately NOT
+      # installed: this bench only needs what ury depends on, and an hrms
+      # built against v16 is what breaks `bench run-tests` on a developer
+      # machine that happens to have it.
+      - name: Build bench
+        run: |
+          bench init --skip-redis-config-generation --frappe-branch version-15 ci-bench
+          cd ci-bench
+          bench get-app --branch version-15 erpnext
+          bench get-app ury "$GITHUB_WORKSPACE/ury"
+          bench set-config -g db_host 127.0.0.1
+          bench set-config -g redis_cache redis://127.0.0.1:6379
+          bench set-config -g redis_queue redis://127.0.0.1:6379
+          bench set-config -g redis_socketio redis://127.0.0.1:6379
+
+      - name: Create site
+        run: |
+          cd ci-bench
+          bench new-site ci.localhost \
+            --mariadb-root-password root \
+            --admin-password admin \
+            --mariadb-user-host-login-scope='%'
+          bench --site ci.localhost install-app erpnext
+          bench --site ci.localhost install-app ury
+          bench --site ci.localhost set-config allow_tests true
+          bench --site ci.localhost set-config developer_mode 1
+
+      # --app ury matters twice over. It scopes which tests run, and it scopes
+      # which apps' `before_tests` hooks fire — and those hooks are not
+      # harmless: erpnext's does `delete from \`tabItem Price\``. That is fine
+      # on a throwaway site like this one and catastrophic on a real one,
+      # which is why the backend suite belongs in CI and nowhere near a
+      # production bench. See docs/TESTING.md.
+      - name: Run ury tests
+        run: |
+          cd ci-bench
+          bench --site ci.localhost run-tests --app ury

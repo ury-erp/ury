@@ -1,4 +1,7 @@
+@import '@ury/ui/styles/fonts.css';
 @import '@ury/ui/styles/theme.css';
+@import '@ury/ui/styles/rtl.css';
+@import '@ury/ui/styles/motion.css';
 
 @tailwind base;
 @tailwind components;
@@ -7,6 +10,8 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    background-image: radial-gradient(circle at 100% 0%, hsl(var(--accent-50) / 0.8), transparent 34rem);
   }
 }
 

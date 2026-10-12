@@ -118,3 +118,34 @@ export const derivePOSCapabilities = (
     canPrintBill: Boolean(user?.roles?.length),
   };
 };
+
+/**
+ * Roles that may open the management dashboard.
+ *
+ * The policy was written twice and the two copies disagreed: the route guard
+ * accepted only "URY Manager", while `useAuth.isManager` also accepted
+ * Administrator and System Manager. An administrator was therefore told they
+ * lacked permission for a screen the rest of the app considered theirs
+ * (UX-15). Declared once here so the two cannot drift again.
+ *
+ * This decides what the interface offers, never what the server allows.
+ * Every endpoint behind these screens does its own check; hiding a route is
+ * not authorization.
+ */
+export const DASHBOARD_MANAGER_ROLES = [
+  'URY Manager',
+  'URY Admin',
+  'Administrator',
+  'System Manager',
+] as const;
+
+/** Whether a role list may open the management dashboard. */
+export const isDashboardManager = (
+  roles: Array<string | { name?: string }> | null | undefined
+): boolean => {
+  if (!roles) return false;
+  return roles.some((role) => {
+    const name = typeof role === 'string' ? role : role?.name;
+    return !!name && (DASHBOARD_MANAGER_ROLES as readonly string[]).includes(name);
+  });
+};

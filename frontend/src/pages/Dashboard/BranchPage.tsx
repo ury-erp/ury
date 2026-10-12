@@ -7,6 +7,7 @@ import SideDrawer from '../../components/layout/SideDrawer';
 import { call, getLoggedUser } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
 
 interface BranchData {
   name: string;
@@ -221,7 +222,7 @@ export const BranchPage: React.FC = () => {
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.branchName || !addForm.branchName.trim()) {
-      showToast.error('Branch Name is required');
+      showToast.error(t('dash.branch.branch_name_is_required'));
       return;
     }
     setSaving(true);
@@ -251,7 +252,7 @@ export const BranchPage: React.FC = () => {
       }
 
       if (!currentUser) {
-        showToast.error('Could not determine a valid user for Branch creation');
+        showToast.error(t('dash.branch.could_not_determine_a_valid_user_for_branch_'));
         setSaving(false);
         return;
       }
@@ -285,7 +286,7 @@ export const BranchPage: React.FC = () => {
           default_room: roomName
         }
       });
-      showToast.success('Branch created successfully');
+      showToast.success(t('dash.branch.branch_created_successfully'));
       setIsAddDrawerOpen(false);
       fetchBranchList();
       fetchLinkedData();
@@ -301,7 +302,7 @@ export const BranchPage: React.FC = () => {
 
     // Validate invoice series prefix
     if (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim()) {
-      showToast.error('Invoice Series Prefix is required');
+      showToast.error(t('dash.branch.invoice_series_prefix_is_required'));
       return;
     }
 
@@ -356,7 +357,7 @@ export const BranchPage: React.FC = () => {
     };
 
     if (JSON.stringify(original) === JSON.stringify(current)) {
-      showToast.warning('No changes in document');
+      showToast.warning(t('dash.branch.no_changes_in_document'));
       return;
     }
 
@@ -416,7 +417,7 @@ export const BranchPage: React.FC = () => {
           doc: updatedDoc
         });
       }
-      showToast.success('Branch saved successfully');
+      showToast.success(t('dash.branch.branch_saved_successfully'));
       await fetchDetails(currentBranchName);
       await fetchBranchList();
       setIsEditMode(false); // Return to read-only View Mode after successful save
@@ -441,7 +442,7 @@ export const BranchPage: React.FC = () => {
               className="text-gray-700 hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
+              <span>{t('dash.branch.back')}</span>
             </Button>
             <div className="h-5 w-px bg-gray-200" />
             <div>
@@ -459,8 +460,8 @@ export const BranchPage: React.FC = () => {
               disabled={saving}
               className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              <Save className="w-4 h-4 mr-1.5 shrink-0" />
-              <span>Save</span>
+              <Save className="w-4 h-4 me-1.5 shrink-0" />
+              <span>{t('dash.branch.save')}</span>
             </Button>
           ) : (
             <Button
@@ -468,8 +469,8 @@ export const BranchPage: React.FC = () => {
               onClick={() => setIsEditMode(true)}
               className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              <Edit2 className="w-4 h-4 mr-1.5 shrink-0" />
-              <span>Edit</span>
+              <Edit2 className="w-4 h-4 me-1.5 shrink-0" />
+              <span>{t('dash.branch.edit')}</span>
             </Button>
           )}
         </div>
@@ -487,13 +488,11 @@ export const BranchPage: React.FC = () => {
                 <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Building2 className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Branch Info
-                </h3>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{t('dash.branch.branch_info')}</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Branch Name</label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.branch_name')}</label>
                   <Input
                     value={branchForm.branch_name || ''}
                     onChange={(e) => setBranchForm(p => ({ ...p, branch_name: e.target.value }))}
@@ -502,7 +501,7 @@ export const BranchPage: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Address</label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.address')}</label>
                   <Input
                     value={branchForm.address || ''}
                     onChange={(e) => setBranchForm(p => ({ ...p, address: e.target.value }))}
@@ -515,12 +514,10 @@ export const BranchPage: React.FC = () => {
 
             {/* RESTAURANT INFO SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Restaurant Info
-              </h3>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">{t('dash.branch.restaurant_info')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Invoice Series Prefix <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.invoice_series_prefix')}<span className="text-red-500">*</span></label>
                   <Input
                     value={restaurantForm.invoice_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
@@ -529,7 +526,7 @@ export const BranchPage: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Aggregator Series Prefix</label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.aggregator_series_prefix')}</label>
                   <Input
                     value={restaurantForm.aggregator_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
@@ -538,7 +535,7 @@ export const BranchPage: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Tax ID</label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.tax_id')}</label>
                   <Input
                     value={restaurantForm.tax_id || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
@@ -547,7 +544,7 @@ export const BranchPage: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Default Tax Template</label>
+                  <label className="text-sm font-medium text-gray-700">{t('dash.branch.default_tax_template')}</label>
                   <Input
                     value={restaurantForm.default_tax_template || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, default_tax_template: e.target.value }))}
@@ -565,9 +562,7 @@ export const BranchPage: React.FC = () => {
                 <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <UtensilsCrossed className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Menu
-                </h3>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{t('dash.branch.menu')}</h3>
               </div>
               {restaurantData ? (
                 <div className="space-y-4">
@@ -583,7 +578,7 @@ export const BranchPage: React.FC = () => {
                           ...menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))
                         ]}
                         disabled={!isEditMode}
-                        placeholder="None"
+                        placeholder={t('dash.branch.none')}
                       />
                     </div>
                     <div className="flex items-center gap-2 pt-6">
@@ -601,9 +596,7 @@ export const BranchPage: React.FC = () => {
                         }}
                         disabled={!isEditMode}
                       />
-                      <label htmlFor="room_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
-                        Room Wise Menu
-                      </label>
+                      <label htmlFor="room_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">{t('dash.branch.room_wise_menu')}</label>
                     </div>
                   </div>
                   {!!restaurantForm.room_wise_menu && (
@@ -611,8 +604,8 @@ export const BranchPage: React.FC = () => {
                       <table className="w-full text-xs text-gray-600">
                         <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
                           <tr>
-                            <th className="px-4 py-2 text-left">Room</th>
-                            <th className="px-4 py-2 text-left">Menu</th>
+                            <th className="px-4 py-2 text-start">{t('dash.branch.room')}</th>
+                            <th className="px-4 py-2 text-start">{t('dash.branch.menu')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -633,7 +626,7 @@ export const BranchPage: React.FC = () => {
                                     ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
                                   ]}
                                   disabled={!isEditMode}
-                                  placeholder="Select Room"
+                                  placeholder={t('dash.branch.select_room')}
                                 />
                               </td>
                               <td className="px-4 py-2 flex items-center gap-2">
@@ -652,7 +645,7 @@ export const BranchPage: React.FC = () => {
                                       ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
                                     ]}
                                     disabled={!isEditMode}
-                                    placeholder="Select Menu"
+                                    placeholder={t('dash.branch.select_menu')}
                                   />
                                 </div>
                                 {isEditMode && (
@@ -677,7 +670,7 @@ export const BranchPage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
+                <p className="text-sm text-gray-400">{t('dash.branch.no_ury_restaurant_linked_to_this_branch')}</p>
               )}
             </div>
 
@@ -687,14 +680,12 @@ export const BranchPage: React.FC = () => {
                 <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Map className="w-4 h-4" />
                 </div>
-                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Room
-                </h3>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{t('dash.branch.room')}</h3>
               </div>
               {restaurantData ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Default Room</label>
+                    <label className="text-sm font-medium text-gray-700">{t('dash.branch.default_room')}</label>
                     <SearchableSelect
                       id="default_room"
                       value={restaurantForm.default_room || ''}
@@ -704,7 +695,7 @@ export const BranchPage: React.FC = () => {
                         ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
                       ]}
                       disabled={!isEditMode}
-                      placeholder="None"
+                      placeholder={t('dash.branch.none')}
                     />
                   </div>
                   <div className="flex items-center gap-2 pt-6">
@@ -722,13 +713,11 @@ export const BranchPage: React.FC = () => {
                       }}
                       disabled={!isEditMode}
                     />
-                    <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
-                      Order Type Wise Menu
-                    </label>
+                    <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">{t('dash.branch.order_type_wise_menu')}</label>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
+                <p className="text-sm text-gray-400">{t('dash.branch.no_ury_restaurant_linked_to_this_branch')}</p>
               )}
             </div>
 
@@ -741,8 +730,8 @@ export const BranchPage: React.FC = () => {
                       <table className="w-full text-xs text-gray-600">
                         <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
                           <tr>
-                            <th className="px-4 py-2 text-left">Order Type</th>
-                            <th className="px-4 py-2 text-left">Menu</th>
+                            <th className="px-4 py-2 text-start">{t('dash.branch.order_type')}</th>
+                            <th className="px-4 py-2 text-start">{t('dash.branch.menu')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -771,7 +760,7 @@ export const BranchPage: React.FC = () => {
                                       ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
                                     ]}
                                     disabled={!isEditMode}
-                                    placeholder="Select Menu"
+                                    placeholder={t('dash.branch.select_menu')}
                                   />
                                 </div>
                                 {isEditMode && (
@@ -796,7 +785,7 @@ export const BranchPage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
+                <p className="text-sm text-gray-400">{t('dash.branch.no_ury_restaurant_linked_to_this_branch')}</p>
               )}
             </div>
           </Card>
@@ -815,7 +804,7 @@ export const BranchPage: React.FC = () => {
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Branch</span>
+          <span>{t('dash.branch.add_branch')}</span>
         </Button>
       </div>
 
@@ -829,26 +818,24 @@ export const BranchPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Building2 className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Branch Configured</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Create a Branch to manage restaurant settings and menus.
-          </p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('dash.branch.no_branch_configured')}</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">{t('dash.branch.create_a_branch_to_manage_restaurant_setting')}</p>
           <Button
             onClick={() => setIsAddDrawerOpen(true)}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Branch</span>
+            <span>{t('dash.branch.add_branch')}</span>
           </Button>
         </Card>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
+          <table className="w-full text-start text-sm text-gray-600">
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Default Menu</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">{t('dash.branch.branch')}</th>
+                <th className="px-6 py-4">{t('dash.branch.default_menu')}</th>
+                <th className="px-6 py-4 text-end">{t('dash.branch.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -859,14 +846,14 @@ export const BranchPage: React.FC = () => {
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{b.branch || b.branch_name || b.name}</td>
                   <td className="px-6 py-4 text-gray-600">{b.default_menu || '-'}</td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-end">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleBranchView(b)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="View Branch"
+                        title={t('dash.branch.view_branch')}
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -875,7 +862,7 @@ export const BranchPage: React.FC = () => {
                         size="sm"
                         onClick={() => handleBranchEdit(b)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Branch"
+                        title={t('dash.branch.edit_branch')}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
@@ -892,15 +879,15 @@ export const BranchPage: React.FC = () => {
       <SideDrawer
         isOpen={isAddDrawerOpen}
         onClose={() => setIsAddDrawerOpen(false)}
-        title="Add Branch"
+        title={t('dash.branch.add_branch')}
       >
         <form onSubmit={handleAddBranch} className="space-y-6 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Branch Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.branch.branch_name')}<span className="text-red-500">*</span></label>
             <Input required value={addForm.branchName} onChange={e => setAddForm({...addForm, branchName: e.target.value})} placeholder="e.g. Main Branch" />
           </div>
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.branch.company')}<span className="text-red-500">*</span></label>
             <SearchableSelect
               id="add_branch_company"
               value={addForm.company}
@@ -909,16 +896,16 @@ export const BranchPage: React.FC = () => {
                 { value: '', label: 'Select Company' },
                 ...companies.map((c: any) => ({ value: c.name, label: c.name }))
               ]}
-              placeholder="Select Company"
+              placeholder={t('dash.branch.select_company')}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Invoice Prefix <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.branch.invoice_prefix')}<span className="text-red-500">*</span></label>
               <Input required value={addForm.invoicePrefix} onChange={e => setAddForm({...addForm, invoicePrefix: e.target.value})} />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Aggregator Prefix <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{t('dash.branch.aggregator_prefix')}<span className="text-red-500">*</span></label>
               <Input required value={addForm.aggregatorPrefix} onChange={e => setAddForm({...addForm, aggregatorPrefix: e.target.value})} />
             </div>
           </div>
@@ -931,10 +918,8 @@ export const BranchPage: React.FC = () => {
             <Input value={addForm.address} onChange={e => setAddForm({...addForm, address: e.target.value})} />
           </div>
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              Save
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>{t('dash.branch.cancel')}</Button>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">{t('dash.branch.save')}</Button>
           </div>
         </form>
       </SideDrawer>

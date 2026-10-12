@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Package, IndianRupee, Search } from 'lucide-react';
+import { Package, IndianRupee, Search, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface EmployeeSuggestion {
   name: string;
@@ -26,11 +28,11 @@ interface EmployeeItemWiseSalesData {
   summary: { total_qty: number; total_amount: number };
 }
 
-const columns: DataTableColumn<ItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty', align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+const getColumns = (): DataTableColumn<ItemRow>[] => [
+  { key: 'item_name', header: t('fields.item') },
+  { key: 'item_group', header: t('fields.group'), render: (r) => r.item_group || '—' },
+  { key: 'qty', header: t('fields.qty'), align: 'right' },
+  { key: 'amount', header: t('fields.amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 export function EmployeeItemWiseSales() {
@@ -76,7 +78,7 @@ export function EmployeeItemWiseSales() {
       );
       setData(res.message ?? (res as unknown as EmployeeItemWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -90,8 +92,8 @@ export function EmployeeItemWiseSales() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Employee Item Wise Sales</h1>
-          <p className="text-sm text-muted-foreground">Item breakdown per employee</p>
+          <h1 className="text-xl font-semibold">{t('reports.employee_item_wise_sales.employee_item_wise_sales')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.employee_item_wise_sales.subtitle')}</p>
         </div>
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
@@ -101,7 +103,7 @@ export function EmployeeItemWiseSales() {
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
-            placeholder="Search employee by name..."
+            placeholder={t('reports.employee_item_wise_sales.search_employee_by_name')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -121,7 +123,7 @@ export function EmployeeItemWiseSales() {
                   setQuery(s.full_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50"
+                className="w-full text-start px-3 py-2 text-sm hover:bg-blue-50"
               >
                 {s.full_name}
               </button>
@@ -131,28 +133,32 @@ export function EmployeeItemWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {!selectedEmployee && !error && (
-        <div className="text-sm text-muted-foreground">Search and select an employee to view their item breakdown.</div>
+        <div className="text-sm text-muted-foreground">{t('reports.employee_item_wise_sales.empty_prompt')}</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <ReportSkeleton />}
 
       {data && !isLoading && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard label="Total Qty" value={data.summary.total_qty} icon={<Package className="w-4 h-4" />} />
+            <StatCard label={t('reports.employee_item_wise_sales.total_qty')} value={data.summary.total_qty} icon={<Package className="w-4 h-4" />} />
             <StatCard
-              label="Total Amount"
+              label={t('reports.employee_item_wise_sales.total_amount')}
               value={formatCurrency(data.summary.total_amount)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
           </div>
-          <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.items} isLoading={isLoading} />
         </>
       )}
     </div>

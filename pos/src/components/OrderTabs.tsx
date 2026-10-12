@@ -15,7 +15,7 @@ const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
     viewBox="0 0 10 10" 
     className={cn(
       "absolute bottom-[-1px] z-10", 
-      position === 'left' ? "-left-[10px]" : "-right-[10px]"
+      position === 'left' ? "-start-[10px]" : "-end-[10px]"
     )}
   >
     {position === 'left' ? (
@@ -84,9 +84,9 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
   return (
     <div 
       ref={scrollContainerRef}
-      className="flex overflow-x-auto mb-3"
+      className="flex overflow-x-auto mb-4"
     >
-      <div className="flex items-center p-1.5 bg-white rounded-xl min-w-max gap-1">
+      <div className="flex items-center p-1 bg-[#f5eadc] rounded-xl min-w-max gap-1 border border-[#eadfce]">
         {tabOrder.map((tab, index) => {
           const isActive = activeTabId === tab.id;
           const isDraft = isActive ? !!orderId : !!heldTabs[tab.id]?.orderId;
@@ -129,8 +129,8 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
               className={cn(
                 'group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 relative',
                 isActive
-                  ? 'text-primary-700 bg-primary-50 border-t border-x border-primary-600 rounded-t-lg z-10'
-                  : 'text-gray-600 bg-transparent hover:text-gray-900 hover:bg-gray-200/50 border border-transparent rounded-lg',
+                  ? 'text-primary-800 bg-white border border-[#f0b83e] rounded-lg z-10 shadow-sm'
+                  : 'text-[#8f6b55] bg-transparent hover:text-[#3f2a20] hover:bg-white/70 border border-transparent rounded-lg',
                 disabled && 'opacity-50 cursor-not-allowed',
                 !disabled && 'cursor-grab active:cursor-grabbing',
                 draggedTabIndex === index && 'opacity-40 scale-95',
@@ -146,7 +146,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
                   <TabFlare position="left" />
                   <TabFlare position="right" />
                   {/* Invisible bottom border line connecting the flares inside the active tab */}
-                  <div className="absolute -bottom-[1px] left-0 right-0 h-[1.5px] bg-primary-50 z-20"></div>
+                  <div className="absolute -bottom-[1px] start-0 end-0 h-[1.5px] bg-primary-50 z-20"></div>
                 </>
               )}
               
@@ -168,12 +168,12 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
                 onClick={(e) => handleCloseClick(e, tab.id)}
                 disabled={disabled}
                 className={cn(
-                  'ml-0.5 rounded-full p-0.5 transition-colors focus:outline-none z-20 relative',
+                  'ms-0.5 rounded-full p-0.5 transition-colors focus:outline-none z-20 relative',
                   isActive
                     ? 'text-primary-500 hover:text-primary-700 hover:bg-primary-100'
                     : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
                 )}
-                title="Close order"
+                title={t('order_tabs.close_order')}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -184,10 +184,10 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 flex-shrink-0 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-gray-200/50 ml-1"
+          className="h-8 w-8 flex-shrink-0 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-gray-200/50 ms-1"
           onClick={() => !disabled && addTab()}
           disabled={disabled}
-          title="Add new order"
+          title={t('order_tabs.add_new_order')}
         >
           <Plus className="w-4 h-4" />
         </Button>
@@ -220,9 +220,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
                       setConfirmCloseTabId(null);
                     }
                   }}
-                >
-                  Remove
-                </Button>
+                >{t('common.remove')}</Button>
               </>
             ) : (
               <Button variant="outline" onClick={() => setConfirmCloseTabId(null)}>

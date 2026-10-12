@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useConfigure, TableData } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
+import { t } from '../../../i18n';
 
 interface PendingShrink {
   newCount: number;
@@ -74,9 +75,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 md:items-end">
         <div className="space-y-1.5">
-          <label htmlFor={`room-name-${room.id}`} className="text-xs font-medium text-muted-foreground">
-            Room Name
-          </label>
+          <label htmlFor={`room-name-${room.id}`} className="text-xs font-medium text-muted-foreground">{t('dash.room_section.room_name')}</label>
           <Input
             id={`room-name-${room.id}`}
             type="text"
@@ -89,9 +88,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor={`room-count-${room.id}`} className="text-xs font-medium text-muted-foreground">
-            Number of Tables
-          </label>
+          <label htmlFor={`room-count-${room.id}`} className="text-xs font-medium text-muted-foreground">{t('dash.room_section.number_of_tables')}</label>
           <Input
             id={`room-count-${room.id}`}
             type="number"
@@ -111,7 +108,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             type="button"
             variant="ghost"
             onClick={() => deleteRoom(room.id)}
-            aria-label="Delete room"
+            aria-label={t('dash.room_section.delete_room')}
             className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto justify-self-end"
           >
             <Trash2 className="w-4 h-4" />
@@ -129,12 +126,8 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             Remove {pendingShrink.tables.map((t) => t.name).join(' and ')}? This can't be undone.
           </p>
           <div className="flex gap-2 shrink-0">
-            <Button type="button" variant="ghost" size="sm" onClick={cancelRemove}>
-              Cancel
-            </Button>
-            <Button type="button" variant="danger" size="sm" onClick={confirmRemove}>
-              Remove
-            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={cancelRemove}>{t('dash.room_section.cancel')}</Button>
+            <Button type="button" variant="danger" size="sm" onClick={confirmRemove}>{t('dash.room_section.remove')}</Button>
           </div>
         </div>
       )}
@@ -172,9 +165,7 @@ export function RoomSection() {
         onClick={handleAdd}
         className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-medium"
       >
-        <Plus className="w-4 h-4" />
-        Add Room
-      </Button>
+        <Plus className="w-4 h-4" />{t('dash.room_section.add_room')}</Button>
     </div>
   );
 }

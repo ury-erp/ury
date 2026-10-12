@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard } from 'lucide-react';
+import { t } from '../../i18n';
 
 export const Footer: React.FC = () => {
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+    { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
   ];
 
   return (

@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@ury/ui';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, DoorClosed, ListFilter } from 'lucide-react';
+import { Badge, Button, Card, CardContent, ErrorState, cn } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
+import SlideOverPanel from '../components/SlideOverPanel';
+import { useDockedPanels } from '../hooks/useViewport';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
@@ -18,7 +20,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, getTableCloseState, closeTable } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -83,6 +85,11 @@ export default function Orders() {
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
   const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+  // Only true when this order's table is still held with every bill on it
+  // settled; the backend owns that rule (see getTableCloseState).
+  const [canCloseTable, setCanCloseTable] = React.useState(false);
+  const [closeTableDialogOpen, setCloseTableDialogOpen] = React.useState(false);
+  const [closingTable, setClosingTable] = React.useState(false);
 
   React.useEffect(() => {
     if (selectedOrder?.name) {
@@ -97,6 +104,56 @@ export default function Orders() {
       setCanCancelInvoice(false);
     }
   }, [selectedOrder?.name]);
+
+  const refreshTableCloseState = React.useCallback(async (order: POSInvoice | null) => {
+    if (!order?.name || !order.restaurant_table) {
+      setCanCloseTable(false);
+      return;
+    }
+    const state = await getTableCloseState({ invoice: order.name });
+    setCanCloseTable(state.can_close);
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!selectedOrder?.name || !selectedOrder.restaurant_table) {
+      setCanCloseTable(false);
+      return;
+    }
+    getTableCloseState({ invoice: selectedOrder.name }).then((state) => {
+      // A slower reply for an order the cashier has already moved off must not
+      // light the button up on whatever is on screen now.
+      if (!cancelled) setCanCloseTable(state.can_close);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrder?.name, selectedOrder?.restaurant_table, selectedOrder?.invoice_printed, selectedOrder?.status]);
+
+  async function handleCloseTable() {
+    if (!selectedOrder) return;
+    setClosingTable(true);
+    try {
+      await closeTable({ invoice: selectedOrder.name });
+      showToast.success(t('success.table_closed'));
+      setCloseTableDialogOpen(false);
+      setCanCloseTable(false);
+      await fetchOrders();
+      const refreshed = useRootStore.getState().orders.find((o) => o.name === selectedOrder.name);
+      if (refreshed) {
+        await selectOrder(refreshed);
+      } else {
+        clearSelectedOrder();
+      }
+    } catch (err) {
+      showToast.error(parseFrappeError(err, t('errors.failed_close_table')));
+      // The refusal is the backend's answer about this table, so re-read the
+      // state rather than leaving a button that has just been told no.
+      await refreshTableCloseState(selectedOrder);
+    } finally {
+      setClosingTable(false);
+    }
+  }
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -162,8 +219,27 @@ export default function Orders() {
     return formattedDate;
   };
 
+  /**
+   * Below 1024px the status rail and the details column are sheets (UX-06):
+   * three fixed columns over a 768px tablet leave a card grid too narrow to
+   * read an order in.
+   */
+  const docked = useDockedPanels();
+  const [showStatuses, setShowStatuses] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+
+  useEffect(() => {
+    if (docked) {
+      setShowStatuses(false);
+      setShowDetails(false);
+    }
+  }, [docked]);
+
   const handleOrderClick = (order: any) => {
     selectOrder(order);
+    // On a tablet the details are a sheet, and a tap that only loaded them
+    // behind the card grid would look like nothing had happened (UX-06).
+    if (!docked) setShowDetails(true);
   };
 
   // Helper function to get badge variant based on order status
@@ -361,24 +437,318 @@ export default function Orders() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
-          <p className="text-gray-600">{error}</p>
-        </div>
+        <ErrorState
+          title={t('errors.failed_load_orders')}
+          description={error}
+          retryLabel={t('common.retry')}
+          onRetry={() => fetchOrders()}
+        />
       </div>
     );
   }
 
+  /**
+   * Same reasoning as the menu grid: the status rail and the details column
+   * both return at `lg` and take about 576px with them, so the card count
+   * drops there and only recovers once the screen can pay for it (UX-06).
+   */
+  const orderGridClasses =
+    'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 max-w-screen-xl mx-auto';
+
+  /**
+   * The order details, written once and placed twice.
+   *
+   * On a counter screen this is a docked column; on a tablet it is a sheet
+   * (UX-06). Extracting it keeps a single definition, so the two placements
+   * cannot drift apart the way the legacy navigation bars did.
+   */
+  const detailsPanel = (
+    <>
+          {!selectedOrder ? (
+            <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
+              <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
+              <p className="text-sm">{t('orders.click_to_view')}</p>
+            </div>
+          ) : selectedOrderLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <Spinner  message={t('common.loading')} />
+            </div>
+          ) : selectedOrderError ? (
+            <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
+              <p className="text-lg font-medium mb-2">{t('errors.failed_load_order_details')}</p>
+              <p className="text-sm">{selectedOrderError}</p>
+            </div>
+          ) : (
+            <>
+              {/* Fixed Header */}
+              <div className="sticky top-0 start-0 end-0 z-20 border-b border-gray-200 bg-white px-6 py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-gray-900">
+                    {selectedOrder.name}
+                  </h2>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isOrderEditable(selectedOrder.status) && (
+                      <>
+                        <OrderActionsMenu
+                          isOpen={orderActionsMenuOpen}
+                          onOpenChange={setOrderActionsMenuOpen}
+                          showMergeBill={canMergeBill}
+                          onMergeBill={() => setShowMergeDialog(true)}
+                          showSplitBill={canSplitBill}
+                          onSplitBill={() => setShowSplitDialog(true)}
+                        />
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label={t('order.edit_order')}
+                          onClick={handleEditOrder}
+                          disabled={editLoading}
+                        >
+                          <Pencil className="w-4 h-4" />
+                          {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
+                        </button>
+                        {canCancelInvoice && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            aria-label={t('order.cancel_order')}
+                            onClick={() => setCancelDialogOpen(true)}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                    <Badge variant={getBadgeVariant(selectedOrder.status)}>
+                      {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
+                    </Badge>
+                  </div>
+                </div>
+                {((selectedOrder.split_total ?? 0) >= 2 ||
+                  isSplitBill(selectedOrder) ||
+                  isMergedBill(selectedOrder)) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                      >
+                        <GitBranch className="h-3 w-3" />
+                        {(selectedOrder.split_total ?? 0) >= 2
+                          ? t('bill_split.split_indicator', {
+                              index: selectedOrder.split_index ?? 0,
+                              total: selectedOrder.split_total ?? 0,
+                            })
+                          : t('bill_split.split_bill')}
+                      </Badge>
+                    ) : null}
+                    {isMergedBill(selectedOrder) ? (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                      >
+                        <GitMerge className="h-3 w-3" />
+                        {t('bill_merge.merged_bill')}
+                      </Badge>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+              {/* Cancel Order Dialog */}
+              <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('order.cancel_order')}</DialogTitle>
+                    <DialogDescription>
+                      {t('errors.enter_cancel_reason')}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="px-6 mb-3">
+                  <Textarea
+                    placeholder={t('order.enter_cancel_reason')}
+                    value={cancelReason}
+                    onChange={e => setCancelReason(e.target.value)}
+                    disabled={cancelLoading}
+                    autoFocus
+                  />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button variant="danger" onClick={handleCancelOrder} disabled={cancelLoading}>
+                      {cancelLoading ? t('common.cancelling') : t('common.confirm_cancel')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              {/* Scrollable Content Area */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 pb-40">
+                <SplitGroupPanel
+                  invoiceName={selectedOrder.name}
+                  onOpenInvoice={openRelatedInvoice}
+                />
+
+                <MergedBillPanel
+                  order={selectedOrder}
+                  onOpenSecondary={openSecondaryInvoice}
+                />
+
+                <div className="mb-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* First column: customer and time */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 text-sm">
+                        <User className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-900 font-medium">{selectedOrder.customer}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-600">{formatDateTime(selectedOrder.posting_date, selectedOrder.posting_time)}</span>
+                      </div>
+                    </div>
+                    {/* Second column: waiter and table */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 text-sm">
+                        <UserCheck className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-600">{selectedOrder.waiter}</span>
+                      </div>
+                      {selectedOrder.restaurant_table && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Receipt className="w-4 h-4 text-gray-500" />
+                          <span className="text-gray-600">{getOrderTableLabel(selectedOrder)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
+                  <div className="space-y-3">
+                    {selectedOrderItems.map((item, index) => (
+                      <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+                          <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                        </div>
+                        <div className="text-end">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(item.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Taxes */}
+                {selectedOrderTaxes.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.taxes_charges')}</h3>
+                    <div className="space-y-2">
+                      {selectedOrderTaxes.map((tax, index) => (
+                        <div key={index} className="flex justify-between items-center py-1">
+                          <span className="text-sm text-gray-600">{tax.description}</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {formatCurrency(tax.rate)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
+              <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
+                <div className="flex items-center gap-3 w-full">
+                  {/* Print Icon Button */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={handlePrintOrder}
+                    aria-label={t('order.print')}
+                    disabled={isPrinting}
+                  >
+                    {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
+                  </Button>
+                  {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders.
+                      Printing is no longer a precondition: a receipt is something the
+                      guest may or may not want, not a step in settling the bill. */}
+                  {isOrderEditable(selectedOrder.status) && (
+                    <Button
+                      className="flex-1"
+                      onClick={() => setShowPaymentDialog(true)}
+                    >
+                      {t('order.payment')}
+                    </Button>
+                  )}
+                  {/* Close Table - the table outlived its bills. Offered only when the
+                      backend confirms nothing is left open on the whole cluster. */}
+                  {canCloseTable && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => setCloseTableDialogOpen(true)}
+                      disabled={closingTable}
+                    >
+                      <DoorClosed className="w-4 h-4" />
+                      {t('order.close_table')}
+                    </Button>
+                  )}
+                  {/* Total */}
+                  <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
+                    {isMergedBill(selectedOrder) ? (
+                      <span className="flex flex-col items-end leading-tight">
+                        <span className="text-xs font-medium text-gray-500">{t('bill_merge.combined_total')}</span>
+                        <span>{formatCurrency(selectedOrderTotals.roundedTotal)}</span>
+                      </span>
+                    ) : (
+                      formatCurrency(selectedOrder.rounded_total)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+    </>
+  );
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Left Sidebar - Order Types */}
-      <OrderStatusSidebar
-        selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
-      />
+      {docked && (
+        <OrderStatusSidebar
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+        />
+      )}
 
       {/* Middle Section - Order Cards */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
+      <div
+        className={cn(
+          'flex-1 flex flex-col h-screen overflow-hidden',
+          docked && 'pe-80 xl:pe-96'
+        )}
+      >
+        {!docked && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setShowStatuses(true)}
+            >
+              <ListFilter className="w-4 h-4" />
+              {t('orders.status_title')}
+            </Button>
+            <span className="truncate text-sm font-semibold text-gray-700">
+              {t(`order_status_types.${selectedStatus.toLowerCase().replace(/ /g, '_')}`)}
+            </span>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -389,7 +759,7 @@ export default function Orders() {
               <p className="text-gray-500">{t('orders.no_orders_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
+            <div className={orderGridClasses}>
               {orders.map((order) => {
                 const splitBill = isSplitBill(order);
                 const mergedBill = isMergedBill(order);
@@ -520,250 +890,70 @@ export default function Orders() {
         </div>
       </div>
 
+      {!docked && (
+        <SlideOverPanel
+          isOpen={showStatuses}
+          onClose={() => setShowStatuses(false)}
+          title={t('orders.status_title')}
+          side="start"
+          className="max-w-xs bg-white"
+        >
+          <OrderStatusSidebar
+            selectedStatus={selectedStatus}
+            setSelectedStatus={(status) => {
+              setSelectedStatus(status);
+              setShowStatuses(false);
+            }}
+            className="w-full border-e-0"
+          />
+        </SlideOverPanel>
+      )}
+
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
-        {!selectedOrder ? (
-          <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
-            <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
-            <p className="text-sm">{t('orders.click_to_view')}</p>
-          </div>
-        ) : selectedOrderLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Spinner  message={t('common.loading')} />
-          </div>
-        ) : selectedOrderError ? (
-          <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
-            <p className="text-sm">{selectedOrderError}</p>
-          </div>
-        ) : (
-          <>
-            {/* Fixed Header */}
-            <div className="sticky top-0 start-0 end-0 z-20 border-b border-gray-200 bg-white px-6 py-4">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-gray-900">
-                  {selectedOrder.name}
-                </h2>
-                <div className="flex shrink-0 items-center gap-2">
-                  {isOrderEditable(selectedOrder.status) && (
-                    <>
-                      <OrderActionsMenu
-                        isOpen={orderActionsMenuOpen}
-                        onOpenChange={setOrderActionsMenuOpen}
-                        showMergeBill={canMergeBill}
-                        onMergeBill={() => setShowMergeDialog(true)}
-                        showSplitBill={canSplitBill}
-                        onSplitBill={() => setShowSplitDialog(true)}
-                      />
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Edit order"
-                        onClick={handleEditOrder}
-                        disabled={editLoading}
-                      >
-                        <Pencil className="w-4 h-4" />
-                        {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
-                      </button>
-                      {canCancelInvoice && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          aria-label="Cancel order"
-                          onClick={() => setCancelDialogOpen(true)}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </>
-                  )}
-                  <Badge variant={getBadgeVariant(selectedOrder.status)}>
-                    {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
-                  </Badge>
-                </div>
-              </div>
-              {((selectedOrder.split_total ?? 0) >= 2 ||
-                isSplitBill(selectedOrder) ||
-                isMergedBill(selectedOrder)) && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitBranch className="h-3 w-3" />
-                      {(selectedOrder.split_total ?? 0) >= 2
-                        ? t('bill_split.split_indicator', {
-                            index: selectedOrder.split_index ?? 0,
-                            total: selectedOrder.split_total ?? 0,
-                          })
-                        : t('bill_split.split_bill')}
-                    </Badge>
-                  ) : null}
-                  {isMergedBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitMerge className="h-3 w-3" />
-                      {t('bill_merge.merged_bill')}
-                    </Badge>
-                  ) : null}
-                </div>
-              )}
-            </div>
-            {/* Cancel Order Dialog */}
-            <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{t('order.cancel_order')}</DialogTitle>
-                  <DialogDescription>
-                    {t('errors.enter_cancel_reason')}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="px-6 mb-3">
-                <Textarea
-                  placeholder={t('order.enter_cancel_reason')}
-                  value={cancelReason}
-                  onChange={e => setCancelReason(e.target.value)}
-                  disabled={cancelLoading}
-                  autoFocus
-                />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>
-                    {t('common.cancel')}
-                  </Button>
-                  <Button variant="danger" onClick={handleCancelOrder} disabled={cancelLoading}>
-                    {cancelLoading ? t('common.cancelling') : t('common.confirm_cancel')}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-6 pb-40">
-              <SplitGroupPanel
-                invoiceName={selectedOrder.name}
-                onOpenInvoice={openRelatedInvoice}
-              />
-
-              <MergedBillPanel
-                order={selectedOrder}
-                onOpenSecondary={openSecondaryInvoice}
-              />
-
-              <div className="mb-6">
-                <div className="grid grid-cols-2 gap-4">
-                  {/* First column: customer and time */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-sm">
-                      <User className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-900 font-medium">{selectedOrder.customer}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <Clock className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-600">{formatDateTime(selectedOrder.posting_date, selectedOrder.posting_time)}</span>
-                    </div>
-                  </div>
-                  {/* Second column: waiter and table */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-sm">
-                      <UserCheck className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-600">{selectedOrder.waiter}</span>
-                    </div>
-                    {selectedOrder.restaurant_table && (
-                      <div className="flex items-center gap-3 text-sm">
-                        <Receipt className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-600">{getOrderTableLabel(selectedOrder)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Items */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
-                <div className="space-y-3">
-                  {selectedOrderItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Taxes */}
-              {selectedOrderTaxes.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.taxes_charges')}</h3>
-                  <div className="space-y-2">
-                    {selectedOrderTaxes.map((tax, index) => (
-                      <div key={index} className="flex justify-between items-center py-1">
-                        <span className="text-sm text-gray-600">{tax.description}</span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {formatCurrency(tax.rate)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
-              <div className="flex items-center gap-3 w-full">
-                {/* Print Icon Button */}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="flex-shrink-0"
-                  onClick={handlePrintOrder}
-                  aria-label="Print"
-                  disabled={isPrinting}
-                >
-                  {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
-                </Button>
-                {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
-                {isOrderEditable(selectedOrder.status) && (
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
-                      setShowPaymentDialog(true);
-                    }}
-                  >
-                    {t('order.payment')}
-                  </Button>
+      {docked ? (
+        <aside className="w-80 xl:w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+          {detailsPanel}
+        </aside>
+      ) : (
+        <SlideOverPanel
+          isOpen={showDetails}
+          onClose={() => setShowDetails(false)}
+          title={t('order.details_title')}
+          className="max-w-lg bg-white"
+        >
+          {detailsPanel}
+        </SlideOverPanel>
+      )}
+      {selectedOrder && (
+        <Dialog open={closeTableDialogOpen} onOpenChange={(open) => !closingTable && setCloseTableDialogOpen(open)}>
+          <DialogContent className="bg-white">
+            <DialogHeader>
+              <DialogTitle>{t('order.close_table')}</DialogTitle>
+              <DialogDescription>
+                {t('order.close_table_confirm', {
+                  table: getOrderTableLabel(selectedOrder) ?? selectedOrder.restaurant_table ?? '',
+                })}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCloseTableDialogOpen(false)}
+                disabled={closingTable}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button onClick={handleCloseTable} disabled={closingTable}>
+                {closingTable ? (
+                  <Spinner className="w-4 h-4" hideMessage message={t('common.loading')} />
+                ) : (
+                  t('order.close_table')
                 )}
-                {/* Total */}
-                <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
-                  {isMergedBill(selectedOrder) ? (
-                    <span className="flex flex-col items-end leading-tight">
-                      <span className="text-xs font-medium text-gray-500">{t('bill_merge.combined_total')}</span>
-                      <span>{formatCurrency(selectedOrderTotals.roundedTotal)}</span>
-                    </span>
-                  ) : (
-                    formatCurrency(selectedOrder.rounded_total)
-                  )}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}

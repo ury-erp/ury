@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
-import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
+import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { DatePicker } from '../../components/setup/DatePicker';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface MissingPriceSection {
   label: string;
@@ -58,7 +60,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
     <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-800 overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-start"
       >
         <span className="flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -164,7 +166,7 @@ export function DailyPnl() {
       });
       setData(res.message ?? (res as unknown as DailyPnlData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +183,7 @@ export function DailyPnl() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Daily P&amp;L</h1>
+          <h1 className="text-xl font-semibold">{t('reports.daily_pnl.daily_p_amp_l')}</h1>
           <p className="text-sm text-muted-foreground">Full daily profit &amp; loss breakdown</p>
         </div>
         <div className="flex items-center gap-3">
@@ -222,13 +224,17 @@ export function DailyPnl() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton />
       ) : !data?.exists ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
@@ -257,24 +263,24 @@ export function DailyPnl() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Gross Sales"
+              label={t('reports.daily_pnl.gross_sales')}
               value={formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
             <StatCard
-              label="Net Sales"
+              label={t('reports.daily_pnl.net_sales')}
               value={formatCurrency(summaryMap.get('net_sales')?.amount ?? 0)}
               icon={<TrendingUp className="w-4 h-4" />}
             />
             <StatCard
-              label="Gross Profit"
+              label={t('reports.daily_pnl.gross_profit')}
               value={`${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
                 summaryMap.get('gross_profit')?.percent ?? 0
               ).toFixed(1)}%)`}
               icon={<Percent className="w-4 h-4" />}
             />
             <StatCard
-              label="Net Profit"
+              label={t('reports.daily_pnl.net_profit')}
               value={`${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
                 summaryMap.get('net_profit')?.percent ?? 0
               ).toFixed(1)}%)`}
@@ -306,10 +312,10 @@ export function DailyPnl() {
           </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} className="self-start" />
-            <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} className="self-start" />
+            <BreakupTable title={t('reports.daily_pnl.direct_expenses')} rows={data.direct_expenses_breakup ?? []} className="self-start" />
+            <BreakupTable title={t('reports.daily_pnl.employee_costs')} rows={data.employee_costs_breakup ?? []} className="self-start" />
             <BreakupTable
-              title="Indirect Expenses"
+              title={t('reports.daily_pnl.indirect_expenses')}
               rows={data.indirect_expenses_breakup ?? []}
               className="lg:col-span-2"
               twoColumn
@@ -319,26 +325,26 @@ export function DailyPnl() {
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
+                <CardTitle className="text-base">{t('reports.daily_pnl.cogs')}</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-muted-foreground border-b">
-                      <th className="py-1.5 pr-4">Item</th>
-                      <th className="py-1.5 pr-4">Group</th>
-                      <th className="py-1.5 pr-4">Qty</th>
-                      <th className="py-1.5 pr-4">Buying Price</th>
-                      <th className="py-1.5">Amount</th>
+                    <tr className="text-start text-muted-foreground border-b">
+                      <th className="py-1.5 pe-4">{t('fields.item')}</th>
+                      <th className="py-1.5 pe-4">{t('fields.group')}</th>
+                      <th className="py-1.5 pe-4">{t('fields.qty')}</th>
+                      <th className="py-1.5 pe-4">{t('fields.buying_price')}</th>
+                      <th className="py-1.5">{t('fields.amount')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.cost_of_goods.map((r, i) => (
                       <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
-                        <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
-                        <td className="py-1.5 pr-4">{r.qty}</td>
-                        <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
+                        <td className="py-1.5 pe-4">{r.item_name || r.item_code}</td>
+                        <td className="py-1.5 pe-4">{r.item_group || '—'}</td>
+                        <td className="py-1.5 pe-4">{r.qty}</td>
+                        <td className="py-1.5 pe-4">{formatCurrency(r.buying_price)}</td>
                         <td className="py-1.5">{formatCurrency(r.amount)}</td>
                       </tr>
                     ))}

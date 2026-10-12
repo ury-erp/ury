@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '../../common/SearchableSelect';
 import { Switch } from '../../ui/switch';
 import { MenuBulkUpload } from '../../common/MenuBulkUpload';
+import { t } from '../../../i18n';
 
 const COURSE_OPTIONS = [
   { value: 'Starters', label: 'Starters' },
@@ -44,7 +45,7 @@ export function MenuSection() {
       {/* 1. Bulk Menu Upload */}
       <MenuBulkUpload
         onItemsParsed={addMenuItems}
-        title="Bulk Menu Upload"
+        title={t('dash.menu_section.bulk_menu_upload')}
         subtitle=""
         file={menuFile}
         onFileChange={setMenuFile}
@@ -77,7 +78,7 @@ export function MenuSection() {
           </div>
 
           <div className="space-y-1.5 w-full">
-            <label className="text-sm font-medium text-foreground">Tax Rate</label>
+            <label className="text-sm font-medium text-foreground">{t('dash.menu_section.tax_rate')}</label>
             <Input
               type="number"
               min={0}
@@ -96,13 +97,13 @@ export function MenuSection() {
 
       {/* 3. Menu Items List */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Menu Items</h3>
+        <h3 className="text-sm font-semibold text-foreground">{t('dash.menu_section.menu_items')}</h3>
 
         <div className="space-y-3">
           {/* Header Row */}
           <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-muted-foreground">
-            <div className="flex-1">Item Name</div>
-            <div className="flex-1">Course</div>
+            <div className="flex-1">{t('dash.menu_section.item_name')}</div>
+            <div className="flex-1">{t('dash.menu_section.course')}</div>
             <div className="flex-1">{priceColumnLabel}</div>
             {menuItems.length > 1 && <div className="w-8"></div>}
           </div>
@@ -120,7 +121,7 @@ export function MenuSection() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       updateMenuItem(item.id, { name: e.target.value })
                     }
-                    placeholder="Item Name"
+                    placeholder={t('dash.menu_section.item_name')}
                     className="w-full text-sm bg-white"
                   />
                 </div>
@@ -131,7 +132,7 @@ export function MenuSection() {
                     value={item.course}
                     options={COURSE_OPTIONS}
                     onChange={(_id, value) => updateMenuItem(item.id, { course: value })}
-                    placeholder="Course"
+                    placeholder={t('dash.menu_section.course')}
                   />
                 </div>
 
@@ -155,7 +156,7 @@ export function MenuSection() {
                   variant="ghost"
                   onClick={() => deleteMenuItem(item.id)}
                   className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
-                  title="Delete Item"
+                  title={t('dash.menu_section.delete_item')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -170,9 +171,7 @@ export function MenuSection() {
           onClick={handleAdd}
           className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/10 flex items-center justify-center gap-2 text-sm font-medium"
         >
-          <Plus className="w-4 h-4" />
-          Add Menu Item
-        </Button>
+          <Plus className="w-4 h-4" />{t('dash.menu_section.add_menu_item')}</Button>
       </div>
     </div>
   );

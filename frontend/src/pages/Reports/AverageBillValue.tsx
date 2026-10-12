@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Gauge, IndianRupee, Receipt } from 'lucide-react';
+import { Gauge, IndianRupee, Receipt, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
+import { ReportSkeleton } from '../../components/reports/ReportSkeleton';
 
 interface ABVRow {
   date: string;
@@ -20,11 +22,11 @@ interface AverageBillValueData {
   summary: { total_bills: number; total_sales: number; average_abv: number };
 }
 
-const columns: DataTableColumn<ABVRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'bill_count', header: 'Bills', align: 'right' },
-  { key: 'total_sales', header: 'Total Sales', render: (r) => formatCurrency(r.total_sales), align: 'right' },
-  { key: 'abv', header: 'ABV', render: (r) => formatCurrency(r.abv), align: 'right' },
+const getColumns = (): DataTableColumn<ABVRow>[] => [
+  { key: 'date', header: t('fields.date') },
+  { key: 'bill_count', header: t('fields.bills'), align: 'right' },
+  { key: 'total_sales', header: t('fields.total_sales'), render: (r) => formatCurrency(r.total_sales), align: 'right' },
+  { key: 'abv', header: t('fields.abv'), render: (r) => formatCurrency(r.abv), align: 'right' },
 ];
 
 export function AverageBillValue() {
@@ -49,7 +51,7 @@ export function AverageBillValue() {
       });
       setData(res.message ?? (res as unknown as AverageBillValueData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +65,7 @@ export function AverageBillValue() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Average Bill Value</h1>
+          <h1 className="text-xl font-semibold">{t('reports.average_bill_value.average_bill_value')}</h1>
           <p className="text-sm text-muted-foreground">
             Daily average bill trend {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -72,32 +74,36 @@ export function AverageBillValue() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <ReportSkeleton chart />
       ) : data ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Total Bills" value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
+            <StatCard label={t('reports.average_bill_value.total_bills')} value={data.summary.total_bills} icon={<Receipt className="w-4 h-4" />} />
             <StatCard
-              label="Total Sales"
+              label={t('reports.average_bill_value.total_sales')}
               value={formatCurrency(data.summary.total_sales)}
               icon={<IndianRupee className="w-4 h-4" />}
             />
             <StatCard
-              label="Average Bill Value"
+              label={t('reports.average_bill_value.average_bill_value')}
               value={formatCurrency(data.summary.average_abv)}
               icon={<Gauge className="w-4 h-4" />}
             />
           </div>
 
-          <LineChartCard title="ABV Trend" data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: 'Avg Bill Value' }} />
+          <LineChartCard title={t('reports.average_bill_value.abv_trend')} data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: t('fields.avg_bill_value') }} />
 
-          <DataTable columns={columns} rows={data.data} isLoading={isLoading} />
+          <DataTable columns={getColumns()} rows={data.data} isLoading={isLoading} />
         </>
       ) : null}
     </div>

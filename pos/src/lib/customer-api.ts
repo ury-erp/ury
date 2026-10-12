@@ -43,6 +43,21 @@ export interface CreateCustomerResponse {
   _server_messages?: string;
 }
 
+function getServerMessage(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const payload = error as { _server_messages?: string; message?: string };
+  if (payload.message) return payload.message;
+  if (!payload._server_messages) return null;
+
+  try {
+    const messages = JSON.parse(payload._server_messages) as string[];
+    const first = messages?.[0] ? JSON.parse(messages[0]) as { message?: string } : null;
+    return first?.message || null;
+  } catch {
+    return null;
+  }
+}
+
 
 export async function getCustomerGroups() {
   const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
@@ -75,7 +90,7 @@ export async function addCustomer(
     const response = await call.post('ury.ury_pos.api.create_customer', customerData);
     const msg = response.message;
     if (!msg || msg.status !== "success") {
-      throw new Error("Failed to create Customer,API Response error");
+      throw new Error(msg?.message || "Failed to create customer");
     }
     return {
       data: {
@@ -88,7 +103,7 @@ export async function addCustomer(
 
   } catch (error) {
     console.error('Error creating customer:', error);
-    throw error;
+    throw new Error(getServerMessage(error) || (error instanceof Error ? error.message : 'Failed to create customer'));
   }
 }
 

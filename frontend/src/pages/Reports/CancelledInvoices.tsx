@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
-import { Ban, IndianRupee, Users, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Ban, IndianRupee, Users, ChevronLeft, ChevronRight, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { t } from '../../i18n';
 
 interface CancelledInvoiceRow {
   date: string;
@@ -52,7 +53,7 @@ export function CancelledInvoices() {
       });
       setData(res.message ?? (res as unknown as CancelledInvoicesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : t('reports.common.load_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -69,12 +70,12 @@ export function CancelledInvoices() {
   const threshold = data ? data.summary.avg_amount * HIGH_VALUE_MULTIPLIER : Infinity;
 
   const columns: DataTableColumn<CancelledInvoiceRow>[] = [
-    { key: 'date', header: 'Date' },
-    { key: 'time', header: 'Time' },
-    { key: 'invoice', header: 'Invoice' },
+    { key: 'date', header: t('fields.date') },
+    { key: 'time', header: t('fields.time') },
+    { key: 'invoice', header: t('fields.invoice') },
     {
       key: 'amount',
-      header: 'Amount',
+      header: t('fields.amount'),
       align: 'right',
       render: (r) => (
         <span className={r.amount > threshold ? 'flex items-center gap-1 text-red-600 font-semibold' : ''}>
@@ -83,8 +84,8 @@ export function CancelledInvoices() {
         </span>
       ),
     },
-    { key: 'cancelled_by', header: 'Cancelled By' },
-    { key: 'cancellation_reason', header: 'Reason', render: (r) => r.cancellation_reason || '—' },
+    { key: 'cancelled_by', header: t('fields.cancelled_by') },
+    { key: 'cancellation_reason', header: t('fields.reason'), render: (r) => r.cancellation_reason || '—' },
   ];
 
   const pagination = data?.pagination;
@@ -93,7 +94,7 @@ export function CancelledInvoices() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Cancelled Invoices</h1>
+          <h1 className="text-xl font-semibold">{t('reports.cancelled_invoices.cancelled_invoices')}</h1>
           <p className="text-sm text-muted-foreground">
             Cancellation audit {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
@@ -102,21 +103,25 @@ export function CancelledInvoices() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-slide-in"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard label="Total Cancelled" value={data.summary.total_count} icon={<Ban className="w-4 h-4" />} />
+          <StatCard label={t('reports.cancelled_invoices.total_cancelled')} value={data.summary.total_count} icon={<Ban className="w-4 h-4" />} />
           <StatCard
-            label="Total Amount"
+            label={t('reports.cancelled_invoices.total_amount')}
             value={formatCurrency(data.summary.total_amount)}
             icon={<IndianRupee className="w-4 h-4" />}
           />
           <StatCard
-            label="Unique Cancellers"
+            label={t('reports.cancelled_invoices.unique_cancellers')}
             value={data.summary.unique_cancellers}
             icon={<Users className="w-4 h-4" />}
           />
@@ -132,15 +137,13 @@ export function CancelledInvoices() {
           </span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="w-4 h-4" /> Prev
-            </Button>
+              <ChevronLeft className="w-4 h-4" />{t('common.prev')}</Button>
             <Button
               variant="outline"
               size="sm"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
-            >
-              Next <ChevronRight className="w-4 h-4" />
+            >{t('common.next')}<ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>

@@ -7,6 +7,8 @@
     "self-order"
   ],
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "ury-pos-install": "cd urypos && yarn install --check-files",
     "ury-pos-build": "cd urypos && yarn build",
     "ury-mosaic-install": "cd mosaic && yarn install --check-files",
@@ -19,6 +21,8 @@
     "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build && yarn ury-self-order-build"
   },
   "devDependencies": {
-    "@types/qz-tray": "^2.2.2"
+    "@types/qz-tray": "^2.2.2",
+    "jsdom": "^30.1.0",
+    "vitest": "^3"
   }
 }

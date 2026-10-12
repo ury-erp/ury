@@ -1,53 +1,56 @@
 import { useState, useEffect } from 'react';
 import ScreenSizeDialog from './ScreenSizeDialog';
+import { POS_MIN_WIDTH } from '../hooks/useViewport';
 
 interface ScreenSizeProviderProps {
   children: React.ReactNode;
 }
 
-// This app-wide 1024px floor predates the Captain migration and is correct
-// for the desktop-oriented Cashier POS — but it renders ABOVE the router
-// (App.tsx: ScreenSizeProvider > AuthGuard > POSOpeningProvider > Router),
-// so a blind width check makes the Captain surface (`/ury/order*`),
-// deliberately built mobile-first per PLAN.md, completely unreachable on
-// any phone. Found via live E2E test at a real phone viewport — every
-// prior test in this migration ran at >=1024px and never hit this. Exempt
-// Captain routes from the desktop-only gate rather than raising the floor
-// for the whole app (Cashier POS genuinely isn't usable below 1024px).
+/**
+ * The floor under the cashier surface, now a phone floor rather than a
+ * desktop one.
+ *
+ * It used to be 1024px, which refused every tablet in the device matrix —
+ * including the 768×1024 and 820×1180 portrait tablets the POS is meant to
+ * run on — and sent the user off to the legacy app instead. The floor could
+ * not simply be lowered: at 768px the three fixed columns (categories rail,
+ * menu, 384px order panel) left no menu to read. The tablet layouts landed
+ * first (POS.tsx, Orders.tsx, `hooks/useViewport.ts`), and the floor follows
+ * them down to `POS_MIN_WIDTH` (UX-06).
+ *
+ * Phones are still out of scope for the cashier surface and keep the legacy
+ * fallback. This provider renders above the router (App.tsx:
+ * ScreenSizeProvider > AuthGuard > POSOpeningProvider > Router), so a blind
+ * width check would also take out the captain surface (`/ury/order*`), which
+ * is deliberately mobile-first — hence the exemption below.
+ */
 const isCaptainRoute = () => window.location.pathname.includes('/order');
 
 const ScreenSizeProvider = ({ children }: ScreenSizeProviderProps) => {
   const [isScreenTooSmall, setIsScreenTooSmall] = useState(false);
 
-  const checkScreenSize = () => {
-    const isSmall = window.innerWidth < 1024 && !isCaptainRoute();
-    setIsScreenTooSmall(isSmall);
-  };
-
   useEffect(() => {
-    // Check on mount
-    checkScreenSize();
-
-    // Add resize listener
-    const handleResize = () => {
-      checkScreenSize();
+    const checkScreenSize = () => {
+      setIsScreenTooSmall(window.innerWidth < POS_MIN_WIDTH && !isCaptainRoute());
     };
 
-    window.addEventListener('resize', handleResize);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    // A tablet turned on its side changes width without always firing a
+    // resize first, and the 768px boundary is exactly where that matters.
+    window.addEventListener('orientationchange', checkScreenSize);
 
-    // Cleanup
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', checkScreenSize);
+      window.removeEventListener('orientationchange', checkScreenSize);
     };
   }, []);
 
-  // Show dialog if screen is too small
   if (isScreenTooSmall) {
     return <ScreenSizeDialog />;
   }
 
-  // Render children if screen size is acceptable
   return <>{children}</>;
 };
 
-export default ScreenSizeProvider; 
+export default ScreenSizeProvider;

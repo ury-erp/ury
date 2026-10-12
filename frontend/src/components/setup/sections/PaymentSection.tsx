@@ -5,6 +5,7 @@ import { SearchableSelect, Option } from '../../common/SearchableSelect';
 import { Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { nextId } from '../../../utils/id';
+import { t } from '../../../i18n';
 
 const DEFAULTS = ['Cash', 'Card', 'UPI'];
 
@@ -56,7 +57,7 @@ export function PaymentSection() {
                 value={method.name}
                 options={allModes}
                 onChange={(_id, value) => updatePaymentMethod(method.id, { name: value })}
-                placeholder="Select Mode of Payment"
+                placeholder={t('dash.payment_section.select_mode_of_payment')}
                 disabled={loading}
               />
             </div>
@@ -66,7 +67,7 @@ export function PaymentSection() {
                 variant="ghost"
                 onClick={() => deletePaymentMethod(method.id)}
                 className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto"
-                title="Delete Method"
+                title={t('dash.payment_section.delete_method')}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -85,9 +86,7 @@ export function PaymentSection() {
         onClick={handleAdd}
         className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/10 flex items-center justify-center gap-2 text-sm font-medium"
       >
-        <Plus className="w-4 h-4" />
-        Add Payment Method
-      </Button>
+        <Plus className="w-4 h-4" />{t('dash.payment_section.add_payment_method')}</Button>
     </div>
   );
 }

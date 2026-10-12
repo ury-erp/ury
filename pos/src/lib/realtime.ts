@@ -172,3 +172,63 @@ export function useKotErrorChannels(
     };
   }, [branch, productionKey]);
 }
+
+export interface ServiceRequestPayload {
+  name: string;
+  request_type: string;
+  table: string;
+  invoice?: string;
+  session?: string;
+  status: string;
+  branch: string;
+  requested_at?: string;
+  repeat?: boolean;
+}
+
+/**
+ * Subscribes to "ury_service_request_<branch>", the channel the self-ordering
+ * backend publishes on when a customer asks for the bill (or for assistance)
+ * from their table, and when another terminal resolves such a request.
+ *
+ * The handler is held in a ref so a caller that rebuilds its callback on every
+ * render does not tear the socket listener down and back up — the moment
+ * between the two is exactly when a request would be missed.
+ */
+export function useServiceRequestChannel(
+  branch: string,
+  onRequest: (payload: ServiceRequestPayload) => void,
+): void {
+  const onRequestRef = useRef(onRequest);
+
+  useEffect(() => {
+    onRequestRef.current = onRequest;
+  }, [onRequest]);
+
+  useEffect(() => {
+    if (!branch) {
+      return;
+    }
+
+    const channelName = `ury_service_request_${branch}`;
+    const handler = (payload: ServiceRequestPayload) => onRequestRef.current(payload);
+    let activeSocket: Socket | null = null;
+    let cancelled = false;
+
+    getRealtimeSocket()
+      .then((s) => {
+        if (cancelled) {
+          return;
+        }
+        activeSocket = s;
+        s.on(channelName, handler);
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to service request channel:', error);
+      });
+
+    return () => {
+      cancelled = true;
+      activeSocket?.off(channelName, handler);
+    };
+  }, [branch]);
+}

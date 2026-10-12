@@ -1,0 +1,23 @@
+{
+ "name": "Smart Restro Sales Today",
+ "label": "Smart Restro Sales Today",
+ "creation": "2026-09-17 12:00:00.000000",
+ "modified": "2026-09-17 12:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "idx": 0,
+ "type": "Document Type",
+ "document_type": "POS Invoice",
+ "function": "Sum",
+ "filters_json": "[[\"POS Invoice\", \"docstatus\", \"=\", 1, false], [\"POS Invoice\", \"posting_date\", \"Timespan\", \"today\", false]]",
+ "is_public": 1,
+ "is_standard": 1,
+ "module": "URY",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Daily",
+ "color": "#30a66d",
+ "roles": [],
+ "aggregate_function_based_on": "grand_total"
+}

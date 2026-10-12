@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/useAuth';
-import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegistry';
+import { reportsRegistry, groupReports, reportLabel, reportGroupLabel } from '../../pages/Reports/reportsRegistry';
+import { t } from '../../i18n';
 import { SidebarContainer, SidebarActiveIndicator, sidebarItemVariants, cn } from '@ury/ui';
 import {
   LayoutDashboard,
   UtensilsCrossed,
   Grid3X3,
+  Globe,
   Map,
   Building2,
   SlidersHorizontal,
@@ -16,52 +18,59 @@ import {
   Settings,
   Store,
   BarChart3,
-  ArrowLeft,
   Grid
-} from 'lucide-react';
+, CalendarClock, Hourglass, MessageSquareHeart, Tags, Bike } from 'lucide-react';
 
 interface NavItem {
+  /** i18n key; resolved at render time, not module scope. */
+  labelKey: string;
+  /** English fallback shown if the key is missing from a locale. */
   label: string;
   path: string;
   icon: React.ElementType;
 }
 
+/** Resolve a nav label, falling back to English when untranslated. */
+const navLabel = (item: NavItem): string => {
+  const translated = t(item.labelKey);
+  return translated === item.labelKey ? item.label : translated;
+};
+
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Menu', path: '/menu', icon: UtensilsCrossed },
-  { label: 'Table', path: '/table', icon: Grid3X3 },
-  { label: 'Room', path: '/room', icon: Map },
-  { label: 'Branch', path: '/branch', icon: Building2 },
+  { labelKey: 'nav.dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { labelKey: 'nav.menu', label: 'Menu', path: '/menu', icon: UtensilsCrossed },
+  { labelKey: 'nav.table', label: 'Table', path: '/table', icon: Grid3X3 },
+  { labelKey: 'nav.reservations', label: 'Reservations', path: '/reservations', icon: CalendarClock },
+  { labelKey: 'nav.waitlist', label: 'Waitlist', path: '/waitlist', icon: Hourglass },
+  { labelKey: 'nav.feedback', label: 'Guest feedback', path: '/feedback', icon: MessageSquareHeart },
+  { labelKey: 'nav.offers', label: 'Offers', path: '/offers', icon: Tags },
+  { labelKey: 'nav.delivery', label: 'Dispatch', path: '/delivery', icon: Bike },
+  { labelKey: 'nav.room', label: 'Room', path: '/room', icon: Map },
+  { labelKey: 'nav.branch', label: 'Branch', path: '/branch', icon: Building2 },
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
-  { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
-  { label: 'User', path: '/user', icon: Users },
-  { label: 'Aggregators', path: '/aggregator', icon: Store },
-  { label: 'Daily P&L Settings', path: '/report-settings', icon: FileText },
-  { label: 'Production Unit', path: '/production-unit', icon: Grid }
+  { labelKey: 'nav.pos_profile', label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
+  { labelKey: 'nav.user', label: 'User', path: '/user', icon: Users },
+  { labelKey: 'nav.aggregators', label: 'Aggregators', path: '/aggregator', icon: Store },
+  { labelKey: 'nav.daily_pnl_settings', label: 'Daily P&L Settings', path: '/report-settings', icon: FileText },
+  { labelKey: 'nav.production_unit', label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 
 const ReportsPanel: React.FC = () => (
-  <nav className="flex-1 px-3 py-4 overflow-y-auto">
-    <Link
-      to="/dashboard"
-      className={cn(sidebarItemVariants({ active: false }), 'mb-4')}
-    >
-      <div className="flex items-center gap-3 ms-1">
-        <ArrowLeft className="w-4 h-4 text-gray-500 shrink-0" />
-        <span>Back</span>
-      </div>
-    </Link>
+  <nav className="border-t border-[#eadfce] px-3 py-4">
+    <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      {t('nav.reports')}
+    </p>
 
     <div className="space-y-4">
       {reportGroupEntries.map(([group, reports], index) => (
         <div key={group} className={index > 0 ? 'pt-3 border-t border-gray-200' : undefined}>
           <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-2">
-            {group}
+            {reportGroupLabel(group)}
           </h3>
           <div className="space-y-1">
             {reports.map((report) => {
@@ -77,7 +86,7 @@ const ReportsPanel: React.FC = () => (
                       {isActive && <SidebarActiveIndicator />}
                       <div className="flex items-center gap-3 ms-1">
                         <Icon className="w-4 h-4 text-gray-500 shrink-0" />
-                        <span>{report.label}</span>
+                        <span>{reportLabel(report)}</span>
                       </div>
                     </>
                   )}
@@ -103,7 +112,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   }, [isSettingsPath]);
 
   return (
-    <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+    <nav className="shrink-0 px-3 py-4 space-y-1">
       {isManager && (
         <NavLink
           to="/reports"
@@ -114,7 +123,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
               {isActive && <SidebarActiveIndicator />}
               <div className="flex items-center gap-3 ms-1">
                 <BarChart3 className="w-4 h-4 text-gray-500 shrink-0" />
-                <span>Reports</span>
+                <span>{t('nav.reports')}</span>
               </div>
             </>
           )}
@@ -134,7 +143,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
                 {isActive && <SidebarActiveIndicator />}
                 <div className="flex items-center gap-3 ms-1">
                   <Icon className="w-4 h-4 text-gray-500 shrink-0" />
-                  <span>{item.label}</span>
+                  <span>{navLabel(item)}</span>
                 </div>
               </>
             )}
@@ -142,15 +151,34 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         );
       })}
 
+      {isManager && (
+        <NavLink
+          to="/website"
+          className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+        >
+          {({ isActive }) => (
+            <>
+              {isActive && <SidebarActiveIndicator />}
+              <div className="flex items-center gap-3 ms-1">
+                <Globe className="w-4 h-4 text-gray-500 shrink-0" />
+                <span>{t('nav.restaurant_website')}</span>
+              </div>
+            </>
+          )}
+        </NavLink>
+      )}
+
       <div>
         <button
+          type="button"
+          aria-expanded={isSettingsOpen}
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
           className={sidebarItemVariants({ active: isSettingsPath })}
         >
           {isSettingsPath && <SidebarActiveIndicator />}
           <div className="flex items-center gap-3 ms-1">
             <Settings className="w-4 h-4 text-gray-500 shrink-0" />
-            <span>Settings</span>
+            <span>{t('nav.settings')}</span>
           </div>
           <ChevronDown
             className={cn(
@@ -161,7 +189,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         </button>
 
         {isSettingsOpen && (
-          <div className="mt-1 pl-4 space-y-1">
+          <div className="mt-1 ps-4 space-y-1">
             {SETTINGS_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
@@ -177,7 +205,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
                       {isActive && <SidebarActiveIndicator />}
                       <div className="flex items-center gap-2.5 ms-1">
                         <Icon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                        <span>{item.label}</span>
+                        <span>{navLabel(item)}</span>
                       </div>
                     </>
                   )}
@@ -196,9 +224,17 @@ export const Sidebar: React.FC = () => {
   const { isManager } = useAuth();
   const inReports = location.pathname.startsWith('/reports');
 
+  // Opening a report used to replace the whole navigation tree with a list of
+  // reports, so the rest of the app vanished and the only way back was a
+  // "Back" link at the top of the list. The global nav now stays put and the
+  // report list is appended under it, which keeps a report one click from the
+  // work it was opened to explain (UX-23).
   return (
     <SidebarContainer>
-      {inReports ? <ReportsPanel /> : <MainPanel isManager={isManager} />}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <MainPanel isManager={isManager} />
+        {inReports && <ReportsPanel />}
+      </div>
     </SidebarContainer>
   );
 };

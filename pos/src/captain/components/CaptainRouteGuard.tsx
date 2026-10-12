@@ -1,6 +1,7 @@
 import React from 'react';
 import { Spinner } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
+import { t } from '../../i18n';
 
 interface Props {
   children: React.ReactNode;
@@ -42,7 +43,7 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-red-600 text-xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Unable to load Captain context</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('captain.context_load_failed')}</h2>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -54,10 +55,8 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-amber-600 text-xl mb-4">🔒</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Not permitted</h2>
-          <p className="text-gray-600">
-            You do not have permission to take table orders.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('errors.not_permitted')}</h2>
+          <p className="text-gray-600">{t('captain.no_permission_table_orders')}</p>
         </div>
       </div>
     );
