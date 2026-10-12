@@ -14,6 +14,7 @@ import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
+import { isBlindCashCount } from '../lib/pos-closing-visibility';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { getChecklist } from '../lib/checklist-api';
 import {
@@ -132,11 +133,21 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
 
 function buildRows(
   openingBalances: OpeningBalanceDetail[],
-  expectedByMode: Record<string, number>
+  expectedByMode: Record<string, number>,
+  blindCashCount: boolean,
+  profilePaymentModes: string[]
 ): ClosingPaymentSummary[] {
   const rows = new Map<string, ClosingPaymentSummary>();
+  const rowBalances = blindCashCount
+    ? [
+        ...openingBalances,
+        ...profilePaymentModes
+          .filter((mode) => !openingBalances.some((detail) => detail.mode_of_payment === mode))
+          .map((mode) => ({ mode_of_payment: mode, opening_amount: 0 })),
+      ]
+    : openingBalances;
 
-  openingBalances.forEach((detail) => {
+  rowBalances.forEach((detail) => {
     rows.set(detail.mode_of_payment, {
       mode_of_payment: detail.mode_of_payment,
       opening_amount: Number(detail.opening_amount) || 0,
@@ -150,7 +161,7 @@ function buildRows(
     const existing = rows.get(mode);
     if (existing) {
       existing.expected_amount = expected;
-    } else {
+    } else if (!blindCashCount) {
       rows.set(mode, {
         mode_of_payment: mode,
         opening_amount: 0,
@@ -165,8 +176,9 @@ function buildRows(
 }
 
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
-  const { posProfile } = usePOSStore();
+  const { posProfile, paymentModes } = usePOSStore();
   const { user } = useRootStore();
+  const blindCashCount = isBlindCashCount(posProfile);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -176,6 +188,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   const [invoiceCount, setInvoiceCount] = useState(0);
   const [totals, setTotals] = useState<AggregatedTotals>({ grandTotal: 0, netTotal: 0, totalQty: 0 });
   const [rows, setRows] = useState<ClosingPaymentSummary[]>([]);
+  // Sales-only tenders must be reconciled without affecting blind-count UI or validation.
+  const [hiddenRows, setHiddenRows] = useState<ClosingPaymentSummary[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Set once the close submission (Sub POS Closing / POS Closing Entry) has
@@ -259,7 +273,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setInvoiceCount(invoices.length);
       const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
       setTotals(aggregatedTotals);
-      setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
+      const paymentRows = buildRows(openingDoc?.balance_details ?? [], expectedByMode, blindCashCount, paymentModes);
+      setRows(paymentRows);
+      setHiddenRows(blindCashCount
+        ? buildRows([], expectedByMode, false, []).filter(
+            (row) => !paymentRows.some((visibleRow) => visibleRow.mode_of_payment === row.mode_of_payment)
+          )
+        : []);
       setTouchedModes(new Set());
     } catch (error) {
       console.error('Failed to load POS closing details:', error);
@@ -267,7 +287,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     } finally {
       setIsLoading(false);
     }
-  }, [posProfile, user]);
+  }, [posProfile, user, blindCashCount, paymentModes]);
 
   useEffect(() => {
     if (!open) return;
@@ -317,7 +337,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       (row) =>
         touchedModes.has(row.mode_of_payment) &&
         row.closing_amount === 0 &&
-        (row.opening_amount !== 0 || row.expected_amount !== 0)
+        (row.opening_amount !== 0 || (!blindCashCount && row.expected_amount !== 0))
     );
 
     let blockingMessage: string | null = null;
@@ -333,7 +353,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         : null;
 
     return { isValid: !blockingMessage, blockingMessage, warningMessage };
-  }, [rows, touchedModes]);
+  }, [rows, touchedModes, blindCashCount]);
 
   const handleRequestSubmit = () => {
     if (!validation.isValid) return;
@@ -347,7 +367,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const paymentReconciliation = rows.map((row) => ({
+    const paymentReconciliation = [...rows, ...hiddenRows].map((row) => ({
       mode_of_payment: row.mode_of_payment,
       opening_amount: row.opening_amount,
       expected_amount: row.expected_amount,
@@ -505,33 +525,36 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
             <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
           ) : (
             <>
-              <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.grandTotal)}
-                  </p>
+              {!blindCashCount && (
+                <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(totals.grandTotal)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(totals.netTotal)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
+                    <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
+                    <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.netTotal)}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
-                </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
-                </div>
-              </div>
+              )}
 
               {hasRows ? (
                 <ClosingPaymentTable
                   rows={rows}
                   touchedModes={touchedModes}
+                  blindCashCount={blindCashCount}
                   onChange={handleRowChange}
                 />
               ) : (

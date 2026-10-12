@@ -21,6 +21,7 @@ export interface PosProfileLimited {
   multiple_cashier: number;
   owner: string;
   edit_order_type?: number;
+  custom_blind_cash_count?: number;
 }
 
 export interface PosProfileLimitedResponse {
@@ -65,6 +66,7 @@ export interface PosProfileFull {
   role_restricted_for_table_order?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
+  custom_blind_cash_count?: number;
 }
 
 // Combined POS Profile with both limited and full fields
@@ -135,6 +137,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     enable_discount: limitedProfile.enable_discount,
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
+    custom_blind_cash_count: limitedProfile.custom_blind_cash_count ?? 0,
   };
 
   return combinedProfile;

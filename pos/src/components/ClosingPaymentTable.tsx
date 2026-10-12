@@ -9,12 +9,14 @@ interface ClosingPaymentTableProps {
   rows: ClosingPaymentSummary[];
   /** Modes the cashier has explicitly entered a closing amount for (see Fix 2). */
   touchedModes: Set<string>;
+  blindCashCount?: boolean;
   onChange: (modeOfPayment: string, closingAmount: number) => void;
 }
 
 const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
   rows,
   touchedModes,
+  blindCashCount = false,
   onChange,
 }) => {
   const handleClosingAmountChange = (modeOfPayment: string, value: string) => {
@@ -36,20 +38,22 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
             <th className="text-right py-3 px-4 font-semibold text-gray-900">
               Opening
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
-              <span
-                title={t('pos_closing.help_expected')}
-                className="inline-flex items-center gap-1 cursor-help"
-              >
-                Expected
+            {!blindCashCount && (
+              <th className="text-right py-3 px-4 font-semibold text-gray-900">
                 <span
-                  aria-hidden="true"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                  title={t('pos_closing.help_expected')}
+                  className="inline-flex items-center gap-1 cursor-help"
                 >
-                  i
+                  Expected
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                  >
+                    i
+                  </span>
                 </span>
-              </span>
-            </th>
+              </th>
+            )}
             <th className="text-center py-3 px-4 font-semibold text-gray-900">
               <span
                 title={t('pos_closing.help_closing')}
@@ -64,20 +68,22 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 </span>
               </span>
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
-              <span
-                title={t('pos_closing.help_difference')}
-                className="inline-flex items-center gap-1 cursor-help"
-              >
-                Difference
+            {!blindCashCount && (
+              <th className="text-right py-3 px-4 font-semibold text-gray-900">
                 <span
-                  aria-hidden="true"
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                  title={t('pos_closing.help_difference')}
+                  className="inline-flex items-center gap-1 cursor-help"
                 >
-                  i
+                  Difference
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                  >
+                    i
+                  </span>
                 </span>
-              </span>
-            </th>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -103,9 +109,11 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 <td className="py-3 px-4 text-right text-gray-700">
                   {formatCurrency(row.opening_amount)}
                 </td>
-                <td className="py-3 px-4 text-right text-gray-700">
-                  {formatCurrency(row.expected_amount)}
-                </td>
+                {!blindCashCount && (
+                  <td className="py-3 px-4 text-right text-gray-700">
+                    {formatCurrency(row.expected_amount)}
+                  </td>
+                )}
                 <td className="py-3 px-4">
                   <Input
                     type="number"
@@ -120,14 +128,16 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                     size="sm"
                   />
                 </td>
-                <td
-                  className={cn(
-                    'py-3 px-4 text-right font-medium',
-                    hasDifference ? 'text-red-600' : 'text-green-600'
-                  )}
-                >
-                  {formatCurrency(difference)}
-                </td>
+                {!blindCashCount && (
+                  <td
+                    className={cn(
+                      'py-3 px-4 text-right font-medium',
+                      hasDifference ? 'text-red-600' : 'text-green-600'
+                    )}
+                  >
+                    {formatCurrency(difference)}
+                  </td>
+                )}
               </tr>
             );
           })}

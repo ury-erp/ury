@@ -456,14 +456,15 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
             "ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect
         ):
             mock_validate_close.return_value = "Success"
-            mock_has_permission.side_effect = lambda doctype, perm: perm == "create" or perm == "submit"
+            mock_has_permission.side_effect = lambda doctype, perm, **kwargs: perm == "create" or perm == "submit"
             mock_multi_cashier.return_value = {
                 "enabled": True,
                 "main_cashier_configured": True,
                 "main_cashier_open": True,
             }
             mock_get_all.return_value = [
-                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open"}
+                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open",
+                 "user": "cashier@example.com", "period_start_date": "2026-10-01 08:10:00"}
             ]
 
             result = get_pos_opening_screen_data()
@@ -521,6 +522,189 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
         self.assertFalse(result["permissions"]["create"])
         self.assertFalse(result["permissions"]["submit"])
         self.assertEqual(result["open_entries"], [])
+
+class TestPOSOpeningOccupancy(unittest.TestCase):
+    """Opening context regressions that run without a Frappe site."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.enterContext(patch("ury.ury_pos.api._", side_effect=lambda message: message))
+        self.frappe.session.user = "cashier@example.com"
+        self.frappe.defaults.get_user_default.return_value = "Test Co"
+        self.frappe.PermissionError = frappe.PermissionError
+        self.frappe.throw.side_effect = frappe.PermissionError("Not permitted")
+        self.allowed = self.enterContext(patch("ury.ury_pos.api._get_allowed_pos_profiles"))
+        self.allowed.return_value = [{"name": "POS-1"}, {"name": "POS-2"}]
+        self.enterContext(patch("ury.ury_pos.api.getPosProfile", return_value={"pos_profile": "POS-1"}))
+        self.enterContext(patch("ury.ury_pos.api.validate_pos_close", return_value="Success"))
+        self.enterContext(patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": False}))
+        self.profile = frappe._dict(name="POS-2", branch="Branch A", restaurant="Rest A", payments=[])
+        self.entry = frappe._dict(
+            name="POS-OPE-0002", pos_profile="POS-2", user="other@example.com",
+            period_start_date="2026-10-01 08:10:00", status="Open", docstatus=1,
+        )
+        self.frappe.get_doc.side_effect = lambda doctype, name: (
+            self.entry if doctype == "POS Opening Entry" else self.profile
+        )
+        self.frappe.db.get_value.side_effect = lambda doctype, name, field: (
+            "Other Cashier" if doctype == "User" and name == self.entry.user else None
+        )
+        self.frappe.has_permission.return_value = True
+        self.frappe.get_all.side_effect = lambda doctype, **kwargs: (
+            [self.entry] if kwargs["filters"].get("pos_profile") == self.entry.pos_profile else []
+        )
+
+    def test_returns_other_holders_name_and_start_for_selected_profile(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertEqual(result["selected_profile"], "POS-2")
+        self.assertEqual(result["occupied_entry"], {
+            "name": "POS-OPE-0002",
+            "user_full_name": "Other Cashier", "period_start_date": "2026-10-01 08:10:00",
+        })
+        self.assertNotIn("other@example.com", json.dumps(result))
+        query = next(call for call in self.frappe.get_all.call_args_list if call.kwargs["filters"].get("pos_profile"))
+        self.assertEqual(query.kwargs["filters"], {
+            "pos_profile": "POS-2", "user": ["!=", "cashier@example.com"],
+            "docstatus": 1, "status": "Open",
+        })
+        self.frappe.has_permission.assert_any_call("POS Opening Entry", "read", doc=self.entry)
+
+    def test_hides_entry_id_without_document_read_permission(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.has_permission.side_effect = lambda doctype, perm, **kwargs: perm != "read"
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertNotIn("name", result["occupied_entry"])
+        self.assertNotIn("user", result["occupied_entry"])
+        self.assertEqual(result["occupied_entry"]["user_full_name"], "Other Cashier")
+        self.assertNotIn("POS-OPE-0002", json.dumps(result))
+        self.assertNotIn("other@example.com", json.dumps(result))
+
+    def test_default_profile_does_not_return_another_profiles_entry(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.assertIsNone(get_pos_opening_screen_data()["occupied_entry"])
+
+    def test_default_profile_reports_its_other_holder(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.entry.pos_profile = "POS-1"
+        occupied = get_pos_opening_screen_data().get("occupied_entry")
+        self.assertIsNotNone(occupied, "The other cashier's open till must be reported")
+        self.assertEqual(occupied["user_full_name"], "Other Cashier")
+
+    def test_shared_profile_does_not_report_or_query_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        with patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": True}):
+            result = get_pos_opening_screen_data(pos_profile="POS-2")
+
+        self.assertIsNone(result["occupied_entry"])
+        self.assertFalse(any(
+            call.kwargs["filters"].get("pos_profile")
+            for call in self.frappe.get_all.call_args_list
+        ))
+
+    def test_default_shared_profile_does_not_report_or_query_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.entry.pos_profile = "POS-1"
+        with patch("ury.ury_pos.api._get_main_cashier_status", return_value={"enabled": True}):
+            result = get_pos_opening_screen_data()
+
+        self.assertIsNone(result["occupied_entry"])
+        self.assertFalse(any(
+            call.kwargs["filters"].get("pos_profile")
+            for call in self.frappe.get_all.call_args_list
+        ))
+
+    def test_holder_has_no_display_name_when_full_name_is_missing(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.db.get_value.return_value = None
+        self.frappe.db.get_value.side_effect = None
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+        self.assertIsNone(result["occupied_entry"]["user_full_name"])
+        self.assertNotIn("user", result["occupied_entry"])
+        self.assertNotIn("other@example.com", json.dumps(result))
+
+    def test_holder_has_no_display_name_when_full_name_is_empty(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        self.frappe.db.get_value.return_value = ""
+        self.frappe.db.get_value.side_effect = None
+        result = get_pos_opening_screen_data(pos_profile="POS-2")
+        self.assertIsNone(result["occupied_entry"]["user_full_name"])
+        self.assertNotIn("user", result["occupied_entry"])
+        self.assertNotIn("other@example.com", json.dumps(result))
+
+    def test_unavailable_profile_cannot_disclose_occupancy(self):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        with self.assertRaises(frappe.PermissionError):
+            get_pos_opening_screen_data(pos_profile="Forbidden POS")
+        self.frappe.get_all.assert_not_called()
+
+
+class TestBlindCashCount(unittest.TestCase):
+    """POS Profile fixture and API flag, without a Frappe site."""
+
+    def setUp(self):
+        self.frappe = self.enterContext(patch("ury.ury_pos.api.frappe"))
+        self.enterContext(patch("ury.ury_pos.api.getBranch", return_value="Branch A"))
+        self.frappe.session.user = "cashier@example.com"
+        self.profile = frappe._dict(
+            name="POS-1", branch="Branch A", company="Test Co", warehouse="Stores",
+            applicable_for_users=[frappe._dict(user="cashier@example.com")],
+            printer_settings=[], qz_print=0, custom_enable_multiple_cashier=0,
+        )
+        self.frappe.db.exists.return_value = self.profile.name
+        self.frappe.get_doc.return_value = self.profile
+        self.frappe.get_single.return_value = frappe._dict(disable_rounded_total=0)
+
+    def test_exposes_enabled_blind_count(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.profile.custom_blind_cash_count = 1
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 1)
+
+    def test_exposes_disabled_blind_count(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.profile.custom_blind_cash_count = 0
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 0)
+
+    def test_missing_field_defaults_to_disabled(self):
+        from ury.ury_pos.api import getPosProfile
+
+        self.assertEqual(getPosProfile().get("custom_blind_cash_count"), 0)
+
+    def test_fixture_is_an_opt_in_pos_profile_checkbox(self):
+        from pathlib import Path
+
+        fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "custom_field.json"
+        with fixture_path.open() as fixture_file:
+            fields = json.load(fixture_file)
+        matches = [field for field in fields if field["name"] == "POS Profile-custom_blind_cash_count"]
+        self.assertEqual(len(matches), 1, "Ship exactly one blind-count field")
+        field = matches[0]
+        self.assertEqual(field["dt"], "POS Profile")
+        self.assertEqual(field["fieldname"], "custom_blind_cash_count")
+        self.assertEqual(field["fieldtype"], "Check")
+        self.assertEqual(field["default"], "0")
+        self.assertEqual(field["reqd"], 0)
+
+    def test_fixture_export_keeps_the_blind_count_field(self):
+        from ury.hooks import fixtures
+
+        custom_fields = next(fixture for fixture in fixtures if fixture.get("doctype") == "Custom Field")
+        names = next(values for field, operator, values in custom_fields["filters"] if field == "name" and operator == "in")
+        self.assertIn("POS Profile-custom_blind_cash_count", names)
+
 
 class TestSubmitChecklistSEC10(FrappeTestCase):
     """Test cases for submit_checklist function."""
