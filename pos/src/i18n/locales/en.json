@@ -142,7 +142,12 @@
     "confirm_submit": "Yes, Close POS",
     "confirm_back": "Go Back",
     "checklist_skip": "Skip for now",
-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
+    "payment_mode": "Payment Mode",
+    "opening": "Opening",
+    "expected": "Expected",
+    "closing": "Closing",
+    "difference": "Difference"
   },
   "checklist": {
     "title_opening": "Opening Checklist",
