@@ -10,6 +10,8 @@ export interface POSInvoice {
   restaurant_table: string | null;
   cashier: string;
   waiter: string;
+  custom_waiter_employee?: string | null;
+  performer_name?: string | null;
   net_total: number;
   posting_time: string;
   total_taxes_and_charges: number;
@@ -191,6 +193,8 @@ export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInv
     custom_merged_tables: inv.custom_merged_tables,
     cashier: inv.cashier ?? '',
     waiter: inv.waiter ?? '',
+    custom_waiter_employee: inv.custom_waiter_employee,
+    performer_name: inv.performer_name,
     net_total: inv.net_total ?? inv.grand_total,
     posting_time: inv.posting_time,
     total_taxes_and_charges: inv.total_taxes_and_charges ?? 0,
@@ -431,4 +435,4 @@ export async function mergeBills(
     throw new Error(result.message || 'Failed to merge bills');
   }
   return result;
-} 
+}

@@ -45,7 +45,9 @@ def get_today_sales(branch=None, date=None):
 		SELECT
 			COUNT(b.`name`) AS total_invoices,
 			ROUND(SUM(b.`net_total`), 2) AS item_total,
-			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS total_taxes_and_charges,
+			ROUND(SUM(b.`total_taxes_and_charges` - IFNULL(b.`custom_service_charge_amount`, 0)), 2) AS total_taxes_and_charges,
+			ROUND(SUM(IFNULL(b.`custom_service_charge_amount`, 0)), 2) AS service_charge,
+			ROUND(SUM(IFNULL(b.`custom_staff_discount_amount`, 0)), 2) AS staff_discount_amount,
 			ROUND(SUM(b.`grand_total`), 2) AS grand_total,
 			ROUND(SUM(b.`grand_total` - b.`rounded_total`), 2) AS round_off,
 			ROUND(SUM(CASE WHEN b.`custom_settlement_stage` = 'Transferred On Credit' THEN 0
@@ -69,6 +71,8 @@ def get_today_sales(branch=None, date=None):
 		"total_invoices",
 		"item_total",
 		"total_taxes_and_charges",
+		"service_charge",
+		"staff_discount_amount",
 		"grand_total",
 		"round_off",
 		"cash_discounts",
@@ -114,7 +118,9 @@ def get_daywise_sales(start_date, end_date, branch=None):
 			date_list.`date` AS date,
 			COUNT(b.`name`) AS total_invoices,
 			ROUND(SUM(b.`net_total`), 2) AS item_total,
-			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS total_taxes,
+			ROUND(SUM(b.`total_taxes_and_charges` - IFNULL(b.`custom_service_charge_amount`, 0)), 2) AS total_taxes,
+			ROUND(SUM(IFNULL(b.`custom_service_charge_amount`, 0)), 2) AS service_charge,
+			ROUND(SUM(IFNULL(b.`custom_staff_discount_amount`, 0)), 2) AS staff_discount_amount,
 			ROUND(SUM(b.`grand_total`), 2) AS grand_total,
 			ROUND(SUM(b.`grand_total` - b.`rounded_total`), 2) AS round_off,
 			ROUND(SUM(CASE WHEN b.`custom_settlement_stage` = 'Transferred On Credit' THEN 0
@@ -130,7 +136,7 @@ def get_daywise_sales(start_date, end_date, branch=None):
 		as_dict=True,
 	)
 
-	numeric_keys = ("total_invoices", "item_total", "total_taxes", "grand_total", "round_off", "cash_discount")
+	numeric_keys = ("total_invoices", "item_total", "total_taxes", "service_charge", "staff_discount_amount", "grand_total", "round_off", "cash_discount")
 	for r in rows:
 		r["date"] = str(r["date"])
 		for key in numeric_keys:
@@ -219,7 +225,10 @@ def get_daywise_invoices(start_date, end_date, branch=None, page=1, page_size=50
 			) AS time,
 			b.`name` AS invoice,
 			b.`net_total` AS item_total,
-			b.`total_taxes_and_charges` AS total_taxes,
+			(b.`total_taxes_and_charges` - IFNULL(b.`custom_service_charge_amount`, 0)) AS total_taxes,
+			IFNULL(b.`custom_service_charge_amount`, 0) AS service_charge,
+			b.`staff_discount_policy` AS staff_discount_policy,
+			IFNULL(b.`custom_staff_discount_amount`, 0) AS staff_discount_amount,
 			b.`grand_total` AS grand_total,
 			(b.`grand_total` - b.`rounded_total`) AS round_off,
 			b.`rounded_total` AS rounded_total,
@@ -301,7 +310,7 @@ def get_month_wise_sales(branch=None, months_back=6):
 			MONTH(date_list.`date`) AS month_number,
 			MONTHNAME(date_list.`date`) AS month_name,
 			ROUND(SUM(b.`net_total`), 2) AS item_total,
-			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS taxes,
+			ROUND(SUM(b.`total_taxes_and_charges` - IFNULL(b.`custom_service_charge_amount`, 0)), 2) AS taxes,
 			ROUND(SUM(b.`grand_total`), 2) AS grand_total
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})

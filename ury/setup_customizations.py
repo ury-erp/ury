@@ -234,6 +234,20 @@ def get_custom_fields():
 					"read_only": 1,
 					"search_index": 1,
 					"translatable": 0,
+				},
+				{
+					"fieldname": "custom_staff_discount_amount",
+					"fieldtype": "Currency",
+					"label": "Staff Policy Discount",
+					"insert_after": "staff_discount_policy",
+					"read_only": 1,
+				},
+				{
+					"fieldname": "custom_service_charge_amount",
+					"fieldtype": "Currency",
+					"label": "Service Charge",
+					"insert_after": "custom_staff_discount_amount",
+					"read_only": 1,
 				}
 				],
 
@@ -503,7 +517,48 @@ def get_custom_fields():
 				"label": "Roles Allowed To Settle On Credit",
 				"options": "Role Permitted",
 				"insert_after": "custom_credit_mode_of_payment",
-			}
+			},
+			{
+				"fieldname": "custom_enable_service_charge",
+				"fieldtype": "Check",
+				"default": "0",
+				"label": "Enable Service Charge",
+				"insert_after": "custom_roles_allowed_for_credit",
+			},
+			{
+				"fieldname": "custom_service_charge_percentage",
+				"fieldtype": "Percent",
+				"label": "Service Charge Percentage",
+				"depends_on": "custom_enable_service_charge",
+				"insert_after": "custom_enable_service_charge",
+			},
+			{
+				"fieldname": "custom_service_charge_order_types",
+				"fieldtype": "Select",
+				"options": "Dine In",
+				"default": "Dine In",
+				"label": "Service Charge Order Types",
+				"depends_on": "custom_enable_service_charge",
+				"insert_after": "custom_service_charge_percentage",
+			},
+			{
+				"fieldname": "custom_service_charge_income_account",
+				"fieldtype": "Link",
+				"options": "Account",
+				"label": "Legacy Service Charge Income Account",
+				"description": "Legacy setting. Use the waiter payable account for new service charges.",
+				"hidden": 1,
+				"depends_on": "custom_enable_service_charge",
+				"insert_after": "custom_service_charge_order_types",
+			},
+			{
+				"fieldname": "custom_service_charge_payable_account",
+				"fieldtype": "Link",
+				"options": "Account",
+				"label": "Waiter Service Payable Account",
+				"depends_on": "custom_enable_service_charge",
+				"insert_after": "custom_service_charge_income_account",
+			},
 		],
   
 		"POS Opening Entry": [
@@ -587,7 +642,30 @@ def get_custom_fields():
 			},
 		],
 
-		"POS Invoice Iten": [
+		"POS Invoice Item": [
+			{
+				"fieldname": "custom_staff_policy_discount",
+				"fieldtype": "Currency",
+				"label": "Staff Policy Discount",
+				"insert_after": "discount_amount",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "custom_staff_policy_base_rate",
+				"fieldtype": "Currency",
+				"label": "Staff Policy Base Rate",
+				"insert_after": "custom_staff_policy_discount",
+				"read_only": 1,
+				"hidden": 1,
+			},
+			{
+				"fieldname": "custom_staff_policy_base_discount_percentage",
+				"fieldtype": "Percent",
+				"label": "Staff Policy Base Discount Percentage",
+				"insert_after": "custom_staff_policy_base_rate",
+				"read_only": 1,
+				"hidden": 1,
+			},
 			{
 				"fieldname": "comment",
 				"fieldtype": "Data",
@@ -595,6 +673,15 @@ def get_custom_fields():
 				"insert_after": "description",
 				"translatable": 0
 			}
+		],
+		"Sales Taxes and Charges": [
+			{
+				"fieldname": "custom_is_service_charge",
+				"fieldtype": "Check",
+				"label": "URY Service Charge",
+				"read_only": 1,
+				"hidden": 1,
+			},
 		],
 
 		"URY KOT": [

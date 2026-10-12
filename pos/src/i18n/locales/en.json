@@ -115,6 +115,15 @@
     "order_actions": "Order actions"
   },
   "payment": {
+    "staff_policy_discount": "Staff discount: {{name}}",
+    "policy_limit_remaining": "Policy limit remaining: {{amount}}",
+    "service_charge": "Waiter service {{percentage}}%",
+    "taxes": "Taxes",
+    "policy_reason_no_applicable_policy": "No staff discount policy applies to this bill.",
+    "policy_reason_no_eligible_items": "No items on this bill qualify for a staff discount.",
+    "policy_reason_period_limit_reached": "The staff discount limit has been reached.",
+    "policy_reason_manual_discount": "Manual discount selected; staff policy is not combined with it.",
+    "policy_reason_rounding_zero": "The staff discount rounds to zero for this bill.",
     "title": "Payment",
     "apply_discount": "Apply Discount",
     "discount_placeholder": "Enter %",

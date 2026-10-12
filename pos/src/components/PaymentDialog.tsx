@@ -6,6 +6,7 @@ import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { BillingQuote, getInvoiceBillingQuote } from '../lib/pos-billing-api';
 
 
 interface PaymentDialogProps {
@@ -44,7 +45,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
   
   // Calculate effective percentage if only amount is provided (for invoice-level discounts)
   const effectivePercentage = discountPercentage 
@@ -54,12 +54,36 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         : 0);
         
   const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
+  const [manualPercentage, setManualPercentage] = useState<number>(effectivePercentage);
+  const [quote, setQuote] = useState<BillingQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(true);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
 
   useEffect(() => {
     fetchPaymentModes();
   }, [fetchPaymentModes]);
+
+  useEffect(() => {
+    let active = true;
+    setQuoteLoading(true);
+    getInvoiceBillingQuote(invoice, manualPercentage)
+      .then((result) => {
+        if (active) {
+          setQuote(result);
+          setError(null);
+        }
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setQuote(null);
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (active) setQuoteLoading(false);
+      });
+    return () => { active = false; };
+  }, [invoice, manualPercentage]);
 
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
@@ -74,47 +98,36 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setError(t('errors.discount_exceeds_max'));
       return;
     }
-    const calculatedDiscount = (baseTotal * value) / 100;
-    setAppliedDiscount(calculatedDiscount);
+    setManualPercentage(value);
     setError(null);
   };
 
   // Order summary logic
-  const subtotal = baseTotal;
-  const adjustment = roundedTotal - grandTotal;
-  const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
-  const totalDiscount = appliedDiscount;
-  const discountedTotal = Math.max(0, subtotal - totalDiscount);
-  // If discount is applied, round up; else, round normally
-  const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+  const subtotal = quote?.subtotal ?? baseTotal;
+  const appliedDiscount = quote?.manual_discount_amount ?? 0;
+  const policyDetails = [quote?.policy, quote?.merged_policy].filter((policy) => policy?.name && (policy.amount || 0) > 0);
+  const finalTotal = quote?.rounded_total ?? roundedTotal;
 
   // Calculate split payment total
   const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
+    .map((mode) => {
+      const amount = parseFloat(paymentInputs[mode] || '');
+      return amount > 0 ? { mode_of_payment: mode, amount } : null;
     })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+    .filter((payment): payment is { mode_of_payment: string; amount: number } => payment !== null);
+  const paymentsTotal = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const shortfall = finalTotal - paymentsTotal;
   const isShort = shortfall > 0.005;
 
-  const finalAdjustment = finalTotal - discountedTotal;
+  const finalAdjustment = finalTotal - (quote?.grand_total ?? grandTotal);
   const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
 
   useEffect(()=>{
-    const defaultPaymentModePresent=paymentModes.find((mode)=>mode===DEFAULT_PAYMENT_MODE)
-    //only one payment mode should be present, then autofill the final amount, if not do not fill
-    const otherPaymentModesNotEntered=Object.keys(paymentInputs).length<=1;
-    if(finalTotal && paymentModes && DEFAULT_PAYMENT_MODE && defaultPaymentModePresent && otherPaymentModesNotEntered){
-      //check if default payment mode is present in paymentModes
-      setPaymentInputs((prev)=>({ 
-        ...prev,
-        [DEFAULT_PAYMENT_MODE]:String(finalTotal) 
-      }))
+    if(finalTotal && paymentModes.includes(DEFAULT_PAYMENT_MODE)){
+      setPaymentInputs((prev) => Object.keys(prev).length <= 1
+        ? { ...prev, [DEFAULT_PAYMENT_MODE]: String(finalTotal) }
+        : prev);
     }
   },[finalTotal,paymentModes])
 
@@ -122,7 +135,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const getRemainingBalance = (currentId: string) => {
     const totalEntered = Object.entries(paymentInputs)
       .filter(([id]) => id !== currentId)
-      .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
+      .reduce((sum, entry) => sum + (parseFloat(entry[1]) || 0), 0);
     return Math.max(0, finalTotal - totalEntered);
   };
 
@@ -143,7 +156,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+        additionalDiscount: manualPercentage || null,
         cashier,
         customer,
         invoice,
@@ -211,11 +224,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           <div className="space-y-4 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
             <div className="grid grid-cols-1 gap-3">
-              {paymentModes.map((mode: any) => {
-                const id = typeof mode === 'string' ? mode : mode.id;
+              {paymentModes.map((mode) => {
+                const id = mode;
                 return (
                   <div key={id} className="flex items-center gap-3">
-                    <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
+                    <span className="w-24 font-medium">{mode}</span>
                     <Input
                       type="number"
                       min="0"
@@ -288,6 +301,26 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                   <span>-{formatCurrency(appliedDiscount)}</span>
                 </div>
               )}
+              {policyDetails.map((policy, index) => (
+                <React.Fragment key={`${policy?.name}-${index}`}>
+                  <div className="flex justify-between text-green-600">
+                    <span>{t('payment.staff_policy_discount', { name: policy?.policy_name || policy?.name })} ({policy?.discount_type === 'Percentage' ? `${policy?.value}%` : formatCurrency(policy?.value || 0)})</span>
+                    <span>-{formatCurrency(policy?.amount || 0)}</span>
+                  </div>
+                  {policy?.remaining_limit != null && (
+                    <div className="text-xs text-gray-600">{t('payment.policy_limit_remaining', { amount: formatCurrency(policy.remaining_limit) })}</div>
+                  )}
+                </React.Fragment>
+              ))}
+              {quote?.policy?.reason && (
+                <div className="text-xs text-gray-600">{t(`payment.policy_reason_${quote.policy.reason}`)}</div>
+              )}
+              {quote?.tax_amount !== undefined && quote.tax_amount !== 0 && (
+                <div className="flex justify-between"><span>{t('payment.taxes')}</span><span>{formatCurrency(quote.tax_amount)}</span></div>
+              )}
+              {quote && quote.service_charge > 0 && (
+                <div className="flex justify-between"><span>{t('payment.service_charge', { percentage: quote.service_charge_percentage })}</span><span>{formatCurrency(quote.service_charge)}</span></div>
+              )}
               {/* Adjustment (if any) */}
               {showFinalAdjustment && (
                 <div className="flex justify-between text-blue-600">
@@ -308,8 +341,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0 || isShort}
-            variant={isProcessing || payments.length === 0 || isShort ? "secondary" : "default"}
+            disabled={isProcessing || quoteLoading || !quote || payments.length === 0 || isShort}
+            variant={isProcessing || quoteLoading || !quote || payments.length === 0 || isShort ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
@@ -320,4 +353,4 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   );
 };
 
-export default PaymentDialog; 
+export default PaymentDialog;

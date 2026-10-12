@@ -115,6 +115,15 @@
     "order_actions": "Тапсырыс әрекеттері"
   },
   "payment": {
+    "staff_policy_discount": "Қызметкер жеңілдігі: {{name}}",
+    "policy_limit_remaining": "Қалған лимит: {{amount}}",
+    "service_charge": "Даяшы қызметі {{percentage}}%",
+    "taxes": "Салықтар",
+    "policy_reason_no_applicable_policy": "Бұл чекке қызметкер жеңілдігі қолданылмайды.",
+    "policy_reason_no_eligible_items": "Чекте жеңілдікке жарамды тауар жоқ.",
+    "policy_reason_period_limit_reached": "Қызметкер жеңілдігінің лимиті аяқталды.",
+    "policy_reason_manual_discount": "Қолмен жеңілдік таңдалды; қызметкер жеңілдігі қосылмайды.",
+    "policy_reason_rounding_zero": "Бұл чек үшін қызметкер жеңілдігі нөлге дейін дөңгелектенеді.",
     "title": "Төлем",
     "apply_discount": "Жеңілдік қолдану",
     "discount_placeholder": "% енгізіңіз",

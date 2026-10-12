@@ -20,10 +20,10 @@ _NET_SALES_EXPR = """
 		CASE
 		  WHEN b.`apply_discount_on` = 'Grand Total'
 		       AND IFNULL(b.`discount_amount`, 0) > 0
-		       AND (IFNULL(b.`net_total`,0) + IFNULL(b.`total_taxes_and_charges`,0)) <> 0
+		       AND (IFNULL(b.`net_total`,0) + IFNULL(b.`total_taxes_and_charges`,0) - IFNULL(b.`custom_service_charge_amount`,0)) <> 0
 		  THEN b.`net_total`
 		       - (b.`discount_amount` * b.`net_total`
-		          / (b.`net_total` + b.`total_taxes_and_charges`))
+		          / (b.`net_total` + b.`total_taxes_and_charges` - IFNULL(b.`custom_service_charge_amount`,0)))
 		  ELSE b.`net_total`
 		END
 """
@@ -51,7 +51,7 @@ _BASE_EXPR = {
 	""",
 	"Net Total": "b.`net_total`",
 	"Item Total": "b.`total`",
-	"Grand Total": "b.`grand_total`",
+	"Grand Total": "b.`grand_total` - IFNULL(b.`custom_service_charge_amount`,0)",
 }
 
 def _coerce_bool(value):

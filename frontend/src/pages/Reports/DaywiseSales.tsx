@@ -12,6 +12,8 @@ interface DayRow {
   total_invoices: number;
   item_total: number;
   total_taxes: number;
+  service_charge: number;
+  staff_discount_amount: number;
   grand_total: number;
   round_off: number;
   cash_discount: number;
@@ -36,6 +38,8 @@ const columns: DataTableColumn<DayRow>[] = [
   { key: 'total_invoices', header: 'Invoices', align: 'right' },
   { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
   { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'service_charge', header: 'Service Charge', render: (r) => formatCurrency(r.service_charge || 0), align: 'right' },
+  { key: 'staff_discount_amount', header: 'Staff Discounts', render: (r) => formatCurrency(r.staff_discount_amount || 0), align: 'right' },
   { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
   { key: 'round_off', header: 'Round Off', render: (r) => formatCurrency(r.round_off), align: 'right' },
   { key: 'cash_discount', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discount), align: 'right' },

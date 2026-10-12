@@ -14,6 +14,9 @@ interface InvoiceRow {
   invoice: string;
   item_total: number;
   total_taxes: number;
+  service_charge: number;
+  staff_discount_policy: string | null;
+  staff_discount_amount: number;
   grand_total: number;
   round_off: number;
   rounded_total: number;
@@ -44,6 +47,9 @@ const columns: DataTableColumn<InvoiceRow>[] = [
   },
   { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
   { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'service_charge', header: 'Service Charge', render: (r) => formatCurrency(r.service_charge || 0), align: 'right' },
+  { key: 'staff_discount_policy', header: 'Staff Policy', render: (r) => r.staff_discount_policy || '—' },
+  { key: 'staff_discount_amount', header: 'Staff Discount', render: (r) => formatCurrency(r.staff_discount_amount || 0), align: 'right' },
   { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
   { key: 'received_amount', header: 'Received', render: (r) => formatCurrency(r.received_amount), align: 'right' },
   { key: 'cash_discounts', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discounts), align: 'right' },

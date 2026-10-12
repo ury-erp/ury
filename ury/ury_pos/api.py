@@ -380,6 +380,28 @@ def _enrich_split_group_meta(invoices):
     return invoices
 
 
+def _enrich_order_performers(invoices):
+    """Attach display names for employees credited with visible invoices."""
+    employee_ids = {
+        row.get("custom_waiter_employee")
+        for row in invoices
+        if row.get("custom_waiter_employee")
+    }
+    if not employee_ids:
+        return invoices
+
+    employees = frappe.get_all(
+        "Employee",
+        filters={"name": ["in", list(employee_ids)]},
+        fields=["name", "employee_name"],
+    )
+    names = {employee["name"]: employee["employee_name"] for employee in employees}
+    for invoice in invoices:
+        employee_id = invoice.get("custom_waiter_employee")
+        invoice["performer_name"] = names.get(employee_id, employee_id) if employee_id else None
+    return invoices
+
+
 @frappe.whitelist()
 def get_split_group(invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
@@ -417,6 +439,7 @@ def get_split_group(invoice):
         "order_type",
         "cashier",
         "waiter",
+        "custom_waiter_employee",
         "mobile_number",
         "net_total",
         "total_taxes_and_charges",
@@ -465,7 +488,7 @@ def get_split_group(invoice):
         inv["is_original"] = not inv.get("custom_split_from")
         inv["split_siblings"] = [row["name"] for row in invoices if row["name"] != inv["name"]]
 
-    return {"invoices": invoices, "current": invoice, "group": group}
+    return {"invoices": _enrich_order_performers(invoices), "current": invoice, "group": group}
 
 
 @frappe.whitelist()
@@ -487,7 +510,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
@@ -507,7 +530,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
@@ -526,7 +549,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
@@ -544,7 +567,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
@@ -562,7 +585,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             updatedlist.pop()
     else:
             next = False   
-    return  { "data":updatedlist,"next":next}
+    return  { "data":_enrich_order_performers(updatedlist),"next":next}
 
 
 
@@ -577,7 +600,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -600,7 +623,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -622,7 +645,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
@@ -642,7 +665,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                cashier, waiter, custom_waiter_employee, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
@@ -663,6 +686,7 @@ def getPosInvoice(status, limit, limit_start):
     else:
             next = False
     updatedlist = _enrich_split_group_meta(updatedlist)
+    updatedlist = _enrich_order_performers(updatedlist)
     return  { "data":updatedlist,"next":next}
 
 
@@ -715,6 +739,7 @@ def searchPosInvoice(query,status):
             "invoice_printed",
             "cashier",
             "waiter",
+            "custom_waiter_employee",
             "total_taxes_and_charges",
             "custom_split_group",
             "custom_split_from",
@@ -726,6 +751,7 @@ def searchPosInvoice(query,status):
         limit_page_length=10 
     )
     pos_invoices = _enrich_split_group_meta(pos_invoices)
+    pos_invoices = _enrich_order_performers(pos_invoices)
     
     return {"data": pos_invoices, "next": len(pos_invoices) == 10}
     
@@ -955,6 +981,9 @@ def getPosProfileFull(pos_profile):
             row.as_dict() for row in profile.get("custom_roles_allowed_for_credit") or []
         ],
         "custom_credit_mode_of_payment": profile.get("custom_credit_mode_of_payment"),
+        "custom_enable_service_charge": profile.get("custom_enable_service_charge"),
+        "custom_service_charge_percentage": profile.get("custom_service_charge_percentage"),
+        "custom_service_charge_order_types": profile.get("custom_service_charge_order_types"),
     }
 
 

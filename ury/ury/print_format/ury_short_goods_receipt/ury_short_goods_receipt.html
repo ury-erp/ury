@@ -97,14 +97,20 @@
         <td class="money">{{ item.get_formatted("net_amount") }}</td>
         <td class="money">—</td>
         <td class="money">—</td>
-        <td class="money">{% if not doc.total_taxes_and_charges %}{{ item.get_formatted("net_amount") }}{% else %}—{% endif %}</td>
+        <td class="money">{% if not ((doc.total_taxes_and_charges or 0) - (doc.get("custom_service_charge_amount") or 0)) %}{{ item.get_formatted("net_amount") }}{% else %}—{% endif %}</td>
       </tr>
       {% endfor %}
+      {% if doc.get("custom_service_charge_amount") %}
+      <tr>
+        <td colspan="5">Waiter Service (tax exempt)</td>
+        <td class="money">{{ doc.get_formatted("custom_service_charge_amount") }}</td>
+      </tr>
+      {% endif %}
       <tr>
         <td colspan="2" class="ury-short-receipt__total-label">TOTAL:</td>
         <td class="money">{{ doc.get_formatted("net_total") }}</td>
         <td></td>
-        <td class="money">{{ doc.get_formatted("total_taxes_and_charges") }}</td>
+        <td class="money">{{ frappe.utils.fmt_money((doc.total_taxes_and_charges or 0) - (doc.get("custom_service_charge_amount") or 0), currency=doc.currency) }}</td>
         <td class="money"><strong>{{ doc.get_formatted("grand_total") }}</strong></td>
       </tr>
     </tbody>
@@ -116,8 +122,13 @@
       {% if doc.get("fiscal_cheque_number") %}<p>Number fiscal cheque: <strong>{{ doc.fiscal_cheque_number }}</strong></p>{% endif %}
     </div>
     <div>
+      {% if doc.get("staff_discount_policy") %}
+      <p>Staff Discount Policy: {{ doc.staff_discount_policy }} — {{ doc.get_formatted("custom_staff_discount_amount") }}</p>
+      {% endif %}
       {% for tax in doc.taxes or [] %}
+      {% if not tax.get("custom_is_service_charge") %}
       <p>{{ tax.description or tax.account_head }}{% if tax.rate %} ({{ tax.rate }}%){% endif %}: {{ tax.get_formatted("tax_amount") }}</p>
+      {% endif %}
       {% endfor %}
       <p class="ury-short-receipt__grand">TOTAL: {{ doc.get_formatted("grand_total") }}</p>
     </div>

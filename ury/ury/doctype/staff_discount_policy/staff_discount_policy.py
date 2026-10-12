@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import getdate, today
+from frappe.utils import cint, getdate, today
 
 
 class StaffDiscountPolicy(Document):
@@ -33,12 +33,13 @@ def _matches_item_group(policy, item_group=None):
 		return True
 	if not policy.eligible_item_groups:
 		return True
-	return any(row.item_group == item_group for row in policy.eligible_item_groups)
+	groups = set(item_group) if isinstance(item_group, (list, tuple, set)) else {item_group}
+	return any(row.item_group in groups for row in policy.eligible_item_groups)
 
 
-@frappe.whitelist()
 def get_applicable_policy(customer=None, employee=None, branch=None, item_group=None):
 	"""
+	Internal resolver: callers must derive the context from trusted documents.
 	Resolve the best-matching, enabled Staff Discount Policy for the given
 	context.
 
@@ -115,8 +116,11 @@ def get_applicable_policy(customer=None, employee=None, branch=None, item_group=
 	if not candidates:
 		return None
 
-	# Branch-specific policies win over global (branch-less) ones.
-	branch_specific = [p for p in candidates if p.branch]
-	best = branch_specific[0] if branch_specific else candidates[0]
-
-	return best.as_dict()
+	# Branch scope precedes explicit priority. Never depend on database row order.
+	best_scope = max(bool(p.branch) for p in candidates)
+	scoped = [p for p in candidates if bool(p.branch) == best_scope]
+	best_priority = max(cint(p.get("priority")) for p in scoped)
+	winners = [p for p in scoped if cint(p.get("priority")) == best_priority]
+	if len(winners) != 1:
+		frappe.throw(frappe._("Multiple Staff Discount Policies match at the same priority. Resolve the policy configuration."))
+	return winners[0].as_dict()

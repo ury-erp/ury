@@ -11,6 +11,7 @@
   "policy_name",
   "branch",
   "enabled",
+  "priority",
   "column_break_basics",
   "valid_from",
   "valid_to",
@@ -51,6 +52,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Higher number wins among policies with the same branch scope. Equal top priority matches are rejected.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority"
   },
   {
    "fieldname": "column_break_basics",

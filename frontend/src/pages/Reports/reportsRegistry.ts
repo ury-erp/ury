@@ -47,6 +47,7 @@ export const reportsRegistry: ReportEntry[] = [
 
   { id: 'employee-sales', label: 'Employee Sales', group: 'Employees & Operations', path: 'employee-sales', icon: UserCog },
   { id: 'employee-commission', label: 'Employee Commission', group: 'Employees & Operations', path: 'employee-commission', icon: Percent },
+  { id: 'waiter-service-payables', label: 'Waiter Service Payables', group: 'Employees & Operations', path: 'waiter-service-payables', icon: Receipt },
   { id: 'employee-item-wise-sales', label: 'Employee Item Wise Sales', group: 'Employees & Operations', path: 'employee-item-wise-sales', icon: ClipboardList },
   { id: 'completed-work-orders', label: 'Completed Work Orders', group: 'Employees & Operations', path: 'completed-work-orders', icon: Factory },
 

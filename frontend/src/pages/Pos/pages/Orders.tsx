@@ -734,6 +734,12 @@ export default function Orders() {
                     )}
                   </div>
                 </div>
+                <div className="mt-3 flex items-start gap-3 text-sm">
+                  <UserCheck className="w-4 h-4 shrink-0 text-text-tertiary" />
+                  <span className="min-w-0 text-muted-foreground">
+                    {t('order.performed_by')}: {selectedOrder.performer_name || selectedOrder.custom_waiter_employee || t('order.no_performer')}
+                  </span>
+                </div>
               </div>
 
               {/* Order Items */}

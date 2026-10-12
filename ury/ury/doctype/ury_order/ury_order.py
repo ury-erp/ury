@@ -2675,17 +2675,15 @@ def _validate_additional_discount(additional_discount, pos_profile):
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None, credit_account=None):
-    additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
-
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
+    if not invoice.name or invoice.pos_profile != pos_profile or (customer and invoice.customer != customer):
+        frappe.throw(_("Payment details no longer match this order. Refresh the order before paying."))
+    additionalDiscount = _validate_additional_discount(additionalDiscount, invoice.pos_profile)
 
     if table:
         restaurant = get_restaurant_and_menu_name(table)
         invoice.restaurant = restaurant
-
-    invoice.customer = customer
-    invoice.pos_profile = pos_profile
 
     credit_mode = get_credit_mode_of_payment(pos_profile)
     is_credit = bool(credit_mode) and any(d["mode_of_payment"] == credit_mode for d in payments)
@@ -2713,12 +2711,23 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
 
         invoice.additional_discount_percentage = discount_val
+        invoice.apply_discount_on = "Net Total"
     else:
         invoice.additional_discount_percentage = 0
+        invoice.discount_amount = 0
         
-    invoice.calculate_taxes_and_totals()
+    from ury.ury.api.pos_billing import prepare_invoice_billing
+
+    prepare_invoice_billing(invoice, lock=True)
 
     invoice_total = flt(invoice.rounded_total) or flt(invoice.grand_total)
+    target = None
+    if invoice.custom_merged_pos_invoice and not is_credit:
+        target = frappe.get_doc("POS Invoice", invoice.custom_merged_pos_invoice)
+        if target.docstatus or target.branch != invoice.branch:
+            frappe.throw(_("Merged invoice is not an open bill in this branch."))
+        prepare_invoice_billing(target, lock=True)
+        invoice_total += flt(target.rounded_total) or flt(target.grand_total)
 
     if is_credit:
         check_credit_limit(credit_party, invoice_total)
@@ -2738,9 +2747,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         invoice.append("payments", dict(mode_of_payment=credit_mode, amount=0))
         invoice.custom_credit_account = credit_party.name
         invoice.custom_settlement_stage = "Transferred On Credit"
-    elif invoice.custom_merged_pos_invoice:
-        target = frappe.get_doc("POS Invoice", invoice.custom_merged_pos_invoice)
-        target.calculate_taxes_and_totals()
+    elif target:
         
         doc_req = invoice.rounded_total
         target_req = target.rounded_total

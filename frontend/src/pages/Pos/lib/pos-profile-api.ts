@@ -72,6 +72,9 @@ export interface PosProfileFull {
   custom_enable_credit_settlement?: number;
   custom_roles_allowed_for_credit?: RolePermission[];
   custom_credit_mode_of_payment?: string | null;
+  custom_enable_service_charge?: number;
+  custom_service_charge_percentage?: number;
+  custom_service_charge_order_types?: string;
 }
 
 // Combined POS Profile with both limited and full fields

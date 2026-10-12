@@ -76,6 +76,16 @@
     "payment": "الدفع"
   },
   "payment": {
+    "success": "تم الدفع بنجاح: المبلغ المستلم {{amount}}",
+    "staff_policy_discount": "خصم الموظف: {{name}}",
+    "policy_limit_remaining": "الحد المتبقي: {{amount}}",
+    "service_charge": "خدمة النادل {{percentage}}%",
+    "taxes": "الضرائب",
+    "policy_reason_no_applicable_policy": "لا تنطبق سياسة خصم الموظفين على هذه الفاتورة.",
+    "policy_reason_no_eligible_items": "لا توجد أصناف مؤهلة لخصم الموظفين.",
+    "policy_reason_period_limit_reached": "تم بلوغ حد خصم الموظفين.",
+    "policy_reason_manual_discount": "تم اختيار خصم يدوي؛ لا يُجمع مع خصم الموظفين.",
+    "policy_reason_rounding_zero": "يُقرب خصم الموظفين إلى الصفر لهذه الفاتورة.",
     "title": "الدفع",
     "apply_discount": "تطبيق الخصم",
     "discount_placeholder": "أدخل نسبة %",

@@ -686,11 +686,14 @@ class TestMakeInvoice(FrappeTestCase):
             customer="Walk In",
             additional_discount_percentage=None,
             rounded_total=250,
+            grand_total=250,
+            write_off_amount=0,
             items=[],
             payments=[],
         )
         fields.update(overrides)
         invoice = _FakeInvoice(**fields)
+        invoice.precision = MagicMock(return_value=2)
         invoice.submit = MagicMock()
         invoice.save = MagicMock()
         # The merged-bill branch sets `.flags.ignore_payment_sync` on both
@@ -700,6 +703,8 @@ class TestMakeInvoice(FrappeTestCase):
 
     def _run(self, invoice, payments, stack, discount=None, table="T1", roles=None):
         stack.enter_context(patch(f"{MODULE}.get_order_invoice", return_value=invoice))
+        stack.enter_context(patch(f"{MODULE}.get_credit_mode_of_payment", return_value=None))
+        stack.enter_context(patch("ury.ury.api.pos_billing.prepare_invoice_billing", side_effect=lambda doc, lock=False: doc.calculate_taxes_and_totals()))
         stack.enter_context(
             patch(f"{MODULE}.frappe.get_value", return_value="Dine In")
         )
@@ -750,6 +755,16 @@ class TestMakeInvoice(FrappeTestCase):
             [(row.mode_of_payment, row.amount) for row in invoice.payments],
             [("Cash", 100), ("Card", 150)],
         )
+
+    def test_merged_payment_must_cover_both_recalculated_invoices(self):
+        invoice = self._invoice(custom_merged_pos_invoice="POS-INV-TARGET")
+        target = self._invoice(name="POS-INV-TARGET", restaurant_table=None, rounded_total=100, grand_total=100)
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{MODULE}.frappe.get_doc", return_value=target))
+            with self.assertRaises(frappe.ValidationError):
+                self._run(invoice, [{"mode_of_payment": "Cash", "amount": 300}], stack)
+        invoice.save.assert_not_called()
+        target.save.assert_not_called()
 
     def test_any_pre_existing_payment_rows_are_discarded_before_settlement(self):
         """The invoice may already carry a provisional payment row written by
@@ -802,7 +817,7 @@ class TestMakeInvoice(FrappeTestCase):
             stack.enter_context(patch(f"{MODULE}.frappe.get_cached_doc", return_value=profile))
             stack.enter_context(patch(f"{MODULE}._free_tables_if_no_open_invoices"))
             self._run(
-                invoice, [{"mode_of_payment": "Cash", "amount": 200}], stack, discount=20
+                invoice, [{"mode_of_payment": "Cash", "amount": 250}], stack, discount=20
             )
         self.assertEqual(invoice.additional_discount_percentage, 20)
         invoice.submit.assert_called_once()
@@ -850,13 +865,13 @@ class TestMakeInvoice(FrappeTestCase):
             stack.enter_context(patch(f"{MODULE}.frappe.get_doc", return_value=primary))
             mock_free = stack.enter_context(patch(f"{MODULE}._free_tables_if_no_open_invoices"))
             self._run(
-                secondary, [{"mode_of_payment": "Cash", "amount": 250}], stack, table=None
+                secondary, [{"mode_of_payment": "Cash", "amount": 500}], stack, table=None
             )
         mock_free.assert_called_once_with("T1", "T2")
-        # The tendered amount covers this bill only; the primary keeps its own
-        # dues rather than being credited twice for the same cash.
+        # A merged payment covers both bills, with each invoice receiving its
+        # own share of the tender.
         self.assertEqual([row.amount for row in secondary.payments], [250])
-        self.assertEqual(primary.payments, [])
+        self.assertEqual([row.amount for row in primary.payments], [250])
 
     def test_a_merged_pair_splits_one_tender_across_both_bills(self):
         """A single tendered amount larger than the secondary's own total

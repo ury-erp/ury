@@ -1,5 +1,3 @@
-import { getManagementLocale } from '../../i18n/language';
-import { getManagementLocale } from '../../i18n/language';
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { KpiStrip, type KpiItemProps, DatePicker, DataTable, type DataTableColumn, PageHeader } from '@ury/ui';
@@ -15,6 +13,8 @@ interface TodaySalesData {
   total_invoices: number;
   item_total: number;
   total_taxes_and_charges: number;
+  service_charge: number;
+  staff_discount_amount: number;
   grand_total: number;
   round_off: number;
   cash_discounts: number;
@@ -141,7 +141,9 @@ export function TodaysSales() {
     ? [
         { label: 'Total Invoices', value: data.total_invoices },
         { label: 'Item Total', value: formatCurrency(data.item_total) },
-        { label: 'Total Taxes & Charges', value: formatCurrency(data.total_taxes_and_charges) },
+        { label: 'Taxes', value: formatCurrency(data.total_taxes_and_charges) },
+        { label: 'Service Charge', value: formatCurrency(data.service_charge || 0) },
+        { label: 'Staff Discounts', value: formatCurrency(data.staff_discount_amount || 0) },
         { label: 'Grand Total', value: formatCurrency(data.grand_total), tone: 'success' },
         { label: 'Round Off', value: formatCurrency(data.round_off) },
         {

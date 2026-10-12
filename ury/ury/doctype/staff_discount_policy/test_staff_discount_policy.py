@@ -101,6 +101,16 @@ class TestMatchesItemGroup(FrappeTestCase):
 
 
 class TestGetApplicablePolicy(FrappeTestCase):
+	def test_equal_priority_matches_are_rejected(self):
+		first = _policy(applies_to="Role", role="Cashier", priority=0)
+		second = _policy(applies_to="Role", role="Cashier", priority=0)
+		with patch(f"{MODULE}.frappe.get_all", return_value=["ONE", "TWO"]), \
+			patch(f"{MODULE}.frappe.get_doc", side_effect=[first, second]), \
+			patch(f"{MODULE}.frappe.get_roles", return_value=["Cashier"]), \
+			patch(f"{MODULE}.frappe.db.get_value", return_value=("user@test.com", None)):
+			with self.assertRaises(frappe.ValidationError):
+				get_applicable_policy(employee="EMP-0001")
+
 	def test_no_enabled_policies_returns_none(self):
 		with patch(f"{MODULE}.frappe.get_all", return_value=[]):
 			result = get_applicable_policy(branch="Branch A")

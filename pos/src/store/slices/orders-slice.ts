@@ -11,6 +11,8 @@ export interface POSInvoice {
   restaurant_table: string | null;
   cashier: string;
   waiter: string;
+  custom_waiter_employee?: string | null;
+  performer_name?: string | null;
   net_total: number;
   posting_time: string;
   total_taxes_and_charges: number;
@@ -226,4 +228,4 @@ export const createOrdersSlice: StateCreator<
   },
 
   setOrderSearchQuery: (query) => set({ orderSearchQuery: query }),
-}); 
+});

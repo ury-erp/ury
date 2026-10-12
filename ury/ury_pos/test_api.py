@@ -6,11 +6,37 @@ from ury.ury_pos.api import create_customer
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 from ury.ury_pos.api import searchPosInvoice
-from ury.ury_pos.api import get_split_group, getPosInvoiceItems
+from ury.ury_pos.api import get_split_group, getPosInvoice, getPosInvoiceItems
 from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu, getMenuCourses
 from ury.ury_pos.api import submit_checklist
 import json
 from datetime import date
+
+
+class TestOrderPerformerDisplay(unittest.TestCase):
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api._enrich_split_group_meta", side_effect=lambda rows: rows)
+    @patch("ury.ury_pos.api.frappe.db.sql")
+    @patch("ury.ury_pos.api.getBranch", return_value="Branch A")
+    def test_order_list_includes_performer_name(
+        self, mock_get_branch, mock_sql, mock_split_groups, mock_get_all
+    ):
+        mock_sql.return_value = [
+            {"name": "INV-1", "custom_waiter_employee": "EMP-1"},
+            {"name": "INV-2", "custom_waiter_employee": None},
+        ]
+        mock_get_all.return_value = [{"name": "EMP-1", "employee_name": "Aiman Sadykova"}]
+
+        result = getPosInvoice("Paid", 10, 0)
+
+        self.assertIn("custom_waiter_employee", mock_sql.call_args.args[0])
+        self.assertEqual(result["data"][0]["performer_name"], "Aiman Sadykova")
+        self.assertNotIn("performer_name", result["data"][1])
+        mock_get_all.assert_called_once_with(
+            "Employee",
+            filters={"name": ["in", ["EMP-1"]]},
+            fields=["name", "employee_name"],
+        )
 
 
 class TestGetRestaurantMenuPhase1(unittest.TestCase):

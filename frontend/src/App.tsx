@@ -61,6 +61,7 @@ import { DaywiseCustomerDetails } from './pages/Reports/DaywiseCustomerDetails';
 import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
 import { EmployeeSales } from './pages/Reports/EmployeeSales';
 import { EmployeeCommission } from './pages/Reports/EmployeeCommission';
+import { WaiterServicePayables } from './pages/Reports/WaiterServicePayables';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
@@ -304,6 +305,7 @@ function AppRoutes() {
             <Route path="repeated-customers" element={<RepeatedCustomers />} />
             <Route path="employee-sales" element={<EmployeeSales />} />
             <Route path="employee-commission" element={<EmployeeCommission />} />
+            <Route path="waiter-service-payables" element={<WaiterServicePayables />} />
             <Route
               path="employee-item-wise-sales"
               element={<EmployeeItemWiseSales />}

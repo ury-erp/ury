@@ -34,6 +34,11 @@ interface PosProfileRecord {
   print_format?: string;
   customer?: string;
   custom_enable_discount?: number;
+  custom_enable_service_charge?: number;
+  custom_service_charge_percentage?: number;
+  custom_service_charge_order_types?: string;
+  custom_service_charge_income_account?: string;
+  custom_service_charge_payable_account?: string;
   custom_enable_multiple_cashier?: number;
   custom_enable_kot_reprint?: number;
   custom_daily_pos_close?: number;
@@ -80,6 +85,27 @@ export const PosProfilePage: React.FC = () => {
   });
   const [options, setOptions] = useState<any>({ companies: [], warehouses: [], users: [], payments: [] });
   const [modesWithoutAccounts, setModesWithoutAccounts] = useState<Set<string>>(new Set());
+  const [servicePayableAccounts, setServicePayableAccounts] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!profileForm.company) {
+      setServicePayableAccounts([]);
+      return;
+    }
+    call<{ message: Array<{ name: string }> }>('frappe.client.get_list', {
+      doctype: 'Account',
+      filters: [['company', '=', profileForm.company], ['root_type', '=', 'Liability'], ['is_group', '=', 0]],
+      fields: ['name'],
+      limit_page_length: 500,
+    }).then((result) => {
+      const accounts = Array.isArray(result) ? result as Array<{ name: string }> : result.message || [];
+      if (active) setServicePayableAccounts(accounts.map((account) => account.name));
+    }).catch(() => {
+      if (active) setServicePayableAccounts([]);
+    });
+    return () => { active = false; };
+  }, [profileForm.company]);
 
   useEffect(() => {
     setAddForm(prev => ({
@@ -284,6 +310,11 @@ export const PosProfilePage: React.FC = () => {
         print_format: profile.print_format || '',
         customer: profile.customer || '',
         custom_enable_discount: profile.custom_enable_discount || 0,
+        custom_enable_service_charge: profile.custom_enable_service_charge || 0,
+        custom_service_charge_percentage: profile.custom_service_charge_percentage || '',
+        custom_service_charge_order_types: profile.custom_service_charge_order_types || 'Dine In',
+        custom_service_charge_income_account: profile.custom_service_charge_income_account || '',
+        custom_service_charge_payable_account: profile.custom_service_charge_payable_account || '',
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
         custom_enable_multiple_cashier: profile.custom_enable_multiple_cashier || 0,
         custom_daily_pos_close: profile.custom_daily_pos_close || 0,
@@ -363,6 +394,11 @@ export const PosProfilePage: React.FC = () => {
         print_format: form.print_format || '',
         customer: form.customer || '',
         custom_enable_discount: form.custom_enable_discount ? 1 : 0,
+        custom_enable_service_charge: form.custom_enable_service_charge ? 1 : 0,
+        custom_service_charge_percentage: Number(form.custom_service_charge_percentage) || 0,
+        custom_service_charge_order_types: 'Dine In',
+        custom_service_charge_income_account: form.custom_service_charge_income_account || '',
+        custom_service_charge_payable_account: form.custom_service_charge_payable_account || '',
         custom_enable_kot_reprint: form.custom_enable_kot_reprint ? 1 : 0,
         custom_enable_multiple_cashier: form.custom_enable_multiple_cashier ? 1 : 0,
         custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
@@ -391,6 +427,12 @@ export const PosProfilePage: React.FC = () => {
     // sync_order falls back to this profile's Customer, so the toggle is inert without one.
     if (profileForm.custom_allow_order_without_customer && !profileForm.customer) {
       showToast.error('Set a Default Customer before allowing orders without a customer');
+      return;
+    }
+    if (profileForm.custom_enable_service_charge &&
+        (!(Number(profileForm.custom_service_charge_percentage) > 0 && Number(profileForm.custom_service_charge_percentage) <= 100)
+          || !profileForm.custom_service_charge_payable_account)) {
+      showToast.error('Set a waiter service percentage (1–100) and a payable account');
       return;
     }
 
@@ -462,6 +504,11 @@ export const PosProfilePage: React.FC = () => {
           print_format: profileForm.print_format,
           customer: profileForm.customer,
           custom_enable_discount: profileForm.custom_enable_discount,
+          custom_enable_service_charge: profileForm.custom_enable_service_charge,
+          custom_service_charge_percentage: profileForm.custom_service_charge_percentage,
+          custom_service_charge_order_types: 'Dine In',
+          custom_service_charge_income_account: profileForm.custom_service_charge_income_account,
+          custom_service_charge_payable_account: profileForm.custom_service_charge_payable_account,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
           custom_enable_multiple_cashier: profileForm.custom_enable_multiple_cashier,
           custom_daily_pos_close: profileForm.custom_daily_pos_close,
@@ -706,6 +753,52 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
                   </div>
+                </div>
+                <div>
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
+                    Waiter Service Charge
+                  </h4>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Switch
+                      id="custom_enable_service_charge"
+                      disabled={!isEditMode}
+                      checked={!!profileForm.custom_enable_service_charge}
+                      onCheckedChange={(checked) => setProfileForm(p => ({ ...p, custom_enable_service_charge: checked ? 1 : 0 }))}
+                    />
+                    <label htmlFor="custom_enable_service_charge" className="font-medium text-foreground text-xs">Enable for Dine In orders</label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-foreground mb-1.5">Percentage</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        disabled={!isEditMode || !profileForm.custom_enable_service_charge}
+                        value={profileForm.custom_service_charge_percentage || ''}
+                        onChange={(e) => setProfileForm(p => ({ ...p, custom_service_charge_percentage: e.target.value }))}
+                        placeholder="e.g. 10"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-foreground mb-1.5">Waiter Payable Account</label>
+                      <SearchableSelect
+                        id="custom_service_charge_payable_account"
+                        disabled={!isEditMode || !profileForm.custom_enable_service_charge}
+                        value={profileForm.custom_service_charge_payable_account || ''}
+                        onChange={(_, val) => setProfileForm(p => ({ ...p, custom_service_charge_payable_account: val }))}
+                        options={[
+                          { value: '', label: 'Select Payable Account' },
+                          ...servicePayableAccounts.map((name) => ({ value: name, label: name })),
+                        ]}
+                        placeholder="Select Payable Account"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Added to Dine In bills after discounts and before taxes. The amount is owed to the credited waiter and excluded from ordinary commission.
+                  </p>
                 </div>
               </div>
             )}

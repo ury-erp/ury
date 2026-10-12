@@ -17,9 +17,10 @@ import re
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.hooks.ury_pos_invoice import calculate_and_set_times
+from ury.ury.hooks.ury_pos_invoice import calculate_and_set_times, validate
 
 MODULE = "ury.ury.hooks.ury_pos_invoice"
 
@@ -51,8 +52,7 @@ class TestCalculateAndSetTimes(FrappeTestCase):
 		self.assertRegex(doc.total_spend_time, HHMMSS_RE)
 
 	def test_datetime_creation_still_works(self):
-		"""doc.creation already a datetime.datetime (post-reload state)
-		must keep working exactly as before the fix."""
+		"""A loaded invoice retains datetime arithmetic."""
 		creation_dt = datetime.now() - timedelta(minutes=10)
 		doc = _FakeInvoice(creation=creation_dt)
 
@@ -75,3 +75,23 @@ class TestCalculateAndSetTimes(FrappeTestCase):
 		self.assertIsNotNone(doc.arrived_time)
 		self.assertIsNotNone(doc.total_spend_time)
 		self.assertRegex(doc.total_spend_time, HHMMSS_RE)
+
+
+class TestPrintedChargeChange(FrappeTestCase):
+	def test_revised_waiter_charge_requires_reprint(self):
+		class Invoice(frappe._dict):
+			def get_doc_before_save(self):
+				return frappe._dict(invoice_printed=1, custom_service_charge_amount=0)
+
+		doc = Invoice(
+			pos_profile="Demo Profile", company="Test Co", branch="Test Branch",
+			docstatus=0, invoice_printed=1, custom_service_charge_amount=0,
+		)
+		with patch(f"{MODULE}.validate_invoice"), patch(f"{MODULE}.validate_customer"), patch(
+			f"{MODULE}.validate_price_list"
+		), patch(f"{MODULE}.set_commission_attribution"), patch(
+			f"{MODULE}.prepare_invoice_billing",
+			side_effect=lambda invoice: invoice.update(custom_service_charge_amount=23),
+		):
+			validate(doc, "validate")
+		self.assertEqual(doc.invoice_printed, 0)

@@ -59,8 +59,8 @@
     "edit_item": "Изменить позицию",
     "add_comment": "Добавить комментарий",
     "edit_comment": "Изменить комментарий",
-    "pax": "Гости",
-    "insufficient_capacity": "Недостаточно остатка, чтобы добавить ещё эту позицию"
+    "insufficient_capacity": "Недостаточно остатка, чтобы добавить ещё эту позицию",
+    "pax": "Гости"
   },
   "order": {
     "performed_by": "Исполнитель",
@@ -76,6 +76,16 @@
     "order_actions": "Действия с заказом"
   },
   "payment": {
+    "success": "Оплата прошла успешно: получено {{amount}}",
+    "staff_policy_discount": "Скидка сотрудника: {{name}}",
+    "policy_limit_remaining": "Остаток лимита: {{amount}}",
+    "service_charge": "Обслуживание официанта {{percentage}}%",
+    "taxes": "Налоги",
+    "policy_reason_no_applicable_policy": "Для этого чека нет подходящей скидки сотрудника.",
+    "policy_reason_no_eligible_items": "В чеке нет товаров, на которые распространяется скидка сотрудника.",
+    "policy_reason_period_limit_reached": "Лимит скидки сотрудника исчерпан.",
+    "policy_reason_manual_discount": "Выбрана ручная скидка; скидка сотрудника с ней не суммируется.",
+    "policy_reason_rounding_zero": "Скидка сотрудника для этого чека округляется до нуля.",
     "title": "Оплата",
     "apply_discount": "Применить скидку",
     "discount_placeholder": "Введите %",
@@ -90,8 +100,7 @@
     "pay_button": "Оплатить {{amount}}",
     "processing": "Обработка...",
     "short_by": "Не хватает {{amount}}",
-    "change_due": "Сдача: {{amount}}",
-    "success": "Оплата прошла успешно: получено {{amount}}"
+    "change_due": "Сдача: {{amount}}"
   },
   "pos": {
     "not_opened_title": "POS не открыт",

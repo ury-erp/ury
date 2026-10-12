@@ -41,12 +41,12 @@ vi.mock("../../components/common/SearchableSelect", () => ({
   SearchableSelect: ({ options, onChange, value }: any) => (
     <select
       value={value || ""}
-      onChange={(e) => onChange?.(e.target.value)}
+      onChange={(e) => onChange?.(e, e.target.value)}
       data-testid="searchable-select"
     >
       {options?.map((opt: any) => (
-        <option key={opt.name || opt} value={opt.name || opt}>
-          {opt.name || opt}
+        <option key={opt.value || opt.name || opt} value={opt.value || opt.name || opt}>
+          {opt.label || opt.name || opt}
         </option>
       ))}
     </select>

@@ -45,6 +45,7 @@ const KNOWN_REPORT_SLUGS = new Set([
   'repeated-customers',
   'employee-sales',
   'employee-commission',
+  'waiter-service-payables',
   'employee-item-wise-sales',
   'completed-work-orders',
   'daily-pnl',
