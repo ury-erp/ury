@@ -1,0 +1,22 @@
+{
+  "subtasks": [
+    {
+      "objective": "Surface the top 3 favourite items for returning customers in POS v2 by fetching existing favourite-item data when a customer is selected and rendering a focused favourites section in the customer/order flow.",
+      "acceptance": "When a returning customer is selected in POS v2, CustomerSelect.tsx calls the existing fav_items API, displays up to three favourite items with enough item context for cashier action, handles empty/loading/error states without blocking order entry, and the POS frontend typecheck/build passes.",
+      "scope": [
+        "pos/src/**/*CustomerSelect*.tsx",
+        "pos/src/**/*customer*.ts",
+        "pos/src/**/*customer*.tsx",
+        "pos/src/**/*menu*.ts",
+        "pos/src/**/*menu*.tsx",
+        "packages/core/src/**/*frappe*.ts",
+        "ury/ury_pos/api.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 3,
+      "risk": 2,
+      "uncertainty": 3,
+      "priority": 80
+    }
+  ]
+}
