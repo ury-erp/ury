@@ -1,0 +1,5 @@
+source,target,context
+{0} order(s) pending payment for over 15 minutes,{0} طلب بانتظار الدفع منذ أكثر من 15 دقيقة,
+{0} table(s) occupied for over 60 minutes,{0} طاولة مشغولة منذ أكثر من 60 دقيقة,
+{0} KOT generation issue(s) in the last hour,{0} خطأ في إنشاء طلب المطبخ خلال الساعة الأخيرة,
+{0} POS session(s) left open from a previous day,{0} جلسة نقطة بيع تركت مفتوحة من يوم سابق,

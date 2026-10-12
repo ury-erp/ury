@@ -456,7 +456,7 @@ def get_needs_attention(branch=None):
 	if pending:
 		items.append({
 			"type": "pending_payment",
-			"message": f"{len(pending)} order(s) pending payment for over 15 minutes",
+			"message": _("{0} order(s) pending payment for over 15 minutes").format(len(pending)),
 			"severity": "high",
 			"reference": {
 				"doctype": "POS Invoice",
@@ -472,7 +472,7 @@ def get_needs_attention(branch=None):
 	if tables:
 		items.append({
 			"type": "table_occupied_long",
-			"message": f"{len(tables)} table(s) occupied for over 60 minutes",
+			"message": _("{0} table(s) occupied for over 60 minutes").format(len(tables)),
 			"severity": "medium",
 			"reference": {
 				"doctype": "URY Table",
@@ -488,7 +488,7 @@ def get_needs_attention(branch=None):
 	if kot_errors:
 		items.append({
 			"type": "kot_errors",
-			"message": f"{len(kot_errors)} KOT generation issue(s) in the last hour",
+			"message": _("{0} KOT generation issue(s) in the last hour").format(len(kot_errors)),
 			"severity": "high",
 			"reference": {
 				"doctype": "URY KOT Error Log",
@@ -504,7 +504,7 @@ def get_needs_attention(branch=None):
 	if stale_sessions:
 		items.append({
 			"type": "unclosed_pos_session",
-			"message": f"{len(stale_sessions)} POS session(s) left open from a previous day",
+			"message": _("{0} POS session(s) left open from a previous day").format(len(stale_sessions)),
 			"severity": "high",
 			"reference": {
 				"doctype": "POS Opening Entry",
