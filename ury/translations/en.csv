@@ -1,0 +1,65 @@
+URY,Smart Restro
+URY Admin,Restro Admin
+URY Audit Log,Restro Audit Log
+URY Captain,Restro Captain
+URY Cashier,Restro Cashier
+URY Checklist Item,Restro Checklist Item
+URY Checklist Log Item,Restro Checklist Log Item
+URY Consumption Log,Restro Consumption Log
+URY Consumption Log Item,Restro Consumption Log Item
+URY Control Center,Restro Control Center
+URY Cost Of Goods,Restro Cost of Goods
+URY Daily P and L,Restro Daily P&L
+URY Delivery,Restro Delivery
+URY Delivery Zone,Restro Delivery Zone
+URY Driver,Restro Driver
+URY Feature Flag,Restro Feature Flag
+URY Feature Settings,Restro Feature Settings
+URY Fixed Expenses,Restro Fixed Expenses
+URY Guest Feedback,Restro Guest Feedback
+URY KOT,Restro KOT
+URY KOT Error Log,Restro KOT Error Log
+URY KOT Items,Restro KOT Item
+URY Kitchen Message,Restro Kitchen Message
+URY Kitchen Message Ack,Restro Kitchen Message Ack
+URY Kitchen Ticket,Restro Kitchen Ticket
+URY Manager,Restro Manager
+URY Materials,Restro Materials
+URY Menu,Restro Menu
+URY Menu Course,Restro Menu Course
+URY Menu Item,Restro Menu Item
+URY Merged POS Invoice Detail,Restro Merged POS Invoice Detail
+URY Notification Recipient,Restro Notification Recipient
+URY Order,Restro Order
+URY Order Item,Restro Order Item
+URY Ordering Device,Restro Ordering Device
+URY Ordering Session,Restro Ordering Session
+URY P and L Breakup,Restro P&L Breakup
+URY P and L Materials,Restro P&L Materials
+URY POS,Restro POS
+URY POS Checklist Log,Restro POS Checklist Log
+URY Payment Terminal,Restro Payment Terminal
+URY Payment Terminal Transaction,Restro Payment Terminal Transaction
+URY Print Job,Restro Print Job
+URY Printer Settings,Restro Printer Settings
+URY Production Item Groups,Restro Station Item Groups
+URY Production Unit,Restro Kitchen Station
+URY Report Settings,Restro Report Settings
+URY Restaurant,Restaurant
+URY Role Access,Restro Role Access
+URY Room,Restro Dining Area
+URY Self Ordering Profile,Restro Self-Ordering Profile
+URY Service Request,Restro Service Request
+URY Sync Request,Restro Sync Request
+URY Table,Restro Table
+URY Table Reservation,Restro Table Reservation
+URY User,Restro User
+URY Variable Expenses,Restro Variable Expenses
+URY Waiter,Restro Waiter
+URY Waiter Order Slip,Restro Waiter Order Slip
+URY Waitlist Entry,Restro Waitlist Entry
+URY Waste Log,Restro Waste Log
+URY Waste Log Item,Restro Waste Log Item
+URY Website,Restro Website
+URY Website Hours,Restro Website Hours
+URY Website Image,Restro Website Image

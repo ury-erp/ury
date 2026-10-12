@@ -1,22 +1,37 @@
 from . import __version__ as app_version
 
+# `app_name` is the module and asset-path identity ("/assets/ury/...",
+# the URY module, the `ury` python package) and is deliberately NOT rebranded —
+# renaming it would invalidate every asset URL and module reference.
 app_name = "ury"
-app_title = "URY"
-app_publisher = "Tridz Technologies Pvt. Ltd"
-app_description = "A Complete Restaurant Order Taking Software"
+app_title = "Smart Restro"
+app_publisher = "Smart Choice"
+# Attribution and modification notice. Smart Restro is a modified distribution
+# of URY, which is licensed under the AGPL-3.0 (see LICENSE). Section 5 of that
+# licence requires a modified version to carry prominent notices stating that
+# it was changed and by whom, so the notice lives here rather than only in the
+# repository history.
+app_description = (
+    "Smart Restro — restaurant management platform by Smart Choice. "
+    "Based on URY, a complete restaurant order-taking software by "
+    "Tridz Technologies Pvt. Ltd, distributed under the AGPL-3.0."
+)
 app_email = "info@tridz.com"
-app_license = "MIT"
-app_logo_url = "/assets/ury/Images/ury-logo.jpg"
-app_icon_title = "URY"
+# Corrected from "MIT": the LICENSE file in this repository is, and always has
+# been, the GNU Affero General Public License v3. The two disagreeing was a
+# pre-existing bug, and the declared licence is what Frappe surfaces to users.
+app_license = "AGPL-3.0"
+app_logo_url = "/assets/ury/Images/smart-restro-logo.png"
+app_icon_title = "Smart Restro"
 required_apps = ["erpnext"]
 # Includes in <head>
 # ------------------
 add_to_apps_screen = [
   {
     "name": "ury",
-    "logo": "/assets/ury/Images/ury.png",
-    "title": "URY",
-    "route": "/ury",
+    "logo": "/assets/ury/Images/smart-restro-logo.png",
+    "title": "Smart Restro",
+    "route": "/restro",
     "has_permission": "ury.permission.check_app_permission"
   }
 ]
@@ -50,13 +65,24 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
-# Splash Image in Website Settings
-website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
+# Smart Choice marks in place of Frappe's. `update_website_context` and the
+# branding entry in `extend_bootinfo` make them win over Website Settings and
+# other apps; this is the plain default underneath.
+website_context = {
+    "favicon": "/assets/ury/Images/smart-choice-icon.png",
+    "splash_image": "/assets/ury/Images/smart-restro-logo.png",
+}
+update_website_context = ["ury.ury.controllers.branding.update_website_context"]
 
+# The www pages keep their file names (ury.html, urypos.html are build output
+# named after the app); the public URLs are /restro and /pos-mobile. The old
+# /ury and /urypos URLs redirect to them (see website_redirects).
 website_route_rules = [
-    {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
+    {"from_route": "/pos-mobile", "to_route": "urypos"},
+    {"from_route": "/pos-mobile/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
-    {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
+    {"from_route": "/restro", "to_route": "ury"},
+    {"from_route": "/restro/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -175,9 +201,16 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
-        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
+        "on_submit": [
+            "ury.ury.hooks.ury_pos_invoice.on_submit",
+            # Recipes: take the sold products' ingredients off the shelf.
+            "ury.ury.api.consumption.on_pos_invoice_submit",
+        ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "on_cancel": [
+            "ury.ury.hooks.ury_pos_invoice.on_trash",
+            "ury.ury.api.consumption.on_pos_invoice_cancel",
+        ],
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
@@ -208,7 +241,14 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
 		]
-	}
+	},
+    "hourly": [
+        "ury.ury.api.consumption.retry_failed",
+    ],
+    "daily": [
+        "ury.ury.doctype.ury_sync_request.ury_sync_request.clear_old_sync_requests",
+        "ury.ury.api.driver_app.clear_old_positions"
+    ]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
@@ -255,8 +295,14 @@ override_whitelisted_methods = {
 # ignore_links_on_delete = ["Communication", "ToDo"]
 
 on_session_creation = [
-    "ury.ury.controllers.setup_redirect.on_session_creation"
+    "ury.ury.controllers.setup_redirect.on_session_creation",
+    # Restaurant roles: where each lands after login (returned as redirect_to).
+    "ury.ury.controllers.access.on_session_creation",
 ]
+
+# Feature switches and the Desk policy, enforced on every request.
+before_request = ["ury.ury.controllers.access.before_request"]
+after_request = ["ury.ury.controllers.access.after_request"]
 
 # Request Events
 # ----------------
@@ -270,13 +316,30 @@ website_path_resolver = [
 website_redirects = [
     {
         "source": "/setup-wizard",
-        "target": "/ury/setup-wizard/0",
+        "target": "/restro/setup-wizard/0",
         "redirect_http_status": 302,
-    }
+    },
+    # Pre-rebrand URLs, kept for bookmarks, home-screen shortcuts and printed
+    # links. 302 until the new URLs have proven themselves: browsers cache a
+    # 301 for good. Frappe drops the query string on these redirects.
+    {"source": "/ury", "target": "/restro", "redirect_http_status": 302},
+    {"source": r"/ury/(.*)", "target": r"/restro/\1", "redirect_http_status": 302},
+    {"source": "/urypos", "target": "/pos-mobile", "redirect_http_status": 302},
+    {"source": r"/urypos/(.*)", "target": r"/pos-mobile/\1", "redirect_http_status": 302},
+    {"source": "/ury-login", "target": "/login", "redirect_http_status": 302},
+    # Browsers ask for /favicon.ico on any page that does not name an icon;
+    # Frappe has no such route and would answer with its 404 page.
+    {
+        "source": "/favicon.ico",
+        "target": "/assets/ury/Images/favicon.ico",
+        "redirect_http_status": 301,
+    },
 ]
 
 extend_bootinfo = [
-    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+    "ury.ury.controllers.setup_redirect.extend_bootinfo",
+    "ury.ury.controllers.access.extend_bootinfo",
+    "ury.ury.controllers.branding.extend_bootinfo",
 ]
 
 # Job Events
@@ -377,6 +440,7 @@ fixtures = [
                     "POS Profile-printer_settings",
                     "POS Profile-qz_print",
                     "POS Profile-qz_host",
+                    "POS Profile-custom_qz_bill_printer",
                     "POS Profile-section_break_tjhrm",
                     "POS Profile-transfer_role_permissions",
                     "POS Profile-role_allowed_for_billing",
@@ -402,6 +466,7 @@ fixtures = [
                     "Branch-custom_no_taxes",
                     "Price List-restaurant_menu",
                     "POS Profile-custom_enable_discount",
+                    "POS Profile-custom_require_bill_print",
                     "POS Invoice-custom_comments",
                     "POS Profile-custom_multiple_cashier_configuration",
                     "POS Profile-custom_enable_multiple_cashier",

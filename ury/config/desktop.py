@@ -5,6 +5,6 @@ def get_data():
 		{
 			"module_name": "URY",
 			"type": "module",
-			"label": _("URY")
+			"label": _("Smart Restro")
 		}
 	]

@@ -1,0 +1,223 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-21 00:10:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "branch",
+  "invoice",
+  "restaurant_table",
+  "column_break_who",
+  "submitted_at",
+  "served_by",
+  "source",
+  "ratings_section",
+  "overall",
+  "food",
+  "column_break_rating",
+  "service",
+  "cleanliness",
+  "recommend_score",
+  "comment_section",
+  "comment",
+  "contact_number",
+  "follow_up_section",
+  "status",
+  "follow_up_notes"
+ ],
+ "fields": [
+  {
+   "default": "FB-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "FB-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "invoice",
+   "fieldtype": "Link",
+   "label": "Invoice",
+   "options": "POS Invoice",
+   "read_only": 1,
+   "unique": 1,
+   "description": "Set when the guest arrived from a receipt link. One rating per bill — a second submission edits nothing and creates nothing."
+  },
+  {
+   "fieldname": "restaurant_table",
+   "fieldtype": "Link",
+   "label": "Table",
+   "options": "URY Table",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_who",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "submitted_at",
+   "fieldtype": "Datetime",
+   "label": "Submitted At",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "served_by",
+   "fieldtype": "Link",
+   "label": "Served By",
+   "options": "User",
+   "read_only": 1,
+   "description": "Taken from the invoice, not from the guest: a rating that names a colleague is a complaint, not feedback."
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Receipt\nTable\nStaff",
+   "default": "Table",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ratings_section",
+   "fieldtype": "Section Break",
+   "label": "Ratings"
+  },
+  {
+   "fieldname": "overall",
+   "fieldtype": "Int",
+   "label": "Overall (1-5)",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "food",
+   "fieldtype": "Int",
+   "label": "Food (1-5)"
+  },
+  {
+   "fieldname": "column_break_rating",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "service",
+   "fieldtype": "Int",
+   "label": "Service (1-5)"
+  },
+  {
+   "fieldname": "cleanliness",
+   "fieldtype": "Int",
+   "label": "Cleanliness (1-5)"
+  },
+  {
+   "fieldname": "recommend_score",
+   "fieldtype": "Int",
+   "label": "Would Recommend (0-10)",
+   "description": "The NPS question. Empty means the guest skipped it, which is not the same as a zero."
+  },
+  {
+   "fieldname": "comment_section",
+   "fieldtype": "Section Break",
+   "label": "In the guest's words"
+  },
+  {
+   "fieldname": "comment",
+   "fieldtype": "Small Text",
+   "label": "Comment"
+  },
+  {
+   "fieldname": "contact_number",
+   "fieldtype": "Data",
+   "label": "Contact Number",
+   "options": "Phone",
+   "description": "Only when the guest asked to be contacted back."
+  },
+  {
+   "fieldname": "follow_up_section",
+   "fieldtype": "Section Break",
+   "label": "Follow-up"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "New\nAcknowledged\nResolved",
+   "default": "New",
+   "in_standard_filter": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "follow_up_notes",
+   "fieldtype": "Small Text",
+   "label": "Follow-up Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-21 00:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Guest Feedback",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "submitted_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

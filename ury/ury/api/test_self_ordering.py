@@ -18,11 +18,15 @@ import frappe
 
 from ury.ury.api.self_ordering import (
     _verify_qr_token,
+    _assert_table_self_ordering_enabled,
     _sign,
     add_customer_items,
     assign_device_table,
     get_customer_order,
     request_bill,
+    call_waiter,
+    _bill_status,
+    _kitchen_status,
     create_payment_request,
     get_payment_status,
     share_payment_link,
@@ -34,10 +38,11 @@ MOD = "ury.ury.api.self_ordering"
 
 
 class TestQRTokenRoundtrip(unittest.TestCase):
+    @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.db.exists")
     @patch(f"{MOD}.frappe.get_doc")
     @patch(f"{MOD}._get_profile_secret")
-    def test_verify_qr_token_valid_table_token(self, mock_secret, mock_get_doc, mock_exists):
+    def test_verify_qr_token_valid_table_token(self, mock_secret, mock_get_doc, mock_exists, mock_get_value):
         secret = "test-secret"
         mock_secret.return_value = secret
         mock_exists.return_value = True
@@ -45,7 +50,10 @@ class TestQRTokenRoundtrip(unittest.TestCase):
         profile_doc = MagicMock()
         profile_doc.enabled = 1
         profile_doc.enable_qr_table_ordering = 1
+        profile_doc.branch = "Branch 1"
         mock_get_doc.return_value = profile_doc
+        # Branch lookup, then the per-table self-ordering switch.
+        mock_get_value.side_effect = ["Branch 1", 1]
 
         payload = "Profile A|Table 7"
         signature = _sign(payload, secret)
@@ -56,6 +64,40 @@ class TestQRTokenRoundtrip(unittest.TestCase):
         self.assertEqual(profile, profile_doc)
         self.assertEqual(table, "Table 7")
         self.assertEqual(source, "QR Table")
+        self.assertIn(
+            (("URY Table", "Table 7", "branch"),),
+            [(c.args,) for c in mock_get_value.call_args_list],
+        )
+
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._get_profile_secret")
+    def test_verify_qr_token_rejects_table_from_other_branch(
+        self, mock_secret, mock_get_doc, mock_exists, mock_get_value
+    ):
+        """A validly-signed token for a table that has since moved to a
+        different branch (or a profile reused across branches) must not be
+        honoured — the branch check is the real authorization boundary, not
+        just the signature."""
+        secret = "test-secret"
+        mock_secret.return_value = secret
+        mock_exists.return_value = True
+
+        profile_doc = MagicMock()
+        profile_doc.enabled = 1
+        profile_doc.enable_qr_table_ordering = 1
+        profile_doc.branch = "Branch 1"
+        mock_get_doc.return_value = profile_doc
+        mock_get_value.return_value = "Branch 2"
+
+        payload = "Profile A|Table 7"
+        signature = _sign(payload, secret)
+        raw = f"{payload}|{signature}"
+        token = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+        with self.assertRaises(frappe.ValidationError):
+            _verify_qr_token(token)
 
     @patch(f"{MOD}._get_profile_secret")
     def test_verify_qr_token_bad_signature_rejected(self, mock_secret):
@@ -485,6 +527,296 @@ class TestRequestBill(unittest.TestCase):
         result = request_bill("session-token")
         self.assertEqual(result["status"], "Already Requested")
         self.assertEqual(result["request"], "SR-EXISTING")
+
+
+    @patch(f"{MOD}.notify_service_request")
+    @patch(f"{MOD}.now_datetime")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_request_bill_notifies_the_pos_terminal(
+        self, mock_set_user, mock_resolve_session, mock_exists, mock_get_doc, mock_now, mock_notify,
+    ):
+        """The request row on its own helps nobody: the cashier has to be told."""
+        session = MagicMock()
+        session.table = "Table 7"
+        session.invoice = "POS-INV-100"
+        session.name = "SESSION-1"
+        session.ordering_profile = "Profile A"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_request_bill = 1
+        req = MagicMock()
+        req.name = "SR-001"
+
+        def get_doc_side_effect(arg, name=None):
+            return req if isinstance(arg, dict) else profile
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_exists.return_value = False
+
+        request_bill("session-token")
+
+        mock_notify.assert_called_once_with(req)
+
+    @patch(f"{MOD}.notify_service_request")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_request_bill_renotifies_when_the_customer_asks_again(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_exists, mock_notify,
+    ):
+        """A second tap means the first alert was missed, not that nothing happened."""
+        session = MagicMock()
+        session.table = "Table 7"
+        session.invoice = "POS-INV-100"
+        session.name = "SESSION-1"
+        session.ordering_profile = "Profile A"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_request_bill = 1
+        mock_get_doc.return_value = profile
+        mock_exists.return_value = "SR-EXISTING"
+
+        request_bill("session-token")
+
+        mock_notify.assert_called_once_with("SR-EXISTING", repeat=True)
+
+
+class TestCallWaiter(unittest.TestCase):
+    """Calling a member of staff from the table."""
+
+    def _session(self, table="Table 7", invoice="POS-INV-100"):
+        session = MagicMock()
+        session.table = table
+        session.invoice = invoice
+        session.name = "SESSION-1"
+        session.ordering_profile = "Profile A"
+        return session
+
+    @patch(f"{MOD}.notify_service_request")
+    @patch(f"{MOD}.now_datetime")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_a_table_can_call_before_it_has_ordered(
+        self, mock_set_user, mock_resolve_session, mock_exists, mock_get_doc, mock_now, mock_notify,
+    ):
+        """The commonest reason to call is being stuck before ordering.
+
+        request_bill requires an invoice; this must not, or the button would
+        be missing exactly when it is needed most.
+        """
+        mock_resolve_session.return_value = self._session(invoice=None)
+
+        profile = MagicMock()
+        profile.enable_call_waiter = 1
+        req = MagicMock()
+        req.name = "SR-009"
+
+        def get_doc_side_effect(arg, name=None):
+            return req if isinstance(arg, dict) else profile
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_exists.return_value = False
+
+        result = call_waiter("session-token")
+
+        self.assertEqual(result["status"], "Requested")
+        req.insert.assert_called_once_with(ignore_permissions=True)
+        mock_notify.assert_called_once_with(req)
+
+    @patch(f"{MOD}.notify_service_request")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_calling_twice_rings_the_terminal_again(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_exists, mock_notify,
+    ):
+        mock_resolve_session.return_value = self._session()
+        profile = MagicMock()
+        profile.enable_call_waiter = 1
+        mock_get_doc.return_value = profile
+        mock_exists.return_value = "SR-EXISTING"
+
+        result = call_waiter("session-token")
+
+        self.assertEqual(result["status"], "Already Requested")
+        mock_notify.assert_called_once_with("SR-EXISTING", repeat=True)
+
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    def test_disabled_on_the_profile_is_refused(self, mock_resolve_session, mock_get_doc):
+        mock_resolve_session.return_value = self._session()
+        profile = MagicMock()
+        profile.enable_call_waiter = 0
+        mock_get_doc.return_value = profile
+
+        with self.assertRaises(frappe.ValidationError):
+            call_waiter("session-token")
+
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    def test_a_pickup_session_has_no_table_to_come_to(self, mock_resolve_session, mock_get_doc):
+        mock_resolve_session.return_value = self._session(table=None)
+        profile = MagicMock()
+        profile.enable_call_waiter = 1
+        mock_get_doc.return_value = profile
+
+        with self.assertRaises(frappe.ValidationError):
+            call_waiter("session-token")
+
+
+class TestKitchenStatus(unittest.TestCase):
+    """What the table is told about where its food is."""
+
+    def _kot(self, status="Ready For Prepare", started=None):
+        return frappe._dict(order_status=status, start_time_prep=started)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_no_tickets_means_nothing_to_report(self, mock_set_user, mock_get_all):
+        mock_get_all.return_value = []
+        self.assertIsNone(_kitchen_status("POS-INV-100"))
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_untouched_tickets_are_queued(self, mock_set_user, mock_get_all):
+        mock_get_all.return_value = [self._kot(), self._kot()]
+        self.assertEqual(_kitchen_status("POS-INV-100"), "queued")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_a_started_ticket_means_preparing(self, mock_set_user, mock_get_all):
+        mock_get_all.return_value = [self._kot(started="2026-09-20 12:00:00")]
+        self.assertEqual(_kitchen_status("POS-INV-100"), "preparing")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_ready_only_when_every_ticket_is_served(self, mock_set_user, mock_get_all):
+        mock_get_all.return_value = [self._kot("Served"), self._kot("Served")]
+        self.assertEqual(_kitchen_status("POS-INV-100"), "ready")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_one_unserved_ticket_holds_the_whole_order_back(self, mock_set_user, mock_get_all):
+        """A plated starter and an untouched main is not a served table —
+        telling them 'ready' sends them looking for food that is not coming."""
+        mock_get_all.return_value = [
+            self._kot("Served"),
+            self._kot(started="2026-09-20 12:00:00"),
+        ]
+        self.assertEqual(_kitchen_status("POS-INV-100"), "preparing")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_cancelled_and_duplicate_tickets_are_excluded(self, mock_set_user, mock_get_all):
+        mock_get_all.return_value = []
+        _kitchen_status("POS-INV-100")
+        filters = mock_get_all.call_args[1]["filters"]
+        self.assertEqual(filters["type"], ["not in", ["Cancelled", "Duplicate"]])
+
+
+class TestGuestEndpointsAreRateLimited(unittest.TestCase):
+    """Every guest endpoint carries a limit.
+
+    A QR card sits on a public table, so holding a valid token is not scarce.
+    This test exists so that adding a new `allow_guest` endpoint without a
+    limit fails here rather than in production.
+    """
+
+    def test_every_guest_endpoint_is_wrapped(self):
+        import inspect
+        import re
+
+        from ury.ury.api import self_ordering
+
+        source = inspect.getsource(self_ordering)
+        # Each guest endpoint must be followed by a rate_limit decorator.
+        unlimited = re.findall(
+            r"@frappe\.whitelist\(allow_guest=True\)\n(?!@rate_limit)(?:@[^\n]+\n)*def (\w+)",
+            source,
+        )
+        # _ensure_admin_branch_mapping is not an endpoint; it is a helper that
+        # happens to sit below an unrelated decorator line in the source.
+        unlimited = [fn for fn in unlimited if not fn.startswith("_")]
+        self.assertEqual(unlimited, [], f"guest endpoints without a rate limit: {unlimited}")
+
+
+class TestTableSelfOrderingToggle(unittest.TestCase):
+    """The per-table switch, enforced where a session is actually opened.
+
+    The card on the table is printed and out of our hands, so the only way
+    to switch a table off is for the server to stop honouring its token.
+    """
+
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._get_profile_secret")
+    def test_a_switched_off_table_refuses_a_valid_code(
+        self, mock_secret, mock_get_doc, mock_exists, mock_get_value
+    ):
+        secret = "test-secret"
+        mock_secret.return_value = secret
+        mock_exists.return_value = True
+
+        profile_doc = MagicMock()
+        profile_doc.enabled = 1
+        profile_doc.enable_qr_table_ordering = 1
+        profile_doc.branch = "Branch 1"
+        mock_get_doc.return_value = profile_doc
+        mock_get_value.side_effect = ["Branch 1", 0]
+
+        payload = "Profile A|Table 7"
+        signature = _sign(payload, secret)
+        raw = f"{payload}|{signature}"
+        token = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+        with self.assertRaises(frappe.ValidationError):
+            _verify_qr_token(token)
+
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_the_guard_accepts_a_switched_on_table(self, mock_get_value):
+        mock_get_value.return_value = 1
+        _assert_table_self_ordering_enabled("Table 7")
+
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_the_guard_refuses_a_switched_off_table(self, mock_get_value):
+        mock_get_value.return_value = 0
+        with self.assertRaises(frappe.ValidationError):
+            _assert_table_self_ordering_enabled("Table 7")
+
+
+class TestBillStatus(unittest.TestCase):
+    """What the waiting customer is told between tapping the button and
+    getting a printed bill."""
+
+    def test_no_request_means_nothing_to_report(self):
+        self.assertIsNone(_bill_status(False, []))
+
+    def test_open_request_reads_as_requested(self):
+        latest = [MagicMock(status="Open")]
+        self.assertEqual(_bill_status(False, latest), "requested")
+
+    def test_acknowledged_request_tells_the_customer_staff_have_it(self):
+        latest = [MagicMock(status="Acknowledged")]
+        self.assertEqual(_bill_status(False, latest), "acknowledged")
+
+    def test_a_closed_request_still_counts_as_seen(self):
+        latest = [MagicMock(status="Resolved")]
+        self.assertEqual(_bill_status(False, latest), "acknowledged")
+
+    def test_printing_wins_over_the_request_row(self):
+        # The bill in their hand is the answer, whatever the row says.
+        self.assertEqual(_bill_status(True, [MagicMock(status="Open")]), "printed")
+        self.assertEqual(_bill_status(True, []), "printed")
 
 
 class TestCreatePaymentRequest(unittest.TestCase):

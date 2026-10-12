@@ -2,6 +2,7 @@ import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import { Button } from '@ury/ui';
 import { Upload, FileText, X, Download } from 'lucide-react';
 import { parseMenuCsv, ParsedMenuRow } from '../../utils/csvParser';
+import { t } from '../../i18n';
 
 interface MenuBulkUploadProps {
   onItemsParsed: (items: ParsedMenuRow[]) => void;
@@ -96,8 +97,7 @@ export function MenuBulkUpload({
           download 
           className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
         >
-          <Download className="w-3.5 h-3.5" /> Download Template
-        </a>
+          <Download className="w-3.5 h-3.5" />{t('dash.menu_bulk_upload.download_template')}</a>
       </div>
 
       <input
@@ -126,7 +126,7 @@ export function MenuBulkUpload({
               setImportError(null);
             }}
             className="text-muted-foreground hover:text-red-600 p-1 h-auto"
-            title="Remove File"
+            title={t('dash.menu_bulk_upload.remove_file')}
           >
             <X className="w-4 h-4" />
           </Button>
@@ -147,7 +147,7 @@ export function MenuBulkUpload({
           <p className="text-xs font-medium text-gray-700">
             Drag &amp; drop CSV file here, or <span className="text-primary hover:underline font-semibold">browse</span>
           </p>
-          <p className="text-[10px] text-gray-500 mt-0.5">Supports CSV files only</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">{t('dash.menu_bulk_upload.supports_csv_files_only')}</p>
         </div>
       )}
 

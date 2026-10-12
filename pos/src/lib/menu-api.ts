@@ -5,7 +5,12 @@ export interface MenuItem {
   item_name: string;
   item_image: string | null;
   rate: number | string;
-  course: string;
+  /** The dish's Item Group — what the POS groups its grid by. */
+  category?: string;
+  category_label?: string;
+  category_icon?: string | null;
+  /** Serving course, kept for the KOT; not used to group the menu. */
+  course?: string;
   course_label?: string;
   trending?: boolean;
   popular?: boolean;

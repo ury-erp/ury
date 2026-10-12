@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   isUserRestrictedFromTableOrders,
   canCaptainTransfer,
@@ -174,19 +175,8 @@ const cases: Case[] = [
   },
 ];
 
-let failures = 0;
-for (const { label, run } of cases) {
-  const passed = run();
-  if (!passed) {
-    failures++;
-    console.error(`FAIL: ${label}`);
-  } else {
-    console.log(`PASS: ${label}`);
-  }
-}
-
-if (failures > 0) {
-  console.error(`\n${failures} test(s) failed.`);
-  process.exit(1);
-}
-console.log('\nAll tests passed.');
+describe('POS role capabilities', () => {
+  it.each(cases)('$label', ({ run }) => {
+    expect(run()).toBe(true);
+  });
+});

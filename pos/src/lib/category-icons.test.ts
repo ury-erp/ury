@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { fuzzyMatchIcon } from './category-icons';
 
 interface Case {
@@ -23,21 +24,22 @@ const cases: Case[] = [
   { input: 'Grilled Fish', expected: 'Fish' },
   { input: 'Ice-Cream', expected: 'IceCreamCone' },
   { input: 'Soft Drinks', expected: 'CupSoda' },
+  // Iraqi Arabic category names
+  { input: 'مشويات', expected: 'Beef' },
+  { input: 'كص دجاج', expected: 'Sandwich' },
+  { input: 'دجاج', expected: 'Drumstick' },
+  { input: 'سمك مسكوف', expected: 'Fish' },
+  { input: 'تمن ومرق', expected: 'CookingPot' },
+  { input: 'شوربات', expected: 'Soup' },
+  { input: 'مشروبات ساخنة', expected: 'Coffee' },
+  { input: 'مشروبات باردة', expected: 'CupSoda' },
+  { input: 'عصائر', expected: 'Citrus' },
+  { input: 'برگر', expected: 'Hamburger' },
+  { input: 'حلويات', expected: 'Cake' },
 ];
 
-let failures = 0;
-for (const { input, expected } of cases) {
-  const actual = fuzzyMatchIcon(input);
-  if (actual !== expected) {
-    failures++;
-    console.error(`FAIL: "${input}" => expected ${expected}, got ${actual}`);
-  } else {
-    console.log(`PASS: "${input}" => ${actual}`);
-  }
-}
-
-if (failures > 0) {
-  console.error(`\n${failures} test(s) failed.`);
-  process.exit(1);
-}
-console.log('\nAll tests passed.');
+describe('fuzzyMatchIcon', () => {
+  it.each(cases)('$input => $expected', ({ input, expected }) => {
+    expect(fuzzyMatchIcon(input)).toBe(expected);
+  });
+});

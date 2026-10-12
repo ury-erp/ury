@@ -1,68 +1,71 @@
 <template>
   <div class="mt-3 flex flex-col md:flex-row">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-border bg-opacity-50 text-lg"
       v-if="this.invoiceData.isPrinting"
     >
-      Printing Invoice
+      {{ $t('order.printing_invoice') }}
     </div>
 
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-border bg-opacity-50 text-lg"
       v-if="this.recentOrders.isLoading"
     >
-      Payment Being Processing
+      {{ $t('payment.processing') }}
     </div>
     <div
-      class="max-w-lg flex-1 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800 sm:p-8"
+      class="max-w-lg flex-1 rounded-lg border border-border bg-card p-4 shadow sm:p-8"
     >
       <div class="mb-4 flex items-center justify-between">
         <h5
-          class="text-xl font-bold leading-none text-gray-900 dark:text-white"
+          class="text-xl font-bold leading-none text-foreground"
         >
-          Recent Orders
+          {{ $t('order.recent_orders') }}
         </h5>
       </div>
       <div class="w-full" @click="this.recentOrders.showOrder = false">
         <input
           type="search"
           id="orderSeach"
-          class="block w-full rounded-lg border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
-          placeholder="Search by Invoice Id or Customer Name or Mobile Number"
+          class="pos-input ps-10"
+          :placeholder="$t('order.search_placeholder')"
           v-model="this.recentOrders.searchOrder"
           @input="this.recentOrders.handleSearchInput"
         />
         <select
           id="status"
-          class="mt-4 block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+          class="pos-select mt-3"
           v-model="this.recentOrders.selectedStatus"
           @change="this.recentOrders.handleStatusChange"
         >
-          <option value="Draft">Draft</option>
-          <option value="Unbilled">Unbilled</option>
+          <!-- Default. Narrowing to one status is a refinement, not the
+               price of seeing anything at all. -->
+          <option value="All">{{ $t('status.all') }}</option>
+          <option value="Draft">{{ $t('status.draft') }}</option>
+          <option value="Unbilled">{{ $t('status.unbilled') }}</option>
           <option
             value="Recently Paid"
             v-if="auth.viewAllStatus === 0 && invoiceData.paidLimit > 0"
           >
-            Recently Paid
+            {{ $t('status.recently_paid') }}
           </option>
           <option value="Paid" v-if="this.auth.viewAllStatus === 1">
-            Paid
+            {{ $t('status.paid') }}
           </option>
           <option value="Consolidated" v-if="this.auth.viewAllStatus === 1">
-            Consolidated
+            {{ $t('status.consolidated') }}
           </option>
           <option value="Return" v-if="this.auth.viewAllStatus === 1">
-            Return
+            {{ $t('status.return') }}
           </option>
         </select>
       </div>
       <div class="flow-root">
-        <ul role="list" class="divide-y divide-gray-200 dark:divide-gray-700">
+        <ul role="list" class="divide-y divide-border">
           <li
             class="mt-2 py-3 sm:py-4"
             :class="{
-              'bg-gray-200': this.recentOrders.setBackground === index,
+              'bg-muted': this.recentOrders.setBackground === index,
             }"
             v-for="(recentOrder, index) in this.recentOrders.filteredOrders"
             :key="recentOrder.name"
@@ -74,16 +77,16 @@
           <div class="flex w-full">
               <div class="w-3/5">
                 <p
-                  class="truncate text-base font-medium text-gray-900 dark:text-white"
+                  class="truncate text-base font-medium text-foreground"
                 >
                   {{ recentOrder.name }}
                 </p>
-                <p class="truncate text-sm text-gray-600 dark:text-gray-400">
+                <p class="truncate text-sm text-muted-foreground">
                   {{ recentOrder.mobile_number }},{{ recentOrder.customer }}
                 </p>
               </div>
               <div class="w-2/5 flex">
-                <p class="text-base font-medium text-gray-900 dark:text-white overflow-hidden text-ellipsis">
+                <p class="text-base font-medium text-foreground overflow-hidden text-ellipsis">
                   {{
                     recentOrder.restaurant_table
                       ? recentOrder.restaurant_table
@@ -93,12 +96,12 @@
               </div>
               <div class="w-1/5 text-right">
                 <p
-                  class="truncate text-base font-medium text-gray-900 dark:text-white"
+                  class="truncate text-base font-medium text-foreground"
                   >
                   {{ this.invoiceData.currency }}
                   {{ recentOrder.grand_total }}
                 </p>
-                <p class="truncate text-sm text-gray-600 dark:text-gray-400">
+                <p class="truncate text-sm text-muted-foreground">
                   {{
                     this.recentOrders.getFormattedTime(
                       recentOrder.posting_time
@@ -116,7 +119,7 @@
           @click="this.recentOrders.previousPageClick()"
           class="mr-2 w-[80px] rounded-md border px-2 py-1"
         >
-          Previous
+          {{ $t('common.previous') }}
         </button>
         <button class="mr-2 rounded-md border px-2 py-1">
           {{ this.recentOrders.currentPage }}
@@ -126,34 +129,34 @@
           v-if="this.recentOrders.next"
           class="w-[80px] rounded-md border px-2 py-1"
         >
-          Next
+          {{ $t('common.next') }}
         </button>
       </div>
     </div>
     <div
-      class="mt-5 max-w-lg flex-1 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800 sm:p-8 md:ml-10 md:mt-0"
+      class="mt-5 max-w-lg flex-1 rounded-lg border border-border bg-card p-4 shadow sm:p-8 md:ml-10 md:mt-0"
       v-if="this.recentOrders.showOrder"
     >
       <div class="flex items-center space-x-4">
         <div class="min-w-0 flex-1">
           <p
-            class="truncate text-xl font-semibold text-gray-900 dark:text-white"
+            class="truncate text-xl font-semibold text-foreground"
           >
             {{ this.recentOrders.selectedOrder.customer }}
           </p>
           <p
-            class="truncate text-xl font-semibold text-gray-900 dark:text-white"
+            class="truncate text-xl font-semibold text-foreground"
           >
             {{ this.recentOrders.selectedOrder.mobile_number }}
           </p>
           <p
-            class="mr-2 mt-2 truncate text-sm text-gray-500 dark:text-gray-400"
+            class="mr-2 mt-2 truncate text-sm text-muted-foreground"
           >
             {{ this.recentOrders.postingDate }}
           </p>
 
           <p
-            class="mr-2 mt-2 truncate text-sm text-gray-500 dark:text-gray-400"
+            class="mr-2 mt-2 truncate text-sm text-muted-foreground"
             v-if="this.recentOrders.selectedOrder.waiter"
           >
             Waiter : {{ this.recentOrders.selectedOrder.waiter }}
@@ -162,7 +165,7 @@
         <div class="items-center space-x-4 text-right">
           <div class="min-w-0 flex-1">
             <p
-              class="mr-2 truncate text-xl font-semibold text-gray-900 dark:text-white"
+              class="mr-2 truncate text-xl font-semibold text-foreground"
             >
               {{ this.invoiceData.currency }}
               {{
@@ -172,7 +175,7 @@
               }}
             </p>
             <p
-              class="mr-2 mt-2 truncate text-sm text-gray-500 dark:text-gray-400"
+              class="mr-2 mt-2 truncate text-sm text-muted-foreground"
             >
               {{ this.recentOrders.selectedOrder.name }}
             </p>
@@ -204,28 +207,28 @@
         </div>
       </div>
       <div class="mb-2 mt-4">
-        <p class="truncate text-lg font-semibold text-gray-900 dark:text-white">
-          Items
+        <p class="truncate text-lg font-semibold text-foreground">
+          {{ $t('menu.items') }}
         </p>
       </div>
-      <div class="w-full rounded bg-gray-50 p-2">
+      <div class="w-full rounded-xl bg-muted p-2">
         <div
           class="ml-2 mt-2"
           v-for="items in this.recentOrders.recentOrderListItems"
         >
           <div class="flex items-center space-x-4">
             <div class="min-w-2 flex-1">
-              <p class="truncate text-base text-gray-800 dark:text-white">
+              <p class="truncate text-base text-foreground">
                 {{ items.item_name }}
               </p>
             </div>
             <div class="flex items-center space-x-4 text-right">
-              <p class="text-base text-gray-800 dark:text-white">
+              <p class="text-base text-foreground">
                 {{ items.qty }}
               </p>
             </div>
             <div class="items-center space-x-4 text-right">
-              <p class="mr-5 truncate text-base text-gray-800 dark:text-white">
+              <p class="mr-5 truncate text-base text-foreground">
                 {{ this.invoiceData.currency }} {{ items.amount }}
               </p>
             </div>
@@ -236,7 +239,7 @@
         class="mt-4 rounded-md border-2 border-dotted"
         :class="[
           {
-            'border-gray-600': !recentOrders.showDiscount,
+            'border-border': !recentOrders.showDiscount,
             'border-green-500': recentOrders.showDiscount,
             'border-red-500':recentOrders.totalAmount <= 0
           },
@@ -291,7 +294,7 @@
           </svg>
 
           <template v-if="!recentOrders.showDiscount">
-            <span>Add Discount</span>
+            <span>{{ $t('payment.add_discount') }}</span>
           </template>
 
           <template v-else>
@@ -307,8 +310,8 @@
       <div class="relative mb-6 mt-6" v-if="this.recentOrders.showInput">
         <input
           type="number"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
-          placeholder="Enter Discount Percentage"
+          class="block w-full rounded-lg border border-input bg-muted p-2.5 pl-10 text-sm text-foreground focus:border-ring focus:ring-ring"
+          :placeholder="$t('payment.enter_discount_pct')"
           v-model="this.recentOrders.percentage"
           @input="this.recentOrders.updatePercentage"
           @keyup.enter="this.recentOrders.applyDiscount"
@@ -316,20 +319,20 @@
         />
       </div>
       <div class="mb-2 mt-5">
-        <p class="truncate text-lg font-semibold text-gray-900 dark:text-white">
-          Totals
+        <p class="truncate text-lg font-semibold text-foreground">
+          {{ $t('totals.title') }}
         </p>
       </div>
-      <div class="w-full rounded bg-gray-50 p-2">
+      <div class="w-full rounded-xl bg-muted p-2">
         <div class="ml-2 mt-2 flex items-center space-x-4">
           <div class="min-w-2 flex-1">
-            <p class="truncate text-base text-gray-800 dark:text-white">
-              Net Total
+            <p class="truncate text-base text-foreground">
+              {{ $t('totals.net_total') }}
             </p>
           </div>
 
           <div class="items-center space-x-4 text-right">
-            <p class="mr-5 truncate text-base text-gray-800 dark:text-white">
+            <p class="mr-5 truncate text-base text-foreground">
               {{ this.invoiceData.currency }} {{ this.recentOrders.netTotal }}
             </p>
           </div>
@@ -337,13 +340,13 @@
         <div class="ml-2" v-for="tax in this.recentOrders.texDetails">
           <div class="mt-2 flex items-center space-x-4">
             <div class="min-w-2 flex-1">
-              <p class="truncate text-base text-gray-800 dark:text-white">
+              <p class="truncate text-base text-foreground">
                 {{ tax.description }}
               </p>
             </div>
 
             <div class="items-center space-x-4 text-right">
-              <p class="mr-5 truncate text-base text-gray-800 dark:text-white">
+              <p class="mr-5 truncate text-base text-foreground">
                 {{ this.invoiceData.currency }} {{ tax.rate }}
               </p>
             </div>
@@ -355,14 +358,14 @@
         >
           <div class="min-w-2 flex-1">
             <p
-              class="truncate text-base font-semibold text-gray-800 dark:text-white"
+              class="truncate text-base font-semibold text-foreground"
             >
               Discount({{ this.recentOrders.additionalPiscountPercentage }})
             </p>
           </div>
           <div class="items-center space-x-4 text-right">
             <p
-              class="mr-5 truncate text-base font-semibold text-gray-800 dark:text-white"
+              class="mr-5 truncate text-base font-semibold text-foreground"
             >
               {{ this.invoiceData.currency }}
               {{ this.recentOrders.discountAmount }}
@@ -372,14 +375,14 @@
         <div class="ml-2 mt-2 flex items-center space-x-4">
           <div class="min-w-2 flex-1">
             <p
-              class="truncate text-base font-semibold text-gray-800 dark:text-white"
+              class="truncate text-base font-semibold text-foreground"
             >
-              Grand Total
+              {{ $t('totals.grand_total') }}
             </p>
           </div>
           <div class="items-center space-x-4 text-right">
             <p
-              class="mr-5 truncate text-base font-semibold text-gray-800 dark:text-white"
+              class="mr-5 truncate text-base font-semibold text-foreground"
             >
               {{ this.invoiceData.currency }}
               {{
@@ -392,7 +395,7 @@
         </div>
       </div>
       <div
-        class="mt-2 rounded px-4 py-2 text-center"
+        class="mt-2 rounded-xl px-4 py-2 text-center"
         v-if="
           this.recentOrders.selectedStatus !== 'Draft' &&
           recentOrders.selectedStatus !== 'Unbilled'
@@ -400,14 +403,14 @@
       >
         <button
           type="button"
-          class="mb-2 mr-2 rounded-lg border border-gray-400 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="mb-2 mr-2 rounded-lg border border-input bg-card px-5 py-2.5 text-sm font-medium text-foreground focus:outline-none"
           @click="this.invoiceData.printFunction()"
         >
-          Print Receipt
+          {{ $t('order.print_receipt') }}
         </button>
       </div>
       <div
-        class="mt-2 rounded px-4 py-2 text-center"
+        class="mt-2 rounded-xl px-4 py-2 text-center"
         v-if="
           this.recentOrders.selectedStatus === 'Draft' ||
           recentOrders.selectedStatus === 'Unbilled'
@@ -415,11 +418,11 @@
       >
         <button
           type="button"
-          class="mb-2 mr-2 w-36 rounded-lg border bg-white px-5 py-2.5 text-sm font-medium focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="mb-2 mr-2 w-36 rounded-lg border bg-card px-5 py-2.5 text-sm font-medium focus:outline-none"
           :class="{
-            'border-gray-200 text-gray-300':
+            'border-border text-muted-foreground/60':
               this.recentOrders.orderType === 'Aggregators',
-            'border-gray-300 text-gray-700':
+            'border-input text-foreground':
               this.recentOrders.orderType !== 'Aggregators',
           }"
           @click="
@@ -428,18 +431,18 @@
               : ''
           "
         >
-          Edit
+          {{ $t('common.edit') }}
         </button>
         <button
           type="button"
-          class="mb-2 mr-2 w-36 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="mb-2 mr-2 w-36 rounded-lg border border-input bg-card px-5 py-2.5 text-sm font-medium text-foreground focus:outline-none"
           @click="this.invoiceData.printFunction()"
         >
-          Print Receipt
+          {{ $t('order.print_receipt') }}
         </button>
       </div>
       <div
-        class="mt-2 rounded px-4 py-2 text-center"
+        class="mt-2 rounded-xl px-4 py-2 text-center"
         v-if="
           this.recentOrders.selectedStatus === 'Draft' ||
           this.recentOrders.selectedStatus === 'Unbilled'
@@ -447,19 +450,19 @@
       >
         <button
           type="button"
-          class="mb-2 mr-2 w-36 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="mb-2 mr-2 w-36 rounded-lg border border-input bg-card px-5 py-2.5 text-sm font-medium text-foreground focus:outline-none"
           @click="this.recentOrders.billing()"
         >
-          Make Payment
+          {{ $t('payment.make_payment') }}
         </button>
         <button
           type="button"
-          class="mb-2 mr-2 w-36 rounded-lg border bg-white px-5 py-2.5 text-sm font-medium focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          class="mb-2 mr-2 w-36 rounded-lg border bg-card px-5 py-2.5 text-sm font-medium focus:outline-none"
           :class="{
-            'border-gray-200 text-gray-300':
+            'border-border text-muted-foreground/60':
               this.recentOrders.invoicePrinted === 1 ||
               this.recentOrders.selectedStatus === 'Unbilled',
-            'border-gray-300 text-gray-700': !(
+            'border-input text-foreground': !(
               this.recentOrders.invoicePrinted === 1 ||
               this.recentOrders.selectedStatus === 'Unbilled'
             ),
@@ -471,17 +474,95 @@
               : ''
           "
         >
-          Cancel Order
+          {{ $t('order.cancel_order') }}
         </button>
+
+        <!--
+          Free the table without printing.
+
+          Only offered where it means something: an order still holding a
+          table whose bill has not been closed out. Once the bill is closed —
+          printed or not — the table is already free and the button would be
+          a no-op dressed as an action.
+        -->
+        <button
+          v-if="canCloseTable"
+          type="button"
+          class="pos-btn-ghost mb-2 mr-2 w-36"
+          @click="this.recentOrders.showCloseTableModal()"
+        >
+          {{ $t('order.close_table') }}
+        </button>
+      </div>
+
+      <!--
+        Closing a table settles the bill as well as releasing the floor, so it
+        asks first and asks why. The reason is what a manager reads later when
+        a shift's takings do not match its covers.
+      -->
+      <div v-if="this.recentOrders.closeTableFlag" class="pos-overlay">
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="pos-card w-full max-w-md p-6 animate-scale-in" role="dialog">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="pos-title">{{ $t('order.close_table_title') }}</h2>
+              <button
+                type="button"
+                class="press -me-2 -mt-2 rounded-lg px-2 py-1 text-xl font-bold text-muted-foreground hover:bg-muted"
+                :aria-label="$t('common.close')"
+                @click="this.recentOrders.closeTableFlag = false"
+              >✕</button>
+            </div>
+
+            <p class="mt-2 text-sm font-medium text-muted-foreground">
+              {{ $t('order.close_table_body') }}
+            </p>
+
+            <div class="mt-4 rounded-xl bg-muted px-4 py-3">
+              <p class="pos-label">{{ $t('tables.title') }}</p>
+              <p class="text-base font-bold text-foreground">
+                {{ this.recentOrders.restaurantTable }}
+              </p>
+            </div>
+
+            <label for="closeReason" class="pos-label mb-1.5 mt-4 block">
+              {{ $t('order.reason') }}
+            </label>
+            <input
+              id="closeReason"
+              type="text"
+              class="pos-input"
+              :placeholder="$t('order.close_table_reason_hint')"
+              v-model="this.recentOrders.closeTableReason"
+            />
+
+            <div class="mt-6 flex gap-3">
+              <button
+                type="button"
+                class="pos-btn-ghost flex-1"
+                @click="this.recentOrders.closeTableFlag = false"
+              >
+                {{ $t('common.no') }}
+              </button>
+              <button
+                type="button"
+                class="pos-btn-primary flex-1"
+                :disabled="this.recentOrders.closingTable || !this.recentOrders.closeTableReason.trim()"
+                @click="this.recentOrders.closeTable()"
+              >
+                {{ this.recentOrders.closingTable ? $t('order.closing') : $t('order.close_table') }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div
         v-if="this.recentOrders.cancelInvoiceFlag === true"
-        class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-gray-100"
+        class="fixed inset-0 z-10 mt-20 overflow-y-auto bg-muted"
       >
         <div class="mt-20 flex items-center justify-center">
-          <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
+          <div class="w-full rounded-lg bg-card p-6 shadow-raised md:max-w-md">
             <div class="flex justify-end">
-              <span class="sr-only">Close</span>
+              <span class="sr-only">{{ $t('common.close') }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -499,36 +580,36 @@
               </svg>
             </div>
             <h2
-              class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white"
+              class="mt-1 block text-left text-xl font-medium text-foreground"
             >
-              Are you sure to cancel
+              {{ $t('order.confirm_cancel') }}
             </h2>
             <div class="relative">
               <label
                 for="cancelReason"
-                class="mt-6 block text-left text-gray-900 dark:text-white"
+                class="mt-6 block text-left text-foreground"
               >
-                Reason
+                {{ $t('order.reason') }}
               </label>
               <input
                 type="text"
                 id="cancelReason"
-                class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
+                class="mt-4 w-full appearance-none rounded-xl border p-2 leading-tight text-foreground shadow focus:outline-none"
                 v-model="this.recentOrders.cancelReason"
               />
             </div>
             <div class="flex justify-end">
               <button
                 @click="this.recentOrders.cancelInvoiceFlag = false"
-                class="mr-3 mt-6 rounded border border-gray-300 bg-gray-50 px-3 py-2"
+                class="mr-3 mt-6 rounded-xl border border-input bg-muted px-3 py-2"
               >
-                No
+                {{ $t('common.no') }}
               </button>
               <button
                 @click="handleConfirmCancellation()"
-                class="mt-6 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+                class="mt-6 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
               >
-                Yes
+                {{ $t('common.yes') }}
               </button>
             </div>
           </div>
@@ -536,12 +617,12 @@
       </div>
       <div
         v-if="this.recentOrders.showPayment"
-        class="fixed inset-0 z-10 mt-14 overflow-y-auto bg-gray-100"
+        class="fixed inset-0 z-10 mt-14 overflow-y-auto bg-muted"
       >
         <div class="mt-10 flex items-center justify-center">
-          <div class="h-82 w-full rounded-lg bg-white p-6 shadow-lg md:w-3/5">
+          <div class="h-82 w-full rounded-lg bg-card p-6 shadow-raised md:w-3/5">
             <div class="flex justify-end">
-              <span class="sr-only">Close</span>
+              <span class="sr-only">{{ $t('common.close') }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"
@@ -559,9 +640,9 @@
               </svg>
             </div>
             <h2
-              class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white"
+              class="mt-1 block text-left text-xl font-medium text-foreground"
             >
-              Select Mode Of Payment
+              {{ $t('payment.select_mode') }}
             </h2>
             <div class="mt-8 flex items-center justify-center">
               <div class="w-full max-w-full overflow-x-auto">
@@ -571,11 +652,11 @@
                       modeOfPayment, index
                     ) in recentOrders.modeOfPaymentList"
                     :key="index"
-                    class="mr-4 w-64 flex-shrink-0 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800"
+                    class="mr-4 w-64 flex-shrink-0 rounded-lg border border-border bg-card p-4 shadow"
                   >
                     <label
                       :for="'modeofPayments-' + index"
-                      class="block text-left text-lg dark:text-white"
+                      class="block text-left text-lg"
                     >
                       {{ modeOfPayment.mode_of_payment }}
                     </label>
@@ -583,7 +664,7 @@
                       :id="'modeofPayments-' + index"
                       type="number"
                       name="modeofPayments"
-                      class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-500 dark:bg-gray-600 dark:text-white dark:placeholder-gray-400"
+                      class="block w-full rounded-lg border border-input bg-muted p-2.5 text-sm text-foreground focus:border-ring focus:ring-ring"
                       required
                       v-model.number="modeOfPayment.value"
                       @click="recentOrders.calculatePaidAmount(modeOfPayment)"
@@ -598,9 +679,9 @@
                 </div>
               </div>
             </div>
-            <div v-if="recentOrders.changeAmount > 0" class="mt-4 p-4 bg-gray-50 rounded-lg">
-              <div class="flex justify-between items-center mt-2 text-green-600">
-                <span class="text-lg font-medium">Change Amount:</span>
+            <div v-if="recentOrders.changeAmount > 0" class="mt-4 p-4 bg-muted rounded-lg">
+              <div class="flex justify-between items-center mt-2 text-success">
+                <span class="text-lg font-medium">{{ $t('payment.change_amount') }}</span>
                 <span class="text-lg">₹ {{ recentOrders.changeAmount.toFixed(2) }}</span>
               </div>
             </div>
@@ -610,9 +691,9 @@
                   this.recentOrders.showPayment = false;
                   this.recentOrders.makePayment();
                 "
-                class="mt-10 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+                class="mt-10 rounded-xl bg-primary px-3 py-2 text-primary-foreground hover:bg-primary"
               >
-                Submit
+                {{ $t('common.submit') }}
               </button>
             </div>
           </div>
@@ -650,13 +731,32 @@ export default {
     const notification = useNotifications();
     return { recentOrders, invoiceData, auth, notification };
   },
+  computed: {
+    /**
+     * Whether this order is still holding a table.
+     *
+     * Three things must be true: the order is attached to a table, its bill
+     * has not been closed out yet, and it has not been cancelled. Anything
+     * else and the table is already free, so offering to free it would be an
+     * action that does nothing.
+     */
+    canCloseTable() {
+      const order = this.recentOrders.selectedOrder;
+      if (!order) return false;
+      return Boolean(
+        this.recentOrders.restaurantTable &&
+          this.recentOrders.invoicePrinted === 0 &&
+          order.status !== "Cancelled"
+      );
+    },
+  },
   mounted() {
     this.recentOrders.handleStatusChange();
   },
 };
 </script>
 <style>
-.bg-gray-100 {
+.bg-muted {
   background-color: rgba(0, 0, 0, 0.2);
 }
 </style>

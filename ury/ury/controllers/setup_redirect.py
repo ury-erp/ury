@@ -1,7 +1,7 @@
 import frappe
 
 # Paths that must keep working during setup (wizard SPA, APIs, static files, login).
-_SKIP_PREFIXES = ("ury", "api", "assets", "files", "private", "login")
+_SKIP_PREFIXES = ("restro", "ury", "api", "assets", "files", "private", "login")
 
 # Desk / default landing paths that should send an incomplete site to the URY wizard.
 # PathResolver strips leading slashes, so these are first-segment matches.
@@ -33,8 +33,8 @@ def _setup_wizard_target():
     completed". Otherwise start at Step 0.
     """
     if frappe.db.exists("Company", {}) and not frappe.db.exists("Branch", {}):
-        return "/ury/setup-wizard/1"
-    return "/ury/setup-wizard/0"
+        return "/restro/setup-wizard/1"
+    return "/restro/setup-wizard/0"
 
 
 def _normalize_path(path):
@@ -60,13 +60,36 @@ def _should_redirect_to_ury_setup(path):
 
 
 def website_path_resolver(path):
-    """Send incomplete sites to the URY wizard before Desk is rendered.
+    """URY's say over which page a path renders, before any HTML is built.
 
-    Used as the `website_path_resolver` hook so the redirect happens inside
+    Used as the `website_path_resolver` hook so redirects happen inside
     PathResolver (which handles frappe.Redirect) rather than before_request
-    (which ignores frappe.local.response type=redirect on page GETs).
+    (which ignores frappe.local.response type=redirect on page GETs). In order:
+
+      1. /login renders URY's sign-in page while that feature is on;
+      2. pages of a switched-off feature render "unavailable" (404);
+      3. restaurant staff kept out of Desk are sent to their own screen;
+      4. an incomplete site sends everyone else to the setup wizard.
     """
     from frappe.website.path_resolver import resolve_path
+
+    from ury.ury import features
+    from ury.ury.controllers import access
+
+    first = _first_segment(path)
+
+    if first == "login" and features.is_enabled("custom_login"):
+        return resolve_path("ury-login")
+
+    feature = features.feature_for_page(first)
+    if feature:
+        frappe.local.flags.ury_unavailable_feature = feature["key"]
+        return resolve_path("ury-unavailable")
+
+    landing = access.guard_page(path)
+    if landing:
+        frappe.local.flags.redirect_location = landing
+        raise frappe.Redirect(302)
 
     if _should_redirect_to_ury_setup(path):
         frappe.local.flags.redirect_location = _setup_wizard_target()

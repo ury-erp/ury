@@ -22,7 +22,7 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
       throw new Error('QZ host is not set');
     }
     const html = await getInvoicePrintHtml(orderId, format as string);
-    await printWithQz(qz_host, html);
+    await printWithQz(qz_host, html, posProfile.qz_bill_printer);
     await updatePrintStatus(orderId);
     return 'qz';
   } else if (print_type === 'network') {

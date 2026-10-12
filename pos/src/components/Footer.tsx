@@ -20,7 +20,7 @@ const Footer = () => {
   ].filter((item) => !item.hidden);
 
   return (
-    <div className="bg-white border-t border-gray-200 py-2 relative">
+    <div className="bg-[#fffdf8] border-t border-[#eadfce] py-1.5 relative">
       <nav className="max-w-screen-xl mx-auto px-4">
         <div className="flex justify-center items-center gap-4">
           {navItems.map((item) => (
@@ -29,8 +29,8 @@ const Footer = () => {
               to={item.path}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors',
-                  isActive && 'text-blue-600'
+                  'flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl text-[#735d4e] hover:bg-[#fff2d7] hover:text-[#c94b37] transition-colors',
+                  isActive && 'bg-[#fff0cb] text-[#c94b37] font-semibold'
                 )
               }
             >

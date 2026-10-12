@@ -58,7 +58,7 @@ const routes = [
 ];
 
 export const router = createRouter({
-  history: createWebHistory('/urypos/'),
+  history: createWebHistory('/pos-mobile/'),
   routes,
 });
 

@@ -10,7 +10,7 @@ const buttonVariants = cva(
     "select-none touch-manipulation",
     // Motion: one shared curve/duration for every state change, plus the
     // transform used by the pressed state.
-    "transition-[background-color,border-color,color,box-shadow,transform,filter,opacity] duration-150 ease-out",
+    "transition-[background-color,border-color,color,box-shadow,transform,filter,opacity] duration-fast ease-out",
     // Pressed state — a small, consistent physical acknowledgement.
     "active:scale-[0.98]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
@@ -53,7 +53,11 @@ const buttonVariants = cva(
         sm: "h-9 px-3 rounded-md",
         lg: "h-12 px-6 text-base rounded-md",
         icon: "h-11 w-11 p-0",
+        "icon-sm": "h-9 w-9 p-0",
         xs: "h-8 px-2.5 text-xs rounded-sm",
+      },
+      fullWidth: {
+        true: "w-full",
       },
     },
     defaultVariants: {
@@ -65,16 +69,55 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /**
+   * Shows a spinner and blocks interaction while an action is in flight.
+   *
+   * Every app was doing this by hand — swapping the label for a "Processing…"
+   * string, which changes the button's width mid-action and makes the layout
+   * jump under the user's finger. Here the label stays mounted and is hidden
+   * visually, so the button keeps its exact size.
+   */
+  loading?: boolean
+  /** Replaces the label while `loading`. Omit to keep the label in place. */
+  loadingText?: string
+}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => {
+  (
+    { className, variant, size, fullWidth, loading, loadingText, disabled, children, ...props },
+    ref
+  ) => {
     return (
       <button
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size, fullWidth, className }), "relative")}
         ref={ref}
+        // A loading button is not "broken", it is busy: keep it focusable and
+        // announce the state rather than removing it from the tab order.
+        aria-busy={loading || undefined}
+        disabled={disabled || loading}
         {...props}
-      />
+      >
+        {loading ? (
+          <span
+            className="absolute inset-0 flex items-center justify-center gap-2"
+            aria-hidden="true"
+          >
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/25 border-t-current" />
+            {loadingText ? <span>{loadingText}</span> : null}
+          </span>
+        ) : null}
+
+        {/* Kept in the layout (not unmounted) so the width never changes. */}
+        <span
+          className={cn(
+            "inline-flex items-center justify-center gap-2",
+            loading && "invisible"
+          )}
+        >
+          {children}
+        </span>
+      </button>
     )
   }
 )

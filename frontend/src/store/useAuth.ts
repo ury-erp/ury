@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getLoggedUser, getUserRoles } from '@ury/core';
+import { getLoggedUser, getUserRoles , isDashboardManager } from '@ury/core';
 
 interface AuthState {
   user: string | null;
@@ -61,13 +61,9 @@ export function useAuth(): AuthState {
     };
   }, []);
 
-  const isManager = useMemo(
-    () =>
-      roles.includes('URY Manager') ||
-      roles.includes('Administrator') ||
-      roles.includes('System Manager'),
-    [roles]
-  );
+  // Same policy as the route guard, declared once in @ury/core so the two
+  // cannot drift apart again (UX-15).
+  const isManager = useMemo(() => isDashboardManager(roles), [roles]);
 
   return {
     user,

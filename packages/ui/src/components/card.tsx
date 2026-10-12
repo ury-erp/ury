@@ -14,6 +14,11 @@ const cardVariants = cva(
         elevated: "border-border bg-card shadow-md",
         outlined: "border-2 border-input bg-card shadow-none",
         ghost: "border-transparent bg-transparent shadow-none",
+        // A card that is itself a control — a menu item, a table tile, a KPI
+        // that navigates. Carries the hover lift and press feedback so it
+        // reads as pressable; pair with `as="button"` or wrap in a link.
+        interactive:
+          "border-border bg-card shadow-sm lift press cursor-pointer hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
       },
       padding: {
         none: "",

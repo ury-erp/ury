@@ -4,7 +4,7 @@
       "id": "company_name",
       "label": "Company Name",
       "type": "text",
-      "placeholder": "e.g. URY Restaurant",
+      "placeholder": "e.g. Baghdad Grill",
       "required": true,
       "validations": ["required", "minLength:3"],
       "triggers": ["company_abbr"]
@@ -13,7 +13,7 @@
       "id": "company_abbr",
       "label": "Company Abbreviation",
       "type": "text",
-      "placeholder": "e.g. URY",
+      "placeholder": "e.g. BG",
       "required": true,
       "validations": ["required", "maxLength:5"],
       "description": "Used as a short prefix for your invoice numbers. Auto-filled from your company name — edit if you'd like something different."

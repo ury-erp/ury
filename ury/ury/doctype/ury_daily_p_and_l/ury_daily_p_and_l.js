@@ -44,8 +44,8 @@ frappe.ui.form.on('URY Daily P and L', {
 				}
 				else{
 					frappe.throw({
-						title: __("Missing URY Report Settings"),
-						message: __("Please set up URY Report Settings for the selected branch: <strong>{0}</strong>", [frm.doc.branch]),
+						title: __("Missing Report Settings"),
+						message: __("Please set up Report Settings for the selected branch: <strong>{0}</strong>", [frm.doc.branch]),
 					});					
 					frm.set_value("materials_consumed",[])
 				}

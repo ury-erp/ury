@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react';
 import { subscribeRealtimeEvent } from '../../lib/realtimeClient';
 import { PROGRESS_STEPS } from './constants';
+import { t } from '../../i18n';
 
 interface ProgressModalProps {
   visible: boolean;
@@ -117,7 +118,7 @@ export function ProgressModal({
         </div>
 
         <div className="px-10 pb-8">
-          <h2 className="text-2xl font-semibold text-foreground mb-1">Setting up your restaurant</h2>
+          <h2 className="text-2xl font-semibold text-foreground mb-1">{t('dash.progress_modal.setting_up_your_restaurant')}</h2>
           <p className="text-sm text-muted-foreground mb-6">
             {description}
           </p>

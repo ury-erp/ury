@@ -173,7 +173,7 @@ const CaptainTransferDialog = ({
                     disabled={isSubmitting}
                     onClick={() => setSelected(row.name)}
                     className={cn(
-                      'flex w-full flex-col rounded-lg border p-3 text-left transition-colors',
+                      'flex w-full flex-col rounded-lg border p-3 text-start transition-colors',
                       isSelected
                         ? 'border-primary bg-primary-50/40'
                         : 'border-gray-200 hover:border-gray-300'

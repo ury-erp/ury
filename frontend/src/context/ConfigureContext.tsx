@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { call } from '@ury/core';
+import { isSectionValid } from '../lib/configureValidation';
+export { isSectionValid } from '../lib/configureValidation';
 import { nextId } from '../utils/id';
 import { uniqueShortCode, generateTableNames, isAutoTableName } from '../utils/shortCode';
 
@@ -86,6 +88,8 @@ export interface ConfigureState {
 }
 
 export interface ConfigureContextType extends ConfigureState {
+  /** Per-section validity, recomputed from the current values. */
+  sectionValidity: Record<SectionId, boolean>;
   setActiveSection: (section: SectionId) => void;
   markSectionCompleted: (section?: SectionId) => void;
   /** Marks the section complete using its current (possibly untouched, seeded) values and advances — the "Use the defaults" affordance. */
@@ -159,34 +163,32 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   );
 
   const [rooms, setRooms] = useState<RoomData[]>(
-    persisted?.rooms || [{ id: nextId('room'), name: 'Main Dining', tableCount: 4, prefix: 'MD' }]
+    persisted?.rooms || [{ id: nextId('room'), name: 'الصالة', tableCount: 4, prefix: 'T' }]
   );
 
   const [tables, setTables] = useState<TableData[]>(
     persisted?.tables ||
-      generateTableNames('MD', 4).map((name) => ({
+      generateTableNames('T', 4).map((name) => ({
         id: nextId('table'),
         name,
         seats: 4,
-        room: 'Main Dining',
+        room: 'الصالة',
         auto: true,
       }))
   );
 
   const [menuItems, setMenuItems] = useState<MenuItemData[]>(
-    persisted?.menuItems || [
-      { id: nextId('menu'), name: 'Pizza',   course: 'Main Course', price: 250 },
-      { id: nextId('menu'), name: 'Burger',  course: 'Main Course', price: 180 },
-      { id: nextId('menu'), name: 'Fries',   course: 'Starters',   price: 80  },
-      { id: nextId('menu'), name: 'Wings',   course: 'Starters',   price: 120 },
-      { id: nextId('menu'), name: 'Coffee',  course: 'Beverages',  price: 60  },
-    ]
+    // Empty on purpose: sample dishes accepted with "finish with defaults"
+    // became real items on a production menu. The restaurant adds its own
+    // here or later from the Menu page. (`course` carries the category.)
+    persisted?.menuItems || []
   );
 
   const [menuFile, setMenuFileState] = useState<File | null>(null);
 
   const [taxConfig, setTaxConfig] = useState<TaxConfigData>(
-    persisted?.taxConfig || { taxType: 'Inclusive', taxPercentage: 5 }
+    // Iraqi restaurants generally charge no VAT; a percentage is opt-in.
+    persisted?.taxConfig || { taxType: 'Inclusive', taxPercentage: 0 }
   );
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>(
@@ -194,15 +196,9 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   );
 
   const [users, setUsers] = useState<UserData[]>(
-    persisted?.users || [
-      {
-        id: nextId('user'),
-        email: 'cashier@example.com',
-        name: 'Cashier',
-        passwordPlaceholder: generateRandomPassword(),
-        role: 'URY Cashier',
-      },
-    ]
+    // No placeholder account: "cashier@example.com" with a random password
+    // was created as a real, unusable login on every site set up with defaults.
+    persisted?.users || []
   );
 
   useEffect(() => {
@@ -246,34 +242,55 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
     setVisitedSections((prev) => new Set(prev).add(section));
   }, []);
 
+  const sectionValidity = useMemo(
+    () =>
+      SECTION_ORDER.reduce((acc, section) => {
+        acc[section] = isSectionValid(section, {
+          branch, rooms, tables, menuItems, taxConfig, paymentMethods, users,
+        });
+        return acc;
+      }, {} as Record<SectionId, boolean>),
+    [branch, rooms, tables, menuItems, taxConfig, paymentMethods, users]
+  );
+
   const markSectionCompleted = useCallback(
     (section?: SectionId) => {
       const sec = section || activeSection;
-      setCompletedSections((prev) => new Set(prev).add(sec));
+      // Always a visit; complete only when the data supports it. Marking
+      // completion on advance is what let an empty branch name reach the
+      // final step wearing a tick.
       setVisitedSections((prev) => new Set(prev).add(sec));
+      setCompletedSections((prev) => {
+        const next = new Set(prev);
+        if (sectionValidity[sec]) next.add(sec);
+        else next.delete(sec);
+        return next;
+      });
     },
-    [activeSection]
+    [activeSection, sectionValidity]
   );
 
   const useDefaultsForSection = useCallback(
     (section?: SectionId) => {
       const sec = section || activeSection;
       markSectionCompleted(sec);
+      if (!sectionValidity[sec]) return;
       const currentIndex = SECTION_ORDER.indexOf(sec);
       if (currentIndex >= 0 && currentIndex < SECTION_ORDER.length - 1) {
         setActiveSection(SECTION_ORDER[currentIndex + 1]);
       }
     },
-    [activeSection, markSectionCompleted, setActiveSection]
+    [activeSection, markSectionCompleted, setActiveSection, sectionValidity]
   );
 
   const goToNextSection = useCallback(() => {
     markSectionCompleted(activeSection);
+    if (!sectionValidity[activeSection]) return;
     const currentIndex = SECTION_ORDER.indexOf(activeSection);
     if (currentIndex < SECTION_ORDER.length - 1) {
       setActiveSection(SECTION_ORDER[currentIndex + 1]);
     }
-  }, [activeSection, markSectionCompleted, setActiveSection]);
+  }, [activeSection, markSectionCompleted, setActiveSection, sectionValidity]);
 
   const goToPrevSection = useCallback(() => {
     const currentIndex = SECTION_ORDER.indexOf(activeSection);
@@ -480,6 +497,7 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
         activeSection,
         visitedSections,
         completedSections,
+        sectionValidity,
         branch,
         rooms,
         tables,

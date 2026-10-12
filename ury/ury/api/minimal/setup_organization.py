@@ -22,7 +22,7 @@ def get_setup_defaults():
         detected_country = ""
         
     if not detected_country:
-        detected_country = frappe.db.get_single_value("System Settings", "country") or "India"
+        detected_country = frappe.db.get_single_value("System Settings", "country") or "Iraq"
     
     countries_dict = get_all()
     countries = list(countries_dict.keys())
@@ -48,7 +48,10 @@ def get_setup_defaults():
         "detected_country": detected_country,
         "countries": countries,
         "currencies": currencies,
-        "timezones": timezones
+        "timezones": timezones,
+        # Only a sandbox site (site_config allow_ury_demo) offers demo data;
+        # see ury.setup.setup_wizard._wants_ury_demo.
+        "allow_demo": bool(frappe.utils.cint(frappe.conf.get("allow_ury_demo"))),
     }
 
 @frappe.whitelist()

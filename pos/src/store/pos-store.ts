@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
-import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
 import { getTableOrder, TableOrder } from '../lib/order-api';
@@ -30,7 +29,6 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   quantity?: number;
   description?: string;
   special_dish?: 1 | 0;
-  category?: string;
   variants?: Array<{ id: string; name: string; price: number }>;
   addons?: Array<{ id: string; name: string; price: number; category: 'sides' | 'drinks' | 'desserts' }>;
   selectedVariant?: { id: string; name: string; price: number };
@@ -63,6 +61,27 @@ export interface Category {
   name: string;
   label: string;
   icon?: string;
+}
+
+/**
+ * The category rail, built from the menu itself.
+ *
+ * It used to come from every URY Menu Course on the site, cached for the
+ * session: a category created after login never appeared, and courses with
+ * nothing on this menu showed up empty. Deriving it from the items means the
+ * rail always lists exactly the categories the cashier can sell from.
+ */
+export function categoriesFromItems(items: Pick<MenuItem, 'category' | 'category_label' | 'category_icon'>[]): Category[] {
+  const seen = new Map<string, Category>();
+  for (const item of items) {
+    if (!item.category || seen.has(item.category)) continue;
+    seen.set(item.category, {
+      name: item.category,
+      label: item.category_label || item.category,
+      icon: item.category_icon || undefined,
+    });
+  }
+  return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, 'ar'));
 }
 
 export interface Order {
@@ -111,6 +130,10 @@ interface POSState {
   selectedTable: string | null;
   selectedRoom: string | null;
   searchQuery: string;
+  /** Header search text while the tables screen is open. Kept apart from
+      `searchQuery` (menu items) so leaving one screen does not silently
+      filter the other. */
+  tableSearchQuery: string;
   selectedCustomer: Customer | null;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
@@ -153,7 +176,6 @@ interface POSState {
 interface POSStore extends POSState {
   fetchMenuItems: () => Promise<void>;
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
-  fetchCategories: () => Promise<void>;
   fetchPaymentModes: () => Promise<void>;
   addToOrder: (item: OrderItem) => Promise<void>;
   removeFromOrder: (uniqueId: string) => Promise<void>;
@@ -164,6 +186,7 @@ interface POSStore extends POSState {
   setSelectedCustomer: (customer: Customer | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
+  setTableSearchQuery: (query: string) => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
   setSelectedItem: (item: MenuItem | null) => void;
   initializeCart: () => Promise<void>;
@@ -299,6 +322,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   categories: [],
   selectedCategory: '',
   searchQuery: '',
+  tableSearchQuery: '',
   quickFilter: "all",
   selectedItem: null,
   cartId: null,
@@ -327,16 +351,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ isInitializing: true, error: null });
       
-      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
+      const [profileResult, menuResult, paymentModesResult] = await Promise.allSettled([
         get().fetchPosProfile(),
         get().fetchMenuItems(),
-        get().fetchCategories(),
         get().fetchPaymentModes()
       ]);
 
       if (profileResult.status === 'rejected' || 
           menuResult.status === 'rejected' || 
-          categoriesResult.status === 'rejected' ||
           paymentModesResult.status === 'rejected') {
         set({ 
           error: 'Failed to initialize app. Please refresh the page.',
@@ -423,14 +445,23 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         item: item.item,
         item_name: item.item_name,
         item_image: item.item_image,
+        category: item.category || item.course,
+        category_label: item.category_label || item.category || item.course_label || item.course,
+        category_icon: item.category_icon,
         course: item.course,
-        course_label: item.course_label || item.course,
         description: item.description || '',
         special_dish: item.special_dish || 0,
         tax_rate: 0,
       }));
 
-      set({ menuItems });
+      const categories = categoriesFromItems(menuItems);
+      const { selectedCategory } = get();
+      set({
+        menuItems,
+        categories,
+        // A category emptied since the last load must not leave the grid blank.
+        selectedCategory: categories.some((c) => c.name === selectedCategory) ? selectedCategory : '',
+      });
     } catch (error) {
       set({ error: 'Failed to load menu items' });
       console.error('Error loading menu items:', error);
@@ -450,31 +481,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         name: item.item_name,
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
-        category: item.course
+        category: item.category || item.course,
+        category_label: item.category_label || item.category || item.course,
       }));
 
-      set({ menuItems, menuLoading: false });
+      set({ menuItems, categories: categoriesFromItems(menuItems), selectedCategory: '', menuLoading: false });
     } catch (error) {
       set({ error: 'Failed to load aggregator menu', menuLoading: false });
       console.error('Error loading aggregator menu:', error);
-    }
-  },
-
-  fetchCategories: async () => {
-    try {
-      const cached = sessionStorage.getItem('menuCategories');
-      if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
-      }
-
-      const courses = await getMenuCourses();
-      sessionStorage.setItem('menuCategories', JSON.stringify(courses));
-      set({ categories: courses });
-    } catch (error) {
-      set({ error: 'Failed to load menu categories' });
-      throw error;
     }
   },
 
@@ -575,6 +589,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setTableSearchQuery: (query) => set({ tableSearchQuery: query }),
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
@@ -590,8 +605,15 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
   setSelectedOrderType: (type) => {
     const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
-    
-    set({ 
+
+    // Re-picking the type that is already active is not a change, and must
+    // not behave like one. The path below clears `activeOrders`, so tapping
+    // the highlighted service type — which a cashier does by reflex, to
+    // reopen the table dialog or just to confirm where they are — silently
+    // emptied a cart that was already correct (UX-02).
+    if (type === selectedOrderType) return;
+
+    set({
           selectedOrderType: type,
           orderId: null
     });

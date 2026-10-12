@@ -17,17 +17,17 @@ class TestSetupWizardTarget(FrappeTestCase):
 	@patch("ury.ury.controllers.setup_redirect.frappe.db.exists")
 	def test_starts_at_step_0_when_no_company(self, mock_exists):
 		mock_exists.return_value = False
-		self.assertEqual(_setup_wizard_target(), "/ury/setup-wizard/0")
+		self.assertEqual(_setup_wizard_target(), "/restro/setup-wizard/0")
 
 	@patch("ury.ury.controllers.setup_redirect.frappe.db.exists")
 	def test_resumes_at_step_1_when_company_exists_without_branch(self, mock_exists):
 		mock_exists.side_effect = lambda doctype, filters=None: doctype == "Company"
-		self.assertEqual(_setup_wizard_target(), "/ury/setup-wizard/1")
+		self.assertEqual(_setup_wizard_target(), "/restro/setup-wizard/1")
 
 	@patch("ury.ury.controllers.setup_redirect.frappe.db.exists")
 	def test_step_0_when_both_company_and_branch_exist(self, mock_exists):
 		mock_exists.return_value = True
-		self.assertEqual(_setup_wizard_target(), "/ury/setup-wizard/0")
+		self.assertEqual(_setup_wizard_target(), "/restro/setup-wizard/0")
 
 
 class TestShouldRedirect(FrappeTestCase):
@@ -57,8 +57,9 @@ class TestShouldRedirect(FrappeTestCase):
 	def test_skips_wizard_api_and_login_paths(self, _mock_complete):
 		frappe.session.user = "Administrator"
 		for path in (
+			"restro/dashboard",
+			"restro/setup-wizard/0",
 			"ury/dashboard",
-			"ury/setup-wizard/0",
 			"api/method/login",
 			"assets/ury/js/setup_redirect.js",
 			"files/x.png",
@@ -94,38 +95,38 @@ class TestWebsitePathResolver(FrappeTestCase):
 	@patch("frappe.website.path_resolver.resolve_path", return_value="ury")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_passes_through_ury_and_api_paths(self, _mock_complete, mock_resolve):
-		self.assertEqual(website_path_resolver("ury/dashboard"), "ury")
+		self.assertEqual(website_path_resolver("restro/dashboard"), "ury")
 		self.assertEqual(website_path_resolver("api/method/ping"), "ury")
 		self.assertEqual(mock_resolve.call_count, 2)
 
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/0")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/0")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_redirects_app_with_302(self, _mock_complete, _mock_target):
 		with self.assertRaises(frappe.Redirect) as ctx:
 			website_path_resolver("app")
 		self.assertEqual(ctx.exception.http_status_code, 302)
-		self.assertEqual(frappe.local.flags.redirect_location, "/ury/setup-wizard/0")
+		self.assertEqual(frappe.local.flags.redirect_location, "/restro/setup-wizard/0")
 
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/0")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/0")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_redirects_app_setup_wizard(self, _mock_complete, _mock_target):
 		with self.assertRaises(frappe.Redirect) as ctx:
 			website_path_resolver("app/setup-wizard")
 		self.assertEqual(ctx.exception.http_status_code, 302)
 
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/0")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/0")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_redirects_empty_path(self, _mock_complete, _mock_target):
 		with self.assertRaises(frappe.Redirect) as ctx:
 			website_path_resolver("")
 		self.assertEqual(ctx.exception.http_status_code, 302)
 
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/1")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/1")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_resumes_at_step_1_when_company_exists(self, _mock_complete, _mock_target):
 		with self.assertRaises(frappe.Redirect):
 			website_path_resolver("app")
-		self.assertEqual(frappe.local.flags.redirect_location, "/ury/setup-wizard/1")
+		self.assertEqual(frappe.local.flags.redirect_location, "/restro/setup-wizard/1")
 
 
 class TestIsUrySetupComplete(FrappeTestCase):
@@ -149,11 +150,11 @@ class TestIsUrySetupComplete(FrappeTestCase):
 
 
 class TestBootAndSessionHooks(FrappeTestCase):
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/0")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/0")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_on_session_creation_sets_home_page(self, _mock_complete, _mock_target):
 		on_session_creation()
-		self.assertEqual(frappe.local.response.get("home_page"), "/ury/setup-wizard/0")
+		self.assertEqual(frappe.local.response.get("home_page"), "/restro/setup-wizard/0")
 
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=True)
 	def test_on_session_creation_noop_when_complete(self, _mock_complete):
@@ -161,13 +162,13 @@ class TestBootAndSessionHooks(FrappeTestCase):
 		on_session_creation()
 		self.assertIsNone(frappe.local.response.get("home_page"))
 
-	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/ury/setup-wizard/1")
+	@patch("ury.ury.controllers.setup_redirect._setup_wizard_target", return_value="/restro/setup-wizard/1")
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=False)
 	def test_extend_bootinfo_sets_ury_flag_and_target(self, _mock_complete, _mock_target):
 		bootinfo = frappe._dict()
 		extend_bootinfo(bootinfo)
 		self.assertIs(bootinfo.ury_setup_complete, False)
-		self.assertEqual(bootinfo.ury_setup_wizard_target, "/ury/setup-wizard/1")
+		self.assertEqual(bootinfo.ury_setup_wizard_target, "/restro/setup-wizard/1")
 		self.assertNotIn("setup_complete", bootinfo)
 
 	@patch("ury.ury.controllers.setup_redirect.is_ury_setup_complete", return_value=True)

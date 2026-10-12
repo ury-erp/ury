@@ -27,8 +27,11 @@ from ury.ury_pos.api import (
 from ury.ury.api.ury_kot_validation import get_kot_errors
 from ury.ury.doctype.sub_pos_closing.sub_pos_closing import get_pos_invoices
 
-TEST_COMPANY = "URY"
-TEST_MODE_OF_PAYMENT = "Cash"
+# Company and mode of payment are resolved from the site at setUp rather
+# than hard-coded. They used to be "URY" and "Cash", which exist on a stock
+# ERPNext test site and on no real one — so this whole end-to-end test died
+# in setUp with "Could not find Company: URY" on every install that had a
+# real company in it, and had been doing so unnoticed.
 TEST_BRANCH = "_Test E2E P0P1 Branch"
 TEST_ROOM = "_Test E2E P0P1 Room"
 TEST_RESTAURANT = "_Test E2E P0P1 Restaurant"
@@ -44,8 +47,29 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
     Entry) rather than mocks.
     """
 
+    def _resolve_company(self):
+        """The site's default company, or any company it has."""
+        company = frappe.defaults.get_defaults().get("company")
+        if company and frappe.db.exists("Company", company):
+            return company
+        companies = frappe.get_all("Company", pluck="name", limit=1)
+        return companies[0] if companies else None
+
+    def _resolve_mode_of_payment(self):
+        modes = frappe.get_all("Mode of Payment", filters={"enabled": 1}, pluck="name", limit=1)
+        return modes[0] if modes else None
+
     def setUp(self):
         frappe.set_user("Administrator")
+
+        self.company = self._resolve_company()
+        if not self.company:
+            self.skipTest("No Company on this site; nothing to run an end-to-end POS flow against.")
+        self.mode_of_payment = self._resolve_mode_of_payment()
+        if not self.mode_of_payment:
+            self.skipTest("No enabled Mode of Payment on this site.")
+        self.currency = frappe.db.get_value("Company", self.company, "default_currency") or "INR"
+
         self._cleanup()
 
         self.cashier = self._make_cashier_user()
@@ -129,7 +153,7 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
                 {
                     "doctype": "URY Restaurant",
                     "name": TEST_RESTAURANT,
-                    "company": TEST_COMPANY,
+                    "company": self.company,
                     "invoice_series_prefix": "E2EP0P1",
                     "branch": self.branch.name,
                     "default_room": room.name,
@@ -149,31 +173,31 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
                 "doctype": "POS Profile",
                 "name": TEST_POS_PROFILE,
                 "naming_series": "_T-POS Profile-",
-                "company": TEST_COMPANY,
-                "currency": "INR",
+                "company": self.company,
+                "currency": self.currency,
                 "warehouse": frappe.db.get_value(
-                    "Warehouse", {"company": TEST_COMPANY, "is_group": 0}, "name"
+                    "Warehouse", {"company": self.company, "is_group": 0}, "name"
                 ),
                 "cost_center": frappe.db.get_value(
-                    "Cost Center", {"company": TEST_COMPANY, "is_group": 0}, "name"
+                    "Cost Center", {"company": self.company, "is_group": 0}, "name"
                 ),
                 "income_account": frappe.db.get_value(
                     "Account",
-                    {"company": TEST_COMPANY, "account_type": "Income Account", "is_group": 0},
+                    {"company": self.company, "account_type": "Income Account", "is_group": 0},
                     "name",
                 ),
                 "expense_account": frappe.db.get_value(
                     "Account",
-                    {"company": TEST_COMPANY, "account_type": "Cost of Goods Sold", "is_group": 0},
+                    {"company": self.company, "account_type": "Cost of Goods Sold", "is_group": 0},
                     "name",
                 ),
                 "write_off_account": frappe.db.get_value(
                     "Account",
-                    {"company": TEST_COMPANY, "account_name": ["like", "%Write Off%"], "is_group": 0},
+                    {"company": self.company, "account_name": ["like", "%Write Off%"], "is_group": 0},
                     "name",
                 ),
                 "write_off_cost_center": frappe.db.get_value(
-                    "Cost Center", {"company": TEST_COMPANY, "is_group": 0}, "name"
+                    "Cost Center", {"company": self.company, "is_group": 0}, "name"
                 ),
                 "write_off_limit": 0,
                 "selling_price_list": "Standard Selling",
@@ -188,7 +212,7 @@ class TestP0P1EndToEndFlow(FrappeTestCase):
                 ],
             }
         )
-        pos_profile.append("payments", {"mode_of_payment": TEST_MODE_OF_PAYMENT, "default": 1})
+        pos_profile.append("payments", {"mode_of_payment": self.mode_of_payment, "default": 1})
         pos_profile.insert(ignore_permissions=True)
         return pos_profile
 

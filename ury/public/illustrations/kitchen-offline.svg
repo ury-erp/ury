@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300" fill="none">
+  <defs>
+    <linearGradient id="ivory" x1="130" y1="70" x2="290" y2="230" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffefb"/><stop offset=".55" stop-color="#f8f4ec"/><stop offset="1" stop-color="#e3d6c6"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="250" y1="80" x2="300" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e9ded0"/><stop offset="1" stop-color="#cdbbaa"/>
+    </linearGradient>
+    <linearGradient id="platformSide" x1="80" y1="232" x2="330" y2="290" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f1e1ce"/><stop offset=".53" stop-color="#e1cdb7"/><stop offset="1" stop-color="#cab69e"/>
+    </linearGradient>
+    <linearGradient id="platformTop" x1="90" y1="205" x2="320" y2="262" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf6"/><stop offset="1" stop-color="#efe5d7"/>
+    </linearGradient>
+    <linearGradient id="clay" x1="0" y1="0" x2="50" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fba98b"/><stop offset=".45" stop-color="#dc7355"/><stop offset="1" stop-color="#ad482f"/>
+    </linearGradient>
+    <linearGradient id="plug" x1="0" y1="0" x2="40" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/><stop offset="1" stop-color="#dccbb6"/>
+    </linearGradient>
+    <filter id="groundShadow" x="-40%" y="-100%" width="180%" height="300%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="softShadow" x="-35%" y="-30%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#836b52" flood-opacity=".15"/>
+    </filter>
+    <filter id="floatShadow" x="-40%" y="-30%" width="190%" height="190%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="3" dy="10" stdDeviation="8" flood-color="#916c50" flood-opacity=".15"/>
+    </filter>
+    <filter id="smallShadow" x="-40%" y="-40%" width="180%" height="200%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#876046" flood-opacity=".16"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="210" cy="160" rx="172" ry="110" transform="rotate(-12 210 160)" stroke="#dbc8b1" stroke-opacity=".45" stroke-dasharray="3 9"/>
+  <circle cx="52" cy="120" r="3.5" fill="#d2b99b"/>
+  <path d="M78 168v10m-5-5h10" stroke="#c8ad8e" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="372" cy="196" r="3" fill="#d9ad8e"/>
+  <path d="M96 48v10m-5-5h10" stroke="#c8ad8e" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- Plinth. -->
+  <ellipse cx="210" cy="272" rx="140" ry="18" fill="#9a785a" opacity=".16" filter="url(#groundShadow)"/>
+  <path d="M70 236c0-27 63-48 140-48s140 21 140 48v13c0 27-63 48-140 48S70 276 70 249v-13Z" fill="url(#platformSide)"/>
+  <ellipse cx="210" cy="236" rx="140" ry="48" fill="url(#platformTop)"/>
+  <ellipse cx="210" cy="235" rx="138" ry="46" stroke="#fffdf7" stroke-width="1.5"/>
+
+  <!-- Kitchen screen, dimmed: nothing is arriving. -->
+  <ellipse cx="200" cy="236" rx="60" ry="12" fill="#aa8d6e" opacity=".2" filter="url(#groundShadow)"/>
+  <path d="m180 222 30-6 26 12c4 2 3 5-1 6l-30 7c-4 1-7 1-10-1l-23-10c-4-2 0-6 8-8Z" fill="url(#ivory)" stroke="#fffdf7"/>
+  <path d="m190 190 20 3 9 32c1 3-2 5-6 6l-8 1c-4 1-7-1-8-4l-7-38Z" fill="#e7ddcf"/>
+  <g filter="url(#softShadow)">
+    <path d="m140 74 132 20c7 1 11 6 11 12l-6 92c-1 6-6 10-12 9l-132-20c-6-1-10-6-10-11l6-93c1-6 5-10 11-9Z" fill="url(#edge)"/>
+    <path d="m136 71 132 20c6 1 10 6 10 12l-6 91c-1 6-6 10-12 9l-132-20c-6-1-10-6-10-12l6-91c1-6 6-10 12-9Z" fill="url(#ivory)" stroke="#fffdfa" stroke-width="1.5"/>
+    <path d="m140 84 122 18c3 0 5 3 5 6l-6 78c0 3-3 5-6 5l-122-18c-3-1-5-3-5-6l6-78c0-3 3-5 6-5Z" fill="#ece5db"/>
+    <g opacity=".55">
+      <path d="m150 96 46 7c2 0 3 2 3 4l-2 30c0 2-2 3-4 3l-46-7c-2 0-3-2-3-4l2-30c0-2 2-3 4-3Z" fill="#f8f2ea" stroke="#e2d6c6" stroke-dasharray="3 3"/>
+      <path d="m208 105 46 7c2 0 3 2 3 4l-2 30c0 2-2 3-4 3l-46-7c-2 0-3-2-3-4l2-30c0-2 2-3 4-3Z" fill="#f8f2ea" stroke="#e2d6c6" stroke-dasharray="3 3"/>
+      <path d="m146 147 46 7c2 0 3 2 3 4l-1 18c0 2-2 3-4 3l-46-7c-2 0-3-2-3-4l1-18c0-2 2-3 4-3Z" fill="#f8f2ea" stroke="#e2d6c6" stroke-dasharray="3 3"/>
+    </g>
+  </g>
+
+  <!-- Unplugged cable with a small gap. -->
+  <path d="M282 178c22 6 18 28 34 26" stroke="#c9b39b" stroke-width="5" stroke-linecap="round"/>
+  <g transform="translate(298 198) rotate(-8)" filter="url(#smallShadow)">
+    <rect x="0" y="0" width="30" height="22" rx="7" fill="url(#plug)" stroke="#fffaf0"/>
+    <path d="M30 7h9M30 15h9" stroke="#b9a48c" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(356 170) rotate(-4)" filter="url(#smallShadow)">
+    <rect width="38" height="42" rx="11" fill="url(#plug)" stroke="#fffaf0"/>
+    <rect x="14" y="11" width="3.5" height="9" rx="1.75" fill="#a8927a"/>
+    <rect x="21" y="11" width="3.5" height="9" rx="1.75" fill="#a8927a"/>
+    <circle cx="19" cy="29" r="3" fill="#cdbba6"/>
+  </g>
+  <path d="M344 186l-5-7m4 26 2 7m-9-16-8-1" stroke="#e39a7a" stroke-width="2.4" stroke-linecap="round"/>
+
+  <!-- Clay alert tile. -->
+  <g transform="translate(292 44) rotate(12)" filter="url(#floatShadow)">
+    <rect x="2" y="4" width="50" height="50" rx="16" fill="#a5452e"/>
+    <rect width="50" height="50" rx="16" fill="url(#clay)" stroke="#ffd8c4"/>
+    <path d="M25 14v15" stroke="#fffaf0" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="25" cy="37" r="2.8" fill="#fffaf0"/>
+  </g>
+</svg>

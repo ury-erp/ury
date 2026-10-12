@@ -11,7 +11,31 @@ from ury.ury.api.minimal.setup_organization import (
 )
 
 
-class TestUrySetupStages(FrappeTestCase):
+class _DemoSiteMixin:
+	"""These tests exercise the demo path, which only a sandbox site allows."""
+
+	def setUp(self):
+		super().setUp()
+		self._had_demo = frappe.conf.get("allow_ury_demo")
+		frappe.conf.allow_ury_demo = 1
+
+	def tearDown(self):
+		frappe.conf.allow_ury_demo = self._had_demo
+		super().tearDown()
+
+
+class TestProductionNeverLoadsDemo(FrappeTestCase):
+	def test_a_demo_request_is_ignored_on_a_production_site(self):
+		had = frappe.conf.get("allow_ury_demo")
+		frappe.conf.allow_ury_demo = 0
+		try:
+			self.assertEqual(get_setup_stages({"setup_ury_demo": 1, "company_name": "Cafe"}), [])
+			self.assertEqual(_normalize_setup_payload({"setup_ury_demo": True})["setup_ury_demo"], 0)
+		finally:
+			frappe.conf.allow_ury_demo = had
+
+
+class TestUrySetupStages(_DemoSiteMixin, FrappeTestCase):
 	def test_empty_without_demo_flag(self):
 		self.assertEqual(get_setup_stages(None), [])
 		self.assertEqual(get_setup_stages({}), [])
@@ -30,7 +54,7 @@ class TestUrySetupStages(FrappeTestCase):
 		self.assertEqual(len(get_setup_stages({"setup_ury_demo": True})), 3)
 
 
-class TestNormalizeSetupPayload(FrappeTestCase):
+class TestNormalizeSetupPayload(_DemoSiteMixin, FrappeTestCase):
 	def test_forwards_ury_demo_and_omits_erpnext_demo(self):
 		payload = _normalize_setup_payload(
 			{
@@ -49,7 +73,7 @@ class TestNormalizeSetupPayload(FrappeTestCase):
 		self.assertEqual(payload["setup_ury_demo"], 0)
 
 
-class TestGetSetupProgressSteps(FrappeTestCase):
+class TestGetSetupProgressSteps(_DemoSiteMixin, FrappeTestCase):
 	@patch("frappe.desk.page.setup_wizard.setup_wizard.get_setup_stages")
 	def test_includes_erpnext_then_ury_when_demo_on(self, mock_stages):
 		mock_stages.return_value = [
@@ -76,7 +100,7 @@ class TestGetSetupProgressSteps(FrappeTestCase):
 		self.assertEqual(mock_stages.call_args.args[0].setup_ury_demo, 1)
 
 
-class TestSubmitSetupPayload(FrappeTestCase):
+class TestSubmitSetupPayload(_DemoSiteMixin, FrappeTestCase):
 	@patch("ury.ury.api.minimal.setup_organization.setup_complete", return_value={"status": "ok"})
 	@patch("ury.ury.api.minimal.setup_organization.frappe.db.get_single_value", return_value=0)
 	def test_submit_setup_passes_ury_demo_not_erpnext_demo(self, _mock_settings, mock_complete):
