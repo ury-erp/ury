@@ -34,13 +34,13 @@
   },
   {
    "fieldname": "quantity",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Quantity"
   },
   {
    "fieldname": "cancelled_qty",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_preview": 1,
    "label": "Cancelled Qty",
    "read_only": 1
