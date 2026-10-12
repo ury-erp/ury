@@ -719,24 +719,33 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
+            {/* Sticky Bottom Section: Print | Split | Settle | Total */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
-              <div className="flex items-center gap-3 w-full">
-                {/* Print Icon Button */}
+              <div className="flex flex-wrap items-center gap-3 w-full">
+                {/* Print Bill / Receipt Button */}
                 <Button
                   variant="outline"
-                  size="icon"
-                  className="flex-shrink-0"
+                  className="min-h-11 shrink-0 gap-2"
                   onClick={handlePrintOrder}
-                  aria-label="Print"
                   disabled={isPrinting}
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
+                  {t(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled'
+                    ? 'order.print_bill' : 'order.print_receipt')}
                 </Button>
+                {isOrderEditable(selectedOrder.status) && canSplitBill && (
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={() => setShowSplitDialog(true)}
+                  >
+                    {t('bill_split.split_bill')}
+                  </Button>
+                )}
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
                 {isOrderEditable(selectedOrder.status) && (
                   <Button
-                    className="flex-1"
+                    className="min-h-11 flex-1"
                     onClick={() => {
                       if (String(selectedOrder.invoice_printed) === '0') {
                         showToast.error(t('errors.please_print_first'));
@@ -745,7 +754,7 @@ export default function Orders() {
                       setShowPaymentDialog(true);
                     }}
                   >
-                    {t('order.payment')}
+                    {t('order.settle_bill')}
                   </Button>
                 )}
                 {/* Total */}
