@@ -71,7 +71,7 @@ def confirm_cancel_kot(name):
     frappe.db.set_value("URY KOT", name, "verified_by", frappe.session.user)
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_site_name():
     return {"site_name": frappe.local.site}
 
