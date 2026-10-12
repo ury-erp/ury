@@ -46,5 +46,21 @@
   "property_type": "Check",
   "row_name": null,
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Stock Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "is_system_generated": 0,
+  "modified": "2026-10-12 15:49:38.032440",
+  "module": "URY",
+  "name": "Stock Entry-main-field_order",
+  "property": "field_order",
+  "property_type": "Data",
+  "row_name": null,
+  "value": "[\"stock_entry_details_tab\", \"naming_series\", \"company\", \"branch\", \"stock_entry_type\", \"purpose\", \"col2\", \"inspection_required\", \"set_posting_time\", \"posting_date\", \"posting_time\", \"reference_section\", \"add_to_transit\", \"apply_putaway_rule\", \"column_break_jabv\", \"work_order\", \"subcontracting_order\", \"outgoing_stock_entry\", \"source_stock_entry\", \"bom_info_section\", \"from_bom\", \"use_multi_level_bom\", \"bom_no\", \"cb1\", \"fg_completed_qty\", \"get_items\", \"section_break_7qsm\", \"process_loss_percentage\", \"column_break_e92r\", \"process_loss_qty\", \"section_break_jwgn\", \"from_warehouse\", \"source_warehouse_address\", \"source_address_display\", \"cb0\", \"to_warehouse\", \"target_warehouse_address\", \"target_address_display\", \"sb0\", \"scan_barcode\", \"last_scanned_warehouse\", \"items_section\", \"items\", \"get_stock_and_rate\", \"section_break_19\", \"total_outgoing_value\", \"column_break_22\", \"total_incoming_value\", \"value_difference\", \"additional_costs_section\", \"additional_costs\", \"total_additional_costs\", \"supplier_info_tab\", \"contact_section\", \"supplier\", \"supplier_name\", \"supplier_address\", \"address_display\", \"accounting_dimensions_section\", \"project\", \"dimension_col_break\", \"cost_center\", \"other_info_tab\", \"printing_settings\", \"select_print_heading\", \"print_settings_col_break\", \"letter_head\", \"reference_details_section\", \"delivery_note_no\", \"sales_invoice_no\", \"job_card\", \"pick_list\", \"column_break_qpvo\", \"asset_repair\", \"purchase_receipt_no\", \"purchase_order\", \"subcontracting_inward_order\", \"is_additional_transfer_entry\", \"more_info\", \"is_opening\", \"remarks\", \"custom_ury_posting_intent\", \"custom_ury_batch_request\", \"col5\", \"per_transferred\", \"total_amount\", \"amended_from\", \"credit_note\", \"is_return\", \"tab_connections\"]"
  }
 ]

@@ -694,6 +694,7 @@ fixtures = [
                     "POS Closing Entry Detail-closing_amount-label",
                     "POS Invoice Item-qty-allow_on_submit",
                     "POS Invoice-items-allow_on_submit",
+                    "Stock Entry-main-field_order",
                 }
             ]
         ],

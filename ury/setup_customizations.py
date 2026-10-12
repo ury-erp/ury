@@ -503,6 +503,13 @@ def get_custom_fields():
 		],
 		"Stock Entry": [
 			{
+				"fieldname": "branch",
+				"fieldtype": "Link",
+				"label": "Branch",
+				"options": "Branch",
+				"insert_after": "company",
+			},
+			{
 				"fieldname": "custom_ury_posting_intent",
 				"fieldtype": "Data",
 				"label": "URY Posting Intent",
