@@ -18,8 +18,8 @@ export interface PosProfileLimited {
   paid_limit: number;
   disable_rounded_total: number;
   enable_discount: number;
-  multiple_cashier: number;
-  owner: string;
+  multiple_cashier?: number;
+  owner?: string;
   edit_order_type?: number;
 }
 
@@ -121,7 +121,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,
-    owner: limitedProfile.owner,
+    owner: limitedProfile.owner || fullProfile.owner,
     waiter: limitedProfile.waiter,
     cashier: limitedProfile.cashier,
     print_format: limitedProfile.print_format,
@@ -133,7 +133,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     paid_limit: limitedProfile.paid_limit,
     disable_rounded_total: limitedProfile.disable_rounded_total,
     enable_discount: limitedProfile.enable_discount,
-    multiple_cashier: limitedProfile.multiple_cashier,
+    multiple_cashier: limitedProfile.multiple_cashier || 0,
     edit_order_type: limitedProfile.edit_order_type,
   };
 

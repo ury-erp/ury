@@ -3,7 +3,7 @@
         "doctype": "POS Profile",
         "__newname": "Demo Profile",
         "company": "__COMPANY__",
-        "restaurant": "Demo Restaurant",
+
         "branch": "Demo Branch",
         "show_image": "1",
         "custom_kot_naming_series": "KOT-UD-",

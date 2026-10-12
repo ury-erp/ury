@@ -1,6 +1,6 @@
 import json
 import frappe
-from ury.ury_pos.api import getBranch
+from ury.ury_pos.api import getBranch, getPosProfile, _resolve_pos_profile
 from frappe.utils import get_datetime
 from frappe import _
 
@@ -108,15 +108,16 @@ def build_dashboard_summary(kot_list):
 def kot_list():
     today = frappe.utils.now()
     branch = getBranch()
+    pos_profile = _resolve_pos_profile(frappe.session.user, branch)
     kot_alert_time = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_warning_time"
+        "POS Profile", pos_profile, "custom_kot_warning_time"
     )
     daily_order_number = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_reset_order_number_daily"
+        "Branch", branch, "custom_reset_order_number_daily"
     )
     three_hours_ago = frappe.utils.add_to_date(today, hours=-3)
     audio_alert = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_alert"
+        "POS Profile", pos_profile, "custom_kot_alert"
     )
     kotList = frappe.get_list(
         "URY KOT",
@@ -175,15 +176,16 @@ def kot_list():
 def served_kot_list():
     today = frappe.utils.now()
     branch = getBranch()
+    pos_profile = _resolve_pos_profile(frappe.session.user, branch)
     kot_alert_time = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_warning_time"
+        "POS Profile", pos_profile, "custom_kot_warning_time"
     )
     daily_order_number = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_reset_order_number_daily"
+        "Branch", branch, "custom_reset_order_number_daily"
     )
     three_hours_ago = frappe.utils.add_to_date(today, hours=-3)
     audio_alert = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_alert"
+        "POS Profile", pos_profile, "custom_kot_alert"
     )
     kotList = frappe.get_list(
         "URY KOT",

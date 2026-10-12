@@ -1,73 +1,33 @@
 import frappe
 
-def before_save(doc, method):
-    sub_pos_close_check(doc, method)
+def on_submit(doc, method=None):
+    pos_profile = doc.get("pos_profile")
+    branch = doc.get("branch") or (frappe.db.get_value("POS Profile", pos_profile, "branch") if pos_profile else None)
+    if not branch:
+        return
+        
+    # Check if reset option is enabled on Branch
+    reset_enabled = frappe.db.get_value("Branch", branch, "custom_reset_order_number_daily")
+    if not reset_enabled:
+        return
 
-def validate(doc, method):
-    calculate_closing_amount(doc, method)
-    validate_cashier(doc, method)
+    # Check if there are any remaining open POS Opening Entries for this branch
+    filters = {
+        "branch": branch,
+        "status": "Open",
+        "docstatus": 1,
+    }
+    pos_opening_entry = doc.get("pos_opening_entry")
+    if pos_opening_entry:
+        filters["name"] = ["!=", pos_opening_entry]
 
-
-def sub_pos_close_check(doc,method):
-    cashier = None
-    multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
-    if multiple_cashier:
-        get_cashier = frappe.get_doc("POS Profile", doc.pos_profile)
-        for user_details in get_cashier.applicable_for_users:
-            if not user_details.custom_main_cashier:
-                cashier = user_details.user
-        if frappe.session.user != cashier:
-            branch=frappe.db.get_value("POS Profile",doc.pos_profile,"branch")
-            pos_opening_list = frappe.get_all(
-                "POS Opening Entry",
-                fields=["name", "docstatus", "status", "posting_date"],
-                filters={"branch": branch,"user":cashier},
-            )
-            flag = 0
-            for pos_opening in pos_opening_list:
-                if pos_opening.status == "Open" and pos_opening.docstatus == 1:
-                    flag = 1
-            if flag == 1:
-                frappe.throw(("Sub Cashier POS  must be closed"), title=("Sub Cashier POS Closing Required"))
-                
-            return flag
-    else:
-        pass
-
-def calculate_closing_amount(doc, method):
-    multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
-    if multiple_cashier:  
-        sub_pos_closing = frappe.get_all(
-            "Sub POS Closing",
-            filters=[
-                ["posting_date", "<=", doc.posting_date],
-                ["period_start_date", ">=", doc.period_start_date],
-                ["docstatus", "=", 1]
-            ],
-            fields=["name"] 
-        )
-        if sub_pos_closing:
-            for closing_details in doc.payment_reconciliation:
-                sub_closing_amount = frappe.db.get_value("Sub POS Closing Payment",{"parent":sub_pos_closing[0].name,"mode_of_payment":closing_details.mode_of_payment},"closing_amount") or 0
-                main_closing_amount = closing_details.custom_closing_amount or 0
-                total_closing_amount = sub_closing_amount + main_closing_amount
-                closing_details.closing_amount = total_closing_amount
-                closing_details.difference = total_closing_amount - closing_details.expected_amount
-        else:
-            frappe.throw("No Sub POS Closing entries found between the given dates")
-            return None
-    else:
-        pass
-def validate_cashier(doc, method):
-    cashier = None
-    multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
-    if multiple_cashier:
-        get_cashier = frappe.get_doc("POS Profile", doc.pos_profile)
-        for user_details in get_cashier.applicable_for_users:
-            if not user_details.custom_main_cashier:
-                cashier = user_details.user
-        if frappe.session.user == cashier:
-            frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
-    else:
-        pass
+    open_entries = frappe.db.count("POS Opening Entry", filters=filters)
     
+    if open_entries == 0:
+        # Reset counters on branch when all POS sessions are closed
+        frappe.db.sql("""
+            UPDATE `tabBranch`
+            SET custom_order_counter = 0,
+                custom_aggregator_order_counter = 0
+            WHERE name = %s
+        """, (branch,))

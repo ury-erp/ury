@@ -18,6 +18,7 @@
    "options": "User"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use POS Profile for room assignment.",
    "fieldname": "room",
    "fieldtype": "Link",
    "label": "Room",
