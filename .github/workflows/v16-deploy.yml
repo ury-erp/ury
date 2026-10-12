@@ -27,7 +27,7 @@ jobs:
       - name: Deploy
         env:
           SSH_HOST: ${{ secrets.URY_DEPLOY_HOST }}
-          SSH_USER: ${{ secrets.URY_DEPLOY_USER }}
+          SSH_USER: ${{ secrets.URY_DEPLOY_USER_V }}
           SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
         run: |
           ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
