@@ -216,6 +216,12 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   // this success -- not off validatePOSClose() -- so it renders in place of
   // the closing form until the cashier clears it.
   const [showClosingChecklist, setShowClosingChecklist] = useState(false);
+  // True when the Closing checklist gate fired BEFORE the close submission.
+  // The grillax validations reject POS Closing Entry creation while
+  // role-based Closing goals are pending, so in this mode completing the
+  // checklist must resume the close submission (and the post-close skip
+  // hatch must not render -- the checklist is not optional here).
+  const [preCloseGate, setPreCloseGate] = useState(false);
   // Modes the cashier has explicitly entered a closing amount for (Fix 2:
   // a blank input must not silently count as "reviewed and zero").
   const [touchedModes, setTouchedModes] = useState<Set<string>>(new Set());
@@ -330,6 +336,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       // here since the user is walking away from this attempt.
       setPendingCloseDoc(null);
       setShowConfirm(false);
+      setPreCloseGate(false);
     }
     onOpenChange(next);
   };
@@ -375,6 +382,27 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
 
   const handleConfirmSubmit = async () => {
     if (!openingEntry || !posProfile || !user) return;
+
+    // Gate on the Closing checklist BEFORE creating the closing doc: the
+    // role-based Dependent Checklist validations (grillax port) throw on
+    // POS Closing Entry creation while pending goals have no Quality
+    // Review, so collecting the checklist first is the only UI path that
+    // lets the cashier actually clear the block.
+    if (posProfile.name) {
+      try {
+        const { logStatus } = await getChecklist(posProfile.name, 'Closing');
+        if (logStatus !== 'Complete') {
+          setPreCloseGate(true);
+          setShowClosingChecklist(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to check closing checklist status:', error);
+        setPreCloseGate(true);
+        setShowClosingChecklist(true);
+        return;
+      }
+    }
 
     setShowConfirm(false);
     setIsSubmitting(true);
@@ -477,6 +505,14 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     onOpenChange(false);
   };
 
+  // Pre-close gate: the close submission hasn't fired yet, so finishing the
+  // checklist resumes it instead of dismissing the dialog.
+  const handlePreCloseChecklistComplete = () => {
+    setShowClosingChecklist(false);
+    setPreCloseGate(false);
+    void handleConfirmSubmit();
+  };
+
   // Fix 5: the underlying POS Closing doc is already submitted by the time
   // the checklist gate renders -- completing the checklist itself is just
   // post-close housekeeping, so give the cashier a way out instead of
@@ -495,23 +531,29 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         <ChecklistGateDialog
           posProfile={posProfile.name}
           checklistType="Closing"
-          onComplete={handleClosingChecklistComplete}
+          onComplete={
+            preCloseGate ? handlePreCloseChecklistComplete : handleClosingChecklistComplete
+          }
         />
         {/*
           Fix 5: the POS Closing doc is already submitted at this point --
           ChecklistGateDialog is otherwise a non-dismissible full-screen
           overlay (z-50) with no way out except finishing every mandatory
           item. Render an escape hatch above it so the cashier isn't
-          stranded if they can't complete the checklist right now.
+          stranded if they can't complete the checklist right now. Not
+          rendered for the pre-close gate: there the checklist is the
+          hard precondition for creating the closing doc at all.
         */}
-        <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
-          <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-border bg-white px-4 py-3 shadow-xl">
-            <p className="text-sm text-gray-700">{t('pos_closing.checklist_skip_hint')}</p>
-            <Button variant="outline" size="sm" onClick={handleSkipClosingChecklist}>
-              {t('pos_closing.checklist_skip')}
-            </Button>
+        {!preCloseGate && (
+          <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+            <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-border bg-white px-4 py-3 shadow-xl">
+              <p className="text-sm text-gray-700">{t('pos_closing.checklist_skip_hint')}</p>
+              <Button variant="outline" size="sm" onClick={handleSkipClosingChecklist}>
+                {t('pos_closing.checklist_skip')}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </>
     );
   }

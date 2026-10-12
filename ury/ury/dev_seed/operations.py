@@ -48,6 +48,8 @@ look like anything a real branch onboarding would create:
 
 import frappe
 
+from ury.ury.services.currency import get_default_currency
+
 
 # ---------------------------------------------------------------------------
 # Production departments / units
@@ -527,6 +529,7 @@ def _ensure_aggregators(branch_name):
 		return []
 
 	existing_customers = {row.customer for row in branch_doc.custom_aggregator_settings}
+	currency = get_default_currency(_get_company(branch_name))
 
 	created = []
 	for name in AGGREGATORS:
@@ -544,7 +547,7 @@ def _ensure_aggregators(branch_name):
 
 		if not frappe.db.exists("Price List", name):
 			frappe.get_doc(
-				{"doctype": "Price List", "price_list_name": name, "selling": 1, "currency": "INR"}
+				{"doctype": "Price List", "price_list_name": name, "selling": 1, "currency": currency}
 			).insert(ignore_permissions=True)
 			print(f"Created Price List: {name}")
 

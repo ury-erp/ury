@@ -330,7 +330,7 @@ frappe.ui.form.on('URY Order', {
 	            <div class="col-lg-2 col-md-3 col-6 mr-0">
                     <div class="border border-light mb-4 mh-100 rounded text-center" id=${index} style="box-shadow: 0 0px 3px 0 rgba(0, 0, 0, 0.2);">
                         <div class="mt-3" style="padding: 0 13px;text-overflow: ellipsis;overflow:hidden;white-space:nowrap;width: 160px;">${menu_item_list.item_name}</div>
-                        <div> ₹ ${menu_item_list.rate_of_item}</div>
+                        <div> ${format_currency(menu_item_list.rate_of_item, frappe.boot.sysdefaults.currency)}</div>
                         <div class="d-none">${menu_item_list.special_dish_menu}</div>
                         <div class="d-flex " style="margin-bottom:10%;margin-top:10%;margin-left:8%;margin-right:8%;">
                             <div class="input-group">

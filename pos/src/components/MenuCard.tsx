@@ -2,10 +2,11 @@ import { FC, useEffect, useState } from 'react';
 import { MenuItemCard } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import {
-  getAvailabilityMessage,
+  getAvailabilityTranslationKey,
   getItemAvailability,
   ItemAvailability,
 } from '../lib/availability-api';
+import { t } from '../i18n';
 
 interface MenuCardProps {
   id: string;
@@ -65,7 +66,7 @@ const MenuCard: FC<MenuCardProps> = ({
     (!availability.sellable ||
       (availability.available_qty != null && availability.available_qty <= 0));
   const unavailableMessage = isUnavailable
-    ? getAvailabilityMessage(availability?.reason_code)
+    ? t(getAvailabilityTranslationKey(availability?.reason_code))
     : null;
 
   // Determine badge variant and text for availability status
@@ -82,7 +83,7 @@ const MenuCard: FC<MenuCardProps> = ({
     ) {
       return {
         variant: 'tagDestructive',
-        text: unavailableMessage || 'Unavailable',
+        text: unavailableMessage || t('availability.unavailable'),
         showDot: false,
       };
     }
@@ -90,18 +91,18 @@ const MenuCard: FC<MenuCardProps> = ({
     if (availability.available_qty != null && availability.available_qty < 5) {
       return {
         variant: 'tagWarning',
-        text: `${availability.available_qty} left`,
+        text: t('availability.left', { count: availability.available_qty }),
         showDot: false,
       };
     }
 
     if (availability.available_qty == null) {
-      return { variant: 'tagSuccess', text: 'Available', showDot: true };
+      return { variant: 'tagSuccess', text: t('availability.available'), showDot: true };
     }
 
     return {
       variant: 'tagSuccess',
-      text: `${availability.available_qty} left`,
+      text: t('availability.left', { count: availability.available_qty }),
       showDot: true,
     };
   };

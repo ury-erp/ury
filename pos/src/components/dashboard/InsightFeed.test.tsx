@@ -3,6 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import InsightFeed from "./InsightFeed";
 
+vi.mock("../../i18n", () => ({
+  t: (key: string) => ({
+    "dashboard.act_now": "Act now",
+    "dashboard.failed_load_insights": "Failed to load insights",
+    "dashboard.nothing_needs_attention": "Nothing needs attention right now.",
+    "dashboard.dismiss": "Dismiss",
+    "common.loading": "Loading...",
+  }[key] ?? key),
+}));
+
 vi.mock("./isPermissionError", () => ({
   isPermissionError: (error: any) => {
     return error?.status === 403 || error?.httpStatus === 403;

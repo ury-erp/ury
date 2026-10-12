@@ -36,8 +36,48 @@
     "switch_to_desk": "Desk-ке өту",
     "language": "Тіл"
   },
+  "dashboard": {
+    "live_floor_status": "Осы ауысымдағы залдың ағымдағы күйі",
+    "live": "Нақты уақытта",
+    "act_now": "Әрекет қажет",
+    "insights_worth_attention_one": "Назар аударуды қажет етеді: {{count}}",
+    "insights_worth_attention_other": "Назар аударуды қажет етеді: {{count}}",
+    "failed_load_insights": "Ұсыныстарды жүктеу мүмкін болмады",
+    "nothing_needs_attention": "Қазір назар аударуды қажет ететін ештеңе жоқ.",
+    "dismiss": "Жасыру",
+    "tables_tracked": "Бақыланатын үстелдер: {{count}}",
+    "open_sessions": "Ашық ауысымдар",
+    "open_sessions_count": "Ашық: {{count}}",
+    "failed_load_open_sessions": "Ашық ауысымдарды жүктеу мүмкін болмады",
+    "no_sessions_left_open": "Жабылмаған ауысымдар жоқ.",
+    "no_open_pos_sessions": "Ашық POS ауысымдары жоқ",
+    "view_all": "Барлығын көру",
+    "more": "Тағы: {{count}}",
+    "shift_brief": "Ауысымның қысқаша есебі",
+    "shift_brief_placeholder": "ЖИ жасаған ауысым қорытындылары әлі қосылмаған. Интеграциядан кейін мұнда HUF-тың ауысым туралы байқаулары көрсетіледі.",
+    "user": "Пайдаланушы",
+    "period_start_date": "Кезеңнің басталу күні",
+    "pos_profile": "POS профилі",
+    "minutes_ago": "{{count}} мин бұрын",
+    "hours_minutes_ago": "{{hours}} сағ {{minutes}} мин бұрын",
+    "attention": {
+      "pending_payment": "15 минуттан астам төлем күтіп тұрған тапсырыстар: {{count}}",
+      "table_occupied_long": "60 минуттан астам бос емес үстелдер: {{count}}",
+      "kot_errors": "Соңғы сағаттағы KOT жасау қателері: {{count}}",
+      "unclosed_pos_session": "Алдыңғы күннен жабылмай қалған POS ауысымдары: {{count}}"
+    }
+  },
   "menu": {
     "special_items": "Арнайы позициялар"
+  },
+  "availability": {
+    "available": "Қолжетімді",
+    "unavailable": "Қолжетімсіз",
+    "not_available_today": "Бүгін қолжетімсіз",
+    "sold_out": "Сатылып кетті",
+    "temporarily_unavailable": "Уақытша қолжетімсіз",
+    "currently_unavailable": "Қазір қолжетімсіз",
+    "left": "Қалды: {{count}}"
   },
   "pos_sidebar": {
     "categories": "Санаттар",
@@ -458,7 +498,7 @@
     "error_loading": "Ашу деректерін жүктеу сәтсіз аяқталды. Қайталап көріңіз.",
     "error_opening": "POS сессиясын ашу сәтсіз аяқталды. Қайталап көріңіз.",
     "opening_balance_help": "Ашылу балансы - ауысым басында жариялайтын бастапқы қолма-қол не төлем сомасы. Ауысым жабылғанда ол сатылыммен салыстыру үшін қолданылады.",
-    "zero_balance_warning": "Сіз барлық төлем әдісі бойынша 0 теңгемен ашып жатырсыз. Жалғастыру үшін \"Растап ашу\" түймесін қайта басыңыз.",
+    "zero_balance_warning": "Сіз барлық төлем әдісі бойынша нөлдік баланспен ашып жатырсыз. Жалғастыру үшін \"Растап ашу\" түймесін қайта басыңыз.",
     "confirm_zero_balance": "Растап ашу",
     "session_opened_success": "POS сессиясы ашылды"
   },

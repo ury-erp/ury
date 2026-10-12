@@ -400,7 +400,7 @@
     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
     "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
     "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
-    "zero_balance_warning": "Vous ouvrez avec 0 ₹ sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+    "zero_balance_warning": "Vous ouvrez avec un solde nul sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
     "confirm_zero_balance": "Confirmer et ouvrir",
     "session_opened_success": "Session PDV ouverte"
   },
@@ -417,5 +417,12 @@
     "confirm_back": "Retour",
     "checklist_skip": "Ignorer pour l'instant",
     "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
+  },
+  "checklist": {
+    "pass": "PASS",
+    "fail": "FAIL",
+    "fail_remarks_placeholder": "Expliquez l'échec (requis)",
+    "fail_remarks_required": "Des remarques sont requises pour les éléments en échec.",
+    "incomplete_error": "Chaque élément doit être marqué PASS ou FAIL avant de terminer la checklist."
   }
 }

@@ -278,6 +278,31 @@ class TestValidateHook(FrappeTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				validate(doc)
 
+	def test_allows_mto_kot_work_order_against_flagged_row(self):
+		# Carve-out: the order-triggered MTO KOT service
+		# (ury_mto_work_order_service.create_work_orders_for_kot) marks its
+		# Work Order with flags.from_mto_kot. That Work Order IS allowed to
+		# link to the MADE_TO_ORDER row's flagged Production Plan Item --
+		# the flag forbids BATCH Work Orders, not the actual order-triggered
+		# one, which must remain traceable to the plan (CBTEST /
+		# MFG-PP-2026-00031 issue).
+		doc = _work_order(
+			production_plan=None, production_plan_item="PPI-1", production_item="CBTEST",
+		)
+		doc.flags.from_mto_kot = True
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=1):
+			validate(doc)  # must not raise
+
+	def test_refusal_still_fires_when_flag_is_falsy(self):
+		# A from_mto_kot value of 0/None must not weaken the refusal.
+		doc = _work_order(
+			production_plan=None, production_plan_item="PPI-1", production_item="CBTEST",
+		)
+		doc.flags.from_mto_kot = 0
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=1):
+			with self.assertRaises(frappe.ValidationError):
+				validate(doc)
+
 	def test_does_not_refuse_a_work_order_with_no_flag_set(self):
 		doc = _work_order(production_plan=None, production_plan_item="PPI-1", wip_warehouse="Some WIP - WH")
 		with patch(f"{MODULE}.frappe.db.get_value", return_value=0):
@@ -369,15 +394,21 @@ class TestValidateHook(FrappeTestCase):
 
 class TestDoesNotRegressExistingCallers(FrappeTestCase):
 	"""`ury_mto_work_order_service` and `ury_batch_manufacture_service` both
-	build Work Orders with `wip_warehouse = fg_warehouse = source`, and
-	neither of them sets `production_plan` at all (verified by reading both
-	modules directly). They must fall through the `is_ury_work_order`/
-	`validate` no-op branch untouched."""
+	build Work Orders with `wip_warehouse = fg_warehouse = source`, and neither
+	depends on the URY warehouse-policy reassertion in `validate`.
+	`ury_mto_work_order_service` MAY set `production_plan` when
+	`_resolve_production_plan_link` finds a usable (non-
+	`custom_ury_no_work_order`) Production Plan Item row -- since commit
+	42345ea8 -- but it deliberately stays unlinked when the only matching row
+	is a guarded MADE_TO_ORDER row, and these tests cover that unlinked shape:
+	it must fall through the `is_ury_work_order`/`validate` no-op branch
+	untouched."""
 
 	def test_mto_style_work_order_is_not_ury(self):
 		# ury_mto_work_order_service.create_work_orders_for_kot builds Work
-		# Orders with wip_warehouse=fg_warehouse=context warehouse and no
-		# production_plan link at all.
+		# Orders with wip_warehouse=fg_warehouse=context warehouse; when no
+		# usable Production Plan link exists it sets no production_plan at
+		# all (and never links a guarded custom_ury_no_work_order row).
 		doc = _work_order(production_plan=None, wip_warehouse="Kitchen - WH", fg_warehouse="Kitchen - WH")
 		self.assertFalse(is_ury_work_order(doc))
 

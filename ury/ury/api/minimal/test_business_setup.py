@@ -1,9 +1,9 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import frappe
 
-from ury.ury.api.minimal.business_setup import submit_configure_data
+from ury.ury.api.minimal.business_setup import submit_configure_data, _prepare_and_insert_item
 
 
 class TestSubmitConfigureDataGuard(unittest.TestCase):
@@ -143,6 +143,25 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
 
         self.assertEqual(result, {"status": "success", "results": {"branch": "Main"}})
         mock_rollback.assert_not_called()
+
+
+class TestPrepareAndInsertItem(unittest.TestCase):
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
+    @patch("ury.ury.api.minimal.business_setup.frappe.db.has_column", return_value=True)
+    @patch("ury.ury.api.minimal.business_setup.frappe.get_meta")
+    def test_hsn_code_is_set_when_field_exists(self, mock_get_meta, mock_has_column, mock_get_doc):
+        mock_meta = MagicMock()
+        mock_meta.has_field.return_value = True
+        mock_get_meta.return_value = mock_meta
+
+        mock_doc = MagicMock()
+        mock_get_doc.return_value = mock_doc
+
+        item_data = {"doctype": "Item", "item_code": "Dish 1"}
+        _prepare_and_insert_item(item_data)
+
+        self.assertEqual(item_data.get("gst_hsn_code"), "999512")
+        mock_doc.insert.assert_called_once_with(ignore_permissions=True)
 
 
 if __name__ == "__main__":

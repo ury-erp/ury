@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, Spinner } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
-import { t } from '../i18n';
+import { getActiveLanguage, t } from '../i18n';
 
 export default function OpenEntries() {
   const { posProfile } = usePOSStore();
@@ -24,7 +24,7 @@ export default function OpenEntries() {
         setEntries(data);
       } catch (err) {
         console.error('Error fetching open entries:', err);
-        setError('Failed to load open sessions');
+        setError(t('dashboard.failed_load_open_sessions'));
       } finally {
         setLoading(false);
       }
@@ -36,7 +36,7 @@ export default function OpenEntries() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString(getActiveLanguage(), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -51,7 +51,9 @@ export default function OpenEntries() {
   return (
     <div className="h-full overflow-y-auto p-6 bg-gray-50">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-6">Open Sessions</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-6">
+          {t('dashboard.open_sessions')}
+        </h1>
 
         <Card className="bg-white border border-border">
           <CardContent className="p-6">
@@ -65,16 +67,22 @@ export default function OpenEntries() {
               </div>
             ) : entries.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-600 text-sm">No open POS sessions</p>
+                <p className="text-gray-600 text-sm">{t('dashboard.no_open_pos_sessions')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">User</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">Period Start Date</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">POS Profile</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">
+                        {t('dashboard.user')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">
+                        {t('dashboard.period_start_date')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">
+                        {t('dashboard.pos_profile')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

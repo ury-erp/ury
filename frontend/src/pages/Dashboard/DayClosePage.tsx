@@ -9,6 +9,8 @@ import {
   PlanVsActualRow,
 } from '../../services/departmentProfitability';
 import { uryDashboardService, DailyPnlSummary, PlanStatus, CloseDayChecklist } from '../../services/dashboard';
+import { translate } from '../../i18n/translate';
+import { describeProfitabilityReason } from '../../lib/profitabilityReasons';
 
 /**
  * Day-close overview page. Ties together:
@@ -226,7 +228,7 @@ export const DayClosePage: React.FC = () => {
 
   const kpiItems: KpiItemProps[] = pnlSummary?.exists
     ? (pnlSummary.summary || []).map((field) => ({
-        label: field.label,
+        label: translate(field.label),
         value: formatCurrency(field.amount),
         hint: `${field.percent.toFixed(1)}% of sales`,
       }))
@@ -240,7 +242,7 @@ export const DayClosePage: React.FC = () => {
 
   kpiItems.push({
     label: 'Sales Plan Status',
-    value: planStatus?.status || 'Not started',
+    value: translate(planStatus?.status || 'Not started'),
     hint: planStatus?.name || undefined,
   });
 
@@ -292,7 +294,7 @@ export const DayClosePage: React.FC = () => {
           <h3 className="mb-2 text-sm font-semibold">Plan vs Actual</h3>
           {planVsActual.reason && (
             <p className="mb-2 text-xs text-warning" data-testid="close-day-plan-vs-actual-reason">
-              {planVsActual.reason}
+              {describeProfitabilityReason(planVsActual.reason)}
             </p>
           )}
           <DataTable columns={planVsActualColumns} rows={planVsActual.rows} emptyMessage="No plan-vs-actual rows for this scope." />
@@ -316,13 +318,13 @@ export const DayClosePage: React.FC = () => {
                 <li key={item.key} className="flex items-center justify-between gap-3 text-sm" data-testid={`close-day-checklist-item-${item.key}`}>
                   <span className="inline-flex items-center gap-2">
                     <StatusDot tone={item.blocking ? 'warning' : 'success'} />
-                    {item.label}
+                    {translate(item.label)}
                     {item.scope_note && (
-                      <span className="text-xs text-muted-foreground">({item.scope_note})</span>
+                      <span className="text-xs text-muted-foreground">({translate(item.scope_note)})</span>
                     )}
                   </span>
                   <span className={numericCellClass}>
-                    {item.blocking ? `${item.count} open` : 'Clear'}
+                    {item.blocking ? translate('Open: {{count}}', { count: item.count }) : translate('Clear')}
                   </span>
                 </li>
               ))}

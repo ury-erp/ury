@@ -64,6 +64,18 @@ class TestCalculateAndSetTimes(FrappeTestCase):
 		self.assertIsNotNone(doc.total_spend_time)
 		self.assertRegex(doc.total_spend_time, HHMMSS_RE)
 
+	def test_none_creation_handles_gracefully(self):
+		"""doc.creation is None must fall back to current time without raising TypeError."""
+		doc = _FakeInvoice(creation=None)
+
+		now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+		with patch(f"{MODULE}.now", return_value=now_str):
+			calculate_and_set_times(doc, "before_submit")
+
+		self.assertIsNotNone(doc.arrived_time)
+		self.assertIsNotNone(doc.total_spend_time)
+		self.assertRegex(doc.total_spend_time, HHMMSS_RE)
+
 
 class TestPrintedChargeChange(FrappeTestCase):
 	def test_revised_waiter_charge_requires_reprint(self):

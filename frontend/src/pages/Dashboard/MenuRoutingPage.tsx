@@ -8,6 +8,7 @@ import {
   ItemAvailability,
 } from '../Pos/lib/availability-api';
 import { ITEM_CHECK_LIMIT, menuAvailabilityService } from '../../services/menuAvailability';
+import { translate } from '../../i18n/translate';
 
 /**
  * Deliberately narrow: this is NOT the full "Menu & Routing" mockup page
@@ -41,7 +42,7 @@ const BLOCKING_REASON_CODES: ReadonlySet<string> = new Set<AvailabilityReasonCod
 const severityForReasonCode = (reasonCode: string): AttentionItemProps['severity'] =>
   BLOCKING_REASON_CODES.has(reasonCode) ? 'blocking' : 'warning';
 
-const reasonLabel = (reasonCode: string): string => AVAILABILITY_REASON_MESSAGES[reasonCode] ?? reasonCode;
+const reasonLabel = (reasonCode: string): string => translate(AVAILABILITY_REASON_MESSAGES[reasonCode] ?? 'Currently unavailable');
 
 interface ReasonGroup {
   reasonCode: string;
@@ -143,7 +144,7 @@ export const MenuRoutingPage: React.FC = () => {
         const hasMore = group.items.length > 8;
         return {
           severity: severityForReasonCode(group.reasonCode),
-          title: `${reasonLabel(group.reasonCode)} (${group.reasonCode})`,
+          title: reasonLabel(group.reasonCode),
           detail: (
             <div className="flex flex-wrap gap-1.5">
               {itemsToShow.map((item) => (
@@ -153,10 +154,10 @@ export const MenuRoutingPage: React.FC = () => {
                   <DeskLink doctype="Item" name={item.item_code} iconOnly />
                 </span>
               ))}
-              {hasMore && <span className="text-sm text-muted-foreground">+{group.items.length - 8} more</span>}
+              {hasMore && <span className="text-sm text-muted-foreground">{translate('{{count}} more', { count: group.items.length - 8 })}</span>}
             </div>
           ),
-          amount: `${group.items.length} item${group.items.length === 1 ? '' : 's'}`,
+          amount: translate('Items: {{count}}', { count: group.items.length }),
         };
       }),
     [reasonGroups],
@@ -192,8 +193,8 @@ export const MenuRoutingPage: React.FC = () => {
                   label: 'Items checked',
                   value: checkedItems.length,
                   hint: catalogCount > checkedItems.length + failedCount
-                    ? `of ${catalogCount} in catalog (capped at ${ITEM_CHECK_LIMIT})`
-                    : `of ${catalogCount} in catalog`,
+                    ? translate('of {{count}} in catalog (capped at {{limit}})', { count: catalogCount, limit: ITEM_CHECK_LIMIT })
+                    : translate('of {{count}} in catalog', { count: catalogCount }),
                 },
                 {
                   label: 'Sellable',
@@ -204,7 +205,7 @@ export const MenuRoutingPage: React.FC = () => {
                   label: 'Unsellable',
                   value: unsellableItems.length,
                   tone: unsellableItems.length > 0 ? 'danger' : 'default',
-                  hint: `${reasonGroups.length} reason${reasonGroups.length === 1 ? '' : 's'}`,
+                  hint: translate('Reasons: {{count}}', { count: reasonGroups.length }),
                 },
                 {
                   label: 'Check failures',
@@ -226,7 +227,7 @@ export const MenuRoutingPage: React.FC = () => {
                       {
                         severity: 'info',
                         title: 'Every checked item is sellable',
-                        detail: `All ${checkedItems.length} checked item${checkedItems.length === 1 ? '' : 's'} came back sellable at this branch right now.`,
+                        detail: translate('All checked items are sellable at this branch right now. Total: {{count}}', { count: checkedItems.length }),
                       },
                     ]
               }

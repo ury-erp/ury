@@ -13,6 +13,7 @@ import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
 import { menuAvailabilityService } from '../../services/menuAvailability';
+import { translate } from '../../i18n/translate';
 
 interface ComplianceRow {
   item: string;
@@ -25,7 +26,7 @@ interface ComplianceRow {
   attached_count: number;
 }
 
-const ALL_BRANCHES_OPTION: AutocompleteOption = { value: '', label: 'All branches' };
+const ALL_BRANCHES_OPTION: AutocompleteOption = { value: '', label: translate('All branches') };
 
 const getComplianceColor = (percent: number | null): string => {
   if (percent === null || percent === undefined) return 'text-muted-foreground';
@@ -234,8 +235,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
           Monitor compliance with yield check cadence requirements. Last 30 days of data.
         </p>
         <p className="mt-1 text-xs text-text-tertiary">
-          Items with no checks required in this window show <span className="font-medium">N/A</span>{' '}
-          rather than 100% — nothing was due, so compliance is not measurable.
+          {translate('Items with no checks required in this window show N/A rather than 100% — nothing was due, so compliance is not measurable.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -248,7 +248,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
               onSearch={searchBranches}
               options={branchOptions}
               searching={branchSearching}
-              placeholder="All branches"
+              placeholder={translate('All branches')}
               className="mt-1"
             />
           </label>

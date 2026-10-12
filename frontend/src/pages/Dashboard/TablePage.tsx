@@ -35,7 +35,7 @@ export const TablePage: React.FC = () => {
   // Branch options from Branch doctype
   const [branches, setBranches] = useState<{ name: string }[]>([]);
   // Room options from URY Room doctype
-  const [rooms, setRooms] = useState<{ name: string; room_name?: string }[]>([]);
+  const [rooms, setRooms] = useState<{ name: string }[]>([]);
 
   const [newTable, setNewTable] = useState({
     table_name: '',
@@ -58,7 +58,7 @@ export const TablePage: React.FC = () => {
 
   const fetchRooms = async () => {
     try {
-      const res = await dashboardService.getModuleRecords<{ name: string; room_name?: string }>('URY Room', activeBranchId);
+      const res = await dashboardService.getModuleRecords<{ name: string }>('URY Room', activeBranchId);
       setRooms(res || []);
     } catch {
       setRooms([]);
@@ -157,15 +157,13 @@ export const TablePage: React.FC = () => {
         }
 
         let currentName = editingTable.name;
-        const branchName = newTable.branch || activeBranchId;
-        const uniqueTableName = `${newTable.table_name} - ${branchName}`;
-        if (uniqueTableName !== editingTable.name) {
+        if (newTable.table_name !== editingTable.name) {
           await call('frappe.client.rename_doc', {
             doctype: 'URY Table',
             old_name: editingTable.name,
-            new_name: uniqueTableName,
+            new_name: newTable.table_name,
           });
-          currentName = uniqueTableName;
+          currentName = newTable.table_name;
         }
 
         await call('frappe.client.set_value', {
@@ -204,13 +202,10 @@ export const TablePage: React.FC = () => {
           return;
         }
 
-        const branchName = newTable.branch || activeBranchId;
-        const uniqueTableName = `${newTable.table_name} - ${branchName}`;
-
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Table',
-            name: uniqueTableName,
+            name: newTable.table_name,
             table_name: newTable.table_name,
             restaurant: restaurantName,
             no_of_seats: parseInt(newTable.no_of_seats),
@@ -434,7 +429,7 @@ export const TablePage: React.FC = () => {
                 onChange={(_, value) => setNewTable({ ...newTable, restaurant_room: value })}
                 options={[
                   { value: '', label: 'Select Room' },
-                  ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
+                  ...rooms.map(r => ({ value: r.name, label: r.name }))
                 ]}
               />
             </div>

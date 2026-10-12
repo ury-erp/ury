@@ -1,4 +1,6 @@
-import type { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideProps } from 'lucide-react';
+import { CurrencyIcon } from '../../components/common/CurrencyIcon';
 import {
   Sun,
   CalendarDays,
@@ -16,7 +18,6 @@ import {
   UserCog,
   ClipboardList,
   Factory,
-  IndianRupee,
   Percent,
 } from 'lucide-react';
 
@@ -25,7 +26,7 @@ export interface ReportEntry {
   label: string;
   group: string;
   path: string;
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
 }
 
 export const reportsRegistry: ReportEntry[] = [
@@ -50,7 +51,7 @@ export const reportsRegistry: ReportEntry[] = [
   { id: 'employee-item-wise-sales', label: 'Employee Item Wise Sales', group: 'Employees & Operations', path: 'employee-item-wise-sales', icon: ClipboardList },
   { id: 'completed-work-orders', label: 'Completed Work Orders', group: 'Employees & Operations', path: 'completed-work-orders', icon: Factory },
 
-  { id: 'daily-pnl', label: 'Daily P&L', group: 'Financial', path: 'daily-pnl', icon: IndianRupee },
+  { id: 'daily-pnl', label: 'Daily P&L', group: 'Financial', path: 'daily-pnl', icon: CurrencyIcon },
 ];
 
 export function groupReports(reports: ReportEntry[]): Record<string, ReportEntry[]> {

@@ -7,12 +7,12 @@ import {
   Card,
   Select,
   Button,
-  Spinner,
   numericCellClass,
 } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { yieldCheckService } from '../../services/yieldCheck';
+import { translate } from '../../i18n/translate';
 
 interface DueYieldCheckRow {
   item: string;
@@ -25,15 +25,25 @@ interface DueYieldCheckRow {
 interface LogCheckModalProps {
   isOpen: boolean;
   row: DueYieldCheckRow | null;
-  branch: string;
   onConfirm: (inputQty: number, outputQty: number) => Promise<void>;
   onCancel: () => void;
 }
 
+const translateDueReason = (reason: string): string => {
+  let match = reason.match(/^Authorized issue (.+) pending yield check$/);
+  if (match) return translate('Authorized issue {{name}} is awaiting a yield check', { name: match[1] });
+  match = reason.match(/^No yield check recorded \(interval: every (\d+) days\)$/);
+  if (match) return translate('No yield check recorded; interval is {{days}} days', { days: match[1] });
+  match = reason.match(/^(\d+) days since last check \(interval: (\d+) days\)$/);
+  if (match) return translate('{{elapsed}} days since the last check; interval is {{interval}} days', { elapsed: match[1], interval: match[2] });
+  match = reason.match(/^Sampled for check \((.+) rate\)$/);
+  if (match) return translate('Selected for a sample check ({{rate}} rate)', { rate: match[1] });
+  return translate(reason);
+};
+
 const LogCheckModal: React.FC<LogCheckModalProps> = ({
   isOpen,
   row,
-  branch,
   onConfirm,
   onCancel,
 }) => {
@@ -82,8 +92,9 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
       <Card className="w-full max-w-md p-6">
         <h2 className="mb-1 text-lg font-semibold text-foreground">Log Yield Check</h2>
         <p className="mb-4 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{row.item_name}</span>
-          {' '} - enter the quantities weighed before and after preparation.
+          {translate('{{item}} — enter the quantities weighed before and after preparation.', {
+            item: row.item_name,
+          })}
         </p>
 
         <div className="mb-4 space-y-3">
@@ -115,7 +126,7 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
 
           {inputQty && outputQty && !isNaN(parseFloat(inputQty)) && !isNaN(parseFloat(outputQty)) && parseFloat(inputQty) > 0 && (
             <p className="text-xs text-muted-foreground">
-              Actual yield:{' '}
+              {translate('Actual yield:')}{' '}
               <span className="font-medium text-foreground">
                 {((parseFloat(outputQty) / parseFloat(inputQty)) * 100).toFixed(1)}%
               </span>
@@ -130,7 +141,7 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
             Cancel
           </Button>
           <Button onClick={handleConfirm} disabled={loading} variant="default">
-            {loading ? 'Saving...' : 'Log Check'}
+            {translate(loading ? 'Saving...' : 'Log Check')}
           </Button>
         </div>
       </Card>
@@ -257,7 +268,10 @@ export const OverdueYieldChecksPage: React.FC = () => {
 
     const actualYield = ((outputQty / inputQty) * 100).toFixed(1);
     setSuccessMessage(
-      `Yield check logged for ${logModal.row.item_name}: ${actualYield}% actual yield.`
+      translate('Yield check logged for {{item}}: {{yield}}% actual yield.', {
+        item: logModal.row.item_name,
+        yield: actualYield,
+      })
     );
     setLogModal({ isOpen: false, row: null });
 
@@ -279,12 +293,12 @@ export const OverdueYieldChecksPage: React.FC = () => {
     {
       key: 'cadence',
       header: 'Cadence',
-      render: (row) => row.cadence,
+      render: (row) => translate(row.cadence),
     },
     {
       key: 'reason',
       header: 'Reason',
-      render: (row) => row.reason,
+      render: (row) => translateDueReason(row.reason),
     },
     {
       key: 'days_overdue',
@@ -316,9 +330,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
         <h1 className="text-xl font-semibold text-foreground">Overdue Yield Checks</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Items that are due for yield checks based on their configured cadence. Click{' '}
-          <span className="font-medium">Log Check</span> on any row to record a standalone
-          spot-check directly from here.
+          {translate('Items that are due for yield checks based on their configured cadence. Click Log Check on any row to record a standalone spot-check directly from here.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -368,7 +380,6 @@ export const OverdueYieldChecksPage: React.FC = () => {
       <LogCheckModal
         isOpen={logModal.isOpen}
         row={logModal.row}
-        branch={currentBranch || ''}
         onConfirm={handleConfirmLog}
         onCancel={() => setLogModal({ isOpen: false, row: null })}
       />

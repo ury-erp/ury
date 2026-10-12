@@ -355,6 +355,13 @@ class TestQzCertificate(FrappeTestCase):
 
 		self.assertIsNone(result)
 
+	def test_qz_certificate_guest_denied(self):
+		"""Test qz_certificate denies Guest user."""
+		with patch("frappe.session") as mock_session:
+			mock_session.user = "Guest"
+			with self.assertRaises(frappe.PermissionError):
+				qz_certificate()
+
 
 class TestSignaturePromise(FrappeTestCase):
 	@patch("ury.ury.api.ury_print.frappe.get_roles")

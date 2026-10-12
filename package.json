@@ -8,6 +8,7 @@
     "serve"
   ],
   "scripts": {
+    "test:localization": "node scripts/check-localization.mjs && node scripts/check-management-localization.mjs",
     "ury-pos-install": "cd urypos && yarn install --check-files",
     "ury-pos-build": "cd urypos && yarn build",
     "ury-mosaic-install": "cd mosaic && yarn install --check-files",

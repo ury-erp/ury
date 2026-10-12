@@ -11,6 +11,7 @@ import {
 } from '../../services/departmentProfitability';
 import { departmentStockService, DepartmentOption } from '../../services/departmentStock';
 import { describeProfitabilityReason } from '../../lib/profitabilityReasons';
+import { translate } from '../../i18n/translate';
 
 /**
  * Additive, unwired reporting page (V3-80): department profitability and
@@ -212,8 +213,8 @@ export const DepartmentProfitabilityPage: React.FC = () => {
   return (
     <Page data-testid="department-profitability-page">
       <PageHeader
-        title="Department Profitability"
-        description="Cost and plan-vs-actual for the selected branch and service date."
+        title={translate('Department Profitability')}
+        description={translate('Cost and plan-vs-actual for the selected branch and service date.')}
         actions={
           <>
             <Input

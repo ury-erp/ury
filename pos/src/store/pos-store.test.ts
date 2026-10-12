@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@ury/core', () => ({
+vi.mock('@ury/core', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@ury/core')>(),
   storage: { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() },
 }));
 vi.mock('../lib/menu-api', () => ({
@@ -22,6 +23,8 @@ vi.mock('../lib/payment-api', () => ({ getPaymentModes: vi.fn() }));
 import { usePOSStore, type OrderItem } from './pos-store';
 import { getRestaurantMenu } from '../lib/menu-api';
 import { getMenuCourses } from '../lib/menu-course-api';
+import { getCombinedPosProfile, getCurrencyInfo } from '../lib/pos-profile-api';
+import { getCurrencySymbol, setCurrency } from '@ury/core';
 
 const menuRow = (item: string, rate: number) => ({
   item,
@@ -29,6 +32,40 @@ const menuRow = (item: string, rate: number) => ({
   item_image: null,
   rate,
   course: 'Main',
+});
+
+describe('POS currency hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    localStorage.clear();
+    setCurrency();
+  });
+
+  it('loads the current profile despite a stale cached profile and symbol', async () => {
+    sessionStorage.setItem('posProfile', JSON.stringify({ currency: 'INR' }));
+    localStorage.setItem('currencySymbol', '₹');
+    vi.mocked(getCombinedPosProfile).mockResolvedValue({ currency: 'KZT' } as never);
+    vi.mocked(getCurrencyInfo).mockResolvedValue({ symbol: '₸' } as never);
+    await usePOSStore.getState().fetchPosProfile();
+    expect(getCombinedPosProfile).toHaveBeenCalledOnce();
+    expect(getCurrencyInfo).toHaveBeenCalledWith('KZT');
+    expect(getCurrencySymbol()).toBe('₸');
+
+    localStorage.clear();
+    sessionStorage.clear();
+    await usePOSStore.getState().fetchPosProfile();
+    expect(getCurrencySymbol()).toBe('₸');
+  });
+
+  it('replaces the previous symbol when the profile currency changes', async () => {
+    setCurrency('INR', '₹');
+    vi.mocked(getCombinedPosProfile).mockResolvedValue({ currency: 'EUR' } as never);
+    vi.mocked(getCurrencyInfo).mockResolvedValue({ symbol: '€' } as never);
+    await usePOSStore.getState().fetchPosProfile();
+    expect(getCurrencySymbol()).toBe('€');
+    expect(usePOSStore.getState().currencySymbol).toBe('€');
+  });
 });
 
 const cartLine = (id: string, price: number) =>

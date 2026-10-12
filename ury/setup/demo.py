@@ -21,6 +21,8 @@ from ury.setup.pos_demo import generate_pos_demo
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
 from frappe.utils.telemetry import capture
 
+from ury.ury.services.currency import get_default_currency
+
 demo_cache = {}
 _DEMO_INSERT_RETRIES = 3
 _IGNORABLE_INSERT_ERRORS = (
@@ -88,7 +90,7 @@ def ensure_master_records_exist():
                     "enabled": 1,
                     "buying": 1 if "Buying" in pl else 0,
                     "selling": 1 if "Selling" in pl else 0,
-                    "currency": frappe.defaults.get_global_default("currency") or "INR"
+                    "currency": get_default_currency()
                 }).insert(ignore_permissions=True)
             except frappe.DuplicateEntryError:
                 pass

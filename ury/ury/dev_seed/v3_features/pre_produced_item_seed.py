@@ -74,16 +74,27 @@ RAW_QTY_PER_BATCH_UNIT = 2
 def _ensure_raw_item():
     if frappe.db.exists("Item", RAW_ITEM):
         return
-    frappe.get_doc(
-        {
-            "doctype": "Item",
-            "item_code": RAW_ITEM,
-            "item_name": "Test Raw Material A",
-            "item_group": "All Item Groups",
-            "stock_uom": "Nos",
-            "is_stock_item": 1,
-        }
-    ).insert(ignore_permissions=True)
+    item_dict = {
+        "doctype": "Item",
+        "item_code": RAW_ITEM,
+        "item_name": "Test Raw Material A",
+        "item_group": "All Item Groups",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+    }
+    meta = frappe.get_meta("Item")
+    if meta.has_field("gst_hsn_code") or frappe.db.has_column("Item", "gst_hsn_code"):
+        item_dict["gst_hsn_code"] = "999512"
+
+    doc = frappe.get_doc(item_dict)
+    try:
+        doc.insert(ignore_permissions=True)
+    except frappe.ValidationError as e:
+        if "HSN" in str(e) or "SAC" in str(e):
+            doc.flags.ignore_mandatory = True
+            doc.insert(ignore_permissions=True)
+        else:
+            raise
     print(f"  + Created raw material item {RAW_ITEM}.")
 
 
@@ -99,17 +110,28 @@ def _ensure_fg_item():
         reference_item_group = stpud.item_group
         reference_uom = stpud.stock_uom
 
-    frappe.get_doc(
-        {
-            "doctype": "Item",
-            "item_code": FG_ITEM,
-            "item_name": "Test Pre-Produced FG",
-            "item_group": reference_item_group,
-            "stock_uom": reference_uom,
-            "is_stock_item": 1,
-            "is_sales_item": 1,
-        }
-    ).insert(ignore_permissions=True)
+    item_dict = {
+        "doctype": "Item",
+        "item_code": FG_ITEM,
+        "item_name": "Test Pre-Produced FG",
+        "item_group": reference_item_group,
+        "stock_uom": reference_uom,
+        "is_stock_item": 1,
+        "is_sales_item": 1,
+    }
+    meta = frappe.get_meta("Item")
+    if meta.has_field("gst_hsn_code") or frappe.db.has_column("Item", "gst_hsn_code"):
+        item_dict["gst_hsn_code"] = "999512"
+
+    doc = frappe.get_doc(item_dict)
+    try:
+        doc.insert(ignore_permissions=True)
+    except frappe.ValidationError as e:
+        if "HSN" in str(e) or "SAC" in str(e):
+            doc.flags.ignore_mandatory = True
+            doc.insert(ignore_permissions=True)
+        else:
+            raise
     print(f"  + Created pre-produced finished-good item {FG_ITEM}.")
 
 

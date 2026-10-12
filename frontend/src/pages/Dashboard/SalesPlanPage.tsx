@@ -5,6 +5,8 @@ import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicke
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
+import { getManagementLocale } from '../../i18n/language';
+import { translate } from '../../i18n/translate';
 import {
   addManualItemToDraft,
   BranchItemSearchResult,
@@ -256,19 +258,22 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
   // file, so the copy never drifts from what the button actually does.
   let summary: string | null = null;
   if (status) {
-    const currentLabel = isTerminalOther ? status : LIFECYCLE_STEPS[activeIndex]?.label ?? status;
+    const currentLabel = translate(isTerminalOther ? status : LIFECYCLE_STEPS[activeIndex]?.label ?? status);
     const nextAction = NEXT_ACTION[status];
-    let nextPart: string;
     if (nextAction) {
-      nextPart = ` · Next: ${nextAction.label}${nextAction.managerOnly ? ' (manager)' : ''}`;
+      summary = translate(
+        nextAction.managerOnly
+          ? 'Currently: {{status}} · Next: {{action}} (manager)'
+          : 'Currently: {{status}} · Next: {{action}}',
+        { status: currentLabel, action: translate(nextAction.label) },
+      );
     } else if (status === 'Locked for Production') {
-      nextPart = ' · This plan is locked for production.';
+      summary = translate('Currently: {{status}} · This plan is locked for production.', { status: currentLabel });
     } else if (isTerminalOther) {
-      nextPart = ' · This plan has been superseded or cancelled.';
+      summary = translate('Currently: {{status}} · This plan has been superseded or cancelled.', { status: currentLabel });
     } else {
-      nextPart = '';
+      summary = translate('Currently: {{status}}', { status: currentLabel });
     }
-    summary = `Currently: ${currentLabel}${nextPart}`;
   }
 
   const manyStepsCount = LIFECYCLE_STEPS.length > 5;
@@ -722,10 +727,19 @@ export const SalesPlanPage: React.FC = () => {
     }
   }, [planDate, todayString]);
 
-  const relativeDateLabel = dayDiffFromToday === 0 ? 'Today' : dayDiffFromToday === 1 ? 'Tomorrow' : dayDiffFromToday === -1 ? 'Yesterday' : null;
+  const relativeDateLabel = dayDiffFromToday === 0 ? translate('Today') : dayDiffFromToday === 1 ? translate('Tomorrow') : dayDiffFromToday === -1 ? translate('Yesterday') : null;
   const absoluteDateLabel = useMemo(() => {
     try {
-      return format(parseISO(planDate), 'EEE, d MMM yyyy');
+      const date = parseISO(planDate);
+      if (getManagementLocale() !== 'ru-RU') {
+        return format(date, 'EEE, d MMM yyyy');
+      }
+      return new Intl.DateTimeFormat('ru-RU', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(date);
     } catch {
       return planDate;
     }
@@ -949,7 +963,7 @@ export const SalesPlanPage: React.FC = () => {
           aria-expanded={addItemOpen}
         >
           <Plus className="h-4 w-4" />
-          <span>Add item</span>
+          <span>{translate('Add item')}</span>
         </Button>
         {addItemOpen && (
           <div className="absolute right-0 top-full z-30 mt-1 w-[380px] rounded-lg border border-border bg-card shadow-lg">
@@ -1087,7 +1101,7 @@ export const SalesPlanPage: React.FC = () => {
     <Page>
       <PageHeader
         bleed
-        title={`Sales Plan — ${dateHeading} · ${branchName}`}
+        title={translate('Sales Plan — {{date}} · {{branch}}', { date: dateHeading, branch: branchName })}
         description="We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval."
         actions={
           <>
@@ -1107,9 +1121,9 @@ export const SalesPlanPage: React.FC = () => {
                 disabled={loading || saving}
                 className="w-[130px]"
               >
-                <option value="Hard">Hard</option>
-                <option value="Soft">Soft</option>
-                <option value="Alert">Alert</option>
+                <option value="Hard">{translate('Hard')}</option>
+                <option value="Soft">{translate('Soft')}</option>
+                <option value="Alert">{translate('Alert')}</option>
               </Select>
             )}
             {isEditable && (
@@ -1188,14 +1202,17 @@ export const SalesPlanPage: React.FC = () => {
             )}
             {!planStatus && supersededPlanName && (
               <p className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-text-tertiary">
-                The previous plan for this branch and date ({supersededPlanName}) was cancelled. You're starting a new one below.
+                {translate(
+                  'The previous plan for this branch and date ({{plan}}) was cancelled. You\'re starting a new one below.',
+                  { plan: supersededPlanName },
+                )}
               </p>
             )}
           </>
         }
       >
         {isPastPlanDate && (
-          <p className="mt-1 text-xs font-medium text-warning">This date has already passed.</p>
+          <p className="mt-1 text-xs font-medium text-warning">{translate('This date has already passed.')}</p>
         )}
       </PageHeader>
 
@@ -1286,8 +1303,7 @@ export const SalesPlanPage: React.FC = () => {
         <Section>
           {isEditable && <div className="mb-3 flex justify-end">{renderAddItemControl()}</div>}
           <Card className="p-10 text-center text-sm text-text-tertiary">
-            No comparable history items found for this plan date. Items with no sales history don't show up as a
-            suggestion, but you can still add any catalog item directly using "Add item" above.
+            {translate('No comparable history items found for this plan date. Items with no sales history don\'t show up as a suggestion, but you can still add any catalog item directly using "Add item" above.')}
           </Card>
         </Section>
       ) : (
@@ -1426,15 +1442,21 @@ export const SalesPlanPage: React.FC = () => {
                   </button>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-text-tertiary">
-                      {departmentItems.length} item{departmentItems.length === 1 ? '' : 's'}
+                      {translate(departmentItems.length === 1 ? '{{count}} item' : '{{count}} items', {
+                        count: departmentItems.length,
+                      })}
                     </span>
                     {departmentIssueCount > 0 && (
                       <Badge size="tag" variant="tagWarning">
-                        {departmentIssueCount} issue{departmentIssueCount === 1 ? '' : 's'}
+                        {translate(departmentIssueCount === 1 ? '{{count}} issue' : '{{count}} issues', {
+                          count: departmentIssueCount,
+                        })}
                       </Badge>
                     )}
                     <span className="text-xs font-medium text-text-tertiary">
-                      {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
+                      {translate('{{qty}} planned', {
+                        qty: formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0)),
+                      })}
                     </span>
                   </div>
                 </div>
@@ -1442,7 +1464,7 @@ export const SalesPlanPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hair px-[14px] py-2">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-medium text-muted-foreground">
-                        Production Plan:{' '}
+                        {translate('Production Plan:')}{' '}
                         {productionState.production_plan || <span className="text-text-tertiary">Not created</span>}
                       </span>
                       {productionState.status && (
@@ -1648,7 +1670,7 @@ export const SalesPlanPage: React.FC = () => {
               </DialogHeader>
               <div className="px-6">
                 <label htmlFor="backward-action-reason" className="mb-2 block text-sm font-medium text-foreground">
-                  Reason for {currentBackwardAction.label.toLowerCase()}
+                  {translate('Reason for {{action}}', { action: translate(currentBackwardAction.label).toLowerCase() })}
                 </label>
                 <Textarea
                   id="backward-action-reason"
@@ -1703,10 +1725,9 @@ export const SalesPlanPage: React.FC = () => {
           if (!prepareConfirmDepartment) return '';
           const plan = getDepartmentProductionState(prepareConfirmDepartment)?.production_plan;
           const planSuffix = plan ? ` (${plan})` : '';
-          return (
-            `This will validate stock, transfer materials from Store, create Work Orders, and post ` +
-            `Manufacture Stock Entries for ${prepareConfirmDepartment}${planSuffix}. Submitting a Manufacture ` +
-            `Stock Entry declares that physical production is complete. Continue?`
+          return translate(
+            'This will validate stock, transfer materials from Store, create Work Orders, and post Manufacture Stock Entries for {{department}}{{plan}}. Submitting a Manufacture Stock Entry declares that physical production is complete. Continue?',
+            { department: prepareConfirmDepartment, plan: planSuffix },
           );
         })()}
         cancelLabel="Cancel"

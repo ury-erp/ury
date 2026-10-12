@@ -76,7 +76,7 @@
     "payment": "الدفع"
   },
   "payment": {
-    "success": "تم الدفع بنجاح",
+    "success": "تم الدفع بنجاح: المبلغ المستلم {{amount}}",
     "staff_policy_discount": "خصم الموظف: {{name}}",
     "policy_limit_remaining": "الحد المتبقي: {{amount}}",
     "service_charge": "خدمة النادل {{percentage}}%",
@@ -280,5 +280,14 @@
     "submitting": "جارٍ الفتح...",
     "load_failed": "فشل تحميل طرق الدفع. يرجى المحاولة مرة أخرى.",
     "submit_failed": "فشل فتح نقطة البيع. يرجى المحاولة مرة أخرى."
+  },
+  "checklist": {
+    "pass": "PASS",
+    "fail": "FAIL",
+    "fail_remarks_placeholder": "اشرح سبب الفشل (مطلوب)",
+    "fail_remarks_required": "الملاحظات مطلوبة للعناصر الفاشلة.",
+    "incomplete_error": "يجب تحديد PASS أو FAIL لكل عنصر قبل إكمال القائمة.",
+    "blocked_heading": "مطلوب: {checklist}",
+    "blocked_message": "لم يكمل {role} {checklist} بعد. يُرجى مطالبة {role} بإكماله قبل المتابعة."
   }
 }

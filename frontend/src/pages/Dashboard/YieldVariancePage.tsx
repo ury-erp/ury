@@ -14,6 +14,7 @@ import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
 import { menuAvailabilityService } from '../../services/menuAvailability';
+import { translate } from '../../i18n/translate';
 
 interface YieldVarianceRow {
   name: string;
@@ -25,7 +26,7 @@ interface YieldVarianceRow {
   checked_on: string;
 }
 
-const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: 'All items' };
+const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: translate('All items') };
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -225,7 +226,7 @@ export const YieldVariancePage: React.FC = () => {
               onSearch={searchItems}
               options={itemOptions}
               searching={itemSearching}
-              placeholder="All items"
+              placeholder={translate('All items')}
               className="mt-1"
             />
           </label>

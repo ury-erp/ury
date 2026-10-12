@@ -76,7 +76,7 @@
     "order_actions": "Действия с заказом"
   },
   "payment": {
-    "success": "Оплата прошла успешно",
+    "success": "Оплата прошла успешно: получено {{amount}}",
     "staff_policy_discount": "Скидка сотрудника: {{name}}",
     "policy_limit_remaining": "Остаток лимита: {{amount}}",
     "service_charge": "Обслуживание официанта {{percentage}}%",
@@ -100,8 +100,7 @@
     "pay_button": "Оплатить {{amount}}",
     "processing": "Обработка...",
     "short_by": "Не хватает {{amount}}",
-    "change_due": "Сдача: {{amount}}",
-    "success": "Оплата прошла успешно"
+    "change_due": "Сдача: {{amount}}"
   },
   "pos": {
     "not_opened_title": "POS не открыт",

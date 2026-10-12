@@ -1,25 +1,67 @@
-import { storage } from './storage';
 import { resolveUryLanguage } from './i18n';
 
-const DEFAULT_CURRENCY_SYMBOL = '₸';
+type CurrencyBoot = {
+  sysdefaults?: { currency?: string; number_format?: string };
+  docs?: Array<{ doctype?: string; name?: string; symbol?: string }>;
+};
 
-/** Symbol stored from the POS profile's currency; the management app never sets it, so it falls back to tenge. */
-export function getCurrencySymbol(): string {
-  return storage.getItem('currencySymbol') || DEFAULT_CURRENCY_SYMBOL;
+function getCurrencyBoot(): CurrencyBoot | undefined {
+  return typeof window === 'undefined' ? undefined :
+    (window as Window & { frappe?: { boot?: CurrencyBoot } }).frappe?.boot;
 }
 
-/** Locale used for amounts: Russian grouping ("1 250 000,5") unless the UI language is English. */
+// Only a freshly loaded profile may override server defaults. Browser storage
+// is deliberately not authoritative: it can be cleared or belong to another profile.
+let activeCurrency: { code: string; symbol?: string } | undefined;
+
+export function setCurrency(code?: string, symbol?: string): void {
+  activeCurrency = code ? { code, symbol } : undefined;
+}
+
+export function getCurrencyCode(): string {
+  return activeCurrency?.code || getCurrencyBoot()?.sysdefaults?.currency || '';
+}
+
+export function getCurrencySymbol(currency = getCurrencyCode()): string {
+  if (!currency) return '';
+  if (activeCurrency?.code === currency && activeCurrency.symbol) return activeCurrency.symbol;
+  const doc = getCurrencyBoot()?.docs?.find(
+    (item) => (item.doctype === ':Currency' || item.doctype === 'Currency') && item.name === currency,
+  );
+  if (doc?.symbol) return doc.symbol;
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0).find((part) => part.type === 'currency')?.value || currency;
+  } catch {
+    return currency;
+  }
+}
+
+/** Site grouping takes precedence; UI language supplies compact-number labels. */
 export function getAmountLocale(): string {
-  return resolveUryLanguage() === 'ru' ? 'ru-RU' : 'en-US';
+  if (getCurrencyBoot()?.sysdefaults?.number_format?.startsWith('#,##,###')) return 'en-IN';
+  try {
+    const language = resolveUryLanguage();
+    return language === 'ru' ? 'ru-RU' : language === 'kk' ? 'kk-KZ' : 'en-US';
+  } catch {
+    return 'en-US';
+  }
 }
 
-export function formatCurrency(amount: number): string {
-  const symbol = getCurrencySymbol();
-  const formattedVal =
-    typeof amount === 'number' && !isNaN(amount)
-      ? amount.toLocaleString(getAmountLocale(), { maximumFractionDigits: 2 })
-      : amount;
-  return `${symbol} ${formattedVal}`;
+function formatAmountParts(parts: Intl.NumberFormatPart[]): string {
+  const pattern = getCurrencyBoot()?.sysdefaults?.number_format;
+  const decimal = pattern?.match(/([^#]+)##$/)?.[1];
+  const group = pattern?.match(/^#([^#]+)#{2,3}/)?.[1];
+  return parts.map((part) => part.type === 'decimal' && decimal ? decimal :
+    part.type === 'group' && group ? group : part.value).join('');
+}
+
+export function formatCurrency(amount: number, currency = getCurrencyCode()): string {
+  const symbol = getCurrencySymbol(currency);
+  const formattedVal = typeof amount === 'number' && Number.isFinite(amount)
+    ? formatAmountParts(new Intl.NumberFormat(getAmountLocale(), { maximumFractionDigits: 2 }).formatToParts(amount))
+    : String(amount);
+  return symbol ? `${symbol} ${formattedVal}` : formattedVal;
 }
 
 /**
@@ -31,10 +73,10 @@ export function formatCompactCurrency(amount: number): string {
   if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
 
   const sign = amount < 0 ? '-' : '';
-  const compact = new Intl.NumberFormat(getAmountLocale(), {
+  const compact = formatAmountParts(new Intl.NumberFormat(getAmountLocale(), {
     notation: 'compact',
     maximumFractionDigits: 2,
-  }).format(Math.abs(amount));
+  }).formatToParts(Math.abs(amount)));
   return `${sign}${symbol}${compact}`;
 }
 

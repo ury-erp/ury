@@ -7,6 +7,7 @@ vi.mock('@ury/core', () => ({
   getLoggedUser: vi.fn(),
   getUserRoles: vi.fn(),
   call: vi.fn(),
+  resolveUryLanguage: () => 'en',
 }));
 
 vi.mock('../../context/BranchContext', () => ({

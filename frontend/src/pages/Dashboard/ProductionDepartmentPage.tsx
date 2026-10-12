@@ -6,6 +6,7 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { translate } from '../../i18n/translate';
 
 interface ProductionDepartmentRecord {
   name: string;
@@ -159,7 +160,11 @@ export const ProductionDepartmentPage: React.FC = () => {
       }
       fetchDepartments();
       setIsDrawerOpen(false);
-      showToast.success(`Production Department ${editingDepartment ? 'updated' : 'added'} successfully`);
+      showToast.success(translate(
+        editingDepartment
+          ? 'Production Department updated successfully'
+          : 'Production Department added successfully',
+      ));
     } catch (err: any) {
       console.error('Failed to save Production Department', err);
       let errorMessage = 'Failed to save Production Department';

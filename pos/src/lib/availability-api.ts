@@ -87,11 +87,33 @@ export const AVAILABILITY_REASON_MESSAGES: Record<string, string> = {
   CONFIGURATION_ERROR: 'Temporarily unavailable',
 };
 
+export const AVAILABILITY_REASON_TRANSLATION_KEYS: Record<string, string> = {
+  AVAILABLE: 'availability.available',
+  NOT_PRODUCED: 'availability.not_available_today',
+  PLAN_EXHAUSTED: 'availability.sold_out',
+  FG_OUT_OF_STOCK: 'availability.sold_out',
+  NO_ACTIVE_PLAN: 'availability.not_available_today',
+  BLOCKING_COMPONENT: 'availability.temporarily_unavailable',
+  MISSING_BOM: 'availability.temporarily_unavailable',
+  MISSING_PRODUCTION_UNIT: 'availability.temporarily_unavailable',
+  PRODUCTION_UNIT_DISABLED: 'availability.temporarily_unavailable',
+  MISSING_DEPARTMENT: 'availability.temporarily_unavailable',
+  DEPARTMENT_DISABLED: 'availability.temporarily_unavailable',
+  CONFIGURATION_ERROR: 'availability.temporarily_unavailable',
+};
+
 const DEFAULT_UNAVAILABLE_MESSAGE = 'Currently unavailable';
 
 export const getAvailabilityMessage = (reasonCode: string | null | undefined): string => {
   if (!reasonCode) return DEFAULT_UNAVAILABLE_MESSAGE;
   return AVAILABILITY_REASON_MESSAGES[reasonCode] ?? DEFAULT_UNAVAILABLE_MESSAGE;
+};
+
+export const getAvailabilityTranslationKey = (
+  reasonCode: string | null | undefined,
+): string => {
+  if (!reasonCode) return 'availability.currently_unavailable';
+  return AVAILABILITY_REASON_TRANSLATION_KEYS[reasonCode] ?? 'availability.currently_unavailable';
 };
 
 // --- display-only cache -----------------------------------------------

@@ -5,6 +5,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { translate } from '../../i18n/translate';
 
 interface CustomerRow {
   customer_id: string;
@@ -61,7 +62,7 @@ export function DaywiseCustomerDetails() {
 
   const exportCsv = () => {
     if (!data) return;
-    const header = 'Customer Name,Mobile,Visits,First Visit,Last Visit\n';
+    const header = `${translate('Customer Name,Mobile,Visits,First Visit,Last Visit')}\n`;
     const body = data.customers
       .map((c) => `"${c.customer_name}",${c.mobile_number ?? ''},${c.visit_count},${c.first_visit},${c.last_visit}`)
       .join('\n');

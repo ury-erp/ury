@@ -18,6 +18,7 @@ import {
 } from '@ury/ui';
 import { call, getCurrencySymbol } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { translate } from '../../i18n/translate';
 import { DepartmentActivityRow, ShiftMetrics, uryDashboardService } from '../../services/dashboard';
 import {
   departmentProfitabilityService,
@@ -50,6 +51,29 @@ const severityForItem = (severity: string): AttentionItemProps['severity'] => {
   if (normalized === 'blocking' || normalized === 'critical' || normalized === 'error') return 'blocking';
   if (normalized === 'warning' || normalized === 'warn') return 'warning';
   return 'info';
+};
+
+const attentionCount = (message: string): number => Number(message.match(/^\d+/)?.[0] ?? 0);
+
+const translateAttentionMessage = (type: string, message: string): string => {
+  const count = attentionCount(message);
+  const templates: Record<string, string> = {
+    pending_payment: 'Orders awaiting payment for more than 15 minutes: {{count}}',
+    table_occupied_long: 'Tables occupied for more than 60 minutes: {{count}}',
+    kot_errors: 'KOT generation issues in the last hour: {{count}}',
+    unclosed_pos_session: 'POS sessions left open from a previous day: {{count}}',
+  };
+  return templates[type] ? translate(templates[type], { count }) : translate(message);
+};
+
+const translateAttentionType = (type: string): string => {
+  const labels: Record<string, string> = {
+    pending_payment: 'Pending payment',
+    table_occupied_long: 'Long table occupancy',
+    kot_errors: 'KOT generation issues',
+    unclosed_pos_session: 'Unclosed POS sessions',
+  };
+  return translate(labels[type] ?? type);
 };
 
 interface DepartmentRow {
@@ -162,8 +186,8 @@ export const ServicePage: React.FC = () => {
           attention.map((item) => {
             const mapped: AttentionItemProps = {
               severity: severityForItem(item.severity),
-              title: item.message,
-              detail: item.type,
+              title: translateAttentionMessage(item.type, item.message),
+              detail: translateAttentionType(item.type),
             };
             // Only wire an inline action where a real destination exists --
             // stock/wastage issues route into the live Department Stock

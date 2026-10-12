@@ -164,6 +164,7 @@ jobs:
               ury.ury.api.test_ury_kot_validation
               ury.ury.api.test_ury_menu_course_validation
               ury.ury.api.test_ury_mto_fulfilment_service
+              ury.ury.api.test_ury_mto_work_order_service
           - shard: 2
             modules: |
               ury.ury.api.test_ury_order_reservation_service
@@ -181,6 +182,7 @@ jobs:
               ury.ury.api.test_ury_stock_service
               ury.ury.api.test_ury_waiter_print
               ury.ury.api.test_ury_wastage
+              ury.ury.api.test_ury_work_order_hooks
               ury.ury.api.test_ury_yield_variance
               ury.ury.api.test_ury_workstation_mapping
               ury.ury.controllers.test_setup_redirect

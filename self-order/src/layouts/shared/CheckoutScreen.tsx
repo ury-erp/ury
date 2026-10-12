@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { translateUryText } from '@ury/core'
 import type { CartEntry } from '../../hooks/useOrderingSession'
 import type { OrderingCapabilities, PaymentRequestResult } from '../../lib/api'
 
@@ -138,8 +139,10 @@ function CheckoutScreen({
           </div>
           {paymentRequest && !paymentRequest.payment_url && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Payment request created ({paymentRequest.amount} {paymentRequest.currency}) — a staff
-              member will assist with payment.
+              {translateUryText(
+                'Payment request created ({{amount}} {{currency}}) — a staff member will assist with payment.',
+                { amount: paymentRequest.amount, currency: paymentRequest.currency },
+              )}
             </p>
           )}
         </section>

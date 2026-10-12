@@ -25,6 +25,9 @@ type TemplateTranslation = {
   translation: string;
 };
 
+let activeRuntimeDictionary: TranslationDictionary | undefined;
+let activeRuntimeTemplates: TemplateTranslation[] = [];
+
 function normalizeLanguage(language?: string | null): UryLanguage | undefined {
   const normalized = language?.toLowerCase().split(/[-_]/)[0];
   if (normalized === 'kz') return 'kk';
@@ -176,6 +179,18 @@ function translateValue(
   return `${leadingWhitespace}${translated}${trailingWhitespace}`;
 }
 
+/** Translate app-owned copy after startDomI18n has selected the app catalog. */
+export function translateUryText(
+  value: string,
+  params?: Record<string, string | number>,
+): string {
+  const source = value.replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
+    params?.[key] === undefined ? placeholder : String(params[key]),
+  );
+  if (!activeRuntimeDictionary) return source;
+  return translateValue(source, activeRuntimeDictionary, activeRuntimeTemplates);
+}
+
 const TRANSLATABLE_ATTRIBUTES = ['placeholder', 'title', 'aria-label', 'alt'] as const;
 const IGNORED_ELEMENTS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE']);
 
@@ -193,13 +208,14 @@ export function startDomI18n(
 
   const activeLanguage = resolveUryLanguage();
   const dictionary = resolveDomDictionary(dictionaryOrCatalog, activeLanguage);
+  activeRuntimeDictionary = dictionary;
+  activeRuntimeTemplates = dictionary ? compileTemplateTranslations(dictionary) : [];
+  document.documentElement.lang = activeLanguage;
+  document.documentElement.dir = 'ltr';
   if (!dictionary) {
     return () => undefined;
   }
-
-  document.documentElement.lang = activeLanguage;
-  document.documentElement.dir = 'ltr';
-  const templates = compileTemplateTranslations(dictionary);
+  const templates = activeRuntimeTemplates;
 
   const translateElementAttributes = (element: Element) => {
     for (const attribute of TRANSLATABLE_ATTRIBUTES) {

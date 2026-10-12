@@ -16,6 +16,7 @@ import { formatCurrency } from '@ury/core';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
 import InsightFeed from '../components/dashboard/InsightFeed';
 import AskBar from '../components/chat/AskBar';
+import { getActiveLanguage, t } from '../i18n';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -50,9 +51,11 @@ function formatOpenSessionDate(dateString: string): string {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffMins = Math.floor((diffMs % 3600000) / 60000);
 
-    if (diffHours === 0) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ${diffMins}m ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (diffHours === 0) return t('dashboard.minutes_ago', { count: diffMins });
+    if (diffHours < 24) {
+      return t('dashboard.hours_minutes_ago', { hours: diffHours, minutes: diffMins });
+    }
+    return date.toLocaleDateString(getActiveLanguage(), { month: 'short', day: 'numeric' });
   } catch {
     return dateString;
   }
@@ -76,6 +79,23 @@ const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: st
 ];
 
 const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s])) as Record<StageKey, (typeof STAGES)[number]>;
+
+const ATTENTION_TRANSLATION_KEYS: Record<string, string> = {
+  pending_payment: 'dashboard.attention.pending_payment',
+  table_occupied_long: 'dashboard.attention.table_occupied_long',
+  kot_errors: 'dashboard.attention.kot_errors',
+  unclosed_pos_session: 'dashboard.attention.unclosed_pos_session',
+};
+
+function translateAttentionMessage(item: any): string {
+  const key = ATTENTION_TRANSLATION_KEYS[item.type];
+  if (!key) return item.message;
+
+  const referenceCount = Array.isArray(item.reference?.names) ? item.reference.names.length : undefined;
+  const messageCount = Number(item.message?.match(/^\d+/)?.[0]);
+  const count = referenceCount ?? (Number.isFinite(messageCount) ? messageCount : 0);
+  return t(key, { count });
+}
 
 /**
  * Every panel on this page is the same object: an icon chip, a title, optional
@@ -272,7 +292,7 @@ export default function Dashboard() {
         if (Array.isArray(attentionData) && attentionData.length > 0) {
           const processedAttention: AttentionItemProps[] = attentionData.map((item) => ({
             severity: item.severity === 'high' ? 'blocking' : 'warning',
-            title: item.message
+            title: translateAttentionMessage(item)
           }));
           setNeedsAttention(processedAttention);
         } else {
@@ -354,9 +374,9 @@ export default function Dashboard() {
         {/* Page header — states where you are and that the numbers are live. */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Shift Overview</h1>
+            <h1 className="text-xl font-semibold text-gray-900">{t('header.shift_overview')}</h1>
             <p className="mt-0.5 text-sm text-gray-500">
-              {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
+              {posProfile?.branch ? `${posProfile.branch} · ` : ''}{t('dashboard.live_floor_status')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -369,7 +389,7 @@ export default function Dashboard() {
                 <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
               </span>
-              Live
+              {t('dashboard.live')}
             </span>
           </div>
         </div>
@@ -411,7 +431,7 @@ export default function Dashboard() {
                 <span className="font-mono tabular-nums">{overCount}</span> over time
               </Badge>
             ) : serviceLine.length > 0 ? (
-              `${serviceLine.length} tables tracked`
+              t('dashboard.tables_tracked', { count: serviceLine.length })
             ) : undefined
           }
         >
@@ -628,15 +648,19 @@ export default function Dashboard() {
 
             <Panel
               icon={LogOut}
-              title="Open Sessions"
-              meta={openEntries.length > 0 ? `${openEntries.length} open` : undefined}
+              title={t('dashboard.open_sessions')}
+              meta={
+                openEntries.length > 0
+                  ? t('dashboard.open_sessions_count', { count: openEntries.length })
+                  : undefined
+              }
             >
               {openEntriesError ? (
-                <PanelState kind="error">Failed to load</PanelState>
+                <PanelState kind="error">{t('dashboard.failed_load_open_sessions')}</PanelState>
               ) : openEntriesLoading ? (
                 <PanelState kind="loading">Loading…</PanelState>
               ) : openEntries.length === 0 ? (
-                <PanelState kind="empty">No sessions left open.</PanelState>
+                <PanelState kind="empty">{t('dashboard.no_sessions_left_open')}</PanelState>
               ) : (
                 <div>
                   <div className="space-y-1.5">
@@ -653,13 +677,15 @@ export default function Dashboard() {
                     ))}
                   </div>
                   {openEntries.length > 5 && (
-                    <p className="py-2 text-center text-xs text-gray-500">+{openEntries.length - 5} more</p>
+                    <p className="py-2 text-center text-xs text-gray-500">
+                      {t('dashboard.more', { count: openEntries.length - 5 })}
+                    </p>
                   )}
                   <a
                     href="/pos/open-entries"
                     className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
                   >
-                    View all
+                    {t('dashboard.view_all')}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </a>
                 </div>
@@ -668,17 +694,14 @@ export default function Dashboard() {
 
             <Panel
               icon={Sparkles}
-              title="Shift Brief"
+              title={t('dashboard.shift_brief')}
               meta={
                 <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary ring-1 ring-primary-200">
                   HUF
                 </span>
               }
             >
-              <p className="text-sm text-gray-500">
-                AI-written shift summaries are not yet connected. This panel will show HUF's shift
-                observations once integrated.
-              </p>
+              <p className="text-sm text-gray-500">{t('dashboard.shift_brief_placeholder')}</p>
             </Panel>
 
             <Panel icon={Bell} title="Recent Notifications">

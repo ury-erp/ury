@@ -36,8 +36,48 @@
     "switch_to_desk": "Switch To Desk",
     "language": "Language"
   },
+  "dashboard": {
+    "live_floor_status": "Live floor status for the current shift",
+    "live": "Live",
+    "act_now": "Act now",
+    "insights_worth_attention_one": "{{count}} thing worth your attention",
+    "insights_worth_attention_other": "{{count}} things worth your attention",
+    "failed_load_insights": "Failed to load insights",
+    "nothing_needs_attention": "Nothing needs attention right now.",
+    "dismiss": "Dismiss",
+    "tables_tracked": "{{count}} tables tracked",
+    "open_sessions": "Open Sessions",
+    "open_sessions_count": "{{count}} open",
+    "failed_load_open_sessions": "Failed to load open sessions",
+    "no_sessions_left_open": "No sessions left open.",
+    "no_open_pos_sessions": "No open POS sessions",
+    "view_all": "View all",
+    "more": "+{{count}} more",
+    "shift_brief": "Shift Brief",
+    "shift_brief_placeholder": "AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.",
+    "user": "User",
+    "period_start_date": "Period Start Date",
+    "pos_profile": "POS Profile",
+    "minutes_ago": "{{count}}m ago",
+    "hours_minutes_ago": "{{hours}}h {{minutes}}m ago",
+    "attention": {
+      "pending_payment": "Orders pending payment for over 15 minutes: {{count}}",
+      "table_occupied_long": "Tables occupied for over 60 minutes: {{count}}",
+      "kot_errors": "KOT generation issues in the last hour: {{count}}",
+      "unclosed_pos_session": "POS sessions left open from a previous day: {{count}}"
+    }
+  },
   "menu": {
     "special_items": "Special Items"
+  },
+  "availability": {
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "not_available_today": "Not available today",
+    "sold_out": "Sold out",
+    "temporarily_unavailable": "Temporarily unavailable",
+    "currently_unavailable": "Currently unavailable",
+    "left": "{{count}} left"
   },
   "pos_sidebar": {
     "categories": "Categories",
@@ -167,7 +207,13 @@
     "submitting": "Submitting...",
     "load_failed": "Failed to load checklist",
     "submit_failed": "Failed to submit checklist",
-    "incomplete_error": "All mandatory items must be checked before this checklist can be completed."
+    "incomplete_error": "Every item must be marked PASS or FAIL before this checklist can be completed.",
+    "pass": "PASS",
+    "fail": "FAIL",
+    "fail_remarks_placeholder": "Explain the failure (required)",
+    "fail_remarks_required": "Remarks are required for failed items.",
+    "blocked_heading": "{checklist} Required",
+    "blocked_message": "{role} has not completed the {checklist} yet. Please ask the {role} to complete it before continuing."
   },
   "customer": {
     "search_placeholder": "Search customer...",
@@ -458,7 +504,7 @@
     "error_loading": "Failed to load opening data. Please try again.",
     "error_opening": "Failed to open POS session. Please try again.",
     "opening_balance_help": "Opening Balance is the starting cash/payment amount you're declaring for this shift. It's used to reconcile against sales when you close out.",
-    "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
+    "zero_balance_warning": "You're opening with a zero balance across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
     "confirm_zero_balance": "Confirm & Open",
     "session_opened_success": "POS session opened"
   },

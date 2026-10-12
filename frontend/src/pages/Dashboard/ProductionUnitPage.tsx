@@ -6,6 +6,7 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { translate } from '../../i18n/translate';
 
 interface ProductionUnitRecord {
   name: string;
@@ -275,7 +276,9 @@ export const ProductionUnitPage: React.FC = () => {
       }
       fetchUnits();
       setIsDrawerOpen(false);
-      showToast.success(`Production Unit ${editingUnit ? 'updated' : 'added'} successfully`);
+      showToast.success(translate(
+        editingUnit ? 'Production Unit updated successfully' : 'Production Unit added successfully',
+      ));
     } catch (err: any) {
       console.error('Failed to save Production Unit', err);
       let errorMessage = 'Failed to save Production Unit';

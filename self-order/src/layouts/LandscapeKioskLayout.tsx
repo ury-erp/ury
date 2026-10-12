@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { translateUryText } from '@ury/core'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
 import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
@@ -71,7 +72,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
   function handleReset() {
-    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+    if (window.confirm(translateUryText('Start a new order? Current cart will be cleared.'))) {
       resetSession()
     }
   }

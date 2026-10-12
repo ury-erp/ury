@@ -16,6 +16,7 @@ import {
   type AutocompleteOption,
 } from '@ury/ui';
 import { dashboardService } from '../../services/dashboard';
+import { translate } from '../../i18n/translate';
 import { searchLinkOptions, withSelectedOption, type LinkFilter } from '../../services/linkSearch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -241,7 +242,11 @@ export const ItemProductionConfigPage: React.FC = () => {
       }
       fetchConfigs();
       setIsDrawerOpen(false);
-      showToast.success(`Item Production Configuration ${editingConfig ? 'updated' : 'added'} successfully`);
+      showToast.success(translate(
+        editingConfig
+          ? 'Item Production Configuration updated successfully'
+          : 'Item Production Configuration added successfully',
+      ));
     } catch (err: any) {
       console.error('Failed to save Item Production Configuration', err);
       let errorMessage = 'Failed to save Item Production Configuration';

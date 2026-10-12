@@ -11,6 +11,7 @@ vi.mock('@ury/core', () => ({
 import {
   AVAILABILITY_REASON_MESSAGES,
   getAvailabilityMessage,
+  getAvailabilityTranslationKey,
   getItemAvailability,
   invalidateAvailabilityCache,
   ItemAvailability,
@@ -63,6 +64,13 @@ describe('availability-api (pos)', () => {
     }
     expect(getAvailabilityMessage('SOME_UNKNOWN_CODE')).toBe('Currently unavailable');
     expect(getAvailabilityMessage(undefined)).toBe('Currently unavailable');
+  });
+
+  it('maps availability reasons to locale keys', () => {
+    expect(getAvailabilityTranslationKey('NOT_PRODUCED')).toBe('availability.not_available_today');
+    expect(getAvailabilityTranslationKey('PLAN_EXHAUSTED')).toBe('availability.sold_out');
+    expect(getAvailabilityTranslationKey('SOME_UNKNOWN_CODE')).toBe('availability.currently_unavailable');
+    expect(getAvailabilityTranslationKey(undefined)).toBe('availability.currently_unavailable');
   });
 
   it('caches per (item_code, branch, company) key and does not leak across keys', async () => {

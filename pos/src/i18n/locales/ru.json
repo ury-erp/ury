@@ -36,8 +36,48 @@
     "switch_to_desk": "Перейти в Desk",
     "language": "Язык"
   },
+  "dashboard": {
+    "live_floor_status": "Текущее состояние зала в этой смене",
+    "live": "В реальном времени",
+    "act_now": "Требует действий",
+    "insights_worth_attention_one": "Требует внимания: {{count}}",
+    "insights_worth_attention_other": "Требуют внимания: {{count}}",
+    "failed_load_insights": "Не удалось загрузить рекомендации",
+    "nothing_needs_attention": "Сейчас ничего не требует внимания.",
+    "dismiss": "Скрыть",
+    "tables_tracked": "Отслеживается столов: {{count}}",
+    "open_sessions": "Открытые смены",
+    "open_sessions_count": "Открыто: {{count}}",
+    "failed_load_open_sessions": "Не удалось загрузить открытые смены",
+    "no_sessions_left_open": "Незакрытых смен нет.",
+    "no_open_pos_sessions": "Нет открытых POS-смен",
+    "view_all": "Посмотреть все",
+    "more": "Ещё: {{count}}",
+    "shift_brief": "Сводка по смене",
+    "shift_brief_placeholder": "Сводки смены, созданные ИИ, пока не подключены. После интеграции здесь будут отображаться наблюдения HUF по смене.",
+    "user": "Пользователь",
+    "period_start_date": "Дата начала периода",
+    "pos_profile": "Профиль POS",
+    "minutes_ago": "{{count}} мин назад",
+    "hours_minutes_ago": "{{hours}} ч {{minutes}} мин назад",
+    "attention": {
+      "pending_payment": "Ожидают оплаты более 15 минут: {{count}}",
+      "table_occupied_long": "Заняты более 60 минут столы: {{count}}",
+      "kot_errors": "Ошибок формирования KOT за последний час: {{count}}",
+      "unclosed_pos_session": "Незакрытых POS-смен с прошлого дня: {{count}}"
+    }
+  },
   "menu": {
     "special_items": "Специальные позиции"
+  },
+  "availability": {
+    "available": "Доступно",
+    "unavailable": "Недоступно",
+    "not_available_today": "Сегодня недоступно",
+    "sold_out": "Распродано",
+    "temporarily_unavailable": "Временно недоступно",
+    "currently_unavailable": "Сейчас недоступно",
+    "left": "Осталось: {{count}}"
   },
   "pos_sidebar": {
     "categories": "Категории",

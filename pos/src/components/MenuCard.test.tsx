@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ItemAvailability } from '../lib/availability-api';
 
 const getItemAvailabilityMock = vi.fn();
 
@@ -14,6 +15,18 @@ vi.mock('../lib/availability-api', async () => {
 
 vi.mock('@ury/core', () => ({
   formatCurrency: (amount: number) => `Rs. ${amount}`,
+}));
+
+vi.mock('../i18n', () => ({
+  t: (key: string, params?: Record<string, string | number>) => ({
+    'availability.available': 'Available',
+    'availability.unavailable': 'Unavailable',
+    'availability.not_available_today': 'Not available today',
+    'availability.sold_out': 'Sold out',
+    'availability.temporarily_unavailable': 'Temporarily unavailable',
+    'availability.currently_unavailable': 'Currently unavailable',
+    'availability.left': `${params?.count} left`,
+  })[key] ?? key,
 }));
 
 import MenuCard from './MenuCard';
@@ -67,5 +80,21 @@ describe('MenuCard availability gating', () => {
 
     await userEvent.click(screen.getByText('Chicken Biryani'));
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('shows the localized daily availability reason', async () => {
+    render(
+      <MenuCard
+        {...baseProps}
+        availability={{
+          item_code: 'ITEM-BIRYANI',
+          sellable: false,
+          available_qty: 0,
+          reason_code: 'NOT_PRODUCED',
+        } as ItemAvailability}
+      />,
+    );
+
+    expect(screen.getByText('Not available today')).toBeInTheDocument();
   });
 });

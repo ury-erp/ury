@@ -86,6 +86,8 @@ from datetime import timedelta
 import frappe
 from frappe.utils import add_days, flt, getdate, now_datetime, nowtime, today
 
+from ury.ury.services.currency import get_default_currency
+
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
@@ -758,7 +760,7 @@ def seed():
 		print("historical_sales.seed: no Mode of Payment found — skipping.")
 		return {"skipped": True, "reason": "no Mode of Payment"}
 
-	currency = frappe.db.get_value("Company", company_name, "default_currency") or "INR"
+	currency = get_default_currency(company_name)
 	cashiers = _ensure_min_staff("URY Cashier", MIN_STAFF_PER_ROLE, "cashier")
 	waiters = _ensure_min_staff("URY Captain", MIN_STAFF_PER_ROLE, "waiter")
 	if not cashiers:

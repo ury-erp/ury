@@ -12,7 +12,10 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_mto_work_order_service import create_work_orders_for_kot
+from ury.ury.api.ury_mto_work_order_service import (
+    _first_usable_plan_row,
+    create_work_orders_for_kot,
+)
 
 MODULE = "ury.ury.api.ury_mto_work_order_service"
 
@@ -65,6 +68,7 @@ def _new_doc_recorder():
         if isinstance(arg, dict):
             doc = frappe._dict(dict(arg))
             doc.name = f"WO-{len(created) + 1}"
+            doc.flags = frappe._dict()
             doc.insert = MagicMock()
             doc.submit = MagicMock()
             created.append(doc)
@@ -108,11 +112,59 @@ class TestCreateWorkOrdersForKot(FrappeTestCase):
         self.assertEqual(created[0]["production_item"], "ITEM-MTO")
         self.assertEqual(created[0]["bom_no"], "BOM-ITEM-MTO-001")
         self.assertEqual(created[0]["qty"], 2)
-        created[0].insert.assert_called_once()
-        created[0].submit.assert_called_once()
+        # System-generated document: created without requiring the caller's
+        # roles to hold Work Order create/submit permission.
+        created[0].insert.assert_called_once_with(ignore_permissions=True)
+        created[0].submit.assert_called_once_with()
         mock_set_value.assert_called_once_with(
             "URY KOT Items", "row-1", "custom_ury_work_order", created[0].name
         )
+
+    def test_work_order_is_linked_to_production_plan_and_flagged_from_mto_kot(self):
+        """The order-triggered Work Order must reference the day's Production
+        Plan and its item's Production Plan Item row -- even when that row is
+        a MADE_TO_ORDER row flagged custom_ury_no_work_order (batch guard) --
+        and must carry flags.from_mto_kot so ury_work_order_hooks.validate
+        allows the link (CBTEST / MFG-PP-2026-00031 issue)."""
+        rows = [_kot_item_row("row-1", "ITEM-MTO")]
+        kot = _make_kot_doc(rows=rows)
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def _get_doc(doctype_or_dict, name=None):
+            if isinstance(doctype_or_dict, dict):
+                return get_doc_side_effect(doctype_or_dict)
+            assert doctype_or_dict == "URY KOT"
+            return kot
+
+        with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=_get_doc
+        ), patch(f"{MODULE}.frappe.get_meta") as mock_get_meta, patch(
+            f"{MODULE}.resolve_production_context", return_value=_context()
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", return_value="BOM-ITEM-MTO-001"
+        ), patch(
+            f"{MODULE}.frappe.db.set_value"
+        ), patch(
+            f"{MODULE}.frappe.db.savepoint"
+        ), patch(
+            f"{MODULE}._resolve_production_plan_link", return_value=("PP-1", "PPI-FLAGGED")
+        ) as mock_resolve_link:
+            mock_get_meta.return_value.has_field.return_value = True
+            result = create_work_orders_for_kot("KOT-1")
+
+        self.assertEqual(len(result["created"]), 1)
+        self.assertEqual(result["errors"], [])
+        # The MTO KOT path must ask the resolver to permit flagged rows...
+        mock_resolve_link.assert_called_once_with(
+            "ITEM-MTO", "Branch A", "Company A", allow_no_work_order_row=True
+        )
+        # ...must link the Work Order to the plan and its item's row...
+        self.assertEqual(created[0]["production_plan"], "PP-1")
+        self.assertEqual(created[0]["production_plan_item"], "PPI-FLAGGED")
+        # ...and must mark it as order-triggered before insert so the
+        # validation hook's no_work_order refusal spares it.
+        self.assertTrue(created[0].flags.get("from_mto_kot"))
+        created[0].insert.assert_called_once_with(ignore_permissions=True)
 
     def test_pre_produced_and_direct_retail_items_are_skipped(self):
         rows = [
@@ -217,3 +269,71 @@ class TestCreateWorkOrdersForKot(FrappeTestCase):
         self.assertEqual(result["created"], [])
         self.assertEqual(len(result["errors"]), 1)
         self.assertEqual(result["errors"][0]["reason"], "KOT_NOT_FOUND")
+
+
+class TestFirstUsablePlanRow(FrappeTestCase):
+    """Selection rules for the Production Plan Item a Work Order may link to.
+
+    Unflagged rows always win. Flagged rows (``custom_ury_no_work_order`` --
+    a MADE_TO_ORDER row's own batch-guard) are returned ONLY when the caller
+    passes ``allow_no_work_order_row=True`` -- the order-triggered MTO KOT
+    path, whose Work Order carries ``flags.from_mto_kot`` and is therefore
+    allowed by ``ury_work_order_hooks.validate`` to reference the guarded
+    row. Any other caller (batch executor semantics, ERPNext-native flows)
+    keeps the strict no-flagged-rows behavior: a flagged row alone yields
+    None (CBTEST on MFG-PP-2026-00025: an un-marked Work Order linked to a
+    flagged row is refused by the hook and the per-item try/except would
+    swallow it, leaving the served order with no Work Order at all)."""
+
+    def test_flagged_mto_row_alone_returns_none(self):
+        rows = [frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1})]
+        self.assertIsNone(_first_usable_plan_row(rows))
+
+    def test_flagged_row_does_not_shadow_usable_row(self):
+        rows = [
+            frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1}),
+            frappe._dict({"pp_item_name": "PPI-USABLE", "pp_name": "PP-1", "no_work_order": 0}),
+        ]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-USABLE")
+
+    def test_usable_row_is_returned(self):
+        rows = [frappe._dict({"pp_item_name": "PPI-USABLE", "pp_name": "PP-1", "no_work_order": 0})]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-USABLE")
+
+    def test_unset_flag_counts_as_usable(self):
+        # Rows created outside the URY Sales Plan adapter have no flag at all
+        # (NULL) -- they must remain linkable.
+        rows = [frappe._dict({"pp_item_name": "PPI-PLAIN", "pp_name": "PP-1"})]
+        self.assertEqual(_first_usable_plan_row(rows)["pp_item_name"], "PPI-PLAIN")
+
+    def test_empty_and_all_flagged_return_none(self):
+        self.assertIsNone(_first_usable_plan_row([]))
+        self.assertIsNone(_first_usable_plan_row(None))
+        self.assertIsNone(
+            _first_usable_plan_row(
+                [frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1})]
+            )
+        )
+
+    def test_allow_flagged_row_when_only_match(self):
+        """MTO KOT path: an MTO item's own row IS flagged, and that flagged
+        row is the correct link target for the order-triggered Work Order."""
+        rows = [frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1})]
+        self.assertEqual(
+            _first_usable_plan_row(rows, allow_no_work_order_row=True)["pp_item_name"],
+            "PPI-FLAGGED",
+        )
+
+    def test_allow_still_prefers_unflagged_row(self):
+        rows = [
+            frappe._dict({"pp_item_name": "PPI-FLAGGED", "pp_name": "PP-1", "no_work_order": 1}),
+            frappe._dict({"pp_item_name": "PPI-USABLE", "pp_name": "PP-1", "no_work_order": 0}),
+        ]
+        self.assertEqual(
+            _first_usable_plan_row(rows, allow_no_work_order_row=True)["pp_item_name"],
+            "PPI-USABLE",
+        )
+
+    def test_allow_empty_returns_none(self):
+        self.assertIsNone(_first_usable_plan_row([], allow_no_work_order_row=True))
+        self.assertIsNone(_first_usable_plan_row(None, allow_no_work_order_row=True))

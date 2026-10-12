@@ -639,7 +639,10 @@ class URYDailyPandL(Document):
 	
 	@frappe.whitelist()
 	def get_proft_loss_details(self):
+		from ury.ury.services.currency import get_default_currency
+
+		company = frappe.db.get_value("Branch", self.branch, "company") if self.branch else None
 		return frappe.render_template(
 			"ury/doctype/ury_daily_p_and_l/profit_loss_details.html",
-			{"data": self, "currency": "INR"},
+			{"data": self, "currency": get_default_currency(company)},
 		)

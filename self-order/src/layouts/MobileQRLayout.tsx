@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { translateUryText } from '@ury/core'
 import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
@@ -75,7 +76,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
   }, [menu, selectedCategory, searchQuery])
 
   function handleStartOver() {
-    if (window.confirm('Start over? Your current cart will be cleared.')) {
+    if (window.confirm(translateUryText('Start over? Your current cart will be cleared.'))) {
       resetSession()
     }
   }
