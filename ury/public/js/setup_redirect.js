@@ -5,5 +5,11 @@
 		window.location.replace(
 			frappe.boot.ury_setup_wizard_target || "/ury/setup-wizard/0"
 		);
+		return;
+	}
+
+	if (frappe.boot && frappe.boot.ury_role_home_page) {
+		window.location.replace(frappe.boot.ury_role_home_page);
 	}
 })();
+

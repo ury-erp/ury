@@ -6,3 +6,7 @@ from frappe.model.document import Document
 
 class POSDisposableItem(Document):
 	pass
+
+
+# Backward compatibility alias for legacy references with lowercase "item"
+POSDisposableitem = POSDisposableItem
