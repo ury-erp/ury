@@ -72,6 +72,9 @@ def network_printing(
                 else:
                     frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
+                from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
+                trigger_manufacture_on_bill_print(name)
+
                 return "Success"
             finally:
                 if os.path.exists(file_path):
@@ -160,6 +163,9 @@ def qz_print_update(invoice):
                 if new_invoice_printed != 1 or new_table_status != 0:
                     return {"status": "Failure"}
         
+        from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
+        trigger_manufacture_on_bill_print(invoice)
+
         return {"status": "Success"}
         
     except Exception as e:
@@ -189,6 +195,9 @@ def print_pos_page(doctype, name, print_format):
 
         if restaurant_table:
             release_merge_cluster_tables(restaurant_table)
+
+    from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
+    trigger_manufacture_on_bill_print(name)
 
 
 @frappe.whitelist()

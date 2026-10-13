@@ -79,7 +79,17 @@ MADE_TO_ORDER = "MADE_TO_ORDER"
 MTO_LEGACY = "MTO"
 DIRECT_RETAIL = "DIRECT_RETAIL"
 READY_STATES = (READY, SERVED)
-POSTING_ROLES = {"System Manager", "Stock Manager", "Production Manager", "Chef", "URY Captain"}
+POSTING_ROLES = {
+	"System Manager",
+	"Stock Manager",
+	"Production Manager",
+	"Chef",
+	"URY Chef",
+	"URY Captain",
+	"URY Manager",
+	"URY Admin",
+	"URY Cashier",
+}
 
 
 @contextmanager
@@ -360,6 +370,12 @@ def _fg_warehouse(snapshots):
 
 def _freeze_payload(execution_doc, actor):
 	execution_state = execution_doc.get("state") or execution_doc.get("execution_state")
+	from ury.ury.api.ury_production_settings import get_manufacture_trigger_time
+
+	trigger_time = get_manufacture_trigger_time()
+	if trigger_time in ("On KOT Create", "On Bill Print") and execution_state not in READY_STATES:
+		execution_state = READY
+
 	if execution_state not in READY_STATES:
 		raise FulfilmentPostingError(
 			"EXECUTION_NOT_READY",
@@ -1103,3 +1119,91 @@ def recover_pending_posting_intents(limit=100):
 		enqueue_posting_intent(row.name)
 		queued.append(row.name)
 	return queued
+
+
+def post_intents_for_kot(kot, actor=None):
+	"""Create and enqueue/process posting intents for all MADE_TO_ORDER items on a KOT.
+	Safe to call at KOT creation or Bill Print. Idempotent.
+	"""
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+	from ury.ury.api.ury_kot_execution_service import _kot_scope
+	from ury.ury.api.ury_kot_item_execution_service import seed_kot_item_executions
+
+	kot_doc = frappe.get_doc(KOT_DOCTYPE, kot) if isinstance(kot, str) else kot
+	kot_name = kot_doc.name
+	branch = kot_doc.get("branch")
+	company = kot_doc.get("company")
+	if not branch or not company:
+		branch, company, _ = _kot_scope(kot_name)
+
+	policy = get_branch_stock_policy(branch=branch, company=company)
+	if not policy.realtime_production_posting_enabled:
+		return []
+
+	# Ensure item execution rows exist
+	item_executions = frappe.get_all(
+		ITEM_EXECUTION_DOCTYPE,
+		filters={"kot": kot_name},
+		fields=["name", "kot_item", "state"],
+	)
+	if not item_executions:
+		seed_kot_item_executions(kot_name, actor=actor)
+		item_executions = frappe.get_all(
+			ITEM_EXECUTION_DOCTYPE,
+			filters={"kot": kot_name},
+			fields=["name", "kot_item", "state"],
+		)
+
+	actor = actor or frappe.session.user
+	results = []
+	for row in item_executions:
+		doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, row["name"])
+		try:
+			intent = create_or_get_posting_intent_for_ready(doc, actor=actor)
+			results.append(intent)
+			if intent.get("name"):
+				enqueue_posting_intent(intent["name"])
+				if intent.get("status") != POSTED:
+					try:
+						process_posting_intent(intent["name"])
+					except Exception:
+						frappe.logger("ury_fulfilment_posting_service").exception(
+							f"Immediate process_posting_intent failed for {intent.get('name')}, background queue will recover"
+						)
+		except Exception as e:
+			frappe.logger("ury_fulfilment_posting_service").exception(
+				f"Failed to post intent for item execution {row['name']}: {e}"
+			)
+	return results
+
+
+def post_intents_for_pos_invoice(invoice, actor=None):
+	"""Create and process posting intents for all KOTs linked to this POS Invoice."""
+	inv_name = invoice if isinstance(invoice, str) else invoice.name
+	kots = frappe.get_all("URY KOT", filters={"invoice": inv_name, "docstatus": ["!=", 2]}, pluck="name")
+
+	merged_invoice = frappe.db.get_value("POS Invoice", inv_name, "custom_merged_pos_invoice")
+	if merged_invoice:
+		merged_kots = frappe.get_all("URY KOT", filters={"invoice": merged_invoice, "docstatus": ["!=", 2]}, pluck="name")
+		for k in merged_kots:
+			if k not in kots:
+				kots.append(k)
+
+	results = []
+	for kot_name in kots:
+		res = post_intents_for_kot(kot_name, actor=actor)
+		results.extend(res)
+	return results
+
+
+@frappe.whitelist()
+def trigger_manufacture_on_bill_print(invoice):
+	"""Called when printing a bill on POS to trigger manufacture stock entry if configured."""
+	from ury.ury.api.ury_production_settings import get_manufacture_trigger_time
+
+	if get_manufacture_trigger_time() != "On Bill Print":
+		return {"status": "skipped", "reason": "Not configured for On Bill Print"}
+
+	results = post_intents_for_pos_invoice(invoice)
+	return {"status": "success", "results": results}
+

@@ -47,3 +47,22 @@ def production_job_stale_minutes():
 	"""
 	value = frappe.db.get_single_value("URY Production Settings", "production_job_stale_minutes")
 	return int(value) if value else 30
+
+
+def get_manufacture_trigger_time():
+	"""Returns the configured manufacture trigger time:
+	'On KOT Serve' (default), 'On KOT Create', or 'On Bill Print'.
+	"""
+	try:
+		value = frappe.db.get_single_value("URY Production Settings", "manufacture_trigger_time")
+	except Exception:
+		value = None
+	if not value:
+		return "On KOT Serve"
+	normalized = str(value).strip().lower()
+	if normalized in ("on kot create", "kot create", "create"):
+		return "On KOT Create"
+	if normalized in ("on bill print", "bill print", "print"):
+		return "On Bill Print"
+	return "On KOT Serve"
+

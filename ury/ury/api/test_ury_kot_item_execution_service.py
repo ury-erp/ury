@@ -475,3 +475,30 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
 		mock_policy.assert_not_called()
 		self.assertEqual(returned, result)
+
+	def test_attach_ready_posting_intent_skipped_when_trigger_not_on_kot_serve(self):
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		fake_policy = frappe._dict({"realtime_production_posting_enabled": True})
+		with patch("ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy), patch(
+			"ury.ury.api.ury_production_settings.get_manufacture_trigger_time", return_value="On KOT Create"
+		), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.create_or_get_posting_intent_for_ready"
+		) as mock_create:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_create.assert_not_called()
+		self.assertIsNone(returned["posting_intent"])
+		self.assertEqual(returned["posting_intent_status"], "SKIPPED_TRIGGER_ON_KOT_CREATE")
+
+	def test_seed_kot_item_executions_on_submit_triggers_when_on_kot_create(self):
+		fake_doc = frappe._dict({"name": "KOT-1"})
+		with patch(f"{MODULE}.seed_kot_item_executions", return_value=[{"name": "EXEC-1"}]), patch(
+			"ury.ury.api.ury_production_settings.get_manufacture_trigger_time", return_value="On KOT Create"
+		), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.post_intents_for_kot"
+		) as mock_post:
+			seed_kot_item_executions_on_submit(fake_doc)
+		mock_post.assert_called_once_with("KOT-1")
+
+
+
