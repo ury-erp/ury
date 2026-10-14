@@ -30,9 +30,9 @@ const Sidebar = ({ disabled }: SidebarProps) => {
   };
 
   return (
-    <SidebarContainer disabled={disabled}>
+    <SidebarContainer disabled={disabled} className="min-h-0 overflow-hidden">
       {/* Categories List */}
-      <nav className="flex-1 p-6 overflow-y-auto">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6">
         <SidebarCard>
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
