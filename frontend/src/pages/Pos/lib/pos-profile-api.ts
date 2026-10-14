@@ -21,6 +21,10 @@ export interface PosProfileLimited {
   multiple_cashier: number;
   owner: string;
   edit_order_type?: number;
+  /** Default Customer from POS Profile (Take Away / Delivery). */
+  customer?: string | null;
+  customer_name?: string | null;
+  customer_mobile_number?: string | null;
 }
 
 export interface PosProfileLimitedResponse {
@@ -53,6 +57,8 @@ export interface PosProfileFull {
   idx: number;
   company: string;
   customer: string | null;
+  customer_name?: string | null;
+  customer_mobile_number?: string | null;
   country: string;
   disabled: number;
   warehouse: string;
@@ -135,9 +141,34 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     enable_discount: limitedProfile.enable_discount,
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
+    // Prefer full-profile customer fields; fall back to limited payload.
+    customer: fullProfile.customer ?? limitedProfile.customer ?? null,
+    customer_name:
+      fullProfile.customer_name ?? limitedProfile.customer_name ?? null,
+    customer_mobile_number:
+      fullProfile.customer_mobile_number ??
+      limitedProfile.customer_mobile_number ??
+      null,
   };
 
   return combinedProfile;
+}
+
+/** Build the POS customer picker value from POS Profile.customer when set. */
+export function getDefaultCustomerFromProfile(
+  profile: Pick<
+    PosProfileCombined,
+    'customer' | 'customer_name' | 'customer_mobile_number'
+  > | null
+): { id: string; name: string; phone: string } | null {
+  if (!profile?.customer) {
+    return null;
+  }
+  return {
+    id: profile.customer,
+    name: profile.customer_name || profile.customer,
+    phone: profile.customer_mobile_number || '',
+  };
 }
 
 export async function getCurrencyInfo(currencyCode: string): Promise<Currency> {

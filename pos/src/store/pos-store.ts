@@ -2,7 +2,12 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
-import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
+import {
+  getCurrencyInfo,
+  PosProfileCombined,
+  getCombinedPosProfile,
+  getDefaultCustomerFromProfile,
+} from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
@@ -288,6 +293,19 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
+      const applyDefaultCustomer = (profile: PosProfileCombined | null) => {
+        // Only seed when the cashier has not already picked a customer
+        // (e.g. restoring a table order). Take Away / Delivery / empty
+        // table then inherit POS Profile.customer.
+        if (get().selectedCustomer) {
+          return;
+        }
+        const defaultCustomer = getDefaultCustomerFromProfile(profile);
+        if (defaultCustomer) {
+          set({ selectedCustomer: defaultCustomer });
+        }
+      };
+
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
@@ -296,6 +314,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           profileLoading: false,
           currency: profile.currency || 'INR'
         });
+        applyDefaultCustomer(profile);
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
         }
@@ -311,6 +330,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         profileLoading: false,
         currency: combinedProfile.currency || 'INR'
       });
+      applyDefaultCustomer(combinedProfile);
       
       if (!storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
@@ -696,7 +716,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             id: order.customer,
             name: order.customer_name,
             phone: order.mobile_number,
-          } : null,
+          } : getDefaultCustomerFromProfile(get().posProfile),
           isUpdatingOrder: true,
           orderId: order.name,
           noOfPax: order.no_of_pax || 1,
@@ -707,7 +727,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         set({
           tableOrder: null,
           activeOrders: [],
-          selectedCustomer: null,
+          selectedCustomer: getDefaultCustomerFromProfile(get().posProfile),
           isUpdatingOrder: false,
           orderId: null,
           noOfPax: 1,
@@ -720,7 +740,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
-        selectedCustomer: null,
+        selectedCustomer: getDefaultCustomerFromProfile(get().posProfile),
         isUpdatingOrder: false,
         orderId: null,
         noOfPax: 1,
@@ -736,7 +756,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     set({
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: getDefaultCustomerFromProfile(get().posProfile),
       isUpdatingOrder: false,
       orderId: null,
       noOfPax: 1,
@@ -753,10 +773,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
+    const { fetchMenuItems, posProfile } = get();
     
     set({
-      selectedCustomer: null,
+      selectedCustomer: getDefaultCustomerFromProfile(posProfile),
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
