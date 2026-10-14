@@ -357,7 +357,23 @@ def get_custom_fields():
 				"insert_after": "qz_print",
 				"label": "QZ Host",
 				"translatable": 0,
-			}
+			},
+			{
+				# Opt-in: on pay, create Sales Invoice with ERPNext SI naming
+				# (ACC-SINV-…), rename POS Invoice to that id, mark consolidated.
+				# Service Board keeps showing the POS Invoice row under the SI id.
+				"fieldname": "custom_consolidate_on_payment",
+				"fieldtype": "Check",
+				"default": "0",
+				"label": "Sales Invoice on Payment (ERPNext series)",
+				"description": (
+					"When enabled, payment creates a Sales Invoice using the "
+					"ERPNext Sales Invoice naming series (e.g. ACC-SINV-YYYY-#####), "
+					"renames the POS Invoice to that same id, and posts GL/stock. "
+					"Default off = consolidate at shift close."
+				),
+				"insert_after": "qz_host",
+			},
 		],
   
 		"POS Opening Entry": [

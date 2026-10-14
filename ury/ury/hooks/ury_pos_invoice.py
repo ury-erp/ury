@@ -21,6 +21,13 @@ def validate(doc, method):
 
 def before_submit(doc, method):
     calculate_and_set_times(doc, method)
+    # Settlement already posted GL on Sales Invoice; skip print gate / disposables
+    # that assume a normal POS-only submit.
+    if frappe.flags.get("ury_settling_as_sales_invoice") or getattr(
+        doc.flags, "ury_settling_as_sales_invoice", False
+    ):
+        set_commission_attribution(doc, method)
+        return
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
     set_commission_attribution(doc, method)
@@ -28,6 +35,10 @@ def before_submit(doc, method):
 
 
 def on_trash(doc, method):
+    # Settling as Sales Invoice deletes the draft on purpose; table release
+    # is handled by make_invoice after conversion.
+    if frappe.flags.get("ury_settling_as_sales_invoice"):
+        return
     table_status_delete(doc, method)
 
 

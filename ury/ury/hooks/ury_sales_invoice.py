@@ -41,6 +41,12 @@ def on_update(doc,method):
     aggregator_unpaid(doc,method)
 
 def sales_invoice_naming(doc, method):
+    # Forced same-name settlement (draft POS Invoice → SI) keeps the ticket id.
+    if getattr(doc.flags, "ury_settle_as_sales_invoice", False) or getattr(
+        doc.flags, "name_set", False
+    ):
+        return
+
     if not doc.is_pos:
         return
     
