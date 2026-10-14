@@ -1126,9 +1126,8 @@ def get_closing_invoices(start, end, pos_profile, user):
 	When POS Profile.custom_consolidate_on_payment is off, delegates to
 	ERPNext ``get_invoices`` (unconsolidated POS Invoices only).
 
-	When on, includes POS Invoices that were already consolidated at payment
-	time so Expected cash still reflects the shift's sales. Payments are
-	read from each POS Invoice's payment child table (retained after merge).
+	When on (Sales Invoice on payment / same ticket), lists submitted
+	Sales Invoices for the shift so Expected cash matches till totals.
 	"""
 	from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 		get_invoices,
@@ -1150,7 +1149,7 @@ def get_closing_invoices(start, end, pos_profile, user):
 	# Timestamp(date, time) currently emits TIMESTAMP(date) only — drops
 	# the time arg — so a SQL timestamp window would compare midnights.)
 	rows = frappe.get_all(
-		"POS Invoice",
+		"Sales Invoice",
 		filters={
 			"owner": user,
 			"docstatus": 1,
@@ -1174,7 +1173,6 @@ def get_closing_invoices(start, end, pos_profile, user):
 			"account_for_change_amount",
 			"is_return",
 			"return_against",
-			"consolidated_invoice",
 		],
 		order_by="posting_date asc, posting_time asc",
 	)
@@ -1185,15 +1183,15 @@ def get_closing_invoices(start, end, pos_profile, user):
 		if ts < start_dt or ts > end_dt:
 			continue
 		row["timestamp"] = ts
-		row["doctype"] = "POS Invoice"
+		row["doctype"] = "Sales Invoice"
 		row["payments"] = frappe.get_all(
 			"Sales Invoice Payment",
-			filters={"parenttype": "POS Invoice", "parent": row.name},
+			filters={"parenttype": "Sales Invoice", "parent": row.name},
 			fields=["mode_of_payment", "account", "amount", "parent"],
 		)
 		row["taxes"] = frappe.get_all(
 			"Sales Taxes and Charges",
-			filters={"parenttype": "POS Invoice", "parent": row.name},
+			filters={"parenttype": "Sales Invoice", "parent": row.name},
 			fields=["account_head", "tax_amount", "parent"],
 		)
 		invoices.append(row)

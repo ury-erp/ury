@@ -359,19 +359,18 @@ def get_custom_fields():
 				"translatable": 0,
 			},
 			{
-				# Opt-in: after each paid POS Invoice, create a one-invoice
-				# POS Invoice Merge Log so accounting (Sales Invoice + GL)
-				# appears immediately instead of only at shift close.
-				# Default off — existing restaurants keep consolidate-on-close.
+				# Opt-in: on pay, create Sales Invoice with ERPNext SI naming
+				# (ACC-SINV-…), rename POS Invoice to that id, mark consolidated.
+				# Service Board keeps showing the POS Invoice row under the SI id.
 				"fieldname": "custom_consolidate_on_payment",
 				"fieldtype": "Check",
 				"default": "0",
-				"label": "Consolidate POS Invoice on Payment",
+				"label": "Sales Invoice on Payment (ERPNext series)",
 				"description": (
-					"When enabled, each paid POS Invoice is immediately "
-					"merged into its own Sales Invoice (GL and stock). "
-					"Shift close still reconciles cash; invoices already "
-					"consolidated are not merged again."
+					"When enabled, payment creates a Sales Invoice using the "
+					"ERPNext Sales Invoice naming series (e.g. ACC-SINV-YYYY-#####), "
+					"renames the POS Invoice to that same id, and posts GL/stock. "
+					"Default off = consolidate at shift close."
 				),
 				"insert_after": "qz_host",
 			},

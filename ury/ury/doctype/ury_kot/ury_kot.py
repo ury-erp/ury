@@ -91,7 +91,13 @@ class URYKOT(Document):
         if production:
             production_doc = frappe.get_doc("URY Production Unit", production)
             if production_doc.enable_order_type_wise_display_on_mosaic:
-                invoice_order_type = frappe.db.get_value("POS Invoice", self.invoice, "order_type")
+                invoice_order_type = frappe.db.get_value(
+                    "POS Invoice", self.invoice, "order_type"
+                )
+                if not invoice_order_type:
+                    invoice_order_type = frappe.db.get_value(
+                        "Sales Invoice", self.invoice, "order_type"
+                    )
                 allowed_order_types = [row.order_type for row in production_doc.get("order_type", [])]
                 if invoice_order_type not in allowed_order_types:
                     return

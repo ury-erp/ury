@@ -2683,31 +2683,38 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     # invoice.owner = owner
     invoice.save()
+
+    restaurant_table = invoice.restaurant_table
+    merged_tables = invoice.get("custom_merged_tables")
+    merged_primary = invoice.get("custom_merged_pos_invoice")
+
+    from ury.ury.hooks.pos_invoice_settle_as_sales_invoice import (
+        profile_uses_sales_invoice_on_payment,
+        settle_as_sales_invoice,
+    )
+
     try:
-        invoice.submit()
+        if profile_uses_sales_invoice_on_payment(pos_profile):
+            # POS Awesome-style: one Sales Invoice, same ticket name as the draft.
+            invoice = settle_as_sales_invoice(invoice)
+        else:
+            invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
-        
-    # Free the table when no other open drafts remain on this table group
 
-    release_invoice = invoice
+    # Free the table when no other open drafts remain on this table group
+    release_table = restaurant_table
+    release_merged = merged_tables
 
     # If this invoice is a secondary merged bill,
     # resolve the primary invoice that owns the tables.
-    if (
-        not release_invoice.restaurant_table
-        and release_invoice.custom_merged_pos_invoice
-    ):
-        release_invoice = frappe.get_doc(
-            "POS Invoice",
-            release_invoice.custom_merged_pos_invoice,
-        )
+    if not release_table and merged_primary and frappe.db.exists("POS Invoice", merged_primary):
+        primary = frappe.get_doc("POS Invoice", merged_primary)
+        release_table = primary.restaurant_table
+        release_merged = primary.get("custom_merged_tables")
 
-    if release_invoice.restaurant_table:
-        _free_tables_if_no_open_invoices(
-            release_invoice.restaurant_table,
-            release_invoice.custom_merged_tables,
-        )
+    if release_table:
+        _free_tables_if_no_open_invoices(release_table, release_merged)
         
         
 

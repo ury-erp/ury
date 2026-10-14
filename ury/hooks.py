@@ -238,8 +238,9 @@ doc_events = {
         "on_submit": [
             "ury.ury.hooks.ury_pos_invoice.on_submit",
             "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
-            # Opt-in (POS Profile.custom_consolidate_on_payment): one paid
-            # POS Invoice → one Sales Invoice + GL immediately.
+            # Legacy Merge-Log path kept for tests/compat; make_invoice prefers
+            # settle_as_sales_invoice when custom_consolidate_on_payment is on
+            # (same ticket name, no second ACC-SINV-* document).
             "ury.ury.hooks.pos_invoice_realtime_consolidation.consolidate_on_payment",
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
