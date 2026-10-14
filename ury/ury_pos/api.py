@@ -845,8 +845,19 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
-
+        "enable_kot_reprint":enable_kot_reprint,
+        # Default customer from POS Profile (Take Away / Delivery / empty table).
+        "customer": pos_profiles.customer or None,
+        "customer_name": (
+            frappe.db.get_value("Customer", pos_profiles.customer, "customer_name")
+            if pos_profiles.customer
+            else None
+        ),
+        "customer_mobile_number": (
+            frappe.db.get_value("Customer", pos_profiles.customer, "mobile_number")
+            if pos_profiles.customer
+            else None
+        ),
     }
 
     return invoice_details
@@ -866,6 +877,14 @@ def getPosProfileFull(pos_profile):
     if profile.branch != branch_name:
         frappe.throw(frappe._("Not permitted to view this POS Profile"), frappe.PermissionError)
 
+    customer_name = None
+    customer_mobile_number = None
+    if profile.customer:
+        customer_name = frappe.db.get_value("Customer", profile.customer, "customer_name")
+        customer_mobile_number = frappe.db.get_value(
+            "Customer", profile.customer, "mobile_number"
+        )
+
     return {
         "name": profile.name,
         "owner": profile.owner,
@@ -876,6 +895,8 @@ def getPosProfileFull(pos_profile):
         "idx": profile.idx,
         "company": profile.company,
         "customer": profile.customer,
+        "customer_name": customer_name,
+        "customer_mobile_number": customer_mobile_number,
         "country": profile.country,
         "disabled": profile.disabled,
         "warehouse": profile.warehouse,
