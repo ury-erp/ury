@@ -50,3 +50,76 @@ def validate_daily_checklists(doc, method):
 			)
 
 	validate_and_throw(non_completed_checklists)
+
+
+def validate_stock_correction(doc, method=None):
+	"""Gate POS Closing Entry when POS Profile.validate_stock_correction is on.
+
+	Wired from hooks.py on every closing validate. When the flag is off this
+	is a no-op. When on, ``ury_pos_closing_entry.validate_ported_checks``
+	already enforces that a Stock Correction exists for the shift window;
+	keep this hook present so Frappe can resolve the path (missing attr
+	raises AttributeError and blocks all closes — including profiles that
+	never enable the feature).
+	"""
+	if not frappe.db.get_value(
+		"POS Profile", doc.pos_profile, "validate_stock_correction"
+	):
+		return
+
+
+def submit_stock_correction(doc, method=None):
+	"""Submit linked draft stock corrections after POS Closing Entry submit.
+
+	No-op unless POS Profile.submit_stock_correction is enabled. Stub keeps
+	the hooks.py ``on_submit`` path importable on version-16.
+	"""
+	if not frappe.db.get_value(
+		"POS Profile", doc.pos_profile, "submit_stock_correction"
+	):
+		return
+
+	for row in doc.get("draft_stock_correction") or []:
+		name = row.get("stock_correction") or row.get("name")
+		if not name:
+			continue
+		if frappe.db.get_value("Stock Correction", name, "docstatus") == 0:
+			frappe.get_doc("Stock Correction", name).submit()
+
+
+@frappe.whitelist()
+def get_draft_stock_correction(
+	pos_profile, period_start_date, period_end_date, closing_entry=None
+):
+	"""Return draft Stock Correction rows for the Desk POS Closing form.
+
+	Used by ``ury/public/js/pos_closing_entry.js``. Returns ``True`` when the
+	profile does not require stock-correction submit (skip UI), ``False``
+	when required but none found, or a list of draft correction names.
+	"""
+	if not frappe.db.get_value(
+		"POS Profile", pos_profile, "submit_stock_correction"
+	):
+		return True
+
+	branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+	warehouse = frappe.db.get_value("POS Profile", pos_profile, "warehouse")
+	if not branch:
+		return False
+
+	filters = {
+		"branch": branch,
+		"docstatus": 0,
+	}
+	if warehouse and frappe.get_meta("Stock Correction").has_field("set_warehouse"):
+		filters["set_warehouse"] = warehouse
+
+	drafts = frappe.get_all(
+		"Stock Correction",
+		filters=filters,
+		fields=["name"],
+		limit=20,
+	)
+	if not drafts:
+		return False
+	return [{"stock_correction": d.name} for d in drafts]

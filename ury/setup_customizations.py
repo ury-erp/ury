@@ -357,7 +357,24 @@ def get_custom_fields():
 				"insert_after": "qz_print",
 				"label": "QZ Host",
 				"translatable": 0,
-			}
+			},
+			{
+				# Opt-in: after each paid POS Invoice, create a one-invoice
+				# POS Invoice Merge Log so accounting (Sales Invoice + GL)
+				# appears immediately instead of only at shift close.
+				# Default off — existing restaurants keep consolidate-on-close.
+				"fieldname": "custom_consolidate_on_payment",
+				"fieldtype": "Check",
+				"default": "0",
+				"label": "Consolidate POS Invoice on Payment",
+				"description": (
+					"When enabled, each paid POS Invoice is immediately "
+					"merged into its own Sales Invoice (GL and stock). "
+					"Shift close still reconciles cash; invoices already "
+					"consolidated are not merged again."
+				),
+				"insert_after": "qz_host",
+			},
 		],
   
 		"POS Opening Entry": [

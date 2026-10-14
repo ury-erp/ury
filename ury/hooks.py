@@ -208,7 +208,9 @@ permission_query_conditions = {
 # Override standard doctype classes
 
 override_doctype_class = {
-	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+	# Package lives at apps/ury/ury/class_overrides (import: ury.class_overrides.*).
+	# The previous ury.ury.class_overrides path 404s and breaks POS close consolidation.
+	"POS Invoice Merge Log": "ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
 }
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
@@ -236,6 +238,9 @@ doc_events = {
         "on_submit": [
             "ury.ury.hooks.ury_pos_invoice.on_submit",
             "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
+            # Opt-in (POS Profile.custom_consolidate_on_payment): one paid
+            # POS Invoice → one Sales Invoice + GL immediately.
+            "ury.ury.hooks.pos_invoice_realtime_consolidation.consolidate_on_payment",
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",

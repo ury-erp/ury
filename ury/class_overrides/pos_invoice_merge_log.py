@@ -13,6 +13,12 @@ class CustomPOSInvoiceMergeLog(POSInvoiceMergeLog):
 		sales_invoice.posting_date = getdate(self.posting_date)
 		sales_invoice.posting_time = get_time(self.posting_time)
 
+		# Do NOT set is_created_using_pos here: when POS Settings.invoice_type
+		# is "POS Invoice", ERPNext.validate_created_using_pos throws
+		# "Transactions using Sales Invoice in POS are disabled."
+		# Cash expected at shift close is handled by URY's closing helpers
+		# when custom_consolidate_on_payment is enabled.
+
 		sales_invoice.save()
 		sales_invoice.submit()
 		self.consolidated_invoice = sales_invoice.name

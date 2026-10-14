@@ -250,16 +250,30 @@ export async function getMainCashierPosInvoices(
 ): Promise<POSClosingInvoice[]> {
   try {
     const response = await call.get<{ message: POSClosingInvoice[] }>(
-      'erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_invoices',
+      'ury.ury_pos.api.get_closing_invoices',
       { start, end, pos_profile: posProfile, user }
     );
 
     let msg = response.message as any;
     if (msg && msg.invoices && !Array.isArray(msg)) {
       let invMap: any = {};
-      msg.invoices.forEach((i: any) => { i.payments = []; i.taxes = []; invMap[i.name] = i; });
-      if (msg.payments) msg.payments.forEach((p: any) => { if (invMap[p.parent]) invMap[p.parent].payments.push(p); });
-      if (msg.taxes) msg.taxes.forEach((t: any) => { if (invMap[t.parent]) invMap[t.parent].taxes.push(t); });
+      msg.invoices.forEach((i: any) => {
+        // Prefer payments already attached by the server (realtime mode);
+        // otherwise seed empty arrays for the aggregated-payments remap.
+        if (!i.payments) i.payments = [];
+        if (!i.taxes) i.taxes = [];
+        invMap[i.name] = i;
+      });
+      if (msg.payments) {
+        msg.payments.forEach((p: any) => {
+          if (p.parent && invMap[p.parent]) invMap[p.parent].payments.push(p);
+        });
+      }
+      if (msg.taxes) {
+        msg.taxes.forEach((t: any) => {
+          if (t.parent && invMap[t.parent]) invMap[t.parent].taxes.push(t);
+        });
+      }
       return msg.invoices as POSClosingInvoice[];
     }
 

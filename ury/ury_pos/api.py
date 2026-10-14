@@ -1120,6 +1120,92 @@ def get_open_pos_opening_entries(pos_profile):
 
 
 @frappe.whitelist()
+def get_closing_invoices(start, end, pos_profile, user):
+	"""Invoice + payment bundle for the React POS Closing dialog.
+
+	When POS Profile.custom_consolidate_on_payment is off, delegates to
+	ERPNext ``get_invoices`` (unconsolidated POS Invoices only).
+
+	When on, includes POS Invoices that were already consolidated at payment
+	time so Expected cash still reflects the shift's sales. Payments are
+	read from each POS Invoice's payment child table (retained after merge).
+	"""
+	from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+		get_invoices,
+		get_payments,
+		get_taxes,
+	)
+
+	if not frappe.db.get_value(
+		"POS Profile", pos_profile, "custom_consolidate_on_payment"
+	):
+		return get_invoices(start, end, pos_profile, user)
+
+	from frappe.utils import get_datetime
+
+	start_dt = get_datetime(start)
+	end_dt = get_datetime(end)
+
+	# Broad date filter in SQL; precise window in Python. (frappe.qb
+	# Timestamp(date, time) currently emits TIMESTAMP(date) only — drops
+	# the time arg — so a SQL timestamp window would compare midnights.)
+	rows = frappe.get_all(
+		"POS Invoice",
+		filters={
+			"owner": user,
+			"docstatus": 1,
+			"is_pos": 1,
+			"pos_profile": pos_profile,
+			"posting_date": [
+				"between",
+				[start_dt.date(), end_dt.date()],
+			],
+		},
+		fields=[
+			"name",
+			"customer",
+			"posting_date",
+			"posting_time",
+			"grand_total",
+			"net_total",
+			"total_qty",
+			"total_taxes_and_charges",
+			"change_amount",
+			"account_for_change_amount",
+			"is_return",
+			"return_against",
+			"consolidated_invoice",
+		],
+		order_by="posting_date asc, posting_time asc",
+	)
+
+	invoices = []
+	for row in rows:
+		ts = get_datetime(f"{row.posting_date} {row.posting_time}")
+		if ts < start_dt or ts > end_dt:
+			continue
+		row["timestamp"] = ts
+		row["doctype"] = "POS Invoice"
+		row["payments"] = frappe.get_all(
+			"Sales Invoice Payment",
+			filters={"parenttype": "POS Invoice", "parent": row.name},
+			fields=["mode_of_payment", "account", "amount", "parent"],
+		)
+		row["taxes"] = frappe.get_all(
+			"Sales Taxes and Charges",
+			filters={"parenttype": "POS Invoice", "parent": row.name},
+			fields=["account_head", "tax_amount", "parent"],
+		)
+		invoices.append(row)
+
+	return {
+		"invoices": invoices,
+		"payments": get_payments(invoices) if invoices else [],
+		"taxes": get_taxes(invoices) if invoices else [],
+	}
+
+
+@frappe.whitelist()
 def validate_pos_close(pos_profile):
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
     
