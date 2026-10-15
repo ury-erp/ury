@@ -163,6 +163,7 @@ from frappe import _
 from frappe.utils import cint, flt
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_sales_plan_commit import apply_commit_delta
 
 # Slack allowed when comparing a required quantity against available capacity,
@@ -898,21 +899,42 @@ def create_reservation(
 	# component rows never equal the top-level item/qty).
 	commit_qty = flt(qty)
 	commit_department = (frozen_context or {}).get("department")
-	try:
-		commit_result = apply_commit_delta(
-			item_code, branch, company, department=commit_department, committed_delta=commit_qty
+	# "Stock Available" is an availability mode, not a production policy: it
+	# bypasses Sales Plan gating at the availability layer and must therefore
+	# never touch the Sales Plan committed_qty/fulfilled_qty counters -- there
+	# is no plan commitment to track. Callers that carry the resolved mode in
+	# `frozen_context` (order reconciliation) supply it directly; a direct/
+	# legacy caller without one resolves it here, best-effort.
+	availability_mode = (frozen_context or {}).get("availability_mode")
+	if not availability_mode:
+		cfg = resolve_production_context(
+			item_code, branch, company=company, department=commit_department
 		)
-	except Exception:
-		# Sales Plan commit-tracking is best-effort accounting on top of the
-		# reservation, not a precondition for it -- a failure here (no
-		# matching plan, a transient DB/locking issue, etc.) must never abort
-		# an otherwise-valid reservation. Same fail-soft contract already
-		# established for realtime event publishing in this file.
-		frappe.logger("ury_reservation_service").exception(
-			"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
-		)
+		if cfg:
+			availability_mode = cfg.get("availability_mode")
+	if availability_mode == "Stock Available":
 		commit_result = None
+	else:
+		try:
+			commit_result = apply_commit_delta(
+				item_code, branch, company, department=commit_department, committed_delta=commit_qty
+			)
+		except Exception:
+			# Sales Plan commit-tracking is best-effort accounting on top of the
+			# reservation, not a precondition for it -- a failure here (no
+			# matching plan, a transient DB/locking issue, etc.) must never abort
+			# an otherwise-valid reservation. Same fail-soft contract already
+			# established for realtime event publishing in this file.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
+			)
+			commit_result = None
 	frozen_context = dict(frozen_context or {})
+	if availability_mode:
+		# Persist the resolved mode into the group's audit context so
+		# `_transition_group`'s defense-in-depth check can read it back without
+		# re-resolving.
+		frozen_context["availability_mode"] = availability_mode
 	# The TOP-LEVEL item quantity this group reserves, frozen explicitly and
 	# under its own purpose-named key.
 	#
@@ -1256,7 +1278,14 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 		append_audit(doc, actor, event=event, reason=reason)
 		doc.save(ignore_permissions=False)
 
-	if sales_plan_commit:
+	# Defense-in-depth: a group whose order-time context resolved to the
+	# "Stock Available" availability mode never held a Sales Plan commitment
+	# (create_reservation skips the commit delta for it), so a transition must
+	# never reverse one either. `_group_sales_plan_commit` already returns None
+	# for such groups (`applied` is False); this guard covers groups whose
+	# frozen context was recorded by a caller that carried the mode without
+	# going through create_reservation's skip.
+	if sales_plan_commit and _group_frozen_context(rows).get("availability_mode") != "Stock Available":
 		committed_delta = -flt(sales_plan_commit.get("qty"))
 		fulfilled_delta = flt(sales_plan_commit.get("qty")) if to_status == FULFILLED else 0
 		try:

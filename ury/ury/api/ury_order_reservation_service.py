@@ -327,6 +327,7 @@ def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, ac
 		"production_policy": context.production_policy,
 		"production_unit": context.get("production_unit"),
 		"department": context.get("department"),
+		"availability_mode": context.get("availability_mode"),
 		"production_configuration": context.get("name"),
 		"reservation_line_key": line_key,
 		"source_line_ref": line.get("source_line_ref"),
