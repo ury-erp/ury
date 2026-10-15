@@ -2074,6 +2074,25 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     try:
         invoice.submit()
     except Exception as e:
+        # Snapshot before anything else so tracking survives the rollback.
+        invoice_name = invoice.name
+        branch = getattr(invoice, "branch", None)
+        error_message = str(e)
+
+        # Wipe uncommitted submit/payment state; the durable error log below
+        # commits in its own transaction and must not take partial stock/GL
+        # side effects with it.
+        frappe.db.rollback()
+
+        try:
+            from grillax.grillax.utils.bill_settlement_tracking import (
+                track_settlement_error,
+            )
+
+            track_settlement_error(invoice_name, branch, error_message)
+        except Exception:
+            frappe.log_error("Bill settlement tracking failure")
+
         frappe.throw(f"Error while settling order: {e}")
         
     # Free the table when no other open drafts remain on this table group
