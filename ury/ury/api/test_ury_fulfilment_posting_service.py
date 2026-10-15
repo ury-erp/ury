@@ -312,6 +312,34 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.assertIsNone(result["name"])
 		self.assertEqual(result["status"], "SKIPPED_NOT_MADE_TO_ORDER")
 
+	def test_bundle_ready_creates_no_intent(self):
+		"""Bundle items are composed of child components; they do not post
+		a Manufacture entry at READY and return SKIPPED_NOT_MADE_TO_ORDER."""
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		rows = _reservation_rows(policy="BUNDLE")
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create(reservation_rows=rows)
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = create_or_get_posting_intent_for_ready(_execution_doc(), actor="chef@example.com")
+
+		self.assertIsNone(result["name"])
+		self.assertEqual(result["status"], "SKIPPED_NOT_MADE_TO_ORDER")
+		self.assertEqual(result["production_policy"], "BUNDLE")
+
 	def test_ready_uses_next_sequence_for_new_reservation_group(self):
 		created = []
 

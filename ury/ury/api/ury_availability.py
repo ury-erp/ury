@@ -186,6 +186,7 @@ def _resolve_production_config(item_code, branch, company, department=None):
 			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
 			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
 			"availability_mode": row.get("availability_mode"),
+			"product_bundle": row.get("product_bundle"),
 			"production_unit_disabled": row.get("production_unit_disabled", 0),
 			"department_disabled": row.get("department_disabled", 0),
 		}
@@ -597,7 +598,7 @@ def _fetch_bundle_children(item_code, branch, company):
 	if not ipc:
 		return None
 
-	product_bundle = ipc.get("product_bundle")
+	product_bundle = ipc.get("product_bundle") or frappe.db.get_value("Product Bundle", {"new_item_code": item_code}, "name")
 	if not product_bundle:
 		return None
 

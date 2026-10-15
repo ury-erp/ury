@@ -371,6 +371,75 @@ class TestGetItemAvailabilityDirectRetail(FrappeTestCase):
         self.assertEqual(result["production_policy"], "DIRECT_RETAIL")
 
 
+class TestGetItemAvailabilityBundle(FrappeTestCase):
+
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._fetch_bundle_children")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_bundle_available_happy_path(self, mock_config, mock_fetch_children, mock_fg):
+        mock_config.return_value = _config(
+            production_policy="BUNDLE",
+            product_bundle="BUNDLE-001",
+            warehouse=None,
+        )
+        mock_fetch_children.return_value = [
+            {
+                "child_item": "ITEM-CHILD-1",
+                "qty_of": 1,
+                "child_config": _config(production_policy="PRE_PRODUCED", warehouse="Kitchen Warehouse - URY"),
+            },
+            {
+                "child_item": "ITEM-CHILD-2",
+                "qty_of": 2,
+                "child_config": _config(production_policy="PRE_PRODUCED", warehouse="Kitchen Warehouse - URY"),
+            },
+        ]
+        mock_fg.side_effect = lambda item_code, warehouse, company: {
+            "ITEM-CHILD-1": {"allocatable_qty": 10},
+            "ITEM-CHILD-2": {"allocatable_qty": 8},
+        }[item_code]
+
+        result = get_item_availability("ITEM-BUNDLE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 4)
+        self.assertIsNone(result["blocking_component"])
+
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._fetch_bundle_children")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_bundle_blocking_component(self, mock_config, mock_fetch_children, mock_fg):
+        mock_config.return_value = _config(
+            production_policy="BUNDLE",
+            product_bundle="BUNDLE-001",
+            warehouse=None,
+        )
+        mock_fetch_children.return_value = [
+            {
+                "child_item": "ITEM-CHILD-1",
+                "qty_of": 1,
+                "child_config": _config(production_policy="PRE_PRODUCED", warehouse="Kitchen Warehouse - URY"),
+            },
+            {
+                "child_item": "ITEM-CHILD-2",
+                "qty_of": 2,
+                "child_config": _config(production_policy="PRE_PRODUCED", warehouse="Kitchen Warehouse - URY"),
+            },
+        ]
+        mock_fg.side_effect = lambda item_code, warehouse, company: {
+            "ITEM-CHILD-1": {"allocatable_qty": 10},
+            "ITEM-CHILD-2": {"allocatable_qty": 0},
+        }[item_code]
+
+        result = get_item_availability("ITEM-BUNDLE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "BLOCKING_COMPONENT")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertEqual(result["blocking_component"], "ITEM-CHILD-2")
+
+
 class TestAvailabilityProductionContextIntegration(FrappeTestCase):
     @patch(f"{MODULE}.project_fg_allocatable")
     @patch(f"{MODULE}._resolve_plan_remaining")
