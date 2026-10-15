@@ -47,7 +47,7 @@ describe('CustomerSelect', () => {
     expect(screen.getByTestId('customer-picker')).toBeInTheDocument();
   });
 
-  it('renders AggregatorSelect for aggregator order type', async () => {
+  it('renders AggregatorSelect for aggregator order type', () => {
     usePOSStoreMock = vi.fn(() => ({
       selectedCustomer: null,
       setSelectedCustomer: vi.fn(),
@@ -58,22 +58,17 @@ describe('CustomerSelect', () => {
     expect(screen.getByText('Aggregator Select')).toBeInTheDocument();
   });
 
-  it('passes disabled prop to CustomerPicker', () => {
-    render(<CustomerSelect disabled={true} />);
-    const input = screen.getByPlaceholderText('Select customer') as HTMLInputElement;
-    expect(input).toBeDisabled();
-  });
-
-  it('disables CustomerPicker when isUpdatingOrder is true', async () => {
-    usePOSStoreMock = vi.fn(() => ({
-      selectedCustomer: null,
-      setSelectedCustomer: vi.fn(),
-      selectedOrderType: 'Dine In',
-      isUpdatingOrder: true,
-    }));
-
-    render(<CustomerSelect />);
-    const input = screen.getByPlaceholderText('Select customer') as HTMLInputElement;
-    expect(input).toBeDisabled();
-  });
+  it.each(['Dine In', 'Take Away', 'Delivery', 'Phone In'] as const)(
+    'keeps CustomerPicker enabled on open %s orders',
+    (orderType) => {
+      usePOSStoreMock = vi.fn(() => ({
+        selectedCustomer: null,
+        setSelectedCustomer: vi.fn(),
+        selectedOrderType: orderType,
+        isUpdatingOrder: true,
+      }));
+      render(<CustomerSelect />);
+      expect(screen.getByPlaceholderText('Select customer')).not.toBeDisabled();
+    }
+  );
 });

@@ -7,17 +7,19 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ disabled }: CustomerSelectProps) {
-  const { selectedCustomer, setSelectedCustomer, selectedOrderType, isUpdatingOrder } = usePOSStore();
+  const { selectedCustomer, setSelectedCustomer, selectedOrderType } = usePOSStore();
 
   if (selectedOrderType === 'Aggregators') {
     return <AggregatorSelect />;
   }
 
+  // Open draft orders stay editable (Dine In / Take Away / Delivery / Phone In)
+  // so Walk-In or a provisional customer can be replaced before pay.
   return (
     <CustomerPicker
       value={selectedCustomer}
       onChange={setSelectedCustomer}
-      disabled={disabled || isUpdatingOrder}
+      disabled={disabled}
     />
   );
 }
