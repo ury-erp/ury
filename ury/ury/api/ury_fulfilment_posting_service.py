@@ -78,6 +78,7 @@ PRE_PRODUCED = "PRE_PRODUCED"
 MADE_TO_ORDER = "MADE_TO_ORDER"
 MTO_LEGACY = "MTO"
 DIRECT_RETAIL = "DIRECT_RETAIL"
+BUNDLE = "BUNDLE"
 READY_STATES = (READY, SERVED)
 POSTING_ROLES = {
 	"System Manager",
@@ -135,7 +136,7 @@ def _normalise_policy(policy):
 	policy = (policy or "").upper()
 	if policy == MTO_LEGACY:
 		return MADE_TO_ORDER
-	if policy in (PRE_PRODUCED, MADE_TO_ORDER, DIRECT_RETAIL):
+	if policy in (PRE_PRODUCED, MADE_TO_ORDER, DIRECT_RETAIL, BUNDLE):
 		return policy
 	return PRE_PRODUCED
 
@@ -532,7 +533,7 @@ def _freeze_payload(execution_doc, actor):
 		# `ury_order._department_warehouse_for_item` use, so the FG received
 		# here and the FG issued by the consolidated Sales Invoice at closing
 		# land in one warehouse and net out.
-		"fg_warehouse": _fg_warehouse(snapshots),
+		"fg_warehouse": _fg_warehouse(snapshots) if policy == MADE_TO_ORDER else (snapshots[0].get("warehouse") if snapshots else None),
 		"components": components,
 		"ready_at": execution_doc.get("ready_at") or now(),
 		"execution_state": execution_state,

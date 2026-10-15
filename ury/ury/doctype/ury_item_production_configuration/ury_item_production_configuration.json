@@ -15,6 +15,7 @@
   "department",
   "production_unit",
   "production_policy",
+  "product_bundle",
   "sourcing_mode",
   "bom",
   "controlled_by_sales_plan",
@@ -61,11 +62,20 @@
    "options": "URY Production Unit"
   },
   {
-   "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit).",
+   "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit), BUNDLE (top-level combo item — explodes to child components for planning, availability, and reservations).",
    "fieldname": "production_policy",
    "fieldtype": "Select",
    "label": "Production Policy",
-   "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
+   "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL\nBUNDLE"
+  },
+  {
+   "depends_on": "eval:doc.production_policy==\"BUNDLE\"",
+   "mandatory_depends_on": "eval:doc.production_policy==\"BUNDLE\"",
+   "description": "The ERPNext Product Bundle whose children define the components of this combo item. Required when Production Policy is BUNDLE.",
+   "fieldname": "product_bundle",
+   "fieldtype": "Link",
+   "label": "Product Bundle",
+   "options": "Product Bundle"
   },
   {
    "default": "IN_HOUSE",
@@ -122,7 +132,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-08 13:59:10.183421",
+ "modified": "2026-10-15 03:10:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Item Production Configuration",

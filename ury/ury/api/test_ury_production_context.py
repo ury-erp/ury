@@ -81,6 +81,18 @@ class TestResolveProductionContext(FrappeTestCase):
 			("URY Production Unit", "Main Kitchen", "warehouse"),
 		)
 
+	@patch(
+		"ury.ury.api.ury_production_context.frappe.db.get_value",
+		side_effect=["Dept Warehouse - URY", "Test Company"],
+	)
+	def test_bundle_returns_product_bundle_field(self, mock_get_value):
+		row = dict(self.rows[0], production_policy="BUNDLE", product_bundle="BUNDLE-001", production_unit=None)
+		with self._patch_get_all([row]):
+			result = resolve_production_context("ITEM-CAKE", "Branch A")
+
+		self.assertEqual(result.production_policy, "BUNDLE")
+		self.assertEqual(result.product_bundle, "BUNDLE-001")
+
 	def test_resolver_derives_disable_flags_from_linked_records(self):
 		"""production_unit_disabled/department_disabled are not real columns
 		on this doctype (N2 fix) -- they must be derived live from the
