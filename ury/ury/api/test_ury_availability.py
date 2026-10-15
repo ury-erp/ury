@@ -599,7 +599,336 @@ class TestAvailabilityModeOverride(FrappeTestCase):
         self.assertFalse(result["sellable"])
 
 
-class TestResolvePlanRemainingReflectsCounters(FrappeTestCase):
+class TestStockAvailableAvailabilityMode(FrappeTestCase):
+    """Coverage for the "Stock Available" availability_mode: an availability
+    override (not a production-policy change) that bypasses every Sales Plan
+    gate -- no active plan required, exhausted plans ignored, regardless of
+    `controlled_by_sales_plan` / `allow_over_plan_sale` -- while still
+    failing closed on stock/capacity and never overriding structural errors.
+    Unlike "Always Available", it must NOT make an out-of-stock item sellable.
+    """
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_pre_produced_stock_available_no_plan(self, mock_config, mock_fg, mock_plan):
+        mock_config.return_value = _config(availability_mode="Stock Available")
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+        self.assertEqual(result["fg_available"], 20)
+        # Plan bypassed: the plan lookup is never consulted for its values
+        # and the response carries no plan figures.
+        self.assertIsNone(result["plan_qty"])
+        self.assertIsNone(result["plan_remaining"])
+        mock_plan.assert_not_called()
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_pre_produced_stock_available_bypasses_exhausted_plan(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # controlled_by_sales_plan=1 (the default) and allow_over_plan_sale=0
+        # -- the strictest plan posture -- yet Stock Available must still sell
+        # purely on stock, with the exhausted plan ignored entirely.
+        mock_config.return_value = _config(availability_mode="Stock Available")
+        mock_fg.return_value = {"allocatable_qty": 15, "bin_actual_qty": 60, "bin_projected_qty": 15}
+        mock_plan.return_value = {"plan_qty": 80, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 15)
+        self.assertIsNone(result["plan_qty"])
+        self.assertIsNone(result["plan_remaining"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_pre_produced_stock_available_zero_stock_never_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        mock_config.return_value = _config(availability_mode="Stock Available")
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 0, "bin_projected_qty": 0}
+        mock_plan.return_value = {"plan_qty": 80, "plan_remaining": 80}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NOT_PRODUCED")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_pre_produced_stock_available_zero_stock_after_depletion(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # Was produced at some point (bin_actual_qty > 0) but currently zero
+        # allocatable -- Stock Available reports FG_OUT_OF_STOCK, never sells.
+        mock_config.return_value = _config(availability_mode="Stock Available")
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 60, "bin_projected_qty": 0}
+        mock_plan.return_value = {"plan_qty": 80, "plan_remaining": 80}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "FG_OUT_OF_STOCK")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}.get_allocatable_qty")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_direct_retail_stock_available_uses_direct_retail_warehouse(
+        self, mock_config, mock_alloc
+    ):
+        mock_config.return_value = _config(
+            production_policy="DIRECT_RETAIL", availability_mode="Stock Available"
+        )
+        mock_alloc.return_value = {"allocatable_qty": 7}
+
+        result = get_item_availability("ITEM-RETAIL", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 7)
+        mock_alloc.assert_called_once_with("ITEM-RETAIL", "Kitchen Warehouse - URY", "Company A")
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_made_to_order_stock_available_no_plan(self, mock_config, mock_compile, mock_alloc, mock_plan):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Stock Available"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [
+                {"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+                {"component_item": "PATTY", "qty": 1, "qty_per_unit": 2, "stock_uom": "Nos"},
+            ],
+        }
+        mock_alloc.return_value = {
+            "BUN": {"allocatable_qty": 50},
+            "PATTY": {"allocatable_qty": 20},
+        }
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        # recipe_capacity = min(50/1, 20/2) = 10; no plan consulted.
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 10)
+        self.assertEqual(result["max_producible"], 10)
+        self.assertIsNone(result["plan_qty"])
+        self.assertIsNone(result["plan_remaining"])
+        mock_plan.assert_not_called()
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_made_to_order_stock_available_missing_component(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Stock Available"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [
+                {"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+                {"component_item": "PATTY", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+            ],
+        }
+        mock_alloc.return_value = {
+            "BUN": {"allocatable_qty": 50},
+            "PATTY": {"allocatable_qty": 0},
+        }
+        mock_plan.return_value = {"plan_qty": 30, "plan_remaining": 30}
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "BLOCKING_COMPONENT")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertEqual(result["blocking_component"], "PATTY")
+        self.assertEqual(result["max_producible"], 0)
+
+    @patch(f"{MODULE}.project_mto_capacity")
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_made_to_order_stock_available_projects_max_producible(
+        self, mock_config, mock_compile, mock_alloc, mock_plan, mock_project
+    ):
+        # Phase C integration: under Stock Available the filler threads its
+        # compiled vector, recipe capacity and component allocatable map into
+        # the projection service and publishes the projected figure as
+        # max_producible -- while available_qty stays the IMMEDIATE
+        # reservable quantity and sellable stays immediate-driven.
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Stock Available"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [
+                {"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+                {"component_item": "RICE", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+            ],
+        }
+        mock_alloc.return_value = {
+            "BUN": {"allocatable_qty": 50},
+            "RICE": {"allocatable_qty": 2},
+        }
+        mock_plan.return_value = None
+        mock_project.return_value = {
+            "immediate_capacity": 2,
+            "max_producible": 10,
+            "projected_shortfalls": {"RICE": 8},
+            "limiting_factors": ["BUN"],
+        }
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        # immediate = min(50/1, 2/1) = 2; projection reports 10 producible
+        # from raw-material top-up of RICE.
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 2)
+        self.assertEqual(result["max_producible"], 10)
+        mock_plan.assert_not_called()
+        # The filler passed its already-resolved context straight through.
+        mock_project.assert_called_once()
+        args, kwargs = mock_project.call_args
+        self.assertEqual(args, ("ITEM-BURGER", "Company A", "Kitchen Warehouse - URY"))
+        self.assertEqual(kwargs["parent_components"], mock_compile.return_value["components"])
+        self.assertEqual(kwargs["immediate_capacity"], 2)
+        self.assertEqual(kwargs["allocatable_by_component"], {"BUN": 50, "RICE": 2})
+        self.assertEqual(kwargs["branch"], "Branch A")
+
+    @patch(f"{MODULE}.project_mto_capacity")
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_made_to_order_plan_available_does_not_project(
+        self, mock_config, mock_compile, mock_alloc, mock_plan, mock_project
+    ):
+        # Regression: projection is a Stock Available behavior only; the
+        # default Plan Available path keeps max_producible = recipe_capacity
+        # and never consults the projection service.
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Plan Available"
+        )
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [
+                {"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+                {"component_item": "RICE", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"},
+            ],
+        }
+        mock_alloc.return_value = {
+            "BUN": {"allocatable_qty": 50},
+            "RICE": {"allocatable_qty": 2},
+        }
+        mock_plan.return_value = {"plan_qty": 30, "plan_remaining": 30}
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertEqual(result["available_qty"], 2)  # min(plan_remaining, capacity)
+        self.assertEqual(result["max_producible"], 2)
+        mock_project.assert_not_called()
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_stock_available_plan_gate_polarity_invariant(self, mock_config, mock_fg, mock_plan):
+        # controlled_by_sales_plan=1 vs 0 must produce identical results under
+        # Stock Available: the mode overrides the flag, not composes with it.
+        fg = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        for controlled in (0, 1):
+            with self.subTest(controlled_by_sales_plan=controlled):
+                mock_config.return_value = _config(
+                    controlled_by_sales_plan=controlled, availability_mode="Stock Available"
+                )
+                mock_fg.return_value = fg
+                mock_plan.return_value = {"plan_qty": 5, "plan_remaining": 0}
+
+                result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+                self.assertEqual(result["reason_code"], "AVAILABLE")
+                self.assertTrue(result["sellable"])
+                self.assertEqual(result["available_qty"], 20)
+                self.assertIsNone(result["plan_qty"])
+                self.assertIsNone(result["plan_remaining"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_plan_available_mode_still_enforces_sales_plan(self, mock_config, mock_fg, mock_plan):
+        # Regression: "Plan Available" (the default) must keep enforcing every
+        # plan gate strictly -- Stock Available must not leak into it.
+        mock_config.return_value = _config(availability_mode="Plan Available")
+        mock_fg.return_value = {"allocatable_qty": 15, "bin_actual_qty": 60, "bin_projected_qty": 15}
+        mock_plan.return_value = {"plan_qty": 80, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "PLAN_EXHAUSTED")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertEqual(result["plan_remaining"], 0)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_plan_available_mode_still_fails_closed_without_plan(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        mock_config.return_value = _config(availability_mode="Plan Available")
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_mode_still_overrides_and_stock_available_does_not(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # Regression + contrast: with zero stock, "Always Available" forces
+        # sellable (its override), while "Stock Available" must NOT -- it is
+        # stock-driven and fails closed on FG_OUT_OF_STOCK/NOT_PRODUCED.
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 60, "bin_projected_qty": 0}
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 10}
+
+        mock_config.return_value = _config(availability_mode="Always Available")
+        always = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+        self.assertEqual(always["reason_code"], "AVAILABLE")
+        self.assertTrue(always["sellable"])
+        self.assertIsNone(always["available_qty"])
+
+        mock_config.return_value = _config(availability_mode="Stock Available")
+        stock = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+        self.assertEqual(stock["reason_code"], "FG_OUT_OF_STOCK")
+        self.assertFalse(stock["sellable"])
+        self.assertEqual(stock["available_qty"], 0)
+
+
     """`_resolve_plan_remaining` must read the real committed_qty/fulfilled_qty
     counters instead of the old hardcoded committed=fulfilled=0 (which made
     plan_remaining always equal the full plan_qty, regardless of how many

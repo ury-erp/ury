@@ -104,6 +104,7 @@ from ury.ury.api.ury_inventory_projection import (
 	project_component_allocatable,
 	project_fg_allocatable,
 )
+from ury.ury.api.ury_projection_service import project_mto_capacity
 from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 
 # Imported for its side effect of making `URY Stock Reservation` a real,
@@ -350,20 +351,20 @@ def get_item_availability(item_code, branch, company, department=None):
 		response["reason_code"] = "CONFIGURATION_ERROR"
 		return response
 
-	# `availability_mode` has two options: "Plan Available" (default/safe, no
-	# override) and "Always Available". "Always Available" overrides
-	# *commercial* not-sellable reasons only (stock/plan-derived: out of
-	# stock, no/exhausted plan, blocking recipe component) — it must NEVER
+	# `availability_mode` has three options: "Plan Available" (default/safe, no
+	# override), "Always Available" and "Stock Available". "Always Available"
+	# overrides *commercial* not-sellable reasons only (stock/plan-derived: out
+	# of stock, no/exhausted plan, blocking recipe component) — it must NEVER
 	# override a structural/config error (missing BOM, missing/disabled
 	# department or production unit, generic configuration error), since
 	# those indicate the item is not actually safe to sell/produce at all,
 	# regardless of plan or stock.
 	#
-	# There is no "Stock Available" mode: selling on stock/recipe-capacity
-	# alone while ignoring the Sales Plan is already covered by turning off
-	# `controlled_by_sales_plan` (see `_fill_pre_produced`/`_fill_made_to_order`
-	# below). A separate "Stock Available" availability_mode was considered
-	# and dropped as functionally identical to that flag.
+	# "Stock Available" bypasses the Sales Plan gates inside
+	# `_fill_pre_produced`/`_fill_made_to_order` (availability is computed
+	# from stock/recipe-capacity alone, with plan_qty/plan_remaining left
+	# null) but never overrides a structural/config error, so it needs no
+	# handling here. It is mutually exclusive with "Always Available".
 	_STRUCTURAL_ERROR_CODES = {
 		"MISSING_BOM",
 		"CONFIGURATION_ERROR",
@@ -396,8 +397,9 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	produced, i.e. no Bin.actual_qty ever recorded) takes precedence, then
 	PLAN_EXHAUSTED, then FG_OUT_OF_STOCK, else AVAILABLE. A missing/absent
 	plan is reported as NO_ACTIVE_PLAN before any of those, unless
-	`controlled_by_sales_plan` is False, in which case the item falls through
-	to stock-based availability.
+	`controlled_by_sales_plan` is False or `availability_mode` is
+	"Stock Available", in which case the item falls through to stock-based
+	availability.
 	"""
 	fg_projection = project_fg_allocatable(item_code, warehouse, company)
 	fg_available = fg_projection["allocatable_qty"]
@@ -411,8 +413,11 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	# but is exhausted (previously only the no-plan case respected this flag,
 	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
 	# explicitly off -- both cases must resolve the same way: stock alone).
+	# "Stock Available" availability_mode forces the same stock-only path,
+	# overriding controlled_by_sales_plan/allow_over_plan_sale.
 	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-	if not controlled_by_sales_plan:
+	stock_available_mode = config.get("availability_mode") == "Stock Available" if config else False
+	if not controlled_by_sales_plan or stock_available_mode:
 		effective_available = fg_available
 		response["available_qty"] = max(effective_available, 0)
 		if fg_available <= 0 and never_produced:
@@ -471,8 +476,12 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	whenever recipe_capacity is the binding constraint (i.e. whenever
 	recipe_capacity < plan_remaining, or there is no plan and
 	recipe_capacity <= 0), per this task's spec. If `controlled_by_sales_plan`
-	is False, plan is optional and the item falls through to capacity-based
-	availability. If `allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
+	is False or `availability_mode` is "Stock Available", plan is optional
+	and the item falls through to capacity-based availability. Under
+	"Stock Available", `max_producible` is further raised by the read-only
+	raw-material top-up projection (`ury_projection_service`), while
+	`available_qty` remains the immediate recipe capacity. If
+	`allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
 	overridden by available recipe capacity.
 	"""
 	try:
@@ -510,9 +519,42 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	# exhausted (previously only the no-plan case respected this flag,
 	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
 	# explicitly off -- both cases must resolve the same way: capacity alone).
+	# "Stock Available" availability_mode forces the same capacity-only path,
+	# overriding controlled_by_sales_plan/allow_over_plan_sale.
 	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-	if not controlled_by_sales_plan:
+	stock_available_mode = config.get("availability_mode") == "Stock Available" if config else False
+	if not controlled_by_sales_plan or stock_available_mode:
 		response["available_qty"] = max(recipe_capacity, 0)
+		if stock_available_mode:
+			# Project additional capacity from raw materials for short
+			# PRE_PRODUCED components (read-only; no production documents).
+			# available_qty stays the immediate reservable quantity above;
+			# only the advisory max_producible is raised.
+			try:
+				projected = project_mto_capacity(
+					item_code,
+					company,
+					warehouse,
+					branch=branch,
+					department=department,
+					parent_components=components,
+					immediate_capacity=recipe_capacity,
+					allocatable_by_component={
+						component_item: projection["allocatable_qty"]
+						for component_item, projection in allocatable_by_component.items()
+					},
+				)
+				response["max_producible"] = max(
+					projected.get("max_producible", recipe_capacity), recipe_capacity
+				)
+			except Exception:
+				# Projection is advisory; a failure here must never break the
+				# stock-only availability response.
+				frappe.logger("ury_availability").exception(
+					"MTO capacity projection failed for {0}; falling back to recipe capacity".format(
+						item_code
+					)
+				)
 		if recipe_capacity <= 0:
 			response["reason_code"] = "BLOCKING_COMPONENT"
 			response["sellable"] = False
