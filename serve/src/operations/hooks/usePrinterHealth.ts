@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import type { Socket } from 'socket.io-client'
 import {
   fetchPrinterHealth,
   listPrintJobs,
@@ -8,6 +9,7 @@ import {
   type PrintJobRow,
 } from '../api/printers'
 import { PRINTER_POLL_MS } from '../constants'
+import { getRealtimeSocket } from '../../lib/realtime'
 import { extractServerErrorMessage } from '../types'
 import { getPrinterHealthSummary } from '../utils/printerStatus'
 import { usePollingGuard } from './usePollingGuard'
@@ -54,6 +56,35 @@ export function usePrinterHealth({
       }
     }
   )
+
+  // The 30s poll stays the baseline; a `printer_health_alert` socket event
+  // means a printer changed state, so refetch immediately instead of waiting
+  // for the next tick.
+  useEffect(() => {
+    if (!active) return
+
+    let activeSocket: Socket | null = null
+    let cancelled = false
+
+    const handleHealthAlert = () => {
+      void refresh()
+    }
+
+    getRealtimeSocket()
+      .then((s) => {
+        if (cancelled) return
+        activeSocket = s
+        s.on('printer_health_alert', handleHealthAlert)
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to printer health alerts:', error)
+      })
+
+    return () => {
+      cancelled = true
+      activeSocket?.off('printer_health_alert', handleHealthAlert)
+    }
+  }, [active, refresh])
 
   const loadJobs = useCallback(async (filters: PrintJobFilters = {}) => {
     setJobsLoading(true)

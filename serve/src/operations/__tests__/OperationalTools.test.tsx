@@ -15,6 +15,22 @@ vi.mock('../api/printers', () => ({
   listFailedPrintJobsForUser: vi.fn(),
 }))
 
+vi.mock('@ury/core', () => ({
+  call: {
+    get: vi.fn(),
+    post: vi.fn(),
+  },
+  db: {
+    getDocList: vi.fn(),
+  },
+}))
+
+vi.mock('../../lib/realtime', () => ({
+  getRealtimeSocket: vi.fn(() =>
+    Promise.resolve({ on: vi.fn(), off: vi.fn() })
+  ),
+}))
+
 vi.mock('../api/checklist', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/checklist')>()
   return {
@@ -28,6 +44,8 @@ vi.mock('../api/checklist', async (importOriginal) => {
 
 import { fetchClosingChecklist } from '../api/checklist'
 
+import { db } from '@ury/core'
+
 import {
   getUnreadNotificationCount,
   listNotificationPage,
@@ -40,6 +58,7 @@ const listNotifMock = vi.mocked(listNotificationPage)
 const markReadMock = vi.mocked(markNotificationAsRead)
 const healthMock = vi.mocked(fetchPrinterHealth)
 const jobsMock = vi.mocked(listPrintJobs)
+const getDocListMock = vi.mocked(db.getDocList)
 const closingFetchMock = vi.mocked(fetchClosingChecklist)
 
 describe('OperationalTools', () => {
@@ -49,6 +68,7 @@ describe('OperationalTools', () => {
     markReadMock.mockReset()
     healthMock.mockReset()
     jobsMock.mockReset()
+    getDocListMock.mockReset()
     closingFetchMock.mockReset()
 
     unreadMock.mockResolvedValue(2)
@@ -76,6 +96,7 @@ describe('OperationalTools', () => {
       ],
     })
     jobsMock.mockResolvedValue([])
+    getDocListMock.mockResolvedValue([])
   })
 
   it('polls unread on mount and opens paginated notifications', async () => {

@@ -10,10 +10,15 @@ import {
   Spinner,
   cn,
   messageToPlainText,
+  showToast,
 } from '@ury/ui'
 import type { PrintJobRow } from '../api/printers'
 import { useNotifications } from '../hooks/useNotifications'
 import { usePrinterHealth } from '../hooks/usePrinterHealth'
+import {
+  usePrintJobsRealtime,
+  type PrintFailureAlertPayload,
+} from '../hooks/usePrintJobsRealtime'
 import type { OperationsIdentityProps } from '../types'
 import { ClosingChecklist } from './OpeningChecklist'
 import {
@@ -66,6 +71,22 @@ export function OperationalTools({
     enabled: pollingEnabled && Boolean(user),
   })
 
+  const handlePrintFailureAlert = (payload: PrintFailureAlertPayload) => {
+    const reference =
+      payload.invoice || payload.reference_name || payload.print_job_id
+    const typeLabel = payload.job_type === 'KOT' ? 'KOT' : 'Invoice'
+    showToast.error(
+      `${typeLabel} printing failed for ${reference}: ${payload.reason || 'Printer error'}`,
+      { autoClose: false, closeOnClick: true }
+    )
+  }
+
+  const printJobs = usePrintJobsRealtime({
+    user,
+    enabled: pollingEnabled && Boolean(user),
+    onFailureAlert: handlePrintFailureAlert,
+  })
+
   useEffect(() => {
     if (notificationsOpen) {
       void notifications.openAndLoad()
@@ -75,9 +96,10 @@ export function OperationalTools({
   }, [notificationsOpen])
 
   // Full listing (limit *) once per open / sync — filter client-side like RN.
+  // The hook also resyncs on socket reconnect; this covers manual opens.
   useEffect(() => {
     if (jobsOpen) {
-      void printers.loadJobs({})
+      void printJobs.resync()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobsOpen])
@@ -86,15 +108,15 @@ export function OperationalTools({
     const fromHealth = printers.printers.map(
       (p) => p.printer_name || p.name || ''
     )
-    const fromJobs = printers.jobs.map(
+    const fromJobs = printJobs.jobs.map(
       (j) => j.printer_name || j.printer || ''
     )
     return Array.from(new Set([...fromHealth, ...fromJobs].filter(Boolean)))
-  }, [printers.printers, printers.jobs])
+  }, [printers.printers, printJobs.jobs])
 
   const visibleJobs = useMemo(
-    () => filterPrintJobs(printers.jobs, jobFilterPrinter, jobFilterStatus),
-    [printers.jobs, jobFilterPrinter, jobFilterStatus]
+    () => filterPrintJobs(printJobs.jobs, jobFilterPrinter, jobFilterStatus),
+    [printJobs.jobs, jobFilterPrinter, jobFilterStatus]
   )
 
   const indicatorClass =
@@ -370,10 +392,10 @@ export function OperationalTools({
             <div>
               <DialogTitle>Print jobs</DialogTitle>
               <p className="text-xs text-muted-foreground">
-                Synced {formatSyncTime(printers.jobsSyncedAt)} ·{' '}
+                Synced {formatSyncTime(printJobs.syncedAt)} ·{' '}
                 {visibleJobs.length}
-                {printers.jobs.length !== visibleJobs.length
-                  ? ` of ${printers.jobs.length}`
+                {printJobs.jobs.length !== visibleJobs.length
+                  ? ` of ${printJobs.jobs.length}`
                   : ''}{' '}
                 shown
               </p>
@@ -382,8 +404,8 @@ export function OperationalTools({
               type="button"
               variant="outline"
               size="sm"
-              disabled={printers.jobsLoading}
-              onClick={() => void printers.loadJobs({})}
+              disabled={printJobs.loading}
+              onClick={() => void printJobs.resync()}
             >
               Sync
             </Button>
@@ -422,13 +444,13 @@ export function OperationalTools({
             )}
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
-            {printers.jobsError && (
+            {printJobs.error && (
               <Alert variant="danger">
-                <p className="text-sm">{printers.jobsError}</p>
+                <p className="text-sm">{printJobs.error}</p>
               </Alert>
             )}
-            {printers.jobsLoading && <Spinner message="Loading jobs…" />}
-            {!printers.jobsLoading && visibleJobs.length === 0 && (
+            {printJobs.loading && <Spinner message="Loading jobs…" />}
+            {!printJobs.loading && visibleJobs.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No print jobs
               </p>
@@ -437,10 +459,10 @@ export function OperationalTools({
               <JobRow
                 key={job.name}
                 job={job}
-                selected={printers.selectedJob?.name === job.name}
+                selected={printJobs.selectedJob?.name === job.name}
                 onSelect={() =>
-                  printers.setSelectedJob(
-                    printers.selectedJob?.name === job.name ? null : job
+                  printJobs.setSelectedJob(
+                    printJobs.selectedJob?.name === job.name ? null : job
                   )
                 }
               />

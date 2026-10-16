@@ -20,7 +20,7 @@ From `serve/`:
 | `yarn dev` | Vite dev server |
 | `yarn build` | Build to `../ury/public/serve` and copy `index.html` to `../ury/www/serve.html` |
 | `yarn typecheck` | TypeScript project build check |
-| `yarn test` | Vitest (excludes `src/operations/**`; that suite has its own config) |
+| `yarn test` | Vitest (root suite + `src/operations/**` as a separate project; `src/operations/vitest.config.ts` still works standalone) |
 | `yarn lint` | ESLint |
 
 From the repo root:

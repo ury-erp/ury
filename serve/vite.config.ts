@@ -24,10 +24,27 @@ export default defineConfig({
     emptyOutDir: true,
   },
   test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-    globals: true,
-    // Operations suite has its own vitest config (mocked APIs).
-    exclude: ['**/node_modules/**', '**/src/operations/**'],
+    // Two vitest projects share this config's plugins/aliases:
+    // the app suite and the operations suite (mocked APIs).
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          globals: true,
+          setupFiles: './src/test/setup.ts',
+          exclude: ['**/node_modules/**', '**/src/operations/**'],
+        },
+      },
+      {
+        test: {
+          name: 'operations',
+          environment: 'jsdom',
+          globals: true,
+          setupFiles: './src/operations/__tests__/setup.ts',
+          include: ['**/src/operations/**/*.test.{ts,tsx}'],
+        },
+      },
+    ],
   },
 })
