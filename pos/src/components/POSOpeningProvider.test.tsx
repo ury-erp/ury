@@ -2,6 +2,16 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import POSOpeningProvider from "./POSOpeningProvider";
 
+let mockPathname = "/register";
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
+  return {
+    ...actual,
+    useLocation: () => ({ pathname: mockPathname }),
+  };
+});
+
 const { mockCheckPOSOpening, mockValidatePOSClose, mockGetChecklist, mockPosProfile } = vi.hoisted(() => ({
   mockCheckPOSOpening: vi.fn(),
   mockValidatePOSClose: vi.fn(),
@@ -71,6 +81,7 @@ vi.mock("../i18n", () => ({
 describe("POSOpeningProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPathname = "/register";
     mockGetChecklist.mockResolvedValue({ logStatus: "Complete" });
   });
 
@@ -215,5 +226,75 @@ describe("POSOpeningProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("opening-dialog")).toBeInTheDocument();
     });
+  });
+
+  it("does not show opening screen on /dashboard when no existing entry", async () => {
+    mockPathname = "/dashboard";
+    mockCheckPOSOpening.mockResolvedValueOnce({ message: 1 });
+    mockValidatePOSClose.mockResolvedValueOnce({ message: "Success" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Dashboard Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Content")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("opening-screen")).not.toBeInTheDocument();
+  });
+
+  it("does not show blocking dialog on /dashboard when daily close pending", async () => {
+    mockPathname = "/dashboard";
+    mockCheckPOSOpening.mockResolvedValueOnce({ message: 1 });
+    mockValidatePOSClose.mockResolvedValueOnce({ message: "Failed" });
+    mockPosProfile.custom_daily_pos_close = 1;
+
+    render(
+      <POSOpeningProvider>
+        <div>Dashboard Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Dashboard Content")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("opening-dialog")).not.toBeInTheDocument();
+    mockPosProfile.custom_daily_pos_close = 0;
+  });
+
+  it("shows opening screen when accessing /tables without existing entry", async () => {
+    mockPathname = "/tables";
+    mockCheckPOSOpening.mockResolvedValueOnce({ message: 1 });
+    mockValidatePOSClose.mockResolvedValueOnce({ message: "Success" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Tables Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Tables Content")).not.toBeInTheDocument();
+  });
+
+  it("shows opening screen when accessing /orders without existing entry", async () => {
+    mockPathname = "/orders";
+    mockCheckPOSOpening.mockResolvedValueOnce({ message: 1 });
+    mockValidatePOSClose.mockResolvedValueOnce({ message: "Success" });
+
+    render(
+      <POSOpeningProvider>
+        <div>Orders Content</div>
+      </POSOpeningProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("opening-screen")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Orders Content")).not.toBeInTheDocument();
   });
 });

@@ -454,6 +454,7 @@
     "payment_mode_misconfigured": "A payment method is not fully configured. Contact your manager.",
     "contact_manager": "Contact your manager",
     "retry": "Retry",
+    "back_to_dashboard": "Back to Dashboard",
     "error_loading": "Failed to load opening data. Please try again.",
     "error_opening": "Failed to open POS session. Please try again.",
     "opening_balance_help": "Opening Balance is the starting cash/payment amount you're declaring for this shift. It's used to reconcile against sales when you close out.",
