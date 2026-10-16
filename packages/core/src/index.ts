@@ -14,6 +14,7 @@ export {
 export type { ReturnContext, BuildDeskUrlOptions } from './frappe/deskLink';
 export type { POSCapabilities } from './frappe/roles';
 export type { User, PosProfileCombined } from './types';
+export { isPrintStatusDisabled } from './types';
 export { storage } from './storage';
 export {
   formatCurrency,

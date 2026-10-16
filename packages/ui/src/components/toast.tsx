@@ -29,6 +29,11 @@ const toastContent = (message: string) => (
   <span dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message) }} />
 );
 
+export interface ToastOptions {
+  autoClose?: number | false;
+  closeOnClick?: boolean;
+}
+
 export const showToast = {
   success: (message: string) => {
     toast.success(toastContent(message), {
@@ -45,12 +50,12 @@ export const showToast = {
       toastId: getToastId(message),
     });
   },
-  error: (message: string) => {
+  error: (message: string, options?: ToastOptions) => {
     toast.error(toastContent(message), {
       position: 'top-right',
-      autoClose: 2000,
+      autoClose: options?.autoClose ?? 2000,
       hideProgressBar: false,
-      closeOnClick: true,
+      closeOnClick: options?.closeOnClick ?? true,
       pauseOnHover: true,
       draggable: true,
       progress: undefined,

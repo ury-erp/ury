@@ -21,6 +21,13 @@ vi.mock("../i18n", () => ({
 
 vi.mock("@ury/core", () => ({
   formatInvoiceTime: (time: string) => "10:00 AM",
+  isPrintStatusDisabled: () => false,
+  storage: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 const mockTable: Table = {
@@ -148,7 +155,7 @@ describe("TableCard", () => {
       />
     );
 
-    const cardElement = screen.getByRole("button");
+    const cardElement = screen.getByText("Table-1").closest('[role="button"]')!;
     await userEvent.click(cardElement);
 
     expect(handleNavigate).toHaveBeenCalledTimes(1);

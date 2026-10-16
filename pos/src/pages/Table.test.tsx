@@ -70,6 +70,7 @@ vi.mock("@ury/core", () => ({
   formatCurrency: (amount: number) => `Rs. ${amount}`,
   canCaptainTransfer: vi.fn(() => false),
   isUserRestrictedFromTableOrders: vi.fn(() => false),
+  isPrintStatusDisabled: vi.fn(() => false),
 }));
 
 // Mock UI components
@@ -87,6 +88,11 @@ vi.mock("@ury/ui", () => ({
   },
   Card: ({ children }: any) => <div data-testid="card">{children}</div>,
   CardContent: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: any) => (open ? <div data-testid="dialog">{children}</div> : null),
+  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogHeader: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  DialogDescription: ({ children }: any) => <div>{children}</div>,
 }));
 
 // Mock dialog components
