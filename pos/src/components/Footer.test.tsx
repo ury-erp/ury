@@ -7,6 +7,10 @@ vi.mock("../i18n", () => ({
   t: (key: string) => key,
 }));
 
+vi.mock("./PrinterWatch", () => ({
+  PrinterStatusButton: () => null,
+}));
+
 describe("Footer", () => {
   const renderWithRouter = (component: React.ReactElement) => {
     return render(

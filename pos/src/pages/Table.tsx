@@ -22,12 +22,17 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import PrintJobsModal from '../components/PrintJobsModal';
+import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 
 const TableView = () => {
   const navigate = useNavigate();
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
+  const { hasTableFailed } = useOrdersPrintJobs();
+  const [printJobsModalOpen, setPrintJobsModalOpen] = useState(false);
+  const [selectedTableForPrintJobs, setSelectedTableForPrintJobs] = useState<string | null>(null);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -384,6 +389,11 @@ const TableView = () => {
       onNavigate={() => handleNavigateToPOS(table.name)}
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
+      onViewPrintJobs={() => {
+        setSelectedTableForPrintJobs(table.name);
+        setPrintJobsModalOpen(true);
+      }}
+      isPrintFailed={hasTableFailed(table.name)}
       isPrinting={printingTable === table.name}
     />
     );
@@ -570,6 +580,15 @@ const TableView = () => {
         }}
         currentCaptain={captainTransferContext?.currentCaptain ?? ''}
         onConfirm={handleCaptainTransferConfirm}
+      />
+
+      <PrintJobsModal
+        open={printJobsModalOpen}
+        onOpenChange={(open) => {
+          setPrintJobsModalOpen(open);
+          if (!open) setSelectedTableForPrintJobs(null);
+        }}
+        tableName={selectedTableForPrintJobs}
       />
 
       {/* Status Legend */}

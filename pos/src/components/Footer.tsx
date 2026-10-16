@@ -8,7 +8,10 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
+import { isPrintStatusDisabled } from '@ury/core';
 import { t } from '../i18n';
+import { PrinterStatusButton } from './PrinterWatch';
+import { usePOSStore } from '../store/pos-store';
 
 /**
  * The bottom rail is a *same-app* router. Cross-app jumps (the management SPA
@@ -22,6 +25,8 @@ import { t } from '../i18n';
  * ClipboardList) that were indistinguishable mid-shift.
  */
 const Footer = () => {
+  const { posProfile } = usePOSStore();
+  const printStatusDisabled = isPrintStatusDisabled(posProfile);
 
   const navItems = [
     { icon: Gauge, label: t('footer.dashboard'), path: '/dashboard' },
@@ -34,7 +39,12 @@ const Footer = () => {
 
   return (
     <div className="bg-white border-t border-border py-1.5 relative">
-      <nav className="max-w-screen-xl mx-auto px-4">
+      <div className="max-w-screen-xl mx-auto px-4 flex items-center justify-between">
+        {/* Left: printer status (fail-closed when the watch app is absent) */}
+        <div className="flex items-center flex-1">
+          {!printStatusDisabled && <PrinterStatusButton />}
+        </div>
+        <nav>
         <div className="flex justify-center items-center gap-1">
           {navItems.map((item) => (
             <NavLink
@@ -67,7 +77,10 @@ const Footer = () => {
             </NavLink>
           ))}
         </div>
-      </nav>
+        </nav>
+        {/* Right spacer mirrors the left slot so the nav stays centered */}
+        <div className="flex-1" />
+      </div>
     </div>
   );
 };

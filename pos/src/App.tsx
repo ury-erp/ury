@@ -23,6 +23,13 @@ import ChatWidget, {
   AiEnabledProvider,
   type ChatWidgetHandle,
 } from './components/chat/ChatWidget';
+import { PrinterWatchProvider } from './components/PrinterWatch';
+import { usePrintNotifications } from './lib/usePrintNotifications';
+
+function PrintNotificationListener() {
+  usePrintNotifications();
+  return null;
+}
 
 function useAiSettings() {
   // Fail-closed: no AI surface renders until the backend explicitly says
@@ -72,8 +79,9 @@ function App() {
     document.documentElement.lang = lang || 'en';
   }, []);
   return (
-    <>
+    <PrinterWatchProvider>
       <ToastProvider />
+      <PrintNotificationListener />
       <KotAlertListener />
       <ScreenSizeProvider>
         <AuthGuard>
@@ -136,7 +144,7 @@ function App() {
           </Router>
         </AuthGuard>
       </ScreenSizeProvider>
-    </>
+    </PrinterWatchProvider>
   );
 }
 

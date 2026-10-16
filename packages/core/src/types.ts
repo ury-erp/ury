@@ -58,4 +58,11 @@ export interface PosProfileCombined {
   remove_items?: number;
   show_image?: number;
   custom_enable_kot_reprint?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
+
+export const isPrintStatusDisabled = (
+  posProfile?: Partial<PosProfileCombined> | null
+): boolean => {
+  return Boolean(posProfile?.custom_disable_print_status_tracking);
+};

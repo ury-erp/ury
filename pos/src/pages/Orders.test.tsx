@@ -75,6 +75,7 @@ vi.mock("@ury/core", () => ({
   call: {
     get: vi.fn().mockResolvedValue({ message: { has_permission: true } }),
   },
+  isPrintStatusDisabled: vi.fn(() => false),
 }));
 
 // Mock order API
