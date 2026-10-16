@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Square } from 'lucide-react'
+import { AlertTriangle, Square, LogOut } from 'lucide-react'
 import {
   Button,
   MultiSelectTableDialog,
@@ -10,6 +10,7 @@ import {
   TablePickerDialog,
   UserPickerDialog,
 } from '@ury/ui'
+import { useRootStore } from '../store/root-store'
 import { useCaptainContext } from '../hooks/useCaptainContext'
 import { useServeStore } from '../store/serve-store'
 import {
@@ -53,6 +54,7 @@ export default function TablesPage() {
   } = useCaptainContext()
   const { hasUnsentDraft, draftTable, discardDraft, startTakeaway, getDraftDestination, needsReconcile } =
     useServeStore()
+  const logoutUser = useRootStore((s) => s.logoutUser)
 
   const currentUser = context?.user ?? null
   const canAccessOther = Boolean(capabilities?.canAccessOtherCaptainsTables)
@@ -80,6 +82,8 @@ export default function TablesPage() {
   const [transferInvoiceName, setTransferInvoiceName] = useState<string | null>(null)
   const [transferDestinations, setTransferDestinations] = useState<Table[]>([])
   const [transferLoading, setTransferLoading] = useState(false)
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const [captainTransferSource, setCaptainTransferSource] = useState<{
     table: Table
@@ -400,6 +404,16 @@ export default function TablesPage() {
               />
             )}
             <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Logout"
+              title="Logout"
+              onClick={() => setLogoutConfirmOpen(true)}
+            >
+              <LogOut className="h-5 w-5" aria-hidden />
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="min-h-11 px-3"
@@ -655,6 +669,25 @@ export default function TablesPage() {
           const next = pendingDestination
           setPendingDestination(null)
           if (next) navigateToDestination(next)
+        }}
+      />
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        onOpenChange={(open) => !isLoggingOut && setLogoutConfirmOpen(open)}
+        title="Logout"
+        description="Are you sure you want to logout?"
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        isSubmitting={isLoggingOut}
+        onConfirm={async () => {
+          setIsLoggingOut(true)
+          try {
+            await logoutUser()
+            setLogoutConfirmOpen(false)
+          } finally {
+            setIsLoggingOut(false)
+          }
         }}
       />
     </div>
