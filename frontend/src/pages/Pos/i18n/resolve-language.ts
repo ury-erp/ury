@@ -1,14 +1,5 @@
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from './config';
 
-/** Locale files use base codes; Frappe boot may send regional variants. */
-function matchSupportedLanguage(code: string | undefined | null): string | null {
-  if (!code) return null;
-  if (SUPPORTED_LANGUAGES[code]) return code;
-  const base = code.split(/[-_]/)[0];
-  if (base && SUPPORTED_LANGUAGES[base]) return base;
-  return null;
-}
-
 /**
  * Resolves the active language using the following priority:
  * 1. frappe.boot.lang (Frappe site config / user preference)
@@ -19,12 +10,15 @@ export function resolveLanguage(): string {
   // 1. Frappe boot object
   const frappeLang: string | undefined =
     (window as any)?.frappe?.boot?.lang;
-  const fromFrappe = matchSupportedLanguage(frappeLang);
-  if (fromFrappe) return fromFrappe;
+  if (frappeLang && SUPPORTED_LANGUAGES[frappeLang]) {
+    return frappeLang;
+  }
 
   // 2. Local storage override
-  const fromStorage = matchSupportedLanguage(localStorage.getItem('ury_language'));
-  if (fromStorage) return fromStorage;
+  const storedLang = localStorage.getItem('ury_language');
+  if (storedLang && SUPPORTED_LANGUAGES[storedLang]) {
+    return storedLang;
+  }
 
   return DEFAULT_LANGUAGE;
 }
