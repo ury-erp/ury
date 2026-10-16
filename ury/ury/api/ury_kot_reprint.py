@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
 from frappe.utils import cint
-from frappe.utils.print_format import print_by_server
 
 from ury.ury_pos.api import getBranch
 from ury.ury.doctype.ury_order.ury_order import _order_ownership_flags
@@ -70,8 +69,7 @@ def reprint_kot(invoice_number):
         if not printer:
             frappe.throw("No printer is assigned for reprinting KOT.")
 
-       
-        print_kot(printer, invoice_number, kot_print_format)
+        print_kot(printer, invoice_number, kot_print_format, restaurant_table, order_type)
 
 
         return "Success"
@@ -82,8 +80,19 @@ def reprint_kot(invoice_number):
         frappe.throw("An unexpected error occurred while reprinting KOT. Please check logs.")
 
 
-def print_kot(printer,docname, kot_print_format):
+def print_kot(printer, docname, kot_print_format, restaurant_table=None, order_type=None):
     try:
-        print_by_server("POS Invoice",docname, printer, kot_print_format)
+        printer_doc = frappe.get_doc("Network Printer Settings", printer)
+        printer_doc.print_doc(
+            doctype="POS Invoice",
+            name=docname,
+            print_format=kot_print_format,
+            job_type="KOT_REPRINT",
+            extra_metadata={
+                "invoice": docname,
+                "restaurant_table": restaurant_table,
+                "order_type": order_type,
+            },
+        )
     except Exception as e:
-        frappe.log_error(f"KOT Reprint Error: {e}")
+        frappe.log_error(f"KOT Reprint Error: {e}", "KOT Reprint Error")

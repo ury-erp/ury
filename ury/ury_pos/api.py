@@ -2434,3 +2434,12 @@ def ensure_payment_mode_accounts(modes, company):
         _ensure_mode_of_payment(mode, company)
         ensured.append(mode)
     return ensured
+
+
+@frappe.whitelist(allow_guest=False)
+def is_printer_watch_installed() -> dict:
+    try:
+        installed = "ury_printer_watch" in frappe.get_installed_apps()
+    except Exception:
+        installed = False
+    return {"installed": bool(installed)}

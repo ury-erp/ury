@@ -208,7 +208,8 @@ permission_query_conditions = {
 # Override standard doctype classes
 
 override_doctype_class = {
-	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog"
+	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog",
+	"Network Printer Settings": "ury.ury.printing.custom_network_printer_settings.CustomNetworkPrinterSettings",
 }
 
 # HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
@@ -242,6 +243,7 @@ doc_events = {
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "before_cancel": "ury.ury.hooks.ury_pos_invoice.before_cancel",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
@@ -329,6 +331,8 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs",
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
@@ -343,13 +347,13 @@ scheduler_events = {
 	},
 	"daily": [
 		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
-	]
+	],
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs",
+	],
 # 	"weekly": [
 # 		"ury.tasks.weekly"
 # 	],
@@ -679,7 +683,9 @@ fixtures = [
                     "POS Profile-custom_disposables",
                     "POS Profile-custom_column_break_bgzjv",
                     "POS Profile-custom_section_break_bmczy",
-                    "POS Profile-custom_ury_pos_configurations"
+                    "POS Profile-custom_ury_pos_configurations",
+                    "POS Profile-custom_disable_pos_invoice_cancellation_after_printing",
+                    "POS Profile-custom_disable_print_status_tracking",
                 },
             ]
         ],

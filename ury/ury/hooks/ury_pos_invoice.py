@@ -27,6 +27,23 @@ def before_submit(doc, method):
     apply_disposable_items(doc, method)
 
 
+def before_cancel(doc, method):
+    validate_cancellation(doc)
+
+
+def validate_cancellation(doc):
+    if not doc.pos_profile:
+        return
+
+    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
+
+    if (
+        pos_profile.get("custom_disable_pos_invoice_cancellation_after_printing") == 1
+        and doc.invoice_printed == 1
+    ):
+        frappe.throw("Cannot cancel POS Invoice after it has been printed")
+
+
 def on_trash(doc, method):
     table_status_delete(doc, method)
 
