@@ -11,6 +11,8 @@ lost.  Jobs are simply re-registered so the existing poller/monitor loop can
 continue tracking them to completion.
 """
 
+import os
+
 import frappe
 
 from ury.ury.printing.print_job_monitor import (
@@ -129,7 +131,10 @@ def reconcile_active_print_jobs():
 
         try:
             conn = cups.Connection(host=server_ip, port=port)
-            active_jobs = conn.getJobs(which_jobs="active") or {}
+            # "not-completed" is the standards-track IPP value (pending,
+            # held, processing, processing-stopped); CUPS >= 2.4 rejects the
+            # legacy "active" extension with error 1035.
+            active_jobs = conn.getJobs(which_jobs="not-completed") or {}
         except Exception as exc:
             summary["errors"].append(
                 f"CUPS query failed for {printer_setting_name} ({server_ip}:{port}): {exc}"
@@ -153,6 +158,28 @@ def reconcile_active_print_jobs():
                 continue
 
             invoice_name = attrs.get("job-name") if isinstance(attrs, dict) else None
+            doc_name = attrs.get("document-name-supplied") if isinstance(attrs, dict) else None
+            printer_uri = attrs.get("job-printer-uri") if isinstance(attrs, dict) else None
+            if not invoice_name and not doc_name:
+                # Some CUPS builds (e.g. 2.4.x) return bare job ids from
+                # Get-Jobs; enrich with a per-job attribute query.
+                try:
+                    full_attrs = conn.getJobAttributes(cups_job_id)
+                except Exception:
+                    full_attrs = {}
+                if isinstance(full_attrs, dict):
+                    invoice_name = full_attrs.get("job-name")
+                    doc_name = full_attrs.get("document-name-supplied")
+                    printer_uri = printer_uri or full_attrs.get("job-printer-uri")
+            # Get-Jobs without a printer filter returns every queue on the
+            # server; keep only jobs that belong to this setting's queue so
+            # shared CUPS servers never cross-match identities.
+            if printer_uri and not printer_uri.rstrip("/").endswith(f"/printers/{printer_name}"):
+                continue
+            if not invoice_name and doc_name:
+                # Some CUPS builds never return job-name at all; fall back to
+                # the submitted document name, which carries the document title.
+                invoice_name = os.path.splitext(os.path.basename(str(doc_name)))[0]
             if not invoice_name:
                 continue
 

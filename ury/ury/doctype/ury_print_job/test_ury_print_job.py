@@ -1,6 +1,10 @@
 # Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and Contributors
 # See license.txt
 
+import os
+import shutil
+import tempfile
+import time
 from unittest.mock import patch
 
 import frappe
@@ -8,8 +12,8 @@ from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_print import get_print_job_status
 from ury.ury.doctype.ury_print_job.ury_print_job import URYPrintJob
+from ury.ury.printing.file_store import get_job
 from ury.ury.printing.print_job_monitor import (
-    MONITOR_ZSET,
     get_due_print_jobs,
     register_print_job,
     stop_monitoring_print_job,
@@ -18,19 +22,15 @@ from ury.ury.printing.state_machine import COMPLETED, SUBMITTED
 
 
 class FakeCache:
-    """Minimal in-memory stand-in for the Frappe Redis cache client."""
+    """Minimal in-memory stand-in for the Frappe Redis cache client.
+
+    Only the sorted-set / string operations used by the monitor scheduler are
+    implemented; authoritative job metadata lives in the JSON file store.
+    """
 
     def __init__(self):
-        self.hashes = {}
         self.zsets = {}
         self.strings = {}
-        self.ttls = {}
-
-    def hset(self, name, key, value):
-        self.hashes.setdefault(name, {})[key] = value
-
-    def hget(self, name, key):
-        return self.hashes.get(name, {}).get(key)
 
     def zadd(self, name, mapping):
         self.zsets.setdefault(name, {}).update(mapping)
@@ -59,41 +59,30 @@ class FakeCache:
         if nx and name in self.strings:
             return None
         self.strings[name] = value
-        self.ttls[name] = ex
         return True
-
-    def delete(self, *keys):
-        for key in keys:
-            self.hashes.pop(key, None)
-            self.strings.pop(key, None)
-            self.ttls.pop(key, None)
 
     def delete_value(self, keys, make_keys=True):
         if not keys:
             return
         if isinstance(keys, str):
             keys = (keys,)
-        self.delete(*keys)
+        for key in keys:
+            self.strings.pop(key, None)
 
     def make_key(self, key):
         return key
-
-    def expire(self, name, time):
-        if name in self.hashes or name in self.strings:
-            self.ttls[name] = time
-        return True
-
-    def scan_iter(self, match=None):
-        import fnmatch
-
-        for key in list(self.hashes.keys()):
-            if match is None or fnmatch.fnmatch(key, match):
-                yield key
 
 
 class TestURYPrintJob(FrappeTestCase):
     def setUp(self):
         super().setUp()
+        self.jobs_dir = tempfile.mkdtemp(prefix="ury-print-jobs-")
+        self.dir_patch = patch(
+            "ury.ury.printing.file_store.get_print_jobs_dir",
+            return_value=self.jobs_dir,
+        )
+        self.dir_patch.start()
+
         self.fake = FakeCache()
         self.redis_patch = patch(
             "ury.ury.printing.print_job_monitor._redis",
@@ -103,6 +92,8 @@ class TestURYPrintJob(FrappeTestCase):
 
     def tearDown(self):
         self.redis_patch.stop()
+        self.dir_patch.stop()
+        shutil.rmtree(self.jobs_dir, ignore_errors=True)
         super().tearDown()
 
     def _sample_metadata(self, print_job_id):
@@ -121,11 +112,10 @@ class TestURYPrintJob(FrappeTestCase):
             "failure_reason": "",
         }
 
-    def test_load_doc_from_redis_matches_metadata(self):
-        """frappe.get_doc loads a virtual doc backed by Redis metadata."""
+    def test_load_doc_from_file_matches_metadata(self):
+        """frappe.get_doc loads a virtual doc backed by the JSON file store."""
         job_id = "PJ-LOAD-001"
-        metadata = self._sample_metadata(job_id)
-        register_print_job(metadata)
+        register_print_job(self._sample_metadata(job_id))
 
         doc = frappe.get_doc("URY Print Job", job_id)
 
@@ -143,7 +133,7 @@ class TestURYPrintJob(FrappeTestCase):
             frappe.get_doc("URY Print Job", "PJ-MISSING")
 
     def test_get_list_returns_active_jobs(self):
-        """frappe.get_list returns jobs currently in the monitor zset."""
+        """frappe.get_list returns jobs currently backed by JSON files."""
         for job_id in ("PJ-LIST-001", "PJ-LIST-002"):
             register_print_job(self._sample_metadata(job_id))
 
@@ -154,7 +144,7 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertIn("PJ-LIST-002", names)
 
     def test_get_count_matches_active_jobs(self):
-        """URYPrintJob.get_count reflects the Redis monitor zset size."""
+        """URYPrintJob.get_count reflects the number of active job files."""
         register_print_job(self._sample_metadata("PJ-COUNT-001"))
         register_print_job(self._sample_metadata("PJ-COUNT-002"))
 
@@ -174,29 +164,40 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertEqual(stats["total_jobs"], 2)
         self.assertEqual(stats["status_breakdown"].get(SUBMITTED), 2)
 
-    def test_delete_removes_job_from_redis(self):
-        """Deleting a virtual doc removes it from Redis."""
+    def test_delete_removes_job_file(self):
+        """Deleting a virtual doc removes its JSON file."""
         job_id = "PJ-DELETE-001"
         register_print_job(self._sample_metadata(job_id))
 
         doc = frappe.get_doc("URY Print Job", job_id)
         doc.delete()
 
-        self.assertNotIn(job_id, get_due_print_jobs())
-        self.assertIsNone(frappe.cache().hget(f"print_job:{job_id}", "data"))
+        self.assertIsNone(get_job(job_id))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.jobs_dir, f"{job_id}.json"))
+        )
 
-    def test_db_insert_and_db_update_are_no_ops(self):
-        """Virtual DocType db_insert/db_update must not write to MariaDB."""
+    def test_db_insert_and_db_update_persist_to_file_store(self):
+        """Virtual DocType db_insert/db_update write to the file store, not MariaDB."""
         doc = URYPrintJob({"doctype": "URY Print Job", "name": "PJ-NOOP-001"})
-        # These should not raise and should not touch MariaDB.
+        doc.status = SUBMITTED
         doc.db_insert()
-        doc.db_update()
+
+        stored = get_job("PJ-NOOP-001")
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.get("status"), SUBMITTED)
+
+        with patch("frappe.publish_realtime"):
+            doc.status = COMPLETED
+            doc.db_update()
+
+        stored = get_job("PJ-NOOP-001")
+        self.assertEqual(stored.get("status"), COMPLETED)
 
     def test_get_print_job_status_api_returns_metadata(self):
         """Whitelisted API returns the current print job metadata."""
         job_id = "PJ-API-001"
-        metadata = self._sample_metadata(job_id)
-        register_print_job(metadata)
+        register_print_job(self._sample_metadata(job_id))
 
         result = get_print_job_status(job_id)
 
@@ -213,28 +214,25 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertIn("not found", result["message"])
 
     def test_retained_jobs_are_listed_alongside_monitor_jobs(self):
-        """Jobs with retained Redis hashes are listed alongside active zset jobs."""
+        """Jobs whose file outlives monitor-zset membership are still listed."""
         job_id = "PJ-MONITOR-001"
         register_print_job(self._sample_metadata(job_id))
-        # Add another hash that is not in the monitor zset but still retained.
-        self.fake.hashes["print_job:PJ-ORPHAN"] = {"data": {"print_job_id": "PJ-ORPHAN"}}
+        # Simulate terminal state: leave the monitor zset but keep the JSON file.
+        stop_monitoring_print_job(job_id)
 
         results = frappe.get_list("URY Print Job")
         names = {r["name"] for r in results}
 
         self.assertIn(job_id, names)
-        self.assertIn("PJ-ORPHAN", names)
 
     def test_get_count_includes_completed_jobs(self):
-        """get_count includes jobs that have left the monitor zset but still have metadata."""
+        """get_count includes jobs that left the monitor zset but still have a file."""
         active_id = "PJ-COUNT-ACTIVE-001"
         completed_id = "PJ-COUNT-COMPLETED-001"
         register_print_job(self._sample_metadata(active_id))
         register_print_job(self._sample_metadata(completed_id))
 
-        # Simulate terminal state: remove from monitor zset but keep hash.
         stop_monitoring_print_job(completed_id)
-        self.fake.zsets[MONITOR_ZSET].pop(completed_id, None)
 
         count = URYPrintJob.get_count()
 
@@ -248,7 +246,6 @@ class TestURYPrintJob(FrappeTestCase):
         register_print_job(self._sample_metadata(completed_id))
 
         stop_monitoring_print_job(completed_id)
-        self.fake.zsets[MONITOR_ZSET].pop(completed_id, None)
 
         results = frappe.get_list("URY Print Job")
         names = {r["name"] for r in results}
@@ -257,15 +254,12 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertIn(completed_id, names)
 
     def test_pagination_ignores_dead_zset_entries(self):
-        """Pagination slices the valid-job list, not raw job_ids with dead zset members."""
-        # Register three valid jobs, then simulate a dead zset member.
-        register_print_job(self._sample_metadata("PJ-PAGE-001"))
-        register_print_job(self._sample_metadata("PJ-PAGE-002"))
-        register_print_job(self._sample_metadata("PJ-PAGE-003"))
-        # Orphaned zset member with no backing hash.
-        self.fake.zsets[MONITOR_ZSET]["PJ-DEAD-001"] = 0
+        """Jobs present in the zset but without a backing file are never listed."""
+        for job_id in ("PJ-PAGE-001", "PJ-PAGE-002", "PJ-PAGE-003"):
+            register_print_job(self._sample_metadata(job_id))
+        # Orphaned zset member with no backing JSON file.
+        self.fake.zsets["print_jobs:monitor"]["PJ-DEAD-001"] = 0
 
-        # Page length 2 should return exactly two valid jobs.
         results = URYPrintJob.get_list({"start": 0, "page_length": 2})
         names = [r["name"] for r in results]
 
@@ -289,3 +283,12 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertEqual(job["cups_job_id"], 42)
         self.assertEqual(job["invoice"], "INV-TEST-001")
 
+    def test_get_due_print_jobs_reads_monitor_zset(self):
+        """Due-job scheduling still uses the Redis monitor zset."""
+        register_print_job(self._sample_metadata("PJ-DUE-001"))
+
+        self.assertIn("PJ-DUE-001", get_due_print_jobs(now_ts=time.time() + 10))
+
+        stop_monitoring_print_job("PJ-DUE-001")
+
+        self.assertNotIn("PJ-DUE-001", get_due_print_jobs(now_ts=time.time() + 10))
