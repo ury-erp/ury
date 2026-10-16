@@ -2684,7 +2684,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     # invoice.owner = owner
     invoice.save()
 
-    # Allow submit without a prior print (Pay / Pay & Print in POS).
+    # Let validate_invoice_print skip during this submit.
     frappe.flags.ury_payment_submit = True
     try:
         invoice.submit()
