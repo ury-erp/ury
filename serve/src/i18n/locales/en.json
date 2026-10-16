@@ -448,5 +448,16 @@
     "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
     "confirm_zero_balance": "Confirm & Open",
     "session_opened_success": "POS session opened"
+  },
+  "login": {
+    "title": "URY Serve",
+    "username": "Username or Email",
+    "password": "Password",
+    "login": "Login",
+    "logging_in": "Logging in...",
+    "sign_in": "Login",
+    "signing_in": "Logging in...",
+    "error_empty": "Please enter both username and password."
   }
 }
+

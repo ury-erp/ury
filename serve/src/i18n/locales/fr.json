@@ -424,5 +424,16 @@
     "fail_remarks_placeholder": "Expliquez l'échec (requis)",
     "fail_remarks_required": "Des remarques sont requises pour les éléments en échec.",
     "incomplete_error": "Chaque élément doit être marqué PASS ou FAIL avant de terminer la checklist."
+  },
+  "login": {
+    "title": "URY Serve",
+    "username": "Nom d'utilisateur ou email",
+    "password": "Mot de passe",
+    "login": "Connexion",
+    "logging_in": "Connexion en cours...",
+    "sign_in": "Connexion",
+    "signing_in": "Connexion en cours...",
+    "error_empty": "Veuillez saisir votre identifiant et votre mot de passe."
   }
 }
+
