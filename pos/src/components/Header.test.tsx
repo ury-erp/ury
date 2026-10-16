@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import Header from "./Header";
 import { BrowserRouter } from "react-router-dom";
 
+const { mockIsPrintStatusDisabled } = vi.hoisted(() => ({
+  mockIsPrintStatusDisabled: vi.fn(),
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
   return {
@@ -17,6 +21,15 @@ vi.mock("@ury/core", () => ({
   logout: vi.fn().mockResolvedValue(undefined),
   withReturnContext: (path: string) => path,
   formatCurrency: (amount: number) => `Rs. ${amount}`,
+  isPrintStatusDisabled: mockIsPrintStatusDisabled,
+}));
+
+vi.mock("./PrinterWatch", () => ({
+  PrinterStatusButton: () => (
+    <button type="button" data-testid="printer-status-button">
+      Printer Status
+    </button>
+  ),
 }));
 
 vi.mock("../store/root-store", () => ({
@@ -38,6 +51,7 @@ vi.mock("../store/pos-store", () => ({
     searchQuery: "",
     setSearchQuery: vi.fn(),
     setShowVoluntaryClosing: vi.fn(),
+    posProfile: {},
   }),
 }));
 
@@ -60,6 +74,7 @@ describe("Header", () => {
     localStorage.clear();
     sessionStorage.clear();
     vi.clearAllMocks();
+    mockIsPrintStatusDisabled.mockReturnValue(false);
   });
 
   it("renders the header", () => {
@@ -119,5 +134,47 @@ describe("Header", () => {
 
     const logoLink = screen.getByAltText("URY POS").closest("a");
     expect(logoLink).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("renders the printer status button next to the user menu when enabled", () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const printerButton = screen.getByTestId("printer-status-button");
+    expect(printerButton).toBeInTheDocument();
+
+    const userButton = screen.getByRole("button", { name: /Test User/i });
+    // The printer button must sit immediately before the user menu in the
+    // right-side actions group.
+    expect(
+      printerButton.compareDocumentPosition(userButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("hides the printer status button when print status is disabled", () => {
+    mockIsPrintStatusDisabled.mockReturnValue(true);
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    expect(screen.queryByTestId("printer-status-button")).not.toBeInTheDocument();
+  });
+
+  it("renders only one user menu and one printer button", () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    expect(screen.getAllByRole("button", { name: /Test User/i })).toHaveLength(1);
+    expect(screen.getAllByTestId("printer-status-button")).toHaveLength(1);
   });
 });

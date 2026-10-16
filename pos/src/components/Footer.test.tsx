@@ -7,10 +7,6 @@ vi.mock("../i18n", () => ({
   t: (key: string) => key,
 }));
 
-vi.mock("./PrinterWatch", () => ({
-  PrinterStatusButton: () => null,
-}));
-
 describe("Footer", () => {
   const renderWithRouter = (component: React.ReactElement) => {
     return render(
@@ -68,5 +64,11 @@ describe("Footer", () => {
       expect(link).toBeEnabled();
       expect(link.tagName).toBe("A");
     });
+  });
+
+  it("does not render the printer status button (moved to the header)", () => {
+    renderWithRouter(<Footer />);
+
+    expect(screen.queryByRole("button", { name: /printer/i })).not.toBeInTheDocument();
   });
 });

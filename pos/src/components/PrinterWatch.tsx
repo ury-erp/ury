@@ -254,7 +254,7 @@ export function PrinterStatusButton() {
     <button
       type="button"
       onClick={open}
-      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
+      className="inline-flex h-7 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
       aria-label="Printer Status"
     >
       <Printer className="h-4 w-4 text-gray-600" />

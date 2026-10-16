@@ -14,8 +14,9 @@ import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout, withReturnContext } from '@ury/core';
+import { logout, withReturnContext, isPrintStatusDisabled } from '@ury/core';
 import { showToast } from '@ury/ui';
+import { PrinterStatusButton } from './PrinterWatch';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -23,7 +24,8 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+  const { searchQuery, setSearchQuery, setShowVoluntaryClosing, posProfile } = usePOSStore();
+  const printStatusDisabled = isPrintStatusDisabled(posProfile);
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -144,6 +146,8 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
+          {/* Printer status (fail-closed when the watch app is absent) */}
+          {!printStatusDisabled && <PrinterStatusButton />}
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button
