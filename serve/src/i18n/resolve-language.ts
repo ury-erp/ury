@@ -1,9 +1,6 @@
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from './config';
 
-/**
- * Map a Frappe / browser language code onto a supported locale.
- * Accepts exact codes (`es`) and regional variants (`es-CO`, `es_MX`).
- */
+/** Locale files use base codes; Frappe boot may send regional variants. */
 function matchSupportedLanguage(code: string | undefined | null): string | null {
   if (!code) return null;
   if (SUPPORTED_LANGUAGES[code]) return code;
