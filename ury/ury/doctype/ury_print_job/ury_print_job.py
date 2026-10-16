@@ -1,0 +1,276 @@
+# Copyright (c) 2026, Tridz Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.model.document import Document
+
+from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs, save_job
+
+
+class URYPrintJob(Document):
+    """Virtual DocType representing a transient URY print job.
+
+    The document is backed by atomic JSON files under the site's private
+    ``print_jobs`` directory.  No MariaDB table is created or written to.
+    """
+
+    def load_from_db(self):
+        """Load job metadata from its JSON file into the document."""
+        data = get_job(self.name)
+
+        if not data:
+            raise frappe.DoesNotExistError
+
+        super(Document, self).__init__(_serialize_for_document(data))
+
+    def db_insert(self, *args, **kwargs):
+        """Persist new job to file store."""
+        data = self.as_dict()
+        if getattr(self, "modified", None):
+            data["modified"] = str(self.modified)
+        if getattr(self, "creation", None):
+            data["creation"] = str(self.creation)
+        save_job(self.name, data)
+
+    def db_update(self, *args, **kwargs):
+        """Persist updated job to file store."""
+        existing = get_job(self.name) or {}
+        old_status = existing.get("status")
+        data = self.as_dict()
+        existing.update(data)
+        if getattr(self, "modified", None):
+            existing["modified"] = str(self.modified)
+        save_job(self.name, existing)
+
+        # Any status transition (including desk edits) emits the same event the
+        # CUPS poller publishes, so POS clients stay in sync without polling.
+        new_status = existing.get("status")
+        if new_status != old_status:
+            frappe.publish_realtime(
+                "print_job_status_updated",
+                {
+                    "print_job_id": self.name,
+                    "job_type": existing.get("job_type"),
+                    "reference_doctype": existing.get("reference_doctype"),
+                    "reference_name": existing.get("reference_name"),
+                    "invoice": existing.get("invoice")
+                    or (
+                        existing.get("reference_name")
+                        if existing.get("reference_doctype") == "POS Invoice"
+                        else None
+                    ),
+                    "status": new_status,
+                },
+            )
+
+        # If status transitioned to FAILED, publish failure alert to job_owner
+        if new_status == "FAILED" and old_status != "FAILED":
+            from ury.ury.printing.notifications import notify_print_failure
+
+            notify_print_failure(
+                invoice=existing.get("invoice") or existing.get("reference_name"),
+                print_job_id=self.name,
+                printer_name=existing.get("printer_name") or existing.get("printer"),
+                reason=existing.get("failure_reason") or "Manual status update to FAILED",
+                job_type=existing.get("job_type", "BILL"),
+                reference_doctype=existing.get("reference_doctype"),
+                reference_name=existing.get("reference_name"),
+                job_owner=existing.get("job_owner") or existing.get("owner"),
+            )
+
+    def delete(self, *args, **kwargs):
+        """Delete the JSON file instead of removing a DB row."""
+        delete_job(self.name)
+
+    @staticmethod
+    def get_list(args=None):
+        """Return active print jobs stored as JSON files.
+
+        Collects non-expired job records from the file store, applies filtering
+        and field projection, and returns paginated results sorted newest-first.
+        """
+        args = args or {}
+        start = int(args.get("start") or 0)
+        page_length = int(args.get("page_length") or 20)
+
+        jobs = list_all_jobs(max_age_seconds=7200)
+        requested_fields = _parse_requested_fields(args.get("fields"))
+        filters = _normalize_filters(args.get("filters"))
+
+        valid_jobs = []
+        for data in jobs:
+            doc = _serialize_for_document(data)
+
+            if filters and not _matches_filters(doc, filters):
+                continue
+
+            if requested_fields:
+                doc_projected = {
+                    key: doc.get(key) for key in requested_fields if key in doc
+                }
+                # Always preserve name for Frappe Desk list view UI.
+                doc_projected["name"] = doc.get("name")
+                valid_jobs.append(doc_projected)
+            else:
+                valid_jobs.append(doc)
+
+        return valid_jobs[start : start + page_length]
+
+    @staticmethod
+    def get_count(args=None):
+        """Return total count of non-expired print job records."""
+        args = args or {}
+        jobs = list_all_jobs(max_age_seconds=7200)
+        filters = _normalize_filters(args.get("filters"))
+
+        if not filters:
+            return len(jobs)
+
+        count = 0
+        for data in jobs:
+            doc = _serialize_for_document(data)
+            if _matches_filters(doc, filters):
+                count += 1
+        return count
+
+    @staticmethod
+    def get_stats(args=None):
+        """Return lightweight aggregate stats for active jobs."""
+        jobs = list_all_jobs(max_age_seconds=7200)
+        statuses = {}
+        for data in jobs:
+            status = data.get("status") or "Unknown"
+            statuses[status] = statuses.get(status, 0) + 1
+
+        return {
+            "total_jobs": len(jobs),
+            "status_breakdown": statuses,
+        }
+
+
+def _serialize_for_document(data):
+    """Convert raw file-store metadata into a Frappe Document-compatible dict."""
+    out = frappe._dict(data)
+    out.name = out.get("print_job_id") or out.get("name")
+    out.doctype = "URY Print Job"
+
+    # Ensure list-view / document contract fields are present.
+    job_owner = out.get("job_owner") or out.get("owner") or out.get("user") or "Administrator"
+    out.job_owner = job_owner
+    out.owner = out.get("owner") or job_owner
+    out.modified_by = out.get("modified_by") or job_owner
+    out.creation = out.get("created_at") or out.get("creation") or "2026-01-01 00:00:00"
+    out.modified = out.get("modified") or out.get("last_checked_at") or out.creation
+    out._comment_count = out.get("_comment_count", 0)
+
+    # Normalize the invoice identifier so filters on `invoice` work for all
+    # job types, including POS Invoice jobs that only store `reference_name`.
+    out.invoice = out.get("invoice") or (
+        out.get("reference_name") if out.get("reference_doctype") == "POS Invoice" else None
+    )
+
+    # Normalize table / restaurant_table
+    out.table = out.get("table") or out.get("restaurant_table")
+
+    return out
+
+
+def _parse_requested_fields(fields):
+    """Extract field names from a Frappe reportview fields list.
+
+    Handles strings such as ``"`tabURY Print Job`.`name`"`` and
+    ``"`name`"``. Returns a list of field names, or an empty list when no
+    fields are requested (meaning the caller wants the full document).
+    """
+    if not fields:
+        return []
+
+    if isinstance(fields, str):
+        try:
+            fields = frappe.parse_json(fields)
+        except Exception:
+            fields = [fields]
+
+    parsed = []
+    for field in fields:
+        if not isinstance(field, str):
+            continue
+        cleaned = field.strip().strip("`")
+        if "." in cleaned:
+            cleaned = cleaned.split(".")[-1].strip().strip("`")
+        if cleaned:
+            parsed.append(cleaned)
+
+    return parsed
+
+
+def _normalize_filters(filters):
+    """Return a list of ``(fieldname, operator, value)`` tuples.
+
+    Accepts dicts, lists of tuples/lists, or single tuples/lists as returned
+    by Frappe list views and reportview APIs.
+    """
+    if not filters:
+        return []
+
+    if isinstance(filters, str):
+        try:
+            filters = frappe.parse_json(filters)
+        except Exception:
+            filters = []
+
+    if not filters:
+        return []
+
+    normalized = []
+
+    if isinstance(filters, dict):
+        for fname, fval in filters.items():
+            normalized.append((fname, "=", fval))
+    elif isinstance(filters, (list, tuple)):
+        for f in filters:
+            if isinstance(f, dict):
+                for fname, fval in f.items():
+                    normalized.append((fname, "=", fval))
+            elif isinstance(f, (list, tuple)):
+                if len(f) == 4:
+                    normalized.append((f[1], f[2], f[3]))
+                elif len(f) >= 3:
+                    normalized.append((f[0], f[1], f[2]))
+
+    return normalized
+
+
+def _matches_filters(doc, filters):
+    """Return True when ``doc`` satisfies all supplied filters."""
+    for fname, fop, fval in filters:
+        if "." in str(fname):
+            fname = str(fname).split(".")[-1]
+
+        if fname not in doc:
+            return False
+
+        doc_value = doc.get(fname)
+
+        if fop == "=":
+            if doc_value == fval:
+                continue
+            # Fallback: POS Invoice jobs may match by reference_name even when
+            # the caller filters on `invoice`.
+            if (
+                fname == "invoice"
+                and doc.get("reference_doctype") == "POS Invoice"
+                and doc.get("reference_name") == fval
+            ):
+                continue
+            return False
+        elif fop == "like":
+            needle = str(fval).replace("%", "").lower()
+            haystack = str(doc_value or "").lower()
+            if needle not in haystack:
+                return False
+        else:
+            # Unsupported operators are treated as no-match to stay safe.
+            return False
+
+    return True

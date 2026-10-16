@@ -398,6 +398,20 @@ def get_custom_fields():
 				"insert_after": "qz_print",
 				"label": "QZ Host",
 				"translatable": 0,
+			},
+			{
+				"fieldname": "custom_disable_pos_invoice_cancellation_after_printing",
+				"fieldtype": "Check",
+				"insert_after": "qz_host",
+				"label": "Disable POS Invoice cancellation after printing",
+				"description": "If enabled, POS Invoices cannot be cancelled after they are printed.",
+			},
+			{
+				"fieldname": "custom_disable_print_status_tracking",
+				"fieldtype": "Check",
+				"insert_after": "custom_disable_pos_invoice_cancellation_after_printing",
+				"label": "Disable Print & Printer Status Tracking",
+				"description": "When enabled, stops background CUPS polling, Redis print monitoring, and hides print/printer status indicators in POS.",
 			}
 		],
   
