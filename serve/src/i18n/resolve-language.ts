@@ -1,13 +1,16 @@
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from './config';
 
-/** Minimal Frappe boot shape used for language detection on desk/portal pages. */
-type FrappeBootWindow = Window & {
-  frappe?: {
-    boot?: {
-      lang?: string;
-    };
-  };
-};
+/**
+ * Map a Frappe / browser language code onto a supported locale.
+ * Accepts exact codes (`es`) and regional variants (`es-CO`, `es_MX`).
+ */
+function matchSupportedLanguage(code: string | undefined | null): string | null {
+  if (!code) return null;
+  if (SUPPORTED_LANGUAGES[code]) return code;
+  const base = code.split(/[-_]/)[0];
+  if (base && SUPPORTED_LANGUAGES[base]) return base;
+  return null;
+}
 
 /**
  * Resolves the active language using the following priority:
@@ -18,16 +21,13 @@ type FrappeBootWindow = Window & {
 export function resolveLanguage(): string {
   // 1. Frappe boot object
   const frappeLang: string | undefined =
-    (window as FrappeBootWindow).frappe?.boot?.lang;
-  if (frappeLang && SUPPORTED_LANGUAGES[frappeLang]) {
-    return frappeLang;
-  }
+    (window as any)?.frappe?.boot?.lang;
+  const fromFrappe = matchSupportedLanguage(frappeLang);
+  if (fromFrappe) return fromFrappe;
 
   // 2. Local storage override
-  const storedLang = localStorage.getItem('ury_language');
-  if (storedLang && SUPPORTED_LANGUAGES[storedLang]) {
-    return storedLang;
-  }
+  const fromStorage = matchSupportedLanguage(localStorage.getItem('ury_language'));
+  if (fromStorage) return fromStorage;
 
   return DEFAULT_LANGUAGE;
 }
