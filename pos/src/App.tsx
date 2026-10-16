@@ -77,21 +77,21 @@ function App() {
       <KotAlertListener />
       <ScreenSizeProvider>
         <AuthGuard>
-          <POSOpeningProvider>
-            {/*
-              PLAN.md item 4: ActiveReportProvider + the floating ChatWidget
-              are mounted once here, wrapping the whole routed app shell, so
-              every page under both the pos/ dashboard routes and the
-              captain "Order" routes shares one chat instance and one
-              active-report context. ChatWidgetRefProvider hands the same
-              instance's ref down to any page's ⌘K AskBar (see
-              components/chat/AskBar.tsx) without prop-threading it through
-              AppLayout.
-            */}
-            <ActiveReportProvider>
-              <AiEnabledProvider enabled={aiEnabled}>
-                <ChatWidgetRefProvider chatRef={chatRef}>
-                  <Router basename="/pos">
+          <Router basename="/pos">
+            <POSOpeningProvider>
+              {/*
+                PLAN.md item 4: ActiveReportProvider + the floating ChatWidget
+                are mounted once here, wrapping the whole routed app shell, so
+                every page under both the pos/ dashboard routes and the
+                captain "Order" routes shares one chat instance and one
+                active-report context. ChatWidgetRefProvider hands the same
+                instance's ref down to any page's ⌘K AskBar (see
+                components/chat/AskBar.tsx) without prop-threading it through
+                AppLayout.
+              */}
+              <ActiveReportProvider>
+                <AiEnabledProvider enabled={aiEnabled}>
+                  <ChatWidgetRefProvider chatRef={chatRef}>
                     <Routes>
                       <Route element={<AppLayout />}>
                         <Route index element={<Navigate to="/dashboard" replace />} />
@@ -128,12 +128,12 @@ function App() {
                         }
                       />
                     </Routes>
-                  </Router>
-                  {aiEnabled && <ChatWidget ref={chatRef} />}
-                </ChatWidgetRefProvider>
-              </AiEnabledProvider>
-            </ActiveReportProvider>
-          </POSOpeningProvider>
+                    {aiEnabled && <ChatWidget ref={chatRef} />}
+                  </ChatWidgetRefProvider>
+                </AiEnabledProvider>
+              </ActiveReportProvider>
+            </POSOpeningProvider>
+          </Router>
         </AuthGuard>
       </ScreenSizeProvider>
     </>

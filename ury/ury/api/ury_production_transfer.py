@@ -163,7 +163,7 @@ def generate_transfer_material_request_for_production_plan(production_plan):
 	bucket, blockers = _compile_department_bucket(sales_plan_doc, department)
 	blockers = list(blockers)
 
-	store_warehouse = get_store_warehouse()
+	store_warehouse = get_store_warehouse(plan_doc.get("company"))
 	readiness = compute_readiness({department: bucket}, store_warehouse=store_warehouse)
 	blockers.extend(readiness["blockers"])
 
@@ -384,7 +384,7 @@ def execute_store_to_department_transfer(production_plan):
 
 	sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, sales_plan)
 
-	store_warehouse = get_store_warehouse()
+	store_warehouse = get_store_warehouse(plan_doc.get("company"))
 	if not store_warehouse:
 		return {
 			"production_plan": production_plan,

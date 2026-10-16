@@ -125,7 +125,7 @@ export function MultiSelect({
         width: `${portalStyle.width}px`,
         maxHeight: portalStyle.maxHeight ? `${portalStyle.maxHeight}px` : undefined,
       }}
-      className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto p-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+      className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto p-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
     >
       {options.length > 5 && (
         <div className="p-1 mb-1 border-b border-gray-100">
@@ -173,7 +173,7 @@ export function MultiSelect({
           isOpen ? 'border-primary ring-2 ring-primary/20' : 'border-gray-300 hover:border-gray-400'
         } ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''}`}
       >
-        <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+        <div className="flex flex-wrap items-start content-start gap-1.5 flex-1 min-w-0 max-h-[85px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {selectedOptions.length > 0 ? (
             selectedOptions.map((opt) => (
               <Badge

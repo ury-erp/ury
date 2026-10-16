@@ -3,6 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import { buttonVariants, KpiStrip, Spinner } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
 import { buildDashboardStatsKpiItems, summaryToDashboardStats } from '../../lib/dashboardStatsKpis';
+import { useCurrency } from '../../context/CurrencyContext';
 
 interface LinkCardProps {
   label: string;
@@ -30,9 +31,10 @@ interface KPIGridProps {
 }
 
 export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
+  const { currencyFor } = useCurrency();
   const kpiItems = useMemo(
-    () => buildDashboardStatsKpiItems(summaryToDashboardStats(summary), { loading }),
-    [summary, loading],
+    () => buildDashboardStatsKpiItems(summaryToDashboardStats(summary), { loading, currencyFor }),
+    [summary, loading, currencyFor],
   );
 
   return (

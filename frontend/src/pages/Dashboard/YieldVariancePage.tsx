@@ -13,6 +13,7 @@ import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
 import { menuAvailabilityService } from '../../services/menuAvailability';
+import { format as formatDate } from 'date-fns';
 
 interface YieldVarianceRow {
   name: string;
@@ -28,7 +29,11 @@ const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: 'All items' };
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
-  return new Date(value).toLocaleString();
+  try {
+    return formatDate(new Date(value), 'yyyy-MM-dd hh:mm:ss a');
+  } catch {
+    return new Date(value).toLocaleString();
+  }
 };
 
 const formatPercent = (value: number) => {

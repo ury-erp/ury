@@ -970,6 +970,256 @@ class TestSalesPlanCommitWiring(FrappeTestCase):
         mock_apply.assert_not_called()
 
 
+class TestStockAvailableSalesPlanCounters(FrappeTestCase):
+    """Stock Available is an availability mode, not a production policy.
+
+    Reservations created under it bypass Sales Plan gating at the
+    availability layer, so they must never touch the Sales Plan
+    committed_qty/fulfilled_qty counters -- not at create, and not on any
+    status transition (release/cancel/expire/fulfil) that would reverse one.
+    """
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_create_reservation_skips_commit_delta_for_stock_available(self):
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta",
+            return_value={"name": "PLI-1", "committed_qty": 4, "fulfilled_qty": 0},
+        ) as mock_apply:
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+                frozen_context={"department": "Hot Line", "availability_mode": "Stock Available"},
+            )
+
+        mock_apply.assert_not_called()
+        audit = json.loads(created[0]["audit_log"])
+        frozen = audit[0]["frozen_context"]
+        self.assertEqual(frozen["availability_mode"], "Stock Available")
+        commit_info = frozen["sales_plan_commit"]
+        self.assertFalse(commit_info["applied"])
+        self.assertIsNone(commit_info["plan_item"])
+
+    def test_create_reservation_resolves_mode_when_frozen_context_omits_it(self):
+        """A direct/legacy caller without the mode in frozen_context falls back
+        to the canonical resolver; a Stock Available resolution skips the
+        counter delta and freezes the resolved mode onto the group."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.resolve_production_context",
+            return_value=frappe._dict({"availability_mode": "Stock Available"}),
+        ) as mock_resolve, patch(
+            f"{MODULE}.apply_commit_delta",
+            return_value={"name": "PLI-1", "committed_qty": 4, "fulfilled_qty": 0},
+        ) as mock_apply:
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+                frozen_context={"department": "Hot Line"},
+            )
+
+        mock_resolve.assert_called_once_with(
+            "ITEM-SIMPLE", "Branch A", company="Company A", department="Hot Line"
+        )
+        mock_apply.assert_not_called()
+        audit = json.loads(created[0]["audit_log"])
+        frozen = audit[0]["frozen_context"]
+        self.assertEqual(frozen["availability_mode"], "Stock Available")
+        self.assertFalse(frozen["sales_plan_commit"]["applied"])
+
+    def _rows_with_mode(self, status, availability_mode, qty=4, applied=False):
+        frozen_context = {
+            "availability_mode": availability_mode,
+            "sales_plan_commit": {
+                "applied": applied,
+                "item_code": "ITEM-SIMPLE",
+                "branch": "Branch A",
+                "company": "Company A",
+                "department": "Hot Line",
+                "qty": qty,
+                "plan_item": "PLI-1" if applied else None,
+            },
+        }
+        audit_log = json.dumps([{"event": "create", "frozen_context": frozen_context}])
+        return [
+            frappe._dict(
+                {"name": "RES-1", "status": status, "reservation_group": "GRP9", "audit_log": audit_log}
+            )
+        ]
+
+    def _sql_side_effect(self, rows):
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                for row in rows:
+                    if row.get("name") == values["name"]:
+                        return [frappe._dict({"reservation_group": row.get("reservation_group")})]
+                return []
+            if values and "group" in values:
+                return [frappe._dict(dict(row)) for row in rows if row.get("reservation_group") == values["group"]]
+            return []
+
+        return _sql
+
+    def test_release_reservation_skips_commit_delta_for_stock_available(self):
+        """A Stock Available group's frozen context must never be counter-reversed.
+
+        The audit entry is deliberately recorded with
+        sales_plan_commit.applied=True (a group whose frozen context carried
+        the mode without going through create_reservation's skip), so this
+        exercises the defense-in-depth guard in _transition_group rather than
+        merely the `_group_sales_plan_commit` applied=False short-circuit.
+        """
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_mode(RESERVED, "Stock Available", applied=True)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1", reason="order cancelled before production")
+
+        mock_apply.assert_not_called()
+
+    def test_fulfil_reservation_skips_commit_delta_for_stock_available(self):
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_mode(RESERVED, "Stock Available", applied=True)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            fulfil_reservation("RES-1")
+
+        mock_apply.assert_not_called()
+
+    def test_plan_available_reservation_still_calls_commit_delta(self):
+        """Regression: Plan Available (or any non-Stock-Available mode) keeps
+        the existing commit-delta behaviour end to end."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta",
+            return_value={"name": "PLI-1", "committed_qty": 4, "fulfilled_qty": 0},
+        ) as mock_apply:
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+                frozen_context={"department": "Hot Line", "availability_mode": "Plan Available"},
+            )
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE", "Branch A", "Company A", department="Hot Line", committed_delta=4
+        )
+
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_mode(RESERVED, "Plan Available", qty=4, applied=True)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-4,
+            fulfilled_delta=0,
+        )
+
+        rows = self._rows_with_mode(RESERVED, "Plan Available", qty=4, applied=True)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            fulfil_reservation("RES-1")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-4,
+            fulfilled_delta=4,
+        )
+
+
 class TestRealtimeEventEmission(FrappeTestCase):
 	"""Tests for realtime event emissions on reservation create/release."""
 

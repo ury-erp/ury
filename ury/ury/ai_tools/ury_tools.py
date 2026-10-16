@@ -5,28 +5,25 @@ deterministic data source (service line, dashboard stats, report_api). None
 of them write or mutate anything, and every one enforces the same manager
 role check used by report_api (`report_api.utils.require_manager`).
 
-This module has no dependency on HUF itself — registering these functions as
-HUF tools is PR-B scope (see PLAN.md item 1/6). Until then they are just
-ordinary whitelisted `ury` endpoints, independently callable/testable.
+This module has no dependency on HUF itself — `ury_tools_registry.py`
+registers these (and `ury_ops_tools.py`'s stock/production/variance tools)
+as HUF Agent Tools. The report tools are driven by `ury_report_catalog`.
 """
 
 import frappe
-from frappe.utils import add_to_date, get_datetime, today
+from frappe.utils import get_datetime
 
 from ury.ury.api.ury_dashboard import get_needs_attention
 from ury.ury.api.ury_dashboard import get_shift_metrics as _dashboard_get_shift_metrics
 from ury.ury.api.ury_service_line import get_service_line
 from ury.ury.report_api.utils import require_manager
 
-from ury.ury.report_api import customers as _customers
-from ury.ury.report_api import employees as _employees
-from ury.ury.report_api import financial as _financial
-from ury.ury.report_api import items as _items
-from ury.ury.report_api import operations as _operations
-from ury.ury.report_api import sales as _sales
+from ury.ury.ai_tools import ury_report_catalog as _catalog
+from ury.ury.ai_tools.ury_report_catalog import llm_sized
 
 
 @frappe.whitelist(methods=["GET"])
+@llm_sized
 def get_floor_state(branch=None):
 	"""Table/floor status summary. Reuses `ury_service_line.get_service_line`
 	(per-table stage: open/seated/fired/served/over) — same source the
@@ -36,6 +33,7 @@ def get_floor_state(branch=None):
 
 
 @frappe.whitelist(methods=["GET"])
+@llm_sized
 def get_open_exceptions(branch=None):
 	"""Currently-open "needs attention" items (pending payments, long-held
 	tables, KOT errors, unclosed POS sessions). Reuses
@@ -45,6 +43,7 @@ def get_open_exceptions(branch=None):
 
 
 @frappe.whitelist(methods=["GET"])
+@llm_sized
 def get_shift_metrics(window="today", branch=None):
 	"""Sales/covers/avg-bill for the given window. Only `window="today"` is
 	currently supported (the underlying dashboard stats are scoped to the
@@ -69,6 +68,7 @@ def _median(values):
 
 
 @frappe.whitelist(methods=["GET"])
+@llm_sized
 def get_baseline(weekday=None, hour=None, branch=None, weeks=6):
 	"""Median sales/covers for the same weekday+hour window over the last
 	`weeks` weeks — "a normal <weekday>" baseline for comparison against
@@ -137,109 +137,81 @@ def get_baseline(weekday=None, hour=None, branch=None, weeks=6):
 	return result
 
 
-# slug -> (function, required args not covered by defaults)
-# Mirrors frontend/src/pages/Reports/reportsRegistry.ts exactly.
-_REPORT_DISPATCH = {
-	"today-sales": _sales.get_today_sales,
-	"daywise-sales": _sales.get_daywise_sales,
-	"daywise-invoices": _sales.get_daywise_invoices,
-	"month-wise-sales": _sales.get_month_wise_sales,
-	"time-wise-sales": _sales.get_time_wise_sales,
-	"service-wise-sales": _sales.get_service_wise_sales,
-	"cancelled-invoices": _sales.get_cancelled_invoices,
-	"average-bill-value": _sales.get_average_bill_value,
-	"item-wise-sales": _items.get_item_wise_sales,
-	"item-wise-purchase-history": _items.get_item_wise_purchase_history,
-	"customer-data": _customers.get_customer_data,
-	"daywise-customer-details": _customers.get_daywise_customer_details,
-	"repeated-customers": _customers.get_repeated_customers,
-	"employee-sales": _employees.get_employee_sales,
-	"employee-item-wise-sales": _employees.get_employee_item_wise_sales,
-	"completed-work-orders": _operations.get_completed_work_orders,
-	"daily-pnl": _financial.get_daily_pnl,
-}
-
-# Slugs whose underlying report function requires start_date/end_date and has
-# no default — default both to today() when the caller didn't supply them, so
-# an AI caller can ask for a snapshot without knowing the report's exact
-# signature.
-_DEFAULT_TO_TODAY_RANGE = {
-	"daywise-sales",
-	"daywise-invoices",
-	"service-wise-sales",
-	"cancelled-invoices",
-	"average-bill-value",
-	"item-wise-sales",
-	"item-wise-purchase-history",
-	"daywise-customer-details",
-	"repeated-customers",
-	"employee-sales",
-	"employee-item-wise-sales",
-	"completed-work-orders",
-}
-
-# customer-data additionally requires a specific customer; daily-pnl requires
-# a specific branch and date. Both are left to the caller via `filters` —
-# there is no sane default customer/branch to guess.
+@frappe.whitelist(methods=["GET"])
+@llm_sized
+def list_reports():
+	"""Catalog of every report the assistant can run (slug, label, group,
+	description) — see `ury_report_catalog.REPORTS`. Lets HUF answer "do you
+	have a report on X" without any DB round-trip."""
+	require_manager()
+	return {
+		"reports": _catalog.catalog_summary(),
+		"period_presets": _catalog.PERIOD_PRESETS,
+		"hint": "Call ury_describe_report(slug) for a report's exact filters before running it.",
+	}
 
 
 @frappe.whitelist(methods=["GET"])
-def get_report_snapshot(report_slug, filters=None):
-	"""Dispatch `report_slug` (e.g. "today-sales", "item-wise-sales") to the
-	matching `report_api` function and return its JSON result, applying a
-	sensible default of "today" for reports whose date range isn't supplied.
+@llm_sized
+def describe_report(report_slug):
+	"""Filters (name, type, required, default) and an example call for one report."""
+	require_manager()
+	return _catalog.describe(report_slug)
 
-	`filters` is a dict of keyword arguments forwarded to the underlying
-	report function (e.g. {"branch": "...", "start_date": "...",
-	"end_date": "..."}). Each report_api function performs its own
-	`require_manager()` check; we also check here so an unknown/mistyped
-	slug fails the same permission gate before we even look it up.
+
+@frappe.whitelist(methods=["GET"])
+@llm_sized
+def get_report_snapshot(report_slug, filters=None, max_rows=None):
+	"""Run any catalog report (`report_api` JSON function or Frappe Desk
+	report) and return its data as JSON.
+
+	`filters` is a dict or JSON string of the report's filters, e.g.
+	{"branch": "URY Muscat", "period": "last_month"} or explicit
+	start_date/end_date. Required filters with a sensible default (dates →
+	today) are filled in; a missing required filter with no default (e.g.
+	branch, customer) returns a clear error naming it. Long row lists are
+	capped and marked `_truncated`.
 	"""
 	require_manager()
-
-	fn = _REPORT_DISPATCH.get(report_slug)
-	if not fn:
-		frappe.throw(f"Unknown report_slug: {report_slug}")
-
-	kwargs = dict(filters) if filters else {}
-
-	if report_slug in _DEFAULT_TO_TODAY_RANGE:
-		kwargs.setdefault("start_date", today())
-		kwargs.setdefault("end_date", today())
-	elif report_slug == "today-sales":
-		kwargs.setdefault("date", today())
-	elif report_slug == "daily-pnl":
-		kwargs.setdefault("date", today())
-
-	data = fn(**kwargs)
-	return {"report_slug": report_slug, "filters": kwargs, "data": data}
-
-
-_REPORTS_CATALOG = [
-	{"slug": "today-sales", "label": "Today's Sales", "description": "Total sales, orders, and average bill for the current business day."},
-	{"slug": "daywise-sales", "label": "Daywise Sales", "description": "Sales totals broken down by day over a date range."},
-	{"slug": "daywise-invoices", "label": "Daywise Invoices", "description": "Individual invoice-level detail for each day in a date range."},
-	{"slug": "month-wise-sales", "label": "Month Wise Sales", "description": "Sales totals broken down by month over a trailing window."},
-	{"slug": "time-wise-sales", "label": "Time Wise Sales", "description": "Sales broken down into hourly/bucketed time slots for a single day."},
-	{"slug": "service-wise-sales", "label": "Service Wise Sales", "description": "Sales broken down by service type (e.g. dine-in, takeaway) over a date range."},
-	{"slug": "cancelled-invoices", "label": "Cancelled Invoices", "description": "List of invoices that were cancelled within a date range."},
-	{"slug": "average-bill-value", "label": "Average Bill Value", "description": "Average bill/order value trend over a date range."},
-	{"slug": "item-wise-sales", "label": "Item Wise Sales", "description": "Sales broken down by menu item, with optional item group/search filters."},
-	{"slug": "item-wise-purchase-history", "label": "Item-wise Purchase History", "description": "Purchase history for stock items over a date range."},
-	{"slug": "customer-data", "label": "Customer Data", "description": "Order history and spend detail for a specific customer."},
-	{"slug": "daywise-customer-details", "label": "Daywise Customer Details", "description": "New vs. returning customer counts broken down by day."},
-	{"slug": "repeated-customers", "label": "Repeated Customers", "description": "Customers with more than one visit within a date range."},
-	{"slug": "employee-sales", "label": "Employee Sales", "description": "Sales totals attributed to each employee/waiter over a date range."},
-	{"slug": "employee-item-wise-sales", "label": "Employee Item Wise Sales", "description": "Item-level sales breakdown for a specific employee."},
-	{"slug": "completed-work-orders", "label": "Completed Work Orders", "description": "Kitchen/production work orders completed within a date range."},
-	{"slug": "daily-pnl", "label": "Daily P&L", "description": "Daily profit and loss statement for a branch on a given date."},
-]
+	return _catalog.run(report_slug, filters, max_rows=max_rows or _catalog.DEFAULT_MAX_ROWS)
 
 
 @frappe.whitelist(methods=["GET"])
-def list_reports():
-	"""Static catalog of all 16 reports (slug, label, human description),
-	mirroring `frontend/src/pages/Reports/reportsRegistry.ts`. Lets HUF
-	answer "do you have a report on X" without any DB round-trip."""
+@llm_sized
+def compare_periods(report_slug, period_a, period_b, filters=None, max_rows=None):
+	"""Run the same report for two periods (presets like 'this_month' /
+	'last_month', a date, or 'YYYY-MM-DD..YYYY-MM-DD') and return both
+	results plus deltas for every top-level numeric total."""
 	require_manager()
-	return {"reports": _REPORTS_CATALOG}
+	base = _catalog.parse_json_arg(filters)
+	for key in ("period", "start_date", "end_date", "date"):
+		base.pop(key, None)
+	rows = max_rows or 15
+	a = _catalog.run(report_slug, {**base, "period": period_a}, max_rows=rows)
+	b = _catalog.run(report_slug, {**base, "period": period_b}, max_rows=rows)
+	return {
+		"report_slug": a["report_slug"],
+		"period_a": {"period": period_a, "filters": a["filters"]},
+		"period_b": {"period": period_b, "filters": b["filters"]},
+		"deltas": _numeric_deltas(a["data"], b["data"]),
+		"a": a["data"],
+		"b": b["data"],
+	}
+
+
+def _numeric_deltas(a, b, prefix=""):
+	"""a − b for numeric leaves of nested dicts (not lists), with % change."""
+	out = {}
+	if not (isinstance(a, dict) and isinstance(b, dict)):
+		return out
+	for key, va in a.items():
+		vb = b.get(key)
+		path = f"{prefix}{key}"
+		if isinstance(va, bool) or isinstance(vb, bool):
+			continue
+		if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
+			diff = va - vb
+			out[path] = {"a": va, "b": vb, "change": round(diff, 3), "change_percent": round(diff / vb * 100, 1) if vb else None}
+		elif isinstance(va, dict) and isinstance(vb, dict):
+			out.update(_numeric_deltas(va, vb, prefix=f"{path}."))
+	return out

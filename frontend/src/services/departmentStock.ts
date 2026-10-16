@@ -34,7 +34,7 @@ export interface IssueAuthorizationRow {
    * authorization, so "Capture Wastage" should not be offered once this is
    * true (mirrors the server-side guard in `ury.ury.api.ury_wastage.capture_wastage`). */
   has_yield_check?: boolean;
-  /** True once a non-cancelled URY Issue Wastage record already exists for
+  /** True once a non-cancelled URY Wastage record already exists for
    * this authorization -- "Log Usable Output" should not be offered once
    * this is true (mirrors `URYYieldCheck.validate_no_duplicate_wastage`). */
   has_wastage?: boolean;
@@ -300,7 +300,7 @@ export const departmentStockService = {
   },
 
   /**
-   * Lists `URY Issue Wastage` records for a branch/department/date range.
+   * Lists `URY Wastage` records for a branch/department/date range.
    * Read-only: no wastage is captured, approved, or rejected by this call.
    */
   async listWastage(filters: WastageFilters): Promise<WastageRow[]> {
@@ -315,7 +315,7 @@ export const departmentStockService = {
   },
 
   /**
-   * Captures (creates) a Draft `URY Issue Wastage` record against an
+   * Captures (creates) a Draft `URY Wastage` record against an
    * Authorized `URY Issue Authorization`. Draft rows never reduce
    * entitlement -- they only start counting once explicitly approved.
    */
@@ -331,13 +331,13 @@ export const departmentStockService = {
     return normalizeWastage((res as any)?.message ?? res);
   },
 
-  /** Approves a Draft `URY Issue Wastage` record, flipping it to Authorized. */
+  /** Approves a Draft `URY Wastage` record, flipping it to Authorized. */
   async approveWastage(wastageName: string): Promise<WastageRow> {
     const res = await call<any>('ury.ury.api.ury_wastage.approve_wastage', { wastage: wastageName });
     return normalizeWastage((res as any)?.message ?? res);
   },
 
-  /** Rejects a Draft `URY Issue Wastage` record; it never counts toward wasted_qty. */
+  /** Rejects a Draft `URY Wastage` record; it never counts toward wasted_qty. */
   async rejectWastage(wastageName: string): Promise<WastageRow> {
     const res = await call<any>('ury.ury.api.ury_wastage.reject_wastage', { wastage: wastageName });
     return normalizeWastage((res as any)?.message ?? res);

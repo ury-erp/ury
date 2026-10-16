@@ -84,8 +84,8 @@
               <!-- Serve Button -->
 
               <!-- Card Header: Table Name and Order Number -->
-              <div class="flex justify-between" @click="rotateCard(kot)">
-                <div class="text-sm w-48" style="font-family: var(--s)">
+              <div class="flex justify-between items-start gap-2" @click="rotateCard(kot)">
+                <div class="text-sm flex-1 min-w-0" style="font-family: var(--s)">
                   <span
                     v-if="kot.tableortakeaway !== 'Takeaway'"
                     class="text-sm font-medium"
@@ -124,7 +124,7 @@
                 </div>
                 <div
                   :class="kot.timecolor"
-                  class="font-semibold text-2xl leading-10"
+                  class="font-semibold text-2xl leading-8 whitespace-nowrap shrink-0 ml-2"
                   style="font-family: var(--m); font-variant-numeric: tabular-nums"
                 >
                   {{ kot.timeRemaining }}
@@ -655,10 +655,12 @@ export default {
     // countdown — the KDS shows how long an order has been sitting, and
     // flips to red once that elapsed time reaches `kot_alert_time` minutes.
     calculateTimeRemaining(targetTime) {
+      if (!targetTime) return { totalMinutes: 0, label: "0:00" };
       const currentTime = new Date();
-      const [targetHours, targetMinutes, targetSeconds] = targetTime
+      const cleanTime = String(targetTime).split(".")[0];
+      const [targetHours, targetMinutes, targetSeconds] = cleanTime
         .split(":")
-        .map(Number);
+        .map((num) => Number(num) || 0);
       let targetDate = new Date(
         currentTime.getFullYear(),
         currentTime.getMonth(),
@@ -685,14 +687,15 @@ export default {
       const totalMinutes = Math.floor(elapsedMs / 60000);
       const hoursElapsed = Math.floor(totalMinutes / 60);
       const minutesElapsed = totalMinutes % 60;
+      const formattedMinutes = String(minutesElapsed).padStart(2, "0");
 
       // Once overdue, prefix with "+" so "overdue by" is unambiguous at a
       // glance from the plain elapsed reading below the alert threshold —
       // the existing red text colour reinforces this further.
-      const isOverdue = totalMinutes >= this.kot_alert_time;
+      const isOverdue = this.kot_alert_time && totalMinutes >= this.kot_alert_time;
       const label = isOverdue
-        ? `+${hoursElapsed} : ${minutesElapsed}`
-        : `${hoursElapsed} : ${minutesElapsed}`;
+        ? `+${hoursElapsed}:${formattedMinutes}`
+        : `${hoursElapsed}:${formattedMinutes}`;
 
       return { totalMinutes, label };
     },

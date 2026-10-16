@@ -17,7 +17,7 @@ import {
   Spinner,
   numericCellClass,
 } from '@ury/ui';
-import { getLoggedUser, getUserRoles } from '@ury/core';
+import { formatCurrency, getLoggedUser, getUserRoles } from '@ury/core';
 
 // Mirrors the identical helper in StockReservationPage.tsx / PaymentTerminalPage.tsx.
 const formatDateTime = (value?: string) => {
@@ -30,7 +30,7 @@ import { departmentStockService, DepartmentOption, WastageRow } from '../../serv
 
 /** Roles permitted to view wastage records. Mirrors
  * `DEPARTMENT_STOCK_ALLOWED_ROLES` in `DepartmentStockPage.tsx`, since
- * `URY Issue Wastage` shares its permission model with the department
+ * `URY Wastage` shares its permission model with the department
  * stock/issue authorization screens. */
 export const WASTAGE_ALLOWED_ROLES = ['Production Manager', 'Stock Manager', 'System Manager'];
 
@@ -48,8 +48,6 @@ const getToday = () => new Date().toISOString().slice(0, 10);
 
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
-const formatCurrency = (value: number) =>
-  value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface WastageRoleGateProps {
   children: React.ReactNode;
@@ -240,7 +238,7 @@ const WastageContent: React.FC = () => {
 
   /**
    * KPI figures computed strictly from `listWastage()`'s real rows. The
-   * `URY Issue Wastage` backend list endpoint
+   * `URY Wastage` backend list endpoint
    * (`ury.ury.api.ury_wastage.list_wastage`) does not return `stock_uom` or
    * `issue_authorization`, so those can't drive a KPI. It does now return
    * `reason_category`, `captured_on`/`approved_on` (timestamps), and
@@ -271,7 +269,7 @@ const WastageContent: React.FC = () => {
     const items: KpiItemProps[] = [
       {
         label: "Total Wastage Value",
-        value: `Rs. ${formatCurrency(totalValue)}`,
+        value: formatCurrency(totalValue),
         tone: 'danger',
       },
       {
@@ -282,7 +280,7 @@ const WastageContent: React.FC = () => {
       {
         label: 'Highest Department',
         value: highestDepartment ? highestDepartment.name : 'N/A',
-        hint: highestDepartment ? `Rs. ${formatCurrency(highestDepartment.value)}` : undefined,
+        hint: highestDepartment ? formatCurrency(highestDepartment.value) : undefined,
         tone: 'warning',
       },
     ];
@@ -317,7 +315,7 @@ const WastageContent: React.FC = () => {
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
-          {row.valuation_amount !== undefined ? `Rs. ${formatCurrency(row.valuation_amount)}` : '-'}
+          {row.valuation_amount !== undefined ? formatCurrency(row.valuation_amount) : '-'}
         </span>
       ),
     },
@@ -439,10 +437,10 @@ const WastageContent: React.FC = () => {
             {selectedRow.branch !== undefined && <KeyValueRow label="Branch" value={selectedRow.branch} />}
             {selectedRow.company !== undefined && <KeyValueRow label="Company" value={selectedRow.company} />}
             {selectedRow.valuation_rate !== undefined && (
-              <KeyValueRow label="Valuation rate" value={`Rs. ${formatCurrency(selectedRow.valuation_rate)}`} />
+              <KeyValueRow label="Valuation rate" value={formatCurrency(selectedRow.valuation_rate)} />
             )}
             {selectedRow.valuation_amount !== undefined && (
-              <KeyValueRow label="Valuation amount" value={`Rs. ${formatCurrency(selectedRow.valuation_amount)}`} />
+              <KeyValueRow label="Valuation amount" value={formatCurrency(selectedRow.valuation_amount)} />
             )}
             {(selectedRow.reason_category || selectedRow.reason_notes) && (
               <>
@@ -476,7 +474,7 @@ const WastageContent: React.FC = () => {
                 record's fields still happens in the desk. Rendered only for
                 users whose desk permissions actually allow opening it. */}
             <div className="pt-3">
-              <DeskLink doctype="URY Issue Wastage" name={selectedRow.name} label="Open in Desk" />
+              <DeskLink doctype="URY Wastage" name={selectedRow.name} label="Open in Desk" />
             </div>
           </>
         )}

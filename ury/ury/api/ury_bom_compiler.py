@@ -91,8 +91,11 @@ from frappe import _
 BOM_DOCTYPE = "BOM"
 BOM_EXPLOSION_ITEM_DOCTYPE = "BOM Explosion Item"
 BOM_ITEM_DOCTYPE = "BOM Item"
+IPC_DOCTYPE = "URY Item Production Configuration"
 
 DEFAULT_CONTROL_MODE = "SOFT"
+POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+POLICY_BUNDLE = "BUNDLE"
 
 
 def compile_bom_vector(item_code, qty, company):
@@ -252,56 +255,167 @@ def build_demand_vector(sales_plan_approval_snapshot):
 	Sales Plan, BOM, or Issue Authorization document is written.
 	"""
 	snapshot_company = sales_plan_approval_snapshot.get("company")
+	snapshot_branch = sales_plan_approval_snapshot.get("branch")
 	default_control_mode = sales_plan_approval_snapshot.get("default_control_mode") or DEFAULT_CONTROL_MODE
 
 	lines = sales_plan_approval_snapshot.get("items") or []
 	rows_by_key = {}
 
 	for line in lines:
-		if (line.get("production_policy") or "").upper() == "DIRECT_RETAIL":
+		policy = (line.get("production_policy") or "").upper()
+
+		if policy == POLICY_DIRECT_RETAIL:
 			continue
 
-		item_code = line.get("item_code")
-		qty = line.get("qty")
-		department = line.get("department")
-		production_unit = line.get("production_unit")
+		if policy == POLICY_BUNDLE:
+			# BUNDLE items carry no BOM — expand to Product Bundle children and
+			# compile each manufactured child individually.
+			for child_line in _expand_bundle_lines(line, snapshot_branch, snapshot_company):
+				_accumulate_line(child_line, snapshot_company, default_control_mode, rows_by_key)
+			continue
 
-		if not item_code or qty is None:
-			frappe.throw(
-				_("Plan line missing item_code or qty: {0}").format(line), frappe.ValidationError
-			)
-		if not department:
-			frappe.throw(
-				_("Plan line for {0} missing department").format(item_code), frappe.ValidationError
-			)
-
-		company = line.get("company") or snapshot_company
-		vector = compile_bom_vector(item_code, qty, company)
-
-		line_control_mode = line.get("control_mode")
-		component_control_modes = line.get("component_control_modes") or {}
-
-		for component in vector["components"]:
-			component_item = component["component_item"]
-			control_mode = (
-				component_control_modes.get(component_item)
-				or line_control_mode
-				or default_control_mode
-			)
-
-			key = (component_item, department, production_unit)
-			if key not in rows_by_key:
-				rows_by_key[key] = {
-					"component_item": component_item,
-					"department": department,
-					"production_unit": production_unit,
-					"required_qty": 0.0,
-					"stock_uom": component["stock_uom"],
-					"control_mode": control_mode,
-				}
-			rows_by_key[key]["required_qty"] += component["qty"]
+		_accumulate_line(line, snapshot_company, default_control_mode, rows_by_key)
 
 	return [rows_by_key[key] for key in sorted(rows_by_key.keys())]
+
+
+def _accumulate_line(line, snapshot_company, default_control_mode, rows_by_key):
+	"""BOM-compile one non-BUNDLE manufactured plan line and merge into rows_by_key."""
+	item_code = line.get("item_code")
+	qty = line.get("qty")
+	department = line.get("department")
+	production_unit = line.get("production_unit")
+
+	if not item_code or qty is None:
+		frappe.throw(
+			_("Plan line missing item_code or qty: {0}").format(line), frappe.ValidationError
+		)
+	if not department:
+		frappe.throw(
+			_("Plan line for {0} missing department").format(item_code), frappe.ValidationError
+		)
+
+	company = line.get("company") or snapshot_company
+	vector = compile_bom_vector(item_code, qty, company)
+
+	line_control_mode = line.get("control_mode")
+	component_control_modes = line.get("component_control_modes") or {}
+
+	for component in vector["components"]:
+		component_item = component["component_item"]
+		control_mode = (
+			component_control_modes.get(component_item)
+			or line_control_mode
+			or default_control_mode
+		)
+
+		key = (component_item, department, production_unit)
+		if key not in rows_by_key:
+			rows_by_key[key] = {
+				"component_item": component_item,
+				"department": department,
+				"production_unit": production_unit,
+				"required_qty": 0.0,
+				"stock_uom": component["stock_uom"],
+				"control_mode": control_mode,
+			}
+		rows_by_key[key]["required_qty"] += component["qty"]
+
+
+def _expand_bundle_lines(bundle_line, branch, company):
+	"""Yield synthetic plan lines for each manufactured child of a BUNDLE item.
+
+	Fetches the ``Product Bundle Item`` rows linked to the parent item's active
+	``URY Item Production Configuration`` at ``branch``, resolves each child's
+	own IPC to obtain its department/production_unit/policy/BOM, scales qty by
+	``parent_qty × child.qty``, and yields a dict shaped like a regular snapshot
+	plan line.  DIRECT_RETAIL children are skipped; nested BUNDLE children are
+	not supported and are also skipped with a log warning.
+	"""
+	item_code = bundle_line.get("item_code")
+	parent_qty = bundle_line.get("qty") or 0
+
+	if not branch:
+		frappe.throw(
+			_("Branch is required to expand bundle item {0} in demand vector").format(item_code),
+			frappe.ValidationError,
+		)
+
+	# Resolve the Product Bundle name from the parent IPC.
+	product_bundle = frappe.db.get_value(
+		IPC_DOCTYPE,
+		{"item": item_code, "branch": branch, "active": 1},
+		"product_bundle",
+	)
+	if not product_bundle:
+		frappe.throw(
+			_("Bundle item {0} has no Product Bundle linked in its active production configuration at branch {1}").format(
+				item_code, branch
+			),
+			frappe.ValidationError,
+		)
+
+	children = frappe.get_all(
+		"Product Bundle Item",
+		filters={"parent": product_bundle},
+		fields=["item_code", "qty"],
+		order_by="idx asc",
+	)
+	if not children:
+		frappe.throw(
+			_("Product Bundle {0} for item {1} has no child items").format(product_bundle, item_code),
+			frappe.ValidationError,
+		)
+
+	for child in children:
+		child_item = child["item_code"]
+		child_qty = (child["qty"] or 0) * parent_qty
+
+		if child_qty <= 0:
+			continue
+
+		# Resolve child IPC to get department / production_unit / policy / BOM.
+		child_ipc = frappe.db.get_value(
+			IPC_DOCTYPE,
+			{"item": child_item, "branch": branch, "active": 1},
+			["production_policy", "department", "production_unit", "bom"],
+			as_dict=True,
+		)
+		if not child_ipc:
+			frappe.throw(
+				_("Bundle child item {0} (component of bundle {1}) has no active production configuration at branch {2}").format(
+					child_item, item_code, branch
+				),
+				frappe.ValidationError,
+			)
+
+		child_policy = (child_ipc.get("production_policy") or "").upper()
+
+		if child_policy == POLICY_DIRECT_RETAIL:
+			# Direct-retail children are excluded from manufacturing demand.
+			continue
+
+		if child_policy == POLICY_BUNDLE:
+			# Nested bundles are not supported; skip with a warning.
+			frappe.log_error(
+				title="Nested BUNDLE skipped in build_demand_vector",
+				message="Nested BUNDLE item {0} (child of bundle {1}) is not supported in demand vector compilation and was skipped.".format(
+					child_item, item_code
+				),
+			)
+			continue
+
+		yield {
+			"item_code": child_item,
+			"qty": child_qty,
+			"company": company,
+			"department": child_ipc.get("department"),
+			"production_unit": child_ipc.get("production_unit"),
+			"production_policy": child_policy,
+			"bom": child_ipc.get("bom"),
+			"control_mode": bundle_line.get("control_mode"),
+			"component_control_modes": bundle_line.get("component_control_modes") or {},
+		}
 
 
 # --- internal helpers -------------------------------------------------------

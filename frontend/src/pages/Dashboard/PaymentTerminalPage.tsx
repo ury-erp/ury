@@ -5,6 +5,7 @@ import {
   PaymentTerminal,
   PaymentTerminalTransaction,
 } from '../../services/paymentTerminal';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const PROVIDERS = ['Simulated', 'Ingenico', 'PAX', 'Verifone', 'Other'];
 
@@ -14,13 +15,7 @@ const formatDateTime = (value?: string) => {
   return d.toLocaleString();
 };
 
-const formatCurrency = (value?: number) => {
-  if (value === undefined) return '';
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-  }).format(value);
-};
+
 
 const getStatusBadgeVariant = (status: string) => {
   switch (status) {
@@ -49,6 +44,7 @@ const getTransactionStatusBadgeVariant = (status: string) => {
 };
 
 const PaymentTerminalContent: React.FC = () => {
+  const { format } = useCurrency();
   const [terminals, setTerminals] = useState<PaymentTerminal[]>([]);
   const [transactions, setTransactions] = useState<PaymentTerminalTransaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -283,7 +279,7 @@ const PaymentTerminalContent: React.FC = () => {
                   key: 'amount',
                   header: 'Amount',
                   align: 'right',
-                  render: (tx) => formatCurrency(tx.amount),
+                  render: (tx) => (tx.amount === undefined ? '' : format(tx.amount, tx.currency)),
                 },
                 {
                   key: 'status',

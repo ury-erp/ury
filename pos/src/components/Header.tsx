@@ -180,7 +180,7 @@ const Header = () => {
                     onClick={() => window.location.href = '/ury/dashboard'}
                   >
                     <Monitor className="w-4 h-4 me-3" />
-                    Switch to Dashboard
+                    {t('header.switch_to_dashboard')}
                   </Button>
                   <Button
                     variant="ghost"

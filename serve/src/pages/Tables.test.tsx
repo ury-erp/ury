@@ -799,4 +799,32 @@ describe('TablesPage actions menu', () => {
     expect(freeCard.className).toMatch(/min-h-\[11\.5rem\]/)
     expect(occupiedCard.className).toMatch(/min-h-\[11\.5rem\]/)
   })
+
+  it('renders a logout button in the header and asks for confirmation before logout', async () => {
+    stubContext()
+    getRooms.mockResolvedValue([])
+    const user = userEvent.setup()
+
+    render(<TablesPage />)
+
+    const logoutBtn = screen.getByRole('button', { name: 'Logout' })
+    expect(logoutBtn).toBeInTheDocument()
+
+    await user.click(logoutBtn)
+
+    expect(screen.getByText('Are you sure you want to logout?')).toBeInTheDocument()
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm' })
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' })
+    expect(confirmBtn).toBeInTheDocument()
+    expect(cancelBtn).toBeInTheDocument()
+
+    await user.click(cancelBtn)
+    await waitFor(() => {
+      expect(screen.queryByText('Are you sure you want to logout?')).not.toBeInTheDocument()
+    })
+
+    await user.click(logoutBtn)
+    expect(screen.getByText('Are you sure you want to logout?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+  })
 })

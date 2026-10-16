@@ -159,10 +159,10 @@ function WaterfallRow({
       }
     >
       <span className={isSubtotal ? 'font-semibold text-foreground' : undefined}>{label}</span>
-      <span className={cn(isSubtotal ? 'font-semibold' : 'font-medium', signColor ?? (isSubtotal ? 'text-foreground' : undefined))}>
-        {formatCurrency(amount)}
+      <span className={cn('inline-flex items-center gap-1.5', isSubtotal ? 'font-semibold' : 'font-medium', signColor ?? (isSubtotal ? 'text-foreground' : undefined))}>
+        <bdi>{formatCurrency(amount)}</bdi>
         {percent !== undefined && (
-          <span className={cn('ml-1 text-xs font-normal', signColor ?? 'text-muted-foreground')}>
+          <span dir="ltr" className={cn('text-xs font-normal', signColor ?? 'text-muted-foreground')}>
             ({Number(percent).toFixed(1)}%)
           </span>
         )}
@@ -327,14 +327,14 @@ export function DailyPnl() {
                 },
                 {
                   label: 'Gross Profit',
-                  value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
+                  value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} \u200E(${Number(
                     summaryMap.get('gross_profit')?.percent ?? 0
                   ).toFixed(1)}%)`,
                   tone: (summaryMap.get('gross_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
                 },
                 {
                   label: 'Net Profit',
-                  value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
+                  value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} \u200E(${Number(
                     summaryMap.get('net_profit')?.percent ?? 0
                   ).toFixed(1)}%)`,
                   tone: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',

@@ -306,7 +306,15 @@ export default function Dashboard() {
       setStatsError(null);
       try {
         const statsData = await uryDashboardService.getDashboardStats(posProfile.branch);
-        setStats(buildDashboardStatsKpiItems(statsData));
+        // Stats come back in the branch's currency; reuse the POS profile's
+        // symbol when it is the same currency.
+        const { currency: posCurrency, currencySymbol } = usePOSStore.getState();
+        setStats(buildDashboardStatsKpiItems(statsData, {
+          currencyFor: (code) => {
+            const resolved = code || posCurrency;
+            return { code: resolved, symbol: resolved === posCurrency ? currencySymbol : null };
+          },
+        }));
       } catch (err) {
         setStatsError('Failed to load stats');
         console.error('Error fetching stats:', err);

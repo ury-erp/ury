@@ -217,7 +217,9 @@ def prepare_production(production_plan):
 	department = plan_doc.get(PP_DEPARTMENT_FIELD)
 
 	bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department)
-	readiness = compute_readiness({department: bucket}, store_warehouse=get_store_warehouse())
+	readiness = compute_readiness(
+		{department: bucket}, store_warehouse=get_store_warehouse(plan_doc.get("company"))
+	)
 
 	blockers = list(compile_blockers) + list(readiness["blockers"])
 	blockers += [store_shortage_blocker(row) for row in readiness["rows"] if row["store_shortage"] > 0]

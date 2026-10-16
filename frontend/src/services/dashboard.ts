@@ -2,7 +2,18 @@ import { call } from '@ury/core';
 
 const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
 
+/** One currency's slice of a scope that spans several (e.g. "All companies"). */
+export interface CurrencyBreakdownRow {
+  currency: string | null;
+  sales: number;
+  orders: number;
+  avg_order_value: number;
+}
+
 export interface DashboardSummary {
+  /** Currency the money fields are in; ``null`` when ``currency_breakdown`` applies. */
+  currency?: string | null;
+  currency_breakdown?: CurrencyBreakdownRow[];
   today_sales: number;
   today_orders: number;
   occupied_tables: number;
@@ -66,6 +77,7 @@ export interface TransactionRecord {
   posting_date: string;
   posting_time: string;
   grand_total: number;
+  currency?: string | null;
   status: string;
   order_type?: string;
   restaurant_table?: string;
@@ -78,40 +90,33 @@ export const dashboardService = {
    * endpoint, which itself reuses ``get_dashboard_stats`` for live sales/table
    * numbers (same source as the POS dashboard).
    */
-  async getSummary(branch?: string): Promise<DashboardSummary> {
+  async getSummary(branch?: string, company?: string): Promise<DashboardSummary> {
     const branchArg = !branch || branch === 'all' ? undefined : branch;
-    try {
-      const res = await call.get<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', {
-        branch: branchArg,
-      });
-      const summary = unwrap<DashboardSummary>(res);
-      return {
-        today_sales: summary?.today_sales ?? 0,
-        today_orders: summary?.today_orders ?? 0,
-        occupied_tables: summary?.occupied_tables ?? 0,
-        total_tables: summary?.total_tables ?? 0,
-        avg_order_value: summary?.avg_order_value ?? 0,
-        active_cashiers: summary?.active_cashiers ?? 0,
-        pending_kitchen_orders: summary?.pending_kitchen_orders ?? 0,
-        total_menu_items: summary?.total_menu_items ?? 0,
-      };
-    } catch {
-      return {
-        today_sales: 0,
-        today_orders: 0,
-        occupied_tables: 0,
-        total_tables: 0,
-        avg_order_value: 0,
-        active_cashiers: 0,
-        pending_kitchen_orders: 0,
-        total_menu_items: 0,
-      };
-    }
+    const companyArg = !company || company === 'all' ? undefined : company;
+    const res = await call.get<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', {
+      branch: branchArg,
+      company: companyArg,
+    });
+    const summary = unwrap<DashboardSummary>(res);
+    return {
+      currency: summary?.currency ?? null,
+      currency_breakdown: summary?.currency_breakdown ?? [],
+      today_sales: summary?.today_sales ?? 0,
+      today_orders: summary?.today_orders ?? 0,
+      occupied_tables: summary?.occupied_tables ?? 0,
+      total_tables: summary?.total_tables ?? 0,
+      avg_order_value: summary?.avg_order_value ?? 0,
+      active_cashiers: summary?.active_cashiers ?? 0,
+      pending_kitchen_orders: summary?.pending_kitchen_orders ?? 0,
+      total_menu_items: summary?.total_menu_items ?? 0,
+    };
   },
 
-  async getCharts(branch?: string): Promise<DashboardChartsData> {
+  async getCharts(branch?: string, company?: string): Promise<DashboardChartsData> {
     try {
-      let res = await call<DashboardChartsData>('ury.ury.api.dashboard.get_dashboard_charts', { branch });
+      const branchArg = !branch || branch === 'all' ? undefined : branch;
+      const companyArg = !company || company === 'all' ? undefined : company;
+      let res = await call<DashboardChartsData>('ury.ury.api.dashboard.get_dashboard_charts', { branch: branchArg, company: companyArg });
       res = (res as any)?.message || res;
       return res || {
         sales_trend: [],
@@ -135,9 +140,11 @@ export const dashboardService = {
     }
   },
 
-  async getRecentTransactions(branch?: string, limit: number = 10): Promise<TransactionRecord[]> {
+  async getRecentTransactions(branch?: string, limit: number = 10, company?: string): Promise<TransactionRecord[]> {
     try {
-      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch, limit });
+      const branchArg = !branch || branch === 'all' ? undefined : branch;
+      const companyArg = !company || company === 'all' ? undefined : company;
+      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch: branchArg, limit, company: companyArg });
       return Array.isArray(res) ? res : ((res as any)?.message || []);
     } catch {
       return [];
@@ -155,11 +162,13 @@ export const dashboardService = {
 };
 
 export interface DashboardStats {
-  todays_sales: number;
+  todays_sales: number | null;
   orders_today: number;
-  avg_order_value: number;
+  avg_order_value: number | null;
   active_tables: number;
   total_tables: number;
+  currency?: string | null;
+  currency_breakdown?: CurrencyBreakdownRow[];
 }
 
 export interface NeedsAttentionReference {

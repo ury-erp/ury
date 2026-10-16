@@ -3,7 +3,7 @@
 Covers item-level disposition resolution for cancelled KOT items:
   1. Return-to-stock disposition sets URY KOT Items.disposition without creating
      wastage.
-  2. Waste disposition creates exactly one URY Issue Wastage record with correct
+  2. Waste disposition creates exactly one URY Wastage record with correct
      qty, item, and actor.
   3. Resolving an already-resolved row raises ALREADY_RESOLVED.
   4. Invalid disposition value raises INVALID_DISPOSITION.
@@ -96,7 +96,7 @@ def _mock_kot_doc(name="KOT-1", branch="Branch A", production_unit="UNIT-1", ite
 
 
 def _new_wastage_doc_recorder():
-	"""Return a frappe.get_doc side_effect that records URY Issue Wastage creation."""
+	"""Return a frappe.get_doc side_effect that records URY Wastage creation."""
 	created_wastage = []
 
 	def _get_doc(*args, **kwargs):
@@ -107,7 +107,7 @@ def _new_wastage_doc_recorder():
 			doc = frappe._dict(dict(arg))
 			doc.insert = MagicMock()
 			doc.save = MagicMock()
-			if doc.get("doctype") == "URY Issue Wastage":
+			if doc.get("doctype") == "URY Wastage":
 				created_wastage.append(doc)
 			return doc
 		raise AssertionError("doc lookups should be by dict in these tests")
@@ -174,7 +174,7 @@ class TestWasteDisposition(FrappeTestCase):
 		self.addCleanup(now_patcher.stop)
 
 	def test_waste_creates_issue_wastage_record(self):
-		"""Waste disposition creates exactly one URY Issue Wastage record with
+		"""Waste disposition creates exactly one URY Wastage record with
 		correct fields.
 		"""
 		kot_item_row = _mock_kot_item_row(name="ROW-1", item="Item-A", quantity=10)
@@ -187,7 +187,7 @@ class TestWasteDisposition(FrappeTestCase):
 				kot_doc,
 				# Second call: get_doc for wastage creation
 				get_doc_side_effect({
-					"doctype": "URY Issue Wastage",
+					"doctype": "URY Wastage",
 					"branch": "Branch A",
 					"company": "Company A",
 					"department": "Dept-1",
@@ -237,7 +237,7 @@ class TestWasteDisposition(FrappeTestCase):
 			with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
 				f"{MODULE}.frappe.get_doc", side_effect=[
 					kot_doc,
-					get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
+					get_doc_side_effect({"doctype": "URY Wastage", "name": "W-1"}),
 				]
 			), patch(
 				f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
@@ -261,7 +261,7 @@ class TestWasteDisposition(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=[
 				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
+				get_doc_side_effect({"doctype": "URY Wastage", "name": "W-1"}),
 			]
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
@@ -287,7 +287,7 @@ class TestWasteDisposition(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=[
 				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
+				get_doc_side_effect({"doctype": "URY Wastage", "name": "W-1"}),
 			]
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
@@ -551,7 +551,7 @@ class TestInvalidQtyError(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=[
 				kot_doc,
-				get_doc_side_effect({"doctype": "URY Issue Wastage", "name": "W-1"}),
+				get_doc_side_effect({"doctype": "URY Wastage", "name": "W-1"}),
 			]
 		), patch(
 			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()

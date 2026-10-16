@@ -22,7 +22,7 @@ interface ServiceWiseSalesData {
 
 const columns: DataTableColumn<ServiceRow>[] = [
   { key: 'order_type', header: 'Order Type' },
-  { key: 'order_count', header: '# Orders', align: 'right' },
+  { key: 'order_count', header: 'Orders', align: 'right' },
   { key: 'revenue', header: 'Revenue', render: (r) => formatCurrency(r.revenue), align: 'right' },
   { key: 'avg_order_value', header: 'Avg Order Value', render: (r) => formatCurrency(r.avg_order_value), align: 'right' },
   { key: 'percentage_of_total', header: '% of Total', render: (r) => `${r.percentage_of_total}%`, align: 'right' },

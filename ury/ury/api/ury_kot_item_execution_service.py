@@ -229,6 +229,14 @@ def _attach_ready_posting_intent(result, actor):
 		result["posting_intent_status"] = "SKIPPED_NATIVE_POS_AUTHORITY"
 		return result
 
+	from ury.ury.api.ury_production_settings import get_manufacture_trigger_time
+
+	trigger_time = get_manufacture_trigger_time()
+	if trigger_time != "On KOT Serve":
+		result["posting_intent"] = None
+		result["posting_intent_status"] = f"SKIPPED_TRIGGER_{trigger_time.upper().replace(' ', '_')}"
+		return result
+
 	from ury.ury.api.ury_fulfilment_posting_service import (
 		create_or_get_posting_intent_for_ready,
 		enqueue_posting_intent,
@@ -386,7 +394,14 @@ def seed_kot_item_executions_on_submit(doc, method=None):
 		# no error surfaced anywhere (found while live-bench verifying
 		# tracks/sa-nontable-production-gap; see test_seed_on_submit_uses_kot_name_not_document
 		# for the regression test).
-		return seed_kot_item_executions(doc.name)
+		created = seed_kot_item_executions(doc.name)
+		from ury.ury.api.ury_production_settings import get_manufacture_trigger_time
+
+		if get_manufacture_trigger_time() == "On KOT Create":
+			from ury.ury.api.ury_fulfilment_posting_service import post_intents_for_kot
+
+			post_intents_for_kot(doc.name)
+		return created
 	except ItemExecutionError as exc:
 		if exc.reason_code == ITEM_EXECUTION_DOCTYPE_NOT_FOUND:
 			frappe.logger("ury").warning(

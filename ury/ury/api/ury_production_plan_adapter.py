@@ -85,6 +85,7 @@ APPROVED_STATES = {"Approved", "Locked for Production"}
 POLICY_PRE_PRODUCED = "PRE_PRODUCED"
 POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+POLICY_BUNDLE = "BUNDLE"
 
 #: Track-Item N2 filter: a Production Plan only ever covers items this
 #: adapter/site actually produces ahead of demand. PRE_PRODUCED items are
@@ -100,6 +101,10 @@ POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 #: separate gap tracked in tracks/sa-item-production-config-gaps/PLAN.md.
 #: This adapter must not attempt to fix the BOM compiler; it only filters on
 #: the ``production_policy`` values the snapshot already provides.
+#: BUNDLE rows are also excluded: they are exploded at the target-compiler
+#: level (ury_production_target_compiler._seed_bundle_row) so their children
+#: appear directly in the Production Plan; the parent Bundle row itself is
+#: never a Production Plan item.
 INCLUDED_PRODUCTION_POLICIES = (POLICY_PRE_PRODUCED,)
 
 #: Production Plan (parent) fields this adapter cannot populate from a Sales

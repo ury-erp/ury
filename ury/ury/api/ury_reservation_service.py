@@ -163,6 +163,7 @@ from frappe import _
 from frappe.utils import cint, flt
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_sales_plan_commit import apply_commit_delta
 
 # Slack allowed when comparing a required quantity against available capacity,
@@ -185,6 +186,7 @@ BOM_ITEM_DOCTYPE = "BOM Item"
 POLICY_PRE_PRODUCED = "PRE_PRODUCED"
 POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+POLICY_BUNDLE = "BUNDLE"
 
 RESERVED = "Reserved"
 FULFILLED = "Fulfilled"
@@ -622,6 +624,9 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 			for component in sorted(vector["components"], key=lambda c: c["component_item"])
 		]
 
+	if production_policy == POLICY_BUNDLE:
+		return _resolve_bundle_components(item_code, qty, company)
+
 	# No production_policy supplied -- fall back to the legacy heuristic.
 	bom_name = frappe.db.get_value(
 		BOM_DOCTYPE,
@@ -645,6 +650,71 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 		{"component_item": component["component_item"], "qty": component["qty"]}
 		for component in sorted(vector["components"], key=lambda c: c["component_item"])
 	]
+
+
+def _resolve_bundle_components(item_code, qty, company):
+	"""Flat component list for a BUNDLE item.
+
+	Fetches the ``Product Bundle Item`` children for this item's linked
+	Product Bundle (resolved from the first active IPC for this item, any
+	branch — warehouse/branch context for bundles lives at the child level).
+	Each child is recursively resolved through its own production policy:
+
+	  - PRE_PRODUCED / DIRECT_RETAIL: the child itself, scaled by its
+	    ``qty_of`` × ``qty``.
+	  - MADE_TO_ORDER: the child's BOM-exploded leaf components, scaled.
+
+	Returns a flat list sorted by ``component_item`` (stable lock order for
+	the ``FOR UPDATE`` Bin locking in ``create_reservation``).
+	"""
+	# Bundle IPC is branch-scoped; here we only need the product_bundle name.
+	# Use frappe.get_all to find any active IPC for this item (the bundle
+	# itself has no warehouse — capacity lives at the child level).
+	ipc_rows = frappe.get_all(
+		"URY Item Production Configuration",
+		filters={"item": item_code, "production_policy": POLICY_BUNDLE, "active": 1},
+		fields=["product_bundle"],
+		limit=1,
+	)
+	if not ipc_rows or not ipc_rows[0].get("product_bundle"):
+		frappe.throw(
+			_("Bundle item {0} has no Product Bundle configured in its active IPC").format(item_code),
+			frappe.ValidationError,
+		)
+
+	product_bundle = ipc_rows[0]["product_bundle"]
+	children = frappe.get_all(
+		"Product Bundle Item",
+		filters={"parent": product_bundle},
+		fields=["item_code", "qty"],
+		order_by="idx asc",
+	)
+	if not children:
+		frappe.throw(
+			_("Product Bundle {0} for item {1} has no child items").format(product_bundle, item_code),
+			frappe.ValidationError,
+		)
+
+	merged = {}  # component_item -> total qty
+	for child in children:
+		child_item = child["item_code"]
+		child_qty = flt(child["qty"]) * flt(qty)
+
+		# Resolve the child's own production policy from any active IPC.
+		child_policy_row = frappe.get_all(
+			"URY Item Production Configuration",
+			filters={"item": child_item, "active": 1},
+			fields=["production_policy"],
+			limit=1,
+		)
+		child_policy = child_policy_row[0].get("production_policy") if child_policy_row else None
+
+		child_components = _resolve_components(child_item, child_qty, company, production_policy=child_policy)
+		for comp in child_components:
+			key = comp["component_item"]
+			merged[key] = merged.get(key, 0) + comp["qty"]
+
+	return [{"component_item": k, "qty": v} for k, v in sorted(merged.items())]
 
 
 # ---------------------------------------------------------------------------
@@ -829,21 +899,42 @@ def create_reservation(
 	# component rows never equal the top-level item/qty).
 	commit_qty = flt(qty)
 	commit_department = (frozen_context or {}).get("department")
-	try:
-		commit_result = apply_commit_delta(
-			item_code, branch, company, department=commit_department, committed_delta=commit_qty
+	# "Stock Available" is an availability mode, not a production policy: it
+	# bypasses Sales Plan gating at the availability layer and must therefore
+	# never touch the Sales Plan committed_qty/fulfilled_qty counters -- there
+	# is no plan commitment to track. Callers that carry the resolved mode in
+	# `frozen_context` (order reconciliation) supply it directly; a direct/
+	# legacy caller without one resolves it here, best-effort.
+	availability_mode = (frozen_context or {}).get("availability_mode")
+	if not availability_mode:
+		cfg = resolve_production_context(
+			item_code, branch, company=company, department=commit_department
 		)
-	except Exception:
-		# Sales Plan commit-tracking is best-effort accounting on top of the
-		# reservation, not a precondition for it -- a failure here (no
-		# matching plan, a transient DB/locking issue, etc.) must never abort
-		# an otherwise-valid reservation. Same fail-soft contract already
-		# established for realtime event publishing in this file.
-		frappe.logger("ury_reservation_service").exception(
-			"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
-		)
+		if cfg:
+			availability_mode = cfg.get("availability_mode")
+	if availability_mode == "Stock Available":
 		commit_result = None
+	else:
+		try:
+			commit_result = apply_commit_delta(
+				item_code, branch, company, department=commit_department, committed_delta=commit_qty
+			)
+		except Exception:
+			# Sales Plan commit-tracking is best-effort accounting on top of the
+			# reservation, not a precondition for it -- a failure here (no
+			# matching plan, a transient DB/locking issue, etc.) must never abort
+			# an otherwise-valid reservation. Same fail-soft contract already
+			# established for realtime event publishing in this file.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
+			)
+			commit_result = None
 	frozen_context = dict(frozen_context or {})
+	if availability_mode:
+		# Persist the resolved mode into the group's audit context so
+		# `_transition_group`'s defense-in-depth check can read it back without
+		# re-resolving.
+		frozen_context["availability_mode"] = availability_mode
 	# The TOP-LEVEL item quantity this group reserves, frozen explicitly and
 	# under its own purpose-named key.
 	#
@@ -1187,7 +1278,14 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 		append_audit(doc, actor, event=event, reason=reason)
 		doc.save(ignore_permissions=False)
 
-	if sales_plan_commit:
+	# Defense-in-depth: a group whose order-time context resolved to the
+	# "Stock Available" availability mode never held a Sales Plan commitment
+	# (create_reservation skips the commit delta for it), so a transition must
+	# never reverse one either. `_group_sales_plan_commit` already returns None
+	# for such groups (`applied` is False); this guard covers groups whose
+	# frozen context was recorded by a caller that carried the mode without
+	# going through create_reservation's skip.
+	if sales_plan_commit and _group_frozen_context(rows).get("availability_mode") != "Stock Available":
 		committed_delta = -flt(sales_plan_commit.get("qty"))
 		fulfilled_delta = flt(sales_plan_commit.get("qty")) if to_status == FULFILLED else 0
 		try:

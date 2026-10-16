@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCompanyContext } from '../../context/CompanyContext';
 import { Plus, Store, Edit2 } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle, DataTable, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
@@ -16,6 +17,7 @@ interface AggregatorSetting {
 
 export const AggregatorPage: React.FC = () => {
   const { activeBranchId, branches } = useBranchContext();
+  const { activeCompanyId, companies } = useCompanyContext();
   const [aggregators, setAggregators] = useState<AggregatorSetting[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   
@@ -97,6 +99,10 @@ export const AggregatorPage: React.FC = () => {
     e.preventDefault();
     const branchToUpdate = activeBranchId === 'all' ? branches[0]?.name : activeBranchId;
     if (!newAggregatorName || !branchToUpdate) return;
+    const branchCompany =
+      branches.find((b) => b.id === branchToUpdate || b.name === branchToUpdate)?.company
+      || (activeCompanyId !== 'all' ? activeCompanyId : null);
+    const priceListCurrency = companies.find((c) => c.name === branchCompany)?.default_currency || null;
     
     setSaving(true);
     try {
@@ -124,7 +130,10 @@ export const AggregatorPage: React.FC = () => {
           doctype: 'Price List',
           price_list_name: newAggregatorName,
           selling: 1,
-          currency: 'INR'
+          // Aggregator prices are in the branch's company currency. When it
+          // can't be resolved, leave it unset so Frappe's mandatory check
+          // fails loudly instead of silently creating an INR list.
+          ...(priceListCurrency ? { currency: priceListCurrency } : {}),
         }
       }).catch((e: any) => {
         const errorMessage = e?.message || e?.responseJSON?.message || String(e);
