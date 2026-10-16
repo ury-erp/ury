@@ -82,10 +82,12 @@
     "adjustment": "Adjustment",
     "total": "Total",
     "pay_button": "Pay {{amount}}",
+    "pay_and_print_button": "Pay & Print {{amount}}",
     "processing": "Processing...",
     "short_by": "Short by {{amount}}",
     "change_due": "Change due: {{amount}}",
-    "success": "Payment successful: {{amount}} received"
+    "success": "Payment successful: {{amount}} received",
+    "print_after_pay_failed": "Payment succeeded, but print failed: {{reason}}"
   },
   "pos": {
     "not_opened_title": "POS Not Opened",

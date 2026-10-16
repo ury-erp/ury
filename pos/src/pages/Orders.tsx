@@ -802,13 +802,7 @@ export default function Orders() {
                 {isOrderEditable(selectedOrder.status) && (
                   <Button
                     className="flex-1"
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error(t('errors.please_print_first'));
-                        return;
-                      }
-                      setShowPaymentDialog(true);
-                    }}
+                    onClick={() => setShowPaymentDialog(true)}
                   >
                     {t('order.payment')}
                   </Button>
@@ -845,6 +839,7 @@ export default function Orders() {
           clearSelectedOrder={clearSelectedOrder}
           discountPercentage={selectedOrder.additional_discount_percentage}
           discountAmount={selectedOrder.discount_amount}
+          printFormat={resolvePrintFormat(selectedOrder, posStore.posProfile?.print_format)}
         />
       )}
       {selectedOrder && (

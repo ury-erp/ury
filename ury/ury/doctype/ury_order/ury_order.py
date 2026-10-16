@@ -2683,11 +2683,16 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     # invoice.owner = owner
     invoice.save()
+
+    # Allow submit without a prior print (Pay / Pay & Print in POS).
+    frappe.flags.ury_payment_submit = True
     try:
         invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
-        
+    finally:
+        frappe.flags.ury_payment_submit = False
+
     # Free the table when no other open drafts remain on this table group
 
     release_invoice = invoice
@@ -2708,8 +2713,9 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             release_invoice.restaurant_table,
             release_invoice.custom_merged_tables,
         )
-        
-        
+
+    return {"name": invoice.name, "doctype": invoice.doctype}
+
 
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):

@@ -22,7 +22,12 @@ vi.mock("@ury/ui", () => ({
   DialogContent: ({ children }: any) => <div data-testid="dialog-content">{children}</div>,
   showToast: {
     success: vi.fn(),
+    error: vi.fn(),
   },
+}));
+
+vi.mock("../lib/print", () => ({
+  printOrder: vi.fn().mockResolvedValue("qz"),
 }));
 
 vi.mock("../i18n", () => ({
