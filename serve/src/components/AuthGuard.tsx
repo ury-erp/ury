@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useRootStore } from '../store/root-store'
 import { Button, Spinner } from '@ury/ui'
 import { RefreshCw } from 'lucide-react'
+import LoginScreen from './LoginScreen'
 
 interface Props {
   children: React.ReactNode
@@ -39,6 +40,10 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
     )
   }
 
+  if (!user) {
+    return <LoginScreen />
+  }
+
   if (authError || configError) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -49,8 +54,6 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
       </div>
     )
   }
-
-  if (!user) return null
 
   if (!posProfile) {
     return (

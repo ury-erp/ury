@@ -58,6 +58,10 @@ export const getUserRoles = async (email: string): Promise<{ roles: string[]; fu
   }
 };
 
+export const login = async (username: string, password: string): Promise<void> => {
+  await auth.loginWithUsernamePassword({ username, password });
+};
+
 export const logout = async () => {
   try {
     return auth.logout();
@@ -66,3 +70,4 @@ export const logout = async () => {
     return false;
   }
 }
+

@@ -399,6 +399,7 @@
     "payment_mode_misconfigured": "Un mode de paiement n'est pas entièrement configuré. Contactez votre responsable.",
     "contact_manager": "Contactez votre responsable",
     "retry": "Réessayer",
+    "back_to_dashboard": "Retour au tableau de bord",
     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
     "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
     "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",

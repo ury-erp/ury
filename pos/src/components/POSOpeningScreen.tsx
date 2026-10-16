@@ -400,6 +400,21 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('pos_opening.retry')}
             </Button>
+
+            <Button
+              onClick={() => {
+                const isUryManager = Boolean(user?.roles?.includes('URY Manager'));
+                if (isUryManager) {
+                  window.location.href = '/ury/dashboard';
+                } else {
+                  window.location.href = '/pos/dashboard';
+                }
+              }}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              {t('pos_opening.back_to_dashboard')}
+            </Button>
           </div>
         </div>
       </div>

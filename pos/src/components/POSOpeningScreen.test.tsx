@@ -1,14 +1,17 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import POSOpeningScreen from "./POSOpeningScreen";
+import { getPOSOpeningContext } from "../lib/pos-opening-api";
 
 vi.mock("../i18n", () => ({
   t: (key: string) => key,
 }));
 
+let mockUser: any = { name: "user1", full_name: "Test User", roles: ["URY Cashier"] };
+
 vi.mock("../store/root-store", () => ({
   useRootStore: () => ({
-    user: { name: "user1", full_name: "Test User" },
+    user: mockUser,
   }),
 }));
 
@@ -57,4 +60,71 @@ describe("POSOpeningScreen", () => {
     const { container } = render(<POSOpeningScreen />);
     expect(container).toBeTruthy();
   });
+
+  it("navigates to /pos/dashboard when cashier clicks Back to Dashboard", async () => {
+    mockUser = { name: "cashier1", full_name: "Cashier User", roles: ["URY Cashier"] };
+    vi.mocked(getPOSOpeningContext).mockResolvedValueOnce({
+      company: "Test Co",
+      allowed_profiles: [{ name: "Profile 1" }],
+      selected_profile: "Profile 1",
+      payment_modes: [],
+      user: "test@example.com",
+      branch: "Main",
+      restaurant: "Rest",
+      daily_close_pending: false,
+      multi_cashier: { enabled: false, main_cashier_open: false, main_cashier_configured: false },
+      permissions: { create: true, submit: true },
+    });
+
+    const originalLocation = window.location;
+    // @ts-expect-error test mock
+    delete window.location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    const { getByText } = render(<POSOpeningScreen />);
+
+    await waitFor(() => {
+      expect(getByText("pos_opening.back_to_dashboard")).toBeTruthy();
+    });
+
+    const backButton = getByText("pos_opening.back_to_dashboard");
+    backButton.click();
+
+    expect(window.location.href).toBe("/pos/dashboard");
+    window.location = originalLocation as any;
+  });
+
+  it("navigates to /ury/dashboard when URY Manager clicks Back to Dashboard", async () => {
+    mockUser = { name: "manager1", full_name: "Manager User", roles: ["URY Manager"] };
+    vi.mocked(getPOSOpeningContext).mockResolvedValueOnce({
+      company: "Test Co",
+      allowed_profiles: [{ name: "Profile 1" }],
+      selected_profile: "Profile 1",
+      payment_modes: [],
+      user: "test@example.com",
+      branch: "Main",
+      restaurant: "Rest",
+      daily_close_pending: false,
+      multi_cashier: { enabled: false, main_cashier_open: false, main_cashier_configured: false },
+      permissions: { create: true, submit: true },
+    });
+
+    const originalLocation = window.location;
+    // @ts-expect-error test mock
+    delete window.location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    const { getByText } = render(<POSOpeningScreen />);
+
+    await waitFor(() => {
+      expect(getByText("pos_opening.back_to_dashboard")).toBeTruthy();
+    });
+
+    const backButton = getByText("pos_opening.back_to_dashboard");
+    backButton.click();
+
+    expect(window.location.href).toBe("/ury/dashboard");
+    window.location = originalLocation as any;
+  });
 });
+

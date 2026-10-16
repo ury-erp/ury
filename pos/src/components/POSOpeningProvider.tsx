@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   checkPOSOpening,
   parseFrappeError,
@@ -14,6 +15,18 @@ import POSOpeningScreen from './POSOpeningScreen';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import POSClosingDialog from './POSClosingDialog';
 import { t } from '../i18n';
+
+export const GATED_ROUTES = ['/register', '/tables', '/orders'];
+
+export function isOpeningGatedRoute(pathname: string): boolean {
+  return GATED_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(`${route}/`) ||
+      pathname === `/pos${route}` ||
+      pathname.startsWith(`/pos${route}/`)
+  );
+}
 
 interface POSOpeningProviderProps {
   children: React.ReactNode;
@@ -71,6 +84,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
 
   const { posProfile, showVoluntaryClosing, setShowVoluntaryClosing } = usePOSStore();
   const { user } = useRootStore();
+  const location = useLocation();
+  const isGated = isOpeningGatedRoute(location.pathname);
 
   const canAccessDesk = useMemo(() => hasDeskAccess(user), [user]);
 
@@ -259,6 +274,29 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         }}
         onClosingSubmitted={handleClosingSuccess}
       />
+    );
+  }
+
+  // Opening requirements (blocking state, checklist, or opening entry creation)
+  // only block transactional routes (/register, /tables, /orders).
+  // Cashiers can freely view non-gated routes like /dashboard.
+  if (!isGated && (!existingEntry || blockingState || needsOpeningChecklist)) {
+    return (
+      <>
+        {children}
+        {showVoluntaryClosing && (
+          <POSClosingDialog
+            open={showVoluntaryClosing}
+            onOpenChange={(open) => {
+              if (!open) setShowVoluntaryClosing(false);
+            }}
+            onClosingSubmitted={() => {
+              setShowVoluntaryClosing(false);
+              checkPOSStatus();
+            }}
+          />
+        )}
+      </>
     );
   }
 

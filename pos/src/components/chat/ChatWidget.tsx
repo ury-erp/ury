@@ -19,13 +19,13 @@ import { resolveReportNavigation, navigateToReportSlug } from './reportNavigatio
  * instance. This context carries the ref App.tsx creates down to wherever
  * an ask bar wants it, without threading it through every layout prop.
  */
-const ChatWidgetRefContext = createContext<React.RefObject<ChatWidgetHandle> | null>(null);
+const ChatWidgetRefContext = createContext<React.RefObject<ChatWidgetHandle | null> | null>(null);
 
 export function ChatWidgetRefProvider({
   chatRef,
   children,
 }: {
-  chatRef: React.RefObject<ChatWidgetHandle>;
+  chatRef: React.RefObject<ChatWidgetHandle | null>;
   children: ReactNode;
 }) {
   return <ChatWidgetRefContext.Provider value={chatRef}>{children}</ChatWidgetRefContext.Provider>;
