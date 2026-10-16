@@ -82,10 +82,12 @@
     "adjustment": "Ajustement",
     "total": "Total",
     "pay_button": "Payer {{amount}}",
+    "pay_and_print_button": "Payer et imprimer {{amount}}",
     "processing": "Traitement...",
     "short_by": "Manque {{amount}}",
     "change_due": "Monnaie à rendre : {{amount}}",
-    "success": "Paiement réussi : {{amount}} reçu"
+    "success": "Paiement réussi : {{amount}} reçu",
+    "print_after_pay_failed": "Paiement réussi, mais l'impression a échoué : {{reason}}"
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",
