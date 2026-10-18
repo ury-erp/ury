@@ -1,0 +1,227 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:run_id",
+ "creation": "2026-10-19 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "run_id",
+  "status",
+  "business_date",
+  "company",
+  "branch",
+  "pos_profile",
+  "column_break_refs",
+  "sales_plan",
+  "pos_opening_entry",
+  "pos_closing_entry",
+  "consolidated_sales_invoice",
+  "section_break_counters",
+  "total_invoices",
+  "takeaway_invoices",
+  "dine_in_invoices",
+  "delivery_invoices",
+  "aggregator_invoices",
+  "total_revenue",
+  "section_break_report",
+  "error_summary",
+  "report_markdown",
+  "section_break_timing",
+  "started_at",
+  "completed_at",
+  "section_break_slots",
+  "slots"
+ ],
+ "fields": [
+  {
+   "fieldname": "run_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Run ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nPreparing\nSales Plan Created\nManufacturing In Progress\nManufacturing Verified\nPOS Open\nGenerating Invoices\nCutoff Reached\nClosing In Progress\nCompleted\nCompleted With Warnings\nFailed\nClosing Failed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "business_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Business Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_refs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_plan",
+   "fieldtype": "Link",
+   "label": "Sales Plan",
+   "options": "URY Sales Plan"
+  },
+  {
+   "fieldname": "pos_opening_entry",
+   "fieldtype": "Link",
+   "label": "POS Opening Entry",
+   "options": "POS Opening Entry"
+  },
+  {
+   "fieldname": "pos_closing_entry",
+   "fieldtype": "Link",
+   "label": "POS Closing Entry",
+   "options": "POS Closing Entry"
+  },
+  {
+   "fieldname": "consolidated_sales_invoice",
+   "fieldtype": "Link",
+   "label": "Consolidated Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "section_break_counters",
+   "fieldtype": "Section Break",
+   "label": "Counters"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_invoices",
+   "fieldtype": "Int",
+   "label": "Total Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "takeaway_invoices",
+   "fieldtype": "Int",
+   "label": "Takeaway Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "dine_in_invoices",
+   "fieldtype": "Int",
+   "label": "Dine-in Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "delivery_invoices",
+   "fieldtype": "Int",
+   "label": "Delivery Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "aggregator_invoices",
+   "fieldtype": "Int",
+   "label": "Aggregator Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_revenue",
+   "fieldtype": "Currency",
+   "label": "Total Revenue"
+  },
+  {
+   "fieldname": "section_break_report",
+   "fieldtype": "Section Break",
+   "label": "Report"
+  },
+  {
+   "fieldname": "error_summary",
+   "fieldtype": "Small Text",
+   "label": "Error Summary"
+  },
+  {
+   "fieldname": "report_markdown",
+   "fieldtype": "Long Text",
+   "label": "Report (Markdown)"
+  },
+  {
+   "fieldname": "section_break_timing",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At"
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At"
+  },
+  {
+   "fieldname": "section_break_slots",
+   "fieldtype": "Section Break",
+   "label": "Slots"
+  },
+  {
+   "fieldname": "slots",
+   "fieldtype": "Table",
+   "label": "Slots",
+   "options": "URY Simulation Slot"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Simulation Run",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
