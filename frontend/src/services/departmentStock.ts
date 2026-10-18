@@ -447,7 +447,7 @@ export const departmentStockService = {
     if (!branch || branch === 'all' || !items || items.length === 0) {
       return [];
     }
-    const res = await call.get<any>('ury.ury.api.ury_requirements_stock.get_plan_stock_on_hand', {
+    const res = await call.post<any>('ury.ury.api.ury_requirements_stock.get_plan_stock_on_hand', {
       branch,
       items: JSON.stringify(items),
     });
