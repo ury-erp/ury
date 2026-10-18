@@ -331,7 +331,10 @@ scheduler_events = {
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 		],
 		"*/5 * * * *":[
-			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
+			"ury.ury.services.food_cost_alerts.notify_high_food_cost",
+			# UAT simulator: work off one leaseable POS slot per open run;
+			# silently no-ops unless allow_uat_simulator is set on the site.
+			"ury.ury.simulator.service.process_scheduled_slot",
 		],
 		# Backstop only. Reservations are normally closed out at the
 		# consolidated Sales Invoice submit (sale) or on cancellation; this
@@ -362,6 +365,7 @@ scheduler_events = {
 # it must never run automatically via the scheduler.
 commands = [
 	"ury.commands.seed_demo_data",
+	"ury.commands.uat_simulate_day",
 ]
 
 # Testing
