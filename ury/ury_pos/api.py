@@ -144,25 +144,50 @@ def getBranch():
 @frappe.whitelist()
 def getBranchRoom():
     user = frappe.session.user
+
     sql_query = """
-        SELECT b.branch , a.room
+        SELECT
+            b.branch,
+            a.room
         FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        INNER JOIN `tabBranch` AS b
+            ON a.parent = b.name
         WHERE a.user = %s
+        LIMIT 1
     """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-    
+
+    branch_array = frappe.db.sql(
+        sql_query,
+        (user,),
+        as_dict=True
+    )
+
+    # No branch/user assignment found
+    if not branch_array:
+        frappe.throw(
+            f"No branch assigned to user {user}. "
+            "Please contact your administrator."
+        )
+
     branch_name = branch_array[0].get("branch")
     room_name = branch_array[0].get("room")
 
+    # Branch exists but is empty
     if not branch_name:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+        frappe.throw(
+            "Branch information is missing for the user. "
+            "Please contact your administrator."
+        )
 
+    # Branch exists but room is empty
     if not room_name:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
+        frappe.throw(
+            f"No room assigned to user {user}. "
+            "Please contact your administrator."
+        )
 
     return [{
-        "name":room_name ,
+        "name": room_name,
         "branch": branch_name,
     }]
 
@@ -879,7 +904,7 @@ def getPosProfileFull(pos_profile):
         "country": profile.country,
         "disabled": profile.disabled,
         "warehouse": profile.warehouse,
-        "campaign": profile.campaign,
+        "campaign": profile.get("campaign") if profile.meta.has_field("campaign") else None,
         "company_address": profile.company_address,
         "restaurant": profile.restaurant,
         "branch": profile.branch,
