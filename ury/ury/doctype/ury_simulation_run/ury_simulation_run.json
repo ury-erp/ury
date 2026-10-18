@@ -50,7 +50,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Pending\nPreparing\nSales Plan Created\nManufacturing In Progress\nManufacturing Verified\nPOS Open\nGenerating Invoices\nCutoff Reached\nClosing In Progress\nCompleted\nCompleted With Warnings\nFailed\nClosing Failed",
+   "options": "Pending\nPreparing\nSales Plan Created\nManufacturing In Progress\nManufacturing Done\nManufacturing Verified\nPOS Open\nGenerating Invoices\nCutoff Reached\nClosing In Progress\nCompleted\nCompleted With Warnings\nFailed\nClosing Failed",
    "reqd": 1
   },
   {
