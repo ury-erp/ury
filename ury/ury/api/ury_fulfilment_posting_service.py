@@ -277,10 +277,14 @@ def _reservation_audit_context(row):
 
 def _reservation_snapshot(row, item_code):
 	entry, context = _reservation_audit_context(row)
-	policy = _normalise_policy(context.get("production_policy") or context.get("policy"))
-	warehouse = context.get("warehouse")
-	component_item = entry.get("component_item") or context.get("component_item")
-	qty = flt(entry.get("qty") or context.get("qty"))
+	ctx_policy = _normalise_policy(context.get("production_policy") or context.get("policy"))
+	if ctx_policy == BUNDLE and row.get("policy") and row.get("policy") != BUNDLE:
+		policy = _normalise_policy(row.get("policy"))
+	else:
+		policy = ctx_policy
+	warehouse = context.get("warehouse") or row.get("warehouse")
+	component_item = entry.get("component_item") or context.get("component_item") or row.get("component_item")
+	qty = flt(entry.get("qty") or context.get("qty") or row.get("qty"))
 	if not policy or not warehouse or not component_item or qty <= 0:
 		raise FulfilmentPostingError(
 			"INVALID_ORDER_TIME_RESERVATION_CONTEXT",
@@ -336,6 +340,48 @@ def _next_fulfilment_sequence(branch, kot, kot_item, accepted_revision, reservat
 	if not rows:
 		return 1
 	return int(rows[0].get("fulfilment_sequence") or 0) + 1
+
+
+def _resolve_bundle_mto_child(item_code, branch=None):
+	"""Resolve the manufactured (MTO) child item and its multiplier for a bundle item."""
+	product_bundle = frappe.db.get_value(
+		"URY Item Production Configuration",
+		{"item": item_code, "branch": branch, "active": 1},
+		"product_bundle",
+	) or frappe.db.get_value("Product Bundle", {"new_item_code": item_code}, "name")
+	if not product_bundle:
+		return None, 1.0
+
+	children = frappe.get_all(
+		"Product Bundle Item",
+		filters={"parent": product_bundle},
+		fields=["item_code", "qty"],
+		order_by="idx asc",
+	)
+	for child in children:
+		child_ipc = frappe.db.get_value(
+			"URY Item Production Configuration",
+			{"item": child["item_code"], "branch": branch, "active": 1},
+			["production_policy", "bom"],
+			as_dict=True,
+		)
+		if not child_ipc and branch:
+			child_ipc = frappe.db.get_value(
+				"URY Item Production Configuration",
+				{"item": child["item_code"], "active": 1},
+				["production_policy", "bom"],
+				as_dict=True,
+			)
+		if child_ipc and child_ipc.get("production_policy") == MADE_TO_ORDER:
+			return child["item_code"], flt(child.get("qty") or 1.0)
+
+	for child in children:
+		is_stock = frappe.db.get_value("Item", child["item_code"], "is_stock_item")
+		bom = frappe.db.get_value("BOM", {"item": child["item_code"], "is_active": 1, "docstatus": 1}, "name")
+		if is_stock and bom:
+			return child["item_code"], flt(child.get("qty") or 1.0)
+
+	return None, 1.0
 
 
 def _fg_warehouse(snapshots):
@@ -403,12 +449,27 @@ def _freeze_payload(execution_doc, actor):
 	)
 	snapshots = [_reservation_snapshot(row, item_code) for row in rows]
 	policies = {snapshot["policy"] for snapshot in snapshots}
-	if len(policies) != 1:
-		raise FulfilmentPostingError(
-			"MIXED_RESERVATION_POLICIES",
-			_("Reserved rows for KOT item {0} do not share one frozen policy").format(execution_doc.kot_item),
-		)
-	policy = snapshots[0]["policy"]
+
+	is_bundle = (
+		frappe.db.get_value("Item", item_code, "is_stock_item") == 0
+		or frappe.db.exists("Product Bundle", {"new_item_code": item_code})
+		or (frappe.db.get_value("URY Item Production Configuration", {"item": item_code, "branch": execution_doc.branch, "active": 1}, "production_policy") == BUNDLE)
+	)
+
+	mto_snapshots = [s for s in snapshots if s["policy"] == MADE_TO_ORDER]
+
+	if mto_snapshots:
+		policy = MADE_TO_ORDER
+		active_snapshots = mto_snapshots
+	else:
+		if len(policies) != 1 and not is_bundle:
+			raise FulfilmentPostingError(
+				"MIXED_RESERVATION_POLICIES",
+				_("Reserved rows for KOT item {0} do not share one frozen policy").format(execution_doc.kot_item),
+			)
+		policy = snapshots[0]["policy"] if snapshots else BUNDLE
+		active_snapshots = snapshots
+
 	reservation_group = rows[0].get("reservation_group") or rows[0].get("name")
 
 	# B03b: this KOT item's SHARE of the reservation group, not the whole group.
@@ -459,29 +520,25 @@ def _freeze_payload(execution_doc, actor):
 			"qty": flt(snapshot["qty"]) * line_share,
 			"s_warehouse": snapshot["warehouse"],
 		}
-		for snapshot in snapshots
+		for snapshot in active_snapshots
 	]
 	if policy in (PRE_PRODUCED, DIRECT_RETAIL) and len(components) > 1:
 		raise FulfilmentPostingError(
 			"UNEXPECTED_FINISHED_GOODS_RESERVATION",
 			_("{0} fulfilment for KOT item {1} must resolve to one stock row").format(policy, execution_doc.kot_item),
 		)
+
+	fg_item_code = item_code
+	fg_qty = accepted_qty
+	if policy == MADE_TO_ORDER and (is_bundle or frappe.db.get_value("Item", item_code, "is_stock_item") == 0):
+		bundle_child, child_mult = _resolve_bundle_mto_child(item_code, execution_doc.branch)
+		if bundle_child:
+			fg_item_code = bundle_child
+			fg_qty = flt(accepted_qty) * flt(child_mult)
+
+	fg_wh = _fg_warehouse(active_snapshots) if policy == MADE_TO_ORDER else (snapshots[0].get("warehouse") if snapshots else None)
+
 	# Which VERSION OF THE LINE this posting is accepted against.
-	#
-	# This used to read `idempotency_key`, but that field is a per-RPC replay
-	# token: the client mints a fresh UUID for every call and `_transition`
-	# rewrites the row's copy on every state change. Freezing it here meant
-	# the intent carried the READY call's UUID while the row went on to carry
-	# the SERVED call's UUID, so the G-07 gate in `ury_feature_flags` found a
-	# mismatch on every normally served item and falsely blocked the invoice.
-	# `revision_key` is stamped once at seed time and advanced only by
-	# `ury_kot_item_execution_service.bump_item_execution_revision` (a genuine
-	# edit / re-fire of the line), which is exactly the identity this needs.
-	#
-	# The `idempotency_key` fallback covers rows seeded before `revision_key`
-	# existed and not yet touched by the v3_21 backfill patch; the gate skips
-	# the revision comparison for such rows rather than acting on a value it
-	# knows is not a revision.
 	accepted_revision = (
 		execution_doc.get("revision_key") or execution_doc.get("idempotency_key") or "current"
 	)
@@ -520,20 +577,9 @@ def _freeze_payload(execution_doc, actor):
 		# them without re-deriving the ratio.
 		"reservation_group_qty": reserved_group_qty,
 		"reservation_line_share": line_share,
-		# The warehouse the finished good is received into, resolved
-		# explicitly rather than inferred from a component row. Frozen here,
-		# at the same moment and from the same order-time context as every
-		# component's own warehouse, so the posting that runs minutes later
-		# in a background worker uses the warehouse the order was accepted
-		# against -- not whatever the item's configuration says by then.
-		#
-		# This is the warehouse the sale later deducts from: the same
-		# `_warehouse_for_context(context)` resolution that
-		# `ury_order_reservation_service._reserve_line` and
-		# `ury_order._department_warehouse_for_item` use, so the FG received
-		# here and the FG issued by the consolidated Sales Invoice at closing
-		# land in one warehouse and net out.
-		"fg_warehouse": _fg_warehouse(snapshots) if policy == MADE_TO_ORDER else (snapshots[0].get("warehouse") if snapshots else None),
+		"fg_item_code": fg_item_code,
+		"fg_qty": fg_qty,
+		"fg_warehouse": fg_wh,
 		"components": components,
 		"ready_at": execution_doc.get("ready_at") or now(),
 		"execution_state": execution_state,
@@ -776,11 +822,12 @@ def _stock_entry_items(payload):
 	assertion below makes that shape unrepresentable, so the bug class cannot
 	be reintroduced by a future caller or policy.
 	"""
+	fg_item = payload.get("fg_item_code") or payload.get("item_code")
 	items = []
 	for row in payload.get("components") or []:
 		if not row.get("item_code") or not row.get("s_warehouse") or flt(row.get("qty")) <= 0:
 			raise FulfilmentPostingError("INVALID_STOCK_ROW", _("Frozen stock row is incomplete"))
-		if row["item_code"] == payload.get("item_code"):
+		if row["item_code"] == fg_item or row["item_code"] == payload.get("item_code"):
 			raise FulfilmentPostingError(
 				"SELF_ISSUE_NOT_ALLOWED",
 				_(
@@ -805,12 +852,13 @@ def _stock_entry_items(payload):
 		# a central raw store). Read the resolved value; express the invariant
 		# rather than depend on the coincidence.
 		target_warehouse = payload.get("fg_warehouse")
-		if not target_warehouse or not payload.get("item_code") or flt(payload.get("accepted_qty")) <= 0:
+		fg_qty = flt(payload.get("fg_qty") or payload.get("accepted_qty"))
+		if not target_warehouse or not fg_item or fg_qty <= 0:
 			raise FulfilmentPostingError("INVALID_STOCK_ROW", _("Frozen stock row is incomplete"))
 		items.append(
 			{
-				"item_code": payload["item_code"],
-				"qty": flt(payload["accepted_qty"]),
+				"item_code": fg_item,
+				"qty": fg_qty,
 				"t_warehouse": target_warehouse,
 				# ERPNext's Stock Entry.mark_finished_and_scrap_items() only
 				# auto-infers is_finished_item from a linked work_order/bom_no
@@ -882,6 +930,12 @@ def _submit_stock_entry(intent, payload):
 		)
 	stock_entry_type = "Manufacture"
 	wo_name, wo_bom_no = _resolve_work_order_for_item(payload)
+	fg_item = payload.get("fg_item_code") or payload.get("item_code")
+	if not wo_bom_no and fg_item:
+		wo_bom_no = frappe.db.get_value("BOM", {"item": fg_item, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
+		if not wo_bom_no:
+			wo_bom_no = frappe.db.get_value("BOM", {"item": fg_item, "is_active": 1, "docstatus": 1}, "name")
+
 	doc = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
@@ -912,7 +966,7 @@ def _submit_stock_entry(intent, payload):
 			# on a Manufacture SE. Without this, it throws "For Quantity
 			# (Manufactured Qty) is mandatory", aborting the transaction and
 			# preventing the reservation from being fulfilled.
-			"fg_completed_qty": payload.get("accepted_qty") or 1,
+			"fg_completed_qty": flt(payload.get("fg_qty") or payload.get("accepted_qty") or 1),
 			# Explicitly carry use_multi_level_bom = 0 to the Stock Entry just
 			# in case ERPNext's getters attempt to re-evaluate the BOM.
 			"use_multi_level_bom": 0,

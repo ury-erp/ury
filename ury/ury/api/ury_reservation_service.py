@@ -585,8 +585,15 @@ def get_available_capacity(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_components(item_code, qty, company, production_policy=None):
-	"""Return [{"component_item": ..., "qty": ...}, ...] for `item_code` at `qty`.
+def _resolve_components(
+	item_code,
+	qty,
+	company,
+	production_policy=None,
+	branch=None,
+	warehouse=None,
+):
+	"""Return [{"component_item": ..., "qty": ..., "warehouse": ...}, ...] for `item_code` at `qty`.
 
 	Component resolution is driven by `production_policy` (the same
 	single source of truth `ury_availability.py`'s `_fill_pre_produced`/
@@ -604,6 +611,9 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 	    returned (via V3-41's `compile_bom_vector`, which reads ERPNext's
 	    precomputed `BOM Explosion Item` table and recurses through any
 	    nested sub-assembly when explosion rows are absent), scaled to `qty`.
+	  - BUNDLE: combo item; explodes to child components, each evaluated
+	    using the child item's own warehouse from its URY Item Production
+	    Configuration.
 
 	`production_policy=None` (no IPC config resolved -- a legacy/unconfigured
 	item, or a caller that hasn't been updated to pass it) falls back to the
@@ -615,17 +625,24 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 	`production_policy` through.
 	"""
 	if production_policy in (POLICY_PRE_PRODUCED, POLICY_DIRECT_RETAIL):
-		return [{"component_item": item_code, "qty": qty}]
+		return [{"component_item": item_code, "qty": qty, "warehouse": warehouse, "policy": production_policy}]
 
 	if production_policy == POLICY_MADE_TO_ORDER:
 		vector = compile_bom_vector(item_code, qty, company)
 		return [
-			{"component_item": component["component_item"], "qty": component["qty"]}
+			{
+				"component_item": component["component_item"],
+				"qty": component["qty"],
+				"warehouse": warehouse,
+				"policy": POLICY_MADE_TO_ORDER,
+			}
 			for component in sorted(vector["components"], key=lambda c: c["component_item"])
 		]
 
 	if production_policy == POLICY_BUNDLE:
-		return _resolve_bundle_components(item_code, qty, company)
+		return _resolve_bundle_components(
+			item_code, qty, company, branch=branch, default_warehouse=warehouse
+		)
 
 	# No production_policy supplied -- fall back to the legacy heuristic.
 	bom_name = frappe.db.get_value(
@@ -634,7 +651,7 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 		"name",
 	)
 	if not bom_name:
-		return [{"component_item": item_code, "qty": qty}]
+		return [{"component_item": item_code, "qty": qty, "warehouse": warehouse, "policy": production_policy}]
 
 	frappe.logger("ury_reservation_service").warning(
 		"create_reservation for item {0} (company {1}) received no production_policy; "
@@ -647,42 +664,61 @@ def _resolve_components(item_code, qty, company, production_policy=None):
 	vector = compile_bom_vector(item_code, qty, company)
 
 	return [
-		{"component_item": component["component_item"], "qty": component["qty"]}
+		{
+			"component_item": component["component_item"],
+			"qty": component["qty"],
+			"warehouse": warehouse,
+			"policy": POLICY_MADE_TO_ORDER,
+		}
 		for component in sorted(vector["components"], key=lambda c: c["component_item"])
 	]
 
 
-def _resolve_bundle_components(item_code, qty, company):
+def _resolve_bundle_components(item_code, qty, company, branch=None, default_warehouse=None):
 	"""Flat component list for a BUNDLE item.
 
 	Fetches the ``Product Bundle Item`` children for this item's linked
-	Product Bundle (resolved from the first active IPC for this item, any
-	branch — warehouse/branch context for bundles lives at the child level).
-	Each child is recursively resolved through its own production policy:
+	Product Bundle (resolved from the active IPC for this item/branch, or any
+	branch fallback).
+	Each child is recursively resolved through its own production policy and
+	assigned warehouse from its URY Item Production Configuration:
 
 	  - PRE_PRODUCED / DIRECT_RETAIL: the child itself, scaled by its
-	    ``qty_of`` × ``qty``.
-	  - MADE_TO_ORDER: the child's BOM-exploded leaf components, scaled.
+	    ``qty_of`` × ``qty``, with warehouse from child's IPC.
+	  - MADE_TO_ORDER: the child's BOM-exploded leaf components, scaled,
+	    with warehouse from child's IPC.
 
-	Returns a flat list sorted by ``component_item`` (stable lock order for
+	Returns a flat list sorted by ``(component_item, warehouse)`` (stable lock order for
 	the ``FOR UPDATE`` Bin locking in ``create_reservation``).
 	"""
-	# Bundle IPC is branch-scoped; here we only need the product_bundle name.
-	# Use frappe.get_all to find any active IPC for this item (the bundle
-	# itself has no warehouse — capacity lives at the child level).
+	ipc_filters = {"item": item_code, "production_policy": POLICY_BUNDLE, "active": 1}
+	if branch:
+		ipc_filters["branch"] = branch
 	ipc_rows = frappe.get_all(
 		"URY Item Production Configuration",
-		filters={"item": item_code, "production_policy": POLICY_BUNDLE, "active": 1},
+		filters=ipc_filters,
 		fields=["product_bundle"],
 		limit=1,
 	)
-	if not ipc_rows or not ipc_rows[0].get("product_bundle"):
+	if not ipc_rows and branch:
+		ipc_rows = frappe.get_all(
+			"URY Item Production Configuration",
+			filters={"item": item_code, "production_policy": POLICY_BUNDLE, "active": 1},
+			fields=["product_bundle"],
+			limit=1,
+		)
+	product_bundle = None
+	if ipc_rows and ipc_rows[0].get("product_bundle"):
+		product_bundle = ipc_rows[0]["product_bundle"]
+	else:
+		product_bundle = frappe.db.get_value("Product Bundle", {"new_item_code": item_code}, "name")
+
+	if not product_bundle:
 		frappe.throw(
 			_("Bundle item {0} has no Product Bundle configured in its active IPC").format(item_code),
 			frappe.ValidationError,
 		)
 
-	product_bundle = ipc_rows[0]["product_bundle"]
 	children = frappe.get_all(
 		"Product Bundle Item",
 		filters={"parent": product_bundle},
@@ -695,26 +731,67 @@ def _resolve_bundle_components(item_code, qty, company):
 			frappe.ValidationError,
 		)
 
-	merged = {}  # component_item -> total qty
+	merged = {}  # (component_item, warehouse) -> total qty
 	for child in children:
 		child_item = child["item_code"]
 		child_qty = flt(child["qty"]) * flt(qty)
 
-		# Resolve the child's own production policy from any active IPC.
-		child_policy_row = frappe.get_all(
-			"URY Item Production Configuration",
-			filters={"item": child_item, "active": 1},
-			fields=["production_policy"],
-			limit=1,
-		)
-		child_policy = child_policy_row[0].get("production_policy") if child_policy_row else None
+		# Resolve the child's own production policy and warehouse from its active IPC.
+		child_context = None
+		if branch:
+			child_context = resolve_production_context(child_item, branch, company=company)
 
-		child_components = _resolve_components(child_item, child_qty, company, production_policy=child_policy)
+		child_policy = None
+		child_wh = None
+		if child_context:
+			child_policy = child_context.get("production_policy")
+			child_wh = child_context.get("warehouse") or child_context.get("direct_retail_warehouse")
+		else:
+			# Fallback when no branch-specific IPC is found
+			child_policy_row = frappe.get_all(
+				"URY Item Production Configuration",
+				filters={"item": child_item, "active": 1},
+				fields=["production_policy", "direct_retail_warehouse", "production_unit", "department"],
+				limit=1,
+			)
+			if child_policy_row:
+				row = child_policy_row[0]
+				child_policy = row.get("production_policy")
+				if child_policy == POLICY_DIRECT_RETAIL:
+					child_wh = row.get("direct_retail_warehouse")
+				elif child_policy == POLICY_PRE_PRODUCED and row.get("department"):
+					child_wh = frappe.db.get_value(
+						"URY Production Department", row["department"], "department_warehouse"
+					)
+				elif row.get("production_unit"):
+					child_wh = frappe.db.get_value(
+						"URY Production Unit", row["production_unit"], "warehouse"
+					)
+				elif row.get("department"):
+					child_wh = frappe.db.get_value(
+						"URY Production Department", row["department"], "department_warehouse"
+					)
+
+		child_wh = child_wh or default_warehouse
+
+		child_components = _resolve_components(
+			child_item,
+			child_qty,
+			company,
+			production_policy=child_policy,
+			branch=branch,
+			warehouse=child_wh,
+		)
 		for comp in child_components:
-			key = comp["component_item"]
+			wh = comp.get("warehouse") or child_wh or default_warehouse
+			pol = comp.get("policy") or child_policy
+			key = (comp["component_item"], wh, pol)
 			merged[key] = merged.get(key, 0) + comp["qty"]
 
-	return [{"component_item": k, "qty": v} for k, v in sorted(merged.items())]
+	return [
+		{"component_item": item, "warehouse": wh, "policy": pol, "qty": v}
+		for (item, wh, pol), v in sorted(merged.items())
+	]
 
 
 # ---------------------------------------------------------------------------
@@ -803,15 +880,23 @@ def create_reservation(
 	_require_positive_qty(qty)
 	_require_scope(branch, company, warehouse, item_code, order_ref)
 
-	components = _resolve_components(item_code, qty, company, production_policy=policy)
-	components_sorted = sorted(components, key=lambda c: c["component_item"])
+	components = _resolve_components(
+		item_code, qty, company, production_policy=policy, branch=branch, warehouse=warehouse
+	)
+	components_sorted = sorted(
+		components,
+		key=lambda c: (c["component_item"], c.get("warehouse") or warehouse),
+	)
 
-	# Step 1: lock every distinct component's Bin row, in a stable sorted
+	# Step 1: lock every distinct (component_item, warehouse) Bin row, in a stable sorted
 	# order, before reading/deciding anything (avoids lock-order deadlocks
 	# between two concurrent multi-component reservations).
+	distinct_targets = sorted(
+		{(c["component_item"], c.get("warehouse") or warehouse) for c in components_sorted}
+	)
 	locked_bins = {
-		component["component_item"]: _lock_bin_row(component["component_item"], warehouse)
-		for component in components_sorted
+		(comp_item, comp_wh): _lock_bin_row(comp_item, comp_wh)
+		for comp_item, comp_wh in distinct_targets
 	}
 
 	# Step 2: check capacity for every component against the now-locked
@@ -836,11 +921,13 @@ def create_reservation(
 	shortfalls = []
 	with committed_read_connection() as committed_conn:
 		for component in components_sorted:
+			comp_wh = component.get("warehouse") or warehouse
+			locked_bin = locked_bins.get((component["component_item"], comp_wh)) or locked_bins.get(component["component_item"])
 			available = get_available_capacity(
 				component["component_item"],
-				warehouse,
+				comp_wh,
 				company,
-				locked_bin=locked_bins[component["component_item"]],
+				locked_bin=locked_bin,
 				read_committed=True,
 				committed_conn=committed_conn,
 			)
@@ -863,24 +950,41 @@ def create_reservation(
 				shortfalls.append(
 					{
 						"component_item": component["component_item"],
+						"warehouse": comp_wh,
 						"required": component["qty"],
 						"available": available,
 					}
 				)
 
 	if shortfalls:
-		frappe.throw(
-			_("Insufficient capacity for {0}: {1}").format(
-				item_code,
-				", ".join(
-					"{0} (required {1}, available {2})".format(
-						row["component_item"], row["required"], row["available"]
-					)
-					for row in shortfalls
+		all_same_warehouse = all(row["warehouse"] == warehouse for row in shortfalls)
+		if all_same_warehouse:
+			frappe.throw(
+				_("Insufficient capacity for {0} in warehouse {1}: {2}").format(
+					item_code,
+					warehouse,
+					", ".join(
+						"{0} (required {1}, available {2})".format(
+							row["component_item"], row["required"], row["available"]
+						)
+						for row in shortfalls
+					),
 				),
-			),
-			frappe.ValidationError,
-		)
+				frappe.ValidationError,
+			)
+		else:
+			frappe.throw(
+				_("Insufficient capacity for {0}: {1}").format(
+					item_code,
+					", ".join(
+						"{0} in warehouse {1} (required {2}, available {3})".format(
+							row["component_item"], row["warehouse"], row["required"], row["available"]
+						)
+						for row in shortfalls
+					),
+				),
+				frappe.ValidationError,
+			)
 
 	# Sales Plan committed_qty tracking: this reservation's `qty` is the
 	# TOP-LEVEL item's requested quantity (not a per-component quantity, which
@@ -965,16 +1069,18 @@ def create_reservation(
 	reservation_group = frappe.generate_hash(length=10)
 	created_names = []
 	for component in components_sorted:
+		comp_wh = component.get("warehouse") or warehouse
+		comp_policy = component.get("policy") or policy
 		doc = frappe.get_doc(
 			{
 				"doctype": RESERVATION_DOCTYPE,
 				"reservation_group": reservation_group,
 				"order_ref": order_ref,
-				"policy": policy,
+				"policy": comp_policy,
 				"status": RESERVED,
 				"branch": branch,
 				"company": company,
-				"warehouse": warehouse,
+				"warehouse": comp_wh,
 				"top_level_item": item_code,
 				"component_item": component["component_item"],
 				"qty": component["qty"],
@@ -982,7 +1088,13 @@ def create_reservation(
 				"actor": actor,
 			}
 		)
-		append_audit(doc, actor, event="create", frozen_context=frozen_context)
+		row_frozen_context = dict(frozen_context)
+		row_frozen_context["production_policy"] = comp_policy
+		row_frozen_context["policy"] = comp_policy
+		row_frozen_context["warehouse"] = comp_wh
+		row_frozen_context["component_item"] = component["component_item"]
+		row_frozen_context["qty"] = component["qty"]
+		append_audit(doc, actor, event="create", frozen_context=row_frozen_context)
 		doc.insert(ignore_permissions=False)
 		created_names.append(doc.name)
 
@@ -994,10 +1106,11 @@ def create_reservation(
 	# it is ever inlined here in future.
 	department = _best_effort_department(item_code, branch)
 	for component in components_sorted:
+		comp_wh = component.get("warehouse") or warehouse
 		try:
 			publish_component_stock_fanout(
 				component["component_item"],
-				warehouse,
+				comp_wh,
 				company,
 				branch,
 				department=department,
