@@ -1,21 +1,27 @@
 import { type MouseEvent } from 'react';
-import { Eye, Loader2, Printer, Users } from 'lucide-react';
+import { AlertTriangle, Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
-import type { Table } from '../lib/table-api';
+import type { Table, TableReservation } from '../lib/table-api';
 import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
+import { formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { t } from '../i18n';
 
 export const TABLE_STATE_STYLES = {
   available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
   occupied: 'border-amber-400 bg-amber-50 text-amber-900',
+  reserved: 'border-primary-400 bg-primary-50 text-primary-950 hover:border-primary-500',
   restricted: 'border-emerald-300 bg-emerald-50 text-emerald-900 opacity-60 cursor-not-allowed',
 } as const;
 
 interface TableCardProps {
   table: Table;
+  isReserved?: boolean;
+  upcomingReservation?: TableReservation | null;
+  activeReservation?: TableReservation | null;
+  reservationEnabled?: boolean;
   mergeGroupLabel?: string;
   className?: string;
   menuOpen: boolean;
@@ -29,11 +35,16 @@ interface TableCardProps {
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
+  onReserve?: () => void;
   isRestricted?: boolean;
 }
 
 const TableCard = ({
   table,
+  isReserved = false,
+  upcomingReservation = null,
+  activeReservation = null,
+  reservationEnabled = true,
   mergeGroupLabel,
   className,
   menuOpen,
@@ -47,9 +58,15 @@ const TableCard = ({
   onPreview,
   onPrint,
   isPrinting,
+  onReserve,
   isRestricted = false,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
+  const isLockedByReservation =
+    isReserved &&
+    !!activeReservation &&
+    (activeReservation.is_lock_window_active || isReservationLockWindowActive(activeReservation)) &&
+    activeReservation.status === 'Confirmed';
 
   return (
     <div
@@ -61,12 +78,14 @@ const TableCard = ({
         }
       }}
       className={cn(
-        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
+        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-colors',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
-          : isRestricted
-            ? TABLE_STATE_STYLES.restricted
-            : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
+          : isLockedByReservation
+            ? cn(TABLE_STATE_STYLES.reserved, 'cursor-pointer hover:shadow-md')
+            : isRestricted
+              ? TABLE_STATE_STYLES.restricted
+              : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
@@ -75,18 +94,54 @@ const TableCard = ({
         <div className="mb-3 flex items-start justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
-              <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
+              <TableShapeIcon
+                shape={table.table_shape || 'Rectangle'}
+                className={cn(
+                  'h-5 w-5',
+                  isOccupied
+                    ? 'text-amber-600'
+                    : isLockedByReservation
+                    ? 'text-primary-600'
+                    : 'text-gray-600'
+                )}
+              />
             </div>
-            <span className="truncate text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
+            <span className="shrink-0 text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
               {table.name}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
-              {isOccupied ? t('tables.occupied') : t('tables.available')}
-            </Badge>
+            {isOccupied ? (
+              <>
+                <Badge variant="warning" className="whitespace-nowrap">
+                  {t('tables.occupied')}
+                </Badge>
+                {isLockedByReservation && (
+                  <Badge
+                    variant="outline"
+                    className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+                  >
+                    Reserved
+                  </Badge>
+                )}
+              </>
+            ) : isLockedByReservation ? (
+              <Badge
+                variant="outline"
+                className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+              >
+                Reserved
+              </Badge>
+            ) : (
+              <Badge variant="success" className="whitespace-nowrap">
+                {t('tables.available')}
+              </Badge>
+            )}
             <TableActionsMenu
               table={table}
+              isReserved={isReserved}
+              hasUpcomingReservation={!!upcomingReservation}
+              reservationEnabled={reservationEnabled}
               isOpen={menuOpen}
               onOpenChange={onMenuOpenChange}
               onMerge={onMerge}
@@ -94,6 +149,7 @@ const TableCard = ({
               onTransferTable={onTransferTable}
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
+              onReserve={onReserve}
             />
           </div>
         </div>
@@ -134,6 +190,14 @@ const TableCard = ({
             <Badge variant="pending" className="mt-2">
               Take away
             </Badge>
+          )}
+          {isLockedByReservation && (
+            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-xs font-medium text-primary-950">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+              <span className="truncate">
+                Reserved for {formatReservationTime(activeReservation?.reserved_at)}
+              </span>
+            </div>
           )}
         </div>
       </div>

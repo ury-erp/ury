@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
+import { ArrowRightLeft, Calendar, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 import { isMergedTable } from '../lib/table-utils';
@@ -7,6 +7,9 @@ import type { Table } from '../lib/table-api';
 
 interface TableActionsMenuProps {
   table: Table;
+  isReserved?: boolean;
+  hasUpcomingReservation?: boolean;
+  reservationEnabled?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onMerge?: () => void;
@@ -14,10 +17,12 @@ interface TableActionsMenuProps {
   onTransferTable?: () => void;
   onTransferCaptain?: () => void;
   showCaptainTransfer?: boolean;
+  onReserve?: () => void;
 }
 
 const TableActionsMenu = ({
   table,
+  reservationEnabled = true,
   isOpen,
   onOpenChange,
   onMerge,
@@ -25,6 +30,7 @@ const TableActionsMenu = ({
   onTransferTable,
   onTransferCaptain,
   showCaptainTransfer = false,
+  onReserve,
 }: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isAvailable = table.occupied === 0;
@@ -74,6 +80,12 @@ const TableActionsMenu = ({
     onTransferCaptain?.();
   };
 
+  const handleReserve = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onReserve?.();
+  };
+
   const hasAvailableActions = isAvailable;
   const hasOccupiedActions =
     isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain));
@@ -96,7 +108,21 @@ const TableActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {reservationEnabled && onReserve && (
+            <>
+              <Button
+                variant="ghost"
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                onClick={handleReserve}
+              >
+                <Calendar className="h-4 w-4 shrink-0 text-emerald-600" />
+                Reserve Table
+              </Button>
+              <div className="my-1 border-t border-gray-100" />
+            </>
+          )}
+
           {isAvailable && (
             <>
               <Button
