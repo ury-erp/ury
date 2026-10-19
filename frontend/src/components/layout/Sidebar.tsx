@@ -141,6 +141,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * Production Units, Departments, Item Config), which are all configuration.
  */
 export const SETUP_ITEMS: NavItem[] = [
+  { label: 'Item', path: '/item', icon: Package },
   { label: 'Menu', path: '/menu', icon: Utensils },
   { label: 'Tables', path: '/table', icon: Table2 },
   { label: 'Rooms', path: '/room', icon: DoorOpen },
@@ -155,7 +156,7 @@ export const SETUP_ITEMS: NavItem[] = [
   { label: 'Commission', path: '/commission-settings', icon: Percent },
   { label: 'Production Units', path: '/production-unit', icon: Factory },
   { label: 'Departments', path: '/production-department', icon: Network },
-  { label: 'Item Config', path: '/item-production-config', icon: Package },
+  { label: 'Item Config', path: '/item-production-config', icon: Boxes },
   { label: 'Yield Standards', path: '/yield-standards', icon: Target }
 ];
 

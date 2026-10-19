@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { formatCurrency } from '@ury/core';
 import { DataTable, DataTableColumn, Badge, Spinner, numericCellClass } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { TransactionRecord } from '../../services/dashboard';
+import { format as formatDate } from 'date-fns';
 
 interface ReportWidgetsProps {
   recentTransactions: TransactionRecord[];
@@ -11,6 +12,7 @@ interface ReportWidgetsProps {
 
 export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions, loading }) => {
   const { activeBranchId, activeBranch } = useBranchContext();
+  const { format } = useCurrency();
 
   const activeBranchName = activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Selected Branch');
 
@@ -45,7 +47,13 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
     {
       key: 'posting_date',
       header: 'Date & Time',
-      render: (row) => <span>{row.posting_date} {row.posting_time}</span>,
+      render: (row) => {
+        try {
+          return <span>{formatDate(new Date(`${row.posting_date} ${row.posting_time}`), 'yyyy-MM-dd hh:mm:ss a')}</span>;
+        } catch {
+          return <span>{row.posting_date} {row.posting_time}</span>;
+        }
+      },
     },
     {
       key: 'status',
@@ -60,9 +68,9 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
       key: 'grand_total',
       header: 'Grand Total',
       align: 'right',
-      render: (row) => <span className={numericCellClass}>{formatCurrency(row.grand_total)}</span>,
+      render: (row) => <span className={numericCellClass}>{format(row.grand_total, row.currency)}</span>,
     },
-  ], []);
+  ], [format]);
 
   return (
     <div className="space-y-2">

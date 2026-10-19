@@ -228,7 +228,39 @@ def create_work_orders_for_kot(kot_name):
         frappe.db.savepoint(savepoint)
         try:
             context = resolve_production_context(item_code, branch)
-            if not context or context.production_policy != MADE_TO_ORDER:
+            if not context:
+                result["skipped"].append(
+                    {
+                        "item_code": item_code,
+                        "reason": "NOT_CONFIGURED",
+                    }
+                )
+                continue
+
+            target_item = item_code
+            target_qty = frappe.utils.flt(row.get("quantity")) or 1
+            configured_bom = context.get("bom")
+            target_wh = context.get("warehouse")
+            company = context.get("company")
+
+            if context.production_policy == "BUNDLE":
+                from ury.ury.api.ury_fulfilment_posting_service import _resolve_bundle_mto_child
+                bundle_child, child_mult = _resolve_bundle_mto_child(item_code, branch)
+                if not bundle_child:
+                    result["skipped"].append(
+                        {
+                            "item_code": item_code,
+                            "reason": "BUNDLE_HAS_NO_MTO_CHILD",
+                        }
+                    )
+                    continue
+                target_item = bundle_child
+                target_qty = target_qty * child_mult
+                child_context = resolve_production_context(target_item, branch, company=company)
+                if child_context:
+                    configured_bom = child_context.get("bom")
+                    target_wh = child_context.get("warehouse") or target_wh
+            elif context.production_policy != MADE_TO_ORDER:
                 result["skipped"].append(
                     {
                         "item_code": item_code,
@@ -237,27 +269,25 @@ def create_work_orders_for_kot(kot_name):
                 )
                 continue
 
-            bom_no = _resolve_bom(item_code, context.get("bom"))
+            bom_no = _resolve_bom(target_item, configured_bom)
             if not bom_no:
                 raise frappe.ValidationError(
-                    _("No active BOM found for item {0}").format(item_code)
+                    _("No active BOM found for item {0}").format(target_item)
                 )
 
-            qty = frappe.utils.flt(row.get("quantity")) or 1
-
             pp_name, pp_item_name = _resolve_production_plan_link(
-                item_code, branch, context.get("company"), allow_no_work_order_row=True
+                target_item, branch, company, allow_no_work_order_row=True
             )
 
             wo_doc = frappe.get_doc(
                 {
                     "doctype": WORK_ORDER_DOCTYPE,
-                    "production_item": item_code,
+                    "production_item": target_item,
                     "bom_no": bom_no,
-                    "qty": qty,
-                    "company": context.get("company"),
-                    "fg_warehouse": context.get("warehouse"),
-                    "source_warehouse": context.get("warehouse"),
+                    "qty": target_qty,
+                    "company": company,
+                    "fg_warehouse": target_wh,
+                    "source_warehouse": target_wh,
                     # skip_transfer = 1: ERPNext's validate_work_order() (in
                     # Stock Entry) requires the Work Order to be "In Process"
                     # before accepting a Manufacture SE. Without this flag the

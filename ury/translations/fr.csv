@@ -1,0 +1,5 @@
+source,target,context
+{0} order(s) pending payment for over 15 minutes,{0} commande(s) en attente de paiement depuis plus de 15 minutes,
+{0} table(s) occupied for over 60 minutes,{0} table(s) occupée(s) depuis plus de 60 minutes,
+{0} KOT generation issue(s) in the last hour,{0} erreur(s) de génération de bon de cuisine dans la dernière heure,
+{0} POS session(s) left open from a previous day,{0} session(s) PDV laissée(s) ouvertes depuis un jour précédent,

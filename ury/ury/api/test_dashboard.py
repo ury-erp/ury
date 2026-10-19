@@ -52,6 +52,8 @@ class TestGetDashboardSummary(FrappeTestCase):
                 "active_cashiers",
                 "pending_kitchen_orders",
                 "total_menu_items",
+                "currency",
+                "currency_breakdown",
             }
             self.assertEqual(set(result.keys()), expected_keys)
             self.assertEqual(result["today_sales"], 1200)
@@ -59,6 +61,32 @@ class TestGetDashboardSummary(FrappeTestCase):
             self.assertEqual(result["occupied_tables"], 2)
             self.assertEqual(result["total_tables"], 10)
             self.assertEqual(result["avg_order_value"], 150)
+
+    def test_summary_passes_through_currency(self):
+        """Summary forwards the stats currency and mixed-currency breakdown."""
+        breakdown = [
+            {"currency": "AED", "sales": 300, "orders": 3, "avg_order_value": 100},
+            {"currency": "OMR", "sales": 40, "orders": 2, "avg_order_value": 20},
+        ]
+        with patch(f"{MODULE}.get_dashboard_stats") as mock_stats, \
+             patch(f"{MODULE}.frappe.db.count") as mock_count, \
+             patch(f"{MODULE}.frappe.db.exists") as mock_exists:
+            mock_stats.return_value = {
+                "todays_sales": None,
+                "orders_today": 5,
+                "avg_order_value": None,
+                "active_tables": 0,
+                "total_tables": 4,
+                "currency": None,
+                "currency_breakdown": breakdown,
+            }
+            mock_count.return_value = 0
+            mock_exists.return_value = True
+
+            result = get_dashboard_summary(company="all")
+
+            self.assertIsNone(result["currency"])
+            self.assertEqual(result["currency_breakdown"], breakdown)
 
     def test_summary_counts_ury_table_doctype(self):
         """Summary falls back to URY Table count when stats omit total_tables."""
@@ -183,7 +211,7 @@ class TestGetDashboardSummary(FrappeTestCase):
             mock_exists.return_value = True
 
             result = get_dashboard_summary(branch="Main Branch")
-            mock_stats.assert_called_once_with("Main Branch")
+            mock_stats.assert_called_once_with("Main Branch", None)
             self.assertEqual(result["today_sales"], 50)
 
     def test_summary_with_all_branch_parameter(self):
@@ -202,7 +230,7 @@ class TestGetDashboardSummary(FrappeTestCase):
             mock_exists.return_value = True
 
             result = get_dashboard_summary(branch="all")
-            mock_stats.assert_called_once_with(None)
+            mock_stats.assert_called_once_with(None, None)
             self.assertIsInstance(result, dict)
 
 

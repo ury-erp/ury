@@ -104,6 +104,7 @@ from ury.ury.api.ury_inventory_projection import (
 	project_component_allocatable,
 	project_fg_allocatable,
 )
+from ury.ury.api.ury_projection_service import project_mto_capacity
 from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 
 # Imported for its side effect of making `URY Stock Reservation` a real,
@@ -119,6 +120,7 @@ SALES_PLAN_DOCTYPE = "URY Sales Plan"
 POLICY_PRE_PRODUCED = "PRE_PRODUCED"
 POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+POLICY_BUNDLE = "BUNDLE"
 
 
 def _verify_branch_scope(user, branch, company):
@@ -185,6 +187,7 @@ def _resolve_production_config(item_code, branch, company, department=None):
 			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
 			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
 			"availability_mode": row.get("availability_mode"),
+			"product_bundle": row.get("product_bundle"),
 			"production_unit_disabled": row.get("production_unit_disabled", 0),
 			"department_disabled": row.get("department_disabled", 0),
 		}
@@ -331,7 +334,9 @@ def get_item_availability(item_code, branch, company, department=None):
 			item_code, company, branch, resolved_department, production_policy, "PRODUCTION_UNIT_DISABLED"
 		)
 
-	if not warehouse:
+	# BUNDLE items do not require a warehouse on the parent IPC — availability
+	# is computed by delegating to each child's own warehouse.
+	if production_policy != POLICY_BUNDLE and not warehouse:
 		return _fail_closed(
 			item_code, company, branch, resolved_department, production_policy, "CONFIGURATION_ERROR"
 		)
@@ -346,24 +351,26 @@ def get_item_availability(item_code, branch, company, department=None):
 		_fill_made_to_order(response, item_code, branch, company, resolved_department, warehouse, config)
 	elif production_policy == POLICY_DIRECT_RETAIL:
 		_fill_direct_retail(response, item_code, branch, company, warehouse)
+	elif production_policy == POLICY_BUNDLE:
+		_fill_bundle(response, item_code, branch, company)
 	else:
 		response["reason_code"] = "CONFIGURATION_ERROR"
 		return response
 
-	# `availability_mode` has two options: "Plan Available" (default/safe, no
-	# override) and "Always Available". "Always Available" overrides
-	# *commercial* not-sellable reasons only (stock/plan-derived: out of
-	# stock, no/exhausted plan, blocking recipe component) — it must NEVER
+	# `availability_mode` has three options: "Plan Available" (default/safe, no
+	# override), "Always Available" and "Stock Available". "Always Available"
+	# overrides *commercial* not-sellable reasons only (stock/plan-derived: out
+	# of stock, no/exhausted plan, blocking recipe component) — it must NEVER
 	# override a structural/config error (missing BOM, missing/disabled
 	# department or production unit, generic configuration error), since
 	# those indicate the item is not actually safe to sell/produce at all,
 	# regardless of plan or stock.
 	#
-	# There is no "Stock Available" mode: selling on stock/recipe-capacity
-	# alone while ignoring the Sales Plan is already covered by turning off
-	# `controlled_by_sales_plan` (see `_fill_pre_produced`/`_fill_made_to_order`
-	# below). A separate "Stock Available" availability_mode was considered
-	# and dropped as functionally identical to that flag.
+	# "Stock Available" bypasses the Sales Plan gates inside
+	# `_fill_pre_produced`/`_fill_made_to_order` (availability is computed
+	# from stock/recipe-capacity alone, with plan_qty/plan_remaining left
+	# null) but never overrides a structural/config error, so it needs no
+	# handling here. It is mutually exclusive with "Always Available".
 	_STRUCTURAL_ERROR_CODES = {
 		"MISSING_BOM",
 		"CONFIGURATION_ERROR",
@@ -396,8 +403,9 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	produced, i.e. no Bin.actual_qty ever recorded) takes precedence, then
 	PLAN_EXHAUSTED, then FG_OUT_OF_STOCK, else AVAILABLE. A missing/absent
 	plan is reported as NO_ACTIVE_PLAN before any of those, unless
-	`controlled_by_sales_plan` is False, in which case the item falls through
-	to stock-based availability.
+	`controlled_by_sales_plan` is False or `availability_mode` is
+	"Stock Available", in which case the item falls through to stock-based
+	availability.
 	"""
 	fg_projection = project_fg_allocatable(item_code, warehouse, company)
 	fg_available = fg_projection["allocatable_qty"]
@@ -411,8 +419,11 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	# but is exhausted (previously only the no-plan case respected this flag,
 	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
 	# explicitly off -- both cases must resolve the same way: stock alone).
+	# "Stock Available" availability_mode forces the same stock-only path,
+	# overriding controlled_by_sales_plan/allow_over_plan_sale.
 	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-	if not controlled_by_sales_plan:
+	stock_available_mode = config.get("availability_mode") == "Stock Available" if config else False
+	if not controlled_by_sales_plan or stock_available_mode:
 		effective_available = fg_available
 		response["available_qty"] = max(effective_available, 0)
 		if fg_available <= 0 and never_produced:
@@ -471,8 +482,12 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	whenever recipe_capacity is the binding constraint (i.e. whenever
 	recipe_capacity < plan_remaining, or there is no plan and
 	recipe_capacity <= 0), per this task's spec. If `controlled_by_sales_plan`
-	is False, plan is optional and the item falls through to capacity-based
-	availability. If `allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
+	is False or `availability_mode` is "Stock Available", plan is optional
+	and the item falls through to capacity-based availability. Under
+	"Stock Available", `max_producible` is further raised by the read-only
+	raw-material top-up projection (`ury_projection_service`), while
+	`available_qty` remains the immediate recipe capacity. If
+	`allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
 	overridden by available recipe capacity.
 	"""
 	try:
@@ -510,9 +525,42 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	# exhausted (previously only the no-plan case respected this flag,
 	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
 	# explicitly off -- both cases must resolve the same way: capacity alone).
+	# "Stock Available" availability_mode forces the same capacity-only path,
+	# overriding controlled_by_sales_plan/allow_over_plan_sale.
 	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-	if not controlled_by_sales_plan:
+	stock_available_mode = config.get("availability_mode") == "Stock Available" if config else False
+	if not controlled_by_sales_plan or stock_available_mode:
 		response["available_qty"] = max(recipe_capacity, 0)
+		if stock_available_mode:
+			# Project additional capacity from raw materials for short
+			# PRE_PRODUCED components (read-only; no production documents).
+			# available_qty stays the immediate reservable quantity above;
+			# only the advisory max_producible is raised.
+			try:
+				projected = project_mto_capacity(
+					item_code,
+					company,
+					warehouse,
+					branch=branch,
+					department=department,
+					parent_components=components,
+					immediate_capacity=recipe_capacity,
+					allocatable_by_component={
+						component_item: projection["allocatable_qty"]
+						for component_item, projection in allocatable_by_component.items()
+					},
+				)
+				response["max_producible"] = max(
+					projected.get("max_producible", recipe_capacity), recipe_capacity
+				)
+			except Exception:
+				# Projection is advisory; a failure here must never break the
+				# stock-only availability response.
+				frappe.logger("ury_availability").exception(
+					"MTO capacity projection failed for {0}; falling back to recipe capacity".format(
+						item_code
+					)
+				)
 		if recipe_capacity <= 0:
 			response["reason_code"] = "BLOCKING_COMPONENT"
 			response["sellable"] = False
@@ -575,6 +623,151 @@ def _fill_direct_retail(response, item_code, branch, company, warehouse):
 
 	if available_qty <= 0:
 		response["reason_code"] = "FG_OUT_OF_STOCK"
+		response["sellable"] = False
+	else:
+		response["reason_code"] = "AVAILABLE"
+		response["sellable"] = True
+
+
+def _fetch_bundle_children(item_code, branch, company):
+	"""Return [{child_item_code, qty_of, child_config}, ...] for a BUNDLE item.
+
+	Reads the ``Product Bundle Item`` child table via the IPC's ``product_bundle``
+	link and resolves each child's own production context. Returns ``None`` when
+	the Product Bundle cannot be resolved (caller treats it as CONFIGURATION_ERROR).
+	"""
+	ipc = _resolve_production_config(item_code, branch, company)
+	if not ipc:
+		return None
+
+	product_bundle = ipc.get("product_bundle") or frappe.db.get_value("Product Bundle", {"new_item_code": item_code}, "name")
+	if not product_bundle:
+		return None
+
+	children = frappe.get_all(
+		"Product Bundle Item",
+		filters={"parent": product_bundle},
+		fields=["item_code", "qty"],
+		order_by="idx asc",
+	)
+	if not children:
+		return None
+
+	result = []
+	for child in children:
+		child_item = child["item_code"]
+		child_config = _resolve_production_config(child_item, branch, company)
+		result.append({
+			"child_item": child_item,
+			"qty_of": child["qty"],
+			"child_config": child_config,
+		})
+	return result
+
+
+def _fill_bundle(response, item_code, branch, company):
+	"""Fill ``response`` in place for a BUNDLE item.
+
+	The bundle's ``available_qty`` is the minimum capacity across all Product
+	Bundle children. Each child is evaluated using its own production policy:
+
+	  - PRE_PRODUCED child: ``project_fg_allocatable`` on its warehouse.
+	  - MADE_TO_ORDER child: BOM explosion + ``project_component_allocatable``.
+	  - DIRECT_RETAIL child: ``get_allocatable_qty`` on its warehouse.
+
+	A child without a resolvable config fails the whole bundle (fail closed).
+	The ``blocking_component`` field identifies the tightest child.
+	"""
+	children = _fetch_bundle_children(item_code, branch, company)
+	if not children:
+		response["reason_code"] = "CONFIGURATION_ERROR"
+		response["sellable"] = False
+		response["available_qty"] = 0
+		return
+
+	min_capacity = None
+	blocking = None
+
+	for entry in children:
+		child_item = entry["child_item"]
+		child_config = entry["child_config"]
+		qty_of = entry["qty_of"]
+
+		if not child_config:
+			# Missing child config → cannot determine capacity → fail closed.
+			response["reason_code"] = "CONFIGURATION_ERROR"
+			response["blocking_component"] = child_item
+			response["sellable"] = False
+			response["available_qty"] = 0
+			return
+
+		child_policy = child_config.get("production_policy")
+		child_warehouse = child_config.get("warehouse") or child_config.get("direct_retail_warehouse")
+
+		if not child_warehouse:
+			response["reason_code"] = "CONFIGURATION_ERROR"
+			response["blocking_component"] = child_item
+			response["sellable"] = False
+			response["available_qty"] = 0
+			return
+
+		if child_policy == POLICY_PRE_PRODUCED:
+			projection = project_fg_allocatable(child_item, child_warehouse, company)
+			child_available = projection["allocatable_qty"]
+			# qty_of represents units of the child per one bundle.
+			# capacity = how many bundles can be made from this child's stock.
+			capacity = math.floor(child_available / qty_of) if qty_of else 0
+
+		elif child_policy == POLICY_MADE_TO_ORDER:
+			try:
+				bom_vector = compile_bom_vector(child_item, qty_of, company)
+			except frappe.ValidationError:
+				response["reason_code"] = "MISSING_BOM"
+				response["blocking_component"] = child_item
+				response["sellable"] = False
+				response["available_qty"] = 0
+				return
+			components = bom_vector["components"]
+			component_items = [r["component_item"] for r in components]
+			allocatable_map = project_component_allocatable(component_items, child_warehouse, company)
+			# Capacity = floor(min(allocatable / required)) across components.
+			child_cap = None
+			for comp in components:
+				comp_item = comp["component_item"]
+				comp_qty = comp["qty"]
+				if not comp_qty:
+					continue
+				alloc = allocatable_map[comp_item]["allocatable_qty"]
+				c = math.floor(alloc / comp_qty)
+				if child_cap is None or c < child_cap:
+					child_cap = c
+			capacity = max(child_cap if child_cap is not None else 0, 0)
+
+		elif child_policy == POLICY_DIRECT_RETAIL:
+			allocatable = get_allocatable_qty(child_item, child_warehouse, company)
+			child_available = allocatable["allocatable_qty"]
+			capacity = math.floor(child_available / qty_of) if qty_of else 0
+
+		else:
+			# Nested bundle or unknown policy: fail closed.
+			response["reason_code"] = "CONFIGURATION_ERROR"
+			response["blocking_component"] = child_item
+			response["sellable"] = False
+			response["available_qty"] = 0
+			return
+
+		capacity = max(capacity, 0)
+		if min_capacity is None or capacity < min_capacity:
+			min_capacity = capacity
+			blocking = child_item
+
+	available = min_capacity if min_capacity is not None else 0
+	response["available_qty"] = available
+	response["max_producible"] = available
+	response["blocking_component"] = blocking if available <= 0 else None
+
+	if available <= 0:
+		response["reason_code"] = "BLOCKING_COMPONENT"
 		response["sellable"] = False
 	else:
 		response["reason_code"] = "AVAILABLE"

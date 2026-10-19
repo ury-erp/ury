@@ -9,6 +9,7 @@ from frappe import _
 class URYItemProductionConfiguration(Document):
     def validate(self):
         self.validate_link_ownership()
+        self._validate_bundle_config()
         # self.validate_no_cross_department_bom_components()
 
     def validate_link_ownership(self):
@@ -45,6 +46,26 @@ class URYItemProductionConfiguration(Document):
             if unit_branch != self.branch:
                 frappe.throw(_("Production Unit {0} does not belong to Branch {1}").format(self.production_unit, self.branch))
             self._validate_company_scope("Production Unit", self.production_unit, unit_company, branch_company)
+
+    def _validate_bundle_config(self):
+        """Enforce Product Bundle consistency when production_policy is BUNDLE."""
+        if self.production_policy != "BUNDLE":
+            return
+
+        if not self.product_bundle:
+            frappe.throw(
+                _("Product Bundle is required when Production Policy is BUNDLE"),
+                frappe.ValidationError,
+            )
+
+        bundle_item = frappe.db.get_value("Product Bundle", self.product_bundle, "new_item_code")
+        if bundle_item and bundle_item != self.item:
+            frappe.throw(
+                _("Product Bundle {0} is for item {1}, not {2}").format(
+                    self.product_bundle, bundle_item, self.item
+                ),
+                frappe.ValidationError,
+            )
 
     def _get_branch_company(self):
         if not self.branch:

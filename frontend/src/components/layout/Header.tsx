@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { useCompanyContext } from '../../context/CompanyContext';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useDeskPermission } from '../DeskLink';
 import uryLogo from '../../../Public/URY-bg.png';
@@ -19,6 +20,7 @@ import {
   Settings,
   Store,
   Building2,
+  Building,
   Check,
   ExternalLink,
   RefreshCw
@@ -47,16 +49,19 @@ function stripHtml(html: string): string {
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { activeBranchId, setActiveBranchId, branches, activeBranch, filterContext } = useBranchContext();
+  const { activeCompanyId, setActiveCompanyId, companies, activeCompany } = useCompanyContext();
   const deskPermission = useDeskPermission('User');
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [userInfo, setUserInfo] = useState({ fullName: 'Admin User', email: 'admin@urypos.com' });
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const branchMenuRef = useRef<HTMLDivElement>(null);
+  const companyMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -66,6 +71,9 @@ export const Header: React.FC = () => {
     }
     if (branchMenuRef.current && !branchMenuRef.current.contains(event.target as Node)) {
       setIsBranchDropdownOpen(false);
+    }
+    if (companyMenuRef.current && !companyMenuRef.current.contains(event.target as Node)) {
+      setIsCompanyDropdownOpen(false);
     }
   }, []);
 
@@ -159,6 +167,68 @@ export const Header: React.FC = () => {
               pre-focused, also reachable via the global ⌘K shortcut. */}
           <div className="hidden md:block w-56 lg:w-72">
             <AskBar />
+          </div>
+
+          {/* Company Selector Dropdown */}
+          <div className="relative" ref={companyMenuRef}>
+            <button
+              onClick={() => setIsCompanyDropdownOpen(!isCompanyDropdownOpen)}
+              className="flex items-center space-x-2 h-7 px-2.5 bg-muted hover:bg-muted/70 rounded-[7px] text-sm font-medium text-foreground transition-colors"
+            >
+              <Building className="w-4 h-4 text-muted-foreground" />
+              <span className="max-w-[120px] sm:max-w-[160px] truncate">
+                {activeCompanyId === 'all' ? 'All Companies' : (activeCompany?.name || 'Select Company')}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isCompanyDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isCompanyDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-card rounded-lg shadow-lg border border-border py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-1.5 text-xs font-semibold text-text-tertiary uppercase tracking-wider">
+                  Select Active Company
+                </div>
+
+                <button
+                  onClick={() => {
+                    setActiveCompanyId('all');
+                    setIsCompanyDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
+                    activeCompanyId === 'all'
+                      ? 'bg-primary-tint text-primary font-semibold'
+                      : 'text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Building className="w-4 h-4" />
+                    <span>All Companies</span>
+                  </div>
+                  {activeCompanyId === 'all' && <Check className="w-4 h-4 text-primary" />}
+                </button>
+
+                <div className="my-1 border-t border-border" />
+
+                {companies.map((c) => (
+                  <button
+                    key={c.name}
+                    onClick={() => {
+                      setActiveCompanyId(c.name);
+                      setIsCompanyDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
+                      activeCompanyId === c.name
+                        ? 'bg-primary-tint text-primary font-semibold'
+                        : 'text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 truncate">
+                      <span className="truncate">{c.company_name || c.name}</span>
+                    </div>
+                    {activeCompanyId === c.name && <Check className="w-4 h-4 text-primary shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Branch Selector Dropdown */}

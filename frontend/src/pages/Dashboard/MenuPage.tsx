@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
+import { useCurrency, withCurrencyLabel } from '../../context/CurrencyContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
@@ -37,6 +38,7 @@ type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course';
 
 export const MenuPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
+  const { symbol: currencySymbol } = useCurrency();
   const [menus, setMenus] = useState<URYMenuRecord[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<string>('');
   const [availableCourses, setAvailableCourses] = useState<{ name: string }[]>([]);
@@ -70,6 +72,8 @@ export const MenuPage: React.FC = () => {
     new_course_name: '',
     is_adding_new_course: false,
     target_menu: '',
+    special_dish: false,
+    disabled: false,
   });
 
   // Add new menu form state
@@ -199,6 +203,8 @@ export const MenuPage: React.FC = () => {
       new_course_name: '',
       is_adding_new_course: false,
       target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
+      special_dish: false,
+      disabled: false,
     });
     setDrawerMode('add-item');
   };
@@ -225,6 +231,8 @@ export const MenuPage: React.FC = () => {
       new_course_name: '',
       is_adding_new_course: false,
       target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
+      special_dish: !!item.special_dish,
+      disabled: !!item.disabled,
     });
     setDrawerMode('edit-item');
   };
@@ -414,6 +422,8 @@ export const MenuPage: React.FC = () => {
         menuDoc.items[rowIndex].rate = parseFloat(newItem.rate);
         menuDoc.items[rowIndex].course = resolvedCourse;
         menuDoc.items[rowIndex].image = sanitizedImage || undefined;
+        menuDoc.items[rowIndex].special_dish = newItem.special_dish ? 1 : 0;
+        menuDoc.items[rowIndex].disabled = newItem.disabled ? 1 : 0;
         await call('frappe.client.save', { doc: menuDoc });
 
         if (editingItem.item) {
@@ -472,6 +482,8 @@ export const MenuPage: React.FC = () => {
             course: resolvedCourse,
             rate: parseFloat(newItem.rate),
             image: sanitizedImage || undefined,
+            special_dish: newItem.special_dish ? 1 : 0,
+            disabled: newItem.disabled ? 1 : 0,
           });
           await call('frappe.client.save', { doc: menuDoc });
         }
@@ -1029,7 +1041,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-foreground mb-1.5">Standard Rate (₹) <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">{withCurrencyLabel('Standard Rate', currencySymbol)} <span className="text-red-500">*</span></label>
             <Input
               type="number"
               value={newItem.rate}
@@ -1037,6 +1049,34 @@ export const MenuPage: React.FC = () => {
               required
               className="font-medium"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={newItem.special_dish}
+                  onChange={(e) => setNewItem({ ...newItem, special_dish: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </div>
+              <span className="text-sm font-medium text-foreground">Special Dish</span>
+            </label>
+            
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={newItem.disabled}
+                  onChange={(e) => setNewItem({ ...newItem, disabled: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </div>
+              <span className="text-sm font-medium text-foreground">Disabled</span>
+            </label>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-border">
@@ -1091,7 +1131,7 @@ export const MenuPage: React.FC = () => {
               {/* Header Row */}
               <div className="flex gap-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="flex-[3]">Item</div>
-                <div className="flex-[1.5]">Price (₹)</div>
+                <div className="flex-[1.5]">{withCurrencyLabel('Price', currencySymbol)}</div>
                 {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
               </div>
 
@@ -1121,6 +1161,8 @@ export const MenuPage: React.FC = () => {
                               new_course_name: '',
                               is_adding_new_course: false,
                               target_menu: '',
+                              special_dish: false,
+                              disabled: false,
                             });
                             setDrawerMode('add-item');
                           } else {

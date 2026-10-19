@@ -1,5 +1,5 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
-export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
+export { getLoggedUser, getUserRoles, logout, login } from './frappe/auth';
 export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
 export {
   buildDeskUrl,
@@ -15,7 +15,16 @@ export type { ReturnContext, BuildDeskUrlOptions } from './frappe/deskLink';
 export type { POSCapabilities } from './frappe/roles';
 export type { User, PosProfileCombined } from './types';
 export { storage } from './storage';
-export { formatCurrency, formatCompactCurrency, formatInvoiceTime } from './format';
+export {
+  formatCurrency,
+  formatCompactCurrency,
+  formatInvoiceTime,
+  setActiveCurrency,
+  getActiveCurrency,
+  currencyFractionDigits,
+  MIXED_CURRENCY,
+} from './format';
+export type { CurrencyInfo } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
 export { validateFieldValue } from './utils/validateField';
 export type { ValidationMessages } from './utils/validateField';

@@ -4,14 +4,15 @@ from ury.ury.api.ury_dashboard import get_dashboard_stats
 
 
 @frappe.whitelist()
-def get_dashboard_summary(branch=None):
+def get_dashboard_summary(branch=None, company=None):
 	"""Management Service Board summary.
 
 	Core sales/table metrics come from ``get_dashboard_stats`` (same source as
 	the POS dashboard). Supplemental counts stay management-only.
 	"""
 	branch_arg = None if not branch or branch == "all" else branch
-	stats = get_dashboard_stats(branch_arg) or {}
+	company_arg = None if not company or company == "all" else company
+	stats = get_dashboard_stats(branch_arg, company_arg) or {}
 
 	table_filters = {"branch": branch_arg} if branch_arg else None
 	item_filters = None
@@ -40,6 +41,8 @@ def get_dashboard_summary(branch=None):
 		"occupied_tables": stats.get("active_tables") or 0,
 		"total_tables": total_tables or 0,
 		"avg_order_value": stats.get("avg_order_value") or 0,
+		"currency": stats.get("currency"),
+		"currency_breakdown": stats.get("currency_breakdown") or [],
 		"active_cashiers": frappe.db.count("User", user_filters),
 		"pending_kitchen_orders": pending_kitchen_orders,
 		"total_menu_items": (
@@ -51,7 +54,7 @@ def get_dashboard_summary(branch=None):
 
 
 @frappe.whitelist()
-def get_dashboard_charts(branch=None):
+def get_dashboard_charts(branch=None, company=None):
 	return {
 		"sales_trend": [],
 		"hourly_sales": [],
@@ -64,10 +67,12 @@ def get_dashboard_charts(branch=None):
 
 
 @frappe.whitelist()
-def get_recent_transactions(branch=None, limit=10):
+def get_recent_transactions(branch=None, limit=10, company=None):
 	filters = {"docstatus": ["in", [0, 1]]}
 	if branch and branch != "all":
 		filters["branch"] = branch
+	if company and company != "all":
+		filters["company"] = company
 
 	if frappe.db.exists("DocType", "POS Invoice"):
 		try:
@@ -80,6 +85,7 @@ def get_recent_transactions(branch=None, limit=10):
 					"posting_date",
 					"posting_time",
 					"grand_total",
+					"currency",
 					"status",
 					"order_type",
 					"restaurant_table as restaurant_table",

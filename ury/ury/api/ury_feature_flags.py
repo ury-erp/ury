@@ -189,6 +189,9 @@ def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 	if not kots:
 		return
 
+	from ury.ury.api.ury_production_settings import get_manufacture_trigger_time
+
+	trigger_time = get_manufacture_trigger_time()
 	for kot in kots:
 		rows = frappe.get_all(
 			ITEM_EXECUTION_DOCTYPE,
@@ -196,10 +199,12 @@ def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 			fields=["name", "kot_item", "state", "idempotency_key", "revision_key", "branch", "company"],
 		)
 		for row in rows:
-			if row.get("state") not in PRODUCED_STATES:
+			if trigger_time == "On KOT Serve" and row.get("state") not in PRODUCED_STATES:
 				# Not produced yet, so there is nothing to have posted. An
 				# unproduced item is a kitchen-workflow question, not a stock
 				# one, and must not block payment.
+				continue
+			if trigger_time == "On Bill Print" and row.get("state") not in PRODUCED_STATES and not _latest_intent(row.get("kot_item")):
 				continue
 			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent, strict=strict)
 

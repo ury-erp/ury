@@ -25,8 +25,8 @@ const columns: DataTableColumn<PurchaseItemRow>[] = [
   { key: 'qty', header: 'Qty Purchased', align: 'right' },
   { key: 'avg_rate', header: 'Avg Rate', render: (r) => formatCurrency(r.avg_rate), align: 'right' },
   { key: 'amount', header: 'Total Spend', render: (r) => formatCurrency(r.amount), align: 'right' },
-  { key: 'purchase_count', header: '# Purchases', align: 'right' },
-  { key: 'supplier_count', header: '# Suppliers', align: 'right' },
+  { key: 'purchase_count', header: 'Purchases', align: 'right' },
+  { key: 'supplier_count', header: 'Suppliers', align: 'right' },
 ];
 
 /**

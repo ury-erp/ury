@@ -26,7 +26,7 @@ def get_close_day_checklist(branch, service_date):
 	    `branch` custom field, used the same way in
 	    ury/doctype/sub_pos_closing/sub_pos_closing.py and
 	    ury/api/ury_kot_validation.py).
-	  - wastage_unsigned: count of URY Issue Wastage records still in
+	  - wastage_unsigned: count of URY Wastage records still in
 	    Draft (not yet Authorized/Rejected) for this branch.
 
 	Each item reports a boolean `blocking` the frontend can render as a

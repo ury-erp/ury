@@ -2009,7 +2009,8 @@ def sync_order(
     effective_order_type = order_type or invoice.order_type
     invoice.no_of_pax = _validate_dine_in_pax(no_of_pax, effective_order_type)
     invoice.pos_profile = pos_profile
-
+    invoice.company = posprofile.company
+    invoice.currency = posprofile.currency
     opening_room = _resolve_sync_opening_room(table=table, room=room, invoice=invoice)
     _require_open_cashier_session(
         posprofile,
@@ -2619,12 +2620,15 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice.customer = customer
     invoice.pos_profile = pos_profile
     
+    pos_prof = frappe.get_cached_doc("POS Profile", pos_profile)
+    invoice.company = pos_prof.company
+    invoice.currency = pos_prof.currency
+    
     if additionalDiscount:
         discount_val = frappe.utils.flt(additionalDiscount)
         if discount_val < 0 or discount_val > 100:
             frappe.throw(_("Discount percentage must be between 0 and 100"))
         
-        pos_prof = frappe.get_cached_doc("POS Profile", pos_profile)
         if not pos_prof.get("allow_discount_change") and not pos_prof.get("custom_enable_discount"):
             frappe.throw(_("Discount is not allowed for this POS Profile"))
         

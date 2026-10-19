@@ -244,6 +244,7 @@ DEPARTMENT_DOCTYPE = "URY Production Department"
 POLICY_PRE_PRODUCED = "PRE_PRODUCED"
 POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
+POLICY_BUNDLE = "BUNDLE"
 
 SOURCING_IN_HOUSE = "IN_HOUSE"
 SOURCING_EXTERNAL_RECEIPT = "EXTERNAL_RECEIPT"
@@ -375,10 +376,88 @@ def _seed_from_snapshot_row(row, branch, company, graph, blockers):
         )
         return
 
+    if policy == POLICY_BUNDLE:
+        _seed_bundle_row(row, branch, company, graph, blockers)
+        return
+
     # DIRECT_RETAIL, or any other/unclassified policy: not a target, and
     # nothing further to traverse -- a DIRECT_RETAIL row is never a BOM node
     # with children (URY Production Validation forbids a BOM on a
     # DIRECT_RETAIL configuration), so there is no tree to walk here.
+
+
+def _seed_bundle_row(row, branch, company, graph, blockers):
+    """Explode a BUNDLE snapshot row into its Product Bundle children.
+
+    Fetches the ERPNext ``Product Bundle Item`` rows linked to the IPC's
+    ``product_bundle`` field, resolves each child's own production context
+    (policy / BOM / department), and re-seeds each child as if it were a
+    direct Sales Plan row at scaled qty (parent_qty × child.qty_of).
+
+    The parent Bundle row is never emitted as a target.
+    """
+    item_code = row.get("item_code")
+    parent_qty = flt(row.get("qty"))
+
+    # Resolve the product_bundle name from the item's IPC at this branch.
+    ipc = resolve_production_context(item_code, branch, company=company)
+    if not ipc:
+        blockers.append({
+            "type": "bundle_missing_config",
+            "item_code": item_code,
+            "message": "Bundle item {0} has no active IPC at branch {1}".format(item_code, branch),
+        })
+        return
+
+    product_bundle = ipc.get("product_bundle")
+    if not product_bundle:
+        blockers.append({
+            "type": "bundle_missing_product_bundle",
+            "item_code": item_code,
+            "message": "Bundle item {0} has no Product Bundle linked in its IPC".format(item_code),
+        })
+        return
+
+    children = frappe.get_all(
+        "Product Bundle Item",
+        filters={"parent": product_bundle},
+        fields=["item_code", "qty"],
+        order_by="idx asc",
+    )
+    if not children:
+        blockers.append({
+            "type": "bundle_empty_product_bundle",
+            "item_code": item_code,
+            "message": "Product Bundle {0} for item {1} has no child items".format(product_bundle, item_code),
+        })
+        return
+
+    for child in children:
+        child_item = child["item_code"]
+        child_qty = flt(child["qty"]) * parent_qty
+
+        child_ipc = resolve_production_context(child_item, branch, company=company)
+        if not child_ipc:
+            blockers.append({
+                "type": "bundle_child_missing_config",
+                "item_code": item_code,
+                "child_item_code": child_item,
+                "message": "Bundle child {0} (of {1}) has no active IPC at branch {2}".format(
+                    child_item, item_code, branch
+                ),
+            })
+            continue
+
+        child_row = {
+            "item_code": child_item,
+            "qty": child_qty,
+            "production_policy": child_ipc.get("production_policy"),
+            "bom": child_ipc.get("bom"),
+            "department": child_ipc.get("department"),
+            "production_unit": child_ipc.get("production_unit"),
+            "stock_uom": frappe.db.get_value("Item", child_item, "stock_uom"),
+        }
+        _seed_from_snapshot_row(child_row, branch, company, graph, blockers)
 
 
 # --- target-level dependency graph -------------------------------------------

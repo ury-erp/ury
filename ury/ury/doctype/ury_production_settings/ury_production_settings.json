@@ -8,7 +8,8 @@
   "enable_auto_production_plan",
   "sales_plan_backward_guard",
   "require_active_menu_for_planning",
-  "production_job_stale_minutes"
+  "production_job_stale_minutes",
+  "manufacture_trigger_time"
  ],
  "fields": [
   {
@@ -45,6 +46,14 @@
    "fieldname": "production_job_stale_minutes",
    "fieldtype": "Int",
    "label": "Production Job Stale (minutes)"
+  },
+  {
+   "default": "On KOT Serve",
+   "description": "Trigger time for manufacturing stock entries: 'On KOT Serve' (when served in Mosaic/kitchen), 'On KOT Create' (while creating KOT), or 'On Bill Print' (when bill is printed from POS).",
+   "fieldname": "manufacture_trigger_time",
+   "fieldtype": "Select",
+   "label": "Manufacture Trigger Time Configuration",
+   "options": "On KOT Serve\nOn KOT Create\nOn Bill Print"
   }
  ],
  "index_web_pages_for_search": 1,

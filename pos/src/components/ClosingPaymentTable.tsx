@@ -31,17 +31,17 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
         <thead>
           <tr className="border-b border-border bg-gray-50">
             <th className="text-left py-3 px-4 font-semibold text-gray-900">
-              Payment Mode
+              {t('pos_closing.payment_mode')}
             </th>
             <th className="text-right py-3 px-4 font-semibold text-gray-900">
-              Opening
+              {t('pos_closing.opening')}
             </th>
             <th className="text-right py-3 px-4 font-semibold text-gray-900">
               <span
                 title={t('pos_closing.help_expected')}
                 className="inline-flex items-center gap-1 cursor-help"
               >
-                Expected
+                {t('pos_closing.expected')}
                 <span
                   aria-hidden="true"
                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
@@ -55,7 +55,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 title={t('pos_closing.help_closing')}
                 className="inline-flex items-center gap-1 cursor-help"
               >
-                Closing
+                {t('pos_closing.closing')}
                 <span
                   aria-hidden="true"
                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
@@ -69,7 +69,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 title={t('pos_closing.help_difference')}
                 className="inline-flex items-center gap-1 cursor-help"
               >
-                Difference
+                {t('pos_closing.difference')}
                 <span
                   aria-hidden="true"
                   className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"

@@ -11,6 +11,13 @@ vi.mock('../../context/BranchContext', () => ({
   })),
 }));
 
+vi.mock('../../context/CompanyContext', () => ({
+  useCompanyContext: vi.fn(() => ({
+    activeCompanyId: 'URY',
+    companies: [{ name: 'URY', default_currency: 'INR' }],
+  })),
+}));
+
 vi.mock('../../services/dashboard', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/dashboard')>();
   return {

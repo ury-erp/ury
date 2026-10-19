@@ -9,7 +9,7 @@ import { getDeskPermission, DeskPermission } from '../services/deskLink';
  * document behind them.
  *
  * Several screens here are deliberately read-only views over documents that
- * are still only editable in the desk (`URY Issue Wastage`, `URY Stock
+ * are still only editable in the desk (`URY Wastage`, `URY Stock
  * Movement`, `POS Invoice`, `Work Order`, ...). Without a link the user has to
  * know the doctype's desk slug and search for the record by hand.
  *
@@ -24,7 +24,7 @@ import { getDeskPermission, DeskPermission } from '../services/deskLink';
  */
 
 export interface DeskLinkProps {
-  /** Doctype of the target document, e.g. `'URY Issue Wastage'`. */
+  /** Doctype of the target document, e.g. `'URY Wastage'`. */
   doctype: string;
   /** Docname (`name`) of the target document. */
   name?: string | null;

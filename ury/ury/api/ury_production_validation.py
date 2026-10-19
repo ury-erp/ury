@@ -10,6 +10,7 @@ CONFIG_DOCTYPE = "URY Item Production Configuration"
 PRE_PRODUCED = "PRE_PRODUCED"
 MADE_TO_ORDER = "MADE_TO_ORDER"
 DIRECT_RETAIL = "DIRECT_RETAIL"
+BUNDLE = "BUNDLE"
 
 POLICY_ALIASES = {
     "PRE_PRODUCED": PRE_PRODUCED,
@@ -20,6 +21,7 @@ POLICY_ALIASES = {
     "MAKE TO ORDER": MADE_TO_ORDER,
     "DIRECT_RETAIL": DIRECT_RETAIL,
     "DIRECT RETAIL": DIRECT_RETAIL,
+    "BUNDLE": BUNDLE,
 }
 
 
@@ -31,12 +33,23 @@ def validate_item_production_configuration(item, branch):
     _validate_required_scope(config, item, branch)
     branch_company = _get_branch_company(branch)
 
+    if not policy:
+        _fail(
+            _("Production policy is not set for Item {0} in Branch {1}").format(item, branch)
+        )
+
     if policy == DIRECT_RETAIL:
         _validate_direct_retail(config, branch_company)
     elif policy in (PRE_PRODUCED, MADE_TO_ORDER):
         _validate_manufactured_item(config, branch_company)
+    elif policy == BUNDLE:
+        _validate_bundle(config)
     else:
-        _fail(_("Invalid production policy for Item {0} in Branch {1}").format(item, branch))
+        _fail(
+            _("Unrecognised production policy '{0}' for Item {1} in Branch {2}").format(
+                policy, item, branch
+            )
+        )
 
     return {
         "item": item,
@@ -47,6 +60,7 @@ def validate_item_production_configuration(item, branch):
         "bom": config.get("bom"),
         "warehouse": _resolve_warehouse_for_policy(config, policy),
         "configuration": config.get("name"),
+        "product_bundle": config.get("product_bundle"),
     }
 
 
@@ -88,6 +102,7 @@ def get_active_item_production_configuration(item, branch):
             "production_policy",
             "bom",
             "direct_retail_warehouse",
+            "product_bundle",
         ],
         filters={
             "item": item,
@@ -154,6 +169,26 @@ def _validate_direct_retail(config, branch_company):
 
     if config.get("production_unit"):
         _validate_production_unit(config, branch_company)
+
+
+def _validate_bundle(config):
+    """A BUNDLE item must have a Product Bundle link and must not carry its own BOM."""
+    _require_field(
+        config,
+        "product_bundle",
+        _("Product Bundle is required for bundle Item {0}").format(config.get("item")),
+    )
+
+    if config.get("bom"):
+        _fail(_("Bundle Item {0} must not use a BOM — define components on the Product Bundle instead").format(config.get("item")))
+
+    product_bundle_exists = frappe.db.exists("Product Bundle", config.get("product_bundle"))
+    if not product_bundle_exists:
+        _fail(
+            _("Product Bundle {0} linked to Item {1} does not exist").format(
+                config.get("product_bundle"), config.get("item")
+            )
+        )
 
 
 def _require_field(config, fieldname, message):
