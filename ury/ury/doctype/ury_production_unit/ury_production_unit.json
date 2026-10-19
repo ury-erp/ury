@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "field:production",
  "creation": "2023-09-27 12:18:07.130899",
@@ -8,22 +9,27 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "production",
   "enabled",
-  "department",
   "pos_profile",
   "branch",
+  "column_break_yphx",
+  "production",
+  "department",
   "warehouse",
-  "lead_chef",
-  "assigned_employees",
-  "workstation",
-  "workstation_type",
+  "section_break_doeo",
   "item_groups",
   "printer_info_section",
   "printer_settings",
   "section_break_sevj",
   "enable_order_type_wise_display_on_mosaic",
-  "order_type"
+  "order_type",
+  "tab_2_tab",
+  "workstation",
+  "workstation_type",
+  "column_break_ebgt",
+  "lead_chef",
+  "section_break_rkua",
+  "assigned_employees"
  ],
  "fields": [
   {
@@ -88,14 +94,15 @@
    "options": "KDS Order Type"
   },
   {
+   "default": "1",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "label": "Enabled",
-   "default": "1"
+   "label": "Enabled"
   },
   {
    "fieldname": "department",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Department",
    "options": "URY Production Department",
    "reqd": 1
@@ -124,11 +131,32 @@
    "fieldtype": "Link",
    "label": "Workstation Type",
    "options": "Workstation Type"
+  },
+  {
+   "fieldname": "column_break_yphx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_doeo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "tab_2_tab",
+   "fieldtype": "Tab Break",
+   "label": "Operations"
+  },
+  {
+   "fieldname": "column_break_ebgt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_rkua",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-10 19:51:25.907064",
+ "modified": "2026-10-19 14:08:47.480559",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Production Unit",
