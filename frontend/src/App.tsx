@@ -6,6 +6,7 @@ import ConfigurePage from './pages/Setup/ConfigurePage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/Dashboard/DashboardPage';
 import { ItemMasterPage } from './pages/Dashboard/ItemMasterPage';
+import { BomPage } from './pages/Dashboard/BomPage';
 import { MenuPage } from './pages/Dashboard/MenuPage';
 import { TablePage } from './pages/Dashboard/TablePage';
 import { RoomPage } from './pages/Dashboard/RoomPage';
@@ -238,6 +239,9 @@ function AppRoutes() {
           <Route path="item" element={<ItemMasterPage />} />
           <Route path="item-master" element={<Navigate to="/item" replace />} />
           <Route path="items" element={<Navigate to="/item" replace />} />
+          <Route path="bom" element={<BomPage />} />
+          <Route path="BOM" element={<Navigate to="/bom" replace />} />
+          <Route path="bill-of-materials" element={<Navigate to="/bom" replace />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
           <Route path="room" element={<RoomPage />} />

@@ -31,13 +31,13 @@ import {
   ClipboardCheck,
   Lock,
   Trash2,
-  ArrowRightLeft,
   Ban,
   PanelLeftClose,
   PanelLeftOpen,
   Bot,
   Percent,
-  Gauge
+  Gauge,
+  Layers
 } from 'lucide-react';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ury.sidebar.collapsed';
@@ -143,6 +143,7 @@ export const NAV_GROUPS: NavGroup[] = [
 export const SETUP_ITEMS: NavItem[] = [
   { label: 'Item', path: '/item', icon: Package },
   { label: 'Menu', path: '/menu', icon: Utensils },
+  { label: 'BOM', path: '/bom', icon: Layers },
   { label: 'Tables', path: '/table', icon: Table2 },
   { label: 'Rooms', path: '/room', icon: DoorOpen },
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
@@ -175,14 +176,12 @@ export const SETUP_ITEMS: NavItem[] = [
 // from the mockup. See tracks/sa-ury-app-transition/DESIGN_GAP.md.
 const getNavLinkClass =
   (isCollapsed: boolean) =>
-  ({ isActive }: { isActive: boolean }) =>
-    `flex items-center rounded-md text-[12.5px] transition-all ${
-      isCollapsed ? 'justify-center px-2 py-[5.5px]' : 'space-x-2 px-2 py-[5.5px]'
-    } ${
-      isActive
+    ({ isActive }: { isActive: boolean }) =>
+      `flex items-center rounded-md text-[12.5px] transition-all ${isCollapsed ? 'justify-center px-2 py-[5.5px]' : 'space-x-2 px-2 py-[5.5px]'
+      } ${isActive
         ? 'bg-card text-foreground font-[550] shadow-[0_0_0_1px_hsl(var(--hair)),0_1px_2px_rgba(0,0,0,0.03)] [&_svg]:text-primary [&_svg]:opacity-100'
         : 'text-muted-foreground font-medium hover:bg-hair/60 hover:text-foreground [&_svg]:opacity-60'
-    }`;
+      }`;
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
@@ -231,9 +230,8 @@ const GroupHeaderButton: React.FC<{
     type="button"
     onClick={onToggle}
     aria-expanded={isOpen}
-    className={`w-full flex items-center justify-between rounded-md text-[10.5px] font-medium uppercase tracking-[0.04em] transition-colors px-2 py-[5px] ${
-      isActive ? 'text-foreground' : 'text-text-tertiary hover:text-foreground'
-    }`}
+    className={`w-full flex items-center justify-between rounded-md text-[10.5px] font-medium uppercase tracking-[0.04em] transition-colors px-2 py-[5px] ${isActive ? 'text-foreground' : 'text-text-tertiary hover:text-foreground'
+      }`}
   >
     <span className="flex items-center space-x-1.5">
       {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
@@ -452,9 +450,8 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-rail border-r border-hair sticky top-12 h-[calc(100vh-3rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${
-        isCollapsed ? 'w-16' : 'w-[232px]'
-      }`}
+      className={`bg-rail border-r border-hair sticky top-12 h-[calc(100vh-3rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${isCollapsed ? 'w-16' : 'w-[232px]'
+        }`}
     >
       <div className={`flex items-center py-2 shrink-0 ${isCollapsed ? 'justify-center' : 'justify-end px-2'}`}>
         <button

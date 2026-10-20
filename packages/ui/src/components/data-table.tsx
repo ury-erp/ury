@@ -24,7 +24,8 @@ export type DataTableRowTone = "default" | "danger" | "warning" | "selected" | u
 
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
-  rows: T[];
+  rows?: T[];
+  data?: T[];
   isLoading?: boolean;
   emptyMessage?: string;
   className?: string;
@@ -54,7 +55,9 @@ export function DataTable<T>({
   className,
   onRowClick,
   rowTone,
-}: DataTableProps<T>) {
+  ...rest
+}: DataTableProps<T> & Record<string, any>) {
+  const effectiveRows = rows ?? rest.data ?? [];
   return (
     <div className={cn("relative w-full overflow-auto rounded-lg border", className)}>
       <table className="w-full caption-bottom text-sm">
@@ -80,14 +83,14 @@ export function DataTable<T>({
                 Loading…
               </td>
             </tr>
-          ) : rows.length === 0 ? (
+          ) : effectiveRows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="p-8 text-center text-muted-foreground">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            rows.map((row, rowIndex) => {
+            effectiveRows.map((row, rowIndex) => {
               const tone = rowTone?.(row);
               return (
                 <tr
