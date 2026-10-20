@@ -19,7 +19,7 @@ Run:
     bench --site uryv16.localhost run-tests --module ury.ury.simulator.test_simulator
 """
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -502,3 +502,332 @@ class TestServiceCoordinator(FrappeTestCase):
 		self.assertTrue(service._slot_terminal(run.slots[1]))
 		self.assertTrue(service._slot_terminal(run.slots[2]))
 		self.assertFalse(service._slot_terminal(run.slots[3]))
+
+
+class TestPerBranchCashier(FrappeTestCase):
+	"""Phase 3 (multi-branch audit): one simulator cashier per branch."""
+
+	def test_get_or_create_sim_cashier_creates_user_with_roles(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branch = "Sim Cashier Test Branch"
+			email = service.get_or_create_sim_cashier(branch)
+			try:
+				self.assertEqual(email, "sim.cashier.sim_cashier_test_branch@ury.local")
+				user = frappe.get_doc("User", email)
+				self.assertEqual(user.first_name, "Sim Cashier {0}".format(branch))
+				self.assertEqual(user.user_type, "System User")
+				self.assertEqual(user.enabled, 1)
+				roles = {row.role for row in user.roles}
+				self.assertIn("URY Cashier", roles)
+				self.assertIn("System Manager", roles)
+				# Idempotent: a second call returns the existing user untouched.
+				self.assertEqual(service.get_or_create_sim_cashier(branch), email)
+			finally:
+				_purge_doc("User", email)
+
+	def test_get_or_create_sim_cashier_scrambles_branch_into_email_local_part(self):
+		# frappe.scrub keeps the mapping deterministic and collision-free.
+		self.assertEqual(
+			frappe.scrub("URY Barsha"),
+			"ury_barsha",
+		)
+		self.assertEqual(
+			frappe.scrub("Golden Fork Jumeirah"),
+			"golden_fork_jumeirah",
+		)
+
+	def test_get_or_create_sim_cashier_fails_closed(self):
+		with _sim_conf(remove=("allow_uat_simulator",)):
+			with self.assertRaises(frappe.ValidationError) as cm:
+				service.get_or_create_sim_cashier("Nope Branch")
+		self.assertIn("disabled", str(cm.exception))
+		# The guard fired before any user could be created.
+		self.assertFalse(frappe.db.exists("User", "sim.cashier.nope_branch@ury.local"))
+
+	def test_assume_sim_cashier_switches_to_branch_user(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branch = "Sim Cashier Test Branch"
+			email = service.get_or_create_sim_cashier(branch)
+			# LIFO: restore the session user BEFORE deleting the cashier.
+			self.addCleanup(_purge_doc, "User", email)
+			self.addCleanup(frappe.set_user, frappe.session.user)
+
+			service._assume_sim_cashier(branch)
+			self.assertEqual(frappe.session.user, email)
+
+
+class TestStaleSessionCleanup(FrappeTestCase):
+	"""Phase 3 (multi-branch audit): abandoned prior-day sessions unblock."""
+
+	def test_cancel_stale_open_sessions_noop_when_nothing_stale(self):
+		self.assertEqual(
+			pos_runner.cancel_stale_open_sessions(POS_PROFILE, business_date="2030-01-01"),
+			[],
+		)
+
+	def test_cancel_stale_open_sessions_cancels_abandoned_session(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			opening = _make_draft_opening(self, datetime(2026, 1, 1, 9, 0, 0))
+			opening.submit()  # docstatus 1, status Open, opened long ago
+			self.assertEqual(frappe.db.get_value(POS_OPENING_DOCTYPE, opening.name, "status"), "Open")
+			self.addCleanup(_purge_doc, POS_OPENING_DOCTYPE, opening.name)
+
+			cancelled = pos_runner.cancel_stale_open_sessions(
+				POS_PROFILE, business_date="2030-01-01"
+			)
+			self.assertEqual(cancelled, [opening.name])
+			fresh = frappe.get_doc(POS_OPENING_DOCTYPE, opening.name)
+			self.assertEqual(fresh.docstatus, 2)
+			self.assertEqual(fresh.status, "Cancelled")
+
+			# Idempotent: nothing stale remains.
+			self.assertEqual(
+				pos_runner.cancel_stale_open_sessions(POS_PROFILE, business_date="2030-01-01"),
+				[],
+			)
+
+
+class TestMultiBranchDiscovery(FrappeTestCase):
+	"""Phase 3 (multi-branch audit): branch discovery for the initiator."""
+
+	def test_get_active_simulation_branches(self):
+		branches = service.get_active_simulation_branches()
+		self.assertIsInstance(branches, list)
+		# Every branch on this site has an enabled POS Profile AND menu
+		# (verified in ongoing/multi-company-simulator-audit/01-recon.md, T3).
+		for expected in (
+			"URY",
+			"URY Barsha",
+			"URY JVC",
+			"URY Muscat",
+			"URY Salalah",
+			"Golden Fork Jumeirah",
+		):
+			self.assertIn(expected, branches)
+		self.assertEqual(len(branches), len(set(branches)))
+
+	def test_discovery_skips_branch_without_menu(self):
+		branch = "SIM Menuless Branch"
+		if not frappe.db.exists("Branch", branch):
+			branch_doc = frappe.get_doc({"doctype": "Branch", "branch": branch})
+			branch_doc.append("user", {"user": frappe.session.user})
+			branch_doc.insert(ignore_permissions=True)
+		self.addCleanup(_purge_doc, "Branch", branch)
+
+		profile = frappe.copy_doc(frappe.get_doc("POS Profile", POS_PROFILE), ignore_no_copy=True)
+		profile.name = "SIM Menuless Profile"
+		profile.branch = branch
+		# The copy inherits applicable_for_users rows whose per-user
+		# "default" flag is unique across profiles -- drop them.
+		profile.set("applicable_for_users", [])
+		profile.insert(ignore_permissions=True)
+		self.addCleanup(_purge_doc, "POS Profile", profile.name)
+
+		self.assertNotIn(branch, service.get_active_simulation_branches())
+
+
+class TestAllBranchesInitiation(FrappeTestCase):
+	"""Phase 3 (multi-branch audit): the morning initiator fan-out."""
+
+	def test_initiate_silent_noop_when_disabled(self):
+		with _sim_conf(remove=("allow_uat_simulator",)):
+			self.assertEqual(service.initiate_daily_simulation_for_all_branches(), [])
+
+	def _patch_branch_pipeline(self, runs, calls, opening_names):
+		"""Patch the per-branch pipeline; fakes persist state like the real steps.
+
+		``opening_names`` maps branch -> a real (draft) POS Opening Entry name:
+		``run.pos_opening_entry`` is a Link field, so fakes must point at
+		existing documents. Returns ``(patches, fake_manufacturing)``.
+		"""
+
+		def fake_get_or_create_daily_run(branch=None, company=None, pos_profile=None, business_date=None):
+			return runs[branch]
+
+		def fake_manufacturing(run):
+			calls["manufactured"].append(run.branch)
+			calls["mfg_user"].append(frappe.session.user)
+			frappe.db.set_value(SIMULATION_RUN_DOCTYPE, run.name, "status", "Manufacturing Done")
+			return {"status": "completed"}
+
+		def fake_open(run):
+			calls["opened"].append(run.branch)
+			frappe.db.set_value(
+				SIMULATION_RUN_DOCTYPE,
+				run.name,
+				{
+					"status": "POS Open",
+					"pos_opening_entry": opening_names[run.branch],
+				},
+			)
+
+		def fake_slots(run, count=12):
+			calls["slots"].append((run.branch, count))
+			run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
+			for i in range(count):
+				run.append(
+					"slots",
+					{
+						"slot_number": i + 1,
+						"slot_time": "09:00:00",
+						"scenario": "Takeaway",
+						"status": "Pending",
+					},
+				)
+			run.save(ignore_permissions=True)
+
+		patches = [
+			patch.object(
+				service, "get_or_create_daily_run", side_effect=fake_get_or_create_daily_run
+			),
+			patch.object(service, "run_manufacturing_simulation", side_effect=fake_manufacturing),
+			patch.object(service, "open_pos_session", side_effect=fake_open),
+			patch.object(service, "generate_simulation_slots", side_effect=fake_slots),
+			# The fake switches the session user for real, like production:
+			# without the initiator's per-branch reset, branch 2's
+			# manufacturing would run as branch 1's cashier.
+			patch.object(
+				service,
+				"_assume_sim_cashier",
+				side_effect=lambda branch=None: (
+					calls["cashier"].append(branch),
+					frappe.set_user("sim.cashier.{0}@ury.local".format(frappe.scrub(branch))),
+				),
+			),
+		]
+		return patches, fake_manufacturing
+
+	def _make_committed_run_with_opening(self, business_date, branch):
+		"""A real run + real (draft) opening entry, committed so a branch's
+		error rollback inside the initiator cannot wipe the fixture."""
+		run = _make_run(self, business_date, branch=branch)
+		opening = _make_draft_opening(self, datetime(2030, 1, 1, 8, 0, 0))
+		frappe.db.commit()
+		return run, opening
+
+	def test_initiate_fanout_manufacture_open_and_slot_each_branch(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branches = ["URY JVC", "Golden Fork Jumeirah"]
+			runs, opening_names = {}, {}
+			for branch in branches:
+				run, opening = self._make_committed_run_with_opening("2030-03-01", branch)
+				runs[branch] = run
+				opening_names[branch] = opening.name
+			calls = {
+				"manufactured": [],
+				"mfg_user": [],
+				"opened": [],
+				"slots": [],
+				"cashier": [],
+			}
+			original_user = frappe.session.user
+			self.addCleanup(frappe.set_user, original_user)
+			patches, _ = self._patch_branch_pipeline(runs, calls, opening_names)
+			patches.insert(0, patch.object(service, "get_active_simulation_branches", return_value=branches))
+			with ExitStack() as stack:
+				for p in patches:
+					stack.enter_context(p)
+				results = service.initiate_daily_simulation_for_all_branches(
+					business_date="2030-03-01", slot_count=7
+				)
+
+			self.assertEqual(len(results), 2)
+			by_branch = {row["branch"]: row for row in results}
+			for branch in branches:
+				row = by_branch[branch]
+				self.assertEqual(row["run_id"], runs[branch].name)
+				self.assertEqual(row["status"], "POS Open")
+				self.assertEqual(row["business_date"], "2030-03-01")
+				self.assertEqual(row["pos_opening_entry"], opening_names[branch])
+				self.assertEqual(row["slots"], 7)
+			self.assertEqual(calls["manufactured"], branches)
+			self.assertEqual(calls["opened"], branches)
+			self.assertEqual(calls["slots"], [(branch, 7) for branch in branches])
+			# Each branch ran as its own cashier.
+			self.assertEqual(calls["cashier"], branches)
+			# Regression: every branch's manufacturing ran as the CALLING
+			# user, never as a previous branch's cashier.
+			self.assertEqual(calls["mfg_user"], [original_user] * len(branches))
+
+	def test_initiate_isolates_failing_branch(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branches = ["URY JVC", "Golden Fork Jumeirah"]
+			runs, opening_names = {}, {}
+			for branch in branches:
+				run, opening = self._make_committed_run_with_opening("2030-03-02", branch)
+				runs[branch] = run
+				opening_names[branch] = opening.name
+			calls = {
+				"manufactured": [],
+				"mfg_user": [],
+				"opened": [],
+				"slots": [],
+				"cashier": [],
+			}
+			original_user = frappe.session.user
+			self.addCleanup(frappe.set_user, original_user)
+			patches, fake_manufacturing = self._patch_branch_pipeline(runs, calls, opening_names)
+
+			def failing_manufacturing(run):
+				if run.branch == "Golden Fork Jumeirah":
+					calls["manufactured"].append(run.branch)
+					raise frappe.ValidationError("boom {0}".format(run.branch))
+				return fake_manufacturing(run)
+
+			patches[1] = patch.object(
+				service, "run_manufacturing_simulation", side_effect=failing_manufacturing
+			)
+			patches.insert(0, patch.object(service, "get_active_simulation_branches", return_value=branches))
+			log_patcher = patch.object(service.frappe, "log_error")
+			with ExitStack() as stack:
+				for p in patches:
+					stack.enter_context(p)
+				log_mock = stack.enter_context(log_patcher)
+				results = service.initiate_daily_simulation_for_all_branches(
+					business_date="2030-03-02"
+				)
+
+			by_branch = {row["branch"]: row for row in results}
+			# The healthy branch still opened its session ...
+			self.assertEqual(by_branch["URY JVC"]["status"], "POS Open")
+			self.assertEqual(by_branch["URY JVC"]["pos_opening_entry"], opening_names["URY JVC"])
+			self.assertEqual(calls["opened"], ["URY JVC"])
+			# ... while the broken branch was recorded as Failed, not raised.
+			self.assertEqual(by_branch["Golden Fork Jumeirah"]["status"], "Failed")
+			self.assertIn("boom Golden Fork Jumeirah", by_branch["Golden Fork Jumeirah"]["error"])
+			self.assertEqual(calls["manufactured"], branches)
+			# The healthy branch's manufacturing ran as the caller (the
+			# failing branch raised before its own manufacturing ran).
+			self.assertEqual(calls["mfg_user"], [original_user])
+			# log_error was called exactly once, for the failing branch.
+			self.assertEqual(log_mock.call_count, 1)
+			self.assertIn("Golden Fork Jumeirah", log_mock.call_args[0][1])
+
+	def test_initiate_resumes_open_run_without_reopening(self):
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branch = "URY JVC"
+			run, opening = self._make_committed_run_with_opening("2030-03-03", branch)
+			frappe.db.set_value(
+				SIMULATION_RUN_DOCTYPE,
+				run.name,
+				{"status": "POS Open", "pos_opening_entry": opening.name},
+			)
+			runs = {branch: frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)}
+			calls = {"manufactured": [], "mfg_user": [], "opened": [], "slots": [], "cashier": []}
+			original_user = frappe.session.user
+			self.addCleanup(frappe.set_user, original_user)
+			patches, _ = self._patch_branch_pipeline(runs, calls, {branch: opening.name})
+			patches.insert(0, patch.object(service, "get_active_simulation_branches", return_value=[branch]))
+			with ExitStack() as stack:
+				for p in patches:
+					stack.enter_context(p)
+				results = service.initiate_daily_simulation_for_all_branches(
+					business_date="2030-03-03", slot_count=5
+				)
+
+			self.assertEqual(calls["manufactured"], [])
+			self.assertEqual(calls["opened"], [])
+			self.assertEqual(calls["slots"], [(branch, 5)])
+			self.assertEqual(results[0]["status"], "POS Open")
+			self.assertEqual(results[0]["pos_opening_entry"], opening.name)
+			self.assertEqual(results[0]["slots"], 5)

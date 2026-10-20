@@ -28,15 +28,15 @@ Dine-in invoices are marked `invoice_printed = 1` before submit -- the
 Two deliberate deviations from a naive reading of the flow, both forced by
 verified site behavior (see `ongoing/uat-simulator-impl/03-pos-runner.md`):
 
-1. Session reuse is staleness-guarded. Only a POS Opening Entry whose
-   `period_start_date` falls on the run's `business_date` is reused; older
-   "Open" entries are foreign stale sessions. A stale session cannot be
-   closed by this runner anyway: its pre-existing POS Invoices carry Expired
-   stock reservations, and the Tier-2 `validate_closing_reconciliation` gate
-   (`ury_pos_closing_reconciliation.py`, enabled for this branch) refuses to
-   close the session over them. Opening a fresh session alongside is what the
-   real opening screen would do (core has no duplicate-open check; the
-   multi-cashier and daily-close gates are off on this profile).
+1. Session reuse is staleness-guarded, and stale sessions are cleaned up.
+   Only a POS Opening Entry whose `period_start_date` falls on the run's
+   `business_date` is reused. Older "Open" entries for the profile are
+   abandoned foreign sessions: ERPNext `check_open_pos_exists` blocks ANY
+   new opening on the profile while one exists, so `open_pos_session`
+   cancels them first (their unconsolidated POS Invoices, which carry the
+   stock reservations, are cancelled first so ERPNext's
+   `check_poe_is_cancellable` passes) and only then creates the fresh
+   session.
 2. Slot times are anchored to the opening entry's `period_start_date`, not a
    fixed clock time. `make_closing_entry_from_opening` collects invoices by
    TIMESTAMP(posting_date, posting_time) inside [period_start, period_end],
@@ -57,6 +57,14 @@ handled defensively by running `create_merge_logs` inline.
 
 Guards: every public entry point calls
 :func:`ury.ury.simulator.guards.assert_uat_simulator_authorized` first.
+
+Cashiers: every session is owned by a per-branch simulator cashier
+(``sim.cashier.<branch>@ury.local``, see :func:`get_or_create_sim_cashier`).
+ERPNext's ``check_user_already_assigned`` rejects a second concurrently
+open session for the SAME user on any profile, so one shared cashier would
+serialize all branches; one cashier per branch lets every branch hold its
+own open session (see ongoing/multi-company-simulator-audit/02-triage.md,
+ISSUE-3).
 """
 
 from __future__ import annotations
@@ -112,16 +120,53 @@ RUN_STATUS_FAILED = "Failed"
 RUN_STATUS_CLOSING_FAILED = "Closing Failed"
 
 
+def get_or_create_sim_cashier(branch: str) -> str:
+    """Return the dedicated simulator cashier user for ``branch``.
+
+    One cashier per branch (``sim.cashier.<scrubbed branch>@ury.local`` --
+    e.g. ``sim.cashier.ury@ury.local``, ``sim.cashier.ury_barsha@ury.local``,
+    ``sim.cashier.golden_fork_jumeirah@ury.local``) keeps ERPNext's per-user
+    open-session check from colliding when several branch sessions are open
+    concurrently. The user is created on first use as an enabled System
+    User with the ``URY Cashier`` and ``System Manager`` roles, and created
+    users are reused forever after (idempotent).
+    """
+    assert_uat_simulator_authorized()
+
+    email = "sim.cashier.{0}@ury.local".format(frappe.scrub(branch or ""))
+    if frappe.db.exists("User", email):
+        return email
+
+    user = frappe.get_doc(
+        {
+            "doctype": "User",
+            "email": email,
+            "first_name": "Sim Cashier {0}".format(branch),
+            "user_type": "System User",
+            "enabled": 1,
+            "send_welcome_email": 0,
+        }
+    )
+    user.insert(ignore_permissions=True)
+    user.add_roles("URY Cashier", "System Manager")
+    frappe.db.commit()
+    return email
+
+
 def open_pos_session(run_doc, opening_amount: float = 500.0) -> str:
 	"""Open (or reuse) the POS session for ``run_doc`` and link it.
 
 	``run_doc`` is either a loaded ``URY Simulation Run`` document or the
-	``run_id`` string of one. An existing open ``POS Opening Entry`` is
-	reused only when it was opened on the run's ``business_date`` (see the
-	module docstring for why stale sessions are not reusable); otherwise a
-	new entry is created with the run's session user, ``balance_details``
-	seeded from the POS Profile's payment modes (``opening_amount`` on the
-	default Cash-like mode, 0 elsewhere), and submitted.
+	``run_id`` string of one. The session runs as the branch's own simulator
+	cashier (created on first use, see :func:`get_or_create_sim_cashier`).
+	Abandoned prior-day open sessions on the profile are cancelled first
+	(see :func:`cancel_stale_open_sessions`) -- ERPNext blocks any new
+	opening on a profile while another entry is Open. An existing open
+	``POS Opening Entry`` is reused only when it was opened on the run's
+	``business_date``; otherwise a new entry is created for the branch
+	cashier, with ``balance_details`` seeded from the POS Profile's payment
+	modes (``opening_amount`` on the default Cash-like mode, 0 elsewhere),
+	and submitted.
 
 	Sets ``run_doc.pos_opening_entry`` and ``status = "POS Open"`` (plus
 	``started_at`` on first open), saves and commits. Returns the opening
@@ -141,11 +186,21 @@ def open_pos_session(run_doc, opening_amount: float = 500.0) -> str:
 			frappe.ValidationError,
 		)
 
+	# The session belongs to the branch's own cashier: ERPNext rejects a
+	# second concurrently open session for the same user on any profile.
+	cashier = get_or_create_sim_cashier(run_doc.branch)
+	if frappe.session.user != cashier:
+		frappe.set_user(cashier)
+
+	# Abandoned prior-day sessions on this profile would wedge the fresh
+	# opening (check_open_pos_exists blocks per profile, any user).
+	cancel_stale_open_sessions(pos_profile, business_date)
+
 	existing_name = _find_reusable_opening(pos_profile, company, business_date, run_doc)
 	if existing_name:
 		opening = frappe.get_doc(POS_OPENING_DOCTYPE, existing_name)
 	else:
-		opening = _create_opening_entry(pos_profile, company, opening_amount)
+		opening = _create_opening_entry(pos_profile, company, opening_amount, user=cashier)
 
 	# The session window must live on the business date: simulated invoices
 	# carry posting_date = business_date, and their TIMESTAMP(posting_date,
@@ -434,10 +489,9 @@ def _find_reusable_opening(pos_profile, company, business_date, run_doc):
 
 	Reusable means: submitted, unclosed, same profile/company/user, AND
 	opened on the run's business date. Older open entries are foreign stale
-	sessions -- closing them is impossible under Tier-2 closing
-	reconciliation anyway (their pre-existing invoices carry Expired stock
-	reservations), so they are left untouched and a fresh session is opened
-	alongside them.
+	sessions; those are already cancelled by
+	:func:`cancel_stale_open_sessions` before this lookup, so anything still
+	Open here was opened on the business date itself.
 	"""
 	filters = {
 		"docstatus": 1,
@@ -461,8 +515,14 @@ def _find_reusable_opening(pos_profile, company, business_date, run_doc):
 	return None
 
 
-def _create_opening_entry(pos_profile, company, opening_amount):
-	"""Create and submit a fresh POS Opening Entry for the session user."""
+def _create_opening_entry(pos_profile, company, opening_amount, user=None):
+	"""Create and submit a fresh POS Opening Entry for ``user``.
+
+	``user`` defaults to the current session user; callers pass the branch
+	cashier explicitly so the entry is assigned to the right user even when
+	the session user was not switched beforehand.
+	"""
+	user = user or frappe.session.user
 	profile = frappe.get_doc(POS_PROFILE_DOCTYPE, pos_profile)
 	if profile.disabled:
 		frappe.throw(
@@ -493,7 +553,7 @@ def _create_opening_entry(pos_profile, company, opening_amount):
 			"doctype": POS_OPENING_DOCTYPE,
 			"company": company,
 			"pos_profile": pos_profile,
-			"user": frappe.session.user,
+			"user": user,
 			"period_start_date": now_datetime(),
 			"posting_date": nowdate(),
 			"balance_details": balance_details,
@@ -508,6 +568,70 @@ def _create_opening_entry(pos_profile, company, opening_amount):
 		frappe.delete_doc(POS_OPENING_DOCTYPE, opening.name, force=True)
 		raise
 	return opening
+
+
+def cancel_stale_open_sessions(pos_profile, business_date=None) -> list:
+	"""Cancel abandoned open POS sessions on ``pos_profile`` from before
+	``business_date`` and return the cancelled opening entry names.
+
+	ERPNext's ``check_open_pos_exists`` blocks ANY new opening on a profile
+	while an entry with status Open exists -- regardless of user or date --
+	and ``check_poe_is_cancellable`` refuses to cancel an opening while
+	unconsolidated invoices exist in its window. So the cleanup order is:
+	cancel the session's unconsolidated POS Invoices first (reversing their
+	GL entries and releasing the stock they reserve), then the opening
+	entry itself. Sessions opened ON ``business_date`` are left untouched.
+
+	This runs inside ``open_pos_session`` before a fresh session is created,
+	so a profile left with an abandoned prior-day session (foreign or from
+	an interrupted run) unblocks itself instead of failing every later run.
+	"""
+	business_date = getdate(business_date or today())
+	stale = frappe.get_all(
+		POS_OPENING_DOCTYPE,
+		filters={
+			"docstatus": 1,
+			"pos_profile": pos_profile,
+			"status": "Open",
+			"period_start_date": ["<", str(business_date)],
+		},
+		pluck="name",
+	)
+	cancelled = []
+	for name in stale:
+		opening = frappe.get_doc(POS_OPENING_DOCTYPE, name)
+		_cancel_stale_invoices(opening)
+		opening = frappe.get_doc(POS_OPENING_DOCTYPE, name)
+		if opening.docstatus == 1:
+			opening.cancel()
+		frappe.db.commit()
+		frappe.logger().info(
+			"URY UAT Simulator: cancelled stale POS session {0} on profile {1}".format(name, pos_profile)
+		)
+		cancelled.append(name)
+	return cancelled
+
+
+def _cancel_stale_invoices(opening):
+	"""Cancel the unconsolidated invoices of an abandoned POS session.
+
+	Uses the same invoice window as ERPNext's own cancellability check
+	(``pos_closing_entry.get_invoices`` over [period_start, now] for the
+	opening's profile and owner), skipping invoices that were already
+	consolidated into a Sales Invoice -- those belong to a closed session
+	and must not be touched.
+	"""
+	from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import get_invoices
+
+	window = get_invoices(opening.period_start_date, now_datetime(), opening.pos_profile, opening.user)
+	for row in window.get("invoices") or []:
+		name = row.get("name")
+		if frappe.db.get_value(POS_INVOICE_DOCTYPE, name, "consolidated_invoice"):
+			continue
+		invoice = frappe.get_doc(POS_INVOICE_DOCTYPE, name)
+		if invoice.docstatus == 1:
+			invoice.cancel()
+			frappe.db.commit()
 
 
 # --- invoice creation ----------------------------------------------------------

@@ -15,6 +15,14 @@ single daily lifecycle for one (branch, business_date) scope:
              the run for the cron-driven path)
         generate_run_report()        -> Markdown summary on run.report_markdown
 
+    initiate_daily_simulation_for_all_branches()
+                                     -- morning scheduler initiator: for every
+                                        branch with an active POS Profile and
+                                        menu, get_or_create the day's run,
+                                        run manufacturing, then open the POS
+                                        session and stamp the slot timetable
+                                        so the cron hook can drain it.
+
     process_scheduled_slot()         -- scheduler cron hook (every 5 min):
         claims one leaseable slot per open run, processes its order, and
         closes the session when every slot is terminal or the 20:00 closing
@@ -29,11 +37,14 @@ two overlapping cron workers can never process the same slot twice; a
 crashed worker's lease simply expires after 10 minutes and the slot becomes
 claimable again (bounded by ``max_attempts``).
 
-The POS pipeline must run under the dedicated simulator cashier user
-(``sim.cashier@ury.local``): stale foreign open sessions wedge the per-user
-opening check for pre-existing users (see ongoing/uat-simulator-impl/
-03-pos-runner.md, Finding A), so the coordinator switches to the cashier
-before touching POS state (manufacturing runs as the calling user).
+The POS pipeline must run under the branch's own simulator cashier user
+(``sim.cashier.<branch>@ury.local``, created on demand): ERPNext rejects a
+second concurrently open POS session for the same user across profiles, so
+one shared cashier would serialize all branches while pre-existing users
+(e.g. Administrator) can carry stale open sessions that wedge the per-user
+opening check (see ongoing/uat-simulator-impl/03-pos-runner.md, Finding A).
+The coordinator therefore switches to the branch cashier before touching
+POS state (manufacturing runs as the calling user).
 
 Guards: every public entry point calls
 :func:`ury.ury.simulator.guards.assert_uat_simulator_authorized` first;
@@ -59,6 +70,7 @@ from ury.ury.simulator.manufacturing_runner import run_manufacturing_simulation
 from ury.ury.simulator.pos_runner import (
 	close_pos_session,
 	generate_simulation_slots,
+	get_or_create_sim_cashier,
 	open_pos_session,
 	process_slot_order,
 	run_pos_simulation,
@@ -69,8 +81,11 @@ POS_PROFILE_DOCTYPE = "POS Profile"
 PRODUCTION_PLAN_DOCTYPE = "Production Plan"
 MERGE_LOG_DOCTYPE = "POS Invoice Merge Log"
 SALES_INVOICE_DOCTYPE = "Sales Invoice"
+URY_MENU_DOCTYPE = "URY Menu"
 
-#: Simulator cashier user -- see module docstring (Finding A, phase 3).
+#: Legacy simulator cashier user -- kept for branch-less callers (see
+#: :func:`_assume_sim_cashier`). POS sessions themselves always use the
+#: per-branch cashier from :func:`get_or_create_sim_cashier`.
 SIM_CASHIER_USER = "sim.cashier@ury.local"
 
 #: Run statuses that still have manufacturing work to do (phase 2 states
@@ -181,7 +196,7 @@ def run_daily_simulation(
 	if run.status in MANUFACTURING_PENDING_STATUSES:
 		manufacturing = run_manufacturing_simulation(run)
 
-	_assume_sim_cashier()
+	_assume_sim_cashier(run.branch)
 
 	pos_outcome = None
 	if auto_close:
@@ -237,6 +252,107 @@ def run_daily_simulation(
 	return summary
 
 
+def get_active_simulation_branches() -> list:
+	"""Branches eligible for simulation: an enabled ``POS Profile`` AND an
+	enabled ``URY Menu`` (a profile without a menu has no sellable items,
+	and a menu without a profile has no session to sell through).
+
+	Read-only helper shared by the morning initiator and the CLI; no guard
+	call -- discovery is harmless on any site.
+	"""
+	branches = []
+	for profile in frappe.get_all(
+		POS_PROFILE_DOCTYPE, filters={"disabled": 0}, fields=["name", "branch"]
+	):
+		if not profile.branch or profile.branch in branches:
+			continue
+		if frappe.db.exists(URY_MENU_DOCTYPE, {"branch": profile.branch, "enabled": 1}):
+			branches.append(profile.branch)
+	return branches
+
+
+def initiate_daily_simulation_for_all_branches(business_date=None, slot_count=12) -> list:
+	"""Morning initiator (registered on the ``0 8 * * *`` cron): open the
+	simulated service day on every active branch.
+
+	For each branch from :func:`get_active_simulation_branches` the day's
+	run is fetched single-flight (:func:`get_or_create_daily_run`), pushed
+	through manufacturing when still pending, then the branch's POS session
+	is opened (as the branch's own cashier) and the slot timetable is
+	stamped -- after which the every-5-minutes :func:`process_scheduled_slot`
+	drains the slots and closes each session independently.
+
+	Resumable and isolated: a run already past manufacturing is not re-run,
+	an already-open session is reused, slot generation is idempotent, and
+	each branch is wrapped in try/except with ``frappe.log_error`` + rollback
+	so one broken branch never blocks the others.
+
+	Silent no-op (returns ``[]``) when the simulator is disabled, matching
+	:func:`process_scheduled_slot`. Returns one dict per branch::
+
+	    {"branch", "run_id", "status", "business_date",
+	     "pos_opening_entry", "slots", "error"?}
+	"""
+	if not is_uat_simulator_enabled():
+		return []
+
+	results = []
+	calling_user = frappe.session.user
+	for branch in get_active_simulation_branches():
+		try:
+			results.append(
+				_initiate_branch_simulation(branch, business_date, slot_count, calling_user)
+			)
+		except Exception:
+			traceback = frappe.get_traceback()
+			frappe.log_error(
+				traceback,
+				"URY UAT Simulator: daily initiation failed for {0}".format(branch),
+			)
+			frappe.db.rollback()
+			results.append(
+				{"branch": branch, "status": "Failed", "error": (traceback or "")[-140:]}
+			)
+	return results
+
+
+def _initiate_branch_simulation(branch, business_date, slot_count, calling_user) -> dict:
+	"""Advance one branch's day to the point the cron hook can take over."""
+	# Manufacturing is permission-checked (Sales Plan workflow transitions)
+	# and must run as the calling user -- a previous branch's
+	# ``_assume_sim_cashier`` leaves the session on that branch's cashier,
+	# which lacks the workflow roles and would wedge every later branch.
+	if frappe.session.user != calling_user:
+		frappe.set_user(calling_user)
+
+	run = get_or_create_daily_run(branch=branch, business_date=business_date)
+
+	if run.status in MANUFACTURING_PENDING_STATUSES:
+		run_manufacturing_simulation(run)
+		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
+
+	_assume_sim_cashier(branch)
+	if run.status == "Manufacturing Done":
+		open_pos_session(run)
+		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
+		generate_simulation_slots(run, count=slot_count)
+		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
+	elif run.status in CRON_ACTIVE_STATUSES:
+		# Resumed run: the session is already open -- just make sure the
+		# slot timetable exists (generation is idempotent).
+		generate_simulation_slots(run, count=slot_count)
+		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
+
+	return {
+		"branch": branch,
+		"run_id": run.name,
+		"status": run.status,
+		"business_date": str(run.business_date),
+		"pos_opening_entry": run.get("pos_opening_entry"),
+		"slots": len(run.get("slots") or []),
+	}
+
+
 def process_scheduled_slot():
 	"""Cron hook (every 5 minutes): work one leaseable slot per open run.
 
@@ -251,7 +367,6 @@ def process_scheduled_slot():
 	"""
 	if not is_uat_simulator_enabled():
 		return
-	_assume_sim_cashier()
 
 	now = now_datetime()
 	runs = frappe.get_all(
@@ -277,6 +392,9 @@ def process_scheduled_slot():
 
 def _process_one_scheduled_slot(run_name, now):
 	run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
+	# Each run works as its own branch cashier: the opening entry, invoices
+	# and closing of concurrent branch sessions never share a user.
+	_assume_sim_cashier(run.branch)
 	slot = _find_claimable_slot(run, now)
 	if slot:
 		claimed = _claim_slot(run, slot, now)
@@ -501,17 +619,21 @@ def _consolidated_sales_invoices(run):
 	return rows
 
 
-def _assume_sim_cashier():
-	"""Run POS pipeline steps as the dedicated simulator cashier user.
+def _assume_sim_cashier(branch=None):
+	"""Run POS pipeline steps as the branch's simulator cashier user.
 
-	Required: pre-existing users (e.g. Administrator) can carry stale open
-	POS sessions that wedge the per-user opening check (phase 3, Finding A).
+	With ``branch``, the per-branch cashier (created on demand by
+	:func:`get_or_create_sim_cashier`) is assumed -- required so concurrent
+	branches do not collide on ERPNext's per-user open-session check.
+	Branch-less callers keep the legacy ``sim.cashier@ury.local`` user, which
+	must already exist on the site.
 	"""
-	if frappe.session.user == SIM_CASHIER_USER:
+	cashier = get_or_create_sim_cashier(branch) if branch else SIM_CASHIER_USER
+	if frappe.session.user == cashier:
 		return
-	if not frappe.db.exists("User", SIM_CASHIER_USER):
+	if not frappe.db.exists("User", cashier):
 		frappe.throw(
-			_("URY UAT Simulator cashier user {0} does not exist on this site.").format(SIM_CASHIER_USER),
+			_("URY UAT Simulator cashier user {0} does not exist on this site.").format(cashier),
 			frappe.ValidationError,
 		)
-	frappe.set_user(SIM_CASHIER_USER)
+	frappe.set_user(cashier)
