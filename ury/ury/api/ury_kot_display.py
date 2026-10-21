@@ -111,6 +111,27 @@ def confirm_cancel_kot(name):
 def get_site_name():
     return {"site_name": frappe.local.site}
 
+def _attach_item_states(kot_jsons):
+    """Stamp each kot_item dict with its URY KOT Item Execution ``state``.
+
+    One batched query for all KOTs (no N+1). Items with no execution row are
+    implicitly QUEUED. Plain fields only, so it is safe on v15 and v16.
+    """
+    kot_names = [k.get("name") for k in kot_jsons if k.get("name")]
+    state_by_item = {}
+    if kot_names:
+        rows = frappe.get_all(
+            "URY KOT Item Execution",
+            filters={"kot": ["in", kot_names]},
+            fields=["kot_item", "state"],
+        )
+        state_by_item = {r.kot_item: r.state for r in rows}
+    for kot in kot_jsons:
+        for item in kot.get("kot_items") or []:
+            item["state"] = state_by_item.get(item.get("name")) or "QUEUED"
+    return kot_jsons
+
+
 def build_dashboard_summary(kot_list):
     summary = {}
 
@@ -299,6 +320,7 @@ def kot_list():
 
         kotjson = json.loads(frappe.as_json(kotdoc))
         KOT.append(kotjson)
+    _attach_item_states(KOT)
     dashboard = build_dashboard_summary(KOT)
     return {
         "KOT": KOT,
@@ -370,6 +392,7 @@ def served_kot_list():
         print(invoice,".....................invoice")
         kotjson = json.loads(frappe.as_json(kotdoc))
         KOT.append(kotjson)
+    _attach_item_states(KOT)
     return {
         "KOT": KOT,
         "Branch": branch,
