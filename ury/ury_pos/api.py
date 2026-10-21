@@ -1056,6 +1056,189 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         }
 
 @frappe.whitelist()
+def get_customers_by_order_type(order_type=None, search=None, limit=20):
+    """
+    Get existing customers who have placed orders for a specific order type.
+    Returns recent customers for that order type, ordered by last order date.
+    If search is provided, filters customers by name/mobile/ID for the order type,
+    and also falls back to other registered customers in tabCustomer.
+    """
+    if not (frappe.has_permission("Customer", "read") or frappe.has_permission("POS Invoice", "read")):
+        frappe.throw(_("Not permitted to access customer data"), frappe.PermissionError)
+
+    try:
+        limit = int(limit)
+    except (ValueError, TypeError):
+        limit = 20
+    if limit <= 0:
+        limit = 20
+    if limit > 100:
+        limit = 100
+
+    search = (search or "").strip()
+    customers = []
+    seen_customer_names = set()
+
+    try:
+        if order_type:
+            clean_order_type = str(order_type).strip()
+            order_types = [clean_order_type]
+            condensed = clean_order_type.replace(" ", "")
+            if condensed and condensed not in order_types:
+                order_types.append(condensed)
+            if clean_order_type.lower() == "takeaway" and "Take Away" not in order_types:
+                order_types.append("Take Away")
+            elif clean_order_type.lower() == "take away" and "Takeaway" not in order_types:
+                order_types.append("Takeaway")
+
+            search_condition = ""
+            params = {
+                "order_types": tuple(order_types),
+                "limit": limit
+            }
+
+            if search:
+                search_condition = """
+                    AND (
+                        inv.customer LIKE %(like_search)s
+                        OR inv.customer_name LIKE %(like_search)s
+                        OR inv.mobile_number LIKE %(like_search)s
+                        OR c.customer_name LIKE %(like_search)s
+                        OR c.mobile_number LIKE %(like_search)s
+                    )
+                """
+                params["like_search"] = f"%{search}%"
+
+            query = f"""
+                SELECT 
+                    inv.customer AS name,
+                    COALESCE(NULLIF(c.customer_name, ''), NULLIF(inv.customer_name, ''), inv.customer) AS customer_name,
+                    COALESCE(NULLIF(c.mobile_number, ''), NULLIF(inv.mobile_number, ''), '') AS mobile_number,
+                    MAX(inv.modified) AS last_order_date
+                FROM `tabPOS Invoice` inv
+                LEFT JOIN `tabCustomer` c ON c.name = inv.customer
+                WHERE inv.docstatus < 2
+                  AND inv.customer IS NOT NULL AND inv.customer != ''
+                  AND (c.disabled IS NULL OR c.disabled = 0)
+                  AND inv.order_type IN %(order_types)s
+                  {search_condition}
+                GROUP BY inv.customer
+                ORDER BY last_order_date DESC
+                LIMIT %(limit)s
+            """
+            rows = frappe.db.sql(query, params, as_dict=True) or []
+
+            for row in rows:
+                cust_name = row.get("name")
+                if cust_name and cust_name not in seen_customer_names:
+                    seen_customer_names.add(cust_name)
+                    c_name = row.get("customer_name") or cust_name
+                    phone = row.get("mobile_number") or ""
+                    customers.append({
+                        "name": cust_name,
+                        "customer_name": c_name,
+                        "mobile_number": phone,
+                        "content": f"Customer Name : {c_name} | Mobile Number : {phone}",
+                        "is_order_type_match": True,
+                        "order_type": clean_order_type,
+                    })
+
+        # If search was provided and we haven't reached the limit, search remaining from tabCustomer
+        remaining_limit = limit - len(customers)
+        if search and remaining_limit > 0:
+            customer_params = {
+                "like_search": f"%{search}%",
+                "limit": remaining_limit
+            }
+            not_in_cond = ""
+            if seen_customer_names:
+                not_in_cond = "AND name NOT IN %(seen_names)s"
+                customer_params["seen_names"] = tuple(seen_customer_names)
+
+            customer_query = f"""
+                SELECT 
+                    name,
+                    customer_name,
+                    mobile_number
+                FROM `tabCustomer`
+                WHERE (disabled IS NULL OR disabled = 0)
+                  AND (
+                      name LIKE %(like_search)s
+                      OR customer_name LIKE %(like_search)s
+                      OR mobile_number LIKE %(like_search)s
+                  )
+                  {not_in_cond}
+                ORDER BY modified DESC
+                LIMIT %(limit)s
+            """
+            fallback_rows = frappe.db.sql(customer_query, customer_params, as_dict=True) or []
+            for row in fallback_rows:
+                cust_name = row.get("name")
+                if cust_name and cust_name not in seen_customer_names:
+                    seen_customer_names.add(cust_name)
+                    c_name = row.get("customer_name") or cust_name
+                    phone = row.get("mobile_number") or ""
+                    customers.append({
+                        "name": cust_name,
+                        "customer_name": c_name,
+                        "mobile_number": phone,
+                        "content": f"Customer Name : {c_name} | Mobile Number : {phone}",
+                        "is_order_type_match": False,
+                        "order_type": order_type,
+                    })
+
+        # If neither order_type nor search was provided (or order_type had 0 invoices and no search),
+        # fallback to recent POS Invoice customers across any order type
+        if not customers and not search and not order_type:
+            recent_rows = frappe.db.sql(
+                """
+                SELECT 
+                    inv.customer AS name,
+                    COALESCE(NULLIF(c.customer_name, ''), NULLIF(inv.customer_name, ''), inv.customer) AS customer_name,
+                    COALESCE(NULLIF(c.mobile_number, ''), NULLIF(inv.mobile_number, ''), '') AS mobile_number,
+                    MAX(inv.modified) AS last_order_date
+                FROM `tabPOS Invoice` inv
+                LEFT JOIN `tabCustomer` c ON c.name = inv.customer
+                WHERE inv.docstatus < 2
+                  AND inv.customer IS NOT NULL AND inv.customer != ''
+                  AND (c.disabled IS NULL OR c.disabled = 0)
+                GROUP BY inv.customer
+                ORDER BY last_order_date DESC
+                LIMIT %s
+                """,
+                (limit,),
+                as_dict=True
+            ) or []
+            for row in recent_rows:
+                cust_name = row.get("name")
+                if cust_name and cust_name not in seen_customer_names:
+                    seen_customer_names.add(cust_name)
+                    c_name = row.get("customer_name") or cust_name
+                    phone = row.get("mobile_number") or ""
+                    customers.append({
+                        "name": cust_name,
+                        "customer_name": c_name,
+                        "mobile_number": phone,
+                        "content": f"Customer Name : {c_name} | Mobile Number : {phone}",
+                        "is_order_type_match": False,
+                        "order_type": None,
+                    })
+
+        return {
+            "status": "success",
+            "data": customers
+        }
+    except Exception as e:
+        frappe.log_error(title="Failed to fetch customers by order type", message=frappe.get_traceback())
+        return {
+            "status": "error",
+            "message": str(e),
+            "data": []
+        }
+
+
+
+@frappe.whitelist()
 def get_open_pos_opening_entries(pos_profile):
     """Currently open (status=Open, submitted) POS Opening Entries for the
     given POS Profile. Backs the React Closing flow (pos-closing-api.ts's
