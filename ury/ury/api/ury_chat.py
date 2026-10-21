@@ -190,3 +190,41 @@ def get_chat_history(conversation_id, limit=50):
 		return {"available": True, "history": history}
 	except Exception:
 		return _huf_unavailable(frappe.get_traceback())
+
+
+@frappe.whitelist(methods=["GET"])
+def get_run_result(agent_run_id):
+	"""Poll target for asynchronous HUF replies: `send_chat_message` may
+	return `{"queued": True, "agent_run_id": ...}` instead of the answer.
+	Returns `{"available": True, "status", "response", "error_message"}` for
+	that Agent Run. The run must belong to a conversation owned by the
+	session user (or the user's cached dashboard conversation)."""
+	require_manager()
+
+	if "huf" not in frappe.get_installed_apps():
+		return _huf_unavailable("huf app is not installed on this site")
+
+	if not frappe.db.exists("Agent Run", agent_run_id):
+		frappe.throw(frappe._("Agent Run not found"), frappe.DoesNotExistError)
+
+	run = frappe.db.get_value(
+		"Agent Run",
+		agent_run_id,
+		["status", "response", "error_message", "conversation", "owner"],
+		as_dict=True,
+	)
+	conversation_owner = (
+		frappe.db.get_value("Agent Conversation", run.conversation, "owner") if run.conversation else None
+	)
+	cached_id = frappe.cache().get_value(_conversation_cache_key())
+	if frappe.session.user not in (conversation_owner, run.owner) and not (
+		run.conversation and run.conversation == cached_id
+	):
+		frappe.throw(frappe._("You do not have access to this run."), frappe.PermissionError)
+
+	return {
+		"available": True,
+		"status": run.status,
+		"response": run.response,
+		"error_message": run.error_message,
+	}

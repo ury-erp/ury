@@ -82,6 +82,38 @@ function buildChatContext(activeReport: ReturnType<typeof useActiveReportContext
   return Object.keys(ctx).length ? JSON.stringify(ctx) : undefined;
 }
 
+const POLL_INTERVAL_MS = 1500;
+const POLL_TIMEOUT_MS = 120_000;
+
+/** Polls `get_run_result` until the Agent Run is done. Never throws. */
+async function pollRun(
+  call: { get: (m: string, a?: Record<string, unknown>) => Promise<{ message?: any }> },
+  runId: string
+): Promise<{ text: string } | { error: string }> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    let data: any;
+    try {
+      data = (await call.get('ury.ury.api.ury_chat.get_run_result', { agent_run_id: runId })).message;
+    } catch (err) {
+      console.error('Error polling chat run:', err);
+      continue; // transient failure; keep trying until the deadline
+    }
+    if (!data?.available) return { error: "Sorry, the assistant isn't available right now." };
+    if (data.status === 'Failed') {
+      return {
+        error: `Sorry, the assistant couldn't answer${data.error_message ? `: ${data.error_message}` : '.'}`,
+      };
+    }
+    if (data.status === 'Success') {
+      const text = typeof data.response === 'string' ? data.response.trim() : '';
+      return text ? { text } : { error: 'The assistant returned an empty answer.' };
+    }
+  }
+  return { error: 'The assistant is taking too long to respond. Please try again.' };
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -116,6 +148,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [initializing, setInitializing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -219,17 +252,34 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
         return;
       }
 
-      const responseText =
-        typeof data.response === 'string'
-          ? data.response
-          : // HUF's send_message_to_conversation() returns
-            // {"success": true, "response": "<reply text>"} -- check that
-            // nested `.response` before falling back to `.message`/`.text`
-            // (other HUF response shapes) or a last-resort JSON dump.
-            (data.response?.response ??
-              data.response?.message ??
-              data.response?.text ??
-              JSON.stringify(data.response));
+      let finalResponse: unknown = data.response;
+      let responseText: string;
+
+      if (finalResponse && typeof finalResponse === 'object' && (finalResponse as any).queued) {
+        // Huf answers asynchronously: poll the Agent Run until it finishes.
+        setThinking(true);
+        const runId = (finalResponse as any).agent_run_id as string | undefined;
+        const polled = runId ? await pollRun(call, runId) : { error: 'No run id returned.' };
+        if ('error' in polled) {
+          responseText = polled.error;
+          finalResponse = null;
+        } else {
+          responseText = polled.text;
+          finalResponse = polled.text;
+        }
+      } else {
+        responseText =
+          typeof finalResponse === 'string'
+            ? finalResponse
+            : // HUF's send_message_to_conversation() returns
+              // {"success": true, "response": "<reply text>"} -- check that
+              // nested `.response` before falling back to `.message`/`.text`
+              // (other HUF response shapes) or a last-resort JSON dump.
+              ((finalResponse as any)?.response ??
+                (finalResponse as any)?.message ??
+                (finalResponse as any)?.text ??
+                JSON.stringify(finalResponse));
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -238,7 +288,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
 
       // PLAN.md item 5 — see reportNavigation.ts for the documented
       // assumption this narrow convention makes.
-      const navigateSlug = resolveReportNavigation(data.response, responseText);
+      const navigateSlug = resolveReportNavigation(finalResponse, responseText);
       if (navigateSlug) {
         navigateToReportSlug(navigate, navigateSlug);
       }
@@ -253,6 +303,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
         },
       ]);
     } finally {
+      setThinking(false);
       setSending(false);
     }
   };
@@ -347,7 +398,15 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                     {m.role === 'assistant' ? <ChatMarkdown>{m.text}</ChatMarkdown> : m.text}
                   </div>
                 ))}
-                {sending && (
+                {sending && thinking && (
+                  <div
+                    className="mr-auto animate-pulse rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
+                    role="status"
+                  >
+                    Thinking…
+                  </div>
+                )}
+                {sending && !thinking && (
                   <div
                     className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-2.5"
                     aria-label="Assistant is typing"
