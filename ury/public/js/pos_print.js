@@ -1,8 +1,21 @@
-frappe.require([
-    '/assets/ury/js/qz-tray.js',
-    '/assets/ury/js/jsrsasign-all-min.js',
-    '/assets/ury/js/sign-message.js'
-]);
+// Load QZ Tray libs strictly in order. On Frappe v16 frappe.require() with an
+// array fetches in parallel and returns a Promise, so sign-message.js could run
+// before qz-tray.js defined `qz` ("qz is not defined" on every desk page).
+(function loadQzLibs() {
+    const libs = [
+        '/assets/ury/js/qz-tray.js',
+        '/assets/ury/js/jsrsasign-all-min.js',
+        '/assets/ury/js/sign-message.js'
+    ];
+    const next = (i) => {
+        if (i >= libs.length) return Promise.resolve();
+        return new Promise((resolve) => {
+            const r = frappe.require(libs[i], resolve);
+            if (r && typeof r.then === 'function') r.then(resolve, resolve);
+        }).then(() => next(i + 1));
+    };
+    next(0);
+})();
 
 async function updateMergedInvoicePrint(invoice) {
 
