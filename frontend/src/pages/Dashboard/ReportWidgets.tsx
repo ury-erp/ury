@@ -4,6 +4,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { TransactionRecord } from '../../services/dashboard';
 import { format as formatDate } from 'date-fns';
+import { normalizeFrappeTime } from '@ury/core';
 
 interface ReportWidgetsProps {
   recentTransactions: TransactionRecord[];
@@ -49,9 +50,9 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
       header: 'Date & Time',
       render: (row) => {
         try {
-          return <span>{formatDate(new Date(`${row.posting_date} ${row.posting_time}`), 'yyyy-MM-dd hh:mm:ss a')}</span>;
+          return <span>{formatDate(new Date(`${row.posting_date} ${normalizeFrappeTime(row.posting_time)}`), 'yyyy-MM-dd hh:mm:ss a')}</span>;
         } catch {
-          return <span>{row.posting_date} {row.posting_time}</span>;
+          return <span>{row.posting_date} {normalizeFrappeTime(row.posting_time)}</span>;
         }
       },
     },

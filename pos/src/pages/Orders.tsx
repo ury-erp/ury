@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, normalizeFrappeTime } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -168,7 +168,7 @@ export default function Orders() {
 
   // Function to format the date and time
   const formatDateTime = (date: string, time: string) => {
-    const formattedDate = new Date(date + ' ' + time).toLocaleString('en-US', {
+    const formattedDate = new Date(date + ' ' + normalizeFrappeTime(time)).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
