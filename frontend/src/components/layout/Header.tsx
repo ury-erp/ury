@@ -464,7 +464,7 @@ export const Header: React.FC = () => {
                     <div
                       key={item.id}
                       className={`p-4 transition-colors ${
-                        item.read ? 'bg-card' : 'bg-primary-tint/40'
+                        item.read ? 'bg-card' : 'bg-primary-tint border-l-2 border-primary'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
@@ -476,7 +476,15 @@ export const Header: React.FC = () => {
 
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                            <p className={`text-sm flex items-center gap-2 ${item.read ? 'font-normal text-muted-foreground' : 'font-semibold text-foreground'}`}>
+                              {!item.read && (
+                                <>
+                                  <span aria-hidden="true" className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                                  <span className="sr-only">Unread: </span>
+                                </>
+                              )}
+                              {item.title}
+                            </p>
                             <span className="text-xs text-text-tertiary">{formatRelativeTime(item.timestamp)}</span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
