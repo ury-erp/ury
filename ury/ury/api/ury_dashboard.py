@@ -533,6 +533,10 @@ def _business_day_bounds(branch):
 	return start, end
 
 
+# Longest plausible ticket when a KOT is served after midnight.
+MAX_TICKET_SECONDS = 6 * 60 * 60
+
+
 @frappe.whitelist(methods=["GET"])
 def get_shift_metrics(branch=None):
 	cache_key = f"ury_dashboard_shift_metrics:{branch}"
@@ -565,27 +569,33 @@ def get_shift_metrics(branch=None):
 	covers = row.covers or 0
 	avg_per_cover = round(sales / covers, 2) if covers else 0
 
-	kot_conditions = "k.`start_time_prep` IS NOT NULL AND k.`start_time_serv` IS NOT NULL AND k.`start_time_serv` != '' AND k.`creation` BETWEEN %(start)s AND %(end)s"
+	kot_conditions = "k.`start_time_prep` IS NOT NULL AND k.`start_time_serv` IS NOT NULL AND k.`creation` BETWEEN %(start)s AND %(end)s"
 	kot_params = {"start": start, "end": end}
 	if branch:
 		kot_conditions += " AND k.`branch` = %(branch)s"
 		kot_params["branch"] = branch
 
-	# start_time_prep is a Time field but start_time_serv is a Data field holding
-	# "HH:MM:SS" text (see serve_kot). TIMESTAMPDIFF() on that mixed TIME/varchar
-	# pair coerces to bogus datetimes (hence ~ -7M minutes). Compare time-of-day
-	# seconds instead and exclude blank/invalid/negative rows rather than hiding them.
+	# Both start_time_prep and start_time_serv are Time fields; compare time-of-day
+	# seconds. serv < prep is treated as a midnight crossing only when the wrapped
+	# duration is plausible (<= MAX_TICKET_SECONDS); anything else is bad data and
+	# is excluded rather than counted as a ~24h ticket. NULL rows are excluded.
 	ticket_row = frappe.db.sql(
 		f"""
 		SELECT AVG(t.secs) / 60 AS avg_ticket_minutes
 		FROM (
-			SELECT TIME_TO_SEC(k.`start_time_serv`) - TIME_TO_SEC(k.`start_time_prep`) AS secs
-			FROM `tabURY KOT` k
-			WHERE {kot_conditions}
+			SELECT CASE
+				WHEN d.diff >= 0 THEN d.diff
+				WHEN d.diff + 86400 <= %(max_ticket_seconds)s THEN d.diff + 86400
+			END AS secs
+			FROM (
+				SELECT TIME_TO_SEC(k.`start_time_serv`) - TIME_TO_SEC(k.`start_time_prep`) AS diff
+				FROM `tabURY KOT` k
+				WHERE {kot_conditions}
+			) d
 		) t
-		WHERE t.secs IS NOT NULL AND t.secs >= 0
+		WHERE t.secs IS NOT NULL
 		""",
-		kot_params,
+		{**kot_params, "max_ticket_seconds": MAX_TICKET_SECONDS},
 		as_dict=True,
 	)[0]
 
