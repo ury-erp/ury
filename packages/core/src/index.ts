@@ -19,6 +19,7 @@ export {
   formatCurrency,
   formatCompactCurrency,
   formatInvoiceTime,
+  normalizeFrappeTime,
   setActiveCurrency,
   getActiveCurrency,
   currencyFractionDigits,
