@@ -167,6 +167,7 @@
     "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
     "order_modified": "Cette commande a été modifiée. Veuillez recharger la page pour récupérer les dernières modifications.",
     "order_sync_failed": "Impossible de synchroniser cette commande. Veuillez recharger la page et réessayer.",
+    "payment_failed": "Le paiement n'a pas pu être effectué. Veuillez réessayer.",
     "posOpening": {
       "permission_denied": "Vous n'avez pas la permission d'ouvrir une session. Contactez votre responsable.",
       "daily_close_pending": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
