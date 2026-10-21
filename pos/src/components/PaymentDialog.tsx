@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
@@ -157,7 +157,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       clearSelectedOrder();
       await fetchOrders();
     } catch (err) {
-      setError((err as Error).message);
+      console.error('Payment failed:', err);
+      setError(parseFrappeError(err, t('errors.payment_failed')));
     } finally {
       setIsProcessing(false);
     }

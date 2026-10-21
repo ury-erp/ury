@@ -34,7 +34,7 @@ import {
   isOrderTypeNotAllowedError,
   isLastItemCannotBeRemovedError,
 } from '../lib/order-api';
-import { parseFrappeError } from '../lib/pos-opening-api';
+import { parseFrappeError } from '@ury/core';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
 
@@ -214,7 +214,7 @@ export default function Orders() {
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
     } finally {
       setCancelLoading(false);
     }
@@ -259,7 +259,7 @@ export default function Orders() {
       // Redirect to POS page
       navigate('/register');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_edit_order')));
     } finally {
       setEditLoading(false);
     }
