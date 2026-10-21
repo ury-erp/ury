@@ -120,11 +120,12 @@ def update_commission_settings(
 				"tier_mode": rule.get("tier_mode"),
 				"disabled": 1 if _coerce_bool(rule.get("disabled")) else 0,
 			})
-			for tier in rule.get("tiers") or []:
-				row.append("tiers", {
-					"from_amount": flt(tier.get("from_amount")),
-					"rate": flt(tier.get("rate")),
-				})
+			# Tier is a grandchild of the Settings single; Frappe cannot append or
+			# persist it on a child row, so hand it to on_update via flags.
+			row.flags.pending_tiers = [
+				{"from_amount": flt(tier.get("from_amount")), "rate": flt(tier.get("rate"))}
+				for tier in rule.get("tiers") or []
+			]
 
 	doc.save(ignore_permissions=True)
 

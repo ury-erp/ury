@@ -9,6 +9,9 @@ def get_rule_tiers(rule):
 	Frappe v16 does not load (or save) grandchild tables, so ``rule.tiers`` may
 	be missing. Prefer rows set in memory, else query them explicitly.
 	"""
+	pending = rule.flags.get("pending_tiers")
+	if pending is not None:
+		return [frappe._dict(idx=i + 1, **t) for i, t in enumerate(pending)]
 	tiers = rule.get("tiers")
 	if tiers:
 		return tiers
@@ -33,8 +36,9 @@ class URYCommissionSettings(Document):
 			orphan["parent"] = ["not in", names]
 		frappe.db.delete("URY Commission Tier", orphan)
 		for rule in self.rules:
-			tiers = rule.get("tiers")
-			if not tiers:
+			pending = rule.flags.get("pending_tiers")
+			tiers = get_rule_tiers(rule) if pending is not None else rule.get("tiers")
+			if pending is None and not tiers:
 				continue  # untouched in memory: keep what is stored
 			frappe.db.delete("URY Commission Tier", {"parent": rule.name, "parenttype": "URY Commission Rule", "parentfield": "tiers"})
 			for t in tiers:
