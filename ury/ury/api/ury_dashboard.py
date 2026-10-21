@@ -565,17 +565,25 @@ def get_shift_metrics(branch=None):
 	covers = row.covers or 0
 	avg_per_cover = round(sales / covers, 2) if covers else 0
 
-	kot_conditions = "k.`start_time_prep` IS NOT NULL AND k.`start_time_serv` IS NOT NULL AND k.`creation` BETWEEN %(start)s AND %(end)s"
+	kot_conditions = "k.`start_time_prep` IS NOT NULL AND k.`start_time_serv` IS NOT NULL AND k.`start_time_serv` != '' AND k.`creation` BETWEEN %(start)s AND %(end)s"
 	kot_params = {"start": start, "end": end}
 	if branch:
 		kot_conditions += " AND k.`branch` = %(branch)s"
 		kot_params["branch"] = branch
 
+	# start_time_prep is a Time field but start_time_serv is a Data field holding
+	# "HH:MM:SS" text (see serve_kot). TIMESTAMPDIFF() on that mixed TIME/varchar
+	# pair coerces to bogus datetimes (hence ~ -7M minutes). Compare time-of-day
+	# seconds instead and exclude blank/invalid/negative rows rather than hiding them.
 	ticket_row = frappe.db.sql(
 		f"""
-		SELECT AVG(TIMESTAMPDIFF(MINUTE, k.`start_time_prep`, k.`start_time_serv`)) AS avg_ticket_minutes
-		FROM `tabURY KOT` k
-		WHERE {kot_conditions}
+		SELECT AVG(t.secs) / 60 AS avg_ticket_minutes
+		FROM (
+			SELECT TIME_TO_SEC(k.`start_time_serv`) - TIME_TO_SEC(k.`start_time_prep`) AS secs
+			FROM `tabURY KOT` k
+			WHERE {kot_conditions}
+		) t
+		WHERE t.secs IS NOT NULL AND t.secs >= 0
 		""",
 		kot_params,
 		as_dict=True,
