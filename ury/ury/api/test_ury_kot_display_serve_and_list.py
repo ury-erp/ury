@@ -20,6 +20,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_kot_display import (
+	_attach_item_states,
 	build_dashboard_summary,
 	get_site_name,
 	serve_kot,
@@ -158,3 +159,27 @@ class TestServeKotEnsuresReadyBeforeServe(FrappeTestCase):
 
 		mock_log_error.assert_called_once()
 		self.assertEqual(calls["order_status"], "Served")
+
+
+class TestAttachItemStates(FrappeTestCase):
+	def test_batches_one_query_and_defaults_to_queued(self):
+		kots = [
+			{"name": "K1", "kot_items": [{"name": "I1"}, {"name": "I2"}]},
+			{"name": "K2", "kot_items": [{"name": "I3"}]},
+		]
+		rows = [
+			frappe._dict(kot_item="I1", state="IN_PREPARATION"),
+			frappe._dict(kot_item="I3", state="READY"),
+		]
+		with patch(f"{MODULE}.frappe.get_all", return_value=rows) as mock_get_all:
+			_attach_item_states(kots)
+
+		mock_get_all.assert_called_once()
+		self.assertEqual(mock_get_all.call_args.kwargs["filters"], {"kot": ["in", ["K1", "K2"]]})
+		self.assertEqual([i["state"] for i in kots[0]["kot_items"]], ["IN_PREPARATION", "QUEUED"])
+		self.assertEqual(kots[1]["kot_items"][0]["state"], "READY")
+
+	def test_empty_list_runs_no_query(self):
+		with patch(f"{MODULE}.frappe.get_all") as mock_get_all:
+			self.assertEqual(_attach_item_states([]), [])
+		mock_get_all.assert_not_called()
