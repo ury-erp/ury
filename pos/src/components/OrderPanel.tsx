@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
@@ -7,7 +7,8 @@ import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
-import { Button } from '@ury/ui';
+import { Button, Badge } from '@ury/ui';
+import { getOrderKotStatus, type KotItemState } from '../lib/kot-status-api';
 import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
 import { useRootStore } from '../store/root-store';
@@ -16,6 +17,13 @@ import { showToast } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
 import { t } from '../i18n';
 import { useCartAvailability, cartQtyForItem, remainingHeadroom } from '../lib/cart-capacity';
+
+const KOT_BADGE: Record<KotItemState, { label: string; variant: 'cancelled' | 'warning' | 'info' | 'success' }> = {
+  QUEUED: { label: 'Sent', variant: 'cancelled' },
+  IN_PREPARATION: { label: 'Preparing', variant: 'warning' },
+  READY: { label: 'Ready', variant: 'info' },
+  SERVED: { label: 'Served', variant: 'success' },
+};
 
 const OrderPanel = () => {
   const { 
@@ -55,6 +63,26 @@ const OrderPanel = () => {
     branch: posProfile?.branch,
     company: posProfile?.company,
   });
+
+  // Read-only kitchen state per item_code for a running (saved) order.
+  const [kotState, setKotState] = useState<Record<string, KotItemState>>({});
+  useEffect(() => {
+    if (!orderId) {
+      setKotState({});
+      return;
+    }
+    let cancelled = false;
+    const load = () =>
+      getOrderKotStatus(orderId)
+        .then((r) => !cancelled && setKotState(r.items))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [orderId, lastModifiedTime]);
 
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
@@ -268,6 +296,15 @@ const OrderPanel = () => {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
+                      {orderId && kotState[item.item] && (
+                        <Badge
+                          size="sm"
+                          variant={KOT_BADGE[kotState[item.item]].variant}
+                          data-testid="kot-status-badge"
+                        >
+                          {KOT_BADGE[kotState[item.item]].label}
+                        </Badge>
+                      )}
                     </div>
                     {item.selectedVariant && (
                       <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
