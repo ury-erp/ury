@@ -20,6 +20,7 @@
 
 
 // Set the signature algorithm and function
+if (typeof qz !== "undefined") {
 qz.security.setSignatureAlgorithm("SHA512"); // Since 2.1
 
 qz.security.setSignaturePromise(function (toSign) {
@@ -41,3 +42,4 @@ qz.security.setSignaturePromise(function (toSign) {
         });
     };
 });
+}
