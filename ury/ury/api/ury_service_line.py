@@ -94,6 +94,18 @@ def get_service_line(branch=None):
 	return result
 
 
+def _bin_actual_qty(item_code, warehouse=None):
+	"""Total Bin actual_qty for an item, optionally scoped to one warehouse.
+
+	Uses get_all + Python sum (valid on Frappe v15 and v16; v16 rejects
+	aggregate expressions as get_value/get_all fields).
+	"""
+	filters = {"item_code": item_code}
+	if warehouse:
+		filters["warehouse"] = warehouse
+	return float(sum(frappe.get_all("Bin", filters=filters, pluck="actual_qty")))
+
+
 @frappe.whitelist(methods=["GET"])
 def get_running_low(branch=None):
 	require_manager()
@@ -134,17 +146,7 @@ def get_running_low(branch=None):
 
 	result = []
 	for row in sold_rows:
-		bin_filters = {"item_code": row.item_code}
-		if warehouse:
-			bin_filters["warehouse"] = warehouse
-		actual_qty = (
-			frappe.db.sql(
-				"SELECT COALESCE(SUM(actual_qty), 0) FROM `tabBin` WHERE item_code = %(item_code)s"
-				+ (" AND warehouse = %(warehouse)s" if warehouse else ""),
-				bin_filters,
-			)[0][0]
-			or 0
-		)
+		actual_qty = _bin_actual_qty(row.item_code, warehouse)
 
 		data_quality_issue = actual_qty < 0
 		remaining = max(actual_qty, 0)
