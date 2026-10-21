@@ -831,3 +831,56 @@ class TestAllBranchesInitiation(FrappeTestCase):
 			self.assertEqual(results[0]["status"], "POS Open")
 			self.assertEqual(results[0]["pos_opening_entry"], opening.name)
 			self.assertEqual(results[0]["slots"], 5)
+
+
+class TestDepartmentSafetyStockSharedWarehouse(FrappeTestCase):
+	"""Verify that when multiple department buckets share the same physical
+	department warehouse, _ensure_department_safety_stock aggregates the direct
+	BOM requirements across all buckets before checking Bin availability.
+	"""
+
+	def test_shared_warehouse_aggregates_requirements_across_departments(self):
+		from ury.ury.simulator import manufacturing_runner
+
+		buckets = {
+			"Kitchen - Salalah": {
+				"warehouse": "Shared Kitchen - UO",
+				"targets": [
+					{"item_code": "DISH_A", "bom_no": "BOM_A", "required_qty": 2.0},
+				],
+			},
+			"Salad - Salalah": {
+				"warehouse": "Shared Kitchen - UO",
+				"targets": [
+					{"item_code": "DISH_B", "bom_no": "BOM_B", "required_qty": 3.0},
+				],
+			},
+		}
+
+		# Dish A requires 2.5 units of TMT per dish -> 2.0 * 2.5 = 5.0 TMT
+		# Dish B requires 2.0 units of TMT per dish -> 3.0 * 2.0 = 6.0 TMT
+		# Total required for Shared Kitchen - UO = 11.0 TMT.
+		def fake_bom_direct_rows(bom_no):
+			if bom_no == "BOM_A":
+				return [{"item_code": "TMT", "qty": 2.5, "stock_qty": 2.5}]
+			if bom_no == "BOM_B":
+				return [{"item_code": "TMT", "qty": 2.0, "stock_qty": 2.0}]
+			return []
+
+		# Available in Shared Kitchen - UO is 4.0 units.
+		# Total shortage must be 11.0 - 4.0 = 7.0 units.
+		with patch.object(manufacturing_runner, "_bom_direct_rows", side_effect=fake_bom_direct_rows), \
+			 patch("frappe.db.get_value", return_value=4.0), \
+			 patch.object(manufacturing_runner, "_create_material_receipt", return_value="STE-RECEIPT-001") as mock_receipt:
+
+			receipts = manufacturing_runner._ensure_department_safety_stock(
+				buckets, company="URY OMAN", business_date="2030-01-01"
+			)
+
+			self.assertEqual(receipts, ["STE-RECEIPT-001"])
+			mock_receipt.assert_called_once_with(
+				"URY OMAN",
+				"Shared Kitchen - UO",
+				{"TMT": 7.0},
+				"2030-01-01",
+			)

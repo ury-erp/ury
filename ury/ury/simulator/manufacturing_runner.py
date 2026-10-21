@@ -451,12 +451,19 @@ def _ensure_department_safety_stock(buckets, company, business_date):
 	Returns the list of created Stock Entry names.
 	"""
 	receipts = []
+	# 1. Aggregate total direct requirement across all buckets grouped by (warehouse, item_code).
+	# This ensures branches where multiple departments share the same department warehouse
+	# (e.g. Kitchen and Salad both using 'Kitchen Salalah - UO') do not evaluate the same
+	# Bin balance independently and under-replenish shared ingredients.
+	required_by_warehouse = {}
 	for department, bucket in buckets.items():
 		department_warehouse = bucket.get("warehouse")
 		if not department_warehouse:
 			continue
+		if department_warehouse not in required_by_warehouse:
+			required_by_warehouse[department_warehouse] = {}
+
 		produced_items = {t.get("item_code") for t in bucket.get("targets") or []}
-		required = {}
 		for target in bucket.get("targets") or []:
 			bom_no = target.get("bom_no")
 			if not bom_no or target.get("skip_work_order"):
@@ -468,10 +475,15 @@ def _ensure_department_safety_stock(buckets, company, business_date):
 				item_code = row["item_code"]
 				if not item_code or item_code in produced_items:
 					continue
-				required[item_code] = required.get(item_code, 0.0) + flt(row.get("stock_qty") or row.get("qty")) * target_qty
+				item_req = flt(row.get("stock_qty") or row.get("qty")) * target_qty
+				required_by_warehouse[department_warehouse][item_code] = (
+					required_by_warehouse[department_warehouse].get(item_code, 0.0) + item_req
+				)
 
+	# 2. For each warehouse and item, calculate the shortage against current Bin stock.
+	for department_warehouse, required_items in required_by_warehouse.items():
 		to_stock = {}
-		for item_code, qty in required.items():
+		for item_code, qty in required_items.items():
 			available = flt(
 				frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": department_warehouse}, "actual_qty")
 			)
