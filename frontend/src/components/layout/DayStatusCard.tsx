@@ -167,7 +167,7 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
               {attentionCount}
             </Badge>
             <span className="ml-1.5">need attention</span>
-            <Link to="/dashboard" className="ml-auto text-primary font-medium hover:underline">
+            <Link to="/service" className="ml-auto text-primary font-medium hover:underline">
               Open →
             </Link>
           </>
