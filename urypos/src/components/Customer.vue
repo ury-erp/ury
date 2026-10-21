@@ -30,7 +30,7 @@
           @input="this.customers.handleSearchInput"
           @click="this.customers.searchCustomer()
           "
-          :disabled="this.menu.selectedOrderType === 'Aggregators' || this.recentOrders.previousOrderdCustomer !== ''"
+          :disabled="this.menu.selectedOrderType === 'Aggregators'"
           required
         />
 
