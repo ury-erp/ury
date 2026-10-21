@@ -4,6 +4,8 @@ from datetime import timedelta
 import frappe
 from frappe.utils import flt, getdate
 
+from ury.ury.doctype.ury_commission_settings.ury_commission_settings import get_rule_tiers
+
 from ury.ury.report_api.utils import (
 	get_business_day_range_condition,
 	report_settings_join,
@@ -53,7 +55,7 @@ def _settings_dict(doc):
 			"idx": row.idx,
 			"tiers": [
 				{"from_amount": flt(t.from_amount), "rate": flt(t.rate)}
-				for t in row.tiers
+				for t in get_rule_tiers(row)
 			],
 		})
 	return {
