@@ -78,7 +78,7 @@ export const BranchPage: React.FC = () => {
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
-        fields: ['name', 'branch', 'custom_no_taxes', 'tax_id', 'custom_invoice_series_prefix', 'custom_aggregator_series_prefix'],
+        fields: ['name', 'branch', 'custom_no_taxes'],
         limit_page_length: 100
       });
       list = Array.isArray(res) ? res : (res?.message || []);
