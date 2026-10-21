@@ -137,7 +137,7 @@
   {
    "allow_on_submit": 1,
    "fieldname": "start_time_serv",
-   "fieldtype": "Data",
+   "fieldtype": "Time",
    "label": "Served Time",
    "read_only": 1
   },
@@ -269,7 +269,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-26 12:28:58.664903",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT",
