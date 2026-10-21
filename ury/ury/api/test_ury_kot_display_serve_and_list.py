@@ -31,8 +31,9 @@ MODULE = "ury.ury.api.ury_kot_display"
 
 class TestGetSiteName(FrappeTestCase):
 	def test_returns_current_site(self):
-		with patch(f"{MODULE}.frappe.local") as mock_local:
-			mock_local.site = "p2round3.local"
+		# Patch only the attribute: replacing frappe.local itself breaks on
+		# Frappe v16, where it is a werkzeug Local (AttributeError: __class__).
+		with patch.object(frappe.local, "site", "p2round3.local"):
 			result = get_site_name()
 		self.assertEqual(result, {"site_name": "p2round3.local"})
 
