@@ -169,6 +169,76 @@ def _get_cancel_confirmed_original_kots(branch):
     return original_names
 
 
+KOT_DISPLAY_WINDOW_HOURS = 3
+KOT_DISPLAY_TYPES = [
+    "New Order",
+    "Order Modified",
+    "Duplicate",
+    "Cancelled",
+    "Partially cancelled",
+]
+
+
+def _kot_display_filters(order_status, branch=None):
+    """Single definition of which KOTs the Mosaic KDS shows.
+
+    Shared by the per-unit view (kot_list / served_kot_list) and the overview
+    counts (production_unit_counts) so both always use the same time window.
+    """
+    filters = {
+        "order_status": order_status,
+        "type": ["in", KOT_DISPLAY_TYPES],
+        "docstatus": 1,
+        "verified": 0,
+        "creation": (
+            ">=",
+            frappe.utils.add_to_date(
+                frappe.utils.now(), hours=-KOT_DISPLAY_WINDOW_HOURS
+            ),
+        ),
+    }
+    if branch:
+        filters["branch"] = branch
+    return filters
+
+
+@frappe.whitelist()
+def production_unit_counts(units=None):
+    """Active/served/total KOT counts per production unit, windowed like the unit view."""
+    if isinstance(units, str):
+        units = json.loads(units)
+    branch = None
+    user = frappe.session.user
+    if not (user == "Administrator" or "URY Admin" in frappe.get_roles(user)):
+        branch = getBranch()
+    cancelled = _get_cancel_confirmed_original_kots(branch)
+
+    def count(order_status):
+        rows = frappe.get_list(
+            "URY KOT",
+            fields=["name", "production"],
+            filters=_kot_display_filters(order_status, branch),
+            limit_page_length=0,
+        )
+        out = {}
+        for r in rows:
+            if r.name in cancelled or not r.production:
+                continue
+            out[r.production] = out.get(r.production, 0) + 1
+        return out
+
+    active, served = count("Ready For Prepare"), count("Served")
+    names = units or sorted(set(active) | set(served))
+    return {
+        u: {
+            "active_orders": active.get(u, 0),
+            "served_orders": served.get(u, 0),
+            "total_orders": active.get(u, 0) + served.get(u, 0),
+        }
+        for u in names
+    }
+
+
 @frappe.whitelist()
 def kot_list():
     today = frappe.utils.now()
@@ -196,24 +266,7 @@ def kot_list():
         "POS Profile", pos_profile_filters, "custom_kot_alert"
     )
 
-    filters = {
-        "order_status": "Ready For Prepare",
-        "type": [
-            "in",
-            [
-                "New Order",
-                "Order Modified",
-                "Duplicate",
-                "Cancelled",
-                "Partially cancelled",
-            ],
-        ],
-        "docstatus": 1,
-        "verified": 0,
-        "creation": (">=", three_hours_ago),
-    }
-    if branch:
-        filters["branch"] = branch
+    filters = _kot_display_filters("Ready For Prepare", branch)
 
     kotList = frappe.get_list(
         "URY KOT",
@@ -283,24 +336,7 @@ def served_kot_list():
         "POS Profile", pos_profile_filters, "custom_kot_alert"
     )
 
-    filters = {
-        "order_status": "Served",
-        "type": [
-            "in",
-            [
-                "New Order",
-                "Order Modified",
-                "Duplicate",
-                "Cancelled",
-                "Partially cancelled",
-            ],
-        ],
-        "docstatus": 1,
-        "verified": 0,
-        "creation": (">=", three_hours_ago),
-    }
-    if branch:
-        filters["branch"] = branch
+    filters = _kot_display_filters("Served", branch)
 
     kotList = frappe.get_list(
         "URY KOT",

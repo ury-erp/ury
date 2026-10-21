@@ -92,28 +92,17 @@ export default {
 
         const units = result || [];
 
-        for (let unit of units) {
-          if (request !== this.requestId) return;
-          const [active, served, total] = await Promise.all([
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-              ["order_status", "=", "Ready For Prepare"],
-            ]),
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-              ["order_status", "=", "Served"],
-            ]),
-            this.db.getCount("URY KOT", [
-              ["production", "=", unit.name],
-              ["docstatus", "=", 1],
-            ]),
-          ]);
-
-          unit.active_orders = active;
-          unit.served_orders = served;
-          unit.total_orders = total;
+        // Same time window/filters as the per-unit KOT view (server-side).
+        const counts = await frappe.call().post("ury.ury.api.ury_kot_display.production_unit_counts", {
+          units: JSON.stringify(units.map((u) => u.name)),
+        });
+        if (request !== this.requestId) return;
+        const byUnit = counts.message || {};
+        for (const unit of units) {
+          const c = byUnit[unit.name] || {};
+          unit.active_orders = c.active_orders || 0;
+          unit.served_orders = c.served_orders || 0;
+          unit.total_orders = c.total_orders || 0;
         }
 
         if (request === this.requestId) this.dashboard = units;
