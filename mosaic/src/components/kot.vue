@@ -614,9 +614,17 @@ export default {
       });
     },
     calculateQty(kotitem, qty, type, cancelled_qty) {
-      kotitem.qty = qty;
+      // quantity / cancelled_qty are Data (string) fields on URY KOT Items and
+      // cancelled_qty is null/absent on rows that never recorded it, so coerce
+      // explicitly instead of relying on implicit JS arithmetic (-> NaN).
+      const toNum = (v) => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const total = toNum(qty);
+      kotitem.qty = total;
       if (type == "Partially cancelled" || type == "Cancelled") {
-        kotitem.qty = qty - cancelled_qty;
+        kotitem.qty = total - toNum(cancelled_qty);
       }
     },
     removeAllItemsFromLocalStorage(kot) {
