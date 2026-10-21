@@ -154,11 +154,12 @@ class TestGetDashboardStats(FrappeTestCase):
             ],
         )
 
+    @patch("ury.ury.api.ury_dashboard.frappe.get_all", return_value=[])
     @patch("ury.ury.api.ury_dashboard.resolve_scope_currency", return_value="AED")
     @patch("ury.ury.api.ury_dashboard.frappe.db.count")
     @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
     @patch("ury.ury.api.ury_dashboard.frappe.cache")
-    def test_no_invoices_still_reports_scope_currency(self, mock_cache_obj, mock_sql, mock_count, mock_resolve):
+    def test_no_invoices_still_reports_scope_currency(self, mock_cache_obj, mock_sql, mock_count, mock_resolve, _mock_branches):
         mock_cache_instance = MagicMock()
         mock_cache_obj.return_value = mock_cache_instance
         mock_cache_instance.get_value.return_value = None
