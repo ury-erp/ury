@@ -137,7 +137,14 @@ def get_running_low(branch=None):
 		bin_filters = {"item_code": row.item_code}
 		if warehouse:
 			bin_filters["warehouse"] = warehouse
-		actual_qty = frappe.db.get_value("Bin", bin_filters, "sum(actual_qty)") or 0
+		actual_qty = (
+			frappe.db.sql(
+				"SELECT COALESCE(SUM(actual_qty), 0) FROM `tabBin` WHERE item_code = %(item_code)s"
+				+ (" AND warehouse = %(warehouse)s" if warehouse else ""),
+				bin_filters,
+			)[0][0]
+			or 0
+		)
 
 		data_quality_issue = actual_qty < 0
 		remaining = max(actual_qty, 0)

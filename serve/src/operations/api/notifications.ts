@@ -44,12 +44,7 @@ export async function listNotificationPage(
  */
 export async function getUnreadNotificationCount(): Promise<number> {
   try {
-    const rows = (await db.getDocList('Notification Log', {
-      fields: ['count(name) as unread_count'],
-      filters: [['read', '=', 0]],
-      limit: 1,
-    } as unknown as Parameters<typeof db.getDocList>[1])) as Array<{ unread_count?: number }>
-    const count = rows?.[0]?.unread_count
+    const count = await db.getCount('Notification Log', [['read', '=', 0]])
     if (typeof count === 'number') return count
   } catch {
     // fall through to name-list count

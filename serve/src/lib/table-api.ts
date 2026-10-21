@@ -98,13 +98,7 @@ export async function getTableCount(room: string, branch?: string): Promise<numb
     ['restaurant_room', '=', room],
     ...(branch ? ([['branch', '=', branch]] as Filter[]) : []),
   ];
-  const rows = (await db.getDocList(DOCTYPES.URY_TABLE, {
-    fields: ['count(name) as count'],
-    filters,
-    limit: 1,
-    asDict: true,
-  } as unknown as Parameters<typeof db.getDocList>[1])) as Array<{ count?: number | string }>;
-  const countValue = rows[0]?.count ?? 0;
+  const countValue = await db.getCount(DOCTYPES.URY_TABLE, filters);
   return typeof countValue === 'number' ? countValue : Number(countValue) || 0;
 }
 export async function getTables(room: string): Promise<Table[]> {
