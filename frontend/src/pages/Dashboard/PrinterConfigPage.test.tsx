@@ -84,9 +84,6 @@ const fullDocs: Record<string, any> = {
   },
   "URY Room:Main Hall": {
     name: "Main Hall",
-    kot_printing: 1,
-    block_takeaway: 0,
-    print_format: "",
     printer_settings: [
       {
         name: "ps-room-1",
@@ -94,16 +91,11 @@ const fullDocs: Record<string, any> = {
         custom_kot_print: 1,
         custom_waiter_print: 0,
         printer: "Kitchen Printer",
-        custom_kot_print_format: "KOT Format",
-        custom_waiter_print_format: "",
       },
     ],
   },
   "URY Room:Terrace": {
     name: "Terrace",
-    kot_printing: 0,
-    block_takeaway: 1,
-    print_format: "",
     printer_settings: [],
   },
 };
@@ -360,7 +352,19 @@ describe("PrinterConfigPage", () => {
     const room = await screen.findByTestId("printer-section-room");
     await waitFor(() => expect(screen.getByDisplayValue("Main Hall")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("switch", { name: "Block Takeaway Orders" }));
+    // Room section no longer renders kot_printing / block_takeaway / Print Format controls.
+    expect(screen.queryByRole("switch", { name: "Enable KOT Printing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Block Takeaway Orders" })).not.toBeInTheDocument();
+    expect(within(room).queryByText("Print Format")).not.toBeInTheDocument();
+    // Clean child table columns only.
+    expect(within(room).queryByText("KOT Format")).not.toBeInTheDocument();
+    expect(within(room).queryByText("Waiter Format")).not.toBeInTheDocument();
+    expect(within(room).getByText("Bill")).toBeInTheDocument();
+    expect(within(room).getByText("KOT Print")).toBeInTheDocument();
+    expect(within(room).getByText("Waiter Print")).toBeInTheDocument();
+    expect(within(room).getByText("Printer")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Room row 1 waiter print" }));
     fireEvent.click(within(room).getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
@@ -369,10 +373,39 @@ describe("PrinterConfigPage", () => {
         expect.objectContaining({
           doctype: "URY Room",
           name: "Main Hall",
-          fieldname: expect.objectContaining({ block_takeaway: 1, kot_printing: 1 }),
+          fieldname: expect.objectContaining({
+            printer_settings: expect.arrayContaining([
+              expect.objectContaining({ name: "ps-room-1", custom_waiter_print: 1 }),
+            ]),
+          }),
         })
       )
     );
+    const setValueCall = mockCall.mock.calls.find((c) => c[0] === "frappe.client.set_value" && c[1]?.doctype === "URY Room");
+    const fieldname = setValueCall?.[1]?.fieldname;
+    expect(fieldname).not.toHaveProperty("kot_printing");
+    expect(fieldname).not.toHaveProperty("block_takeaway");
+    expect(fieldname).not.toHaveProperty("print_format");
+  });
+
+  it("allows adding multiple rows in both Production Unit and Room printer tables", async () => {
+    render(<PrinterConfigPage />);
+    const unit = await screen.findByTestId("printer-section-production-unit");
+    const room = await screen.findByTestId("printer-section-room");
+    await waitFor(() => expect(screen.getByDisplayValue("Kitchen Unit")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("Main Hall")).toBeInTheDocument();
+
+    // Production Unit table starts with one row and supports multiple rows.
+    expect(document.getElementById("unit-printer-row-0")).not.toBeNull();
+    expect(document.getElementById("unit-printer-row-1")).toBeNull();
+    fireEvent.click(within(unit).getByRole("button", { name: /Add Row/ }));
+    expect(document.getElementById("unit-printer-row-1")).not.toBeNull();
+
+    // Room table starts with one row and supports multiple rows.
+    expect(document.getElementById("room-printer-row-0")).not.toBeNull();
+    expect(document.getElementById("room-printer-row-1")).toBeNull();
+    fireEvent.click(within(room).getByRole("button", { name: /Add Row/ }));
+    expect(document.getElementById("room-printer-row-1")).not.toBeNull();
   });
 
   it("does not save a section without changes", async () => {

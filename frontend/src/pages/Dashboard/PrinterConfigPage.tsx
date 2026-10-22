@@ -104,9 +104,6 @@ const emptyUnitForm = () => ({
 });
 
 const emptyRoomForm = () => ({
-  kot_printing: false,
-  block_takeaway: false,
-  print_format: '',
   printer_settings: [] as PrinterRow[],
 });
 
@@ -391,9 +388,6 @@ export const PrinterConfigPage: React.FC = () => {
   const buildRoomForm = useCallback((doc: any) => {
     const rows = Array.isArray(doc.printer_settings) ? doc.printer_settings : [];
     return {
-      kot_printing: doc.kot_printing === 1,
-      block_takeaway: doc.block_takeaway === 1,
-      print_format: doc.print_format || '',
       printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, false) })) as PrinterRow[],
     };
   }, []);
@@ -524,9 +518,6 @@ export const PrinterConfigPage: React.FC = () => {
             doctype: 'URY Room',
             name,
             fieldname: {
-              kot_printing: roomForm.kot_printing ? 1 : 0,
-              block_takeaway: roomForm.block_takeaway ? 1 : 0,
-              print_format: roomForm.print_format,
               printer_settings: roomForm.printer_settings.map(rowForSave),
             },
           });
@@ -616,12 +607,7 @@ export const PrinterConfigPage: React.FC = () => {
   const renderPrinterTable = (
     rows: PrinterRow[],
     onChange: (rows: PrinterRow[]) => void,
-    {
-      withFormats = false,
-      withBlockTakeaway = false,
-      idPrefix,
-      labelPrefix,
-    }: { withFormats?: boolean; withBlockTakeaway?: boolean; idPrefix: string; labelPrefix: string }
+    { idPrefix, labelPrefix }: { idPrefix: string; labelPrefix: string }
   ) => (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -648,15 +634,6 @@ export const PrinterConfigPage: React.FC = () => {
                 <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">KOT Print</th>
                 <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">Waiter Print</th>
                 <th className="text-left font-medium text-muted-foreground px-3 py-2 min-w-[180px]">Printer</th>
-                {withFormats && (
-                  <>
-                    <th className="text-left font-medium text-muted-foreground px-3 py-2 min-w-[160px]">KOT Format</th>
-                    <th className="text-left font-medium text-muted-foreground px-3 py-2 min-w-[160px]">Waiter Format</th>
-                  </>
-                )}
-                {withBlockTakeaway && (
-                  <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">Block Takeaway KOT</th>
-                )}
                 <th className="w-10 px-2 py-2" aria-label="actions" />
               </tr>
             </thead>
@@ -700,44 +677,6 @@ export const PrinterConfigPage: React.FC = () => {
                       options={withEmpty(options.printers, 'Select Printer')}
                     />
                   </td>
-                  {withFormats && (
-                    <>
-                      <td className="px-3 py-2">
-                        <SearchableSelect
-                          id={`${idPrefix}-kot-format-row-${idx}`}
-                          value={row.custom_kot_print_format}
-                          onChange={(_, value) =>
-                            onChange(rows.map((r, i) => (i === idx ? { ...r, custom_kot_print_format: value } : r)))
-                          }
-                          options={withEmpty(options.printFormats, 'Select KOT Format')}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <SearchableSelect
-                          id={`${idPrefix}-waiter-format-row-${idx}`}
-                          value={row.custom_waiter_print_format}
-                          onChange={(_, value) =>
-                            onChange(rows.map((r, i) => (i === idx ? { ...r, custom_waiter_print_format: value } : r)))
-                          }
-                          options={withEmpty(options.printFormats, 'Select Waiter Format')}
-                        />
-                      </td>
-                    </>
-                  )}
-                  {withBlockTakeaway && (
-                    <td className="px-3 py-2">
-                      <Switch
-                        aria-label={`${labelPrefix} row ${idx + 1} block takeaway KOT`}
-                        checked={row.custom_block_takeaway_kot === 1}
-                        disabled={row.custom_kot_print !== 1}
-                        onCheckedChange={(checked) =>
-                          onChange(
-                            rows.map((r, i) => (i === idx ? { ...r, custom_block_takeaway_kot: checked ? 1 : 0 } : r))
-                          )
-                        }
-                      />
-                    </td>
-                  )}
                   <td className="px-2 py-2">
                     <Button
                       type="button"
@@ -1020,8 +959,6 @@ export const PrinterConfigPage: React.FC = () => {
                 {unitForm.department && <Badge variant="info">{unitForm.department}</Badge>}
               </div>
               {renderPrinterTable(unitForm.printer_settings, (rows) => setUnitForm((prev) => ({ ...prev, printer_settings: rows })), {
-                withFormats: true,
-                withBlockTakeaway: true,
                 idPrefix: 'unit',
                 labelPrefix: 'Unit',
               })}
@@ -1067,44 +1004,7 @@ export const PrinterConfigPage: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-foreground">Enable KOT Printing</p>
-                    <p className="text-xs text-muted-foreground">Fire KOTs to this room's printers when orders are placed.</p>
-                  </div>
-                  <Switch
-                    id="kot_printing"
-                    aria-label="Enable KOT Printing"
-                    checked={roomForm.kot_printing}
-                    onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, kot_printing: checked }))}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-foreground">Block Takeaway Orders</p>
-                    <p className="text-xs text-muted-foreground">Prevent takeaway and delivery orders from printing through this room.</p>
-                  </div>
-                  <Switch
-                    id="block_takeaway"
-                    aria-label="Block Takeaway Orders"
-                    checked={roomForm.block_takeaway}
-                    onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, block_takeaway: checked }))}
-                  />
-                </div>
-                <div className="max-w-md">
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
-                  <SearchableSelect
-                    id="room_print_format"
-                    value={roomForm.print_format}
-                    onChange={(_, value) => setRoomForm((prev) => ({ ...prev, print_format: value }))}
-                    options={withEmpty(options.printFormats, 'Select Print Format')}
-                  />
-                </div>
-              </div>
-
               {renderPrinterTable(roomForm.printer_settings, (rows) => setRoomForm((prev) => ({ ...prev, printer_settings: rows })), {
-                withFormats: true,
                 idPrefix: 'room',
                 labelPrefix: 'Room',
               })}
