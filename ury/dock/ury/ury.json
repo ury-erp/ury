@@ -8,13 +8,61 @@
   {
    "added": 0,
    "hidden": 0,
-   "icon": "utensils",
+   "icon": "layout-dashboard",
    "link_to": "URY",
    "link_type": "Sidebar",
-   "title": "URY"
+   "title": "Home"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "book-open",
+   "link_to": "URY Menu",
+   "link_type": "Sidebar",
+   "title": "Menu & Kitchen"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "store",
+   "link_to": "URY Restaurant",
+   "link_type": "Sidebar",
+   "title": "Restaurant"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "package",
+   "link_to": "URY Stock",
+   "link_type": "Sidebar",
+   "title": "Stock & Buying"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "wallet",
+   "link_to": "URY Money",
+   "link_type": "Sidebar",
+   "title": "Money"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "users",
+   "link_to": "URY Team",
+   "link_type": "Sidebar",
+   "title": "Team"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "shield-check",
+   "link_to": "URY Records",
+   "link_type": "Sidebar",
+   "title": "Records & Settings"
   }
  ],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-10-24 06:12:00.000000",
  "modified_by": "Administrator",
  "name": "ury",
  "owner": "Administrator",

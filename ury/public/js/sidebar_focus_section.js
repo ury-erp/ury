@@ -10,7 +10,8 @@
 	function focus_current_section() {
 		try {
 			const sidebar = frappe.app && frappe.app.sidebar;
-			if (!sidebar || sidebar.current_module !== "URY") return;
+			const cur = sidebar && String(sidebar.current_module || "");
+			if (!cur || !(cur === "URY" || cur.indexOf("URY ") === 0)) return;
 			document.querySelectorAll(".sidebar-item-container.section-item").forEach((section) => {
 				const nested = section.querySelector(":scope > .nested-container");
 				const header = section.querySelector(":scope > .standard-sidebar-item");
