@@ -222,6 +222,7 @@
     "dine_in_restricted": "Dine In is not available for your role",
     "order_modified": "This order has been modified. Please reload the page to retrieve the latest edits.",
     "order_sync_failed": "Could not sync this order. Please reload the page and try again.",
+    "payment_failed": "Payment could not be completed. Please try again.",
     "posOpening": {
       "permission_denied": "You don't have permission to open a session. Contact your manager.",
       "daily_close_pending": "Yesterday's session was never closed. Contact your manager to close it before opening today.",

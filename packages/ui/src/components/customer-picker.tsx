@@ -43,6 +43,7 @@ export interface CustomerPickerProps {
   disabled?: boolean
   labels: CustomerPickerLabels
   favourites?: Array<{ name: string; onSelect: () => void }>
+  resultsHeader?: string
 }
 
 function prefillFromQuery(query: string): { name: string; phone: string } {
@@ -62,6 +63,7 @@ export function CustomerPicker({
   disabled,
   labels,
   favourites,
+  resultsHeader,
 }: CustomerPickerProps) {
   const [query, setQuery] = useState('')
   const [listOpen, setListOpen] = useState(false)
@@ -187,6 +189,11 @@ export function CustomerPicker({
               )}
               {!searching && !searchError && query.trim() && results.length === 0 && (
                 <p className="p-4 text-center text-xs text-gray-500">{labels.noResults}</p>
+              )}
+              {!searching && resultsHeader && !query.trim() && results.length > 0 && (
+                <div className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+                  {resultsHeader}
+                </div>
               )}
               {!searching &&
                 results.map((customer, idx) => (
