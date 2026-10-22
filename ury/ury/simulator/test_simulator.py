@@ -884,3 +884,23 @@ class TestDepartmentSafetyStockSharedWarehouse(FrappeTestCase):
 				{"TMT": 7.0},
 				"2030-01-01",
 			)
+
+	def test_ensure_transfer_material_requests_generates_supplementary_mr(self):
+		from ury.ury.simulator import manufacturing_runner
+
+		production_plans = ["MFG-PP-2026-00087", "MFG-PP-2026-00088"]
+
+		def fake_generate(pp_name):
+			if pp_name == "MFG-PP-2026-00087":
+				return {"production_plan": pp_name, "material_request": "MAT-MR-2026-00099"}
+			return {"production_plan": pp_name, "material_request": None}
+
+		with patch.object(
+			manufacturing_runner,
+			"generate_transfer_material_request_for_production_plan",
+			side_effect=fake_generate,
+		) as mock_gen:
+			mrs = manufacturing_runner._ensure_transfer_material_requests(production_plans)
+			self.assertEqual(mrs, ["MAT-MR-2026-00099"])
+			self.assertEqual(mock_gen.call_count, 2)
+

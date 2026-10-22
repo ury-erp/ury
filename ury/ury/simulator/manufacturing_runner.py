@@ -36,6 +36,9 @@ from ury.ury.api.ury_sales_plan_production_plan import (
 	PP_DEPARTMENT_FIELD,
 	create_or_get_department_production_plans,
 )
+from ury.ury.api.ury_production_transfer import (
+	generate_transfer_material_request_for_production_plan,
+)
 from ury.ury.api.ury_production_settings import get_store_warehouse
 from ury.ury.api.ury_production_readiness import compute_readiness
 from ury.ury.api.ury_prepare_production import (
@@ -423,6 +426,8 @@ def _replenish_store(sales_plan, production_plans, store_warehouse, company, bus
 	department_receipts = _ensure_department_safety_stock(buckets, company, business_date)
 	store_receipts.extend(department_receipts)
 
+	transfer_mrs = _ensure_transfer_material_requests(production_plans)
+
 	return {
 		"readiness_blockers": readiness.get("blockers") or [],
 		"compile_blockers": compile_blockers,
@@ -430,7 +435,34 @@ def _replenish_store(sales_plan, production_plans, store_warehouse, company, bus
 		"stocked": dict(stocked),
 		"purchase_fulfilled": purchase_fulfilled,
 		"store_receipts": store_receipts,
+		"transfer_material_requests": transfer_mrs,
 	}
+
+
+def _ensure_transfer_material_requests(production_plans):
+	"""Ensure every department plan has its submitted Transfer Material Request.
+
+	When a Sales Plan is re-simulated or resumed, its department Production
+	Plans already exist, bypassing ``create_or_get_department_production_plans``.
+	If the department warehouse has shortages (or if an earlier transfer was
+	already consumed), ``execute_store_to_department_transfer`` strictly requires
+	a submitted Transfer Material Request linked to the plan.
+
+	``generate_transfer_material_request_for_production_plan`` nets outstanding
+	transfers and only creates an MR when unallocated department shortage exists,
+	so calling it idempotently here is completely safe and leak-free.
+	"""
+	generated = []
+	for pp_name in production_plans:
+		try:
+			res = generate_transfer_material_request_for_production_plan(pp_name)
+			if res and res.get("material_request"):
+				generated.append(res["material_request"])
+		except Exception as exc:
+			frappe.logger().warning(
+				f"URY UAT Simulator: supplementary transfer MR generation failed for {pp_name}: {exc}"
+			)
+	return generated
 
 
 def _ensure_department_safety_stock(buckets, company, business_date):
