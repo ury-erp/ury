@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\": \"fn01a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fs00d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 4}}, {\"id\": \"fs01d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 4}}, {\"id\": \"fs02d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fs03d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Commission Settings\", \"col\": 4}}, {\"id\": \"fs04d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Entry\", \"col\": 4}}, {\"id\": \"fs05d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 4}}, {\"id\": \"fn02a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"fn00g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Sales Today\", \"col\": 4}}, {\"id\": \"fn01g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"fn02g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Unsettled Bills\", \"col\": 4}}, {\"id\": \"fsp0a1b2c3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fc00j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"fc01j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Commissions and Discounts\", \"col\": 4}}, {\"id\": \"fc02j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}, {\"id\": \"fc03j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "content": "[{\"id\": \"fn01a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fs00d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 4}}, {\"id\": \"fs01d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 4}}, {\"id\": \"fs02d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fs03d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Commission Settings\", \"col\": 4}}, {\"id\": \"fs04d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Entry\", \"col\": 4}}, {\"id\": \"fs05d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 4}}, {\"id\": \"fn02a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"fn00g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Sales Today\", \"col\": 4}}, {\"id\": \"fn01g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"fn02g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fsp0a1b2c3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fc00j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"fc01j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Commissions and Discounts\", \"col\": 4}}, {\"id\": \"fc02j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}, {\"id\": \"fc03j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -26,7 +26,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Daily P and L",
+   "label": "Daily P&L",
    "link_count": 0,
    "link_to": "URY Daily P and L",
    "link_type": "DocType",
@@ -36,7 +36,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Cost Variance Snapshot",
+   "label": "Cost Variance Snapshot",
    "link_count": 0,
    "link_to": "URY Cost Variance Snapshot",
    "link_type": "DocType",
@@ -133,7 +133,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Report Settings",
+   "label": "Report Settings",
    "link_count": 0,
    "link_to": "URY Report Settings",
    "link_type": "DocType",
@@ -143,7 +143,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Commission Settings",
+   "label": "Commission Settings",
    "link_count": 0,
    "link_to": "URY Commission Settings",
    "link_type": "DocType",
@@ -151,21 +151,21 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 00:00:00.000000",
+ "modified": "2026-10-23 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Finance",
  "number_cards": [
   {
-   "label": "URY Sales Today",
+   "label": "Sales Today",
    "number_card_name": "URY Sales Today"
   },
   {
-   "label": "URY Cancelled Bills Today",
+   "label": "Cancelled Bills Today",
    "number_card_name": "URY Cancelled Bills Today"
   },
   {
-   "label": "URY Unsettled Bills",
+   "label": "Unsettled Bills",
    "number_card_name": "URY Unsettled Bills"
   }
  ],
@@ -207,7 +207,7 @@
    "doc_view": ""
   },
   {
-   "label": "URY Commission Settings",
+   "label": "Commission Settings",
    "link_to": "URY Commission Settings",
    "type": "DocType",
    "doc_view": ""

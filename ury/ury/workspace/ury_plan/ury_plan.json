@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\":\"346b81a32e\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Frequently used</b></span>\",\"col\":12}},{\"id\":\"f7add26e99\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Sales Plan\",\"col\":3}},{\"id\":\"ccd34db6ef\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Bulk Production\",\"col\":3}},{\"id\":\"55ed1bf015\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Item Production Configuration\",\"col\":3}},{\"id\":\"a8b3d68a95\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Production Settings\",\"col\":3}},{\"id\":\"1952a01898\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"8ee0726ff5\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"f7ba46692f\",\"type\":\"card\",\"data\":{\"card_name\":\"Production Configuration\",\"col\":4}},{\"id\":\"b8d6545b38\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
+ "content": "[{\"id\": \"346b81a32e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"f7add26e99\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Plan\", \"col\": 3}}, {\"id\": \"ccd34db6ef\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Bulk Production\", \"col\": 3}}, {\"id\": \"55ed1bf015\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Item Production Configuration\", \"col\": 3}}, {\"id\": \"a8b3d68a95\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Production Settings\", \"col\": 3}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"8ee0726ff5\", \"type\": \"card\", \"data\": {\"card_name\": \"Planning\", \"col\": 4}}, {\"id\": \"f7ba46692f\", \"type\": \"card\", \"data\": {\"card_name\": \"Production Configuration\", \"col\": 4}}, {\"id\": \"b8d6545b38\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -25,7 +25,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Sales Plan",
+   "label": "Sales Plan",
    "link_count": 0,
    "link_to": "URY Sales Plan",
    "link_type": "DocType",
@@ -54,7 +54,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Item Production Configuration",
+   "label": "Item Production Configuration",
    "link_count": 0,
    "link_to": "URY Item Production Configuration",
    "link_type": "DocType",
@@ -73,7 +73,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Production Settings",
+   "label": "Production Settings",
    "link_count": 0,
    "link_to": "URY Production Settings",
    "link_type": "DocType",
@@ -81,7 +81,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 20:00:00.000000",
+ "modified": "2026-10-23 02:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Plan",
@@ -101,7 +101,7 @@
  "sequence_id": 32.0,
  "shortcuts": [
   {
-   "label": "URY Sales Plan",
+   "label": "Sales Plan",
    "link_to": "URY Sales Plan",
    "type": "DocType",
    "doc_view": "List"
@@ -113,13 +113,13 @@
    "doc_view": "List"
   },
   {
-   "label": "URY Item Production Configuration",
+   "label": "Item Production Configuration",
    "link_to": "URY Item Production Configuration",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Production Settings",
+   "label": "Production Settings",
    "link_to": "URY Production Settings",
    "type": "DocType",
    "doc_view": "List"

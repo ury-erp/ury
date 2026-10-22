@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\":\"346b81a32e\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Frequently used</b></span>\",\"col\":12}},{\"id\":\"80bf74d531\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY KOT\",\"col\":3}},{\"id\":\"a0b2b4b9d0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Table\",\"col\":3}},{\"id\":\"08c0f7de62\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sub POS Closing\",\"col\":3}},{\"id\":\"6a15ce7f3e\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Ordering Session\",\"col\":3}},{\"id\":\"705184c3b4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Service Request\",\"col\":3}},{\"id\":\"280f77bd10\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"URY Room\",\"col\":3}},{\"id\":\"1952a01898\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"160ea63b1c\",\"type\":\"card\",\"data\":{\"card_name\":\"Kitchen and Billing\",\"col\":4}},{\"id\":\"fa57271f2c\",\"type\":\"card\",\"data\":{\"card_name\":\"Floor and Service\",\"col\":4}},{\"id\":\"b8d6545b38\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
+ "content": "[{\"id\": \"346b81a32e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"80bf74d531\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"KOT\", \"col\": 3}}, {\"id\": \"a0b2b4b9d0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Table\", \"col\": 3}}, {\"id\": \"08c0f7de62\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sub POS Closing\", \"col\": 3}}, {\"id\": \"6a15ce7f3e\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ordering Session\", \"col\": 3}}, {\"id\": \"705184c3b4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Service Request\", \"col\": 3}}, {\"id\": \"280f77bd10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Room\", \"col\": 3}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"160ea63b1c\", \"type\": \"card\", \"data\": {\"card_name\": \"Kitchen and Billing\", \"col\": 4}}, {\"id\": \"fa57271f2c\", \"type\": \"card\", \"data\": {\"card_name\": \"Floor and Service\", \"col\": 4}}, {\"id\": \"b8d6545b38\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -25,7 +25,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY KOT",
+   "label": "KOT",
    "link_count": 0,
    "link_to": "URY KOT",
    "link_type": "DocType",
@@ -45,7 +45,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Payment Terminal",
+   "label": "Payment Terminal",
    "link_count": 0,
    "link_to": "URY Payment Terminal",
    "link_type": "DocType",
@@ -64,7 +64,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Table",
+   "label": "Table",
    "link_count": 0,
    "link_to": "URY Table",
    "link_type": "DocType",
@@ -74,7 +74,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Room",
+   "label": "Room",
    "link_count": 0,
    "link_to": "URY Room",
    "link_type": "DocType",
@@ -84,7 +84,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Ordering Session",
+   "label": "Ordering Session",
    "link_count": 0,
    "link_to": "URY Ordering Session",
    "link_type": "DocType",
@@ -94,7 +94,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Service Request",
+   "label": "Service Request",
    "link_count": 0,
    "link_to": "URY Service Request",
    "link_type": "DocType",
@@ -113,7 +113,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Order",
+   "label": "Order",
    "link_count": 0,
    "link_to": "URY Order",
    "link_type": "DocType",
@@ -121,7 +121,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 20:00:00.000000",
+ "modified": "2026-10-23 02:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Operate",
@@ -147,13 +147,13 @@
  "sequence_id": 33.0,
  "shortcuts": [
   {
-   "label": "URY KOT",
+   "label": "KOT",
    "link_to": "URY KOT",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Table",
+   "label": "Table",
    "link_to": "URY Table",
    "type": "DocType",
    "doc_view": "List"
@@ -165,19 +165,19 @@
    "doc_view": "List"
   },
   {
-   "label": "URY Ordering Session",
+   "label": "Ordering Session",
    "link_to": "URY Ordering Session",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Service Request",
+   "label": "Service Request",
    "link_to": "URY Service Request",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Room",
+   "label": "Room",
    "link_to": "URY Room",
    "type": "DocType",
    "doc_view": "List"

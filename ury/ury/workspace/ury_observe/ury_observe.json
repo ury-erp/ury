@@ -2,11 +2,11 @@
  "app": "ury",
  "charts": [
   {
-   "chart_name": "URY Sales Trend",
-   "label": "URY Sales Trend"
+   "chart_name": "Daily Sales Trend",
+   "label": "Daily Sales Trend"
   }
  ],
- "content": "[{\"id\": \"886c6cd235\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"f957575998\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Daily P and L\", \"col\": 3}}, {\"id\": \"93cba406d3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Yield Check\", \"col\": 3}}, {\"id\": \"47052fac06\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Food Cost and Margin Report\", \"col\": 3}}, {\"id\": \"2121e18233\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"RevPASH Report\", \"col\": 3}}, {\"id\": \"710b22a2b2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Table Turnaround Delay\", \"col\": 3}}, {\"id\": \"7a3a4b0425\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"APC\", \"col\": 3}}, {\"id\": \"a1bb8b1d27\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"924c1c6660\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Open KOTs\", \"col\": 4}}, {\"id\": \"fe502ab291\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Wastage Today\", \"col\": 4}}, {\"id\": \"fyc7a1b2c3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Failed Yield Checks\", \"col\": 4}}, {\"id\": \"0adeb96b31\", \"type\": \"chart\", \"data\": {\"chart_name\": \"URY Sales Trend\", \"col\": 12}}, {\"id\": \"f184056134\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fbf2d5ce38\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"81b1b911d3\", \"type\": \"card\", \"data\": {\"card_name\": \"Service & Yield\", \"col\": 4}}, {\"id\": \"2908c9c8d5\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "content": "[{\"id\": \"886c6cd235\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"f957575998\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daily P&L\", \"col\": 3}}, {\"id\": \"93cba406d3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Yield Check\", \"col\": 3}}, {\"id\": \"47052fac06\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Food Cost and Margin Report\", \"col\": 3}}, {\"id\": \"2121e18233\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"RevPASH Report\", \"col\": 3}}, {\"id\": \"710b22a2b2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Table Turnaround Delay\", \"col\": 3}}, {\"id\": \"7a3a4b0425\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"APC\", \"col\": 3}}, {\"id\": \"a1bb8b1d27\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"924c1c6660\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"fe502ab291\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Wastage Today\", \"col\": 4}}, {\"id\": \"fyc7a1b2c3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Failed Yield Checks\", \"col\": 4}}, {\"id\": \"0adeb96b31\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Daily Sales Trend\", \"col\": 12}}, {\"id\": \"f184056134\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fbf2d5ce38\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"81b1b911d3\", \"type\": \"card\", \"data\": {\"card_name\": \"Service & Yield\", \"col\": 4}}, {\"id\": \"2908c9c8d5\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -31,7 +31,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Daily P and L",
+   "label": "Daily P&L",
    "link_count": 0,
    "link_to": "URY Daily P and L",
    "link_type": "DocType",
@@ -70,7 +70,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Yield Check",
+   "label": "Yield Check",
    "link_count": 0,
    "link_to": "URY Yield Check",
    "link_type": "DocType",
@@ -117,21 +117,21 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 20:00:00.000000",
+ "modified": "2026-10-23 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Observe",
  "number_cards": [
   {
-   "label": "URY Open KOTs",
+   "label": "Open KOTs",
    "number_card_name": "URY Open KOTs"
   },
   {
-   "label": "URY Wastage Today",
+   "label": "Wastage Today",
    "number_card_name": "URY Wastage Today"
   },
   {
-   "label": "URY Failed Yield Checks",
+   "label": "Failed Yield Checks",
    "number_card_name": "URY Failed Yield Checks"
   }
  ],
@@ -149,13 +149,13 @@
  "sequence_id": 34.0,
  "shortcuts": [
   {
-   "label": "URY Daily P and L",
+   "label": "Daily P&L",
    "link_to": "URY Daily P and L",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Yield Check",
+   "label": "Yield Check",
    "link_to": "URY Yield Check",
    "type": "DocType",
    "doc_view": "List"

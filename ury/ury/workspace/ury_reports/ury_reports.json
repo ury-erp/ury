@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\":\"4b4d1a3353\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Frequently used</b></span>\",\"col\":12}},{\"id\":\"46db431bea\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Today's Sales\",\"col\":3}},{\"id\":\"3684644271\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Daywise Sales\",\"col\":3}},{\"id\":\"cc3b821247\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Item Wise Sales\",\"col\":3}},{\"id\":\"8753c50bc6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unsettled Bills\",\"col\":3}},{\"id\":\"c656a012f3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Cancelled Invoices\",\"col\":3}},{\"id\":\"db64d6879c\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Wastage and Damage Report\",\"col\":3}},{\"id\":\"da534503d6\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"b32f8c68e2\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales\",\"col\":4}},{\"id\":\"134a84a3a1\",\"type\":\"card\",\"data\":{\"card_name\":\"Customers & Items\",\"col\":4}},{\"id\":\"bce3a82ab4\",\"type\":\"card\",\"data\":{\"card_name\":\"Employees & Ops\",\"col\":4}},{\"id\":\"91aec4dc63\",\"type\":\"card\",\"data\":{\"card_name\":\"Financial\",\"col\":4}},{\"id\":\"d2df580ef1\",\"type\":\"card\",\"data\":{\"card_name\":\"Stock & Yield\",\"col\":4}},{\"id\":\"6fe2106e4c\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
+ "content": "[{\"id\": \"4b4d1a3353\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"46db431bea\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Today's Sales\", \"col\": 3}}, {\"id\": \"3684644271\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daywise Sales\", \"col\": 3}}, {\"id\": \"cc3b821247\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Item Wise Sales\", \"col\": 3}}, {\"id\": \"8753c50bc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 3}}, {\"id\": \"c656a012f3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 3}}, {\"id\": \"db64d6879c\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Wastage and Damage Report\", \"col\": 3}}, {\"id\": \"da534503d6\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"b32f8c68e2\", \"type\": \"card\", \"data\": {\"card_name\": \"Sales\", \"col\": 4}}, {\"id\": \"134a84a3a1\", \"type\": \"card\", \"data\": {\"card_name\": \"Customers & Items\", \"col\": 4}}, {\"id\": \"bce3a82ab4\", \"type\": \"card\", \"data\": {\"card_name\": \"Employees & Ops\", \"col\": 4}}, {\"id\": \"91aec4dc63\", \"type\": \"card\", \"data\": {\"card_name\": \"Financial\", \"col\": 4}}, {\"id\": \"d2df580ef1\", \"type\": \"card\", \"data\": {\"card_name\": \"Stock & Yield\", \"col\": 4}}, {\"id\": \"6fe2106e4c\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -301,7 +301,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Report Settings",
+   "label": "Report Settings",
    "link_count": 0,
    "link_to": "URY Report Settings",
    "link_type": "DocType",
@@ -309,7 +309,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-23 02:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Reports",

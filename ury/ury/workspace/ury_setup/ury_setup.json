@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\": \"8b2215f42f\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"e4ef7c16fb\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch\", \"col\": 3}}, {\"id\": \"914f050348\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Restaurant\", \"col\": 3}}, {\"id\": \"339bd666b5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Profile\", \"col\": 3}}, {\"id\": \"3d9fe5b362\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Menu\", \"col\": 3}}, {\"id\": \"64a23b96ea\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Table\", \"col\": 3}}, {\"id\": \"8b205a7550\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Production Unit\", \"col\": 3}}, {\"id\": \"3cc0eb2dcb\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"15877b29e7\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"15d2592f5b\", \"type\": \"card\", \"data\": {\"card_name\": \"Production & Reporting\", \"col\": 4}}, {\"id\": \"135eb6782c\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "content": "[{\"id\": \"8b2215f42f\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"e4ef7c16fb\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch\", \"col\": 3}}, {\"id\": \"914f050348\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Restaurant\", \"col\": 3}}, {\"id\": \"339bd666b5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Profile\", \"col\": 3}}, {\"id\": \"3d9fe5b362\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Menu\", \"col\": 3}}, {\"id\": \"64a23b96ea\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Table\", \"col\": 3}}, {\"id\": \"8b205a7550\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Production Unit\", \"col\": 3}}, {\"id\": \"3cc0eb2dcb\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"15877b29e7\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"15d2592f5b\", \"type\": \"card\", \"data\": {\"card_name\": \"Production & Reporting\", \"col\": 4}}, {\"id\": \"135eb6782c\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -36,7 +36,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Restaurant",
+   "label": "Restaurant",
    "link_count": 0,
    "link_to": "URY Restaurant",
    "link_type": "DocType",
@@ -56,7 +56,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Menu",
+   "label": "Menu",
    "link_count": 0,
    "link_to": "URY Menu",
    "link_type": "DocType",
@@ -66,7 +66,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Menu Course",
+   "label": "Menu Course",
    "link_count": 0,
    "link_to": "URY Menu Course",
    "link_type": "DocType",
@@ -76,7 +76,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Table",
+   "label": "Table",
    "link_count": 0,
    "link_to": "URY Table",
    "link_type": "DocType",
@@ -86,7 +86,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Room",
+   "label": "Room",
    "link_count": 0,
    "link_to": "URY Room",
    "link_type": "DocType",
@@ -115,7 +115,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Production Unit",
+   "label": "Production Unit",
    "link_count": 0,
    "link_to": "URY Production Unit",
    "link_type": "DocType",
@@ -125,7 +125,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Report Settings",
+   "label": "Report Settings",
    "link_count": 0,
    "link_to": "URY Report Settings",
    "link_type": "DocType",
@@ -144,7 +144,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Production Settings",
+   "label": "Production Settings",
    "link_count": 0,
    "link_to": "URY Production Settings",
    "link_type": "DocType",
@@ -154,7 +154,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Commission Settings",
+   "label": "Commission Settings",
    "link_count": 0,
    "link_to": "URY Commission Settings",
    "link_type": "DocType",
@@ -164,7 +164,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY AI Settings",
+   "label": "AI Settings",
    "link_count": 0,
    "link_to": "URY AI Settings",
    "link_type": "DocType",
@@ -174,7 +174,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Feature Flags",
+   "label": "Feature Flags",
    "link_count": 0,
    "link_to": "URY Feature Flags",
    "link_type": "DocType",
@@ -192,7 +192,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 00:00:00.000000",
+ "modified": "2026-10-23 02:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Setup",
@@ -217,7 +217,7 @@
    "doc_view": "List"
   },
   {
-   "label": "URY Restaurant",
+   "label": "Restaurant",
    "link_to": "URY Restaurant",
    "type": "DocType",
    "doc_view": "List"
@@ -229,19 +229,19 @@
    "doc_view": "List"
   },
   {
-   "label": "URY Menu",
+   "label": "Menu",
    "link_to": "URY Menu",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Table",
+   "label": "Table",
    "link_to": "URY Table",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "URY Production Unit",
+   "label": "Production Unit",
    "link_to": "URY Production Unit",
    "type": "DocType",
    "doc_view": "List"
