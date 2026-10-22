@@ -12,12 +12,13 @@
  * - erpnext/accounts/doctype/pos_closing_entry/pos_closing_entry.py
  *   (get_cashiers, get_pos_invoices)
  *
- * Note: the standard ERPNext POS Closing Entry module exposes a whitelisted
- * `get_pos_invoices(start, end, pos_profile, user)` -- there is no separate
- * `get_invoices` method, and it returns the same "list of full POS Invoice
- * dicts" shape as the Sub POS Closing method (POSClosingInvoice[]), not a
- * {invoices, payments, taxes} object. Both are wrapped below using the same
- * POSClosingInvoice[] return type.
+ * Note: ERPNext v16's `get_invoices(start, end, pos_profile, user)` on the
+ * POS Closing Entry module returns a pre-aggregated
+ * {invoices, payments, taxes} object: `payments` is already grouped by
+ * mode_of_payment with change_amount already deducted server-side, and
+ * payment/tax rows carry no `parent` field. Older/Sub POS Closing paths
+ * return a plain list of full POS Invoice dicts (POSClosingInvoice[]).
+ * getMainCashierPosInvoices therefore returns POSClosingData | POSClosingInvoice[].
  */
 
 import { call, db } from '@ury/core';
@@ -53,6 +54,18 @@ export interface POSClosingInvoice {
   account_for_change_amount: string;
   taxes: POSClosingTax[];
   payments: POSClosingPayment[];
+}
+
+/**
+ * Pre-aggregated response returned by ERPNext v16's
+ * pos_closing_entry.get_invoices: invoice dicts plus payments already
+ * grouped by mode_of_payment (change_amount already deducted server-side)
+ * and aggregated taxes.
+ */
+export interface POSClosingData {
+  invoices: POSClosingInvoice[];
+  payments?: POSClosingPayment[];
+  taxes?: POSClosingTax[];
 }
 
 /**
@@ -232,35 +245,29 @@ export async function getSubCashierPosInvoices(
 }
 
 /**
- * Main-cashier / single-cashier path: returns the full POS Invoice dicts
- * (with taxes and payments) for a cashier within a time window.
- * Wraps erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices(start, end, pos_profile, user).
+ * Main-cashier / single-cashier path.
+ * Wraps erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_invoices(start, end, pos_profile, user).
  *
- * This is the standard ERPNext whitelisted method referenced as
- * `get_invoices` in the task brief; the actual method name is
- * `get_pos_invoices` and it returns the same POSClosingInvoice[] shape as
- * the Sub POS Closing variant above (not a separate
- * {invoices, payments, taxes} object).
+ * ERPNext v16 returns {invoices, payments, taxes} with payments pre-aggregated
+ * by mode_of_payment (change_amount already deducted server-side). Legacy
+ * responses that are a bare array of invoice dicts are returned as-is.
  */
 export async function getMainCashierPosInvoices(
   start: string,
   end: string,
   posProfile: string,
   user: string
-): Promise<POSClosingInvoice[]> {
+): Promise<POSClosingData | POSClosingInvoice[]> {
   try {
-    const response = await call.get<{ message: POSClosingInvoice[] }>(
+    const response = await call.get<{ message: POSClosingData | POSClosingInvoice[] }>(
       'erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_invoices',
       { start, end, pos_profile: posProfile, user }
     );
 
-    let msg = response.message as any;
-    if (msg && msg.invoices && !Array.isArray(msg)) {
-      let invMap: any = {};
-      msg.invoices.forEach((i: any) => { i.payments = []; i.taxes = []; invMap[i.name] = i; });
-      if (msg.payments) msg.payments.forEach((p: any) => { if (invMap[p.parent]) invMap[p.parent].payments.push(p); });
-      if (msg.taxes) msg.taxes.forEach((t: any) => { if (invMap[t.parent]) invMap[t.parent].taxes.push(t); });
-      return msg.invoices as POSClosingInvoice[];
+    const msg = response.message;
+    if (msg && !Array.isArray(msg) && Array.isArray((msg as POSClosingData).invoices)) {
+      const data = msg as POSClosingData;
+      return { invoices: data.invoices, payments: data.payments, taxes: data.taxes };
     }
 
     return msg as POSClosingInvoice[];

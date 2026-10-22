@@ -27,6 +27,7 @@ import {
   submitPosClosingEntry,
   type OpenPosOpeningEntry,
   type POSClosingInvoice,
+  type POSClosingPayment,
   type ClosingPaymentSummary,
 } from '../lib/pos-closing-api';
 
@@ -132,13 +133,15 @@ interface AggregatedTotals {
 
 /**
  * Aggregates raw POS Invoice dicts into closing totals and per-mode expected
- * amounts, faithfully porting the logic in
- * ury/ury/doctype/sub_pos_closing/sub_pos_closing.js (refresh_payments /
- * set_form_data): sums grand_total/net_total/total_qty, and for each
- * payment subtracts the invoice's change_amount when the payment account
- * matches account_for_change_amount before accumulating by mode_of_payment.
+ * amounts. When `paymentsByMode` is provided (ERPNext v16 main-cashier path),
+ * those payments are already pre-aggregated server-side by mode_of_payment
+ * with change_amount already deducted, so they are summed verbatim. When it
+ * is absent (sub-cashier path / legacy invoice-list shape), expected amounts
+ * are accumulated per-invoice, subtracting the invoice's change_amount when
+ * the payment account matches account_for_change_amount (mirroring
+ * sub_pos_closing.js refresh_payments / set_form_data).
  */
-function aggregateInvoices(invoices: POSClosingInvoice[]): {
+function aggregateInvoices(invoices: POSClosingInvoice[], paymentsByMode?: POSClosingPayment[]): {
   totals: AggregatedTotals;
   expectedByMode: Record<string, number>;
 } {
@@ -150,15 +153,24 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
     totals.netTotal += Number(invoice.net_total) || 0;
     totals.totalQty += Number(invoice.total_qty) || 0;
 
-    (invoice.payments || []).forEach((payment) => {
-      let amount = Number(payment.amount) || 0;
-      if (payment.account === invoice.account_for_change_amount) {
-        amount -= Number(invoice.change_amount) || 0;
-      }
-      expectedByMode[payment.mode_of_payment] =
-        (expectedByMode[payment.mode_of_payment] || 0) + amount;
-    });
+    if (!paymentsByMode) {
+      (invoice.payments || []).forEach((payment) => {
+        let amount = Number(payment.amount) || 0;
+        if (payment.account === invoice.account_for_change_amount) {
+          amount -= Number(invoice.change_amount) || 0;
+        }
+        expectedByMode[payment.mode_of_payment] =
+          (expectedByMode[payment.mode_of_payment] || 0) + amount;
+      });
+    }
   });
+
+  if (paymentsByMode) {
+    paymentsByMode.forEach((payment) => {
+      expectedByMode[payment.mode_of_payment] =
+        (expectedByMode[payment.mode_of_payment] || 0) + (Number(payment.amount) || 0);
+    });
+  }
 
   return { totals, expectedByMode };
 }
@@ -170,24 +182,27 @@ function buildRows(
   const rows = new Map<string, ClosingPaymentSummary>();
 
   openingBalances.forEach((detail) => {
+    const opening = Number(detail.opening_amount) || 0;
     rows.set(detail.mode_of_payment, {
       mode_of_payment: detail.mode_of_payment,
-      opening_amount: Number(detail.opening_amount) || 0,
-      expected_amount: 0,
+      opening_amount: opening,
+      // Matches ERPNext Desk / Sub POS Closing: expected_amount =
+      // opening_amount + sales_amount.
+      expected_amount: opening,
       closing_amount: 0,
       difference: 0,
     });
   });
 
-  Object.entries(expectedByMode).forEach(([mode, expected]) => {
+  Object.entries(expectedByMode).forEach(([mode, sales]) => {
     const existing = rows.get(mode);
     if (existing) {
-      existing.expected_amount = expected;
+      existing.expected_amount += sales;
     } else {
       rows.set(mode, {
         mode_of_payment: mode,
         opening_amount: 0,
-        expected_amount: expected,
+        expected_amount: sales,
         closing_amount: 0,
         difference: 0,
       });
@@ -288,15 +303,17 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setPeriodEndDate(now);
       const end = formatDateTime(now);
 
-      const [invoices, openingDoc] = await Promise.all([
+      const [invoiceResult, openingDoc] = await Promise.all([
         subCashier
           ? getSubCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name)
           : getMainCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name),
         db.getDoc<OpeningEntryDoc>('POS Opening Entry', ownEntry.name),
       ]);
 
+      const invoices = Array.isArray(invoiceResult) ? invoiceResult : (invoiceResult?.invoices || []);
+      const payments = Array.isArray(invoiceResult) ? undefined : invoiceResult?.payments;
       setInvoiceCount(invoices.length);
-      const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
+      const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices, payments);
       setTotals(aggregatedTotals);
       setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
       setTouchedModes(new Set());

@@ -147,6 +147,19 @@ export const posClosing = defineStore("posClose", {
                 item.amount;
             });
           });
+          // ERPNext v16 get_invoices pre-aggregates payments by
+          // mode_of_payment with change_amount already deducted server-side;
+          // per-invoice payment rows carry no parent link, so prefer the
+          // server aggregates when present instead of dropping them.
+          if (msg && !Array.isArray(msg) && Array.isArray(msg.payments) && msg.payments.length > 0) {
+            paymentAggregated = {};
+            msg.payments.forEach((item) => {
+              paymentAggregated[item.mode_of_payment] = {
+                expected_amount: parseFloat(item.amount) || 0,
+                mode_of_payment: item.mode_of_payment,
+              };
+            });
+          }
           this.payments = Object.values(paymentAggregated);
 
           this.posInvoice = this.invoiceDetails.map((item) => ({

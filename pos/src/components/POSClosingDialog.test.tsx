@@ -78,6 +78,9 @@ vi.mock("./ClosingPaymentTable", () => ({
     <div>
       {rows.map((row: any) => (
         <div key={row.mode_of_payment}>
+          <span data-testid={`expected-${row.mode_of_payment}`}>
+            {row.expected_amount}
+          </span>
           <input
             data-testid={row.mode_of_payment}
             type="number"
@@ -244,6 +247,67 @@ describe("POSClosingDialog", () => {
     await userEvent.click(cancelButton);
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("computes expected_amount as opening + sales for pre-aggregated payments (ERPNext v16)", async () => {
+    // ERPNext v16 get_invoices returns {invoices, payments, taxes} with
+    // payments pre-aggregated by mode and change_amount already deducted.
+    getMainCashierPosInvoicesMock.mockResolvedValueOnce({
+      invoices: [
+        {
+          name: "SI-001",
+          grand_total: 693,
+          net_total: 693,
+          total_qty: 1,
+          payments: [],
+          taxes: [],
+        },
+      ],
+      payments: [{ mode_of_payment: "Cash", amount: 693, account: "Cash Account" }],
+      taxes: [],
+    });
+
+    render(
+      <POSClosingDialog
+        open={true}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    // Opening balance for Cash is 1000 (db.getDoc mock) + 693 sales = 1693.
+    // 693 must NOT be reduced again by any change_amount.
+    await waitFor(() => {
+      expect(screen.getByTestId("expected-Cash")).toHaveTextContent("1693");
+    });
+  });
+
+  it("computes expected_amount as opening + sales for per-invoice payments", async () => {
+    // Legacy shape: bare invoice list; change_amount is deducted client-side
+    // when the payment account matches account_for_change_amount.
+    getMainCashierPosInvoicesMock.mockResolvedValueOnce([
+      {
+        name: "SI-001",
+        grand_total: 1000,
+        net_total: 900,
+        total_qty: 2,
+        payments: [{ mode_of_payment: "Cash", amount: 1000, account: "Cash Account" }],
+        account_for_change_amount: "Cash Account",
+        change_amount: 50,
+        taxes: [],
+      },
+    ]);
+
+    render(
+      <POSClosingDialog
+        open={true}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    // Opening 1000 + (1000 payment - 50 change) = 1950.
+    await waitFor(() => {
+      expect(screen.getByTestId("expected-Cash")).toHaveTextContent("1950");
+    });
   });
 
   it("gates closing submission on a pending Closing checklist before creating the doc", async () => {
