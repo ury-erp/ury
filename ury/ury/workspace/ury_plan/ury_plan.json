@@ -8,7 +8,7 @@
  "doctype": "Workspace",
  "for_user": "",
  "hide_custom": 0,
- "icon": "calendar-range",
+ "icon": "calendar-check",
  "idx": 0,
  "is_hidden": 0,
  "label": "URY Plan",
@@ -81,7 +81,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-22 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Plan",
