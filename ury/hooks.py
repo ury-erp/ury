@@ -28,9 +28,6 @@ app_include_js = [
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
     "/assets/ury/js/ury_pos_kot.js",
-    # Floating "Back to <App>" chip for users a URY SPA sent into the desk.
-    # See ury/public/js/return_to_app.js and packages/core/src/frappe/deskLink.ts.
-    "/assets/ury/js/return_to_app.js",
     "/assets/ury/js/remove_duplicates.js",
     "/assets/ury/js/journal_entry.js",
     "/assets/ury/js/round_off_limit_exceed.js",

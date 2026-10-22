@@ -104,14 +104,7 @@ describe('OperationalTools', () => {
     )
   })
 
-  it('shows printer watch unavailable instead of empty success', async () => {
-    healthMock.mockResolvedValue({
-      status: 'unavailable',
-      printers: [],
-      message: 'Printer watch is not available on this site (ury_printer_watch).',
-    })
-
-    const user = userEvent.setup()
+  it('does not render printer status button (printer watch restricted to POS)', () => {
     render(
       <OperationalTools
         user="captain@example.com"
@@ -120,24 +113,9 @@ describe('OperationalTools', () => {
       />
     )
 
-    // still allow manual open; trigger one health fetch via enabling poll false
-    // so call refresh by opening dialog after priming mock
-    healthMock.mockClear()
-    healthMock.mockResolvedValue({
-      status: 'unavailable',
-      printers: [],
-      message: 'Printer watch is not available on this site (ury_printer_watch).',
-    })
-
-    // With polling disabled, open dialog and Sync to fetch
-    await user.click(screen.getByRole('button', { name: /Printer status/i }))
-    // Dialog may show empty until sync — click Sync
-    const sync = await screen.findByRole('button', { name: /^Sync$/i })
-    await user.click(sync)
-
     expect(
-      await screen.findByText(/Printer watch unavailable/i)
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: /Printer status/i })
+    ).not.toBeInTheDocument()
   })
 
   it('opens the Closing checklist from the toolbar icon and closes after submit', async () => {

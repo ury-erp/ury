@@ -178,8 +178,9 @@
 	};
 
 	const init = () => {
-		const context = resolveContext();
-		if (context) render(context);
+		// Desk footer chip is disabled to avoid obscuring Frappe list view pagination and load more.
+		const existing = document.getElementById(ELEMENT_ID);
+		if (existing) existing.remove();
 	};
 
 	if (document.readyState === "loading") {
@@ -188,3 +189,4 @@
 		init();
 	}
 })();
+
