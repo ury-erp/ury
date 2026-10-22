@@ -6,7 +6,7 @@
    "label": "Payment Mode Split"
   }
  ],
- "content": "[{\"id\": \"fn01a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fs00d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 4}}, {\"id\": \"fs01d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 4}}, {\"id\": \"fs02d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fs03d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Commission Settings\", \"col\": 4}}, {\"id\": \"fs04d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Entry\", \"col\": 4}}, {\"id\": \"fs05d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 4}}, {\"id\": \"fn02a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"fn00g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Sales Today\", \"col\": 4}}, {\"id\": \"fn01g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"fn02g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills (All Open)\", \"col\": 4}}, {\"id\": \"fin_trend_h\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Payments</b></span>\", \"col\": 12}}, {\"id\": \"fin_pay_chart\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Payment Mode Split\", \"col\": 12}}, {\"id\": \"fsp0a1b2c3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fc00j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"fc01j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Commissions and Discounts\", \"col\": 4}}, {\"id\": \"fc02j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}, {\"id\": \"fc03j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "content": "[{\"id\": \"fn01a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fs00d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 4}}, {\"id\": \"fs01d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 4}}, {\"id\": \"fs02d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fs03d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Invoice\", \"col\": 4}}, {\"id\": \"fs04d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Entry\", \"col\": 4}}, {\"id\": \"fs05d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 4}}, {\"id\": \"fn02a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"fn00g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Sales Today\", \"col\": 4}}, {\"id\": \"fn01g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"fn02g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills (All Open)\", \"col\": 4}}, {\"id\": \"fin_trend_h\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Payments</b></span>\", \"col\": 12}}, {\"id\": \"fin_pay_chart\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Payment Mode Split\", \"col\": 12}}, {\"id\": \"fsp0a1b2c3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fc00j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"fc01j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Commissions and Discounts\", \"col\": 4}}, {\"id\": \"fc02j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}, {\"id\": \"fc03j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -156,7 +156,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 07:00:00.000000",
+ "modified": "2026-10-23 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Finance",
@@ -212,12 +212,6 @@
    "doc_view": ""
   },
   {
-   "label": "Commission Settings",
-   "link_to": "URY Commission Settings",
-   "type": "DocType",
-   "doc_view": ""
-  },
-  {
    "label": "Payment Entry",
    "link_to": "Payment Entry",
    "type": "DocType",
@@ -228,6 +222,12 @@
    "link_to": "Journal Entry",
    "type": "DocType",
    "doc_view": "List"
+  },
+  {
+   "label": "POS Invoice",
+   "link_to": "POS Invoice",
+   "type": "DocType",
+   "doc_view": ""
   }
  ],
  "title": "URY Finance",
