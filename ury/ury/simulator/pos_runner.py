@@ -1052,6 +1052,17 @@ def _run_merge_inline(closing):
 		create_merge_logs,
 		get_invoice_customer_map,
 	)
+	from frappe.utils.background_jobs import get_job
+
+	# Cancel the background job that ERPNext enqueued during closing.submit()
+	# so an RQ worker does not attempt a duplicate merge and log a false failure.
+	job_id = "pos_invoice_merge::" + str(closing.name)
+	try:
+		job = get_job(job_id)
+		if job:
+			job.cancel()
+	except Exception:
+		pass
 
 	pos_invoices = [
 		frappe._dict(
