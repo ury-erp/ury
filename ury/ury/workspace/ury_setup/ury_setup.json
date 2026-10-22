@@ -18,7 +18,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Restaurant",
-   "link_count": 8,
+   "link_count": 10,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -106,8 +106,30 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Ordering Device",
+   "link_count": 0,
+   "link_to": "URY Ordering Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Self Ordering Profile",
+   "link_count": 0,
+   "link_to": "URY Self Ordering Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Production & Reporting",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -131,6 +153,17 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Department",
+   "link_count": 0,
+   "link_to": "URY Production Department",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
   },
   {
    "hidden": 0,
@@ -192,7 +225,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 07:00:00.000000",
+ "modified": "2026-10-23 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Setup",

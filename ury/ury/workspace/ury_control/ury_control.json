@@ -18,7 +18,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Stock",
-   "link_count": 4,
+   "link_count": 7,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -66,8 +66,41 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Issue Authorizations",
+   "link_count": 0,
+   "link_to": "URY Issue Authorization",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Fulfilment Records",
+   "link_count": 0,
+   "link_to": "URY Fulfilment Record",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Fulfilment Posting Intents",
+   "link_count": 0,
+   "link_to": "URY Fulfilment Posting Intent",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Waste & Errors",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -95,6 +128,17 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Checklist Logs",
+   "link_count": 0,
+   "link_to": "URY POS Checklist Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Settings",
    "link_count": 1,
    "link_type": "DocType",
@@ -112,7 +156,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 07:00:00.000000",
+ "modified": "2026-10-23 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Control",
