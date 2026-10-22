@@ -1,0 +1,377 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"4b4d1a3353\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"46db431bea\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Today's Sales\", \"col\": 3}}, {\"id\": \"3684644271\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daywise Sales\", \"col\": 3}}, {\"id\": \"cc3b821247\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Item Wise Sales\", \"col\": 3}}, {\"id\": \"8753c50bc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 3}}, {\"id\": \"c656a012f3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 3}}, {\"id\": \"db64d6879c\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Wastage and Damage Report\", \"col\": 3}}, {\"id\": \"da534503d6\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"b32f8c68e2\", \"type\": \"card\", \"data\": {\"card_name\": \"Sales\", \"col\": 4}}, {\"id\": \"134a84a3a1\", \"type\": \"card\", \"data\": {\"card_name\": \"Customers & Items\", \"col\": 4}}, {\"id\": \"bce3a82ab4\", \"type\": \"card\", \"data\": {\"card_name\": \"Employees & Ops\", \"col\": 4}}, {\"id\": \"91aec4dc63\", \"type\": \"card\", \"data\": {\"card_name\": \"Financial\", \"col\": 4}}, {\"id\": \"d2df580ef1\", \"type\": \"card\", \"data\": {\"card_name\": \"Stock & Yield\", \"col\": 4}}, {\"id\": \"6fe2106e4c\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "sheet",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Reports",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales",
+   "link_count": 10,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Today's Sales",
+   "link_count": 0,
+   "link_to": "Today's Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Sales",
+   "link_count": 0,
+   "link_to": "Daywise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Invoices",
+   "link_count": 0,
+   "link_to": "Daywise Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Month Wise Sales",
+   "link_count": 0,
+   "link_to": "Month Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Time Wise Sales",
+   "link_count": 0,
+   "link_to": "Time Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Service Wise Sales",
+   "link_count": 0,
+   "link_to": "Service Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Cancelled Invoices",
+   "link_count": 0,
+   "link_to": "Cancelled Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Average Bill Value",
+   "link_count": 0,
+   "link_to": "Average Bill Value",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unsettled Bills",
+   "link_count": 0,
+   "link_to": "Unsettled Bills",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Avg Per Cover",
+   "link_count": 0,
+   "link_to": "APC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customers & Items",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Customer Data",
+   "link_count": 0,
+   "link_to": "Customer Data",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Customer Details",
+   "link_count": 0,
+   "link_to": "Daywise Customer Details",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Repeated Customers",
+   "link_count": 0,
+   "link_to": "Repeated Customers",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Product Categorization",
+   "link_count": 0,
+   "link_to": "Product Categorization",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employees & Ops",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Sales",
+   "link_count": 0,
+   "link_to": "Employee Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Table Turnaround Delay",
+   "link_count": 0,
+   "link_to": "Table Turnaround Delay",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "RevPASH Report",
+   "link_count": 0,
+   "link_to": "RevPASH Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Financial",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Food Cost & Margin",
+   "link_count": 0,
+   "link_to": "Food Cost and Margin Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock & Yield",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Short-Excess Report",
+   "link_count": 0,
+   "link_to": "Short-Excess Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Stock Authority Shadow Comparison Report",
+   "link_count": 0,
+   "link_to": "Stock Authority Shadow Comparison Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Wastage and Damage Report",
+   "link_count": 0,
+   "link_to": "Wastage and Damage Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report Settings",
+   "link_count": 0,
+   "link_to": "URY Report Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Reports",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 36.0,
+ "shortcuts": [
+  {
+   "label": "Today's Sales",
+   "link_to": "Today's Sales",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Daywise Sales",
+   "link_to": "Daywise Sales",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Item Wise Sales",
+   "link_to": "Item Wise Sales",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Unsettled Bills",
+   "link_to": "Unsettled Bills",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Cancelled Invoices",
+   "link_to": "Cancelled Invoices",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Wastage and Damage Report",
+   "link_to": "Wastage and Damage Report",
+   "report_ref_doctype": "URY Wastage",
+   "type": "Report",
+   "doc_view": ""
+  }
+ ],
+ "title": "URY Reports",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

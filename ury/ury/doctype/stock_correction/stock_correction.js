@@ -54,12 +54,12 @@ frappe.ui.form.on("Stock Correction", {
 						let newS = totalSeconds % 60;
 						let newTime = [newH, newM, newS].map(v => String(v).padStart(2, '0')).join(':');
 
-						frappe.new_doc('Stock Correction').then((doc) => {
-							frm.set_value('reference_stock_correction', docName);
-							frm.set_value('posting_date', originalDate);
-							frm.set_value('edit_posting_date', 1);
-							frm.set_value('posting_time', newTime);
-							frappe.set_route('Form', 'Stock Correction', doc.name);
+						// Initial values go to the NEW doc (via frappe.route_options)
+						frappe.new_doc('Stock Correction', {
+							reference_stock_correction: docName,
+							posting_date: originalDate,
+							edit_posting_date: 1,
+							posting_time: newTime
 						});
 					});
 				});

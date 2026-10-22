@@ -1,0 +1,246 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"2510c39011\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"5b794490c5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Attendance\", \"col\": 3}}, {\"id\": \"9c63ee0396\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Shift Assignment\", \"col\": 3}}, {\"id\": \"2991736396\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Employee\", \"col\": 3}}, {\"id\": \"e3fe671496\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch Operating Schedule\", \"col\": 3}}, {\"id\": \"74ec344606\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Employee Sales\", \"col\": 3}}, {\"id\": \"6fc7c8dc57\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Leave Application\", \"col\": 3}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"645235c079\", \"type\": \"card\", \"data\": {\"card_name\": \"Schedules\", \"col\": 4}}, {\"id\": \"f5ae9c4c23\", \"type\": \"card\", \"data\": {\"card_name\": \"Staff\", \"col\": 4}}, {\"id\": \"faa575e74a\", \"type\": \"card\", \"data\": {\"card_name\": \"Attendance and Shifts\", \"col\": 4}}, {\"id\": \"63501e4e8d\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}, {\"id\": \"b8d6545b38\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 21:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "users",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY HR and Shifts",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Schedules",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch Operating Schedule",
+   "link_count": 0,
+   "link_to": "URY Branch Operating Schedule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch Operating Exception",
+   "link_count": 0,
+   "link_to": "URY Branch Operating Exception",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Staff",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee",
+   "link_count": 0,
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Staff Discount Policy",
+   "link_count": 0,
+   "link_to": "Staff Discount Policy",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Attendance and Shifts",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Attendance",
+   "link_count": 0,
+   "link_to": "Attendance",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shift Type",
+   "link_count": 0,
+   "link_to": "Shift Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shift Assignment",
+   "link_count": 0,
+   "link_to": "Shift Assignment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Checkin",
+   "link_count": 0,
+   "link_to": "Employee Checkin",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reports",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Sales",
+   "link_count": 0,
+   "link_to": "Employee Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission Settings",
+   "link_count": 0,
+   "link_to": "URY Commission Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HR Settings",
+   "link_count": 0,
+   "link_to": "HR Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY HR",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  }
+ ],
+ "sequence_id": 40.0,
+ "shortcuts": [
+  {
+   "label": "Attendance",
+   "link_to": "Attendance",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Shift Assignment",
+   "link_to": "Shift Assignment",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Employee",
+   "link_to": "Employee",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Branch Operating Schedule",
+   "link_to": "URY Branch Operating Schedule",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Employee Sales",
+   "link_to": "Employee Sales",
+   "type": "Report",
+   "report_ref_doctype": "POS Invoice",
+   "doc_view": ""
+  },
+  {
+   "label": "Leave Application",
+   "link_to": "Leave Application",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY Staff and Shifts",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

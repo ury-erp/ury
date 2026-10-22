@@ -1,0 +1,237 @@
+{
+ "app": "ury",
+ "charts": [
+  {
+   "chart_name": "Payment Mode Split",
+   "label": "Payment Mode Split"
+  }
+ ],
+ "content": "[{\"id\": \"fn01a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fs00d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"General Ledger\", \"col\": 4}}, {\"id\": \"fs01d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Cancelled Invoices\", \"col\": 4}}, {\"id\": \"fs02d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"fs03d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Invoice\", \"col\": 4}}, {\"id\": \"fs04d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Entry\", \"col\": 4}}, {\"id\": \"fs05d4e5f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Journal Entry\", \"col\": 4}}, {\"id\": \"fn02a1b2c3\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"fn00g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Sales Today\", \"col\": 4}}, {\"id\": \"fn01g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"fn02g7h8i9\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills (All Open)\", \"col\": 4}}, {\"id\": \"fin_trend_h\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Payments</b></span>\", \"col\": 12}}, {\"id\": \"fin_pay_chart\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Payment Mode Split\", \"col\": 12}}, {\"id\": \"fsp0a1b2c3\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fc00j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"fc01j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Commissions and Discounts\", \"col\": 4}}, {\"id\": \"fc02j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Accounting\", \"col\": 4}}, {\"id\": \"fc03j0k1l2\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "wallet",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Finance",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Profitability",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily P&L",
+   "link_count": 0,
+   "link_to": "URY Daily P and L",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cost Variance Snapshot",
+   "link_count": 0,
+   "link_to": "URY Cost Variance Snapshot",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Food Cost & Margin",
+   "link_count": 0,
+   "link_to": "Food Cost and Margin Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commissions and Discounts",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Staff Discount Policy",
+   "link_count": 0,
+   "link_to": "Staff Discount Policy",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Accounting",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Chart of Accounts",
+   "link_count": 0,
+   "link_to": "Account",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Payment Entry",
+   "link_count": 0,
+   "link_to": "Payment Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Journal Entry",
+   "link_count": 0,
+   "link_to": "Journal Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "General Ledger",
+   "link_count": 0,
+   "link_to": "General Ledger",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report Settings",
+   "link_count": 0,
+   "link_to": "URY Report Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission Settings",
+   "link_count": 0,
+   "link_to": "URY Commission Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Finance",
+ "number_cards": [
+  {
+   "label": "Sales Today",
+   "number_card_name": "URY Sales Today"
+  },
+  {
+   "label": "Cancelled Bills Today",
+   "number_card_name": "URY Cancelled Bills Today"
+  },
+  {
+   "label": "Unsettled Bills (All Open)",
+   "number_card_name": "URY Unsettled Bills"
+  }
+ ],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  }
+ ],
+ "sequence_id": 38.0,
+ "shortcuts": [
+  {
+   "label": "General Ledger",
+   "link_to": "General Ledger",
+   "type": "Report",
+   "doc_view": "",
+   "report_ref_doctype": "GL Entry"
+  },
+  {
+   "label": "Cancelled Invoices",
+   "link_to": "Cancelled Invoices",
+   "type": "Report",
+   "report_ref_doctype": "POS Invoice",
+   "doc_view": ""
+  },
+  {
+   "label": "Unsettled Bills",
+   "link_to": "Unsettled Bills",
+   "type": "Report",
+   "report_ref_doctype": "POS Invoice",
+   "doc_view": ""
+  },
+  {
+   "label": "Payment Entry",
+   "link_to": "Payment Entry",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Journal Entry",
+   "link_to": "Journal Entry",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Invoice",
+   "link_to": "POS Invoice",
+   "type": "DocType",
+   "doc_view": ""
+  }
+ ],
+ "title": "URY Finance",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

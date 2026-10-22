@@ -7,18 +7,20 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "tab_correction",
   "naming_series",
   "company",
   "posting_date",
   "col1",
-  "period_end_date",
   "posting_time",
   "edit_posting_date",
+  "period_end_date",
   "section_break_8",
   "column_break_pr0l",
   "branch",
   "column_break_nlca",
   "set_warehouse",
+  "reference_stock_reconciliation",
   "section_break_zbxn",
   "reference_stock_correction",
   "reason",
@@ -26,12 +28,14 @@
   "remarks",
   "section_break_22",
   "items",
+  "tab_accounting",
   "section_break_9",
   "expense_account",
   "column_break_13",
   "difference_amount",
   "accounting_dimensions_section",
   "cost_center",
+  "tab_audit",
   "amended_from",
   "correction_stock_entries_section",
   "correction_stock_entries",
@@ -94,7 +98,8 @@
   },
   {
    "fieldname": "section_break_8",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Location"
   },
   {
    "fieldname": "column_break_pr0l",
@@ -118,7 +123,9 @@
   },
   {
    "fieldname": "section_break_zbxn",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Revision",
+   "depends_on": "eval:doc.reference_stock_correction"
   },
   {
    "fieldname": "reference_stock_correction",
@@ -148,7 +155,8 @@
   },
   {
    "fieldname": "section_break_22",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": ""
   },
   {
    "allow_bulk_edit": 1,
@@ -160,7 +168,8 @@
   },
   {
    "fieldname": "section_break_9",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Difference"
   },
   {
    "fieldname": "expense_account",
@@ -241,7 +250,9 @@
   },
   {
    "fieldname": "section_break_pdni",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Status",
+   "collapsible": 1
   },
   {
    "allow_on_submit": 1,
@@ -290,13 +301,28 @@
    "label": "Reference Stock Reconciliation",
    "options": "Stock Reconciliation",
    "reqd": 0
+  },
+  {
+   "fieldname": "tab_correction",
+   "fieldtype": "Tab Break",
+   "label": "Correction"
+  },
+  {
+   "fieldname": "tab_accounting",
+   "fieldtype": "Tab Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "tab_audit",
+   "fieldtype": "Tab Break",
+   "label": "Audit"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-05-21 10:19:27.909325",
+ "modified": "2026-10-23 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Ury",
  "name": "Stock Correction",
@@ -315,6 +341,20 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

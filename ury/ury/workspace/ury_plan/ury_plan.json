@@ -1,0 +1,132 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"346b81a32e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"f7add26e99\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Plans\", \"col\": 3}}, {\"id\": \"ccd34db6ef\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Bulk Production\", \"col\": 3}}, {\"id\": \"55ed1bf015\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Item Production Setup\", \"col\": 3}}, {\"id\": \"a8b3d68a95\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Yield Checks\", \"col\": 3}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"8ee0726ff5\", \"type\": \"card\", \"data\": {\"card_name\": \"Planning\", \"col\": 4}}, {\"id\": \"f7ba46692f\", \"type\": \"card\", \"data\": {\"card_name\": \"Production Configuration\", \"col\": 4}}, {\"id\": \"b8d6545b38\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "calendar-check",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Plan",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Planning",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Plans",
+   "link_count": 0,
+   "link_to": "URY Sales Plan",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bulk Production",
+   "link_count": 0,
+   "link_to": "Bulk Production",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Configuration",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Production Setup",
+   "link_count": 0,
+   "link_to": "URY Item Production Configuration",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Settings",
+   "link_count": 0,
+   "link_to": "URY Production Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Plan",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 32.0,
+ "shortcuts": [
+  {
+   "label": "Sales Plans",
+   "link_to": "URY Sales Plan",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Bulk Production",
+   "link_to": "Bulk Production",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Item Production Setup",
+   "link_to": "URY Item Production Configuration",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Yield Checks",
+   "link_to": "URY Yield Check",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY Plan",
+ "standard": 1,
+ "type": "Workspace",
+ "link_type": "DocType"
+}

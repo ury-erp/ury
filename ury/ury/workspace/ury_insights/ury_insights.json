@@ -1,0 +1,171 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"55618a9261\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fe3b106980\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Insights\", \"col\": 3}}, {\"id\": \"e62a8161e5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent\", \"col\": 3}}, {\"id\": \"62e9f0fcf8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent Conversation\", \"col\": 3}}, {\"id\": \"48b0ac88b8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daily P&L\", \"col\": 3}}, {\"id\": \"3fc7fd59a0\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"ffa95d5ec7\", \"type\": \"card\", \"data\": {\"card_name\": \"Insights\", \"col\": 3}}, {\"id\": \"04d6dc3c3b\", \"type\": \"card\", \"data\": {\"card_name\": \"AI Assistant\", \"col\": 3}}, {\"id\": \"f2707c2899\", \"type\": \"card\", \"data\": {\"card_name\": \"Operational Alerts\", \"col\": 3}}, {\"id\": \"fc27b1519d\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 3}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "sparkles",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Insights",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Insights",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Insights",
+   "link_count": 0,
+   "link_to": "URY Insight",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Assistant",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Agent",
+   "link_count": 0,
+   "link_to": "Agent",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Agent Conversation",
+   "link_count": 0,
+   "link_to": "Agent Conversation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Operational Alerts",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "KOT Errors",
+   "link_count": 0,
+   "link_to": "URY KOT Error Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Alert Settings",
+   "link_count": 0,
+   "link_to": "Alert Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Settings",
+   "link_count": 0,
+   "link_to": "URY AI Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Alert Settings",
+   "link_count": 0,
+   "link_to": "Alert Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Insights",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 41.0,
+ "shortcuts": [
+  {
+   "label": "Insights",
+   "link_to": "URY Insight",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Agent",
+   "link_to": "Agent",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Agent Conversation",
+   "link_to": "Agent Conversation",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Daily P&L",
+   "link_to": "URY Daily P and L",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY AI Insights",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

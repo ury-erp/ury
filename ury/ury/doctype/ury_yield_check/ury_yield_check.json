@@ -8,21 +8,28 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "section_break_header",
   "item",
+  "column_break_header1",
   "branch",
+  "column_break_header2",
   "company",
-  "section_break_input",
-  "input_qty",
-  "output_qty",
-  "stock_uom",
-  "column_break_yield",
-  "actual_yield_percent",
-  "standard_yield_percent_snapshot",
-  "variance_percent",
   "section_break_details",
   "check_type",
+  "column_break_details",
   "department",
   "production_unit",
+  "section_break_input",
+  "input_qty",
+  "stock_uom",
+  "column_break_io",
+  "output_qty",
+  "section_break_result",
+  "actual_yield_percent",
+  "column_break_yield",
+  "standard_yield_percent_snapshot",
+  "column_break_result2",
+  "variance_percent",
   "section_break_check_info",
   "checked_by",
   "checked_on",
@@ -30,6 +37,10 @@
   "issue_authorization"
  ],
  "fields": [
+  {
+   "fieldname": "section_break_header",
+   "fieldtype": "Section Break"
+  },
   {
    "fieldname": "item",
    "fieldtype": "Link",
@@ -39,12 +50,20 @@
    "reqd": 1
   },
   {
+   "fieldname": "column_break_header1",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "branch",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Branch",
    "options": "Branch",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_header2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "company",
@@ -56,18 +75,12 @@
   {
    "fieldname": "section_break_input",
    "fieldtype": "Section Break",
-   "label": "Input/Output"
+   "label": "Input / Output"
   },
   {
    "fieldname": "input_qty",
    "fieldtype": "Float",
    "label": "Input Qty",
-   "reqd": 1
-  },
-  {
-   "fieldname": "output_qty",
-   "fieldtype": "Float",
-   "label": "Output Qty",
    "reqd": 1
   },
   {
@@ -78,14 +91,30 @@
    "reqd": 1
   },
   {
-   "fieldname": "column_break_yield",
+   "fieldname": "column_break_io",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "output_qty",
+   "fieldtype": "Float",
+   "label": "Output Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_result",
+   "fieldtype": "Section Break",
+   "label": "Result"
   },
   {
    "fieldname": "actual_yield_percent",
    "fieldtype": "Percent",
    "label": "Actual Yield %",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_yield",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "standard_yield_percent_snapshot",
@@ -94,10 +123,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "column_break_result2",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "variance_percent",
    "fieldtype": "Percent",
    "label": "Variance %",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "section_break_details",
@@ -111,6 +145,10 @@
    "label": "Check Type",
    "options": "Routine\nScheduled\nSpot-Check\nManual",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "department",
@@ -127,7 +165,8 @@
   {
    "fieldname": "section_break_check_info",
    "fieldtype": "Section Break",
-   "label": "Check Info"
+   "label": "Authorization and Audit",
+   "collapsible": 1
   },
   {
    "fieldname": "checked_by",
@@ -142,8 +181,7 @@
   },
   {
    "fieldname": "section_break_auth",
-   "fieldtype": "Section Break",
-   "label": "Authorization"
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "issue_authorization",
@@ -155,7 +193,7 @@
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-09-10 00:00:00.000000",
+ "modified": "2026-10-23 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Yield Check",

@@ -315,7 +315,7 @@
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-10-15 04:40:49.000000",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Fulfilment Posting Intent",
@@ -347,6 +347,13 @@
    "role": "URY Captain",
    "read": 1,
    "report": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
   }
  ],
  "sort_field": "modified",

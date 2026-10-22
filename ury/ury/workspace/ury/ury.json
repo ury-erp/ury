@@ -1,6 +1,24 @@
 {
- "charts": [],
- "content": "[{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":3}},{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}}]",
+ "app": "ury",
+ "charts": [
+  {
+   "chart_name": "Daily Sales Trend",
+   "label": "Daily Sales Trend"
+  },
+  {
+   "chart_name": "Order Type Split",
+   "label": "Order Type Split"
+  },
+  {
+   "chart_name": "Payment Mode Split",
+   "label": "Payment Mode Split"
+  },
+  {
+   "chart_name": "Top Selling Items",
+   "label": "Top Selling Items"
+  }
+ ],
+ "content": "[{\"id\": \"346b81a32e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"80bf74d531\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Kitchen Orders\", \"col\": 3}}, {\"id\": \"08c0f7de62\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sub POS Closing\", \"col\": 3}}, {\"id\": \"f7add26e99\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Plans\", \"col\": 3}}, {\"id\": \"0b83e8549e\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Today's Sales\", \"col\": 3}}, {\"id\": \"11f9bca382\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Month Wise Sales\", \"col\": 3}}, {\"id\": \"f569d22332\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daywise Sales\", \"col\": 3}}, {\"id\": \"ae4171856a\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"477062892b\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Sales Today\", \"col\": 4}}, {\"id\": \"42438abee6\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Bills Today\", \"col\": 4}}, {\"id\": \"03f23901b4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Average Bill Today\", \"col\": 4}}, {\"id\": \"01ed9ffa42\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Cancelled Bills Today\", \"col\": 4}}, {\"id\": \"1a0997d4ba\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills (All Open)\", \"col\": 4}}, {\"id\": \"hknKOTs\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"hkToday\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Wastage Today\", \"col\": 4}}, {\"id\": \"6320c1115d\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Trends</b></span>\", \"col\": 12}}, {\"id\": \"5a1687fc00\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Daily Sales Trend\", \"col\": 6}}, {\"id\": \"38d5cab446\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Order Type Split\", \"col\": 6}}, {\"id\": \"bc2b72ab74\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Payment Mode Split\", \"col\": 6}}, {\"id\": \"366aa398ff\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Top Selling Items\", \"col\": 6}}, {\"id\": \"6fb4187254\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"URY POS\", \"col\": 2}}, {\"id\": \"077acb348f\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"POS V1\", \"col\": 2}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}]",
  "creation": "2023-11-30 12:04:38.330350",
  "custom_blocks": [
   {
@@ -16,122 +34,95 @@
  "doctype": "Workspace",
  "for_user": "",
  "hide_custom": 0,
- "icon": "milestone",
+ "icon": "house",
  "idx": 0,
  "is_hidden": 0,
  "label": "URY",
- "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Setup",
-   "link_count": 8,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Branch",
-   "link_count": 0,
-   "link_to": "Branch",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Restaurant",
-   "link_count": 0,
-   "link_to": "URY Restaurant",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "POS Profile",
-   "link_count": 0,
-   "link_to": "POS Profile",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Menu",
-   "link_count": 0,
-   "link_to": "URY Menu",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Menu Course",
-   "link_count": 0,
-   "link_to": "URY Menu Course",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Table",
-   "link_count": 0,
-   "link_to": "URY Table",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Room",
-   "link_count": 0,
-   "link_to": "URY Room",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Network Printer Settings",
-   "link_count": 0,
-   "link_to": "Network Printer Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  }
- ],
- "modified": "2026-01-16 11:47:19.008936",
+ "links": [],
+ "modified": "2026-10-23 07:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
- "number_cards": [],
+ "number_cards": [
+  {
+   "label": "Sales Today",
+   "number_card_name": "URY Sales Today"
+  },
+  {
+   "label": "Bills Today",
+   "number_card_name": "URY Bills Today"
+  },
+  {
+   "label": "Average Bill Today",
+   "number_card_name": "URY Average Bill Today"
+  },
+  {
+   "label": "Cancelled Bills Today",
+   "number_card_name": "URY Cancelled Bills Today"
+  },
+  {
+   "label": "Unsettled Bills (All Open)",
+   "number_card_name": "URY Unsettled Bills"
+  },
+  {
+   "label": "Open KOTs",
+   "number_card_name": "URY Open KOTs"
+  },
+  {
+   "label": "Wastage Today",
+   "number_card_name": "URY Wastage Today"
+  }
+ ],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
  "roles": [
   {
-   "role": "URY Captain"
-  },
-  {
    "role": "URY Manager"
   },
   {
-   "role": "URY Cashier"
+   "role": "System Manager"
   }
  ],
  "sequence_id": 31.0,
- "shortcuts": [],
- "title": "URY"
+ "shortcuts": [
+  {
+   "label": "Kitchen Orders",
+   "link_to": "URY KOT",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Sub POS Closing",
+   "link_to": "Sub POS Closing",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Sales Plans",
+   "link_to": "URY Sales Plan",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Today's Sales",
+   "link_to": "Today's Sales",
+   "type": "Report"
+  },
+  {
+   "label": "Month Wise Sales",
+   "link_to": "Month Wise Sales",
+   "type": "Report"
+  },
+  {
+   "label": "Daywise Sales",
+   "link_to": "Daywise Sales",
+   "type": "Report"
+  }
+ ],
+ "title": "URY Home",
+ "standard": 1,
+ "type": "Workspace",
+ "link_type": "DocType"
 }
