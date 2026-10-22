@@ -37,6 +37,7 @@ import { DayClosePage } from './pages/Dashboard/DayClosePage';
 import { KotErrorLogPage } from './pages/Dashboard/KotErrorLogPage';
 import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
 import { PaymentTerminalPage } from './pages/Dashboard/PaymentTerminalPage';
+import { PrinterConfigPage } from './pages/Dashboard/PrinterConfigPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { Landing } from './components/Landing';
@@ -279,6 +280,7 @@ function AppRoutes() {
           />
           <Route path="stock-reservations" element={<StockReservationPage />} />
           <Route path="payment-terminals" element={<PaymentTerminalPage />} />
+          <Route path="printer-config" element={<PrinterConfigPage />} />
 
           <Route
             path="reports/*"
