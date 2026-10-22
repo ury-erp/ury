@@ -1,0 +1,218 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"73b48b2fd5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"58e8f221f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Corrections\", \"col\": 3}}, {\"id\": \"13ecd76227\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Movements\", \"col\": 3}}, {\"id\": \"68cd87f5a3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Reservations\", \"col\": 3}}, {\"id\": \"aa88d2fe03\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Wastage\", \"col\": 3}}, {\"id\": \"8a5798345d\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"KOT Errors\", \"col\": 3}}, {\"id\": \"b5fcda5512\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch Stock Policy\", \"col\": 3}}, {\"id\": \"138518eae1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"b82d0fbc62\", \"type\": \"card\", \"data\": {\"card_name\": \"Stock\", \"col\": 4}}, {\"id\": \"00ffdec532\", \"type\": \"card\", \"data\": {\"card_name\": \"Waste & Errors\", \"col\": 4}}, {\"id\": \"42b44a3e23\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "shield-check",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Control",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock",
+   "link_count": 7,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Corrections",
+   "link_count": 0,
+   "link_to": "Stock Correction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Movements",
+   "link_count": 0,
+   "link_to": "URY Stock Movement",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Reservations",
+   "link_count": 0,
+   "link_to": "URY Stock Reservation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch Stock Policy",
+   "link_count": 0,
+   "link_to": "URY Branch Stock Policy",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Issue Authorizations",
+   "link_count": 0,
+   "link_to": "URY Issue Authorization",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Fulfilment Records",
+   "link_count": 0,
+   "link_to": "URY Fulfilment Record",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Fulfilment Posting Intents",
+   "link_count": 0,
+   "link_to": "URY Fulfilment Posting Intent",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Waste & Errors",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Wastage",
+   "link_count": 0,
+   "link_to": "URY Wastage",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "KOT Errors",
+   "link_count": 0,
+   "link_to": "URY KOT Error Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Checklist Logs",
+   "link_count": 0,
+   "link_to": "URY POS Checklist Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Feature Flags",
+   "link_count": 0,
+   "link_to": "URY Feature Flags",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Control",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 35.0,
+ "shortcuts": [
+  {
+   "label": "Stock Corrections",
+   "link_to": "Stock Correction",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Stock Movements",
+   "link_to": "URY Stock Movement",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Stock Reservations",
+   "link_to": "URY Stock Reservation",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Wastage",
+   "link_to": "URY Wastage",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "KOT Errors",
+   "link_to": "URY KOT Error Log",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Branch Stock Policy",
+   "link_to": "URY Branch Stock Policy",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY Control",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

@@ -1,0 +1,201 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"346b81a32e\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"80bf74d531\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Kitchen Orders\", \"col\": 3}}, {\"id\": \"a0b2b4b9d0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tables\", \"col\": 3}}, {\"id\": \"08c0f7de62\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sub POS Closing\", \"col\": 3}}, {\"id\": \"6a15ce7f3e\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ordering Sessions\", \"col\": 3}}, {\"id\": \"705184c3b4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Service Requests\", \"col\": 3}}, {\"id\": \"280f77bd10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Rooms\", \"col\": 3}}, {\"id\": \"1952a01898\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"160ea63b1c\", \"type\": \"card\", \"data\": {\"card_name\": \"Kitchen and Billing\", \"col\": 4}}, {\"id\": \"fa57271f2c\", \"type\": \"card\", \"data\": {\"card_name\": \"Floor and Service\", \"col\": 4}}, {\"id\": \"b8d6545b38\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "chef-hat",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Operate",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Kitchen and Billing",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Kitchen Orders",
+   "link_count": 0,
+   "link_to": "URY KOT",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sub POS Closing",
+   "link_count": 0,
+   "link_to": "Sub POS Closing",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Payment Terminals",
+   "link_count": 0,
+   "link_to": "URY Payment Terminal",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Terminal Transactions",
+   "link_count": 0,
+   "link_to": "URY Payment Terminal Transaction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Floor and Service",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tables",
+   "link_count": 0,
+   "link_to": "URY Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rooms",
+   "link_count": 0,
+   "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Ordering Sessions",
+   "link_count": 0,
+   "link_to": "URY Ordering Session",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Service Requests",
+   "link_count": 0,
+   "link_to": "URY Service Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Orders",
+   "link_count": 0,
+   "link_to": "URY Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Operate",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Captain"
+  },
+  {
+   "role": "URY Cashier"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 33.0,
+ "shortcuts": [
+  {
+   "label": "Kitchen Orders",
+   "link_to": "URY KOT",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Tables",
+   "link_to": "URY Table",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Sub POS Closing",
+   "link_to": "Sub POS Closing",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Ordering Sessions",
+   "link_to": "URY Ordering Session",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Service Requests",
+   "link_to": "URY Service Request",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Rooms",
+   "link_to": "URY Room",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY Operate",
+ "standard": 1,
+ "type": "Workspace",
+ "link_type": "DocType"
+}

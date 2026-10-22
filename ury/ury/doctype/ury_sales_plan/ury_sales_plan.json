@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "is_submittable": 1,
  "field_order": [
+  "tab_plan",
   "status",
   "enforcement_mode",
   "branch",
@@ -18,13 +19,15 @@
   "service_period",
   "section_break_items",
   "items",
+  "section_break_reason",
+  "cancellation_reason",
+  "tab_audit",
   "section_break_snapshot",
   "approval_snapshot",
   "approval_snapshot_hash",
   "insight_snapshot",
   "section_break_audit",
   "audit_log",
-  "cancellation_reason",
   "amended_from"
  ],
  "fields": [
@@ -37,12 +40,11 @@
    "label": "Status",
    "options": "Draft\nProposed\nSubmitted for Approval\nApproved\nLocked for Production\nSuperseded/Cancelled",
    "read_only": 1,
-   "reqd": 1,
-   "allow_on_submit": 1
+   "reqd": 1
   },
   {
    "default": "Hard",
-   "description": "Hard: block order placement once plan_remaining hits 0. Soft: allow the order, over-plan status is computable from committed_qty + fulfilled_qty > qty. Alert: allow the order and notify branch-scoped Production Manager/URY Manager recipients when the plan is exceeded.",
+   "description": "Hard: block orders once the plan is used up. Soft: allow, over-plan is flagged. Alert: allow and notify managers.",
    "fieldname": "enforcement_mode",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -96,7 +98,8 @@
   {
    "fieldname": "section_break_snapshot",
    "fieldtype": "Section Break",
-   "label": "Approval Snapshot"
+   "label": "Approval Snapshot",
+   "collapsible": 1
   },
   {
    "fieldname": "approval_snapshot",
@@ -119,15 +122,15 @@
   {
    "fieldname": "section_break_audit",
    "fieldtype": "Section Break",
-   "label": "Audit"
+   "label": "Audit",
+   "collapsible": 1
   },
   {
    "allow_on_submit": 1,
    "fieldname": "audit_log",
    "fieldtype": "Long Text",
    "label": "Audit Log (JSON)",
-   "read_only": 1,
-   "allow_on_submit": 1
+   "read_only": 1
   },
   {
    "fieldname": "amended_from",
@@ -144,13 +147,28 @@
    "label": "Reason (Return to Draft / Cancel)",
    "no_copy": 1,
    "allow_on_submit": 1,
-   "description": "Required input when Returning a plan to Draft or Supersede/Cancelling it; carried into that transition audit_log entry and cleared immediately after -- a transient input, not a standing display field. See the note in audit_log for the permanent record."
+   "description": "Required when returning a plan to Draft or cancelling it. Kept in the audit log."
+  },
+  {
+   "fieldname": "tab_plan",
+   "fieldtype": "Tab Break",
+   "label": "Plan"
+  },
+  {
+   "fieldname": "section_break_reason",
+   "fieldtype": "Section Break",
+   "label": "Reason"
+  },
+  {
+   "fieldname": "tab_audit",
+   "fieldtype": "Tab Break",
+   "label": "Audit"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-09-11 00:00:00.000000",
+ "modified": "2026-10-23 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan",
@@ -191,6 +209,5 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
- "is_submittable": 1
+ "states": []
 }

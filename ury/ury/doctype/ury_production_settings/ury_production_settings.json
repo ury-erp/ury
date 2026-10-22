@@ -4,14 +4,24 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "stock_triggers_section",
   "store_warehouse",
+  "stock_triggers_column",
+  "manufacture_trigger_time",
+  "sales_plan_rules_section",
   "enable_auto_production_plan",
-  "sales_plan_backward_guard",
   "require_active_menu_for_planning",
-  "production_job_stale_minutes",
-  "manufacture_trigger_time"
+  "sales_plan_rules_column",
+  "sales_plan_backward_guard",
+  "advanced_section",
+  "production_job_stale_minutes"
  ],
  "fields": [
+  {
+   "fieldname": "stock_triggers_section",
+   "fieldtype": "Section Break",
+   "label": "Stock and Triggers"
+  },
   {
    "fieldname": "store_warehouse",
    "fieldtype": "Link",
@@ -19,47 +29,66 @@
    "options": "Warehouse"
   },
   {
+   "fieldname": "stock_triggers_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "On KOT Serve",
+   "description": "When stock is manufactured: on KOT Serve, on KOT Create, or on Bill Print.",
+   "fieldname": "manufacture_trigger_time",
+   "fieldtype": "Select",
+   "label": "Manufacture Trigger Time Configuration",
+   "options": "On KOT Serve\nOn KOT Create\nOn Bill Print"
+  },
+  {
+   "fieldname": "sales_plan_rules_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Plan Rules"
+  },
+  {
    "default": "0",
-   "description": "When on, locking a Sales Plan for Production creates every department Production Plan. When off, locking creates nothing and the manager creates plans by hand from the Sales Plan UI.",
+   "description": "On: locking a Sales Plan creates every department's Production Plan. Off: plans are created by hand.",
    "fieldname": "enable_auto_production_plan",
    "fieldtype": "Check",
    "label": "Auto-create Production Plans on Lock for Production"
   },
   {
+   "default": "1",
+   "description": "On: a sellable item can only be planned if it is on an enabled menu for the branch.",
+   "fieldname": "require_active_menu_for_planning",
+   "fieldtype": "Check",
+   "label": "Require Active Menu Item for Sales Plan Items"
+  },
+  {
+   "fieldname": "sales_plan_rules_column",
+   "fieldtype": "Column Break"
+  },
+  {
    "default": "Block",
-   "description": "What happens when a Sales Plan is Returned to Draft or Cancelled while a live (non-cancelled) Production Plan is linked to it. Block is recommended.",
+   "description": "What happens when a Sales Plan with a live Production Plan is returned to Draft or cancelled. Block is recommended.",
    "fieldname": "sales_plan_backward_guard",
    "fieldtype": "Select",
    "label": "Sales Plan Return/Cancel with Live Production Plan",
    "options": "Block\nWarn"
   },
   {
-   "default": "1",
-   "description": "When on, a sellable item can only be planned for a branch if it is on an enabled URY Menu for that branch. Non-sellable (semi-finished) items are exempt.",
-   "fieldname": "require_active_menu_for_planning",
-   "fieldtype": "Check",
-   "label": "Require Active Menu Item for Sales Plan Items"
+   "fieldname": "advanced_section",
+   "fieldtype": "Section Break",
+   "label": "Advanced",
+   "collapsible": 1
   },
   {
    "default": "30",
-   "description": "A department Production Plan's execution job is recoverable only when its heartbeat (custom_ury_execution_heartbeat) has been stale for longer than this many minutes AND its recorded job is confirmed no longer running in the queue. This is a heartbeat staleness threshold, not a total-runtime limit -- a long-running job that keeps updating its heartbeat is never considered stuck.",
+   "description": "Minutes without a heartbeat before a stuck production job can be recovered.",
    "fieldname": "production_job_stale_minutes",
    "fieldtype": "Int",
    "label": "Production Job Stale (minutes)"
-  },
-  {
-   "default": "On KOT Serve",
-   "description": "Trigger time for manufacturing stock entries: 'On KOT Serve' (when served in Mosaic/kitchen), 'On KOT Create' (while creating KOT), or 'On Bill Print' (when bill is printed from POS).",
-   "fieldname": "manufacture_trigger_time",
-   "fieldtype": "Select",
-   "label": "Manufacture Trigger Time Configuration",
-   "options": "On KOT Serve\nOn KOT Create\nOn Bill Print"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-21 00:00:00.000000",
+ "modified": "2026-10-23 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Production Settings",

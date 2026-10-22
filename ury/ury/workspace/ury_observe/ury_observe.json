@@ -1,0 +1,196 @@
+{
+ "app": "ury",
+ "charts": [
+  {
+   "chart_name": "Under-Yield Checks per Day",
+   "label": "Under-Yield Checks per Day"
+  }
+ ],
+ "content": "[{\"id\": \"886c6cd235\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"f957575998\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Daily P&L\", \"col\": 3}}, {\"id\": \"93cba406d3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Yield Checks\", \"col\": 3}}, {\"id\": \"47052fac06\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Food Cost & Margin\", \"col\": 3}}, {\"id\": \"2121e18233\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"RevPASH Report\", \"col\": 3}}, {\"id\": \"710b22a2b2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Table Turnaround Delay\", \"col\": 3}}, {\"id\": \"7a3a4b0425\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Avg Per Cover\", \"col\": 3}}, {\"id\": \"a1bb8b1d27\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"924c1c6660\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"fe502ab291\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Wastage Today\", \"col\": 4}}, {\"id\": \"fyc7a1b2c3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Under-Yield Checks (7 days)\", \"col\": 4}}, {\"id\": \"0adeb96b31\", \"type\": \"chart\", \"data\": {\"chart_name\": \"Under-Yield Checks per Day\", \"col\": 12}}, {\"id\": \"f184056134\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"fbf2d5ce38\", \"type\": \"card\", \"data\": {\"card_name\": \"Profitability\", \"col\": 4}}, {\"id\": \"81b1b911d3\", \"type\": \"card\", \"data\": {\"card_name\": \"Service & Yield\", \"col\": 4}}, {\"id\": \"2908c9c8d5\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "eye",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Observe",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Profitability",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily P&L",
+   "link_count": 0,
+   "link_to": "URY Daily P and L",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Food Cost & Margin",
+   "link_count": 0,
+   "link_to": "Food Cost and Margin Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Avg Per Cover",
+   "link_count": 0,
+   "link_to": "APC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Service & Yield",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Yield Checks",
+   "link_count": 0,
+   "link_to": "URY Yield Check",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "RevPASH Report",
+   "link_count": 0,
+   "link_to": "RevPASH Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Table Turnaround Delay",
+   "link_count": 0,
+   "link_to": "Table Turnaround Delay",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Alert Settings",
+   "link_count": 0,
+   "link_to": "Alert Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Observe",
+ "number_cards": [
+  {
+   "label": "Open KOTs",
+   "number_card_name": "URY Open KOTs"
+  },
+  {
+   "label": "Wastage Today",
+   "number_card_name": "URY Wastage Today"
+  },
+  {
+   "label": "Under-Yield Checks (7 days)",
+   "number_card_name": "URY Failed Yield Checks"
+  }
+ ],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 34.0,
+ "shortcuts": [
+  {
+   "label": "Daily P&L",
+   "link_to": "URY Daily P and L",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Yield Checks",
+   "link_to": "URY Yield Check",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Food Cost & Margin",
+   "link_to": "Food Cost and Margin Report",
+   "report_ref_doctype": "Item Price",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "RevPASH Report",
+   "link_to": "RevPASH Report",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Table Turnaround Delay",
+   "link_to": "Table Turnaround Delay",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  },
+  {
+   "label": "Avg Per Cover",
+   "link_to": "APC",
+   "report_ref_doctype": "POS Invoice",
+   "type": "Report",
+   "doc_view": ""
+  }
+ ],
+ "title": "URY Observe",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}

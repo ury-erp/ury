@@ -1,0 +1,287 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"8b2215f42f\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"e4ef7c16fb\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch\", \"col\": 3}}, {\"id\": \"914f050348\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Restaurant\", \"col\": 3}}, {\"id\": \"339bd666b5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Profile\", \"col\": 3}}, {\"id\": \"3d9fe5b362\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Menu\", \"col\": 3}}, {\"id\": \"64a23b96ea\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tables\", \"col\": 3}}, {\"id\": \"8b205a7550\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Production Unit\", \"col\": 3}}, {\"id\": \"3cc0eb2dcb\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"15877b29e7\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"15d2592f5b\", \"type\": \"card\", \"data\": {\"card_name\": \"Production & Reporting\", \"col\": 4}}, {\"id\": \"135eb6782c\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "creation": "2026-10-22 16:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "settings",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY Setup",
+ "link_type": "DocType",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant",
+   "link_count": 10,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch",
+   "link_count": 0,
+   "link_to": "Branch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant",
+   "link_count": 0,
+   "link_to": "URY Restaurant",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Profile",
+   "link_count": 0,
+   "link_to": "POS Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Menu",
+   "link_count": 0,
+   "link_to": "URY Menu",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Menu Course",
+   "link_count": 0,
+   "link_to": "URY Menu Course",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tables",
+   "link_count": 0,
+   "link_to": "URY Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rooms",
+   "link_count": 0,
+   "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Network Printer Settings",
+   "link_count": 0,
+   "link_to": "Network Printer Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Ordering Device",
+   "link_count": 0,
+   "link_to": "URY Ordering Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Self Ordering Profile",
+   "link_count": 0,
+   "link_to": "URY Self Ordering Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production & Reporting",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Unit",
+   "link_count": 0,
+   "link_to": "URY Production Unit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report Settings",
+   "link_count": 0,
+   "link_to": "URY Report Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Department",
+   "link_count": 0,
+   "link_to": "URY Production Department",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link",
+   "idx": 0
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Production Settings",
+   "link_count": 0,
+   "link_to": "URY Production Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission Settings",
+   "link_count": 0,
+   "link_to": "URY Commission Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Settings",
+   "link_count": 0,
+   "link_to": "URY AI Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Feature Flags",
+   "link_count": 0,
+   "link_to": "URY Feature Flags",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Alert Settings",
+   "link_count": 0,
+   "link_to": "Alert Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-23 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Setup",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 37.0,
+ "shortcuts": [
+  {
+   "label": "Branch",
+   "link_to": "Branch",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Restaurant",
+   "link_to": "URY Restaurant",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Profile",
+   "link_to": "POS Profile",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Menu",
+   "link_to": "URY Menu",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Tables",
+   "link_to": "URY Table",
+   "type": "DocType",
+   "doc_view": "List"
+  },
+  {
+   "label": "Production Unit",
+   "link_to": "URY Production Unit",
+   "type": "DocType",
+   "doc_view": "List"
+  }
+ ],
+ "title": "URY Setup",
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
+}
