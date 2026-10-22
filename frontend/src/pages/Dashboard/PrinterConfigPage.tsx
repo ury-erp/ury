@@ -7,24 +7,26 @@ import {
   Input,
   Spinner,
   showToast,
-  SegmentedControl,
   EmptyState,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
-import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 
-type ConfigTab = 'pos_profile' | 'production_unit' | 'room';
+type SectionKey = 'pos_profile' | 'production_unit' | 'room';
 
-const TAB_DOCTYPES: Record<ConfigTab, string> = {
+const SECTION_DOCTYPES: Record<SectionKey, string> = {
   pos_profile: 'POS Profile',
   production_unit: 'URY Production Unit',
   room: 'URY Room',
 };
 
-const TAB_LABELS: Record<ConfigTab, string> = {
+const SECTION_LABELS: Record<SectionKey, string> = {
   pos_profile: 'POS Profile',
   production_unit: 'Production Unit',
   room: 'Room',
@@ -46,6 +48,13 @@ interface NamedRecord {
   name: string;
   branch?: string;
   [key: string]: unknown;
+}
+
+interface NetworkPrinter {
+  name: string;
+  server_ip?: string;
+  port?: number;
+  printer_name?: string;
 }
 
 interface OptionList {
@@ -72,6 +81,33 @@ const emptyRow = (): PrinterRow => ({
   custom_kot_print_format: '',
   custom_waiter_print_format: '',
   custom_block_takeaway_kot: 0,
+});
+
+const emptyPosForm = () => ({
+  print_format: '',
+  letter_head: '',
+  tc_name: '',
+  select_print_heading: '',
+  qz_print: false,
+  qz_host: '',
+  custom_enable_kot_reprint: false,
+  custom_reprint_kot_format: '',
+  custom_table_order_printer: '',
+  custom_parcel_order_printer: '',
+  printer_settings: [] as PrinterRow[],
+});
+
+const emptyUnitForm = () => ({
+  production: '',
+  department: '',
+  printer_settings: [] as PrinterRow[],
+});
+
+const emptyRoomForm = () => ({
+  kot_printing: false,
+  block_takeaway: false,
+  print_format: '',
+  printer_settings: [] as PrinterRow[],
 });
 
 /** Fixed key order so `JSON.stringify` comparison is stable. */
@@ -129,9 +165,9 @@ const withEmpty = (options: { value: string; label: string }[], placeholder: str
 export const PrinterConfigPage: React.FC = () => {
   const { activeBranchId, branches = [] } = useBranchContext();
 
-  const [activeTab, setActiveTab] = useState<ConfigTab>('pos_profile');
   const [options, setOptions] = useState<OptionList>(EMPTY_OPTIONS);
-  const [records, setRecords] = useState<Record<ConfigTab, NamedRecord[]>>({
+  const [networkPrinters, setNetworkPrinters] = useState<NetworkPrinter[]>([]);
+  const [records, setRecords] = useState<Record<SectionKey, NamedRecord[]>>({
     pos_profile: [],
     production_unit: [],
     room: [],
@@ -140,40 +176,43 @@ export const PrinterConfigPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedNames, setSelectedNames] = useState<Record<ConfigTab, string>>({
+  const [selectedNames, setSelectedNames] = useState<Record<SectionKey, string>>({
     pos_profile: '',
     production_unit: '',
     room: '',
   });
-  const [docLoading, setDocLoading] = useState<boolean>(false);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [originals, setOriginals] = useState<Record<SectionKey, string>>({
+    pos_profile: '',
+    production_unit: '',
+    room: '',
+  });
+  const [docLoading, setDocLoading] = useState<Record<SectionKey, boolean>>({
+    pos_profile: false,
+    production_unit: false,
+    room: false,
+  });
+  const [saving, setSaving] = useState<Record<SectionKey, boolean>>({
+    pos_profile: false,
+    production_unit: false,
+    room: false,
+  });
 
-  // Form state per tab — all values normalized to 0/1 for checks and 1/0 for saves.
-  const [posForm, setPosForm] = useState({
-    print_format: '',
-    letter_head: '',
-    tc_name: '',
-    select_print_heading: '',
-    qz_print: false,
-    qz_host: '',
-    custom_enable_kot_reprint: false,
-    custom_reprint_kot_format: '',
-    custom_table_order_printer: '',
-    custom_parcel_order_printer: '',
-    printer_settings: [] as PrinterRow[],
+  // Form state per section — all values normalized to 0/1 for checks and 1/0 for saves.
+  const [posForm, setPosForm] = useState(emptyPosForm);
+  const [unitForm, setUnitForm] = useState(emptyUnitForm);
+  const [roomForm, setRoomForm] = useState(emptyRoomForm);
+
+  // Network printer modal state.
+  const [printerModalOpen, setPrinterModalOpen] = useState<boolean>(false);
+  const [printerForm, setPrinterForm] = useState({
+    name: '',
+    server_ip: 'localhost',
+    port: '631',
+    printer_name: '',
   });
-  const [unitForm, setUnitForm] = useState({
-    production: '',
-    department: '',
-    printer_settings: [] as PrinterRow[],
-  });
-  const [roomForm, setRoomForm] = useState({
-    kot_printing: false,
-    block_takeaway: false,
-    print_format: '',
-    printer_settings: [] as PrinterRow[],
-  });
-  const [original, setOriginal] = useState<string>('');
+  const [addingPrinter, setAddingPrinter] = useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deletingPrinter, setDeletingPrinter] = useState<boolean>(false);
 
   const activeBranchName = useMemo(() => {
     if (activeBranchId === 'all') return 'All Branches';
@@ -185,9 +224,13 @@ export const PrinterConfigPage: React.FC = () => {
     [activeBranchId]
   );
 
+  const applyPrinters = useCallback((list: NetworkPrinter[]) => {
+    setNetworkPrinters(list);
+    setOptions((prev) => ({ ...prev, printers: toOptions(list) }));
+  }, []);
+
   const loadOptions = useCallback(async (): Promise<OptionList> => {
-    const [printers, printFormats, letterHeads, printHeadings, terms] = await Promise.all([
-      dashboardService.getModuleRecords<{ name: string }>('Network Printer Settings', 'all'),
+    const [printFormats, letterHeads, printHeadings, terms] = await Promise.all([
       call('frappe.client.get_list', {
         doctype: 'Print Format',
         fields: ['name', 'doc_type'],
@@ -198,7 +241,7 @@ export const PrinterConfigPage: React.FC = () => {
       call('frappe.client.get_list', { doctype: 'Terms and Conditions', fields: ['name'] }),
     ]);
     const next: OptionList = {
-      printers: toOptions(printers),
+      ...EMPTY_OPTIONS,
       printFormats: toOptions(unwrap(printFormats)),
       letterHeads: toOptions(unwrap(letterHeads)),
       printHeadings: toOptions(unwrap(printHeadings)),
@@ -208,7 +251,18 @@ export const PrinterConfigPage: React.FC = () => {
     return next;
   }, []);
 
-  const loadRecords = useCallback(async (): Promise<Record<ConfigTab, NamedRecord[]>> => {
+  const loadNetworkPrinters = useCallback(async (): Promise<NetworkPrinter[]> => {
+    const res = await call('frappe.client.get_list', {
+      doctype: 'Network Printer Settings',
+      fields: ['name', 'server_ip', 'port', 'printer_name'],
+      limit_page_length: 0,
+    });
+    const list = (unwrap(res) as NetworkPrinter[]) || [];
+    applyPrinters(list);
+    return list;
+  }, [applyPrinters]);
+
+  const loadRecords = useCallback(async (): Promise<Record<SectionKey, NamedRecord[]>> => {
     const [profiles, units, rooms] = await Promise.all([
       call('frappe.client.get_list', {
         doctype: 'POS Profile',
@@ -229,7 +283,7 @@ export const PrinterConfigPage: React.FC = () => {
         limit_page_length: 0,
       }),
     ]);
-    const next: Record<ConfigTab, NamedRecord[]> = {
+    const next: Record<SectionKey, NamedRecord[]> = {
       pos_profile: (unwrap(profiles) as NamedRecord[]) || [],
       production_unit: (unwrap(units) as NamedRecord[]) || [],
       room: (unwrap(rooms) as NamedRecord[]) || [],
@@ -244,16 +298,16 @@ export const PrinterConfigPage: React.FC = () => {
       else setLoading(true);
       setError(null);
       try {
-        const nextRecords = await Promise.all([loadOptions(), loadRecords()]);
-        const resolved = nextRecords[1];
+        const resolved = await Promise.all([loadOptions(), loadRecords(), loadNetworkPrinters()]);
+        const nextRecords = resolved[1];
         // Keep the current selection when it still exists, otherwise fall back
         // to the first record of each list.
         setSelectedNames((prev) => {
           const next = { ...prev };
-          (Object.keys(resolved) as ConfigTab[]).forEach((tab) => {
-            const list = resolved[tab];
-            if (list.some((r) => r.name === prev[tab])) return;
-            next[tab] = list[0]?.name || '';
+          (Object.keys(nextRecords) as SectionKey[]).forEach((section) => {
+            const list = nextRecords[section];
+            if (list.some((r) => r.name === prev[section])) return;
+            next[section] = list[0]?.name || '';
           });
           return next;
         });
@@ -265,185 +319,309 @@ export const PrinterConfigPage: React.FC = () => {
         setRefreshing(false);
       }
     },
-    [loadOptions, loadRecords]
+    [loadOptions, loadRecords, loadNetworkPrinters]
   );
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
 
-  // Fetch the full document (with child rows) whenever the tab selection changes.
+  const refreshPrinters = useCallback(async () => {
+    try {
+      await loadNetworkPrinters();
+    } catch (err) {
+      showToast.error(parseFrappeError(err) || 'Failed to refresh network printers');
+    }
+  }, [loadNetworkPrinters]);
+
+  const snapshotOf = useCallback((section: SectionKey, form: any): string => {
+    if (section === 'pos_profile') {
+      return JSON.stringify({
+        ...form,
+        printer_settings: form.printer_settings.map((r: PrinterRow) => normalizeRow(r, false)),
+      });
+    }
+    if (section === 'production_unit') {
+      return JSON.stringify({
+        ...form,
+        printer_settings: form.printer_settings.map((r: PrinterRow) => normalizeRow(r, true)),
+      });
+    }
+    return JSON.stringify({
+      ...form,
+      printer_settings: form.printer_settings.map((r: PrinterRow) => normalizeRow(r, false)),
+    });
+  }, []);
+
+  const currentSnapshot = useCallback(
+    (section: SectionKey): string => {
+      if (section === 'pos_profile') return snapshotOf('pos_profile', posForm);
+      if (section === 'production_unit') return snapshotOf('production_unit', unitForm);
+      return snapshotOf('room', roomForm);
+    },
+    [snapshotOf, posForm, unitForm, roomForm]
+  );
+
+  const buildPosForm = useCallback((doc: any) => {
+    const rows = Array.isArray(doc.printer_settings) ? doc.printer_settings : [];
+    return {
+      print_format: doc.print_format || '',
+      letter_head: doc.letter_head || '',
+      tc_name: doc.tc_name || '',
+      select_print_heading: doc.select_print_heading || '',
+      qz_print: doc.qz_print === 1,
+      qz_host: doc.qz_host || '',
+      custom_enable_kot_reprint: doc.custom_enable_kot_reprint === 1,
+      custom_reprint_kot_format: doc.custom_reprint_kot_format || '',
+      custom_table_order_printer: doc.custom_table_order_printer || '',
+      custom_parcel_order_printer: doc.custom_parcel_order_printer || '',
+      printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, false) })) as PrinterRow[],
+    };
+  }, []);
+
+  const buildUnitForm = useCallback((doc: any) => {
+    const rows = Array.isArray(doc.printer_settings) ? doc.printer_settings : [];
+    return {
+      production: doc.production || doc.name || '',
+      department: doc.department || '',
+      printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, true) })) as PrinterRow[],
+    };
+  }, []);
+
+  const buildRoomForm = useCallback((doc: any) => {
+    const rows = Array.isArray(doc.printer_settings) ? doc.printer_settings : [];
+    return {
+      kot_printing: doc.kot_printing === 1,
+      block_takeaway: doc.block_takeaway === 1,
+      print_format: doc.print_format || '',
+      printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, false) })) as PrinterRow[],
+    };
+  }, []);
+
+  // Fetch the full document (with child rows) whenever a section's selection changes.
   useEffect(() => {
-    const name = selectedNames[activeTab];
+    const name = selectedNames.pos_profile;
     if (!name) {
-      setOriginal('');
+      setPosForm(emptyPosForm());
+      setOriginals((prev) => ({ ...prev, pos_profile: '' }));
       return;
     }
     let cancelled = false;
     (async () => {
-      setDocLoading(true);
+      setDocLoading((prev) => ({ ...prev, pos_profile: true }));
       try {
-        const res = await call('frappe.client.get', {
-          doctype: TAB_DOCTYPES[activeTab],
-          name,
-        });
-        const doc = unwrap(res) || {};
+        const res = await call('frappe.client.get', { doctype: 'POS Profile', name });
         if (cancelled) return;
-        const rows = Array.isArray(doc.printer_settings) ? doc.printer_settings : [];
-        if (activeTab === 'pos_profile') {
-          const form = {
-            print_format: doc.print_format || '',
-            letter_head: doc.letter_head || '',
-            tc_name: doc.tc_name || '',
-            select_print_heading: doc.select_print_heading || '',
-            qz_print: doc.qz_print === 1,
-            qz_host: doc.qz_host || '',
-            custom_enable_kot_reprint: doc.custom_enable_kot_reprint === 1,
-            custom_reprint_kot_format: doc.custom_reprint_kot_format || '',
-            custom_table_order_printer: doc.custom_table_order_printer || '',
-            custom_parcel_order_printer: doc.custom_parcel_order_printer || '',
-            printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, false) })) as PrinterRow[],
-          };
-          setPosForm(form);
-          setOriginal(JSON.stringify({ ...form, printer_settings: form.printer_settings.map((r) => normalizeRow(r, false)) }));
-        } else if (activeTab === 'production_unit') {
-          const form = {
-            production: doc.production || doc.name || '',
-            department: doc.department || '',
-            printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, true) })) as PrinterRow[],
-          };
-          setUnitForm(form);
-          setOriginal(JSON.stringify({ ...form, printer_settings: form.printer_settings.map((r) => normalizeRow(r, true)) }));
-        } else {
-          const form = {
-            kot_printing: doc.kot_printing === 1,
-            block_takeaway: doc.block_takeaway === 1,
-            print_format: doc.print_format || '',
-            printer_settings: rows.map((r: any) => ({ name: r.name, ...normalizeRow(r, false) })) as PrinterRow[],
-          };
-          setRoomForm(form);
-          setOriginal(JSON.stringify({ ...form, printer_settings: form.printer_settings.map((r) => normalizeRow(r, false)) }));
-        }
+        const doc = unwrap(res) || {};
+        const form = buildPosForm(doc);
+        setPosForm(form);
+        setOriginals((prev) => ({ ...prev, pos_profile: snapshotOf('pos_profile', form) }));
       } catch (err) {
-        if (!cancelled) {
-          showToast.error(parseFrappeError(err) || 'Failed to load record');
-        }
+        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
       } finally {
-        if (!cancelled) setDocLoading(false);
+        if (!cancelled) setDocLoading((prev) => ({ ...prev, pos_profile: false }));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [activeTab, selectedNames]);
+  }, [selectedNames.pos_profile, buildPosForm, snapshotOf]);
 
-  const currentSnapshot = (): string => {
-    if (activeTab === 'pos_profile') {
-      return JSON.stringify({
-        ...posForm,
-        printer_settings: posForm.printer_settings.map((r) => normalizeRow(r, false)),
-      });
-    }
-    if (activeTab === 'production_unit') {
-      return JSON.stringify({
-        ...unitForm,
-        printer_settings: unitForm.printer_settings.map((r) => normalizeRow(r, true)),
-      });
-    }
-    return JSON.stringify({
-      ...roomForm,
-      printer_settings: roomForm.printer_settings.map((r) => normalizeRow(r, false)),
-    });
-  };
-
-  const handleSave = async () => {
-    const name = selectedNames[activeTab];
-    if (!name || saving) return;
-    if (JSON.stringify(original) === currentSnapshot()) {
-      showToast.warning('No changes in document');
+  useEffect(() => {
+    const name = selectedNames.production_unit;
+    if (!name) {
+      setUnitForm(emptyUnitForm());
+      setOriginals((prev) => ({ ...prev, production_unit: '' }));
       return;
     }
-    setSaving(true);
-    try {
-      if (activeTab === 'pos_profile') {
-        await call('frappe.client.set_value', {
-          doctype: 'POS Profile',
-          name,
-          fieldname: {
-            print_format: posForm.print_format,
-            letter_head: posForm.letter_head,
-            tc_name: posForm.tc_name,
-            select_print_heading: posForm.select_print_heading,
-            qz_print: posForm.qz_print ? 1 : 0,
-            qz_host: posForm.qz_host,
-            custom_enable_kot_reprint: posForm.custom_enable_kot_reprint ? 1 : 0,
-            custom_reprint_kot_format: posForm.custom_reprint_kot_format,
-            custom_table_order_printer: posForm.custom_table_order_printer,
-            custom_parcel_order_printer: posForm.custom_parcel_order_printer,
-            printer_settings: posForm.printer_settings.map(rowForSave),
-          },
-        });
-      } else if (activeTab === 'production_unit') {
-        await call('frappe.client.set_value', {
-          doctype: 'URY Production Unit',
-          name,
-          fieldname: {
-            printer_settings: unitForm.printer_settings.map(rowForSave),
-          },
-        });
-      } else {
-        await call('frappe.client.set_value', {
-          doctype: 'URY Room',
-          name,
-          fieldname: {
-            kot_printing: roomForm.kot_printing ? 1 : 0,
-            block_takeaway: roomForm.block_takeaway ? 1 : 0,
-            print_format: roomForm.print_format,
-            printer_settings: roomForm.printer_settings.map(rowForSave),
-          },
-        });
+    let cancelled = false;
+    (async () => {
+      setDocLoading((prev) => ({ ...prev, production_unit: true }));
+      try {
+        const res = await call('frappe.client.get', { doctype: 'URY Production Unit', name });
+        if (cancelled) return;
+        const doc = unwrap(res) || {};
+        const form = buildUnitForm(doc);
+        setUnitForm(form);
+        setOriginals((prev) => ({ ...prev, production_unit: snapshotOf('production_unit', form) }));
+      } catch (err) {
+        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
+      } finally {
+        if (!cancelled) setDocLoading((prev) => ({ ...prev, production_unit: false }));
       }
-      showToast.success(`${TAB_LABELS[activeTab]} printer settings saved`);
-      setOriginal(currentSnapshot());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedNames.production_unit, buildUnitForm, snapshotOf]);
+
+  useEffect(() => {
+    const name = selectedNames.room;
+    if (!name) {
+      setRoomForm(emptyRoomForm());
+      setOriginals((prev) => ({ ...prev, room: '' }));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setDocLoading((prev) => ({ ...prev, room: true }));
+      try {
+        const res = await call('frappe.client.get', { doctype: 'URY Room', name });
+        if (cancelled) return;
+        const doc = unwrap(res) || {};
+        const form = buildRoomForm(doc);
+        setRoomForm(form);
+        setOriginals((prev) => ({ ...prev, room: snapshotOf('room', form) }));
+      } catch (err) {
+        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
+      } finally {
+        if (!cancelled) setDocLoading((prev) => ({ ...prev, room: false }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedNames.room, buildRoomForm, snapshotOf]);
+
+  const saveSection = useCallback(
+    async (section: SectionKey) => {
+      const name = selectedNames[section];
+      if (!name || saving[section]) return;
+      if (originals[section] === currentSnapshot(section)) {
+        showToast.warning('No changes in document');
+        return;
+      }
+      setSaving((prev) => ({ ...prev, [section]: true }));
+      try {
+        if (section === 'pos_profile') {
+          await call('frappe.client.set_value', {
+            doctype: 'POS Profile',
+            name,
+            fieldname: {
+              print_format: posForm.print_format,
+              letter_head: posForm.letter_head,
+              tc_name: posForm.tc_name,
+              select_print_heading: posForm.select_print_heading,
+              qz_print: posForm.qz_print ? 1 : 0,
+              qz_host: posForm.qz_host,
+              custom_enable_kot_reprint: posForm.custom_enable_kot_reprint ? 1 : 0,
+              custom_reprint_kot_format: posForm.custom_reprint_kot_format,
+              custom_table_order_printer: posForm.custom_table_order_printer,
+              custom_parcel_order_printer: posForm.custom_parcel_order_printer,
+              printer_settings: posForm.printer_settings.map(rowForSave),
+            },
+          });
+        } else if (section === 'production_unit') {
+          await call('frappe.client.set_value', {
+            doctype: 'URY Production Unit',
+            name,
+            fieldname: {
+              printer_settings: unitForm.printer_settings.map(rowForSave),
+            },
+          });
+        } else {
+          await call('frappe.client.set_value', {
+            doctype: 'URY Room',
+            name,
+            fieldname: {
+              kot_printing: roomForm.kot_printing ? 1 : 0,
+              block_takeaway: roomForm.block_takeaway ? 1 : 0,
+              print_format: roomForm.print_format,
+              printer_settings: roomForm.printer_settings.map(rowForSave),
+            },
+          });
+        }
+        showToast.success(`${SECTION_LABELS[section]} printer settings saved`);
+        setOriginals((prev) => ({ ...prev, [section]: currentSnapshot(section) }));
+      } catch (err) {
+        showToast.error(parseFrappeError(err) || 'Failed to save printer settings');
+        console.error('Failed to save printer settings', err);
+      } finally {
+        setSaving((prev) => ({ ...prev, [section]: false }));
+      }
+    },
+    [selectedNames, saving, originals, currentSnapshot, posForm, unitForm, roomForm]
+  );
+
+  const handleAddPrinter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (addingPrinter) return;
+    if (!printerForm.name.trim()) {
+      showToast.error('Printer name is required');
+      return;
+    }
+    setAddingPrinter(true);
+    try {
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Network Printer Settings',
+          name: printerForm.name.trim(),
+          server_ip: printerForm.server_ip.trim() || 'localhost',
+          port: Number(printerForm.port) || 631,
+          printer_name: printerForm.printer_name.trim(),
+        },
+      });
+      showToast.success('Network printer created');
+      setPrinterModalOpen(false);
+      setPrinterForm({ name: '', server_ip: 'localhost', port: '631', printer_name: '' });
+      await refreshPrinters();
     } catch (err) {
-      showToast.error(parseFrappeError(err) || 'Failed to save printer settings');
-      console.error('Failed to save printer settings', err);
+      showToast.error(parseFrappeError(err) || 'Failed to create network printer');
     } finally {
-      setSaving(false);
+      setAddingPrinter(false);
     }
   };
 
-  const tabRecords = records[activeTab];
-  const selectedName = selectedNames[activeTab];
-  const hasRecords = tabRecords.length > 0;
+  const handleDeletePrinter = async () => {
+    if (!deleteTarget || deletingPrinter) return;
+    setDeletingPrinter(true);
+    try {
+      await call('frappe.client.delete', {
+        doctype: 'Network Printer Settings',
+        name: deleteTarget,
+      });
+      showToast.success('Network printer deleted');
+      setDeleteTarget(null);
+      await refreshPrinters();
+    } catch (err) {
+      showToast.error(parseFrappeError(err) || 'Failed to delete network printer');
+    } finally {
+      setDeletingPrinter(false);
+    }
+  };
 
-  const renderSelector = () => (
-    <Card className="p-4">
-      <div className="flex flex-col md:flex-row md:items-end gap-4">
-        <div className="flex-1 min-w-0">
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            {TAB_LABELS[activeTab]}
-          </label>
-          <SearchableSelect
-            id="record-selector"
-            value={selectedName}
-            onChange={(_, value) => {
-              if (value) setSelectedNames((prev) => ({ ...prev, [activeTab]: value }));
-            }}
-            options={withEmpty(
-              tabRecords.map((r) => ({ value: r.name, label: r.name })),
-              `Select ${TAB_LABELS[activeTab]}`
-            )}
-          />
-        </div>
+  const renderSectionHeader = (title: string, subtitle: string, action?: React.ReactNode) => (
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
-    </Card>
+      {action}
+    </div>
+  );
+
+  const renderSaveButton = (section: SectionKey) => (
+    <div className="flex justify-end pt-2 border-t border-border">
+      <Button
+        onClick={() => saveSection(section)}
+        disabled={saving[section] || docLoading[section]}
+        className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs min-w-[140px]"
+      >
+        {saving[section] ? <Spinner className="w-4 h-4" hideMessage /> : <Save className="w-4 h-4" />}
+        Save Changes
+      </Button>
+    </div>
   );
 
   const renderPrinterTable = (
     rows: PrinterRow[],
     onChange: (rows: PrinterRow[]) => void,
-    { withFormats = false, withBlockTakeaway = false }: { withFormats?: boolean; withBlockTakeaway?: boolean } = {}
+    {
+      withFormats = false,
+      withBlockTakeaway = false,
+      idPrefix,
+      labelPrefix,
+    }: { withFormats?: boolean; withBlockTakeaway?: boolean; idPrefix: string; labelPrefix: string }
   ) => (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -487,7 +665,7 @@ export const PrinterConfigPage: React.FC = () => {
                 <tr key={row.name || idx} className="border-b border-border last:border-b-0">
                   <td className="px-3 py-2">
                     <Switch
-                      aria-label={`Row ${idx + 1} bill`}
+                      aria-label={`${labelPrefix} row ${idx + 1} bill`}
                       checked={row.bill === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, bill: checked ? 1 : 0 } : r)))
@@ -496,7 +674,7 @@ export const PrinterConfigPage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2">
                     <Switch
-                      aria-label={`Row ${idx + 1} KOT print`}
+                      aria-label={`${labelPrefix} row ${idx + 1} KOT print`}
                       checked={row.custom_kot_print === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, custom_kot_print: checked ? 1 : 0 } : r)))
@@ -505,7 +683,7 @@ export const PrinterConfigPage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2">
                     <Switch
-                      aria-label={`Row ${idx + 1} waiter print`}
+                      aria-label={`${labelPrefix} row ${idx + 1} waiter print`}
                       checked={row.custom_waiter_print === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, custom_waiter_print: checked ? 1 : 0 } : r)))
@@ -514,7 +692,7 @@ export const PrinterConfigPage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2">
                     <SearchableSelect
-                      id={`printer-row-${idx}`}
+                      id={`${idPrefix}-printer-row-${idx}`}
                       value={row.printer}
                       onChange={(_, value) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, printer: value } : r)))
@@ -526,7 +704,7 @@ export const PrinterConfigPage: React.FC = () => {
                     <>
                       <td className="px-3 py-2">
                         <SearchableSelect
-                          id={`kot-format-row-${idx}`}
+                          id={`${idPrefix}-kot-format-row-${idx}`}
                           value={row.custom_kot_print_format}
                           onChange={(_, value) =>
                             onChange(rows.map((r, i) => (i === idx ? { ...r, custom_kot_print_format: value } : r)))
@@ -536,7 +714,7 @@ export const PrinterConfigPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <SearchableSelect
-                          id={`waiter-format-row-${idx}`}
+                          id={`${idPrefix}-waiter-format-row-${idx}`}
                           value={row.custom_waiter_print_format}
                           onChange={(_, value) =>
                             onChange(rows.map((r, i) => (i === idx ? { ...r, custom_waiter_print_format: value } : r)))
@@ -549,7 +727,7 @@ export const PrinterConfigPage: React.FC = () => {
                   {withBlockTakeaway && (
                     <td className="px-3 py-2">
                       <Switch
-                        aria-label={`Row ${idx + 1} block takeaway KOT`}
+                        aria-label={`${labelPrefix} row ${idx + 1} block takeaway KOT`}
                         checked={row.custom_block_takeaway_kot === 1}
                         disabled={row.custom_kot_print !== 1}
                         onCheckedChange={(checked) =>
@@ -565,7 +743,7 @@ export const PrinterConfigPage: React.FC = () => {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`Delete row ${idx + 1}`}
+                      aria-label={`${labelPrefix} delete row ${idx + 1}`}
                       onClick={() => onChange(rows.filter((_, i) => i !== idx))}
                       className="text-destructive hover:text-destructive/80 h-8 w-8"
                     >
@@ -581,176 +759,362 @@ export const PrinterConfigPage: React.FC = () => {
     </div>
   );
 
-  const renderPosProfileForm = () => (
-    <div className="space-y-4">
-      <Card className="p-4 space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Standard Print Settings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
-            <SearchableSelect
-              id="print_format"
-              value={posForm.print_format}
-              onChange={(_, value) => setPosForm((prev) => ({ ...prev, print_format: value }))}
-              options={withEmpty(options.printFormats, 'Select Print Format')}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Letter Head</label>
-            <SearchableSelect
-              id="letter_head"
-              value={posForm.letter_head}
-              onChange={(_, value) => setPosForm((prev) => ({ ...prev, letter_head: value }))}
-              options={withEmpty(options.letterHeads, 'Select Letter Head')}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Terms and Conditions</label>
-            <SearchableSelect
-              id="tc_name"
-              value={posForm.tc_name}
-              onChange={(_, value) => setPosForm((prev) => ({ ...prev, tc_name: value }))}
-              options={withEmpty(options.terms, 'Select Terms and Conditions')}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Heading</label>
-            <SearchableSelect
-              id="select_print_heading"
-              value={posForm.select_print_heading}
-              onChange={(_, value) => setPosForm((prev) => ({ ...prev, select_print_heading: value }))}
-              options={withEmpty(options.printHeadings, 'Select Print Heading')}
-            />
-          </div>
+  const renderNetworkPrintersSection = () => (
+    <Card className="p-4 space-y-4" data-testid="printer-section-network">
+      {renderSectionHeader(
+        'Network Printers',
+        'Configured CUPS and network printer endpoints.',
+        <Button
+          type="button"
+          variant="outline"
+          size="compact"
+          onClick={() => setPrinterModalOpen(true)}
+          className="text-primary border-primary"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Network Printer
+        </Button>
+      )}
+      {loading ? (
+        <div className="py-8 flex justify-center">
+          <Spinner className="w-6 h-6 text-primary" hideMessage />
         </div>
-      </Card>
-
-      <Card className="p-4 space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Hardware / QZ Settings</h3>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-foreground">QZ Print</p>
-            <p className="text-xs text-muted-foreground">Print through a local QZ Tray client instead of network printers.</p>
-          </div>
-          <Switch
-            id="qz_print"
-            aria-label="QZ Print"
-            checked={posForm.qz_print}
-            onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, qz_print: checked }))}
-          />
+      ) : networkPrinters.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-3">No network printers configured.</p>
+      ) : (
+        <div className="overflow-x-auto border border-border rounded-lg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="text-left font-medium text-muted-foreground px-3 py-2">Printer Name / ID</th>
+                <th className="text-left font-medium text-muted-foreground px-3 py-2">Server IP</th>
+                <th className="text-left font-medium text-muted-foreground px-3 py-2">Port</th>
+                <th className="text-left font-medium text-muted-foreground px-3 py-2">Printer Device Name</th>
+                <th className="text-left font-medium text-muted-foreground px-3 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {networkPrinters.map((printer) => (
+                <tr key={printer.name} className="border-b border-border last:border-b-0">
+                  <td className="px-3 py-2 font-medium text-foreground">{printer.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{printer.server_ip || '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{printer.port ?? '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{printer.printer_name || '—'}</td>
+                  <td className="px-3 py-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete printer ${printer.name}`}
+                      onClick={() => setDeleteTarget(printer.name)}
+                      className="text-destructive hover:text-destructive/80 h-8 w-8"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">QZ Host</label>
-          <Input
-            id="qz_host"
-            value={posForm.qz_host}
-            onChange={(e) => setPosForm((prev) => ({ ...prev, qz_host: e.target.value }))}
-            placeholder="localhost"
-            disabled={!posForm.qz_print}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-foreground">Enable KOT Reprint</p>
-            <p className="text-xs text-muted-foreground">Allow reprinting KOTs for table and parcel orders.</p>
-          </div>
-          <Switch
-            id="custom_enable_kot_reprint"
-            aria-label="Enable KOT Reprint"
-            checked={posForm.custom_enable_kot_reprint}
-            onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, custom_enable_kot_reprint: checked }))}
-          />
-        </div>
-        {posForm.custom_enable_kot_reprint && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Reprint KOT Format</label>
-              <SearchableSelect
-                id="custom_reprint_kot_format"
-                value={posForm.custom_reprint_kot_format}
-                onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_reprint_kot_format: value }))}
-                options={withEmpty(options.printFormats, 'Select Print Format')}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Table Order Printer</label>
-              <SearchableSelect
-                id="custom_table_order_printer"
-                value={posForm.custom_table_order_printer}
-                onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_table_order_printer: value }))}
-                options={withEmpty(options.printers, 'Select Printer')}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Parcel Order Printer</label>
-              <SearchableSelect
-                id="custom_parcel_order_printer"
-                value={posForm.custom_parcel_order_printer}
-                onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_parcel_order_printer: value }))}
-                options={withEmpty(options.printers, 'Select Printer')}
-              />
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Card className="p-4">{renderPrinterTable(posForm.printer_settings, (rows) => setPosForm((prev) => ({ ...prev, printer_settings: rows })))}</Card>
-    </div>
-  );
-
-  const renderProductionUnitForm = () => (
-    <Card className="p-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{unitForm.production || selectedName}</Badge>
-        {unitForm.department && <Badge variant="info">{unitForm.department}</Badge>}
-      </div>
-      {renderPrinterTable(unitForm.printer_settings, (rows) => setUnitForm((prev) => ({ ...prev, printer_settings: rows })), {
-        withFormats: true,
-        withBlockTakeaway: true,
-      })}
+      )}
     </Card>
   );
 
-  const renderRoomForm = () => (
-    <div className="space-y-4">
-      <Card className="p-4 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-foreground">Enable KOT Printing</p>
-            <p className="text-xs text-muted-foreground">Fire KOTs to this room's printers when orders are placed.</p>
+  const renderPosProfileSection = () => (
+    <Card className="p-4 space-y-4" data-testid="printer-section-pos-profile">
+      {renderSectionHeader(
+        'POS Profile Printer Settings',
+        'Configure invoice, receipt, and QZ printing for POS profiles.'
+      )}
+      {records.pos_profile.length === 0 ? (
+        <EmptyState
+          icon={Printer}
+          title="No POS Profiles for this branch"
+          description={`There are no pos profiles assigned to ${activeBranchName}.`}
+        />
+      ) : (
+        <>
+          <div className="max-w-md">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">POS Profile</label>
+            <SearchableSelect
+              id="pos-profile-selector"
+              value={selectedNames.pos_profile}
+              onChange={(_, value) => {
+                if (value) setSelectedNames((prev) => ({ ...prev, pos_profile: value }));
+              }}
+              options={withEmpty(
+                records.pos_profile.map((r) => ({ value: r.name, label: r.name })),
+                'Select POS Profile'
+              )}
+            />
           </div>
-          <Switch
-            id="kot_printing"
-            aria-label="Enable KOT Printing"
-            checked={roomForm.kot_printing}
-            onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, kot_printing: checked }))}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-foreground">Block Takeaway Orders</p>
-            <p className="text-xs text-muted-foreground">Prevent takeaway and delivery orders from printing through this room.</p>
-          </div>
-          <Switch
-            id="block_takeaway"
-            aria-label="Block Takeaway Orders"
-            checked={roomForm.block_takeaway}
-            onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, block_takeaway: checked }))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
-          <SearchableSelect
-            id="room_print_format"
-            value={roomForm.print_format}
-            onChange={(_, value) => setRoomForm((prev) => ({ ...prev, print_format: value }))}
-            options={withEmpty(options.printFormats, 'Select Print Format')}
-          />
-        </div>
-      </Card>
+          {docLoading.pos_profile ? (
+            <div className="py-8 flex justify-center">
+              <Spinner className="w-6 h-6 text-primary" hideMessage />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 pt-2 border-t border-border">
+                <h3 className="text-sm font-semibold text-foreground">Standard Print Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
+                    <SearchableSelect
+                      id="print_format"
+                      value={posForm.print_format}
+                      onChange={(_, value) => setPosForm((prev) => ({ ...prev, print_format: value }))}
+                      options={withEmpty(options.printFormats, 'Select Print Format')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Letter Head</label>
+                    <SearchableSelect
+                      id="letter_head"
+                      value={posForm.letter_head}
+                      onChange={(_, value) => setPosForm((prev) => ({ ...prev, letter_head: value }))}
+                      options={withEmpty(options.letterHeads, 'Select Letter Head')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Terms and Conditions</label>
+                    <SearchableSelect
+                      id="tc_name"
+                      value={posForm.tc_name}
+                      onChange={(_, value) => setPosForm((prev) => ({ ...prev, tc_name: value }))}
+                      options={withEmpty(options.terms, 'Select Terms and Conditions')}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Heading</label>
+                    <SearchableSelect
+                      id="select_print_heading"
+                      value={posForm.select_print_heading}
+                      onChange={(_, value) => setPosForm((prev) => ({ ...prev, select_print_heading: value }))}
+                      options={withEmpty(options.printHeadings, 'Select Print Heading')}
+                    />
+                  </div>
+                </div>
+              </div>
 
-      <Card className="p-4">{renderPrinterTable(roomForm.printer_settings, (rows) => setRoomForm((prev) => ({ ...prev, printer_settings: rows })), { withFormats: true })}</Card>
-    </div>
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-semibold text-foreground">Hardware / QZ Settings</h3>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-foreground">QZ Print</p>
+                    <p className="text-xs text-muted-foreground">Print through a local QZ Tray client instead of network printers.</p>
+                  </div>
+                  <Switch
+                    id="qz_print"
+                    aria-label="QZ Print"
+                    checked={posForm.qz_print}
+                    onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, qz_print: checked }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">QZ Host</label>
+                  <Input
+                    id="qz_host"
+                    value={posForm.qz_host}
+                    onChange={(e) => setPosForm((prev) => ({ ...prev, qz_host: e.target.value }))}
+                    placeholder="localhost"
+                    disabled={!posForm.qz_print}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-foreground">Enable KOT Reprint</p>
+                    <p className="text-xs text-muted-foreground">Allow reprinting KOTs for table and parcel orders.</p>
+                  </div>
+                  <Switch
+                    id="custom_enable_kot_reprint"
+                    aria-label="Enable KOT Reprint"
+                    checked={posForm.custom_enable_kot_reprint}
+                    onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, custom_enable_kot_reprint: checked }))}
+                  />
+                </div>
+                {posForm.custom_enable_kot_reprint && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Reprint KOT Format</label>
+                      <SearchableSelect
+                        id="custom_reprint_kot_format"
+                        value={posForm.custom_reprint_kot_format}
+                        onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_reprint_kot_format: value }))}
+                        options={withEmpty(options.printFormats, 'Select Print Format')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Table Order Printer</label>
+                      <SearchableSelect
+                        id="custom_table_order_printer"
+                        value={posForm.custom_table_order_printer}
+                        onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_table_order_printer: value }))}
+                        options={withEmpty(options.printers, 'Select Printer')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Parcel Order Printer</label>
+                      <SearchableSelect
+                        id="custom_parcel_order_printer"
+                        value={posForm.custom_parcel_order_printer}
+                        onChange={(_, value) => setPosForm((prev) => ({ ...prev, custom_parcel_order_printer: value }))}
+                        options={withEmpty(options.printers, 'Select Printer')}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-border">
+                {renderPrinterTable(posForm.printer_settings, (rows) => setPosForm((prev) => ({ ...prev, printer_settings: rows })), {
+                  idPrefix: 'pos',
+                  labelPrefix: 'POS',
+                })}
+              </div>
+
+              {renderSaveButton('pos_profile')}
+            </>
+          )}
+        </>
+      )}
+    </Card>
+  );
+
+  const renderProductionUnitSection = () => (
+    <Card className="p-4 space-y-4" data-testid="printer-section-production-unit">
+      {renderSectionHeader(
+        'URY Production Unit Printer Settings',
+        'Configure KOT and order routing printers for kitchen and bar production units.'
+      )}
+      {records.production_unit.length === 0 ? (
+        <EmptyState
+          icon={Printer}
+          title="No Production Units for this branch"
+          description={`There are no production units assigned to ${activeBranchName}.`}
+        />
+      ) : (
+        <>
+          <div className="max-w-md">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Production Unit</label>
+            <SearchableSelect
+              id="unit-selector"
+              value={selectedNames.production_unit}
+              onChange={(_, value) => {
+                if (value) setSelectedNames((prev) => ({ ...prev, production_unit: value }));
+              }}
+              options={withEmpty(
+                records.production_unit.map((r) => ({ value: r.name, label: r.name })),
+                'Select Production Unit'
+              )}
+            />
+          </div>
+          {docLoading.production_unit ? (
+            <div className="py-8 flex justify-center">
+              <Spinner className="w-6 h-6 text-primary" hideMessage />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{unitForm.production || selectedNames.production_unit}</Badge>
+                {unitForm.department && <Badge variant="info">{unitForm.department}</Badge>}
+              </div>
+              {renderPrinterTable(unitForm.printer_settings, (rows) => setUnitForm((prev) => ({ ...prev, printer_settings: rows })), {
+                withFormats: true,
+                withBlockTakeaway: true,
+                idPrefix: 'unit',
+                labelPrefix: 'Unit',
+              })}
+              {renderSaveButton('production_unit')}
+            </>
+          )}
+        </>
+      )}
+    </Card>
+  );
+
+  const renderRoomSection = () => (
+    <Card className="p-4 space-y-4" data-testid="printer-section-room">
+      {renderSectionHeader(
+        'URY Room Printer Settings',
+        'Configure dining area, hall, and room printer routing.'
+      )}
+      {records.room.length === 0 ? (
+        <EmptyState
+          icon={Printer}
+          title="No Rooms for this branch"
+          description={`There are no rooms assigned to ${activeBranchName}.`}
+        />
+      ) : (
+        <>
+          <div className="max-w-md">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Room</label>
+            <SearchableSelect
+              id="room-selector"
+              value={selectedNames.room}
+              onChange={(_, value) => {
+                if (value) setSelectedNames((prev) => ({ ...prev, room: value }));
+              }}
+              options={withEmpty(
+                records.room.map((r) => ({ value: r.name, label: r.name })),
+                'Select Room'
+              )}
+            />
+          </div>
+          {docLoading.room ? (
+            <div className="py-8 flex justify-center">
+              <Spinner className="w-6 h-6 text-primary" hideMessage />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-foreground">Enable KOT Printing</p>
+                    <p className="text-xs text-muted-foreground">Fire KOTs to this room's printers when orders are placed.</p>
+                  </div>
+                  <Switch
+                    id="kot_printing"
+                    aria-label="Enable KOT Printing"
+                    checked={roomForm.kot_printing}
+                    onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, kot_printing: checked }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-foreground">Block Takeaway Orders</p>
+                    <p className="text-xs text-muted-foreground">Prevent takeaway and delivery orders from printing through this room.</p>
+                  </div>
+                  <Switch
+                    id="block_takeaway"
+                    aria-label="Block Takeaway Orders"
+                    checked={roomForm.block_takeaway}
+                    onCheckedChange={(checked) => setRoomForm((prev) => ({ ...prev, block_takeaway: checked }))}
+                  />
+                </div>
+                <div className="max-w-md">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
+                  <SearchableSelect
+                    id="room_print_format"
+                    value={roomForm.print_format}
+                    onChange={(_, value) => setRoomForm((prev) => ({ ...prev, print_format: value }))}
+                    options={withEmpty(options.printFormats, 'Select Print Format')}
+                  />
+                </div>
+              </div>
+
+              {renderPrinterTable(roomForm.printer_settings, (rows) => setRoomForm((prev) => ({ ...prev, printer_settings: rows })), {
+                withFormats: true,
+                idPrefix: 'room',
+                labelPrefix: 'Room',
+              })}
+
+              {renderSaveButton('room')}
+            </>
+          )}
+        </>
+      )}
+    </Card>
   );
 
   return (
@@ -758,8 +1122,10 @@ export const PrinterConfigPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Printer Config</h1>
-          <p className="text-sm text-muted-foreground">Manage printer settings for the selected branch.</p>
+          <h1 className="text-xl font-semibold text-foreground">Printer Configuration</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage network printers and printer assignments across POS Profiles, Production Units, and Rooms.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="gap-1.5">
@@ -791,58 +1157,102 @@ export const PrinterConfigPage: React.FC = () => {
         </Card>
       ) : (
         <>
-          <SegmentedControl<ConfigTab>
-            aria-label="Printer configuration type"
-            value={activeTab}
-            onChange={setActiveTab}
-            options={[
-              { value: 'pos_profile', label: 'POS Profile' },
-              { value: 'production_unit', label: 'Production Unit' },
-              { value: 'room', label: 'Room' },
-            ]}
-          />
-
-          {!hasRecords ? (
-            <Card className="p-6">
-              <EmptyState
-                icon={Printer}
-                title={`No ${TAB_LABELS[activeTab]}s for this branch`}
-                description={`There are no ${TAB_LABELS[activeTab].toLowerCase()} records assigned to ${activeBranchName}.`}
-              />
-            </Card>
-          ) : (
-            <>
-              {renderSelector()}
-              {docLoading ? (
-                <div className="py-12">
-                  <Spinner className="w-8 h-8 text-primary" hideMessage />
-                </div>
-              ) : (
-                <>
-                  {activeTab === 'pos_profile' && renderPosProfileForm()}
-                  {activeTab === 'production_unit' && renderProductionUnitForm()}
-                  {activeTab === 'room' && renderRoomForm()}
-
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      onClick={handleSave}
-                      disabled={saving || docLoading}
-                      className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs min-w-[140px]"
-                    >
-                      {saving ? (
-                        <Spinner className="w-4 h-4" hideMessage />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      Save Changes
-                    </Button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
+          {renderNetworkPrintersSection()}
+          {renderPosProfileSection()}
+          {renderProductionUnitSection()}
+          {renderRoomSection()}
         </>
       )}
+
+      {/* Add Network Printer modal */}
+      <Dialog open={printerModalOpen} onOpenChange={(open) => !open && setPrinterModalOpen(false)}>
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setPrinterModalOpen(false)}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Network Printer</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddPrinter} className="space-y-4 text-sm mt-4">
+            <div>
+              <label className="block font-semibold text-foreground mb-1.5">
+                Printer Name / ID <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="np-name"
+                value={printerForm.name}
+                onChange={(e) => setPrinterForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Kitchen Printer"
+                required
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-foreground mb-1.5">Server IP</label>
+              <Input
+                id="np-server-ip"
+                value={printerForm.server_ip}
+                onChange={(e) => setPrinterForm((prev) => ({ ...prev, server_ip: e.target.value }))}
+                placeholder="localhost"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-foreground mb-1.5">Port</label>
+              <Input
+                id="np-port"
+                type="number"
+                value={printerForm.port}
+                onChange={(e) => setPrinterForm((prev) => ({ ...prev, port: e.target.value }))}
+                placeholder="631"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-foreground mb-1.5">
+                Printer Device Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="np-printer-name"
+                value={printerForm.printer_name}
+                onChange={(e) => setPrinterForm((prev) => ({ ...prev, printer_name: e.target.value }))}
+                placeholder="e.g. EPSON_TM-T88VI"
+                required
+              />
+            </div>
+            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
+              <Button type="button" variant="outline" onClick={() => setPrinterModalOpen(false)} disabled={addingPrinter} className="font-semibold">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addingPrinter} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                {addingPrinter ? <Spinner className="w-4 h-4" hideMessage /> : <Plus className="w-4 h-4" />}
+                <span>Add Printer</span>
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Network Printer confirmation */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setDeleteTarget(null)}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-foreground">Delete Network Printer</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mt-4">
+            Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget}</span>? Printer
+            assignments referencing it will need to be reconfigured.
+          </p>
+          <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deletingPrinter} className="font-semibold">
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeletePrinter}
+              disabled={deletingPrinter}
+              className="bg-destructive hover:bg-destructive/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deletingPrinter ? <Spinner className="w-4 h-4" hideMessage /> : <Trash2 className="w-4 h-4" />}
+              <span>Delete</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
