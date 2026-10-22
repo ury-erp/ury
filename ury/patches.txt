@@ -30,3 +30,4 @@ ury.patches.v3_29.grant_stock_reservation_write_to_order_roles
 ury.patches.v3_30.add_production_plan_item_no_work_order_field
 ury.patches.v3_31.refactor_wastage_doctype
 ury.patches.v3_32.fix_stock_entry_branch_field_layout
+ury.patches.v3_34.grant_ury_manager_read_on_control_doctypes

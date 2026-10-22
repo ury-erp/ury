@@ -39,7 +39,7 @@
  "is_hidden": 0,
  "label": "URY",
  "links": [],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
@@ -113,5 +113,8 @@
    "type": "Report"
   }
  ],
- "title": "URY"
+ "title": "URY",
+ "standard": 1,
+ "type": "Workspace",
+ "link_type": "DocType"
 }

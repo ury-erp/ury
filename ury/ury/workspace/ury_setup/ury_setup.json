@@ -192,7 +192,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Setup",
@@ -248,5 +248,7 @@
   }
  ],
  "title": "URY Setup",
- "type": "Workspace"
+ "type": "Workspace",
+ "standard": 1,
+ "parent_page": ""
 }
