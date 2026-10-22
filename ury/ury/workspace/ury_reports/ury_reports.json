@@ -116,7 +116,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "APC",
+   "label": "Avg Per Cover",
    "link_count": 0,
    "link_to": "APC",
    "link_type": "Report",
@@ -243,7 +243,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Food Cost and Margin Report",
+   "label": "Food Cost & Margin",
    "link_count": 0,
    "link_to": "Food Cost and Margin Report",
    "link_type": "Report",
@@ -309,7 +309,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 02:00:00.000000",
+ "modified": "2026-10-23 05:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Reports",

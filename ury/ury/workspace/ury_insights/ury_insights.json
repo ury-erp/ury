@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\": \"55618a9261\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fe3b106980\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Insight\", \"col\": 3}}, {\"id\": \"e62a8161e5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent\", \"col\": 3}}, {\"id\": \"62e9f0fcf8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent Conversation\", \"col\": 3}}, {\"id\": \"48b0ac88b8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Alert Settings\", \"col\": 3}}, {\"id\": \"468d954e50\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Settings\", \"col\": 3}}, {\"id\": \"da622ff19b\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"c3bb4bb95c\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 6}}, {\"id\": \"029390c87c\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Wastage Today\", \"col\": 6}}, {\"id\": \"3fc7fd59a0\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"ffa95d5ec7\", \"type\": \"card\", \"data\": {\"card_name\": \"Insights\", \"col\": 3}}, {\"id\": \"04d6dc3c3b\", \"type\": \"card\", \"data\": {\"card_name\": \"AI Assistant\", \"col\": 3}}, {\"id\": \"f2707c2899\", \"type\": \"card\", \"data\": {\"card_name\": \"Operational Alerts\", \"col\": 3}}, {\"id\": \"fc27b1519d\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 3}}]",
+ "content": "[{\"id\": \"55618a9261\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"fe3b106980\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Insights\", \"col\": 3}}, {\"id\": \"e62a8161e5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent\", \"col\": 3}}, {\"id\": \"62e9f0fcf8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Agent Conversation\", \"col\": 3}}, {\"id\": \"48b0ac88b8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Alert Settings\", \"col\": 3}}, {\"id\": \"468d954e50\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Settings\", \"col\": 3}}, {\"id\": \"da622ff19b\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"c3bb4bb95c\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 6}}, {\"id\": \"029390c87c\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Wastage Today\", \"col\": 6}}, {\"id\": \"3fc7fd59a0\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"ffa95d5ec7\", \"type\": \"card\", \"data\": {\"card_name\": \"Insights\", \"col\": 3}}, {\"id\": \"04d6dc3c3b\", \"type\": \"card\", \"data\": {\"card_name\": \"AI Assistant\", \"col\": 3}}, {\"id\": \"f2707c2899\", \"type\": \"card\", \"data\": {\"card_name\": \"Operational Alerts\", \"col\": 3}}, {\"id\": \"fc27b1519d\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 3}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -26,7 +26,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Insight",
+   "label": "Insights",
    "link_count": 0,
    "link_to": "URY Insight",
    "link_type": "DocType",
@@ -74,7 +74,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "KOT Error Log",
+   "label": "KOT Errors",
    "link_count": 0,
    "link_to": "URY KOT Error Log",
    "link_type": "DocType",
@@ -121,7 +121,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 03:00:00.000000",
+ "modified": "2026-10-23 05:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Insights",
@@ -149,7 +149,7 @@
  "sequence_id": 41.0,
  "shortcuts": [
   {
-   "label": "Insight",
+   "label": "Insights",
    "link_to": "URY Insight",
    "type": "DocType",
    "doc_view": "List"

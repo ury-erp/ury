@@ -67,7 +67,7 @@
    "reqd": 1
   },
   {
-   "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
+   "description": "Needed for Pre-Produced and Made to Order. Optional for Direct Retail.",
    "fieldname": "production_unit",
    "fieldtype": "Link",
    "label": "Production Unit",
@@ -89,7 +89,7 @@
    "label": "Production Policy"
   },
   {
-   "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit), BUNDLE (top-level combo item — explodes to child components for planning, availability, and reservations).",
+   "description": "How availability is worked out: stock (Pre-Produced), recipe capacity (Made to Order), stock without a unit (Direct Retail), or from components (Bundle).",
    "fieldname": "production_policy",
    "fieldtype": "Select",
    "label": "Production Policy",
@@ -108,7 +108,7 @@
   {
    "default": "IN_HOUSE",
    "depends_on": "eval:doc.production_policy==\"PRE_PRODUCED\"",
-   "description": "Only meaningful when Production Policy is PRE_PRODUCED (MADE_TO_ORDER is always in-house at order time; DIRECT_RETAIL is already a receipt-only path via Direct Retail Warehouse). IN_HOUSE: batch is manufactured at this branch/unit via a real BOM-based Manufacture Stock Entry. EXTERNAL_RECEIPT: item arrives already finished from a central kitchen/processing location and is received directly as finished stock, no BOM consumption.",
+   "description": "Pre-Produced items only. In House: made at this unit from a recipe. External Receipt: arrives finished from a central kitchen.",
    "fieldname": "sourcing_mode",
    "fieldtype": "Select",
    "label": "Sourcing Mode",
@@ -142,7 +142,7 @@
   },
   {
    "depends_on": "eval:doc.sourcing_mode==\"EXTERNAL_RECEIPT\"",
-   "description": "Warehouse the finished item is received into when produced off-site (e.g. a central kitchen/processing location). Used by the Receive Batch action instead of the BOM-based Manufacture Stock Entry.",
+   "description": "Where finished stock is received when it is produced off-site.",
    "fieldname": "external_receiving_warehouse",
    "fieldtype": "Link",
    "label": "External Receiving Warehouse",
@@ -156,7 +156,7 @@
   },
   {
    "default": "1",
-   "description": "When checked (default), item availability requires an active approved/locked sales plan for the branch/department. When unchecked (an explicit opt-out), item availability is based on stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) alone, without plan requirement.",
+   "description": "On: the item needs an approved Sales Plan to be sellable. Off: availability follows stock or capacity only.",
    "fieldname": "controlled_by_sales_plan",
    "fieldtype": "Check",
    "label": "Controlled by Sales Plan"
@@ -164,7 +164,7 @@
   {
    "default": "0",
    "depends_on": "eval:doc.controlled_by_sales_plan==1",
-   "description": "When checked and plan is exhausted, allows selling/producing beyond the approved plan quantity if stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) is available. Only applicable when Controlled by Sales Plan is enabled.",
+   "description": "Allow selling beyond the planned quantity while stock or capacity lasts. Needs Controlled by Sales Plan.",
    "fieldname": "allow_over_plan_sale",
    "fieldtype": "Check",
    "label": "Allow Over-Plan Sale"
@@ -175,7 +175,7 @@
   },
   {
    "default": "Plan Available",
-   "description": "Controls availability override behavior; distinct from 'Controlled by Sales Plan' below, which decides whether a Sales Plan gates this item at all. 'Plan Available' (default/safe): normal plan+stock (PRE_PRODUCED) or plan+recipe-capacity (MADE_TO_ORDER) based availability checking, no override. 'Always Available' makes the item sellable regardless of plan/stock/capacity constraints (but never overrides structural/config errors such as a missing BOM). 'Stock Available' checks warehouse stock (PRE_PRODUCED/DIRECT_RETAIL) or recipe capacity (MADE_TO_ORDER) directly and bypasses all Sales Plan restrictions (no active plan required, exhausted plans ignored), regardless of 'Controlled by Sales Plan' and 'Allow Over-Plan Sale'.",
+   "description": "Plan Available: normal checks. Always Available: sellable regardless of plan, stock or capacity. Stock Available: stock or capacity only, ignoring Sales Plans.",
    "fieldname": "availability_mode",
    "fieldtype": "Select",
    "label": "Availability Mode",
@@ -183,7 +183,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-10-23 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Item Production Configuration",

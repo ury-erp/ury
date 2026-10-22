@@ -1,7 +1,7 @@
 {
  "app": "ury",
  "charts": [],
- "content": "[{\"id\": \"73b48b2fd5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"58e8f221f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Correction\", \"col\": 3}}, {\"id\": \"13ecd76227\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Movement\", \"col\": 3}}, {\"id\": \"68cd87f5a3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Reservation\", \"col\": 3}}, {\"id\": \"aa88d2fe03\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Wastage\", \"col\": 3}}, {\"id\": \"8a5798345d\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"KOT Error Log\", \"col\": 3}}, {\"id\": \"b5fcda5512\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch Stock Policy\", \"col\": 3}}, {\"id\": \"138518eae1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"b82d0fbc62\", \"type\": \"card\", \"data\": {\"card_name\": \"Stock\", \"col\": 4}}, {\"id\": \"00ffdec532\", \"type\": \"card\", \"data\": {\"card_name\": \"Waste & Errors\", \"col\": 4}}, {\"id\": \"42b44a3e23\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
+ "content": "[{\"id\": \"73b48b2fd5\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Frequently used</b></span>\", \"col\": 12}}, {\"id\": \"58e8f221f6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Corrections\", \"col\": 3}}, {\"id\": \"13ecd76227\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Movements\", \"col\": 3}}, {\"id\": \"68cd87f5a3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Stock Reservations\", \"col\": 3}}, {\"id\": \"aa88d2fe03\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Wastage\", \"col\": 3}}, {\"id\": \"8a5798345d\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"KOT Errors\", \"col\": 3}}, {\"id\": \"b5fcda5512\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch Stock Policy\", \"col\": 3}}, {\"id\": \"138518eae1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"b82d0fbc62\", \"type\": \"card\", \"data\": {\"card_name\": \"Stock\", \"col\": 4}}, {\"id\": \"00ffdec532\", \"type\": \"card\", \"data\": {\"card_name\": \"Waste & Errors\", \"col\": 4}}, {\"id\": \"42b44a3e23\", \"type\": \"card\", \"data\": {\"card_name\": \"Settings\", \"col\": 4}}]",
  "creation": "2026-10-22 16:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -26,7 +26,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Correction",
+   "label": "Stock Corrections",
    "link_count": 0,
    "link_to": "Stock Correction",
    "link_type": "DocType",
@@ -36,7 +36,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Movement",
+   "label": "Stock Movements",
    "link_count": 0,
    "link_to": "URY Stock Movement",
    "link_type": "DocType",
@@ -46,7 +46,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Reservation",
+   "label": "Stock Reservations",
    "link_count": 0,
    "link_to": "URY Stock Reservation",
    "link_type": "DocType",
@@ -85,7 +85,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "KOT Error Log",
+   "label": "KOT Errors",
    "link_count": 0,
    "link_to": "URY KOT Error Log",
    "link_type": "DocType",
@@ -112,7 +112,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-23 02:00:00.000000",
+ "modified": "2026-10-23 05:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Control",
@@ -131,19 +131,19 @@
  "sequence_id": 35.0,
  "shortcuts": [
   {
-   "label": "Stock Correction",
+   "label": "Stock Corrections",
    "link_to": "Stock Correction",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "Stock Movement",
+   "label": "Stock Movements",
    "link_to": "URY Stock Movement",
    "type": "DocType",
    "doc_view": "List"
   },
   {
-   "label": "Stock Reservation",
+   "label": "Stock Reservations",
    "link_to": "URY Stock Reservation",
    "type": "DocType",
    "doc_view": "List"
@@ -155,7 +155,7 @@
    "doc_view": "List"
   },
   {
-   "label": "KOT Error Log",
+   "label": "KOT Errors",
    "link_to": "URY KOT Error Log",
    "type": "DocType",
    "doc_view": "List"
