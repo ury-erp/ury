@@ -9,27 +9,35 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "active",
+  "scope_section",
   "item",
-  "branch",
   "department",
+  "scope_column",
+  "branch",
   "production_unit",
+  "scope_column_2",
+  "active",
+  "policy_section",
   "production_policy",
-  "product_bundle",
-  "sourcing_mode",
   "bom",
+  "policy_column",
+  "sourcing_mode",
+  "product_bundle",
+  "warehouses_section",
+  "direct_retail_warehouse",
+  "warehouses_column",
+  "external_receiving_warehouse",
+  "sales_plan_section",
   "controlled_by_sales_plan",
   "allow_over_plan_sale",
-  "availability_mode",
-  "direct_retail_warehouse",
-  "external_receiving_warehouse"
+  "sales_plan_column",
+  "availability_mode"
  ],
  "fields": [
   {
-   "default": "1",
-   "fieldname": "active",
-   "fieldtype": "Check",
-   "label": "Active"
+   "fieldname": "scope_section",
+   "fieldtype": "Section Break",
+   "label": "Scope"
   },
   {
    "fieldname": "item",
@@ -40,19 +48,23 @@
    "reqd": 1
   },
   {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "URY Production Department"
+  },
+  {
+   "fieldname": "scope_column",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "branch",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Branch",
    "options": "Branch",
    "reqd": 1
-  },
-  {
-   "fieldname": "department",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Department",
-   "options": "URY Production Department"
   },
   {
    "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
@@ -62,6 +74,21 @@
    "options": "URY Production Unit"
   },
   {
+   "fieldname": "scope_column_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "policy_section",
+   "fieldtype": "Section Break",
+   "label": "Production Policy"
+  },
+  {
    "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit), BUNDLE (top-level combo item — explodes to child components for planning, availability, and reservations).",
    "fieldname": "production_policy",
    "fieldtype": "Select",
@@ -69,13 +96,14 @@
    "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL\nBUNDLE"
   },
   {
-   "depends_on": "eval:doc.production_policy==\"BUNDLE\"",
-   "mandatory_depends_on": "eval:doc.production_policy==\"BUNDLE\"",
-   "description": "The ERPNext Product Bundle whose children define the components of this combo item. Required when Production Policy is BUNDLE.",
-   "fieldname": "product_bundle",
+   "fieldname": "bom",
    "fieldtype": "Link",
-   "label": "Product Bundle",
-   "options": "Product Bundle"
+   "label": "BOM",
+   "options": "BOM"
+  },
+  {
+   "fieldname": "policy_column",
+   "fieldtype": "Column Break"
   },
   {
    "default": "IN_HOUSE",
@@ -87,10 +115,44 @@
    "options": "IN_HOUSE\nEXTERNAL_RECEIPT"
   },
   {
-   "fieldname": "bom",
+   "depends_on": "eval:doc.production_policy==\"BUNDLE\"",
+   "mandatory_depends_on": "eval:doc.production_policy==\"BUNDLE\"",
+   "description": "The ERPNext Product Bundle whose children define the components of this combo item. Required when Production Policy is BUNDLE.",
+   "fieldname": "product_bundle",
    "fieldtype": "Link",
-   "label": "BOM",
-   "options": "BOM"
+   "label": "Product Bundle",
+   "options": "Product Bundle"
+  },
+  {
+   "fieldname": "warehouses_section",
+   "fieldtype": "Section Break",
+   "label": "Warehouses",
+   "depends_on": "eval:doc.production_policy==\"DIRECT_RETAIL\" || doc.sourcing_mode==\"EXTERNAL_RECEIPT\""
+  },
+  {
+   "depends_on": "eval:doc.production_policy==\"DIRECT_RETAIL\"",
+   "fieldname": "direct_retail_warehouse",
+   "fieldtype": "Link",
+   "label": "Direct Retail Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "warehouses_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.sourcing_mode==\"EXTERNAL_RECEIPT\"",
+   "description": "Warehouse the finished item is received into when produced off-site (e.g. a central kitchen/processing location). Used by the Receive Batch action instead of the BOM-based Manufacture Stock Entry.",
+   "fieldname": "external_receiving_warehouse",
+   "fieldtype": "Link",
+   "label": "External Receiving Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "sales_plan_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Plan Control",
+   "collapsible": 1
   },
   {
    "default": "1",
@@ -108,31 +170,20 @@
    "label": "Allow Over-Plan Sale"
   },
   {
+   "fieldname": "sales_plan_column",
+   "fieldtype": "Column Break"
+  },
+  {
    "default": "Plan Available",
    "description": "Controls availability override behavior; distinct from 'Controlled by Sales Plan' below, which decides whether a Sales Plan gates this item at all. 'Plan Available' (default/safe): normal plan+stock (PRE_PRODUCED) or plan+recipe-capacity (MADE_TO_ORDER) based availability checking, no override. 'Always Available' makes the item sellable regardless of plan/stock/capacity constraints (but never overrides structural/config errors such as a missing BOM). 'Stock Available' checks warehouse stock (PRE_PRODUCED/DIRECT_RETAIL) or recipe capacity (MADE_TO_ORDER) directly and bypasses all Sales Plan restrictions (no active plan required, exhausted plans ignored), regardless of 'Controlled by Sales Plan' and 'Allow Over-Plan Sale'.",
    "fieldname": "availability_mode",
    "fieldtype": "Select",
    "label": "Availability Mode",
    "options": "Plan Available\nAlways Available\nStock Available"
-  },
-  {
-   "depends_on": "eval:doc.production_policy==\"DIRECT_RETAIL\"",
-   "fieldname": "direct_retail_warehouse",
-   "fieldtype": "Link",
-   "label": "Direct Retail Warehouse",
-   "options": "Warehouse"
-  },
-  {
-   "depends_on": "eval:doc.sourcing_mode==\"EXTERNAL_RECEIPT\"",
-   "description": "Warehouse the finished item is received into when produced off-site (e.g. a central kitchen/processing location). Used by the Receive Batch action instead of the BOM-based Manufacture Stock Entry.",
-   "fieldname": "external_receiving_warehouse",
-   "fieldtype": "Link",
-   "label": "External Receiving Warehouse",
-   "options": "Warehouse"
   }
  ],
  "links": [],
- "modified": "2026-10-15 03:10:00.000000",
+ "modified": "2026-10-22 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Item Production Configuration",

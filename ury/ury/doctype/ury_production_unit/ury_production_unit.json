@@ -9,6 +9,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "tab_general",
   "enabled",
   "pos_profile",
   "branch",
@@ -18,18 +19,19 @@
   "warehouse",
   "section_break_doeo",
   "item_groups",
-  "printer_info_section",
-  "printer_settings",
-  "section_break_sevj",
-  "enable_order_type_wise_display_on_mosaic",
-  "order_type",
   "tab_2_tab",
   "workstation",
   "workstation_type",
   "column_break_ebgt",
   "lead_chef",
   "section_break_rkua",
-  "assigned_employees"
+  "assigned_employees",
+  "tab_devices",
+  "printer_info_section",
+  "printer_settings",
+  "section_break_sevj",
+  "enable_order_type_wise_display_on_mosaic",
+  "order_type"
  ],
  "fields": [
   {
@@ -138,7 +140,8 @@
   },
   {
    "fieldname": "section_break_doeo",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Item Groups"
   },
   {
    "fieldname": "tab_2_tab",
@@ -151,12 +154,23 @@
   },
   {
    "fieldname": "section_break_rkua",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Staff"
+  },
+  {
+   "fieldname": "tab_general",
+   "fieldtype": "Tab Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "tab_devices",
+   "fieldtype": "Tab Break",
+   "label": "Devices and KDS"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-19 14:08:47.480559",
+ "modified": "2026-10-22 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Production Unit",
