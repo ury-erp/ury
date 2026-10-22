@@ -332,15 +332,17 @@ scheduler_events = {
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost",
+		],
+		"*/10 * * * *":[
 			# UAT simulator: work off one leaseable POS slot per open run;
 			# silently no-ops unless allow_uat_simulator is set on the site.
 			"ury.ury.simulator.service.process_scheduled_slot",
 		],
 		# UAT simulator morning initiator: open the simulated service day on
 		# every active branch (manufacturing -> POS session -> slot
-		# timetable); the */5 hook above then drains slots per branch.
+		# timetable); the */10 hook above then drains slots per branch.
 		# Silently no-ops unless allow_uat_simulator is set on the site.
-		"0 8 * * *":[
+		"0 10 * * *":[
 			"ury.ury.simulator.service.initiate_daily_simulation_for_all_branches"
 		],
 		# Backstop only. Reservations are normally closed out at the

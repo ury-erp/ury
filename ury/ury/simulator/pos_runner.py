@@ -107,7 +107,7 @@ SCENARIO_COUNTER_FIELD = {
 }
 
 #: Minutes between consecutive slot times.
-SLOT_INTERVAL_MINUTES = 5
+SLOT_INTERVAL_MINUTES = 10
 
 #: Qty per item line, cycled deterministically by slot number (1 or 2).
 MAX_LINE_QTY = 2

@@ -904,3 +904,42 @@ class TestDepartmentSafetyStockSharedWarehouse(FrappeTestCase):
 			self.assertEqual(mrs, ["MAT-MR-2026-00099"])
 			self.assertEqual(mock_gen.call_count, 2)
 
+	def test_single_pos_opening_and_closing_per_day(self):
+		"""Verify that if a branch already has a Completed run for today,
+		initiate_daily_simulation_for_all_branches does not open a second session
+		or run manufacturing again.
+		"""
+		with _sim_conf(allow_uat_simulator=True, developer_mode=1):
+			branch = "URY JVC"
+			run = _make_run(self, "2030-05-05", branch=branch)
+			frappe.db.set_value(
+				SIMULATION_RUN_DOCTYPE,
+				run.name,
+				{
+					"status": "Completed",
+					"pos_opening_entry": "POS-OPEN-FAKE-001",
+					"pos_closing_entry": "POS-CLOS-FAKE-001",
+				},
+			)
+			calls = {"manufactured": [], "opened": []}
+
+			with patch.object(service, "get_active_simulation_branches", return_value=[branch]), \
+				 patch.object(service, "run_manufacturing_simulation", side_effect=lambda r: calls["manufactured"].append(r.name)), \
+				 patch.object(service, "open_pos_session", side_effect=lambda r: calls["opened"].append(r.name)):
+
+				results = service.initiate_daily_simulation_for_all_branches(
+					business_date="2030-05-05", slot_count=5
+				)
+
+				self.assertEqual(len(results), 1)
+				self.assertEqual(results[0]["status"], "Completed")
+				self.assertEqual(results[0]["pos_opening_entry"], "POS-OPEN-FAKE-001")
+				# Neither manufacturing nor opening should be called
+				self.assertEqual(calls["manufactured"], [])
+				self.assertEqual(calls["opened"], [])
+
+	def test_slot_interval_is_ten_minutes(self):
+		self.assertEqual(pos_runner.SLOT_INTERVAL_MINUTES, 10)
+		self.assertEqual(service.CLOSING_CUTOFF.hour, 22)
+
+

@@ -16,16 +16,16 @@ single daily lifecycle for one (branch, business_date) scope:
         generate_run_report()        -> Markdown summary on run.report_markdown
 
     initiate_daily_simulation_for_all_branches()
-                                     -- morning scheduler initiator: for every
+                                     -- morning scheduler initiator (10:00 AM): for every
                                         branch with an active POS Profile and
                                         menu, get_or_create the day's run,
                                         run manufacturing, then open the POS
                                         session and stamp the slot timetable
                                         so the cron hook can drain it.
 
-    process_scheduled_slot()         -- scheduler cron hook (every 5 min):
+    process_scheduled_slot()         -- scheduler cron hook (every 10 min):
         claims one leaseable slot per open run, processes its order, and
-        closes the session when every slot is terminal or the 20:00 closing
+        closes the session when every slot is terminal or the 22:00 closing
         cutoff has passed.
 
 The cron path exists so a simulated service day unfolds in near-real-time
@@ -103,21 +103,23 @@ CRON_ACTIVE_STATUSES = ("POS Open", "Generating Invoices")
 #: Minutes a claimed slot stays leased before another worker may retry it.
 LEASE_MINUTES = 10
 
-#: Closing cutoff: sessions left open past this local time are closed by the
+#: Closing cutoff: sessions left open past this local time (10:00 PM) are closed by the
 #: next cron tick even when slots remain unprocessed.
-CLOSING_CUTOFF = dt_time(20, 0)
+CLOSING_CUTOFF = dt_time(22, 0)
 
 
 def get_or_create_daily_run(branch, company=None, pos_profile=None, business_date=None):
-	"""Return the single non-terminal ``URY Simulation Run`` for
-	``(business_date, branch)``, creating it when none exists.
+	"""Return the single ``URY Simulation Run`` for ``(business_date, branch)``,
+	creating it when none exists.
 
 	``business_date`` defaults to today. ``company`` and ``pos_profile``
 	default to the values configured on the branch's POS Profile. The
-	(business_date, branch) scope is single-flight: an existing non-terminal
-	run (any phase) is returned untouched so a re-invocation resumes the
-	same day instead of forking it. Terminal runs (Failed / Closing Failed /
-	Completed) never block a fresh run.
+	(business_date, branch) scope is single-flight and single-daily:
+	1. An existing non-terminal run (any active phase) is returned untouched
+	   so a re-invocation resumes the same day instead of forking it.
+	2. An already "Completed" run for the day is also returned untouched so
+	   a repeat call does not open a second POS session or duplicate the daily run.
+	3. Only when no run (or only an aborted/failed run) exists is a fresh run created.
 	"""
 	assert_uat_simulator_authorized()
 
@@ -130,7 +132,8 @@ def get_or_create_daily_run(branch, company=None, pos_profile=None, business_dat
 			frappe.ValidationError,
 		)
 
-	existing = frappe.get_all(
+	# 1. First preference: return any active, in-flight run
+	active = frappe.get_all(
 		SIMULATION_RUN_DOCTYPE,
 		filters={
 			"business_date": business_date,
@@ -141,8 +144,23 @@ def get_or_create_daily_run(branch, company=None, pos_profile=None, business_dat
 		order_by="creation asc",
 		limit=1,
 	)
-	if existing:
-		return frappe.get_doc(SIMULATION_RUN_DOCTYPE, existing[0].name)
+	if active:
+		return frappe.get_doc(SIMULATION_RUN_DOCTYPE, active[0].name)
+
+	# 2. If the day's run is already completed, return it to ensure only one session per day
+	completed = frappe.get_all(
+		SIMULATION_RUN_DOCTYPE,
+		filters={
+			"business_date": business_date,
+			"branch": branch,
+			"status": "Completed",
+		},
+		fields=["name"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if completed:
+		return frappe.get_doc(SIMULATION_RUN_DOCTYPE, completed[0].name)
 
 	run_id = "SIM-{}-{}-{}".format(
 		str(business_date).replace("-", ""),
@@ -272,14 +290,14 @@ def get_active_simulation_branches() -> list:
 
 
 def initiate_daily_simulation_for_all_branches(business_date=None, slot_count=12) -> list:
-	"""Morning initiator (registered on the ``0 8 * * *`` cron): open the
+	"""Morning initiator (registered on the ``0 10 * * *`` cron): open the
 	simulated service day on every active branch.
 
 	For each branch from :func:`get_active_simulation_branches` the day's
 	run is fetched single-flight (:func:`get_or_create_daily_run`), pushed
 	through manufacturing when still pending, then the branch's POS session
 	is opened (as the branch's own cashier) and the slot timetable is
-	stamped -- after which the every-5-minutes :func:`process_scheduled_slot`
+	stamped -- after which the every-10-minutes :func:`process_scheduled_slot`
 	drains the slots and closes each session independently.
 
 	Resumable and isolated: a run already past manufacturing is not re-run,
@@ -327,6 +345,18 @@ def _initiate_branch_simulation(branch, business_date, slot_count, calling_user)
 
 	run = get_or_create_daily_run(branch=branch, business_date=business_date)
 
+	if run.status == "Completed":
+		# Only one POS session per day: if today's run has already completed,
+		# do not attempt manufacturing or open a second POS session.
+		return {
+			"branch": branch,
+			"run_id": run.name,
+			"status": run.status,
+			"business_date": str(run.business_date),
+			"pos_opening_entry": run.get("pos_opening_entry"),
+			"slots": len(run.get("slots") or []),
+		}
+
 	if run.status in MANUFACTURING_PENDING_STATUSES:
 		run_manufacturing_simulation(run)
 		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run.name)
@@ -354,14 +384,14 @@ def _initiate_branch_simulation(branch, business_date, slot_count, calling_user)
 
 
 def process_scheduled_slot():
-	"""Cron hook (every 5 minutes): work one leaseable slot per open run.
+	"""Cron hook (every 10 minutes): work one leaseable slot per open run.
 
 	Silent no-op when the simulator is disabled or nothing is claimable.
 	For each ``URY Simulation Run`` of today in a POS-active status, one slot
 	is claimed with a conditional UPDATE (atomic across overlapping cron
 	workers), its order is processed through the real POS pipeline, and the
 	session is closed -- with the report generated -- once every slot is
-	terminal or the 20:00 closing cutoff has passed. A slot that fails keeps
+	terminal or the 22:00 closing cutoff has passed. A slot that fails keeps
 	its lease for :data:`LEASE_MINUTES`; after the lease expires it is
 	retried until ``max_attempts``.
 	"""
