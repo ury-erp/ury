@@ -51,23 +51,93 @@ function formatDate(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Generic frappe-js-sdk fallbacks that carry no actionable detail. */
+const GENERIC_ERROR_MESSAGES = new Set([
+  'there was an error while updating the document.',
+  'there was an error while creating the document.',
+  'request failed with status code 500',
+  'there was an error.',
+  'internal server error',
+]);
+
+function readErrorProp(source: unknown, key: string): unknown {
+  if (source && typeof source === 'object' && key in source) {
+    return (source as Record<string, unknown>)[key];
+  }
+  return undefined;
+}
+
+/** Returns the substring after the first colon, or null when there is none. */
+function detailAfterColon(text: string): string | null {
+  const idx = text.indexOf(':');
+  if (idx === -1) return null;
+  return text.slice(idx + 1).trim() || null;
+}
+
+function combineWithFallback(fallback: string, detail: string): string {
+  if (fallback && !detail.includes(fallback)) return `${fallback}: ${detail}`;
+  return detail;
+}
+
 /**
- * Extracts a human-readable message from a Frappe API error.
+ * Extracts a human-readable message from a Frappe API error. Frappe answers
+ * errors in several shapes: `_server_messages` (frappe.throw), `exception` /
+ * `exc` (uncaught exceptions returned on HTTP 500 without _server_messages),
+ * or a plain `message`. Each shape is checked on the error object directly
+ * and on its axios `response.data` envelope. When a specific detail is found
+ * it is prefixed with the fallback, unless the detail already contains it.
  */
 function extractServerErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object' && '_server_messages' in error) {
-    const raw = (error as { _server_messages?: unknown })._server_messages;
-    if (typeof raw === 'string') {
-      try {
-        const messages = JSON.parse(raw);
-        const first = JSON.parse(messages[0]);
-        if (first?.message) return messageToPlainText(first.message as string);
-      } catch {
-        // fall through to other extraction strategies
+  const response = readErrorProp(error, 'response');
+  const responseData =
+    response && typeof response === 'object' ? readErrorProp(response, 'data') : undefined;
+  const sources = [error, responseData];
+
+  for (const source of sources) {
+    const raw = readErrorProp(source, '_server_messages');
+    if (typeof raw !== 'string') continue;
+    try {
+      const messages = JSON.parse(raw);
+      const first = JSON.parse(messages[0]);
+      if (first?.message) {
+        return combineWithFallback(fallback, messageToPlainText(first.message as string));
       }
+    } catch {
+      // fall through to other extraction strategies
     }
   }
-  if (error instanceof Error && error.message) return error.message;
+
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'exception');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const detail = detailAfterColon(raw);
+    if (detail) return combineWithFallback(fallback, messageToPlainText(detail));
+  }
+
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'exc');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    let lastLine = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        lastLine = String(parsed[parsed.length - 1]);
+      }
+    } catch {
+      const lines = raw.trim().split('\n');
+      lastLine = lines[lines.length - 1];
+    }
+    const detail = detailAfterColon(lastLine);
+    if (detail) return combineWithFallback(fallback, messageToPlainText(detail));
+  }
+
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'message');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    if (GENERIC_ERROR_MESSAGES.has(raw.trim().toLowerCase())) continue;
+    return combineWithFallback(fallback, messageToPlainText(raw));
+  }
+
   return fallback;
 }
 

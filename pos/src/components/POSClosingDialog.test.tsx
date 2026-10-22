@@ -70,7 +70,7 @@ vi.mock("../store/root-store", () => ({
 }));
 
 vi.mock("../i18n", () => ({
-  t: (key: string) => key,
+  t: (key: string) => (key === "pos_closing.submit_failed" ? "Failed to close POS" : key),
 }));
 
 vi.mock("./ClosingPaymentTable", () => ({
@@ -359,6 +359,48 @@ describe("POSClosingDialog", () => {
     );
     await waitFor(() => {
       expect(createPosClosingEntryMock).toHaveBeenCalled();
+    });
+  });
+
+  it("surfaces a server exception detail (NegativeStockError) instead of the generic fallback", async () => {
+    createPosClosingEntryMock.mockResolvedValue({ name: "PCE-1" });
+    // Frappe HTTP 500 answers carry `exception` but no `_server_messages`;
+    // frappe-js-sdk surfaces it as a plain object, not an Error instance.
+    submitPosClosingEntryMock.mockRejectedValue({
+      exception:
+        "erpnext.stock.stock_ledger.NegativeStockError: 6.0 units of Item BTRSCP: Butter Scotch Scoop needed in Warehouse Direct Retail Warehouse - U to complete this transaction.",
+      exc_type: "NegativeStockError",
+    });
+
+    render(
+      <POSClosingDialog
+        open={true}
+        onOpenChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("Cash")).toBeInTheDocument();
+    });
+
+    // Touch every row so the submit validates.
+    await userEvent.type(screen.getByTestId("Cash"), "1000");
+    await userEvent.clear(screen.getByTestId("Card"));
+    await userEvent.type(screen.getByTestId("Card"), "0");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "pos_closing.submit" })
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "pos_closing.confirm_submit" })
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Failed to close POS: 6.0 units of Item BTRSCP: Butter Scotch Scoop needed in Warehouse Direct Retail Warehouse - U to complete this transaction."
+        )
+      ).toBeInTheDocument();
     });
   });
 });

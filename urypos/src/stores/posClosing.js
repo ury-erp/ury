@@ -227,6 +227,13 @@ export const posClosing = defineStore("posClose", {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
             this.alert.createAlert("Message",message.message, "OK")
+          } else if (error.exception) {
+            // Uncaught server exceptions (e.g. NegativeStockError on submit)
+            // carry no _server_messages; surface the exception detail instead
+            // of swallowing the failure silently.
+            const idx = error.exception.indexOf(":");
+            const detail = idx === -1 ? error.exception : error.exception.slice(idx + 1).trim();
+            this.alert.createAlert("Message", detail, "OK")
           }
         });
     },
@@ -261,7 +268,11 @@ export const posClosing = defineStore("posClose", {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
             this.alert.createAlert("Message",message.message, "OK")
-            
+
+          } else if (error.exception) {
+            const idx = error.exception.indexOf(":");
+            const detail = idx === -1 ? error.exception : error.exception.slice(idx + 1).trim();
+            this.alert.createAlert("Message", detail, "OK")
           }
         });
     },
