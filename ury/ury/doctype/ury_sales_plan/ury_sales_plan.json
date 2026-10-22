@@ -19,9 +19,9 @@
   "service_period",
   "section_break_items",
   "items",
+  "tab_audit",
   "section_break_reason",
   "cancellation_reason",
-  "tab_audit",
   "section_break_snapshot",
   "approval_snapshot",
   "approval_snapshot_hash",
@@ -87,7 +87,7 @@
   {
    "fieldname": "section_break_items",
    "fieldtype": "Section Break",
-   "label": "Items"
+   "label": ""
   },
   {
    "fieldname": "items",
@@ -157,7 +157,8 @@
   {
    "fieldname": "section_break_reason",
    "fieldtype": "Section Break",
-   "label": "Reason"
+   "label": "Return / Cancel Reason",
+   "collapsible": 1
   },
   {
    "fieldname": "tab_audit",
@@ -168,7 +169,7 @@
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-10-23 04:00:00.000000",
+ "modified": "2026-10-23 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan",
