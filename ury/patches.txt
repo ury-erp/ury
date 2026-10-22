@@ -33,3 +33,4 @@ ury.patches.v3_32.fix_stock_entry_branch_field_layout
 ury.patches.v3_34.grant_ury_manager_read_on_control_doctypes
 ury.patches.v3_35.grant_ury_manager_read_on_log_and_snapshot
 ury.patches.v3_36.delete_prefixed_dashboard_charts
+ury.patches.v3_37.delete_yield_variance_trend_chart
