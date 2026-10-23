@@ -50,6 +50,14 @@ vi.mock("@ury/ui", () => ({
     />
   ),
   cn: (...args: any[]) => args.filter(Boolean).join(" "),
+  showToast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock("../lib/print", () => ({
+  printOrder: vi.fn().mockResolvedValue("qz"),
 }));
 
 import PaymentDialog from "./PaymentDialog";

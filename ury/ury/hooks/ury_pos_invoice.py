@@ -405,6 +405,10 @@ def calculate_and_set_times(doc, method=None):
 
 
 def validate_invoice_print(doc, method):
+    # Skip when settle comes from POS payment (print is optional there).
+    if frappe.flags.get("ury_payment_submit"):
+        return
+
     # Check if the invoice has been printed
     invoice_printed = frappe.db.get_value("POS Invoice", doc.name, "invoice_printed")
 

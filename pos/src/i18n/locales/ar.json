@@ -88,10 +88,12 @@
     "adjustment": "التسوية",
     "total": "الإجمالي",
     "pay_button": "دفع {{amount}}",
+    "pay_and_print_button": "دفع وطباعة {{amount}}",
     "processing": "جاري المعالجة...",
     "short_by": "ناقص {{amount}}",
     "change_due": "الباقي: {{amount}}",
-    "success": "تم الدفع بنجاح: تم استلام {{amount}}"
+    "success": "تم الدفع بنجاح: تم استلام {{amount}}",
+    "print_after_pay_failed": "تم الدفع بنجاح، لكن فشلت الطباعة: {{reason}}"
   },
   "pos": {
     "not_opened_title": "نقطة البيع غير مفتوحة",
