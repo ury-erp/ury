@@ -53,6 +53,19 @@ Given below is the list of features of URY app.
 > **Use the URY branch `v1` to access these separate apps.**
 > **Support for this version will end in December 2025.**
 
+## Site branding
+
+Set `app_name`, `app_logo`, and `favicon` in **Website Settings** to brand
+`/pos`, `/urypos` (including its login), `/mosaic`, and guest `/order`.
+Each unset field keeps that screen's existing URY default. Upload site logos
+to Frappe Files; no tenant logo needs to be committed to this repository.
+
+The `/pos` and `/order` footer retains URY attribution and a public Source
+link. It defaults to `https://github.com/ury-erp/ury`. Deployments of modified
+versions should set the site-config key `ury_source_url` to the public fork's
+exact release-tag source URL, for example
+`https://github.com/YOUR-ORG/ury/tree/YOUR-PUBLIC-RELEASE-TAG`.
+
 ## Features
 
 ### POS & Billing
