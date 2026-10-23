@@ -16,8 +16,11 @@ import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
 import { getActiveLanguage } from './i18n';
+import { useRootStore } from './store/root-store';
+import { homePath } from './lib/home-route';
 
 function App() {
+  const user = useRootStore((state) => state.user);
   const {
     initializeApp
   } = usePOSStore();
@@ -42,7 +45,7 @@ function App() {
             <Router basename="/pos">
               <Routes>
                 <Route element={<AppLayout />}>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route index element={<Navigate to={homePath(user)} replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/pos" element={<POS />} />
                   <Route path="/tables" element={<Table />} />

@@ -30,6 +30,8 @@ export interface POSInvoice {
   custom_merged_total?: number | null;
   discount_amount?: number;
   additional_discount_percentage?: number;
+  age_minutes?: number;
+  items_preview?: Array<{ item_name: string; qty: number }>;
 }
 
 export interface SplitGroupInvoice extends POSInvoice {
@@ -67,7 +69,7 @@ interface GetPOSInvoicesResponse {
 }
 
 interface GetPOSInvoicesParams {
-  status: POSInvoice['status'];
+  status: OrderStatusType;
   limit?: number;
   limit_start?: number;
   paid_limit?: number;
