@@ -164,17 +164,16 @@ export const posClosing = defineStore("posClose", {
         let found = false;
         this.payments.forEach((secondItem) => {
           if (secondItem.mode_of_payment === item.mode_of_payment) {
-            item.expected_amount = secondItem.expected_amount;
-            item.difference = -secondItem.expected_amount;
+            item.expected_amount = (Number(item.opening_amount) || 0) + secondItem.expected_amount;
 
             found = true;
           }
         });
 
         if (!found) {
-          item.expected_amount = 0;
-          item.difference = 0;
+          item.expected_amount = Number(item.opening_amount) || 0;
         }
+        item.difference = (Number(item.closing_amount) || 0) - item.expected_amount;
       });
 
       this.db
