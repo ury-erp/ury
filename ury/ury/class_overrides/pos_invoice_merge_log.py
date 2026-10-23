@@ -80,14 +80,21 @@ class CustomPOSInvoiceMergeLog(POSInvoiceMergeLog):
 		sales_invoice = self.merge_pos_invoice_into(sales_invoice, data)
 
 		closing_time, closing_date = self.get_sales_closing_time_and_date()
-		posting_time = closing_time or get_time(self.posting_time)
-		posting_date = closing_date or getdate(self.posting_date)
 
 		sales_invoice.is_consolidated = 1
 		sales_invoice.set_posting_time = 1
 
-		sales_invoice.posting_date = posting_date
-		sales_invoice.posting_time = posting_time
+		# Only override what the POS Profile configures. Otherwise keep the date and time
+		# ERPNext already took from the merged POS invoices.
+		if closing_date:
+			sales_invoice.posting_date = closing_date
+		elif not sales_invoice.posting_date:
+			sales_invoice.posting_date = getdate(self.posting_date)
+
+		if closing_time:
+			sales_invoice.posting_time = closing_time
+		elif not sales_invoice.posting_time:
+			sales_invoice.posting_time = get_time(self.posting_time)
 
 		sales_invoice.save()
 		sales_invoice.submit()
@@ -114,6 +121,7 @@ class CustomPOSInvoiceMergeLog(POSInvoiceMergeLog):
 			credit_note.posting_time = closing_time or get_time(self.posting_time)
 			credit_note.save()
 			credit_note.submit()
-			credit_notes[key] = credit_note.name
+			self.consolidated_credit_note = credit_note.name
+			credit_notes[credit_note.name] = [d.name for d in value]
 
 		return credit_notes
