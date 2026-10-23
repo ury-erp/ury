@@ -20,18 +20,6 @@ import { call } from '@ury/core';
 
 type SectionKey = 'pos_profile' | 'production_unit' | 'room';
 
-const SECTION_DOCTYPES: Record<SectionKey, string> = {
-  pos_profile: 'POS Profile',
-  production_unit: 'URY Production Unit',
-  room: 'URY Room',
-};
-
-const SECTION_LABELS: Record<SectionKey, string> = {
-  pos_profile: 'POS Profile',
-  production_unit: 'Production Unit',
-  room: 'Room',
-};
-
 /** Effective child-row schema of the shared `URY Printer Settings` table. */
 interface PrinterRow {
   name?: string;
@@ -188,11 +176,7 @@ export const PrinterConfigPage: React.FC = () => {
     production_unit: false,
     room: false,
   });
-  const [saving, setSaving] = useState<Record<SectionKey, boolean>>({
-    pos_profile: false,
-    production_unit: false,
-    room: false,
-  });
+  const [savingAll, setSavingAll] = useState<boolean>(false);
 
   // Form state per section — all values normalized to 0/1 for checks and 1/0 for saves.
   const [posForm, setPosForm] = useState(emptyPosForm);
@@ -477,62 +461,84 @@ export const PrinterConfigPage: React.FC = () => {
     };
   }, [selectedNames.room, buildRoomForm, snapshotOf]);
 
-  const saveSection = useCallback(
-    async (section: SectionKey) => {
-      const name = selectedNames[section];
-      if (!name || saving[section]) return;
-      if (originals[section] === currentSnapshot(section)) {
-        showToast.warning('No changes in document');
-        return;
-      }
-      setSaving((prev) => ({ ...prev, [section]: true }));
-      try {
-        if (section === 'pos_profile') {
-          await call('frappe.client.set_value', {
-            doctype: 'POS Profile',
-            name,
-            fieldname: {
-              print_format: posForm.print_format,
-              letter_head: posForm.letter_head,
-              tc_name: posForm.tc_name,
-              select_print_heading: posForm.select_print_heading,
-              qz_print: posForm.qz_print ? 1 : 0,
-              qz_host: posForm.qz_host,
-              custom_enable_kot_reprint: posForm.custom_enable_kot_reprint ? 1 : 0,
-              custom_reprint_kot_format: posForm.custom_reprint_kot_format,
-              custom_table_order_printer: posForm.custom_table_order_printer,
-              custom_parcel_order_printer: posForm.custom_parcel_order_printer,
-              printer_settings: posForm.printer_settings.map(rowForSave),
-            },
-          });
-        } else if (section === 'production_unit') {
-          await call('frappe.client.set_value', {
-            doctype: 'URY Production Unit',
-            name,
-            fieldname: {
-              printer_settings: unitForm.printer_settings.map(rowForSave),
-            },
-          });
-        } else {
-          await call('frappe.client.set_value', {
-            doctype: 'URY Room',
-            name,
-            fieldname: {
-              printer_settings: roomForm.printer_settings.map(rowForSave),
-            },
-          });
-        }
-        showToast.success(`${SECTION_LABELS[section]} printer settings saved`);
-        setOriginals((prev) => ({ ...prev, [section]: currentSnapshot(section) }));
-      } catch (err) {
-        showToast.error(parseFrappeError(err) || 'Failed to save printer settings');
-        console.error('Failed to save printer settings', err);
-      } finally {
-        setSaving((prev) => ({ ...prev, [section]: false }));
-      }
-    },
-    [selectedNames, saving, originals, currentSnapshot, posForm, unitForm, roomForm]
-  );
+  const anyDocLoading = docLoading.pos_profile || docLoading.production_unit || docLoading.room;
+
+  const handleSaveAll = useCallback(async () => {
+    if (savingAll || anyDocLoading) return;
+    const isPosDirty =
+      !!selectedNames.pos_profile && originals.pos_profile !== currentSnapshot('pos_profile');
+    const isUnitDirty =
+      !!selectedNames.production_unit &&
+      originals.production_unit !== currentSnapshot('production_unit');
+    const isRoomDirty = !!selectedNames.room && originals.room !== currentSnapshot('room');
+    if (!isPosDirty && !isUnitDirty && !isRoomDirty) {
+      showToast.warning('No changes in document');
+      return;
+    }
+    setSavingAll(true);
+    try {
+      await Promise.all([
+        isPosDirty
+          ? call('frappe.client.set_value', {
+              doctype: 'POS Profile',
+              name: selectedNames.pos_profile,
+              fieldname: {
+                print_format: posForm.print_format,
+                letter_head: posForm.letter_head,
+                tc_name: posForm.tc_name,
+                select_print_heading: posForm.select_print_heading,
+                qz_print: posForm.qz_print ? 1 : 0,
+                qz_host: posForm.qz_host,
+                custom_enable_kot_reprint: posForm.custom_enable_kot_reprint ? 1 : 0,
+                custom_reprint_kot_format: posForm.custom_reprint_kot_format,
+                custom_table_order_printer: posForm.custom_table_order_printer,
+                custom_parcel_order_printer: posForm.custom_parcel_order_printer,
+                printer_settings: posForm.printer_settings.map(rowForSave),
+              },
+            })
+          : Promise.resolve(),
+        isUnitDirty
+          ? call('frappe.client.set_value', {
+              doctype: 'URY Production Unit',
+              name: selectedNames.production_unit,
+              fieldname: {
+                printer_settings: unitForm.printer_settings.map(rowForSave),
+              },
+            })
+          : Promise.resolve(),
+        isRoomDirty
+          ? call('frappe.client.set_value', {
+              doctype: 'URY Room',
+              name: selectedNames.room,
+              fieldname: {
+                printer_settings: roomForm.printer_settings.map(rowForSave),
+              },
+            })
+          : Promise.resolve(),
+      ]);
+      setOriginals((prev) => ({
+        ...prev,
+        ...(isPosDirty ? { pos_profile: currentSnapshot('pos_profile') } : {}),
+        ...(isUnitDirty ? { production_unit: currentSnapshot('production_unit') } : {}),
+        ...(isRoomDirty ? { room: currentSnapshot('room') } : {}),
+      }));
+      showToast.success('Printer configuration saved');
+    } catch (err) {
+      showToast.error(parseFrappeError(err) || 'Failed to save printer settings');
+      console.error('Failed to save printer settings', err);
+    } finally {
+      setSavingAll(false);
+    }
+  }, [
+    savingAll,
+    anyDocLoading,
+    selectedNames,
+    originals,
+    currentSnapshot,
+    posForm,
+    unitForm,
+    roomForm,
+  ]);
 
   const handleAddPrinter = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -591,19 +597,6 @@ export const PrinterConfigPage: React.FC = () => {
     </div>
   );
 
-  const renderSaveButton = (section: SectionKey) => (
-    <div className="flex justify-end pt-2 border-t border-border">
-      <Button
-        onClick={() => saveSection(section)}
-        disabled={saving[section] || docLoading[section]}
-        className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs min-w-[140px]"
-      >
-        {saving[section] ? <Spinner className="w-4 h-4" hideMessage /> : <Save className="w-4 h-4" />}
-        Save Changes
-      </Button>
-    </div>
-  );
-
   const renderPrinterTable = (
     rows: PrinterRow[],
     onChange: (rows: PrinterRow[]) => void,
@@ -630,17 +623,17 @@ export const PrinterConfigPage: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">Bill</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">KOT Print</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2 whitespace-nowrap">Waiter Print</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2 min-w-[180px]">Printer</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">Bill</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">KOT Print</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">Waiter Print</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 min-w-[180px]">Printer</th>
                 <th className="w-10 px-2 py-2" aria-label="actions" />
               </tr>
             </thead>
             <tbody>
               {rows.map((row, idx) => (
                 <tr key={row.name || idx} className="border-b border-border last:border-b-0">
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5">
                     <Switch
                       aria-label={`${labelPrefix} row ${idx + 1} bill`}
                       checked={row.bill === 1}
@@ -649,7 +642,7 @@ export const PrinterConfigPage: React.FC = () => {
                       }
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5">
                     <Switch
                       aria-label={`${labelPrefix} row ${idx + 1} KOT print`}
                       checked={row.custom_kot_print === 1}
@@ -658,7 +651,7 @@ export const PrinterConfigPage: React.FC = () => {
                       }
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5">
                     <Switch
                       aria-label={`${labelPrefix} row ${idx + 1} waiter print`}
                       checked={row.custom_waiter_print === 1}
@@ -667,7 +660,7 @@ export const PrinterConfigPage: React.FC = () => {
                       }
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5">
                     <SearchableSelect
                       id={`${idPrefix}-printer-row-${idx}`}
                       value={row.printer}
@@ -699,7 +692,7 @@ export const PrinterConfigPage: React.FC = () => {
   );
 
   const renderNetworkPrintersSection = () => (
-    <Card className="p-4 space-y-4" data-testid="printer-section-network">
+    <Card className="p-4 space-y-3" data-testid="printer-section-network">
       {renderSectionHeader(
         'Network Printers',
         'Configured CUPS and network printer endpoints.',
@@ -725,21 +718,21 @@ export const PrinterConfigPage: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="text-left font-medium text-muted-foreground px-3 py-2">Printer Name / ID</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2">Server IP</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2">Port</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2">Printer Device Name</th>
-                <th className="text-left font-medium text-muted-foreground px-3 py-2">Actions</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Printer Name / ID</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Server IP</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Port</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Printer Device Name</th>
+                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Actions</th>
               </tr>
             </thead>
             <tbody>
               {networkPrinters.map((printer) => (
                 <tr key={printer.name} className="border-b border-border last:border-b-0">
-                  <td className="px-3 py-2 font-medium text-foreground">{printer.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{printer.server_ip || '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{printer.port ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{printer.printer_name || '—'}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5 font-medium text-foreground">{printer.name}</td>
+                  <td className="px-2.5 py-1.5 text-muted-foreground">{printer.server_ip || '—'}</td>
+                  <td className="px-2.5 py-1.5 text-muted-foreground">{printer.port ?? '—'}</td>
+                  <td className="px-2.5 py-1.5 text-muted-foreground">{printer.printer_name || '—'}</td>
+                  <td className="px-2.5 py-1.5">
                     <Button
                       type="button"
                       variant="ghost"
@@ -761,7 +754,7 @@ export const PrinterConfigPage: React.FC = () => {
   );
 
   const renderPosProfileSection = () => (
-    <Card className="p-4 space-y-4" data-testid="printer-section-pos-profile">
+    <Card className="p-4 space-y-3" data-testid="printer-section-pos-profile">
       {renderSectionHeader(
         'POS Profile Printer Settings',
         'Configure invoice, receipt, and QZ printing for POS profiles.'
@@ -794,9 +787,9 @@ export const PrinterConfigPage: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="space-y-4 pt-2 border-t border-border">
+              <div className="space-y-3 pt-2 border-t border-border">
                 <h3 className="text-sm font-semibold text-foreground">Standard Print Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
                     <SearchableSelect
@@ -836,7 +829,7 @@ export const PrinterConfigPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-border">
+              <div className="space-y-3 pt-3 border-t border-border">
                 <h3 className="text-sm font-semibold text-foreground">Hardware / QZ Settings</h3>
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -873,7 +866,7 @@ export const PrinterConfigPage: React.FC = () => {
                   />
                 </div>
                 {posForm.custom_enable_kot_reprint && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1.5">Reprint KOT Format</label>
                       <SearchableSelect
@@ -905,14 +898,12 @@ export const PrinterConfigPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="pt-4 border-t border-border">
+              <div className="pt-3 border-t border-border">
                 {renderPrinterTable(posForm.printer_settings, (rows) => setPosForm((prev) => ({ ...prev, printer_settings: rows })), {
                   idPrefix: 'pos',
                   labelPrefix: 'POS',
                 })}
               </div>
-
-              {renderSaveButton('pos_profile')}
             </>
           )}
         </>
@@ -921,7 +912,7 @@ export const PrinterConfigPage: React.FC = () => {
   );
 
   const renderProductionUnitSection = () => (
-    <Card className="p-4 space-y-4" data-testid="printer-section-production-unit">
+    <Card className="p-4 space-y-3" data-testid="printer-section-production-unit">
       {renderSectionHeader(
         'URY Production Unit Printer Settings',
         'Configure KOT and order routing printers for kitchen and bar production units.'
@@ -962,7 +953,6 @@ export const PrinterConfigPage: React.FC = () => {
                 idPrefix: 'unit',
                 labelPrefix: 'Unit',
               })}
-              {renderSaveButton('production_unit')}
             </>
           )}
         </>
@@ -971,7 +961,7 @@ export const PrinterConfigPage: React.FC = () => {
   );
 
   const renderRoomSection = () => (
-    <Card className="p-4 space-y-4" data-testid="printer-section-room">
+    <Card className="p-4 space-y-3" data-testid="printer-section-room">
       {renderSectionHeader(
         'URY Room Printer Settings',
         'Configure dining area, hall, and room printer routing.'
@@ -1008,8 +998,6 @@ export const PrinterConfigPage: React.FC = () => {
                 idPrefix: 'room',
                 labelPrefix: 'Room',
               })}
-
-              {renderSaveButton('room')}
             </>
           )}
         </>
@@ -1018,7 +1006,7 @@ export const PrinterConfigPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
         <div>
@@ -1028,13 +1016,13 @@ export const PrinterConfigPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="gap-1.5">
-            <Printer className="w-3 h-3" />
-            {activeBranchName}
-          </Badge>
-          <Button variant="outline" onClick={() => loadAll(true)} disabled={loading || refreshing}>
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+          <Button
+            onClick={handleSaveAll}
+            disabled={savingAll || anyDocLoading}
+            className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs min-w-[140px]"
+          >
+            {savingAll ? <Spinner className="w-4 h-4" hideMessage /> : <Save className="w-4 h-4" />}
+            Save Changes
           </Button>
         </div>
       </div>
@@ -1057,10 +1045,14 @@ export const PrinterConfigPage: React.FC = () => {
         </Card>
       ) : (
         <>
-          {renderNetworkPrintersSection()}
-          {renderPosProfileSection()}
-          {renderProductionUnitSection()}
-          {renderRoomSection()}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <div className="space-y-4">
+            {renderNetworkPrintersSection()}
+            {renderProductionUnitSection()}
+            {renderRoomSection()}
+          </div>
+          <div className="space-y-4">{renderPosProfileSection()}</div>
+        </div>
         </>
       )}
 

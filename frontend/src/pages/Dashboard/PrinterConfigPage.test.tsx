@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import PrinterConfigPage from "./PrinterConfigPage";
+import { showToast } from "@ury/ui";
 
 vi.mock("../../context/BranchContext", () => ({
   useBranchContext: () => ({
@@ -8,6 +9,18 @@ vi.mock("../../context/BranchContext", () => ({
     branches: [{ id: "Kozhikode", name: "Kozhikode" }],
   }),
 }));
+
+vi.mock("@ury/ui", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    showToast: {
+      error: vi.fn(),
+      success: vi.fn(),
+      warning: vi.fn(),
+    },
+  };
+});
 
 const mockCall = vi.hoisted(() => vi.fn());
 
@@ -156,7 +169,19 @@ describe("PrinterConfigPage", () => {
         "Manage network printers and printer assignments across POS Profiles, Production Units, and Rooms."
       )
     ).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("Kozhikode")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("printer-section-network")).toBeInTheDocument());
+  });
+
+  it("renders a single Save Changes button in the header without a branch badge or refresh button", async () => {
+    render(<PrinterConfigPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("Main POS")).toBeInTheDocument());
+
+    // Exactly one Save Changes button exists for the whole page, in the header.
+    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
+
+    // No refresh button and no branch name badge in the header.
+    expect(screen.queryByRole("button", { name: /Refresh/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Kozhikode")).not.toBeInTheDocument();
   });
 
   it("renders all four sections simultaneously without tabs", async () => {
@@ -302,13 +327,13 @@ describe("PrinterConfigPage", () => {
     expect(document.getElementById("pos-printer-row-1")).toBeNull();
   });
 
-  it("saves POS Profile changes independently via frappe.client.set_value", async () => {
+  it("saves POS Profile changes via the unified Save Changes button", async () => {
     render(<PrinterConfigPage />);
-    const pos = await screen.findByTestId("printer-section-pos-profile");
+    await screen.findByTestId("printer-section-pos-profile");
     await waitFor(() => expect(screen.getByDisplayValue("Main POS")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("switch", { name: "QZ Print" }));
-    fireEvent.click(within(pos).getByRole("button", { name: "Save Changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
       expect(mockCall).toHaveBeenCalledWith(
@@ -320,16 +345,17 @@ describe("PrinterConfigPage", () => {
         })
       )
     );
+    expect(showToast.success).toHaveBeenCalledWith("Printer configuration saved");
   });
 
-  it("saves Production Unit printer settings independently via frappe.client.set_value", async () => {
+  it("saves Production Unit printer settings via the unified Save Changes button", async () => {
     render(<PrinterConfigPage />);
     const unit = await screen.findByTestId("printer-section-production-unit");
     await waitFor(() => expect(screen.getByDisplayValue("Kitchen Unit")).toBeInTheDocument());
     expect(within(unit).getByText("Kitchen Dept")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "Unit row 1 KOT print" }));
-    fireEvent.click(within(unit).getByRole("button", { name: "Save Changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
       expect(mockCall).toHaveBeenCalledWith(
@@ -365,7 +391,7 @@ describe("PrinterConfigPage", () => {
     expect(within(room).getByText("Printer")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "Room row 1 waiter print" }));
-    fireEvent.click(within(room).getByRole("button", { name: "Save Changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
       expect(mockCall).toHaveBeenCalledWith(
@@ -408,18 +434,49 @@ describe("PrinterConfigPage", () => {
     expect(document.getElementById("room-printer-row-1")).not.toBeNull();
   });
 
-  it("does not save a section without changes", async () => {
+  it("does not save any section without changes and warns instead", async () => {
     render(<PrinterConfigPage />);
-    const pos = await screen.findByTestId("printer-section-pos-profile");
+    await screen.findByTestId("printer-section-pos-profile");
     await waitFor(() => expect(screen.getByDisplayValue("Main POS")).toBeInTheDocument());
 
-    fireEvent.click(within(pos).getByRole("button", { name: "Save Changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() =>
+      expect(showToast.warning).toHaveBeenCalledWith("No changes in document")
+    );
     expect(mockCall).not.toHaveBeenCalledWith(
       "frappe.client.set_value",
-      expect.objectContaining({ doctype: "POS Profile" })
+      expect.anything()
     );
+  });
+
+  it("saves all dirty sections concurrently with the single Save Changes button", async () => {
+    render(<PrinterConfigPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("Main POS")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("Kitchen Unit")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Main Hall")).toBeInTheDocument();
+
+    // Dirty all three sections.
+    fireEvent.click(screen.getByRole("switch", { name: "QZ Print" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Unit row 1 KOT print" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Room row 1 waiter print" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(mockCall).toHaveBeenCalledWith(
+        "frappe.client.set_value",
+        expect.objectContaining({ doctype: "POS Profile", name: "Main POS" })
+      );
+      expect(mockCall).toHaveBeenCalledWith(
+        "frappe.client.set_value",
+        expect.objectContaining({ doctype: "URY Production Unit", name: "Kitchen Unit" })
+      );
+      expect(mockCall).toHaveBeenCalledWith(
+        "frappe.client.set_value",
+        expect.objectContaining({ doctype: "URY Room", name: "Main Hall" })
+      );
+    });
+    expect(showToast.success).toHaveBeenCalledWith("Printer configuration saved");
   });
 
   it("renders empty states for sections without records in the branch", async () => {
