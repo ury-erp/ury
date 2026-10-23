@@ -27,6 +27,7 @@ import {
   submitPosClosingEntry,
   type OpenPosOpeningEntry,
   type POSClosingInvoice,
+  type POSClosingPayment,
   type ClosingPaymentSummary,
 } from '../lib/pos-closing-api';
 
@@ -69,26 +70,99 @@ function formatTime(date: Date): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
+/** Generic frappe-js-sdk fallbacks that carry no actionable detail. */
+const GENERIC_ERROR_MESSAGES = new Set([
+  'there was an error while updating the document.',
+  'there was an error while creating the document.',
+  'request failed with status code 500',
+  'there was an error.',
+  'internal server error',
+]);
+
+function readErrorProp(source: unknown, key: string): unknown {
+  if (source && typeof source === 'object' && key in source) {
+    return (source as Record<string, unknown>)[key];
+  }
+  return undefined;
+}
+
+/** Returns the substring after the first colon, or null when there is none. */
+function detailAfterColon(text: string): string | null {
+  const idx = text.indexOf(':');
+  if (idx === -1) return null;
+  return text.slice(idx + 1).trim() || null;
+}
+
+function combineWithFallback(fallback: string, detail: string): string {
+  if (fallback && !detail.includes(fallback)) return `${fallback}: ${detail}`;
+  return detail;
+}
+
 /**
- * Extracts a human-readable message from a Frappe API error, unwrapping
- * `_server_messages` when present (e.g. frappe.throw("Submit/Delete Draft
- * Invoices") raised by SubPOSClosing.validate()). Falls back to the error's
- * own message, then to a generic string.
+ * Extracts a human-readable message from a Frappe API error. Frappe answers
+ * errors in several shapes depending on where the exception was raised:
+ * `_server_messages` (frappe.throw), `exception` / `exc` (uncaught exceptions
+ * such as NegativeStockError, returned on HTTP 500 without _server_messages),
+ * or a plain `message`. Each shape is checked on the error object directly
+ * and on its axios `response.data` envelope. When a specific detail is found
+ * it is prefixed with the fallback (e.g. "Failed to close POS: ..."), unless
+ * the detail already contains it.
  */
 function extractServerErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === 'object' && '_server_messages' in error) {
-    const raw = (error as { _server_messages?: unknown })._server_messages;
-    if (typeof raw === 'string') {
-      try {
-        const messages = JSON.parse(raw);
-        const first = JSON.parse(messages[0]);
-        if (first?.message) return messageToPlainText(first.message as string);
-      } catch {
-        // fall through to other extraction strategies
+  const response = readErrorProp(error, 'response');
+  const responseData =
+    response && typeof response === 'object' ? readErrorProp(response, 'data') : undefined;
+  const sources = [error, responseData];
+
+  // a. _server_messages: JSON array of JSON-encoded { message: ... } entries.
+  for (const source of sources) {
+    const raw = readErrorProp(source, '_server_messages');
+    if (typeof raw !== 'string') continue;
+    try {
+      const messages = JSON.parse(raw);
+      const first = JSON.parse(messages[0]);
+      if (first?.message) {
+        return combineWithFallback(fallback, messageToPlainText(first.message as string));
       }
+    } catch {
+      // fall through to other extraction strategies
     }
   }
-  if (error instanceof Error && error.message) return error.message;
+
+  // b. exception: "module.ClassName: human readable detail".
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'exception');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const detail = detailAfterColon(raw);
+    if (detail) return combineWithFallback(fallback, messageToPlainText(detail));
+  }
+
+  // c. exc: JSON array or newline-separated traceback; use its last line.
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'exc');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    let lastLine = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        lastLine = String(parsed[parsed.length - 1]);
+      }
+    } catch {
+      const lines = raw.trim().split('\n');
+      lastLine = lines[lines.length - 1];
+    }
+    const detail = detailAfterColon(lastLine);
+    if (detail) return combineWithFallback(fallback, messageToPlainText(detail));
+  }
+
+  // d. message: usable only when it isn't a generic SDK fallback string.
+  for (const source of sources) {
+    const raw = readErrorProp(source, 'message');
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    if (GENERIC_ERROR_MESSAGES.has(raw.trim().toLowerCase())) continue;
+    return combineWithFallback(fallback, messageToPlainText(raw));
+  }
+
   return fallback;
 }
 
@@ -100,13 +174,15 @@ interface AggregatedTotals {
 
 /**
  * Aggregates raw POS Invoice dicts into closing totals and per-mode expected
- * amounts, faithfully porting the logic in
- * ury/ury/doctype/sub_pos_closing/sub_pos_closing.js (refresh_payments /
- * set_form_data): sums grand_total/net_total/total_qty, and for each
- * payment subtracts the invoice's change_amount when the payment account
- * matches account_for_change_amount before accumulating by mode_of_payment.
+ * amounts. When `paymentsByMode` is provided (ERPNext v16 main-cashier path),
+ * those payments are already pre-aggregated server-side by mode_of_payment
+ * with change_amount already deducted, so they are summed verbatim. When it
+ * is absent (sub-cashier path / legacy invoice-list shape), expected amounts
+ * are accumulated per-invoice, subtracting the invoice's change_amount when
+ * the payment account matches account_for_change_amount (mirroring
+ * sub_pos_closing.js refresh_payments / set_form_data).
  */
-function aggregateInvoices(invoices: POSClosingInvoice[]): {
+function aggregateInvoices(invoices: POSClosingInvoice[], paymentsByMode?: POSClosingPayment[]): {
   totals: AggregatedTotals;
   expectedByMode: Record<string, number>;
 } {
@@ -118,15 +194,24 @@ function aggregateInvoices(invoices: POSClosingInvoice[]): {
     totals.netTotal += Number(invoice.net_total) || 0;
     totals.totalQty += Number(invoice.total_qty) || 0;
 
-    (invoice.payments || []).forEach((payment) => {
-      let amount = Number(payment.amount) || 0;
-      if (payment.account === invoice.account_for_change_amount) {
-        amount -= Number(invoice.change_amount) || 0;
-      }
-      expectedByMode[payment.mode_of_payment] =
-        (expectedByMode[payment.mode_of_payment] || 0) + amount;
-    });
+    if (!paymentsByMode) {
+      (invoice.payments || []).forEach((payment) => {
+        let amount = Number(payment.amount) || 0;
+        if (payment.account === invoice.account_for_change_amount) {
+          amount -= Number(invoice.change_amount) || 0;
+        }
+        expectedByMode[payment.mode_of_payment] =
+          (expectedByMode[payment.mode_of_payment] || 0) + amount;
+      });
+    }
   });
+
+  if (paymentsByMode) {
+    paymentsByMode.forEach((payment) => {
+      expectedByMode[payment.mode_of_payment] =
+        (expectedByMode[payment.mode_of_payment] || 0) + (Number(payment.amount) || 0);
+    });
+  }
 
   return { totals, expectedByMode };
 }
@@ -138,24 +223,27 @@ function buildRows(
   const rows = new Map<string, ClosingPaymentSummary>();
 
   openingBalances.forEach((detail) => {
+    const opening = Number(detail.opening_amount) || 0;
     rows.set(detail.mode_of_payment, {
       mode_of_payment: detail.mode_of_payment,
-      opening_amount: Number(detail.opening_amount) || 0,
-      expected_amount: 0,
+      opening_amount: opening,
+      // Matches ERPNext Desk / Sub POS Closing: expected_amount =
+      // opening_amount + sales_amount.
+      expected_amount: opening,
       closing_amount: 0,
       difference: 0,
     });
   });
 
-  Object.entries(expectedByMode).forEach(([mode, expected]) => {
+  Object.entries(expectedByMode).forEach(([mode, sales]) => {
     const existing = rows.get(mode);
     if (existing) {
-      existing.expected_amount = expected;
+      existing.expected_amount += sales;
     } else {
       rows.set(mode, {
         mode_of_payment: mode,
         opening_amount: 0,
-        expected_amount: expected,
+        expected_amount: sales,
         closing_amount: 0,
         difference: 0,
       });
@@ -218,15 +306,17 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setPeriodEndDate(now);
       const end = formatDateTime(now);
 
-      const [invoices, openingDoc] = await Promise.all([
+      const [invoiceResult, openingDoc] = await Promise.all([
         subCashier
           ? getSubCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name)
           : getMainCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name),
         db.getDoc<OpeningEntryDoc>('POS Opening Entry', ownEntry.name),
       ]);
 
+      const invoices = Array.isArray(invoiceResult) ? invoiceResult : (invoiceResult?.invoices || []);
+      const payments = Array.isArray(invoiceResult) ? undefined : invoiceResult?.payments;
       setInvoiceCount(invoices.length);
-      const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
+      const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices, payments);
       setTotals(aggregatedTotals);
       setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
     } catch (error) {
@@ -425,7 +515,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         </div>
 
         {submitError && (
-          <p className="px-6 pb-2 text-sm font-medium text-destructive">{submitError}</p>
+          <p className="px-6 pb-2 text-sm font-medium text-destructive break-words">{submitError}</p>
         )}
 
         <DialogFooter>
