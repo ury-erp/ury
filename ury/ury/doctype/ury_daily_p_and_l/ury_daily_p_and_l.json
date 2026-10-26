@@ -52,6 +52,7 @@
   "direct_expenses_breakup",
   "section_break_lught",
   "employee_costs_breakup",
+  "employee_wages",
   "section_break_rhkwy",
   "indirect_expenses_breakup",
   "cogs_tab",
@@ -314,6 +315,14 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "employee_wages",
+   "fieldtype": "Table",
+   "label": "Employee Wages",
+   "options": "URY P and L Employee Wage Breakup",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_rhkwy",
    "fieldtype": "Section Break"
   },
@@ -400,7 +409,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-01-09 14:15:52.566841",
+ "modified": "2026-10-26 20:11:19.062064",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Daily P and L",
