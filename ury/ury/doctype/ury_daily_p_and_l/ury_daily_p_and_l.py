@@ -284,6 +284,7 @@ class URYDailyPandL(Document):
 		self.direct_expenses_breakup = []
 		self.employee_costs_breakup = []
 		self.indirect_expenses_breakup = []
+		self.employee_wages = []
 
 		'''Total Sales Of the Day'''
 		gross_sales = frappe.db.sql('''
@@ -426,14 +427,24 @@ class URYDailyPandL(Document):
 			WHERE 
 				b.`attendance_date` = %(date)s
 				AND c.`branch` = %(branch)s
-				AND c.`payment_type` = "Daily Wage"                        
+				AND c.`payment_type` = "Daily Wage"
+				AND b.`docstatus` = 1
+				AND b.`status` != "Absent"
 		''', {"branch": self.branch, "date": self.date}, as_dict=True)
 
 		for attendance in employee_attendance_dw_list:
+			emp_wage = 0
 			if attendance["Status"] == "Half Day":
-				salary_cost_gross = round((salary_cost_gross + 0.5 * attendance["Salary"]),2)
+				emp_wage = round((0.5 * attendance["Salary"]),2)
 			if attendance["Status"] == "Present":
-				salary_cost_gross = round((salary_cost_gross + attendance["Salary"]),2)
+				emp_wage = round((attendance["Salary"]),2)
+
+			salary_cost_gross = round((salary_cost_gross + emp_wage), 2)
+
+			self.append("employee_wages", {
+				"employee": attendance["Employee"],
+				"employee_cost": emp_wage
+			})
 
 		date_str =  self.date
 		date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -449,11 +460,17 @@ class URYDailyPandL(Document):
 			FROM `tabEmployee` b
 			WHERE 
 				b.`branch` = %(branch)s
-				AND b.`payment_type` = "Salary"                        
+				AND b.`payment_type` = "Salary"
+				AND b.`status` = "Active"
 		''', {"branch": self.branch, "date": self.date}, as_dict=True)
 
 		for attendance in employee_attendance_sl_list:
-			salary_cost_gross = round((salary_cost_gross + attendance["Salary"]/days),2)
+			emp_wage = round((attendance["Salary"]/days),2)
+			salary_cost_gross = round((salary_cost_gross + emp_wage), 2)
+			self.append("employee_wages", {
+				"employee": attendance["Employee"],
+				"employee_cost": emp_wage
+			})
 
 		if self.net_sales != 0.0:
 			salary_cost_gross_percent = round(((salary_cost_gross / self.net_sales) * 100),3)
