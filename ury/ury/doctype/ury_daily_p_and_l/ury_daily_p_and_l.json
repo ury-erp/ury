@@ -52,6 +52,7 @@
   "direct_expenses_breakup",
   "section_break_lught",
   "employee_costs_breakup",
+  "employee_wages",
   "section_break_rhkwy",
   "indirect_expenses_breakup",
   "cogs_tab",
@@ -395,6 +396,13 @@
    "fieldtype": "Table",
    "label": "Materials Consumed",
    "options": "URY P and L Materials"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "employee_wages",
+   "fieldtype": "Table",
+   "label": "Employee Wages",
+   "options": "URY P and L Employee Wage Breakup"
   }
  ],
  "index_web_pages_for_search": 1,
