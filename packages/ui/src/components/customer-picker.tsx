@@ -4,6 +4,7 @@ import { Button } from './button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
 import { Input } from './input'
 import { cn } from '../lib/cn'
+import { validatePhoneNumber, getCountryCallingCode } from '../lib/phone-validation'
 
 export interface CustomerOption {
   id: string
@@ -30,6 +31,7 @@ export interface CustomerPickerLabels {
   searchFailed?: string
   searching: string
   createTitle: string
+  invalidPhone?: string
 }
 
 export interface CustomerPickerProps {
@@ -44,11 +46,16 @@ export interface CustomerPickerProps {
   labels: CustomerPickerLabels
   favourites?: Array<{ name: string; onSelect: () => void }>
   resultsHeader?: string
+  country?: string
+  validatePhone?: (
+    phone: string,
+    country?: string
+  ) => { isValid: boolean; message: string } | boolean | string
 }
 
 function prefillFromQuery(query: string): { name: string; phone: string } {
   const trimmed = query.trim()
-  if (/^\d+$/.test(trimmed)) return { name: '', phone: trimmed }
+  if (/^\+?\d+$/.test(trimmed)) return { name: '', phone: trimmed }
   return { name: trimmed, phone: '' }
 }
 
@@ -64,6 +71,8 @@ export function CustomerPicker({
   labels,
   favourites,
   resultsHeader,
+  country,
+  validatePhone,
 }: CustomerPickerProps) {
   const [query, setQuery] = useState('')
   const [listOpen, setListOpen] = useState(false)
@@ -73,8 +82,10 @@ export function CustomerPicker({
   const [phone, setPhone] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const onSearchRef = useRef(onSearch)
   onSearchRef.current = onSearch
+  const userEditedPhoneRef = useRef(false)
 
   const changeLabel = labels.changeLabel ?? labels.cancel
   const searchFailedLabel = labels.searchFailed ?? labels.noResults
@@ -90,26 +101,98 @@ export function CustomerPicker({
     setHighlightedIndex(0)
   }, [results, query])
 
+  useEffect(() => {
+    if (createOpen && !userEditedPhoneRef.current && country) {
+      const callingCode = getCountryCallingCode(country)
+      if (callingCode && (!phone.trim() || phone.startsWith('+'))) {
+        setPhone(callingCode)
+      }
+    }
+  }, [createOpen, country])
+
   const openCreate = (fromQuery = query) => {
+    userEditedPhoneRef.current = false
     const prefill = prefillFromQuery(fromQuery)
     setName(prefill.name)
-    setPhone(prefill.phone)
+    const callingCode = getCountryCallingCode(country)
+    let initialPhone = prefill.phone
+    if (!initialPhone && callingCode) {
+      initialPhone = callingCode
+    } else if (initialPhone && callingCode && !initialPhone.startsWith('+')) {
+      const codeDigits = callingCode.replace('+', '')
+      if (!initialPhone.startsWith(codeDigits)) {
+        initialPhone = `${callingCode}${initialPhone}`
+      } else {
+        initialPhone = `+${initialPhone}`
+      }
+    }
+    setPhone(initialPhone)
     setError('')
+    setPhoneError('')
     setCreateOpen(true)
     setListOpen(false)
   }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !phone.trim()) return
+    const callingCode = getCountryCallingCode(country)
+    const callingCodeDigits = callingCode.replace('+', '')
+    const digitsOnly = phone.replace(/\D/g, '')
+    const isOnlyCallingCode = Boolean(
+      callingCode &&
+      digitsOnly === callingCodeDigits &&
+      (phone.trim() === callingCode || phone.trim() === `+${callingCodeDigits}` || phone.trim() === callingCodeDigits)
+    )
+
+    if (!name.trim() || !phone.trim() || isOnlyCallingCode) {
+      if (isOnlyCallingCode) {
+        setPhoneError('Mobile number is required')
+      }
+      return
+    }
+
+    let isValid = true
+    let validationMsg = ''
+    let sanitizedPhone = phone.trim()
+
+    if (validatePhone) {
+      const res = validatePhone(phone, country)
+      if (typeof res === 'boolean') {
+        isValid = res
+        validationMsg = res
+          ? ''
+          : (labels.invalidPhone ||
+            (country ? `Invalid mobile number for ${country}` : 'Invalid mobile number format'))
+      } else if (typeof res === 'string') {
+        isValid = !res
+        validationMsg = res
+      } else {
+        isValid = res.isValid
+        validationMsg = res.message
+      }
+    } else {
+      const res = validatePhoneNumber(phone, country)
+      isValid = res.isValid
+      validationMsg = labels.invalidPhone || res.message
+      sanitizedPhone = res.sanitized || sanitizedPhone
+    }
+
+    if (!isValid) {
+      setPhoneError(validationMsg)
+      setError('')
+      return
+    }
+
+    setPhoneError('')
     setCreating(true)
     setError('')
     try {
-      const created = await onCreate({ name: name.trim(), phone: phone.trim() })
+      const created = await onCreate({ name: name.trim(), phone: sanitizedPhone })
       onChange(created)
       setCreateOpen(false)
       setName('')
       setPhone('')
+      setPhoneError('')
       setQuery('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create customer')
@@ -286,13 +369,21 @@ export function CustomerPicker({
                   id="ury-cust-phone"
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    userEditedPhoneRef.current = true
+                    setPhone(e.target.value)
+                    if (phoneError) setPhoneError('')
+                    if (error) setError('')
+                  }}
                   required
                   disabled={creating}
                   className="pl-10"
                 />
                 <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
+              {phoneError && (
+                <p className="mt-1 text-xs text-destructive">{phoneError}</p>
+              )}
             </div>
             <div className="flex gap-3">
               <Button type="submit" className="flex-1" disabled={creating}>

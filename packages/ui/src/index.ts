@@ -1,5 +1,6 @@
 export { cn } from './lib/cn';
 export { sanitizeMessageHtml, messageToPlainText } from './lib/sanitize-message';
+export * from './lib/phone-validation';
 
 export * from './chart-colors';
 

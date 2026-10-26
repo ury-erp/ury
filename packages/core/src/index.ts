@@ -30,3 +30,6 @@ export type { CurrencyInfo } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
 export { validateFieldValue } from './utils/validateField';
 export type { ValidationMessages } from './utils/validateField';
+export { validatePhoneNumber, sanitizePhoneNumber, getCountryCallingCode, COUNTRY_CALLING_CODES } from './utils/phoneValidation';
+export type { PhoneValidationResult } from './utils/phoneValidation';
+

@@ -147,4 +147,90 @@ describe('CustomerPicker keyboard and prefill', () => {
     expect(await screen.findByText('Failed to search customers')).toBeInTheDocument();
     expect(screen.queryByText('No customers found')).not.toBeInTheDocument();
   });
+
+  it('validates mobile number as per the country and shows error message when invalid', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn().mockResolvedValue({ id: 'CUST-NEW', name: 'John Doe', phone: '9876543210' });
+
+    render(
+      <CustomerPicker
+        value={null}
+        onChange={vi.fn()}
+        results={[]}
+        onSearch={vi.fn()}
+        onCreate={onCreate}
+        labels={labels}
+        country="India"
+      />
+    );
+
+    // Open create customer dialog
+    await user.click(screen.getByPlaceholderText('Search customer...'));
+    await user.click(screen.getByRole('button', { name: /add new customer/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    const nameInput = within(dialog).getByLabelText('Name');
+    const phoneInput = within(dialog).getByLabelText('Phone');
+
+    // Country calling code +91 should show as already entered for India
+    expect(phoneInput).toHaveValue('+91');
+
+    await user.type(nameInput, 'John Doe');
+
+    // Submitting with only +91 should be blocked as mobile number is required
+    await user.click(within(dialog).getByRole('button', { name: 'Add Customer' }));
+    expect(within(dialog).getByText('Mobile number is required')).toBeInTheDocument();
+    expect(onCreate).not.toHaveBeenCalled();
+
+    // Now type invalid 5-digit number
+    await user.clear(phoneInput);
+    await user.type(phoneInput, '+9112345');
+    await user.click(within(dialog).getByRole('button', { name: 'Add Customer' }));
+
+    // Should show error message mentioning invalid mobile number for India
+    expect(within(dialog).getByText('Invalid mobile number for India')).toBeInTheDocument();
+    expect(onCreate).not.toHaveBeenCalled();
+
+    // Now fix the phone to a valid 10-digit India number with +91
+    await user.clear(phoneInput);
+    await user.type(phoneInput, '+919876543210');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add Customer' }));
+    expect(onCreate).toHaveBeenCalledWith({ name: 'John Doe', phone: '+919876543210' });
+  });
+
+  it('validates UAE mobile numbers correctly and prefills +971', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+
+    render(
+      <CustomerPicker
+        value={null}
+        onChange={vi.fn()}
+        results={[]}
+        onSearch={vi.fn()}
+        onCreate={onCreate}
+        labels={labels}
+        country="United Arab Emirates"
+      />
+    );
+
+    await user.click(screen.getByPlaceholderText('Search customer...'));
+    await user.click(screen.getByRole('button', { name: /add new customer/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    const nameInput = within(dialog).getByLabelText('Name');
+    const phoneInput = within(dialog).getByLabelText('Phone');
+
+    // Country calling code +971 should show as already entered for UAE
+    expect(phoneInput).toHaveValue('+971');
+
+    await user.type(nameInput, 'Ahmed');
+    await user.type(phoneInput, '12345');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add Customer' }));
+
+    expect(within(dialog).getByText('Invalid mobile number for United Arab Emirates')).toBeInTheDocument();
+    expect(onCreate).not.toHaveBeenCalled();
+  });
 });

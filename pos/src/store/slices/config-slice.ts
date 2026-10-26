@@ -100,14 +100,16 @@ export const createConfigSlice: StateCreator<
       const cached = sessionStorage.getItem('posProfile');
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);
-        set({ posProfile: profile });
-        // Allowed to enter the app: any role this POS Profile references
-        // anywhere (billing, transfer, table-order-restricted) — see
-        // deriveAllowedRoles for why this isn't billing-role-only.
-        const allowedRoles = deriveAllowedRoles(profile);
-        get().setAllowedRoles(allowedRoles);
-        set({ isLoading: false });
-        return;
+        if (profile && profile.country) {
+          set({ posProfile: profile });
+          // Allowed to enter the app: any role this POS Profile references
+          // anywhere (billing, transfer, table-order-restricted) — see
+          // deriveAllowedRoles for why this isn't billing-role-only.
+          const allowedRoles = deriveAllowedRoles(profile);
+          get().setAllowedRoles(allowedRoles);
+          set({ isLoading: false });
+          return;
+        }
       }
 
       // If not in cache or forcing refresh, fetch from API

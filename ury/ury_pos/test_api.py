@@ -370,6 +370,31 @@ class TestUryPosApi(unittest.TestCase):
         self.assertEqual(result.get("status"), "success")
         self.assertTrue(frappe.db.exists("Customer", "Test Auth Customer"))
 
+    def test_create_customer_invalid_phone(self):
+        frappe.set_user("Administrator")
+
+        with self.assertRaises(frappe.ValidationError) as cm:
+            create_customer("Test Invalid Customer", "12345")
+        self.assertIn("Invalid mobile number", str(cm.exception))
+
+    @patch("ury.ury_pos.api.frappe.db.get_value")
+    def test_create_customer_validates_against_pos_profile_country(self, mock_get_value):
+        frappe.set_user("Administrator")
+        # Simulate pos_profile with country "India"
+        mock_get_value.return_value = "India"
+
+        # Valid 10-digit India number
+        result = create_customer("Test India Customer", "9876543210", pos_profile="India POS")
+        self.assertEqual(result.get("status"), "success")
+        if frappe.db.exists("Customer", "Test India Customer"):
+            frappe.delete_doc("Customer", "Test India Customer", ignore_permissions=True, force=1)
+
+        # Invalid number for India (e.g. 5-digit)
+        with self.assertRaises(frappe.ValidationError) as cm:
+            create_customer("Test India Invalid", "12345", pos_profile="India POS")
+        self.assertIn("Invalid mobile number", str(cm.exception))
+        self.assertIn("India", str(cm.exception))
+
 
 
 class TestGetAllowedPosProfiles(unittest.TestCase):

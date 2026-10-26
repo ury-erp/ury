@@ -830,6 +830,7 @@ def getPosProfile():
         "pos_profile": pos_profile_name,
         "branch": branch,
         "company": company,
+        "country": getattr(pos_profiles, "country", None) or frappe.db.get_value("Company", company, "country"),
         "waiter": waiter,
         "warehouse": warehouse,
         "cashier": cashier,
@@ -876,7 +877,7 @@ def getPosProfileFull(pos_profile):
         "idx": profile.idx,
         "company": profile.company,
         "customer": profile.customer,
-        "country": profile.country,
+        "country": profile.country or frappe.db.get_value("Company", profile.company, "country"),
         "disabled": profile.disabled,
         "warehouse": profile.warehouse,
         "campaign": profile.get("campaign"),
@@ -1000,8 +1001,46 @@ def getAggregatorMOP(aggregator):
             {"mode_of_payment": modeOfPayment, "opening_amount": float(0)}
     )
     return modeOfPaymentsList
+def validate_customer_mobile(mobile_number, country=None):
+    from frappe.geo.country_info import get_all
+    import phonenumbers
+
+    mobile_number = str(mobile_number or "").strip()
+    if not mobile_number:
+        frappe.throw(_("Mobile Number is required"))
+
+    # Also run standard validate_phone_number to preserve existing mock expectations
+    try:
+        validate_phone_number(mobile_number, throw=True)
+    except Exception:
+        frappe.throw(_("Invalid mobile number format"))
+
+    country_code = None
+    calling_code = None
+    if country:
+        all_info = get_all()
+        c_info = all_info.get(country) or {}
+        country_code = (c_info.get("code") or "").upper() or None
+        calling_code = c_info.get("isd")
+
+    clean_mobile = mobile_number.replace(" ", "")
+    if calling_code and clean_mobile in (calling_code, calling_code.lstrip("+")):
+        frappe.throw(_("Mobile Number is required"))
+
+    is_valid = False
+    try:
+        parsed = phonenumbers.parse(mobile_number, country_code)
+        is_valid = phonenumbers.is_valid_number(parsed)
+    except Exception:
+        is_valid = False
+
+    if not is_valid:
+        error_msg = _("Invalid mobile number {0} for {1}").format(mobile_number, country) if country else _("Invalid mobile number format")
+        frappe.throw(error_msg)
+
+
 @frappe.whitelist()
-def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory=None):
+def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory=None, pos_profile=None):
     if not frappe.has_permission("Customer", "create"):
         frappe.throw(_("Not permitted to create customers"), frappe.PermissionError)
 
@@ -1009,10 +1048,33 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         frappe.throw(_("Customer name is required"))
     if not mobile_number:
         frappe.throw(_("Mobile Number is required"))
-    try:
-        validate_phone_number(mobile_number, throw=True)
-    except Exception:
-        frappe.throw(_("Invalid mobile number format"))
+
+    country = None
+    if pos_profile:
+        country = frappe.db.get_value("POS Profile", pos_profile, "country")
+        if not country:
+            company = frappe.db.get_value("POS Profile", pos_profile, "company")
+            if company:
+                country = frappe.db.get_value("Company", company, "country")
+
+    if not country:
+        try:
+            branch = getBranch()
+            if branch:
+                pos_profile_name = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
+                if pos_profile_name:
+                    country = frappe.db.get_value("POS Profile", pos_profile_name, "country")
+                    if not country:
+                        company = frappe.db.get_value("POS Profile", pos_profile_name, "company")
+                        if company:
+                            country = frappe.db.get_value("Company", company, "country")
+        except Exception:
+            pass
+
+    if not country:
+        country = frappe.db.get_single_value("System Settings", "country")
+
+    validate_customer_mobile(mobile_number, country)
 
     """Create a new customer"""
     try:

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CustomerPicker as CustomerPickerView, type CustomerOption } from '@ury/ui';
 import { addCustomer, searchCustomers, getCustomersByOrderType } from '../lib/customer-api';
-import { type Customer } from '../store/pos-store';
+import { type Customer, usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
 import { t } from '../i18n';
 
 export interface CustomerPickerProps {
@@ -20,6 +21,22 @@ function parseCustomer(row: { name: string; content?: string }): CustomerOption 
 }
 
 export function CustomerPicker({ value, onChange, disabled, orderType }: CustomerPickerProps) {
+  const posStoreProfile = usePOSStore((state) => state.posProfile);
+  const rootStoreProfile = useRootStore((state) => state.posProfile);
+  const posProfile = posStoreProfile || rootStoreProfile;
+
+  const country =
+    posProfile?.country ||
+    (() => {
+      try {
+        const raw = sessionStorage.getItem('posProfile');
+        return raw ? JSON.parse(raw)?.country : undefined;
+      } catch {
+        return undefined;
+      }
+    })() ||
+    (typeof window !== 'undefined' && ((window as any)?.frappe?.boot?.sysdefaults?.country || (window as any)?.frappe?.boot?.country)) ||
+    undefined;
   const [results, setResults] = useState<CustomerOption[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -85,10 +102,12 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
       onSearch={handleSearch}
       disabled={disabled}
       resultsHeader={orderType ? `${orderType} Customers` : undefined}
+      country={country}
       onCreate={async ({ name, phone }) => {
         const response = await addCustomer({
           customer_name: name,
           mobile_number: phone,
+          pos_profile: posProfile?.name,
         });
         const created = response.data;
         if (!created.name) {
@@ -113,6 +132,7 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
         searchFailed: t('customer.failed_search'),
         searching: t('common.searching'),
         createTitle: t('customer.add_customer_title'),
+        invalidPhone: posProfile?.country ? t('customer.phone_invalid', { country: posProfile.country }) : undefined,
       }}
     />
   );

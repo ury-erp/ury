@@ -36,6 +36,7 @@ export interface CreateCustomerData {
   customer_group?: string;
   territory?: string;
   name?: string;
+  pos_profile?: string;
 }
 
 export interface CreateCustomerResponse {

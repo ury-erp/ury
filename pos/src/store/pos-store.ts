@@ -291,15 +291,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        set({ 
-          posProfile: profile, 
-          profileLoading: false,
-          currency: profile.currency || 'INR'
-        });
-        if (!storage.getItem('currencySymbol')) {
-          await get().fetchCurrencySymbol();
+        if (profile && profile.country) {
+          set({ 
+            posProfile: profile, 
+            profileLoading: false,
+            currency: profile.currency || 'INR'
+          });
+          if (!storage.getItem('currencySymbol')) {
+            await get().fetchCurrencySymbol();
+          }
+          return;
         }
-        return;
       }
 
       set({ profileLoading: true, error: null });
