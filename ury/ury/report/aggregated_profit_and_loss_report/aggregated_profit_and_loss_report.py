@@ -18,15 +18,36 @@ def execute(filters=None):
 
 	parent_docs = get_parent_docs(filters)
 	parent_names = [row.name for row in parent_docs]
+	branches = list({row.branch for row in parent_docs if row.branch})
+	currencies = get_branch_currencies(branches)
 
 	aggregates = get_aggregated_parent_totals(filters, parent_names)
 	gross_sales = flt(aggregates.get("gross_sales"))
 	breakup_rows = get_breakup_rows(parent_names)
 
-	columns = get_columns()
+	multi_currency = len(currencies) > 1
+	columns = get_columns(", ".join(currencies) if currencies else None, multi_currency)
 	data = get_data(aggregates, breakup_rows, gross_sales)
 	chart = get_chart(aggregates)
 	report_summary = get_report_summary(aggregates, gross_sales)
+
+	if multi_currency:
+		data.insert(0, {
+			"category": _("WARNING: Amounts mix multiple currencies ({0}) and are not additive. Filter by a single branch for meaningful totals.").format(", ".join(currencies)),
+			"account_name": None,
+			"parent_category": None,
+			"parent_account": None,
+			"indent": 0,
+			"is_group": 0,
+			"amount": None,
+			"percentage": None,
+		})
+		report_summary.insert(0, {
+			"label": _("Currencies Mixed"),
+			"value": ", ".join(currencies),
+			"indicator": "Orange",
+			"datatype": "Data",
+		})
 
 	return columns, data, None, chart, report_summary
 
@@ -49,8 +70,14 @@ def normalize_filters(filters):
 	}
 
 
-def get_columns():
+def get_columns(currency_label=None, multi_currency=False):
 	"""Return the financial-statement style columns for the report."""
+	if multi_currency:
+		amount_label = _("Amount (multi-currency)")
+	elif currency_label:
+		amount_label = _("Amount ({0})").format(currency_label)
+	else:
+		amount_label = _("Amount")
 	return [
 		{
 			"label": _("Category"),
@@ -59,7 +86,7 @@ def get_columns():
 			"width": 340,
 		},
 		{
-			"label": _("Amount"),
+			"label": amount_label,
 			"fieldname": "amount",
 			"fieldtype": "Currency",
 			"width": 160,
@@ -340,7 +367,7 @@ def get_report_summary(aggregates, gross_sales):
 			"datatype": "Currency",
 		},
 		{
-			"label": _("Gross Profit"),
+			"label": _("Gross Profit After Direct Expenses"),
 			"value": flt(aggregates.get("gross_profit")),
 			"indicator": "Green" if flt(aggregates.get("gross_profit")) >= 0 else "Red",
 			"datatype": "Currency",
@@ -400,18 +427,51 @@ def get_chart(aggregates):
 
 
 def get_parent_docs(filters):
-	"""Fetch matching Daily P&L documents."""
-	daily_pl = DocType(PARENT_DOCTYPE)
-	query = frappe.qb.from_(daily_pl).select(daily_pl.name)
+	"""Fetch matching Daily P&L documents, deduplicated to one doc per (branch, date).
 
-	query = query.where(daily_pl.docstatus != 2)
-	query = query.where(daily_pl.date >= filters.get("from_date"))
-	query = query.where(daily_pl.date <= filters.get("to_date"))
+	Multiple submitted docs can exist for the same branch-day; without
+	deduplication their amounts are double-counted in the aggregates.
+	"""
+	return frappe.db.sql(
+		"""
+		SELECT name, branch
+		FROM (
+			SELECT
+				name,
+				branch,
+				ROW_NUMBER() OVER (
+					PARTITION BY branch, date
+					ORDER BY modified DESC
+				) AS rn
+			FROM `tabURY Daily P and L`
+			WHERE docstatus != 2
+				AND date >= %(from_date)s
+				AND date <= %(to_date)s
+				AND (%(branch)s IS NULL OR %(branch)s = '' OR branch = %(branch)s)
+		) t
+		WHERE rn = 1
+		""",
+		filters,
+		as_dict=True,
+	)
 
-	if filters.get("branch"):
-		query = query.where(daily_pl.branch == filters.get("branch"))
 
-	return query.run(as_dict=True)
+def get_branch_currencies(branches):
+	"""Resolve the distinct default currencies of the given branches."""
+	if not branches:
+		return []
+
+	rows = frappe.db.sql(
+		"""
+		SELECT DISTINCT c.default_currency AS currency
+		FROM `tabBranch` b
+		JOIN `tabCompany` c ON c.name = b.company
+		WHERE b.name IN %(branches)s
+		""",
+		{"branches": tuple(branches)},
+		as_dict=True,
+	)
+	return sorted(row.currency for row in rows if row.currency)
 
 
 def get_aggregated_parent_totals(filters, parent_names):
