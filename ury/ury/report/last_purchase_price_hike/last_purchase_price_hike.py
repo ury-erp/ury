@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.utils import flt
 
 def execute(filters=None):
 
@@ -49,8 +50,10 @@ def execute(filters=None):
 	""", filters, as_dict=1)
 
 	for row in data:
-		increase = row.current_rate - row.previous_rate
+		previous_rate = flt(row.previous_rate)
+		current_rate = flt(row.current_rate)
+		increase = current_rate - previous_rate
 		row["increase_amount"] = increase
-		row["increase_percent"] = (increase / row.previous_rate) * 100
+		row["increase_percent"] = (increase / previous_rate) * 100 if previous_rate else None
 
 	return columns, data
