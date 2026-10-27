@@ -24,7 +24,7 @@ def execute(filters=None):
 			SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY) AS `date`
 		)
         SELECT
-            e.`employee_name` AS "employee"
+            COALESCE(e.`employee_name`, CONCAT('Unmapped: ', b.`waiter`)) AS "employee"
         FROM date_list
 		LEFT JOIN `tabPOS Invoice` b ON (
 			b.`branch` = %s
@@ -34,7 +34,7 @@ def execute(filters=None):
         LEFT JOIN `tabURY Report Settings` rs ON (
 			rs.`branch` = b.`branch`
 		)
-        INNER JOIN `tabEmployee` e ON(
+        LEFT JOIN `tabEmployee` e ON(
             e.`user_id`= b.`waiter`
         )
         WHERE 
@@ -45,7 +45,7 @@ def execute(filters=None):
 			)
             AND b.`waiter` != ""
         GROUP BY
-            e.`employee_name`
+            COALESCE(e.`employee_name`, CONCAT('Unmapped: ', b.`waiter`))
     """, branch, as_dict=True)
     
     # Fetch sales_data
@@ -55,7 +55,7 @@ def execute(filters=None):
 			SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY) AS `date`
 		)
         SELECT
-			e.`employee_name` AS "employee",
+			COALESCE(e.`employee_name`, CONCAT('Unmapped: ', a.`waiter`)) AS "employee",
             SUM(a.`grand_total`) AS `grand_total`
         FROM date_list
 		LEFT JOIN `tabPOS Invoice` a ON (
@@ -73,7 +73,8 @@ def execute(filters=None):
 				OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
 				OR (rs.`branch` IS NULL AND a.`posting_date` = date_list.`date`)
 			)
-        GROUP BY e.`employee_name`
+            AND a.`waiter` != ""
+        GROUP BY COALESCE(e.`employee_name`, CONCAT('Unmapped: ', a.`waiter`))
     """, branch, as_dict=True)
     sales_data = {e.employee: e.grand_total for e in sales_data}
 
@@ -109,7 +110,7 @@ def execute(filters=None):
 			SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY) AS `date`
 		)
         SELECT
-			e.`employee_name` AS "employee",
+			COALESCE(e.`employee_name`, CONCAT('Unmapped: ', i.`waiter`)) AS "employee",
             COUNT(DISTINCT i.name) AS 'Total Invoices',
             COUNT(DISTINCT(dc.custom_course)) AS 'Total Courses',
             ROUND(IFNULL(COUNT(DISTINCT(dc.custom_course)) / NULLIF(COUNT(DISTINCT i.name), 0), 0), 2) AS 'average_course_count'
@@ -130,8 +131,9 @@ def execute(filters=None):
 				OR (rs.`hours` > 0 AND TIMESTAMP(i.`posting_date`, i.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(i.`posting_date`, i.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
 				OR (rs.`branch` IS NULL AND i.`posting_date` = date_list.`date`)
 			)
-        GROUP BY 
-            e.`employee_name`
+            AND i.`waiter` != ""
+        GROUP BY
+            COALESCE(e.`employee_name`, CONCAT('Unmapped: ', i.`waiter`))
     """, branch, as_dict=True)
     acc_data = {e.employee: e.average_course_count for e in acc_data}
 
@@ -141,9 +143,9 @@ def execute(filters=None):
 			SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY) AS `date`
 		)
         SELECT
-			e.`employee_name` AS "employee",
+			COALESCE(e.`employee_name`, CONCAT('Unmapped: ', i.`waiter`)) AS "employee",
 			CASE
-                WHEN i.`order_type` = "Dine In" THEN ROUND((SUM(ABS(i.`no_of_pax`)) / SUM(dc.`qty`)),3)
+                WHEN i.`order_type` = "Dine In" THEN ROUND((SUM(ABS(i.`no_of_pax`)) / NULLIF(SUM(inv_qty.qty), 0)),3)
                 ELSE 0
             END AS `apc`
         FROM date_list
@@ -156,15 +158,20 @@ def execute(filters=None):
 			rs.`branch` = i.`branch`
 		)
 		LEFT JOIN `tabEmployee`e ON e.`user_id`= i.`waiter`
-		LEFT JOIN `tabPOS Invoice Item` dc ON i.name = dc.parent
+		LEFT JOIN (
+			SELECT parent, SUM(qty) AS qty
+			FROM `tabPOS Invoice Item`
+			GROUP BY parent
+		) inv_qty ON inv_qty.parent = i.name
 		WHERE
 			(
 				((rs.`hours` IS NULL OR rs.`hours` = 0) AND i.`posting_date` = date_list.`date`)
 				OR (rs.`hours` > 0 AND TIMESTAMP(i.`posting_date`, i.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(i.`posting_date`, i.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
 				OR (rs.`branch` IS NULL AND i.`posting_date` = date_list.`date`)
 			)
-        GROUP BY 
-            e.`employee_name`
+            AND i.`waiter` != ""
+        GROUP BY
+            COALESCE(e.`employee_name`, CONCAT('Unmapped: ', i.`waiter`))
     """, branch, as_dict=True)
     apc_data = {e.employee: e.apc for e in apc_data}
 
