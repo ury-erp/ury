@@ -128,7 +128,7 @@ def execute(filters=None):
         delta = end_datetime - start_datetime
         working_hours = delta.total_seconds() / 3600.0
         date = start_datetime.date()
-        pos_data[date] = working_hours
+        pos_data[date] = round(pos_data.get(date, 0.0) + working_hours, 2)
 
     # Combine data
     
@@ -136,12 +136,13 @@ def execute(filters=None):
     total_working_hours = 0
     for date in date_list:
         grand_total = sales_data.get(date, 0)
-        working_hours = round(pos_data.get(date, 0),2)
+        hours = pos_data.get(date)
+        working_hours = round(hours, 2) if hours else None
         total_grand_total += grand_total
-        total_working_hours += working_hours
+        total_working_hours += hours or 0.0
         acc = acc_data.get(date, 0)
 
-        revpash = round(grand_total / (no_of_seats * working_hours), 2) if no_of_seats and working_hours else None
+        revpash = round(grand_total / (no_of_seats * hours), 2) if no_of_seats and hours else None
 
         data.append({
             "Date": date,
