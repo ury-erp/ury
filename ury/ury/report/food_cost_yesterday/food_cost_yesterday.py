@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.utils import getdate
+from frappe.utils import getdate, flt
 from datetime import datetime, timedelta, date
 from ury.ury.doctype.ury_daily_p_and_l.ury_daily_p_and_l import inner_bom_process
 
@@ -52,9 +52,8 @@ def execute(filters=None):
 			AND a.`docstatus` = 1
 			AND
 			(
-				(rs.`hours` IS NULL AND a.`posting_date` = %(date)s)
+				((rs.`hours` IS NULL OR rs.`hours` = 0 OR rs.`branch` IS NULL) AND a.`posting_date` = %(date)s)
 				OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(%(date)s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(date)s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-				OR (rs.`branch` IS NULL AND a.`posting_date` = %(date)s)
 			)
 			AND d.new_item_code IS NULL
 			AND e.item IS NULL
@@ -92,9 +91,8 @@ def execute(filters=None):
 			AND a.`docstatus` = 1
 			AND
 			(
-				(rs.`hours` IS NULL AND a.`posting_date` = %(date)s)
+				((rs.`hours` IS NULL OR rs.`hours` = 0 OR rs.`branch` IS NULL) AND a.`posting_date` = %(date)s)
 				OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(%(date)s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(date)s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-				OR (rs.`branch` IS NULL AND a.`posting_date` = %(date)s)
 			)
 			AND d.new_item_code IS NULL
 			AND e.item IS NOT NULL
@@ -126,9 +124,8 @@ def execute(filters=None):
 			AND a.`docstatus` = 1
 			AND
 			(
-				(rs.`hours` IS NULL AND a.`posting_date` = %(date)s)
+				((rs.`hours` IS NULL OR rs.`hours` = 0 OR rs.`branch` IS NULL) AND a.`posting_date` = %(date)s)
 				OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(%(date)s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(date)s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-				OR (rs.`branch` IS NULL AND a.`posting_date` = %(date)s)
 			)
 			AND d.new_item_code IS NOT NULL
 		GROUP BY 
@@ -136,6 +133,25 @@ def execute(filters=None):
 		ORDER BY 
 			c.item_group ASC, b.item_name ASC
 	''', {"branch": branch, "date": yesterday}, as_dict=True)
+
+    net_sales_result = frappe.db.sql('''
+		SELECT
+			SUM(a.grand_total) AS net_sales
+		FROM `tabPOS Invoice` a
+		LEFT JOIN `tabURY Report Settings` rs ON (
+			rs.`branch` = %(branch)s
+		)
+		WHERE
+			a.`branch` = %(branch)s
+			AND a.`status` IN ("Consolidated", "Paid")
+			AND a.`docstatus` = 1
+			AND
+			(
+				((rs.`hours` IS NULL OR rs.`hours` = 0 OR rs.`branch` IS NULL) AND a.`posting_date` = %(date)s)
+				OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(%(date)s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(date)s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+			)
+	''', {"branch": branch, "date": yesterday}, as_dict=True)
+    net_sales = flt(net_sales_result[0].net_sales) if net_sales_result else 0.0
 
     cogs_items = {}
     for item in non_pb_item_sales:
@@ -211,22 +227,45 @@ def execute(filters=None):
 	# Convert sorted dictionary to a list of tuples
     sorted_items_list = list(sorted_items.items())
 
+    cogs_percent = flt((cogs / net_sales) * 100, 2) if net_sales else 0.0
+
+    if not sorted_items_list:
+        data.append({
+            "cogs": 0.0,
+            "cogs_percent": cogs_percent,
+            "lowest_item": "No sales data for this day",
+            "lowest_cost": 0.0,
+            "lowest_cost_percent": 0.0,
+            "highest_item": "No sales data for this day",
+            "highest_cost": 0.0,
+            "highest_cost_percent": 0.0,
+        })
+
+        columns = get_columns()
+        return columns, data
+
 	# Access the first and last items
     highest = sorted_items_list[0]
     lowest = sorted_items_list[-1]
 
     data.append({
 		"cogs": cogs,
-		"cogs_percent": 100,
+		"cogs_percent": cogs_percent,
         "lowest_item":lowest[0],
         "lowest_cost": lowest[1],
-        "lowest_cost_percent": round((lowest[1]/cogs)*100,2),
+        "lowest_cost_percent": round((lowest[1]/cogs)*100,2) if cogs else 0.0,
         "highest_item":highest[0],
         "highest_cost": highest[1],
-        "highest_cost_percent": round((highest[1]/cogs)*100,2)
+        "highest_cost_percent": round((highest[1]/cogs)*100,2) if cogs else 0.0
 	})
 
-    columns = [
+    columns = get_columns()
+
+    return columns, data
+
+
+def get_columns():
+    return [
         {"label": "Cost Of Goods", "fieldname": "cogs", "fieldtype": "Currency", "width": 100},
         {"label": "Cost Of Goods Percentage", "fieldname": "cogs_percent", "fieldtype": "Percent", "width": 100},
         {"label": "Lowest Cost Group", "fieldname": "lowest_item", "fieldtype": "Data", "width": 200},
