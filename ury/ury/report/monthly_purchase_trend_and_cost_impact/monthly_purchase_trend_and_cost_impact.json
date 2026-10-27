@@ -34,6 +34,14 @@
    "wildcard_filter": 0
   },
   {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "mandatory": 1,
+   "options": "Company",
+   "wildcard_filter": 0
+  },
+  {
    "fieldname": "min_impact",
    "fieldtype": "Currency",
    "label": "Impact",

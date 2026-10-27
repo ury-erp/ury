@@ -10,6 +10,10 @@ def execute(filters=None):
 
 	month_number = datetime.datetime.strptime(filters.month, "%B").month
 	year = int(filters.year)
+	company = filters.get("company")
+	if not company:
+		frappe.throw("Company is a mandatory filter for this report.")
+	currency = frappe.get_cached_value("Company", company, "default_currency") or ""
 
 	month_date = datetime.date(year, month_number, 1)
 
@@ -21,19 +25,19 @@ def execute(filters=None):
 
 	columns = [
 		{"label": "Item", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
-		{"label": "Previous Avg", "fieldname": "prev_avg", "fieldtype": "Currency", "width": 120},
-		{"label": "Current Avg", "fieldname": "curr_avg", "fieldtype": "Currency", "width": 120},
-		{"label": "Change ₹", "fieldname": "change_amount", "fieldtype": "Currency", "width": 120},
+		{"label": f"Previous Avg ({currency})", "fieldname": "prev_avg", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": f"Current Avg ({currency})", "fieldname": "curr_avg", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": f"Change ({currency})", "fieldname": "change_amount", "fieldtype": "Currency", "options": currency, "width": 120},
 		{"label": "Change %", "fieldname": "change_percent", "fieldtype": "Percent", "width": 100},
 		{"label": "Current Qty", "fieldname": "curr_qty", "fieldtype": "Float", "width": 100},
-		{"label": "Impact", "fieldname": "impact", "fieldtype": "Currency", "width": 120},
+		{"label": f"Impact ({currency})", "fieldname": "impact", "fieldtype": "Currency", "options": currency, "width": 120},
 		{"label": "Major Supplier", "fieldname": "major_supplier", "fieldtype": "Link", "options": "Supplier", "width": 150},
 	]
 
-	prev_data = get_avg(prev_start, prev_end, filters.get("item_group"))
-	curr_data = get_avg(current_start, current_end, filters.get("item_group"))
+	prev_data = get_avg(prev_start, prev_end, company, filters.get("item_group"))
+	curr_data = get_avg(current_start, current_end, company, filters.get("item_group"))
 
-	supplier_map = get_major_suppliers()
+	supplier_map = get_major_suppliers(company)
 
 	result = []
 
@@ -72,10 +76,10 @@ def execute(filters=None):
 	return columns, result
 
 
-def get_avg(start, end, item_group=None):
+def get_avg(start, end, company, item_group=None):
 
-	conditions = ""
-	values = [start, end]
+	conditions = " AND pi.company = %s"
+	values = [start, end, company]
 
 	if item_group:
 		conditions += " AND item.item_group = %s"
@@ -105,7 +109,7 @@ def get_avg(start, end, item_group=None):
 	}
 
 
-def get_major_suppliers():
+def get_major_suppliers(company):
 
 	data = frappe.db.sql("""
 		SELECT
@@ -116,9 +120,10 @@ def get_major_suppliers():
 		JOIN `tabPurchase Invoice` pi
 			ON pi.name = pii.parent
 		WHERE pi.docstatus = 1
+			AND pi.company = %s
 		GROUP BY pii.item_code, pi.supplier
 		ORDER BY pii.item_code, purchase_count DESC
-	""", as_dict=1)
+	""", company, as_dict=1)
 
 	result = {}
 	for row in data:
