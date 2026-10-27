@@ -121,13 +121,15 @@ def execute(filters=None):
 	if unsorted_data != []:
 		sorted_data = sorted(unsorted_data, key=itemgetter('Food Cost Percentage'),reverse=True)
 		num_items_to_display = 3
-		top_items = sorted_data[-num_items_to_display:]  # Top 3 highest
-		bottom_items = sorted_data[:num_items_to_display]  # Top 3 lowest
+		if len(sorted_data) <= num_items_to_display * 2:
+			display_items = list(sorted_data)
+		else:
+			display_items = sorted_data[:num_items_to_display] + sorted_data[-num_items_to_display:]
 		# frappe.msgprint(title='Message',indicator='red',msg=("Complete Order Taker Checklist"))
-		total_rows = len(sorted_data)
-		for index, dat in enumerate(bottom_items + top_items):
-			red = int(255 - (255 * index / total_rows))
-			green = int(255 * index / total_rows)
+		total_rows = len(display_items)
+		for index, dat in enumerate(display_items):
+			red = max(0, min(255, int(255 - (255 * index / total_rows))))
+			green = max(0, min(255, int(255 * index / total_rows)))
 
 			if index < total_rows/2:
 				color = f'rgb(255, {green}, 0)'
