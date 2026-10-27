@@ -1,0 +1,47 @@
+{
+ "add_total_row": 1,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-10-01 00:00:00",
+ "disable_prepared_report_automation": 0,
+ "disabled": 1,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 17:38:41.423843",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Today's Invoices",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    a.name AS \"Invoice:Link/POS Invoice:160\",\n    a.posting_time AS \"Time:Time:100\",\n    a.customer AS \"Customer:Link/Customer:160\",\n    IFNULL(a.order_type, '') AS \"Order Type:Data:110\",\n    IFNULL(a.restaurant_table, '') AS \"Table:Data:100\",\n    a.grand_total AS \"Grand Total:Currency:120\",\n    a.status AS \"Status:Data:110\"\nFROM\n    `tabPOS Invoice` a\nWHERE\n    a.docstatus = 1\n    AND a.posting_date = CURDATE()\n    AND a.branch = %(branch)s\nORDER BY\n    a.posting_time DESC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Today's Invoices",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "snapshot_report": 0,
+ "timeout": 0
+}

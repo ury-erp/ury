@@ -1,0 +1,55 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2023-12-12 18:17:36.055432",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 111,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 18:45:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Pending KOTs",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "URY KOT",
+ "report_name": "Pending KOTs",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Restaurant Manager"
+  },
+  {
+   "role": "Accounts Head"
+  },
+  {
+   "role": "Area Manager"
+  },
+  {
+   "role": "Director"
+  },
+  {
+   "role": "Chairman"
+  },
+  {
+   "role": "Restaurant Admin"
+  },
+  {
+   "role": "Accounts"
+  }
+ ],
+ "timeout": 0
+}

@@ -1,0 +1,52 @@
+{
+ "add_total_row": 1,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-10-01 14:15:28.456955",
+ "disable_prepared_report_automation": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "mandatory": 1,
+   "options": "Warehouse",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 17:34:26.272171",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Stock Correction Report",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "WITH RankedStockCorrections AS (\n    SELECT\n        a.item_code,\n        a.item_name,\n        a.uom,\n        a.qty,\n        b.warehouse AS warehouse,\n        ROW_NUMBER() OVER (\n            PARTITION BY a.item_code, b.warehouse\n            ORDER BY b.posting_date DESC, b.posting_time DESC, b.creation DESC\n        ) AS latest_entry_rank,\n        COUNT(*) OVER (\n            PARTITION BY a.item_code, b.warehouse\n        ) AS correction_count\n    FROM `tabStock Correction` b\n    INNER JOIN `tabStock Correction Item` a ON (\n        a.parent = b.name\n    )\n    LEFT JOIN `tabURY Report Settings` rs ON (\n        rs.branch = %(branch)s\n    )\n    WHERE\n        b.branch = %(branch)s\n        AND (\n            %(warehouse)s IS NULL\n            OR %(warehouse)s = ''\n            OR b.warehouse = %(warehouse)s\n        )\n        AND b.docstatus = 1\n        AND (\n            (\n                (rs.hours IS NULL OR rs.hours = 0)\n                AND b.posting_date = %(date)s\n            )\n            OR (\n                rs.hours > 0\n                AND TIMESTAMP(\n                    b.posting_date,\n                    b.posting_time\n                ) <= TIMESTAMP(\n                    DATE_ADD(%(date)s, INTERVAL 1 DAY),\n                    CONCAT(\n                        LPAD(rs.hours, 2, '0'),\n                        ':00:00'\n                    )\n                )\n                AND TIMESTAMP(\n                    b.posting_date,\n                    b.posting_time\n                ) >= TIMESTAMP(\n                    %(date)s,\n                    CONCAT(\n                        LPAD(rs.hours, 2, '0'),\n                        ':00:00'\n                    )\n                )\n            )\n            OR (\n                rs.branch IS NULL\n                AND b.posting_date = %(date)s\n            )\n        )\n)\nSELECT\n    item_code AS \"Item Code\",\n    item_name AS \"Item Name\",\n    ROUND(\n        MAX(\n            CASE\n                WHEN latest_entry_rank = 1\n                THEN qty\n                ELSE NULL\n            END\n        ),\n        3\n    ) AS \"Quantity\",\n    MAX(uom) AS \"UOM\",\n    warehouse AS \"Warehouse\",\n    MAX(correction_count) AS \"Corrections\"\nFROM RankedStockCorrections\nGROUP BY\n    item_code,\n    warehouse\nORDER BY\n    item_code,\n    warehouse;",
+ "ref_doctype": "Stock Correction",
+ "report_name": "Stock Correction Report",
+ "report_type": "Query Report",
+ "roles": [],
+ "snapshot_report": 0,
+ "timeout": 0
+}

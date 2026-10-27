@@ -1,0 +1,56 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2024-08-24 13:29:32.308432",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 30,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-03-31 11:59:08.417616",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "30 Day Repeated Customers",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "WITH RECURSIVE date_list AS (\n    SELECT CURDATE() AS `date`\n    UNION ALL\n    SELECT DATE_SUB(`date`, INTERVAL 1 DAY)\n    FROM date_list\n    WHERE `date` > DATE_SUB(CURDATE(), INTERVAL 29 DAY)\n)\nSELECT\n    `Date`,\n    `Total Customers`,\n    `New Customers`,\n    `Total Customers`-`New Customers` AS `Repeated Customers`,\n    ROUND(((`Total Customers`-`New Customers`) / `Total Customers`)*100,2)  AS Percentage\nFROM\n    (SELECT\n    date_list.`date` AS `Date`,\n    COUNT(d.customer) AS `Total Customers`,\n    COUNT(DISTINCT CASE WHEN b.customer IS NOT NULL THEN b.customer END) AS `New Customers`\n    FROM date_list\n    LEFT JOIN `tabPOS Invoice` d ON (\n        d.`branch` = %(branch)s\n        AND d.`status` IN (\"Consolidated\",\"Paid\") \n        AND d.`docstatus` = 1\n    )\n    LEFT JOIN `tabPOS Invoice` b ON (\n        b.`name` = d.`name`\n        AND b.`branch` = %(branch)s\n        AND b.`status` IN (\"Consolidated\", \"Paid\")\n        AND b.`docstatus` = 1\n        AND NOT EXISTS (\n            SELECT 1\n            FROM `tabPOS Invoice` c\n            LEFT JOIN `tabURY Report Settings` rs ON (\n                rs.`branch` = %(branch)s\n            )\n            WHERE\n                (\n                    ((rs.`hours` IS NULL OR rs.`hours` = 0) IS NULL AND c.`posting_date` < date_list.`date`)\n                    OR (rs.`hours` > 0 AND TIMESTAMP(c.`posting_date`, c.`posting_time`) < TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n                    OR (rs.`branch` IS NULL AND c.`posting_date` < date_list.`date`)\n                )\n                AND c.`customer` = b.`customer`\n                AND c.`branch` = %(branch)s\n                AND c.`status` IN (\"Consolidated\", \"Paid\")\n                AND c.`docstatus` = 1\n        )\n    )\n    LEFT JOIN `tabURY Report Settings` rs ON (\n        rs.`branch` = %(branch)s\n    )\n    WHERE\n    (\n        ((rs.`hours` IS NULL OR rs.`hours` = 0) IS NULL AND d.`posting_date` = date_list.`date`)\n        OR (rs.`hours` > 0 AND TIMESTAMP(d.`posting_date`, d.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(d.`posting_date`, d.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n        OR (rs.`branch` IS NULL AND d.`posting_date` = date_list.`date`)\n    )\n    GROUP BY \n        date_list.`date`\n    ORDER BY \n        date_list.`date` DESC) AS subquery;",
+ "ref_doctype": "POS Invoice",
+ "report_name": "30 Day Repeated Customers",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Accounts Head"
+  },
+  {
+   "role": "Restaurant Admin"
+  },
+  {
+   "role": "Chairman"
+  },
+  {
+   "role": "Director"
+  },
+  {
+   "role": "Accounts"
+  }
+ ],
+ "timeout": 0
+}

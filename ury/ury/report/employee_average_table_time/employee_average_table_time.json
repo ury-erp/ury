@@ -1,0 +1,91 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-05-11 12:45:01.466603",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-05-11 12:51:28.237557",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Employee Average Table Time",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    pi.waiter AS \"Waiter:Data:200\",\n\n\n    ROUND(\n        AVG(\n            TIME_TO_SEC(\n                ADDTIME('00:00:00', pi.total_spend_time)\n            )\n        ) / 60,\n        2\n    ) AS \"Average Table Time (Minutes):Float:220\"\n\nFROM\n    `tabPOS Invoice` pi\n\nLEFT JOIN\n    `tabURY Report Settings` rs\n    ON rs.branch = %(branch)s\n\nWHERE\n    pi.docstatus = 1\n    AND IFNULL(pi.waiter, '') != ''\n    AND pi.branch = %(branch)s\n\n    AND\n    (\n        (\n            (rs.hours IS NULL OR rs.hours = 0)\n\n            AND pi.posting_date BETWEEN %(from_date)s AND %(to_date)s\n        )\n\n        OR\n\n        (\n            rs.hours > 0\n\n            AND TIMESTAMP(\n                pi.posting_date,\n                pi.posting_time\n            )\n\n            >= TIMESTAMP(\n                %(from_date)s,\n                CONCAT(LPAD(rs.hours, 2, '0'), ':00:00')\n            )\n\n            AND TIMESTAMP(\n                pi.posting_date,\n                pi.posting_time\n            )\n\n            <= TIMESTAMP(\n                DATE_ADD(%(to_date)s, INTERVAL 1 DAY),\n                CONCAT(LPAD(rs.hours, 2, '0'), ':00:00')\n            )\n        )\n\n        OR\n\n        (\n            rs.branch IS NULL\n\n            AND pi.posting_date BETWEEN %(from_date)s AND %(to_date)s\n        )\n    )\n\nGROUP BY\n    pi.waiter\n\nORDER BY\n    ROUND(\n        AVG(\n            TIME_TO_SEC(\n                ADDTIME('00:00:00', pi.total_spend_time)\n            )\n        ) / 60,\n        2\n    ) DESC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Employee Average Table Time",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Director"
+  },
+  {
+   "role": "Restaurant Admin"
+  },
+  {
+   "role": "Order Taker"
+  },
+  {
+   "role": "Restaurant Manager"
+  },
+  {
+   "role": "Cashier"
+  },
+  {
+   "role": "ARM"
+  },
+  {
+   "role": "Accounts Head"
+  },
+  {
+   "role": "AM 01"
+  },
+  {
+   "role": "Store Manager"
+  },
+  {
+   "role": "Chef"
+  },
+  {
+   "role": "AM 02"
+  },
+  {
+   "role": "Extra"
+  },
+  {
+   "role": "Operational Head"
+  },
+  {
+   "role": "Accounts"
+  }
+ ],
+ "timeout": 0
+}

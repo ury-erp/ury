@@ -1,0 +1,47 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2024-08-26 15:14:16.640403",
+ "disable_prepared_report_automation": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 18:00:34.763518",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Average Table Time and Production Time",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "WITH invoice_production_times AS (\n    SELECT\n        pos_invoice.name AS invoice_id,\n        AVG(formatted_kot.production_time) AS avg_production_time_seconds\n    FROM\n        `tabPOS Invoice` AS pos_invoice\n    JOIN\n        (SELECT\n            kot.*,\n             DATE(kot.date) AS formatted_kot_date\n         FROM\n             `tabURY KOT` AS kot\n        WHERE kot.order_status = 'Served'\n        ) AS formatted_kot\n   \n    ON pos_invoice.name = formatted_kot.invoice\n    LEFT JOIN `tabURY Report Settings` rs ON (\n        rs.`branch` = %(branch)s\n    )\n    WHERE \n    (\n        ((rs.`hours` IS NULL OR rs.`hours` = 0) AND pos_invoice.`posting_date` = DATE_SUB(CURDATE(), INTERVAL 1 DAY))\n        OR (rs.`hours` > 0 AND TIMESTAMP(pos_invoice.`posting_date`, pos_invoice.`posting_time`) <= TIMESTAMP(DATE_ADD(DATE_SUB(CURDATE(), INTERVAL 1 DAY), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(pos_invoice.`posting_date`, pos_invoice.`posting_time`) >= TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n        OR (rs.`branch` IS NULL AND pos_invoice.`posting_date` = DATE_SUB(CURDATE(), INTERVAL 1 DAY))\n    )\n    AND pos_invoice.branch = %(branch)s\n)\n\nSELECT\n    DATE(posting_date) AS Date,\n    ROUND(\n        AVG(\n            TIME_TO_SEC(\n                ADDTIME('00:00:00', total_spend_time)\n            )\n        )\n    ) /60 AS `Average Spend Time`,\n    ROUND(AVG(avg_production_time_seconds),3) AS `Average Production Time`\nFROM `tabPOS Invoice`\nLEFT JOIN invoice_production_times\nON `tabPOS Invoice`.name = invoice_production_times.invoice_id\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nWHERE \n(\n    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND `tabPOS Invoice`.posting_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY))\n    OR (rs.`hours` > 0 AND TIMESTAMP(`tabPOS Invoice`.posting_date, `tabPOS Invoice`.posting_time) <= TIMESTAMP(DATE_ADD(DATE_SUB(CURDATE(), INTERVAL 1 DAY), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(`tabPOS Invoice`.posting_date, `tabPOS Invoice`.posting_time) >= TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n    OR (rs.`branch` IS NULL AND `tabPOS Invoice`.posting_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY))\n)\nAND `tabPOS Invoice`.branch = %(branch)s\n",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Average Table Time and Production Time",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Administrator"
+  }
+ ],
+ "snapshot_report": 0,
+ "timeout": 0
+}
