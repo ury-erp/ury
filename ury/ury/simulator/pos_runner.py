@@ -76,6 +76,9 @@ from frappe import _
 from frappe.utils import flt, get_datetime, get_time, getdate, now_datetime, nowdate, today
 
 from ury.ury.simulator.guards import assert_uat_simulator_authorized
+from ury.ury.api.ury_kot_generate import kot_execute
+from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
 
 SIMULATION_RUN_DOCTYPE = "URY Simulation Run"
 POS_OPENING_DOCTYPE = "POS Opening Entry"
@@ -390,11 +393,113 @@ def close_pos_session(run_doc) -> dict:
 	run_doc.save(ignore_permissions=True)
 	frappe.db.commit()
 
+	# Create URY Daily Profit and Loss document after successful closing
+	try:
+		create_daily_pnl_for_branch(run_doc.branch, run_doc.business_date)
+		frappe.db.commit()
+	except Exception:
+		frappe.logger("ury.simulator").exception(
+			f"Daily P&L creation non-fatal error for branch {run_doc.branch} on {run_doc.business_date}"
+		)
+
 	return _closing_result(
 		frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_doc.name),
 		invoice_count=invoice_count,
 		consolidated_si_names=si_names,
 	)
+
+
+def create_daily_pnl_for_branch(branch: str, posting_date=None):
+	"""Ensure employee attendance and payment configuration, then submit URY Daily P and L."""
+	if not branch:
+		return None
+
+	if not posting_date:
+		posting_date = today()
+
+	# Idempotency check: Skip if already exists and not cancelled
+	existing_pnl = frappe.db.exists(
+		"URY Daily P and L",
+		{"branch": branch, "date": posting_date, "docstatus": ["!=", 2]}
+	)
+	if existing_pnl:
+		return frappe.get_doc("URY Daily P and L", existing_pnl)
+
+	# Ensure URY Report Settings exists for the branch
+	if not frappe.db.exists("URY Report Settings", branch):
+		buying_pl = "Standard Buying"
+		for candidate in ["URY UAE Buying", "URY Oman Buying", "Standard Buying"]:
+			if frappe.db.exists("Price List", candidate):
+				buying_pl = candidate
+				break
+		rs = frappe.new_doc("URY Report Settings")
+		rs.branch = branch
+		rs.buying_price_list = buying_pl
+		rs.flags.ignore_permissions = True
+		rs.insert(ignore_permissions=True)
+	else:
+		buying_pl = frappe.db.get_value("URY Report Settings", branch, "buying_price_list")
+		if not buying_pl:
+			frappe.db.set_value("URY Report Settings", branch, "buying_price_list", "Standard Buying")
+
+	# Ensure active branch employees have payment_type and payment_amount configured
+	active_employees = frappe.get_all(
+		"Employee",
+		filters={"branch": branch, "status": "Active"},
+		fields=["name", "company", "payment_type", "payment_amount"]
+	)
+
+	if not active_employees:
+		company = frappe.db.get_value("Branch", branch, "custom_company") or frappe.db.get_value("Company", {}, "name")
+		first_emp = frappe.get_all("Employee", filters={"status": "Active"}, fields=["name", "company", "payment_type", "payment_amount"], limit=1)
+		if first_emp:
+			emp_name = first_emp[0].name
+			frappe.db.set_value("Employee", emp_name, "branch", branch)
+			active_employees = frappe.get_all("Employee", filters={"branch": branch, "status": "Active"}, fields=["name", "company", "payment_type", "payment_amount"])
+
+	for emp in active_employees:
+		updates = {}
+		if not emp.payment_type:
+			updates["payment_type"] = "Daily Wage"
+		if not emp.payment_amount or emp.payment_amount <= 0:
+			updates["payment_amount"] = 100.0
+		if updates:
+			frappe.db.set_value("Employee", emp.name, updates)
+
+	# Ensure submitted Attendance exists for active employees of this branch on posting_date
+	existing_attendance = frappe.db.sql("""
+		SELECT COUNT(b.name) as total
+		FROM `tabAttendance` b
+		INNER JOIN `tabEmployee` c ON c.name = b.employee
+		WHERE b.docstatus = 1
+		  AND b.status IN ("Present", "Half Day")
+		  AND b.attendance_date = %s
+		  AND c.branch = %s
+	""", (posting_date, branch), as_dict=True)
+
+	if not existing_attendance or existing_attendance[0].total == 0:
+		for emp in active_employees:
+			if not frappe.db.exists("Attendance", {"employee": emp.name, "attendance_date": posting_date, "docstatus": 1}):
+				att = frappe.new_doc("Attendance")
+				att.employee = emp.name
+				att.attendance_date = posting_date
+				att.status = "Present"
+				att.company = emp.company or frappe.db.get_value("Branch", branch, "custom_company")
+				att.flags.ignore_permissions = True
+				att.insert(ignore_permissions=True)
+				att.submit()
+
+	# Create URY Daily P and L
+	pnl = frappe.new_doc("URY Daily P and L")
+	pnl.branch = branch
+	pnl.date = posting_date
+	pnl.electricity_opening = 100.0
+	pnl.electricity_closing = 120.0
+	pnl.flags.ignore_permissions = True
+	pnl.insert(ignore_permissions=True)
+	pnl.submit()
+
+	return pnl
 
 
 def run_pos_simulation(run_doc, slot_count: int = 12) -> dict:
@@ -680,19 +785,28 @@ class _SlotCatalog:
 	def _resolve_customer(self):
 		if self.profile.customer and frappe.db.exists("Customer", self.profile.customer):
 			return self.profile.customer
-		# Prefer a non-test customer; fall back to any enabled one.
+		# Prefer non-test customers; fall back to any enabled ones.
 		for where in ("name not like '\\_Test%'", "1 = 1"):
-			customer = frappe.db.sql(
-				"select name from `tabCustomer` where disabled = 0 and {0} order by creation limit 1".format(
+			customers = frappe.db.sql(
+				"select name from `tabCustomer` where disabled = 0 and {0} order by creation".format(
 					where
-				)
+				),
+				pluck=True,
 			)
-			if customer:
-				return customer[0][0]
+			if customers:
+				self._eligible_customers = customers
+				return customers[0]
 		frappe.throw(
 			_("No enabled Customer found for the {0} simulation.").format(self.run_doc.branch),
 			frappe.ValidationError,
 		)
+
+	def customer_for_slot(self, slot_number: int):
+		"""Cycle deterministically through eligible non-test customers per slot."""
+		if not hasattr(self, "_eligible_customers") or not self._eligible_customers:
+			self._resolve_customer()
+		customers = getattr(self, "_eligible_customers", [self.customer])
+		return customers[(slot_number - 1) % len(customers)]
 
 	def _discover_items(self):
 		if self._explicit_items:
@@ -769,7 +883,7 @@ def _create_and_submit_invoice(run_doc, slot_row, catalog):
 	scenario = slot_row.scenario
 	order_type = SCENARIO_ORDER_TYPE.get(scenario, "Take Away")
 	payment_mode = catalog.payment_modes[(slot_row.slot_number - 1) % len(catalog.payment_modes)]
-	customer = catalog.customer
+	customer = catalog.customer_for_slot(slot_row.slot_number)
 	aggregator_fallback = False
 
 	table = None
@@ -860,6 +974,37 @@ def _create_and_submit_invoice(run_doc, slot_row, catalog):
 	doc.append("payments", {"mode_of_payment": payment_mode, "amount": estimated_total})
 	doc.insert(ignore_permissions=True)
 	try:
+		# Trigger KOT generation and Stock Reservation flow
+		try:
+			kot_items = [
+				{
+					"item": i.item_code,
+					"item_code": i.item_code,
+					"item_name": i.item_name or i.item_code,
+					"qty": i.qty,
+					"comments": "",
+					"reservation_line_key": f"slot:{slot_row.slot_number}:{i.item_code}"
+				}
+				for i in doc.items
+			]
+			kot_execute(doc.name, customer, table, kot_items, [], "")
+			if table and doc.invoice_printed == 0:
+				frappe.db.set_value("URY Table", table, {"occupied": 1, "latest_invoice_time": doc.creation})
+
+			# Reconcile stock reservations if reservation control is enabled on branch
+			policy = get_branch_stock_policy(branch=doc.branch, company=doc.company)
+			if policy.reservation_control_enabled:
+				reconcile_order_reservations(
+					order_ref=doc.name,
+					previous_items=[],
+					accepted_items=kot_items,
+					branch=doc.branch,
+					company=doc.company,
+					actor=frappe.session.user,
+				)
+		except Exception:
+			frappe.logger("ury.simulator").exception(f"KOT/Reservation creation non-fatal error on {doc.name}")
+
 		real_total = flt(doc.rounded_total) or flt(doc.grand_total)
 		if real_total and abs(real_total - flt(doc.payments[0].amount)) > 0.01:
 			doc.payments[0].amount = real_total
