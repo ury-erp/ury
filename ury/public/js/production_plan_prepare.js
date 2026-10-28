@@ -24,6 +24,8 @@ frappe.ui.form.on("Production Plan", {
 		ury_stop_polling(frm.doc.name);
 
 		if (!ury_is_eligible(frm)) {
+			frm.page.clear_primary_action();
+			frm.remove_custom_button(__("Prepare Production"));
 			return;
 		}
 
@@ -171,6 +173,7 @@ function ury_render_result_links(frm, result) {
 
 function ury_render_actions(frm, state) {
 	frm.page.clear_actions_menu && frm.page.clear_actions_menu();
+	frm.page.clear_primary_action();
 	frm.remove_custom_button(__("Prepare Production"));
 	frm.remove_custom_button(__("Reset Stuck Execution"));
 
@@ -179,10 +182,8 @@ function ury_render_actions(frm, state) {
 	// Hidden/disabled once completed -- nothing left for this action to do.
 	const can_prepare = ["awaiting_materials", "ready", "failed"].includes(state.execution_state);
 	if (can_prepare) {
-		frm.add_custom_button(__("Prepare Production"), () => ury_confirm_and_prepare(frm));
-		frm.page.set_primary_action(__("Prepare Production"), () => ury_confirm_and_prepare(frm));
-	} else if (state.execution_state === "processing") {
-		frm.page.clear_primary_action();
+		const btn = frm.add_custom_button(__("Prepare Production"), () => ury_confirm_and_prepare(frm));
+		btn && btn.addClass("btn-primary");
 	}
 
 	if (state.can_reset) {
