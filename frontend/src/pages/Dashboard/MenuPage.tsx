@@ -64,6 +64,7 @@ export const MenuPage: React.FC = () => {
 
   // Add/Edit item form state
   const [newItem, setNewItem] = useState({
+    item: '',
     item_name: '',
     rate: '',
     course: '',
@@ -195,6 +196,7 @@ export const MenuPage: React.FC = () => {
     setEditingItem(null);
     setPreviewImageUrl(null);
     setNewItem({
+      item: '',
       item_name: '',
       rate: '',
       course: '',
@@ -223,6 +225,7 @@ export const MenuPage: React.FC = () => {
     }
 
     setNewItem({
+      item: item.item || '',
       item_name: item.item_name || '',
       rate: item.rate?.toString() || '',
       course: item.course || '',
@@ -235,6 +238,22 @@ export const MenuPage: React.FC = () => {
       disabled: !!item.disabled,
     });
     setDrawerMode('edit-item');
+  };
+
+  const handleAddItemSelect = (_id: string, value: string) => {
+    if (value && newItem.target_menu === selectedMenu && items.some(m => m.item === value)) {
+      showToast.error('This item is already added to this menu');
+      return;
+    }
+    const selectedItem = allItems.find(i => i.name === value);
+    setNewItem(prev => ({
+      ...prev,
+      item: value,
+      item_name: selectedItem ? (selectedItem.item_name || selectedItem.name) : '',
+      rate: selectedItem && selectedItem.standard_rate != null ? String(selectedItem.standard_rate) : '',
+      course: selectedItem ? (selectedItem.custom_course || '') : '',
+      image: selectedItem ? (selectedItem.image || '') : '',
+    }));
   };
 
   const getItemImage = (item: MenuItemRecord): string | undefined => {
@@ -380,8 +399,10 @@ export const MenuPage: React.FC = () => {
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.item_name || !newItem.rate) return;
+    if (!newItem.rate) return;
     if (creatingItemForRowIndex === null && !newItem.target_menu) return;
+    if (!editingItem && creatingItemForRowIndex === null && !newItem.item) return;
+    if ((editingItem || creatingItemForRowIndex !== null) && !newItem.item_name) return;
 
     // Ensure image is a valid URL and not raw base64 data
     const sanitizedImage = newItem.image ? newItem.image.trim() : '';
@@ -441,7 +462,7 @@ export const MenuPage: React.FC = () => {
             console.error('Failed to update Item doc image', err);
           }
         }
-      } else {
+      } else if (creatingItemForRowIndex !== null) {
         const insertRes = await call<any>('frappe.client.insert', {
           doc: {
             doctype: 'Item',
@@ -460,33 +481,36 @@ export const MenuPage: React.FC = () => {
 
         await fetchAllItems();
 
-        if (creatingItemForRowIndex !== null) {
-          const updatedRows = [...newMenuRows];
-          updatedRows[creatingItemForRowIndex] = {
-            ...updatedRows[creatingItemForRowIndex],
-            item: createdItem.name,
-            item_name: newItem.item_name,
-            price: parseFloat(newItem.rate) || 0,
-          };
-          setNewMenuRows(updatedRows);
-          
-          setCreatingItemForRowIndex(null);
-          setDrawerMode('add-menu');
-        } else {
-          const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
-          const menuDoc = res.message || res;
-          if (!menuDoc.items) menuDoc.items = [];
-          menuDoc.items.push({
-            item: createdItem.name,
-            item_name: newItem.item_name,
-            course: resolvedCourse,
-            rate: parseFloat(newItem.rate),
-            image: sanitizedImage || undefined,
-            special_dish: newItem.special_dish ? 1 : 0,
-            disabled: newItem.disabled ? 1 : 0,
-          });
-          await call('frappe.client.save', { doc: menuDoc });
+        const updatedRows = [...newMenuRows];
+        updatedRows[creatingItemForRowIndex] = {
+          ...updatedRows[creatingItemForRowIndex],
+          item: createdItem.name,
+          item_name: newItem.item_name,
+          price: parseFloat(newItem.rate) || 0,
+        };
+        setNewMenuRows(updatedRows);
+
+        setCreatingItemForRowIndex(null);
+        setDrawerMode('add-menu');
+      } else {
+        // Add an existing Item master record to the target URY Menu — never create a new Item here.
+        const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
+        const menuDoc = res.message || res;
+        if (!menuDoc.items) menuDoc.items = [];
+        if (menuDoc.items.some((row: any) => row.item === newItem.item)) {
+          showToast.error('This item is already added to this menu');
+          return;
         }
+        menuDoc.items.push({
+          item: newItem.item,
+          item_name: newItem.item_name,
+          course: resolvedCourse,
+          rate: parseFloat(newItem.rate),
+          image: sanitizedImage || undefined,
+          special_dish: newItem.special_dish ? 1 : 0,
+          disabled: newItem.disabled ? 1 : 0,
+        });
+        await call('frappe.client.save', { doc: menuDoc });
       }
 
       // Refresh both allItems and menu items so list view updates immediately with new/replaced/removed image
@@ -495,7 +519,11 @@ export const MenuPage: React.FC = () => {
         creatingItemForRowIndex === null ? fetchMenuItems(selectedMenu) : Promise.resolve(),
       ]);
 
-      showToast.success('Item saved');
+      showToast.success(
+        !editingItem && creatingItemForRowIndex === null
+          ? 'Item added to menu'
+          : 'Item saved'
+      );
       if (creatingItemForRowIndex === null) {
         closeDrawer();
       }
@@ -949,7 +977,24 @@ export const MenuPage: React.FC = () => {
             </div>
           )}
 
-          {/* Item Name & Upload Image Row */}
+          {/* Select Item (add-to-menu flow) or Item Name + Upload Image (edit / inline-create flows) */}
+          {drawerMode === 'add-item' && creatingItemForRowIndex === null ? (
+            <div>
+              <label className="block font-semibold text-foreground mb-1.5">
+                Select Item <span className="text-red-500">*</span>
+              </label>
+              <SearchableSelect
+                id="item-select"
+                value={newItem.item}
+                onChange={handleAddItemSelect}
+                options={allItems.map(i => ({
+                  value: i.name,
+                  label: i.item_name ? `${i.item_name} (${i.name})` : i.name,
+                }))}
+                placeholder="Select Item..."
+              />
+            </div>
+          ) : (
           <div className="flex items-end gap-3">
             <div className="flex-1">
               <label className="block font-semibold text-foreground mb-1.5">
@@ -1018,6 +1063,7 @@ export const MenuPage: React.FC = () => {
               )}
             </div>
           </div>
+          )}
 
           {/* Course field */}
           <div>
@@ -1082,7 +1128,7 @@ export const MenuPage: React.FC = () => {
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-border">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
             <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              {editingItem ? 'Save Changes' : 'Create Item'}
+              {editingItem ? 'Save Changes' : creatingItemForRowIndex !== null ? 'Create Item' : 'Add to Menu'}
             </Button>
           </div>
         </form>
@@ -1153,6 +1199,7 @@ export const MenuPage: React.FC = () => {
                           if (value === 'CREATE_NEW_ITEM') {
                             setCreatingItemForRowIndex(index);
                             setNewItem({
+                              item: '',
                               item_name: '',
                               rate: '',
                               course: '',
