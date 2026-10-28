@@ -334,7 +334,30 @@ scheduler_events = {
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 		],
 		"*/5 * * * *":[
-			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
+			"ury.ury.services.food_cost_alerts.notify_high_food_cost",
+		],
+		"*/10 10-18 * * *":[
+			# UAT simulator Stage 2 (transaction window 10:00-18:59): work off
+			# one leaseable POS slot per open run; NEVER closes sessions --
+			# Stage 3 at 19:00 does that. Silently no-ops unless
+			# allow_uat_simulator is set on the site.
+			"ury.ury.simulator.service.process_scheduled_slot",
+		],
+		# UAT simulator Stage 1 morning initiator: open the simulated service
+		# day on every active branch (manufacturing -> POS session -> slot
+		# timetable); the */10 hook above then drains slots per branch and the
+		# 19:00 finalizer closes each session. Silently no-ops unless
+		# allow_uat_simulator is set on the site.
+		"0 10 * * *":[
+			"ury.ury.simulator.service.initiate_morning_simulation"
+		],
+		# UAT simulator Stage 3 evening finalizer: lock the day's runs out of
+		# slot execution, complete/close their Production Plans (MTO-aware),
+		# close each POS session (consolidation + reservations + Daily P&L),
+		# and mark the runs Completed. Silently no-ops unless
+		# allow_uat_simulator is set on the site.
+		"0 19 * * *":[
+			"ury.ury.simulator.service.finalize_evening_simulation"
 		],
 		# Backstop only. Reservations are normally closed out at the
 		# consolidated Sales Invoice submit (sale) or on cancellation; this
@@ -365,6 +388,7 @@ scheduler_events = {
 # it must never run automatically via the scheduler.
 commands = [
 	"ury.commands.seed_demo_data",
+	"ury.commands.uat_simulate_day",
 ]
 
 # Testing
