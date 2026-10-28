@@ -1,0 +1,62 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-10-01 17:40:45.375047",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2026-10-01 17:43:09.312097",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Menu Course Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    COALESCE(NULLIF(child.custom_course, ''), 'Unassigned / Standalone') AS \"Course:Data:150\",\n    SUM(child.qty) AS \"Count:Int:100\",\n    SUM(child.base_net_amount) AS \"Sales Value:Currency:120\"\nFROM\n    `tabPOS Invoice` parent\nINNER JOIN\n    `tabPOS Invoice Item` child ON child.parent = parent.name\nWHERE\n    parent.docstatus = 1\n    AND parent.posting_date BETWEEN %(start_date)s AND %(end_date)s\n    AND parent.branch = %(branch)s\nGROUP BY\n    COALESCE(NULLIF(child.custom_course, ''), 'Unassigned / Standalone')\nORDER BY\n    SUM(child.base_net_amount) DESC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Menu Course Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "URY Captain"
+  },
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Cashier"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [
+  {
+   "fieldname": "Time Interval",
+   "fieldtype": "Data",
+   "label": "Time Interval",
+   "width": 200
+  },
+  {
+   "fieldname": "Sales",
+   "fieldtype": "Currency",
+   "label": "Sales",
+   "width": 150
+  },
+  {
+   "fieldname": "Bills",
+   "fieldtype": "Data",
+   "label": "Bills",
+   "width": 150
+  }
+ ],
+ "creation": "2026-04-16 15:26:42.250729",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-04-16 15:54:35.609497",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Hourly Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\r\n    time_intervals.`Time Interval`,\r\n    COALESCE(SUM(sales_by_interval.`Sales`), 0) AS 'Sales',\r\n    COUNT(sales_by_interval.`Bill`) AS 'Bills'\r\nFROM (\r\n    SELECT '12 AM - 01 AM' AS 'Time Interval', 1 AS 'Order'\r\n    UNION ALL SELECT '01 AM - 02 AM', 2  UNION ALL SELECT '02 AM - 03 AM', 3\r\n    UNION ALL SELECT '03 AM - 04 AM', 4  UNION ALL SELECT '04 AM - 05 AM', 5\r\n    UNION ALL SELECT '05 AM - 06 AM', 6  UNION ALL SELECT '06 AM - 07 AM', 7\r\n    UNION ALL SELECT '07 AM - 08 AM', 8  UNION ALL SELECT '08 AM - 09 AM', 9\r\n    UNION ALL SELECT '09 AM - 10 AM', 10 UNION ALL SELECT '10 AM - 11 AM', 11\r\n    UNION ALL SELECT '11 AM - 12 PM', 12 UNION ALL SELECT '12 PM - 01 PM', 13\r\n    UNION ALL SELECT '01 PM - 02 PM', 14 UNION ALL SELECT '02 PM - 03 PM', 15\r\n    UNION ALL SELECT '03 PM - 04 PM', 16 UNION ALL SELECT '04 PM - 05 PM', 17\r\n    UNION ALL SELECT '05 PM - 06 PM', 18 UNION ALL SELECT '06 PM - 07 PM', 19\r\n    UNION ALL SELECT '07 PM - 08 PM', 20 UNION ALL SELECT '08 PM - 09 PM', 21\r\n    UNION ALL SELECT '09 PM - 10 PM', 22 UNION ALL SELECT '10 PM - 11 PM', 23\r\n    UNION ALL SELECT '11 PM - 12 AM', 24\r\n) AS time_intervals\r\nLEFT JOIN (\r\n    SELECT\r\n        CASE \r\n            WHEN HOUR(`creation`) = 0 THEN '12 AM - 01 AM'\r\n            WHEN HOUR(`creation`) = 1 THEN '01 AM - 02 AM'\r\n            WHEN HOUR(`creation`) = 2 THEN '02 AM - 03 AM'\r\n            WHEN HOUR(`creation`) = 3 THEN '03 AM - 04 AM'\r\n            WHEN HOUR(`creation`) = 4 THEN '04 AM - 05 AM'\r\n            WHEN HOUR(`creation`) = 5 THEN '05 AM - 06 AM'\r\n            WHEN HOUR(`creation`) = 6 THEN '06 AM - 07 AM'\r\n            WHEN HOUR(`creation`) = 7 THEN '07 AM - 08 AM'\r\n            WHEN HOUR(`creation`) = 8 THEN '08 AM - 09 AM'\r\n            WHEN HOUR(`creation`) = 9 THEN '09 AM - 10 AM'\r\n            WHEN HOUR(`creation`) = 10 THEN '10 AM - 11 AM'\r\n            WHEN HOUR(`creation`) = 11 THEN '11 AM - 12 PM'\r\n            WHEN HOUR(`creation`) = 12 THEN '12 PM - 01 PM'\r\n            WHEN HOUR(`creation`) = 13 THEN '01 PM - 02 PM'\r\n            WHEN HOUR(`creation`) = 14 THEN '02 PM - 03 PM'\r\n            WHEN HOUR(`creation`) = 15 THEN '03 PM - 04 PM'\r\n            WHEN HOUR(`creation`) = 16 THEN '04 PM - 05 PM'\r\n            WHEN HOUR(`creation`) = 17 THEN '05 PM - 06 PM'\r\n            WHEN HOUR(`creation`) = 18 THEN '06 PM - 07 PM'\r\n            WHEN HOUR(`creation`) = 19 THEN '07 PM - 08 PM'\r\n            WHEN HOUR(`creation`) = 20 THEN '08 PM - 09 PM'\r\n            WHEN HOUR(`creation`) = 21 THEN '09 PM - 10 PM'\r\n            WHEN HOUR(`creation`) = 22 THEN '10 PM - 11 PM'\r\n            WHEN HOUR(`creation`) = 23 THEN '11 PM - 12 AM'\r\n        END AS 'Time Interval',\r\n        `name` AS \"Bill\",\r\n        `grand_total` AS 'Sales'\r\n    FROM `tabPOS Invoice`\r\n    WHERE \r\n        DATE(`creation`) BETWEEN %(from_date)s AND %(to_date)s\r\n        AND `branch` = %(branch)s\r\n        AND `docstatus` = 1\r\n        AND `status` IN (\"Consolidated\", \"Paid\")\r\n) AS sales_by_interval\r\nON time_intervals.`Time Interval` = sales_by_interval.`Time Interval`\r\nGROUP BY time_intervals.`Time Interval`\r\nORDER BY time_intervals.`Order`;",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Hourly Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Director"
+  },
+  {
+   "role": "Restaurant Admin"
+  },
+  {
+   "role": "Restaurant Manager"
+  },
+  {
+   "role": "Accounts Head"
+  },
+  {
+   "role": "Store Manager"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "timeout": 0
+}

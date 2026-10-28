@@ -1,0 +1,55 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-10-01 14:57:00.130681",
+ "disable_prepared_report_automation": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 14:57:00.130681",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Employee Wise ACC",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    inv.waiter AS \"Employee\",\n    SUM(IFNULL(course_data.course_count, 0)) AS \"Total Courses\",\n    COUNT(inv.name) AS \"No of Invoices\",\n    ROUND((SUM(IFNULL(course_data.course_count, 0)) / COUNT(inv.name)), 2) AS \"ACC\"\nFROM \n    (\n        SELECT %(start_date)s AS `date`\n        UNION\n        SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n        FROM (\n            SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n            FROM (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS a\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS b\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS c\n            ORDER BY n\n        ) AS nums\n        WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n        UNION\n        SELECT %(end_date)s AS `date`\n    ) AS date_list\nINNER JOIN `tabPOS Invoice` inv ON (\n    inv.`branch` = %(branch)s\n    AND inv.`docstatus` = 1\n)\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nLEFT JOIN (\n    SELECT\n        parent,\n        COUNT(DISTINCT custom_course) AS course_count\n    FROM `tabPOS Invoice Item`\n    WHERE custom_course IS NOT NULL \n      AND custom_course != ''\n    GROUP BY parent\n) course_data ON course_data.parent = inv.name\nWHERE\n    (\n    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND inv.`posting_date` = date_list.`date`)\n    OR (rs.`hours` > 0 AND TIMESTAMP(inv.`posting_date`, inv.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(inv.`posting_date`, inv.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n    OR (rs.`branch` IS NULL AND inv.`posting_date` = date_list.`date`)\n    )\n  AND inv.waiter IS NOT NULL \n  AND inv.waiter != ''\nGROUP BY \n    inv.waiter\nORDER BY \n    `ACC` DESC\n",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Employee Wise ACC",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Chef"
+  }
+ ],
+ "snapshot_report": 0,
+ "timeout": 0
+}

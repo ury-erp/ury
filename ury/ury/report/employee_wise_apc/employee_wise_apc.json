@@ -1,0 +1,65 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2025-10-07 18:06:20.510205",
+ "disable_prepared_report_automation": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "options": "",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "options": "",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "mandatory": 0,
+   "options": "User",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 18:35:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Employee Wise APC",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "WITH invoice_data AS (\r\n    SELECT\r\n        a.`name` AS `invoice_name`,\r\n        DATE_ADD(\r\n            DATE(a.`posting_date`),\r\n            INTERVAL CASE\r\n                WHEN TIME(a.`posting_time`) >= CONCAT(LPAD(COALESCE(rs.`hours`, 0), 2, '0'), ':00:00')\r\n                    THEN 0\r\n                ELSE -1\r\n            END DAY\r\n        ) AS `date`,\r\n        a.`no_of_pax` AS `no_of_pax`,\r\n        a.`grand_total` AS `sales_amount`\r\n    FROM `tabPOS Invoice` a\r\n    LEFT JOIN `tabURY Report Settings` rs ON rs.`branch` = %(branch)s\r\n    WHERE\r\n        a.`branch` = %(branch)s\r\n        AND a.`restaurant_table` != \"\"\r\n        AND a.`order_type` != \"Take Away\"\r\n        AND a.`status` IN (\"Consolidated\", \"Paid\")\r\n        AND a.`docstatus` = 1\r\n        AND a.`no_of_pax` > 0\r\n)\r\nSELECT\r\n    i.`date` AS \"Date\",\r\n    i.`invoice_name` AS \"Invoice Name\",\r\n    ROUND(i.`sales_amount`, 2) AS \"Sales Amount\",\r\n    i.`no_of_pax` AS \"No of Pax\",\r\n    ROUND(i.`sales_amount` / NULLIF(i.`no_of_pax`, 0), 2) AS \"APC\"\r\nFROM invoice_data i\r\nORDER BY i.`date` DESC, i.`invoice_name`;\r\n\r\n",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Employee Wise APC",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Administrator"
+  }
+ ],
+ "snapshot_report": 0,
+ "timeout": 0
+}

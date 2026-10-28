@@ -1,0 +1,63 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2024-10-09 16:08:52.794154",
+ "disable_prepared_report_automation": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "doctype_to_sync": [],
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "User",
+   "mandatory": 1,
+   "options": "User",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 39,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-10-01 17:59:24.401628",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Employee Service Wise Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    b.`posting_date` AS \"Date\",\n    (CASE\n        WHEN b.`order_type` = \"Take Away\" THEN\n            CASE\n                WHEN b.`restaurant_table` IS NOT NULL THEN \"Table Take Away\"\n                ELSE \"Take Away\"\n            END\n        ELSE b.`order_type`\n    END) AS \"Order Type\",\n    COUNT(b.`name`) AS \"Invoice Count\",\n    SUM(b.`grand_total`) AS \"Grand Total\"\nFROM \n    (\n        SELECT %(start_date)s AS `date`\n        UNION\n        SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n        FROM (\n            SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n            FROM (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS a\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS b\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS c\n            ORDER BY n\n        ) AS nums\n        WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n        UNION\n        SELECT %(end_date)s AS `date`\n    ) AS date_list\nLEFT JOIN `tabPOS Invoice` b ON (\n    b.`branch` = %(branch)s\n    AND b.`status` IN (\"Consolidated\",\"Paid\") \n    AND b.`docstatus` = 1\n)\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nINNER JOIN `tabUser` e ON (\n    e.`name` = %(employee)s\n    AND e.`name`= b.`waiter`\n)\nWHERE\n    (\n    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = date_list.`date`)\n    OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n    OR (rs.`branch` IS NULL AND b.`posting_date` = date_list.`date`)\n    )\nGROUP BY \n    date_list.`date`, b.`order_type`\nORDER BY \n    date_list.`date` ASC, b.`order_type` ASC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Employee Service Wise Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Administrator"
+  }
+ ],
+ "snapshot_report": 0,
+ "timeout": 0
+}

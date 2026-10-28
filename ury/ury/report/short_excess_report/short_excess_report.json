@@ -1,5 +1,5 @@
 {
- "add_total_row": 0,
+ "add_total_row": 1,
  "columns": [],
  "creation": "2026-09-08 00:00:00.000000",
  "disable_prepared_report": 0,
@@ -39,7 +39,7 @@
  ],
  "idx": 0,
  "is_standard": "Yes",
- "modified": "2026-10-21 15:45:00.000000",
+ "modified": "2026-10-28 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Short-Excess Report",

@@ -68,7 +68,7 @@ def execute(filters=None):
 			SUM(sii.qty) AS total_qty
 		FROM `tabItem` a
 		LEFT JOIN `tabSales Invoice Item` sii ON sii.item_code = a.item_code
-		LEFT JOIN `tabSales Invoice` si ON (
+		INNER JOIN `tabSales Invoice` si ON (
 			si.name = sii.parent
 			AND si.docstatus = 1
 			AND DATE(si.posting_date) >= %s
@@ -91,7 +91,7 @@ def execute(filters=None):
 			SUM(sii.qty) AS total_qty
 		FROM `tabItem` a
 		LEFT JOIN `tabSales Invoice Item` sii ON sii.item_code = a.item_code
-		LEFT JOIN `tabSales Invoice` si ON (
+		INNER JOIN `tabSales Invoice` si ON (
 			si.name = sii.parent
 			AND si.docstatus = 1
 			AND DATE(si.posting_date) >= %s

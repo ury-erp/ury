@@ -1,0 +1,68 @@
+{
+ "add_total_row": 1,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-07-15 15:16:33.120207",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "options": "",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "order_type",
+   "fieldtype": "Select",
+   "label": "Order Type",
+   "mandatory": 0,
+   "options": "\nDine In\nPhone In\nTake Away\nTable Takeaway\nDelivery\nAggregators",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-07-21 20:51:33.671942",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Order Type Item Wise Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    c.`item_group` AS \"Item Group\",\n    c.`item_name` AS \"Item Name\",\n    SUM(b.`qty`) AS \"Qty\",\n    SUM(b.`amount`) AS \"Amount\"\nFROM\n(\n    SELECT %(start_date)s AS `date`\n\n    UNION\n\n    SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n    FROM (\n        SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n        FROM\n        (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4\n            UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) a\n        CROSS JOIN\n        (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4\n            UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) b\n        CROSS JOIN\n        (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4\n            UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) c\n        ORDER BY n\n    ) nums\n    WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n\n    UNION\n\n    SELECT %(end_date)s AS `date`\n) date_list\n\nLEFT JOIN `tabPOS Invoice` a\n    ON (\n        a.branch = %(branch)s\n        AND a.status IN (\"Consolidated\", \"Paid\")\n        AND a.docstatus = 1\n    )\n\nINNER JOIN `tabPOS Invoice Item` b\n    ON a.name = b.parent\n\nLEFT JOIN `tabItem` c\n    ON c.item_code = b.item_code\n\nLEFT JOIN `tabURY Report Settings` rs\n    ON rs.branch = %(branch)s\n\nWHERE\n(\n    (\n        (rs.hours IS NULL OR rs.hours = 0)\n        AND a.posting_date = date_list.date\n    )\n\n    OR\n\n    (\n        rs.hours > 0\n        AND TIMESTAMP(a.posting_date, a.posting_time)\n            <= TIMESTAMP(\n                DATE_ADD(date_list.date, INTERVAL 1 DAY),\n                CONCAT(LPAD(rs.hours, 2, '0'), ':00:00')\n            )\n        AND TIMESTAMP(a.posting_date, a.posting_time)\n            >= TIMESTAMP(\n                date_list.date,\n                CONCAT(LPAD(rs.hours, 2, '0'), ':00:00')\n            )\n    )\n\n    OR\n\n    (\n        rs.branch IS NULL\n        AND a.posting_date = date_list.date\n    )\n)\n\nAND\n(\n    IFNULL(%(order_type)s, '') = ''\n    OR a.order_type = %(order_type)s\n)\n\nGROUP BY\n    c.item_name,\n    c.item_group\n\nORDER BY\n    c.item_group ASC,\n    c.item_name ASC;",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Order Type Item Wise Sales",
+ "report_script": "",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "timeout": 0
+}
