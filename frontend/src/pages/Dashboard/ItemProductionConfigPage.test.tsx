@@ -110,4 +110,19 @@ describe('ItemProductionConfigPage', () => {
       expect(screen.getByPlaceholderText('Search Production Unit (optional)')).toBeInTheDocument();
     });
   });
+
+  it('includes all desk field production policies (PRE_PRODUCED, MADE_TO_ORDER, DIRECT_RETAIL, BUNDLE)', async () => {
+    render(<ItemProductionConfigPage />);
+    const addBtn = await screen.findByRole('button', { name: /Add Item Production Configuration/i });
+    addBtn.click();
+    await waitFor(() => {
+      const select = document.getElementById('production_policy') as HTMLSelectElement;
+      expect(select).toBeInTheDocument();
+      const options = Array.from(select.querySelectorAll('option')).map((opt) => opt.value);
+      expect(options).toContain('PRE_PRODUCED');
+      expect(options).toContain('MADE_TO_ORDER');
+      expect(options).toContain('DIRECT_RETAIL');
+      expect(options).toContain('BUNDLE');
+    });
+  });
 });
