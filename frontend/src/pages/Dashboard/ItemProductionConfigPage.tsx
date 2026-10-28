@@ -28,14 +28,23 @@ interface ItemProductionConfigRecord {
   production_unit?: string;
   production_policy?: string;
   bom?: string;
+  product_bundle?: string;
+  sourcing_mode?: string;
   active?: number;
   controlled_by_sales_plan?: number;
   allow_over_plan_sale?: number;
   availability_mode?: string;
   direct_retail_warehouse?: string;
+  external_receiving_warehouse?: string;
 }
 
-const PRODUCTION_POLICY_OPTIONS = ['PRE_PRODUCED', 'MADE_TO_ORDER', 'DIRECT_RETAIL'];
+const DEFAULT_PRODUCTION_POLICY_OPTIONS = [
+  'PRE_PRODUCED',
+  'MADE_TO_ORDER',
+  'DIRECT_RETAIL',
+  'BUNDLE',
+];
+const SOURCING_MODE_OPTIONS = ['IN_HOUSE', 'EXTERNAL_RECEIPT'];
 const AVAILABILITY_MODE_OPTIONS = ['Always Available', 'Plan Available', 'Stock Available'];
 
 const emptyForm = {
@@ -46,13 +55,24 @@ const emptyForm = {
   production_unit: '',
   production_policy: '',
   bom: '',
+  product_bundle: '',
+  sourcing_mode: 'IN_HOUSE',
   controlled_by_sales_plan: false,
   allow_over_plan_sale: false,
   availability_mode: '',
   direct_retail_warehouse: '',
+  external_receiving_warehouse: '',
 };
 
-type LinkFieldKey = 'item' | 'branch' | 'department' | 'production_unit' | 'bom' | 'direct_retail_warehouse';
+type LinkFieldKey =
+  | 'item'
+  | 'branch'
+  | 'department'
+  | 'production_unit'
+  | 'bom'
+  | 'product_bundle'
+  | 'direct_retail_warehouse'
+  | 'external_receiving_warehouse';
 
 const EMPTY_OPTIONS: Record<LinkFieldKey, AutocompleteOption[]> = {
   item: [],
@@ -60,7 +80,9 @@ const EMPTY_OPTIONS: Record<LinkFieldKey, AutocompleteOption[]> = {
   department: [],
   production_unit: [],
   bom: [],
+  product_bundle: [],
   direct_retail_warehouse: [],
+  external_receiving_warehouse: [],
 };
 
 export const ItemProductionConfigPage: React.FC = () => {
@@ -74,6 +96,46 @@ export const ItemProductionConfigPage: React.FC = () => {
   const [form, setForm] = useState(emptyForm);
   const [linkOptions, setLinkOptions] = useState(EMPTY_OPTIONS);
   const [linkSearching, setLinkSearching] = useState<Partial<Record<LinkFieldKey, boolean>>>({});
+  const [productionPolicyOptions, setProductionPolicyOptions] = useState<string[]>(
+    DEFAULT_PRODUCTION_POLICY_OPTIONS
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPolicyOptions = async () => {
+      try {
+        const res = await call<any>('frappe.client.get_value', {
+          doctype: 'DocField',
+          fieldname: 'options',
+          filters: {
+            parent: 'URY Item Production Configuration',
+            fieldname: 'production_policy',
+          },
+        });
+        const rawOptions = (res as any)?.message?.options || (res as any)?.options;
+        if (typeof rawOptions === 'string' && isMounted) {
+          const parsed = rawOptions
+            .split('\n')
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+          if (parsed.length > 0) {
+            setProductionPolicyOptions(parsed);
+          }
+        }
+      } catch {
+        // Fall back to DEFAULT_PRODUCTION_POLICY_OPTIONS
+      }
+    };
+
+    fetchPolicyOptions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const displayPolicyOptions = Array.from(
+    new Set([...productionPolicyOptions, ...(form.production_policy ? [form.production_policy] : [])])
+  );
 
   const setFieldOptions = (field: LinkFieldKey, options: AutocompleteOption[], committed: string) => {
     setLinkOptions((prev) => ({
@@ -128,7 +190,19 @@ export const ItemProductionConfigPage: React.FC = () => {
             descriptionField: 'item',
             filters: bomFilters,
           });
-        } else if (field === 'direct_retail_warehouse') {
+        } else if (field === 'product_bundle') {
+          const bundleFilters: LinkFilter[] = [['disabled', '=', 0]];
+          if (formSnapshot.item) {
+            bundleFilters.unshift(['new_item_code', '=', formSnapshot.item]);
+          }
+          options = await searchLinkOptions({
+            doctype: 'Product Bundle',
+            query,
+            fields: ['name', 'new_item_code'],
+            descriptionField: 'new_item_code',
+            filters: bundleFilters,
+          });
+        } else if (field === 'direct_retail_warehouse' || field === 'external_receiving_warehouse') {
           options = await searchLinkOptions({
             doctype: 'Warehouse',
             query,
@@ -185,10 +259,13 @@ export const ItemProductionConfigPage: React.FC = () => {
       production_unit: config.production_unit || '',
       production_policy: config.production_policy || '',
       bom: config.bom || '',
+      product_bundle: config.product_bundle || '',
+      sourcing_mode: config.sourcing_mode || 'IN_HOUSE',
       controlled_by_sales_plan: !!config.controlled_by_sales_plan,
       allow_over_plan_sale: !!config.allow_over_plan_sale,
       availability_mode: config.availability_mode || '',
       direct_retail_warehouse: config.direct_retail_warehouse || '',
+      external_receiving_warehouse: config.external_receiving_warehouse || '',
     };
     setForm(nextForm);
     setLinkOptions({
@@ -199,8 +276,14 @@ export const ItemProductionConfigPage: React.FC = () => {
         ? [{ value: nextForm.production_unit, label: nextForm.production_unit }]
         : [],
       bom: nextForm.bom ? [{ value: nextForm.bom, label: nextForm.bom }] : [],
+      product_bundle: nextForm.product_bundle
+        ? [{ value: nextForm.product_bundle, label: nextForm.product_bundle }]
+        : [],
       direct_retail_warehouse: nextForm.direct_retail_warehouse
         ? [{ value: nextForm.direct_retail_warehouse, label: nextForm.direct_retail_warehouse }]
+        : [],
+      external_receiving_warehouse: nextForm.external_receiving_warehouse
+        ? [{ value: nextForm.external_receiving_warehouse, label: nextForm.external_receiving_warehouse }]
         : [],
     });
     setIsDrawerOpen(true);
@@ -219,6 +302,12 @@ export const ItemProductionConfigPage: React.FC = () => {
         production_unit: form.production_unit || null,
         production_policy: form.production_policy || null,
         bom: form.bom || null,
+        product_bundle: form.production_policy === 'BUNDLE' ? form.product_bundle || null : null,
+        sourcing_mode: form.production_policy === 'PRE_PRODUCED' ? form.sourcing_mode || 'IN_HOUSE' : null,
+        external_receiving_warehouse:
+          form.production_policy === 'PRE_PRODUCED' && form.sourcing_mode === 'EXTERNAL_RECEIPT'
+            ? form.external_receiving_warehouse || null
+            : null,
         controlled_by_sales_plan: form.controlled_by_sales_plan ? 1 : 0,
         allow_over_plan_sale: form.allow_over_plan_sale ? 1 : 0,
         availability_mode: form.availability_mode || null,
@@ -330,8 +419,9 @@ export const ItemProductionConfigPage: React.FC = () => {
                   ...prev,
                   item: val,
                   bom: '',
+                  ...(prev.production_policy === 'BUNDLE' && !prev.product_bundle ? { product_bundle: val } : {}),
                 }));
-                setLinkOptions((prev) => ({ ...prev, bom: [] }));
+                setLinkOptions((prev) => ({ ...prev, bom: [], product_bundle: [] }));
               }}
               onSearch={(query) => runLinkSearch('item', query, form)}
               options={linkOptions.item}
@@ -394,19 +484,84 @@ export const ItemProductionConfigPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Production Policy</label>
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="production_policy">
+              Production Policy
+            </label>
             <Select
+              id="production_policy"
               value={form.production_policy}
-              onChange={(e) => setForm({ ...form, production_policy: e.target.value })}
+              onChange={(e) => {
+                const nextPolicy = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  production_policy: nextPolicy,
+                  ...(nextPolicy === 'BUNDLE' && !prev.product_bundle && prev.item
+                    ? { product_bundle: prev.item }
+                    : {}),
+                }));
+              }}
               placeholder="Select Policy (optional)"
             >
-              {PRODUCTION_POLICY_OPTIONS.map((opt) => (
+              {displayPolicyOptions.map((opt) => (
                 <SelectItem key={opt} value={opt}>
                   {opt}
                 </SelectItem>
               ))}
             </Select>
           </div>
+
+          {form.production_policy === 'BUNDLE' && (
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1" htmlFor="product_bundle">
+                Product Bundle
+              </label>
+              <Autocomplete
+                id="product_bundle"
+                value={form.product_bundle}
+                onChange={(val) => setForm((prev) => ({ ...prev, product_bundle: val }))}
+                onSearch={(query) => runLinkSearch('product_bundle', query, form)}
+                options={linkOptions.product_bundle}
+                searching={!!linkSearching.product_bundle}
+                placeholder={form.item ? 'Search Product Bundle' : 'Select an Item first'}
+                disabled={!form.item}
+              />
+              <p className="text-xs text-text-tertiary mt-1">Product Bundle must belong to the selected Item.</p>
+            </div>
+          )}
+
+          {form.production_policy === 'PRE_PRODUCED' && (
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1">Sourcing Mode</label>
+              <Select
+                id="sourcing_mode"
+                value={form.sourcing_mode}
+                onChange={(e) => setForm({ ...form, sourcing_mode: e.target.value })}
+              >
+                {SOURCING_MODE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {form.production_policy === 'PRE_PRODUCED' && form.sourcing_mode === 'EXTERNAL_RECEIPT' && (
+            <div>
+              <label className="block font-semibold text-muted-foreground mb-1" htmlFor="external_receiving_warehouse">
+                External Receiving Warehouse
+              </label>
+              <Autocomplete
+                id="external_receiving_warehouse"
+                value={form.external_receiving_warehouse}
+                onChange={(val) => setForm((prev) => ({ ...prev, external_receiving_warehouse: val }))}
+                onSearch={(query) => runLinkSearch('external_receiving_warehouse', query, form)}
+                options={linkOptions.external_receiving_warehouse}
+                searching={!!linkSearching.external_receiving_warehouse}
+                placeholder="Search Warehouse (optional)"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="bom">
