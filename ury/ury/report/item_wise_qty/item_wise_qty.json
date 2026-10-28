@@ -47,6 +47,9 @@
  "roles": [
   {
    "role": "ARM"
+  },
+  {
+   "role": "System Manager"
   }
  ],
  "timeout": 0

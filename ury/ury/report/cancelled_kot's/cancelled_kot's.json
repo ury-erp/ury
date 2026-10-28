@@ -64,6 +64,9 @@
   },
   {
    "role": "Accounts"
+  },
+  {
+   "role": "System Manager"
   }
  ],
  "timeout": 0
