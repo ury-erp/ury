@@ -5,7 +5,7 @@ import frappe
 from frappe.model.document import Document
 import json
 import calendar
-from datetime import datetime
+from frappe.utils import getdate
 
 def inner_bom_process(buying_price_list, bom):
     unset_bom_items = []
@@ -538,8 +538,7 @@ class URYDailyPandL(Document):
 			)
 			frappe.msgprint(cost_exclusion_note, title="Employee Cost Excluded", indicator="orange")
 
-		date_str =  self.date
-		date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+		date_obj = getdate(self.date)
 		year = date_obj.year
 		month_number = date_obj.month
 		days = calendar.monthrange(year, month_number)[1]

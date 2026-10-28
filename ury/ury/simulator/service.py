@@ -15,18 +15,29 @@ single daily lifecycle for one (branch, business_date) scope:
              the run for the cron-driven path)
         generate_run_report()        -> Markdown summary on run.report_markdown
 
-    initiate_daily_simulation_for_all_branches()
-                                     -- morning scheduler initiator (10:00 AM): for every
-                                        branch with an active POS Profile and
-                                        menu, get_or_create the day's run,
-                                        run manufacturing, then open the POS
-                                        session and stamp the slot timetable
-                                        so the cron hook can drain it.
+    initiate_morning_simulation()    -- Stage 1 morning initiator (10:00 AM):
+                                        for every branch with an active POS
+                                        Profile and menu, get_or_create the
+                                        day's run, run manufacturing, then open
+                                        the POS session and stamp the slot
+                                        timetable so the cron hook can drain it.
 
-    process_scheduled_slot()         -- scheduler cron hook (every 10 min):
-        claims one leaseable slot per open run, processes its order, and
-        closes the session when every slot is terminal or the 22:00 closing
-        cutoff has passed.
+    process_scheduled_slot()         -- Stage 2 scheduler cron hook (every 10
+        min, 10:00-18:59):             claims one leaseable slot per open run
+                                        and processes its order. It NEVER
+                                        closes the session -- a run whose slots
+                                        are all terminal is simply left "Open"
+                                        for Stage 3.
+
+    finalize_evening_simulation()    -- Stage 3 evening finalizer (19:00):
+                                        for every run of the day still open,
+                                        locks out further slot execution,
+                                        completes/closes its Production Plans
+                                        (MTO-aware gate), closes the POS
+                                        session (consolidation + reservation
+                                        fulfilment + URY Daily P and L), then
+                                        generates the report and marks the run
+                                        "Completed".
 
 The cron path exists so a simulated service day unfolds in near-real-time
 instead of inside one long CLI call: ``uat-simulate-day --no-auto-close``
@@ -68,6 +79,7 @@ from ury.ury.simulator.guards import (
 )
 from ury.ury.simulator.manufacturing_runner import run_manufacturing_simulation
 from ury.ury.simulator.pos_runner import (
+	close_or_complete_production_plans_for_run,
 	close_pos_session,
 	generate_simulation_slots,
 	get_or_create_sim_cashier,
@@ -100,11 +112,25 @@ MANUFACTURING_PENDING_STATUSES = (
 #: Run statuses the cron slot processor works on.
 CRON_ACTIVE_STATUSES = ("POS Open", "Generating Invoices")
 
+#: Run statuses the evening finalizer (Stage 3) works on. "POS Open" /
+#: "Generating Invoices" are the in-transaction-window states ("Open");
+#: "Closing Failed" runs get a retry. "Transactions Complete" is listed
+#: defensively for runs stamped terminal-by-slots by an earlier revision --
+#: Stage 2 no longer writes it (it simply leaves the run Open).
+FINALIZABLE_RUN_STATUSES = (
+	"POS Open",
+	"Generating Invoices",
+	"Transactions Complete",
+	"Closing In Progress",
+	"Closing Failed",
+)
+
 #: Minutes a claimed slot stays leased before another worker may retry it.
 LEASE_MINUTES = 10
 
-#: Closing cutoff: sessions left open past this local time (10:00 PM) are closed by the
-#: next cron tick even when slots remain unprocessed.
+#: Legacy closing cutoff (22:00). Stage 2 no longer closes sessions at all --
+#: closing happens exclusively in :func:`finalize_evening_simulation` -- but
+#: the constant is kept for the CLI backstop and existing imports.
 CLOSING_CUTOFF = dt_time(22, 0)
 
 
@@ -289,16 +315,18 @@ def get_active_simulation_branches() -> list:
 	return branches
 
 
-def initiate_daily_simulation_for_all_branches(business_date=None, slot_count=12) -> list:
-	"""Morning initiator (registered on the ``0 10 * * *`` cron): open the
-	simulated service day on every active branch.
+def initiate_morning_simulation(business_date=None, slot_count=12) -> list:
+	"""Stage 1 morning initiator (registered on the ``0 10 * * *`` cron):
+	open the simulated service day on every active branch.
 
 	For each branch from :func:`get_active_simulation_branches` the day's
 	run is fetched single-flight (:func:`get_or_create_daily_run`), pushed
 	through manufacturing when still pending, then the branch's POS session
 	is opened (as the branch's own cashier) and the slot timetable is
 	stamped -- after which the every-10-minutes :func:`process_scheduled_slot`
-	drains the slots and closes each session independently.
+	(Stage 2) drains the slots and the 19:00
+	:func:`finalize_evening_simulation` (Stage 3) closes the session. The
+	run is left in its "Open" POS-active status.
 
 	Resumable and isolated: a run already past manufacturing is not re-run,
 	an already-open session is reused, slot generation is idempotent, and
@@ -332,6 +360,15 @@ def initiate_daily_simulation_for_all_branches(business_date=None, slot_count=12
 				{"branch": branch, "status": "Failed", "error": (traceback or "")[-140:]}
 			)
 	return results
+
+
+def initiate_daily_simulation_for_all_branches(business_date=None, slot_count=12) -> list:
+	"""Back-compat alias for :func:`initiate_morning_simulation` (Stage 1).
+
+	Older callers and tests import this name; new code should use
+	:func:`initiate_morning_simulation`.
+	"""
+	return initiate_morning_simulation(business_date=business_date, slot_count=slot_count)
 
 
 def _initiate_branch_simulation(branch, business_date, slot_count, calling_user) -> dict:
@@ -384,16 +421,19 @@ def _initiate_branch_simulation(branch, business_date, slot_count, calling_user)
 
 
 def process_scheduled_slot():
-	"""Cron hook (every 10 minutes): work one leaseable slot per open run.
+	"""Stage 2 cron hook (``*/10 10-18 * * *``): work one leaseable slot per
+	open run.
 
 	Silent no-op when the simulator is disabled or nothing is claimable.
 	For each ``URY Simulation Run`` of today in a POS-active status, one slot
 	is claimed with a conditional UPDATE (atomic across overlapping cron
-	workers), its order is processed through the real POS pipeline, and the
-	session is closed -- with the report generated -- once every slot is
-	terminal or the 22:00 closing cutoff has passed. A slot that fails keeps
-	its lease for :data:`LEASE_MINUTES`; after the lease expires it is
-	retried until ``max_attempts``.
+	workers) and its order is processed through the real POS pipeline. This
+	stage NEVER closes the session: when every slot is terminal it simply
+	leaves the run "Open" -- with no claimable slots left, subsequent ticks
+	are no-ops -- and the 19:00 :func:`finalize_evening_simulation` performs
+	the close. A slot that fails keeps its lease for
+	:data:`LEASE_MINUTES`; after the lease expires it is retried until
+	``max_attempts``.
 	"""
 	if not is_uat_simulator_enabled():
 		return
@@ -438,20 +478,16 @@ def _process_one_scheduled_slot(run_name, now):
 
 	run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
 	slots = list(run.slots)
+	# Stage 2 never closes: a fully-terminal slot table only means the
+	# transaction window is over. The run stays "Open" (POS-active status,
+	# no claimable slots) until Stage 3 (finalize_evening_simulation, 19:00)
+	# locks it and closes the session. _slot_terminal stays as the shared
+	# predicate for that finalizer and the tests.
 	all_terminal = bool(slots) and all(_slot_terminal(slot) for slot in slots)
-	past_cutoff = get_datetime(now).time() >= CLOSING_CUTOFF
-	if all_terminal or past_cutoff:
-		close_result = close_pos_session(run)
-		run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
-		run.report_markdown = generate_run_report(run)
-		run.save(ignore_permissions=True)
-		frappe.db.commit()
+	if all_terminal:
 		frappe.logger().info(
-			"URY UAT Simulator: closed run {0} ({1} invoices, consolidated SI {2})".format(
-				run_name,
-				close_result.get("closing_invoice_count"),
-				close_result.get("consolidated_sales_invoice"),
-			)
+			"URY UAT Simulator: run {0} has no non-terminal slots left; "
+			"leaving it open for the evening finalizer".format(run_name)
 		)
 
 
@@ -498,6 +534,108 @@ def _slot_terminal(slot) -> bool:
 	if slot.status == "Failed":
 		return (slot.attempts or 0) >= (slot.max_attempts or 0)
 	return False
+
+
+# --- Stage 3: evening finalization ----------------------------------------------
+
+
+def finalize_evening_simulation(business_date=None) -> list:
+	"""Stage 3 evening finalizer (registered on the ``0 19 * * *`` cron).
+
+	For every run of ``business_date`` (default today) still open -- see
+	:data:`FINALIZABLE_RUN_STATUSES` -- :func:`_finalize_one_run`:
+
+	1. Locks the run out of further slot execution (moves it to
+	   "Closing In Progress", which Stage 2 never picks up).
+	2. Completes/closes its Production Plans via
+	   :func:`ury.ury.simulator.pos_runner.close_or_complete_production_plans_for_run`
+	   (the MTO-aware gate; blocked plans are reported, not fatal).
+	3. Closes the POS session via ``close_pos_session`` -- POS Closing
+	   Entry, consolidated Sales Invoices, reservation fulfilment and the
+	   URY Daily P and L.
+	4. Regenerates the run report and leaves the run "Completed"
+	   (or "Closing Failed" for a later retry when the close itself fails).
+
+	Resumable and isolated like the morning initiator: each run is wrapped
+	in try/except with ``frappe.log_error`` + rollback so one broken run
+	never starves the others, and a run already carrying a closing entry is
+	reported by ``close_pos_session`` without a second close. Silent no-op
+	(returns ``[]``) when the simulator is disabled. Returns one dict per
+	run.
+	"""
+	if not is_uat_simulator_enabled():
+		return []
+
+	business_date = getdate(business_date or today())
+	results = []
+	calling_user = frappe.session.user
+	run_names = frappe.get_all(
+		SIMULATION_RUN_DOCTYPE,
+		filters={
+			"business_date": business_date,
+			"status": ["in", list(FINALIZABLE_RUN_STATUSES)],
+		},
+		pluck="name",
+	)
+	for run_name in run_names:
+		try:
+			results.append(_finalize_one_run(run_name, calling_user))
+		except Exception:
+			traceback = frappe.get_traceback()
+			frappe.log_error(
+				traceback,
+				"URY UAT Simulator: evening finalization failed for {0}".format(run_name),
+			)
+			frappe.db.rollback()
+			results.append(
+				{"run_id": run_name, "status": "Failed", "error": (traceback or "")[-140:]}
+			)
+	return results
+
+
+def _finalize_one_run(run_name, calling_user) -> dict:
+	"""Finalize a single run: see :func:`finalize_evening_simulation`."""
+	if frappe.session.user != calling_user:
+		frappe.set_user(calling_user)
+	run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
+
+	# 1. Lock out further slot execution: "Closing In Progress" is not a
+	#    cron-active status, so the Stage 2 hook skips this run from now on.
+	if run.status in ("POS Open", "Generating Invoices", "Transactions Complete"):
+		run.status = "Closing In Progress"
+		run.save(ignore_permissions=True)
+		frappe.db.commit()
+
+	# 2. Production Plan closure gate, as the calling user (manufacturing
+	#    permissions): MTO-aware completion of every plan of the run's
+	#    Sales Plan. Blocked plans are logged inside and reported back.
+	production_plans = close_or_complete_production_plans_for_run(run)
+
+	# 3. POS closing + consolidation + reservation fulfilment + Daily P&L,
+	#    as the branch's own cashier (session ownership is per user).
+	pos_outcome = None
+	run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
+	if run.get("pos_opening_entry") and not run.get("pos_closing_entry"):
+		_assume_sim_cashier(run.branch)
+		pos_outcome = close_pos_session(run)
+
+	# 4. Report + terminal stamp. close_pos_session already set "Completed"
+	#    or "Closing Failed"; keep whatever it stamped.
+	if frappe.session.user != calling_user:
+		frappe.set_user(calling_user)
+	run = frappe.get_doc(SIMULATION_RUN_DOCTYPE, run_name)
+	run.report_markdown = generate_run_report(run)
+	run.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"run_id": run_name,
+		"status": run.status,
+		"branch": run.branch,
+		"production_plans": production_plans,
+		"pos_closing_entry": run.get("pos_closing_entry"),
+		"pos": pos_outcome,
+	}
 
 
 def generate_run_report(run_doc) -> str:

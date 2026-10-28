@@ -408,7 +408,12 @@ def _replenish_store(sales_plan, production_plans, store_warehouse, company, bus
 	for row in readiness.get("rows") or []:
 		shortage = flt(row.get("store_shortage"))
 		if shortage > 0:
-			shortage_by_item[row["item_code"]] = max(shortage_by_item.get(row["item_code"], 0.0), shortage)
+			# A tiny buffer above the exact shortage absorbs binary-float dust
+			# from BOM arithmetic so a plan never dies on a "short by 0.007"
+			# style store_shortage at completion readiness.
+			shortage_by_item[row["item_code"]] = max(
+				shortage_by_item.get(row["item_code"], 0.0), flt(shortage) + 0.05
+			)
 
 	stocked = {}
 	store_receipts = []
@@ -497,20 +502,34 @@ def _ensure_department_safety_stock(buckets, company, business_date):
 
 		produced_items = {t.get("item_code") for t in bucket.get("targets") or []}
 		for target in bucket.get("targets") or []:
-			bom_no = target.get("bom_no")
-			if not bom_no or target.get("skip_work_order"):
-				continue
 			target_qty = flt(target.get("required_qty"))
 			if target_qty <= 0:
 				continue
-			for row in _bom_direct_rows(bom_no):
-				item_code = row["item_code"]
-				if not item_code or item_code in produced_items:
-					continue
-				item_req = flt(row.get("stock_qty") or row.get("qty")) * target_qty
-				required_by_warehouse[department_warehouse][item_code] = (
-					required_by_warehouse[department_warehouse].get(item_code, 0.0) + item_req
-				)
+			bom_no = target.get("bom_no")
+			if bom_no and not target.get("skip_work_order"):
+				for row in _bom_direct_rows(bom_no):
+					item_code = row["item_code"]
+					if not item_code or item_code in produced_items:
+						continue
+					item_req = flt(row.get("stock_qty") or row.get("qty")) * target_qty
+					required_by_warehouse[department_warehouse][item_code] = (
+						required_by_warehouse[department_warehouse].get(item_code, 0.0) + item_req
+					)
+			# ERPNext Product Bundle packed items: a POS Invoice for a bundle
+			# item expands into its packed items and checks THEIR stock in the
+			# selling warehouse, so the packed items must be pre-stocked here
+			# exactly like BOM rows (e.g. salad bundles needing YCPSM/GRCPSM
+			# in the branch kitchen).
+			target_item = target.get("item_code")
+			if target_item:
+				for packed in _product_bundle_rows(target_item):
+					packed_code = packed["item_code"]
+					if not packed_code or packed_code in produced_items:
+						continue
+					packed_req = flt(packed.get("qty")) * target_qty
+					required_by_warehouse[department_warehouse][packed_code] = (
+						required_by_warehouse[department_warehouse].get(packed_code, 0.0) + packed_req
+					)
 
 	# 2. For each warehouse and item, calculate the shortage against current Bin stock.
 	for department_warehouse, required_items in required_by_warehouse.items():
@@ -529,6 +548,17 @@ def _ensure_department_safety_stock(buckets, company, business_date):
 		if to_stock:
 			receipts.append(_create_material_receipt(company, department_warehouse, to_stock, business_date))
 	return receipts
+
+
+def _product_bundle_rows(item_code):
+	"""The packed item rows of the ``Product Bundle`` named after ``item_code``
+	(ERPNext names a Product Bundle after its bundle item), or [] when the
+	item is not a bundle."""
+	return frappe.db.get_all(
+		"Product Bundle Item",
+		filters={"parent": item_code},
+		fields=["item_code", "qty"],
+	)
 
 
 def _bom_direct_rows(bom_no):

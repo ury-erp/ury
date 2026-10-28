@@ -73,12 +73,17 @@ from datetime import datetime, time, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime, get_time, getdate, now_datetime, nowdate, today
+from frappe.utils import cint, flt, get_datetime, get_time, getdate, now_datetime, nowdate, today
 
 from ury.ury.simulator.guards import assert_uat_simulator_authorized
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.api.ury_reservation_service import (
+	FULFILLED,
+	RESERVED,
+	append_audit,
+)
 
 SIMULATION_RUN_DOCTYPE = "URY Simulation Run"
 POS_OPENING_DOCTYPE = "POS Opening Entry"
@@ -360,6 +365,13 @@ def close_pos_session(run_doc) -> dict:
 	Invoices (only onto the closing's own ``sales_invoices`` rows, which
 	stay empty in POS mode).
 
+	Before the closing entry submits,
+	:func:`_settle_orphaned_released_reservations` sweeps the session's
+	reservation groups: an aborted slot attempt or a quantity edit can leave
+	groups in ``Released`` (or any other state the closing reconciliation
+	gate refuses) under an invoice that did sell. Stale duplicates are
+	purged and sold lines settled to ``Fulfilled`` so the gate can pass.
+
 	Sets ``run_doc.pos_closing_entry``, ``consolidated_sales_invoice`` and
 	``status = "Completed"`` (plus ``completed_at``), saves and commits.
 	On failure the run is stamped ``Closing Failed`` and the exception
@@ -380,6 +392,7 @@ def close_pos_session(run_doc) -> dict:
 		)
 
 	try:
+		_settle_orphaned_released_reservations(opening_name)
 		closing_name, si_name, invoice_count, si_names = _close_and_consolidate(opening_name)
 	except Exception:
 		_record_closing_failure(run_doc)
@@ -1325,3 +1338,193 @@ def _stamp_run_failure(run_doc):
 		frappe.db.commit()
 	except Exception:
 		frappe.db.rollback()
+
+
+# --- evening finalization ------------------------------------------------------
+
+
+def close_or_complete_production_plans_for_run(run_doc) -> list:
+	"""Evening Stage-3 gate: complete every Production Plan linked to the run.
+
+	ERPNext only flips a Production Plan to ``Completed`` when every
+	``po_items`` row reports ``produced_qty >= planned_qty`` -- but URY's
+	MADE_TO_ORDER rows (``custom_ury_no_work_order = 1``) are produced
+	on demand via KOT-created Work Orders and never accumulate
+	``produced_qty``, so a plan whose batch work is genuinely done stays
+	``In Process`` forever and finalization can never verify completion.
+	This gate re-checks completion the URY way, per ``po_items`` row:
+
+	- rows with ``custom_ury_no_work_order`` falsy (batch / PRE_PRODUCED)
+	  must have ``produced_qty >= planned_qty``;
+	- MTO rows are settled when every Work Order created against them
+	  (KOT-time Work Orders link ``production_plan`` +
+	  ``production_plan_item``, see ``ury_mto_work_order_service``) is
+	  completed or stopped, with no drafts left behind.
+
+	When every row passes, the plan is marked ``Completed``. Plans that do
+	not pass are left untouched and reported as ``blocked`` -- the caller
+	logs them and still closes the POS session. Idempotent: already
+	terminal plans (Completed / Closed / Cancelled) are reported and
+	skipped. Returns one dict per plan.
+	"""
+	assert_uat_simulator_authorized()
+
+	run_doc = _resolve_run_doc(run_doc)
+	sales_plan = run_doc.get("sales_plan")
+	if not sales_plan:
+		return []
+	pp_names = frappe.get_all(
+		"Production Plan",
+		filters={"custom_ury_sales_plan": sales_plan, "docstatus": 1},
+		pluck="name",
+	)
+	results = []
+	for pp_name in pp_names:
+		results.append(_close_or_complete_one_production_plan(pp_name))
+	if pp_names:
+		frappe.db.commit()
+	return results
+
+
+def _close_or_complete_one_production_plan(pp_name) -> dict:
+	pp = frappe.get_doc("Production Plan", pp_name)
+	if pp.status in ("Completed", "Closed", "Cancelled"):
+		return {"production_plan": pp_name, "status": pp.status, "action": "already_closed"}
+
+	blockers = []
+	for row in pp.get("po_items") or []:
+		planned_qty = flt(row.get("planned_qty"))
+		produced_qty = flt(row.get("produced_qty"))
+		if cint(row.get("custom_ury_no_work_order")):
+			work_orders = frappe.get_all(
+				"Work Order",
+				filters={"production_plan": pp_name, "production_plan_item": row.name},
+				fields=["name", "status", "docstatus"],
+			)
+			unfinished = [
+				wo.name
+				for wo in work_orders
+				if wo.docstatus == 0 or (wo.docstatus == 1 and wo.status not in ("Completed", "Stopped"))
+			]
+			if unfinished:
+				blockers.append(
+					"{0}: unfinished MTO Work Orders {1}".format(row.item_code, ", ".join(unfinished))
+				)
+		elif produced_qty < planned_qty - 1e-6:
+			blockers.append(
+				"{0}: produced {1} < planned {2}".format(row.item_code, produced_qty, planned_qty)
+			)
+
+	if blockers:
+		frappe.logger("ury.simulator").warning(
+			"Production Plan %s left %s by evening finalization: %s",
+			pp_name,
+			pp.status,
+			"; ".join(blockers),
+		)
+		return {
+			"production_plan": pp_name,
+			"status": pp.status,
+			"action": "blocked",
+			"blockers": blockers,
+		}
+
+	frappe.db.set_value("Production Plan", pp_name, "status", "Completed")
+	return {"production_plan": pp_name, "status": "Completed", "action": "completed"}
+
+
+def _settle_orphaned_released_reservations(opening_name) -> dict:
+	"""Pre-close sweep so the closing reconciliation gate can pass.
+
+	``validate_closing_reconciliation`` refuses to close a session while any
+	reservation group of its invoices is in a state other than all-``Reserved``
+	or all-``Fulfilled``. A slot whose order was edited or retried can leave
+	``Released`` groups behind under a ``order_ref`` whose invoice did sell
+	(``_reconcile_line`` releases the old group and builds a replacement),
+	which would block the closing permanently. For every non-resolvable
+	group of the session's submitted, unconsolidated invoices:
+
+	- if a resolvable (Reserved/Fulfilled) group already covers the same
+	  (order, item) -- or the item is no longer on the invoice at all -- the
+	  rows are inert duplicates of a deleted/replaced line and are purged;
+	- otherwise the line was sold but its only group was released mid-order:
+	  the consolidated Sales Invoice will consume the stock anyway, so the
+	  group is settled to ``Fulfilled`` (inert for capacity accounting, and
+	  the state the gate expects for a sold line). Sales Plan commit
+	  counters are not touched: the release already reversed them.
+
+	Per-group failures are logged and skipped -- the sweep must never be the
+	reason a session cannot close. Returns ``{"purged": [...], "settled":
+	[...]}`` of reservation group keys.
+	"""
+	from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import get_invoices
+
+	opening = frappe.get_doc(POS_OPENING_DOCTYPE, opening_name)
+	window = get_invoices(opening.period_start_date, now_datetime(), opening.pos_profile, opening.user)
+	invoice_names = []
+	for row in window.get("invoices") or []:
+		name = row.get("name")
+		if not name:
+			continue
+		if frappe.db.get_value(POS_INVOICE_DOCTYPE, name, "docstatus") != 1:
+			continue
+		if frappe.db.get_value(POS_INVOICE_DOCTYPE, name, "consolidated_invoice"):
+			continue
+		invoice_names.append(name)
+	if not invoice_names:
+		return {"purged": [], "settled": []}
+
+	reservation_rows = frappe.get_all(
+		"URY Stock Reservation",
+		filters={"order_ref": ["in", invoice_names]},
+		fields=["name", "reservation_group", "order_ref", "status", "top_level_item"],
+	)
+	groups = {}
+	for row in reservation_rows:
+		groups.setdefault(row.reservation_group or row.name, []).append(row)
+
+	covered = {
+		(row.order_ref, row.top_level_item)
+		for rows in groups.values()
+		for row in rows
+		if {r.status for r in rows} <= {RESERVED, FULFILLED}
+	}
+
+	purged, settled = [], []
+	for group_key, rows in groups.items():
+		if {r.status for r in rows} <= {RESERVED, FULFILLED}:
+			continue
+		order_ref = rows[0].order_ref
+		top_item = rows[0].top_level_item
+		try:
+			if (order_ref, top_item) in covered or not _invoice_has_item(order_ref, top_item):
+				for row in rows:
+					frappe.delete_doc(
+						"URY Stock Reservation", row.name, force=True, ignore_permissions=True
+					)
+				purged.append(group_key)
+			else:
+				reason = "Simulator closing settlement of orphaned released group"
+				for row in rows:
+					doc = frappe.get_doc("URY Stock Reservation", row.name)
+					doc.status = FULFILLED
+					doc.reason = reason
+					append_audit(doc, frappe.session.user, event="fulfil", reason=reason)
+					doc.save(ignore_permissions=True)
+				settled.append(group_key)
+		except Exception:
+			frappe.logger("ury.simulator").exception(
+				"Failed to settle orphaned reservation group %s for opening %s",
+				group_key,
+				opening_name,
+			)
+	frappe.db.commit()
+	return {"purged": purged, "settled": settled}
+
+
+def _invoice_has_item(invoice_name, item_code) -> bool:
+	if not item_code:
+		return False
+	return bool(
+		frappe.db.exists("POS Invoice Item", {"parent": invoice_name, "item_code": item_code})
+	)
