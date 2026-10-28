@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Button, Card, DataTable, Page, Section, Spinner, Textarea, type DataTableColumn } from '@ury/ui';
+import { Badge, Card, DataTable, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { DeskLink } from '../../components/DeskLink';
@@ -92,104 +92,11 @@ export const StockReservationRoleGate: React.FC<StockReservationRoleGateProps> =
   return <>{children}</>;
 };
 
-interface ActionModalProps {
-  isOpen: boolean;
-  title: string;
-  action: string;
-  onConfirm: (reason: string) => Promise<void>;
-  onCancel: () => void;
-}
-
-const ActionModal: React.FC<ActionModalProps> = ({
-  isOpen,
-  title,
-  action,
-  onConfirm,
-  onCancel,
-}) => {
-  const [reason, setReason] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
-
-  // `fulfil_reservation` has no `reason` parameter, so offering the field for
-  // that action would silently discard whatever the user typed.
-  const showReason = action !== 'Fulfil';
-
-  const handleConfirm = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await onConfirm(reason);
-      setReason('');
-      onCancel();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <Card className="w-full max-w-md p-6">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">{title}</h2>
-        <div className="mb-4 space-y-3">
-          {showReason ? (
-            <label className="flex flex-col text-sm font-medium text-muted-foreground">
-              Reason (optional)
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Enter reason for this action..."
-                className="mt-1"
-                disabled={loading}
-              />
-            </label>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Mark this reservation group as fulfilled. Its held capacity stops being
-              counted as available and the transition is written to the reservation's
-              audit log. This cannot be undone from here.
-            </p>
-          )}
-          {error && (
-            <div className="text-sm text-destructive">{error}</div>
-          )}
-        </div>
-        <div className="flex gap-3 justify-end">
-          <Button
-            onClick={onCancel}
-            disabled={loading}
-            variant="outline"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={loading}
-            variant="default"
-          >
-            {loading ? 'Processing...' : action}
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
 const StockReservationContent: React.FC = () => {
   const { activeBranchId } = useBranchContext();
   const [reservations, setReservations] = useState<StockReservationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionModal, setActionModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    action: string;
-    rowId: string;
-  }>({ isOpen: false, title: '', action: '', rowId: '' });
 
   useEffect(() => {
     if (!activeBranchId || activeBranchId === 'all') {
@@ -221,46 +128,12 @@ const StockReservationContent: React.FC = () => {
     };
   }, [activeBranchId]);
 
-  const handleActionClick = (rowId: string, action: 'fulfil' | 'release' | 'cancel') => {
-    const config = {
-      fulfil: { title: 'Fulfil Reservation', action: 'Fulfil' },
-      release: { title: 'Release Reservation', action: 'Release' },
-      cancel: { title: 'Cancel Reservation', action: 'Cancel' },
-    }[action];
-    setActionModal({
-      isOpen: true,
-      title: config.title,
-      action: config.action,
-      rowId,
-    });
-  };
-
-  const handleConfirmAction = async (reason: string) => {
-    try {
-      if (actionModal.action === 'Fulfil') {
-        // `fulfil_reservation` takes no reason -- the backend records the
-        // actor and event in the reservation's audit log itself.
-        await stockReservationService.fulfilReservation(actionModal.rowId);
-      } else if (actionModal.action === 'Release') {
-        await stockReservationService.releaseReservation(actionModal.rowId, reason || undefined);
-      } else {
-        await stockReservationService.cancelReservation(actionModal.rowId, reason || undefined);
-      }
-      const rows = await stockReservationService.listReservations(activeBranchId!);
-      setReservations(rows);
-    } catch (err: any) {
-      throw new Error(err.message || 'Action failed');
-    }
-  };
-
   return (
     <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <h1 className="text-xl font-semibold text-foreground">Stock Reservations</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Monitor active stock reservations and manage capacity holds. Managers can fulfil, release,
-          or cancel Reserved status reservations; releasing and cancelling restore inventory
-          availability, fulfilling settles the hold.
+          Monitor active stock reservations and inventory holds.
         </p>
       </div>
 
@@ -330,37 +203,7 @@ const StockReservationContent: React.FC = () => {
                 header: 'Actions',
                 render: (row) => (
                   <div className="flex items-center gap-2">
-                    {/* Open in desk points at the editable URY Stock Reservation
-                        document, since this screen only performs status
-                        transitions and never edits a reservation's fields.
-                        Shown for every status -- a released/expired row is
-                        exactly the kind you want to inspect in the desk. */}
                     <DeskLink doctype="URY Stock Reservation" name={row.name} iconOnly />
-                    {row.status === 'Reserved' && (
-                      <>
-                        <Button
-                          onClick={() => handleActionClick(row.name, 'fulfil')}
-                          variant="secondary"
-                          size="xs"
-                        >
-                          Fulfil
-                        </Button>
-                        <Button
-                          onClick={() => handleActionClick(row.name, 'release')}
-                          variant="secondary"
-                          size="xs"
-                        >
-                          Release
-                        </Button>
-                        <Button
-                          onClick={() => handleActionClick(row.name, 'cancel')}
-                          variant="secondary"
-                          size="xs"
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
                   </div>
                 ),
               },
@@ -369,14 +212,6 @@ const StockReservationContent: React.FC = () => {
           })()}
         </Section>
       )}
-
-      <ActionModal
-        isOpen={actionModal.isOpen}
-        title={actionModal.title}
-        action={actionModal.action}
-        onConfirm={handleConfirmAction}
-        onCancel={() => setActionModal({ ...actionModal, isOpen: false })}
-      />
     </Page>
   );
 };
