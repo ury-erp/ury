@@ -659,6 +659,7 @@ def resolve_cancellation_disposition(kot, item_row_name, disposition, qty, actor
 					}
 				],
 				"status": "Draft",
+				"wastage_source": "KOT Cancellation",
 				"reason_category": reason_category,
 				"reason_notes": reason,
 				"captured_by": actor,
