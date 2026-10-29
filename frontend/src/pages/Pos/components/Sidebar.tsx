@@ -32,7 +32,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-64 bg-card border-e border-border h-screen flex flex-col",
+      "w-64 bg-card border-e border-border h-full flex flex-col shrink-0 font-inter",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories List */}
