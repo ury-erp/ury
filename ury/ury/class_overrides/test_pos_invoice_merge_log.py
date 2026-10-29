@@ -8,7 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.class_overrides.pos_invoice_merge_log import CustomPOSInvoiceMergeLog
 
 
-class TestCustomPOSInvoiceMergeLog(FrappeTestCase):
+class TestCustomPOSInvoiceMergeLog(unittest.TestCase):
 	def test_get_sales_closing_time_and_date_with_closing_entry(self):
 		orig_get_value = frappe.db.get_value
 
@@ -122,3 +122,53 @@ class TestCustomPOSInvoiceMergeLog(FrappeTestCase):
 			self.assertEqual(result.posting_date, date(2026, 10, 21))
 			self.assertEqual(result.posting_time, time(23, 0, 0))
 			self.assertEqual(merge_log.consolidated_invoice, "SINV-TEST-0001")
+
+	def test_credit_notes_map_to_pos_invoices_and_are_recorded(self):
+		made = []
+
+		def new_credit_note():
+			name = f"SINV-RET-{len(made) + 1}"
+			note = frappe._dict(name=name, save=lambda: None, submit=lambda: None)
+			made.append(note)
+			return note
+
+		merge_log = CustomPOSInvoiceMergeLog({"doctype": "POS Invoice Merge Log"})
+		merge_log.posting_date = date(2026, 10, 22)
+		merge_log.posting_time = time(15, 0, 0)
+		merge_log.get_sales_closing_time_and_date = lambda: (None, None)
+		merge_log.get_new_sales_invoice = new_credit_note
+		merge_log.merge_pos_invoice_into = lambda note, rows: note
+
+		returns = {
+			"SINV-0001": [frappe._dict(name="POS-RET-1"), frappe._dict(name="POS-RET-2")],
+			"SINV-0002": [frappe._dict(name="POS-RET-3")],
+		}
+		result = merge_log.process_merging_into_credit_notes(returns)
+
+		# ERPNext's update_pos_invoices looks up each return POS invoice by membership in these lists
+		self.assertEqual(
+			result,
+			{"SINV-RET-1": ["POS-RET-1", "POS-RET-2"], "SINV-RET-2": ["POS-RET-3"]},
+		)
+		# cancel_linked_invoices cancels this credit note when the merge log is cancelled
+		self.assertEqual(merge_log.consolidated_credit_note, "SINV-RET-2")
+
+	def test_sales_invoice_keeps_pos_invoice_date_when_not_configured(self):
+		sales_invoice = frappe._dict(
+			name="SINV-TEST-0002",
+			posting_date=date(2026, 10, 21),
+			posting_time=time(22, 45, 0),
+			save=lambda: None,
+			submit=lambda: None,
+		)
+		merge_log = CustomPOSInvoiceMergeLog({"doctype": "POS Invoice Merge Log"})
+		merge_log.posting_date = date(2026, 10, 22)
+		merge_log.posting_time = time(0, 5, 0)
+		merge_log.get_sales_closing_time_and_date = lambda: (None, None)
+		merge_log.get_new_sales_invoice = lambda: sales_invoice
+		merge_log.merge_pos_invoice_into = lambda sinv, data: sinv
+
+		merge_log.process_merging_into_sales_invoice([])
+
+		self.assertEqual(sales_invoice.posting_date, date(2026, 10, 21))
+		self.assertEqual(sales_invoice.posting_time, time(22, 45, 0))
