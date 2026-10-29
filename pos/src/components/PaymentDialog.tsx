@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Percent, Coins } from 'lucide-react';
+import { X, Percent, Coins, Printer } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
+import { printOrder } from '../lib/print';
 import { t } from '../i18n';
 
 
@@ -23,6 +24,7 @@ interface PaymentDialogProps {
   clearSelectedOrder: () => void;
   discountPercentage?: number;
   discountAmount?: number;
+  printFormat?: string | null;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -39,7 +41,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   fetchOrders,
   clearSelectedOrder,
   discountPercentage,
-  discountAmount
+  discountAmount,
+  printFormat,
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -138,21 +141,42 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     });
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (andPrint: boolean) => {
     setIsProcessing(true);
     setError(null);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
-        cashier,
-        customer,
-        invoice,
-        owner,
-        payments,
-        pos_profile: posProfile,
-        table,
-      });
+      const response = await call.post<{ message?: { name?: string } }>(
+        'ury.ury.doctype.ury_order.ury_order.make_invoice',
+        {
+          additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+          cashier,
+          customer,
+          invoice,
+          owner,
+          payments,
+          pos_profile: posProfile,
+          table,
+        }
+      );
+      const paidName = response?.message?.name || invoice;
       showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
+
+      if (andPrint && storePosProfile) {
+        try {
+          await printOrder({
+            orderId: paidName,
+            posProfile: storePosProfile,
+            printFormat: printFormat || storePosProfile.print_format,
+          });
+        } catch (printErr) {
+          showToast.error(
+            t('payment.print_after_pay_failed', {
+              reason: (printErr as Error)?.message || String(printErr),
+            })
+          );
+        }
+      }
+
       onClose();
       clearSelectedOrder();
       await fetchOrders();
@@ -163,6 +187,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setIsProcessing(false);
     }
   };
+
+  const payDisabled = isProcessing || payments.length === 0 || isShort;
+  const payAmountLabel = formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal);
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -258,7 +285,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
         </div>
 
-        {/* Right Column - Order Summary and Pay Button */}
+        {/* Right Column - Order Summary and Pay Buttons */}
         <div className="md:w-1/2 p-6 overflow-y-auto">
           {/* Error Message */}
           {error && (
@@ -306,19 +333,35 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             </div>
           </div>
 
-          {/* Payment Button */}
-          <Button
-            onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0 || isShort}
-            variant={isProcessing || payments.length === 0 || isShort ? "secondary" : "default"}
-            className="w-full"
-          >
-            {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={() => handlePayment(false)}
+              disabled={payDisabled}
+              variant={payDisabled ? "secondary" : "default"}
+              className="flex-1"
+            >
+              {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: payAmountLabel })}
+            </Button>
+            <Button
+              onClick={() => handlePayment(true)}
+              disabled={payDisabled}
+              variant={payDisabled ? "secondary" : "default"}
+              className="flex-1"
+            >
+              {isProcessing ? (
+                t('payment.processing')
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Printer className="w-4 h-4" />
+                  {t('payment.pay_and_print_button', { amount: payAmountLabel })}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
 
-export default PaymentDialog; 
+export default PaymentDialog;
