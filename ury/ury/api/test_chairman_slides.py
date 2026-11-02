@@ -159,6 +159,39 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(s.cashup_tone(5, 0), "good")
 		self.assertEqual(s.cashup_tone(5, 1), "bad")
 
+	def test_ms_to_minutes_and_percentile(self):
+		self.assertEqual(s.ms_to_minutes(["60000", 120000, None, "", "x", 0, -5]), [1.0, 2.0])
+		self.assertIsNone(s.percentile([], 90))
+		self.assertEqual(s.percentile([5], 90), 5)
+		self.assertEqual(s.percentile(list(range(1, 11)), 90), 9.1)
+
+	def test_kitchen_summary_headline_tone(self):
+		self.assertEqual(s.kitchen_summary([]), (0, None, None))
+		self.assertEqual(s.kitchen_summary(["", None]), (0, None, None))
+		count, avg, p90 = s.kitchen_summary([str(m * 60000) for m in (6, 8, 10, 12)])
+		self.assertEqual((count, avg, p90), (4, 9.0, 11.4))
+		self.assertEqual(s.kitchen_headline(0, None, None), "No kitchen tickets completed")
+		self.assertEqual(
+			s.kitchen_headline(4, 9.0, 11.4), "Kitchen averaged 9.0 min per ticket, slowest 10% took 11.4 min or more"
+		)
+		self.assertEqual(s.kitchen_tone(0, None), "neutral")
+		self.assertEqual(s.kitchen_tone(4, 15), "good")
+		self.assertEqual(s.kitchen_tone(4, 20), "neutral")
+		self.assertEqual(s.kitchen_tone(4, 26), "bad")
+
+	def test_covers_summary_and_headline(self):
+		self.assertEqual(s.covers_summary([]), (0, 0, 0.0, None))
+		rows = [
+			{"pax": "2", "net_total": 1000},
+			{"pax": "4", "net_total": 2000},
+			{"pax": "", "net_total": 500},
+			{"pax": "0", "net_total": 500},
+			{"pax": None, "net_total": 99},
+		]
+		self.assertEqual(s.covers_summary(rows), (2, 6, 3000.0, 500))
+		self.assertEqual(s.covers_headline(0, None), "No covers recorded")
+		self.assertEqual(s.covers_headline(6, 500), "6 covers, ₹500 spend per cover")
+
 
 def _sql(query, values=()):
 	import frappe
@@ -288,6 +321,21 @@ class SiteTests(IntegrationTestCase):
 		if not sl["exceptions"]:
 			self.assertEqual(sl["headline"], "All tills balanced")
 			self.assertEqual(sl["tone"], "good")
+
+	def test_kitchen_and_covers_match_sql(self):
+		day = self._day()
+		ks = s.slide_kitchen(day)
+		rows = _sql(
+			"SELECT production_time FROM `tabURY KOT` WHERE docstatus=1 AND date=%s AND order_status='Served'", (day,)
+		)
+		self.assertEqual(ks["tickets"], len(s.ms_to_minutes([r[0] for r in rows])))
+		cv = s.slide_covers(day)
+		got = _sql(
+			"SELECT COALESCE(SUM(CAST(no_of_pax AS UNSIGNED)),0) FROM `tabPOS Invoice` WHERE docstatus=1 AND is_return=0"
+			" AND order_type='Dine In' AND status<>'Consolidated' AND posting_date=%s AND CAST(no_of_pax AS UNSIGNED)>0",
+			(day,),
+		)
+		self.assertEqual(cv["covers"], int(got[0][0]))
 
 	def test_cashup_no_entries_window_is_neutral(self):
 		sl = s.slide_cashup(self._day())  # no closing entries in Oct 2026 on the demo data

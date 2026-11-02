@@ -13,7 +13,9 @@
 #   3 branch_ranking  net sales per branch for day D, MTD alongside, ranked
 #   5 top_bottom_items top 3 / bottom 3 items by net_amount, window D-6..D
 #   7 leakage         cancellations (docstatus=2) + discounts, window D-6..D
+#   8 kitchen         avg / p90 minutes per served KOT (production_time, stored in MILLISECONDS), day D
 #   9 cashup          POS Closing Entry Detail rows with difference<>0, window D-6..D
+#  10 covers          covers (no_of_pax) on Paid Dine In bills for day D + spend per cover
 
 import calendar
 from datetime import timedelta
@@ -26,7 +28,8 @@ UNSPECIFIED = "Unspecified"
 WINDOW_DAYS = 7
 TOP_N = 3
 LEAKAGE_BAD_RATIO = 0.05
-SLIDE_IDS = ("mtd_target", "branch_ranking", "top_bottom_items", "leakage", "cashup")
+SLIDE_IDS = ("mtd_target", "branch_ranking", "top_bottom_items", "leakage", "kitchen", "cashup", "covers")
+MS_PER_MIN = 60000.0
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -192,6 +195,78 @@ def cashup_tone(entries, exceptions):
 	if not entries:
 		return "neutral"
 	return "bad" if exceptions else "good"
+
+
+def ms_to_minutes(values):
+	"""production_time text/number values in MILLISECONDS -> minutes. Blank, non-numeric,
+	zero and negative values are dropped (an unfinished KOT has no duration)."""
+	out = []
+	for v in values:
+		try:
+			f = float(v)
+		except (TypeError, ValueError):
+			continue
+		if f > 0 and f == f:
+			out.append(f / MS_PER_MIN)
+	return out
+
+
+def percentile(values, pct):
+	"""Linear-interpolated percentile (pct 0-100) of a list; None when empty."""
+	if not values:
+		return None
+	xs = sorted(values)
+	k = (len(xs) - 1) * pct / 100.0
+	lo = int(k)
+	hi = min(lo + 1, len(xs) - 1)
+	return xs[lo] + (xs[hi] - xs[lo]) * (k - lo)
+
+
+def kitchen_summary(durations_ms):
+	"""-> (count, avg_min, p90_min); avg/p90 are None when there is no usable duration."""
+	mins = ms_to_minutes(durations_ms)
+	if not mins:
+		return 0, None, None
+	return len(mins), round(sum(mins) / len(mins), 1), round(percentile(mins, 90), 1)
+
+
+def kitchen_headline(count, avg, p90):
+	if not count:
+		return frappe._("No kitchen tickets completed")
+	return frappe._("Kitchen averaged {0} min per ticket, slowest 10% took {1} min or more").format(avg, p90)
+
+
+def kitchen_tone(count, p90):
+	"""good: p90 within 15 min (default kitchen warning time); bad: p90 over 25 min; none: neutral."""
+	if not count or p90 is None:
+		return "neutral"
+	if p90 <= 15:
+		return "good"
+	return "bad" if p90 > 25 else "neutral"
+
+
+def covers_summary(rows):
+	"""rows: [{pax, net_total}] Paid Dine In bills. Only bills with pax > 0 count (bills without
+	covers would dilute spend per cover). -> (bills, covers, net_sales, spend_per_cover|None)."""
+	bills = covers = 0
+	net = 0.0
+	for r in rows:
+		try:
+			pax = int(float(r.get("pax") or 0))
+		except (TypeError, ValueError):
+			pax = 0
+		if pax <= 0:
+			continue
+		bills += 1
+		covers += pax
+		net += float(r.get("net_total") or 0)
+	return bills, covers, money(net), (round(net / covers) if covers else None)
+
+
+def covers_headline(covers, spend):
+	if not covers:
+		return frappe._("No covers recorded")
+	return frappe._("{0} covers, {1} spend per cover").format(covers, _chairman().format_inr_compact(spend))
 
 
 def _slide(sid, title, headline, **kw):
@@ -375,6 +450,77 @@ def slide_leakage(day):
 	)
 
 
+def slide_kitchen(day):
+	kot = frappe.qb.DocType("URY KOT")
+	q = (
+		frappe.qb.from_(kot)
+		.where(kot.docstatus == 1)
+		.where(kot.date == day)
+		.where(kot.order_status == "Served")
+	)
+	chairman = _chairman()
+	allowed = chairman._allowed("Branch")
+	if allowed is not None:
+		q = q.where(kot.branch.isin(allowed)) if allowed else q.where(kot.docstatus == -99)
+	rows = q.select(kot.production_time).run(as_dict=True)
+	count, avg, p90 = kitchen_summary([r["production_time"] for r in rows])
+	return _slide(
+		"kitchen",
+		frappe._("Kitchen speed"),
+		kitchen_headline(count, avg, p90),
+		value=avg,
+		value_text=None if avg is None else "{0} min".format(avg),
+		tone=kitchen_tone(count, p90),
+		chart={
+			"type": "bar",
+			"series": []
+			if not count
+			else [
+				{"label": frappe._("Average"), "value": avg, "value_text": "{0} min".format(avg)},
+				{"label": frappe._("Slowest 10%"), "value": p90, "value_text": "{0} min".format(p90)},
+			],
+		},
+		basis="kot_minutes",
+		tickets=count,
+		avg_minutes=avg,
+		p90_minutes=p90,
+		data_quality="ok" if count else "partial",
+	)
+
+
+def slide_covers(day):
+	pi, q = _pi_query(day, day)
+	rows = (
+		q.where(pi.is_return == 0)
+		.where(pi.order_type == "Dine In")
+		.where(pi.status != "Consolidated")
+		.select(pi.no_of_pax.as_("pax"), pi.net_total)
+		.run(as_dict=True)
+	)
+	bills, covers, net, spend = covers_summary(rows)
+	return _slide(
+		"covers",
+		frappe._("Covers"),
+		covers_headline(covers, spend),
+		value=covers,
+		value_text=str(covers),
+		chart={
+			"type": "bar",
+			"series": []
+			if not covers
+			else [
+				{"label": frappe._("Covers"), "value": covers, "value_text": str(covers)},
+				{"label": frappe._("Spend per cover"), "value": spend, "value_text": _chairman().format_inr_compact(spend)},
+			],
+		},
+		basis="covers",
+		bills=bills,
+		covers=covers,
+		spend_per_cover=spend,
+		data_quality="ok" if covers else "partial",
+	)
+
+
 def slide_cashup(day):
 	from frappe.query_builder.functions import IfNull
 
@@ -423,10 +569,12 @@ BUILDERS = {
 	"branch_ranking": slide_branch_ranking,
 	"top_bottom_items": slide_top_bottom_items,
 	"leakage": slide_leakage,
+	"kitchen": slide_kitchen,
 	"cashup": slide_cashup,
+	"covers": slide_covers,
 }
 
 
 def build_slides(day):
-	"""All five P1 slides for business day `day` (a date), in plan order 2, 3, 5, 7, 9."""
+	"""All seven P1 slides for business day `day` (a date), in plan order 2, 3, 5, 7, 8, 9, 10."""
 	return [BUILDERS[sid](day) for sid in SLIDE_IDS]

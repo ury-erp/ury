@@ -390,7 +390,9 @@ DECK_ORDER = (
 	"top_bottom_items",
 	"payment_mix",
 	"leakage",
+	"kitchen",
 	"cashup",
+	"covers",
 )
 
 

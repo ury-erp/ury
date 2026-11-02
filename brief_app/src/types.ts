@@ -18,6 +18,12 @@ export interface Slide {
   status?: string;
   top?: Point[];
   bottom?: Point[];
+  tickets?: number;
+  avg_minutes?: number | null;
+  p90_minutes?: number | null;
+  covers?: number;
+  bills?: number;
+  spend_per_cover?: number | null;
 }
 export interface Brief {
   schema_version?: number;
