@@ -120,6 +120,9 @@ test("storable refuses audio, no-store, errors and never-cache urls", () => {
 	assert.ok(!h.storable(new Response("x", { headers: { "content-type": "audio/mpeg" } })));
 	assert.ok(!h.storable(new Response("x", { headers: { "content-type": "video/webm" } })));
 	assert.ok(!h.storable(jsonRes({}, 200, { "cache-control": "no-store" })));
+	assert.ok(h.storable(jsonRes({}, 200, { "cache-control": "no-store" }), true), "user-scoped override");
+	assert.ok(!h.storable(withUrl(jsonRes({}), ORIGIN + "/api/method/ury.ury.api.chairman.chairman_chat"), true));
+	assert.ok(!h.storable(new Response("x", { headers: { "content-type": "audio/mpeg" } }), true));
 	assert.ok(!h.storable(jsonRes({}, 500)));
 	assert.ok(!h.storable(withUrl(jsonRes({}), ORIGIN + "/api/method/huf.ai.x")));
 });
@@ -182,9 +185,8 @@ test("brief: 403 behaves like 401 (even for unknown user)", async () => {
 	assert.deepEqual(d.sent, [{ type: "AUTH_LOST" }]);
 });
 
-test("brief: no-store or audio responses are returned but not stored", async () => {
+test("brief: audio responses are returned but not stored", async () => {
 	const c = fakeCaches();
-	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({}, 200, { "cache-control": "no-store" })));
 	await h.briefFetch(req(API + "?date=2026-10-01", UA), deps(c, async () => new Response("x", { headers: { "content-type": "audio/mpeg" } })));
 	assert.equal(c.stores.get(U(UA)).size, 0);
 });
@@ -267,8 +269,68 @@ test("shell: not cached when user unknown, or response no-store/redirected", asy
 	assert.equal(allKeys(c).includes("/ury/brief"), false);
 	const c2 = fakeCaches(metaFor(UA));
 	await h.shellFetch(req(ORIGIN + "/ury/brief"), deps(c2, async () => withUrl(new Response("<html>"), ORIGIN + "/ury/brief/", true)));
-	await h.shellFetch(req(ORIGIN + "/ury/brief"), deps(c2, async () => withUrl(new Response("<html>", { headers: { "cache-control": "no-store" } }), ORIGIN + "/ury/brief/")));
 	assert.equal(allKeys(c2).includes("/ury/brief"), false);
+});
+
+const FRAPPE_CC = { "cache-control": "no-store,no-cache,must-revalidate,max-age=0" };
+
+test("no-store override: shell IS stored with a user key, NOT without", async () => {
+	const page = () => withUrl(new Response("<html>", { headers: FRAPPE_CC }), ORIGIN + "/ury/brief/");
+	const c = fakeCaches(metaFor(UA));
+	await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => page()));
+	assert.ok(c.stores.get(U(UA)).has("/ury/brief"));
+	const c2 = fakeCaches();
+	await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c2, async () => page()));
+	assert.equal(allKeys(c2).includes("/ury/brief"), false);
+	assert.deepEqual(allKeys(c2), []);
+});
+
+test("no-store override: get_brief IS stored with a user key, NOT without", async () => {
+	const c = fakeCaches();
+	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({ v: 1 }, 200, FRAPPE_CC)));
+	assert.ok(c.stores.get(U(UA)).has(KEY));
+	const c2 = fakeCaches();
+	const r = await h.briefFetch(req(API), deps(c2, async () => jsonRes({ v: 1 }, 200, FRAPPE_CC)));
+	assert.deepEqual(await r.json(), { v: 1 });
+	assert.deepEqual(allKeys(c2), []);
+});
+
+test("no-store override never applies to chairman_chat (with or without no-store)", async () => {
+	const CHAT = ORIGIN + "/api/method/ury.ury.api.chairman.chairman_chat";
+	assert.equal(h.route(req(CHAT, UA), ORIGIN), "skip");
+	assert.equal(h.route(req(CHAT, UA, { method: "POST" }), ORIGIN), "skip");
+	for (const hdrs of [FRAPPE_CC, {}]) {
+		const c = fakeCaches(metaFor(UA));
+		await h.briefFetch(req(CHAT, UA), deps(c, async () => withUrl(jsonRes({ a: 1 }, 200, hdrs), CHAT)));
+		assert.equal(allKeys(c).some((x) => x.includes("chairman_chat")), false);
+		assert.ok(!h.storable(withUrl(jsonRes({}, 200, hdrs), CHAT), true));
+	}
+});
+
+test("offline after no-store responses: serves cached shell and brief for current user only", async () => {
+	const c = fakeCaches({ [h.STATIC_CACHE]: { [h.OFFLINE_URL]: new Response("offline page") } });
+	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({ v: "A" }, 200, FRAPPE_CC)));
+	await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => withUrl(new Response("A shell", { headers: FRAPPE_CC }), ORIGIN + "/ury/brief/")));
+	const off = async () => { throw new Error("offline"); };
+	const b = await h.briefFetch(req(API, UA), deps(c, off));
+	assert.equal(b.headers.get("X-Brief-Source"), "cache");
+	assert.deepEqual(await b.json(), { v: "A" });
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, off))).text(), "A shell");
+	/* user B: never sees A's data */
+	const bB = await h.briefFetch(req(API, UB), deps(c, off));
+	assert.equal(bB.status, 503);
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, off))).text(), "offline page");
+	/* LOGOUT: nothing served */
+	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({ v: "A" }, 200, FRAPPE_CC)));
+	await h.onMessage({ type: "LOGOUT" }, deps(c, null));
+	assert.equal((await h.briefFetch(req(API), deps(c, off))).status, 503);
+});
+
+test("no-store still refused for static assets", async () => {
+	const c = fakeCaches();
+	const u = ORIGIN + "/assets/ury/brief/x.js";
+	await h.assetFetch(req(u), deps(c, async () => withUrl(new Response("x", { headers: FRAPPE_CC }), u)));
+	assert.equal(allKeys(c).length, 0);
 });
 
 test("shell: redirect to /login wipes caches and returns the response", async () => {

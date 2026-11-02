@@ -69,17 +69,40 @@ export function announceUser() {
   if (user) swPost({ type: "SET_USER", user });
 }
 
-export async function signOut() {
-  const finish = async () => {
-    swPost({ type: "LOGOUT" });
-    await wipeCaches();
-    ls.del(USER_KEY);
-    location.href = "/login";
-  };
+export function csrfToken(): string {
+  const w = window as unknown as { csrf_token?: string; frappe?: { csrf_token?: string } };
+  const t = w.csrf_token || w.frappe?.csrf_token ||
+    document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+  return t && !t.includes("{{") ? t : "";
+}
+
+function showSignOutError() {
+  const el = document.createElement("div");
+  el.setAttribute("role", "alert");
+  el.textContent = "Could not sign out. Try again.";
+  el.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#b3261e;" +
+    "color:#fff;padding:10px 16px;border-radius:8px;z-index:99999;font:14px system-ui,sans-serif";
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+export async function signOut(): Promise<boolean> {
+  // Fail-safe for the device: always drop client state first.
+  swPost({ type: "LOGOUT" });
+  await wipeCaches();
+  ls.del(USER_KEY);
+  let ok = false;
   try {
-    await fetch("/api/method/logout", { method: "POST", credentials: "same-origin" });
-  } catch { /* ignore */ }
-  await finish();
+    const res = await fetch("/api/method/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-Frappe-CSRF-Token": csrfToken() },
+    });
+    ok = res.ok;
+  } catch { ok = false; }
+  if (!ok) { showSignOutError(); return false; }
+  location.href = "/login?redirect-to=/ury/brief/";
+  return true;
 }
 
 export function forgetUser() { ls.del(USER_KEY); }

@@ -11,7 +11,9 @@
  *  - Without a known user key, nothing user-specific is stored or served from cache.
  *  - LOGOUT message, 401/403, or a login redirect wipe every ury-brief-* cache.
  *  - Chat, Huf, file, socket.io traffic and non-GET requests are never intercepted;
- *    audio/video and no-store responses are never stored.
+ *    audio/video and no-store responses are never stored, EXCEPT the shell document and
+ *    the get_brief response, which ignore no-store (Frappe sends it on every response)
+ *    but only when written into the per-user cache of a valid user key.
  */
 (function () {
 	"use strict";
@@ -100,17 +102,20 @@
 		var cc = (res && res.headers && res.headers.get("cache-control")) || "";
 		return /no-store/i.test(cc);
 	}
-	/** Response may be written to Cache Storage at all. */
-	function storable(res) {
+	/**
+	 * Response may be written to Cache Storage at all.
+	 * userScoped=true (only for shell/get_brief into a valid per-user cache) ignores no-store.
+	 */
+	function storable(res, userScoped) {
 		return !!res && !!res.ok && res.type !== "opaqueredirect" && res.type !== "opaque" &&
-			!isAudio(res) && !noStore(res) && !(res.url && isNeverCache(res.url));
+			!isAudio(res) && (userScoped === true || !noStore(res)) && !(res.url && isNeverCache(res.url));
 	}
 	function isLoggedOutShell(res) {
 		if (isAuthStatus(res.status) || res.type === "opaqueredirect") { return true; }
 		return pathOf(res.url).indexOf("/login") === 0;
 	}
-	function shouldCacheShell(res) {
-		return storable(res) && !res.redirected && pathOf(res.url).replace(/\/$/, "") === SCOPE_PREFIX;
+	function shouldCacheShell(res, userScoped) {
+		return storable(res, userScoped) && !res.redirected && pathOf(res.url).replace(/\/$/, "") === SCOPE_PREFIX;
 	}
 	function offlineJson() {
 		return new Response(JSON.stringify({ offline: true }), {
@@ -205,7 +210,8 @@
 						if (isAuthStatus(res.status)) {
 							return authLost(deps).then(function () { return decorate(res, "network"); });
 						}
-						if (storable(res)) {
+						/* name is a valid per-user cache here, request is get_brief: no-store ignored */
+						if (storable(res, isBriefApi(pathOf(request.url)))) {
 							return store(cache, key, res.clone()).then(function () { return decorate(res, "network"); });
 						}
 						return cached ? fallback() : decorate(res, "network");
@@ -225,10 +231,10 @@
 			if (isLoggedOutShell(res)) {
 				return wipeAll(deps).then(function () { return res; });
 			}
-			if (!shouldCacheShell(res)) { return res; }
+			if (!shouldCacheShell(res, true)) { return res; }
 			return getUser(deps).then(function (user) {
 				var name = userCacheName(user);
-				if (!name) { return res; }
+				if (!name) { return res; } /* no-store override applies only with a valid user key */
 				return deps.caches.open(name).then(function (cache) { return cache.put(SHELL_KEY, res.clone()); })
 					.then(function () { return res; }, function () { return res; });
 			});
