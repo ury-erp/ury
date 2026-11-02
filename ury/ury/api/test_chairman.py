@@ -25,6 +25,11 @@ def _stub_frappe():
 	u = types.ModuleType("frappe.utils")
 	u.getdate = lambda d: d
 	u.now_datetime = lambda: None
+	u.nowdate = lambda: date(2026, 11, 2)
+	def _throw(msg, exc=Exception):
+		raise exc(msg)
+
+	f.throw = _throw
 	f.utils = u
 	sys.modules["frappe"] = f
 	sys.modules["frappe.utils"] = u
@@ -50,9 +55,9 @@ class PureTests(unittest.TestCase):
 	def test_formatter_boundaries(self):
 		self.assertEqual(c.format_inr_compact(999), "₹999")
 		self.assertEqual(c.format_inr_compact(1000), "₹1K")
-		self.assertEqual(c.format_inr_compact(99999), "₹100K")
+		self.assertEqual(c.format_inr_compact(99999), "₹1L")
 		self.assertEqual(c.format_inr_compact(100000), "₹1L")
-		self.assertEqual(c.format_inr_compact(9999999), "₹100L")
+		self.assertEqual(c.format_inr_compact(9999999), "₹1Cr")
 		self.assertEqual(c.format_inr_compact(10000000), "₹1Cr")
 
 	def test_formatter_rounding_and_dot_zero(self):
@@ -69,7 +74,7 @@ class PureTests(unittest.TestCase):
 
 	def test_headline_up_down_flat(self):
 		d = date(2026, 10, 21)  # Wednesday
-		self.assertEqual(c.yesterday_headline(120000, 111000, 0.081, d), "Yesterday ₹1.2L, up 8% vs last Wednesday")
+		self.assertEqual(c.yesterday_headline(120000, 111000, 0.081, d), "Yesterday ₹1.2L, up 8.1% vs last Wednesday")
 		self.assertEqual(c.yesterday_headline(90000, 100000, -0.1, d), "Yesterday ₹90K, down 10% vs last Wednesday")
 		self.assertEqual(c.yesterday_headline(100500, 100000, 0.005, d), "Yesterday ₹1L, flat vs last Wednesday")
 
@@ -146,6 +151,91 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.data_quality_for(7, 101, 1000), "partial")
 		self.assertEqual(c.data_quality_for(7, 0, 0), "ok")
 
+	def test_formatter_promotes_after_rounding(self):
+		self.assertEqual(c.format_inr_compact(99949), "₹99.9K")
+		self.assertEqual(c.format_inr_compact(99950), "₹1L")
+		self.assertEqual(c.format_inr_compact(999999), "₹10L")
+		self.assertEqual(c.format_inr_compact(9999999), "₹1Cr")
+		self.assertEqual(c.format_inr_compact(999.96), "₹1K")
+		self.assertEqual(c.format_inr_compact(-99999), "-₹1L")
+
+	def test_pct_text_one_function(self):
+		self.assertEqual(c.pct_text(0.125), "12")
+		self.assertEqual(c.pct_text(0.0849), "8.5")
+		self.assertEqual(c.pct_text(0.05), "5")
+		self.assertEqual(c.pct_text(-0.0999), "10")
+		self.assertEqual(c.pct_text(0.5), "50")
+
+	def test_headline_matches_chip_label(self):
+		d = date(2026, 10, 21)
+		delta = c.compute_delta(108.5, 100)
+		h = c.yesterday_headline(108.5, 100, delta, d)
+		self.assertIn("up " + c.pct_text(delta) + "%", h)
+		self.assertIn("8.5%", h)
+
+	def test_net_revenue_nets_returns(self):
+		inv = [
+			{"net_total": 100, "is_return": 0},
+			{"net_total": 50, "is_return": 0},
+			{"net_total": -30, "is_return": 1},
+		]
+		self.assertEqual(c.net_revenue(inv), (120, 2))
+		self.assertEqual(c.net_revenue([]), (0, 0))
+
+	def test_cash_adjustment_prefers_cash_mode(self):
+		rows = [{"mode_of_payment": "Cash", "total": 100}, {"mode_of_payment": "Petty Cash", "total": 500}]
+		types = {"Cash": "Cash", "Petty Cash": "Cash"}
+		out = c.apply_cash_adjustment(rows, types, 20)
+		self.assertEqual(out[0]["total"], 80)
+		self.assertEqual(out[1]["total"], 500)
+		self.assertEqual(rows[0]["total"], 100)  # input untouched
+
+	def test_cash_adjustment_largest_cash_type(self):
+		rows = [{"mode_of_payment": "A", "total": 10}, {"mode_of_payment": "B", "total": 90}, {"mode_of_payment": "UPI", "total": 99}]
+		out = c.apply_cash_adjustment(rows, {"A": "Cash", "B": "Cash", "UPI": "Bank"}, 5)
+		self.assertEqual([r["total"] for r in out], [10, 85, 99])
+
+	def test_cash_adjustment_noop_cases(self):
+		rows = [{"mode_of_payment": "UPI", "total": 10}]
+		self.assertEqual(c.apply_cash_adjustment(rows, {"UPI": "Bank"}, 5), rows)
+		self.assertEqual(c.apply_cash_adjustment(rows, {"UPI": "Cash"}, 0), rows)
+		self.assertEqual(c.apply_cash_adjustment([], {}, 5), [])
+
+	def test_date_clamp(self):
+		today = date(2026, 11, 2)
+		self.assertTrue(c.date_in_range(today, today))
+		self.assertFalse(c.date_in_range(date(2026, 11, 3), today))
+		self.assertTrue(c.date_in_range(date(2025, 9, 28), today))  # today-400
+		self.assertFalse(c.date_in_range(date(2025, 9, 27), today))
+
+	def test_parse_date_default_and_bounds(self):
+		from datetime import timedelta
+
+		self.assertEqual(c._parse_date(None), c._today() - timedelta(days=1))
+		with self.assertRaises(c.frappe.ValidationError):
+			c._parse_date(c._today() + timedelta(days=1))
+
+	def test_allowed_from_perms(self):
+		perms = {"Company": [{"doc": "B"}, {"doc": "A"}, {"doc": "A"}]}
+		self.assertEqual(c.allowed_from_perms(perms, "Company"), ["A", "B"])
+		self.assertIsNone(c.allowed_from_perms(perms, "Branch"))
+		self.assertIsNone(c.allowed_from_perms({}, "Company"))
+
+	def test_scope_intersection(self):
+		self.assertEqual(c.intersect_scope(None, {"b", "a"}), ["a", "b"])
+		self.assertEqual(c.intersect_scope(["a", "z"], {"a", "b"}), ["a"])
+		self.assertEqual(c.intersect_scope(["z"], {"a", "b"}), [])
+
+	def test_currency_single(self):
+		self.assertEqual(c.currency_info({"X": "AED", "Y": "AED"}, ["X", "Y"]), ("AED", False))
+
+	def test_currency_mixed_flag(self):
+		self.assertEqual(c.currency_info({"X": "AED", "Y": "INR"}, ["X", "Y"]), ("INR", True))
+
+	def test_currency_none_defaults(self):
+		self.assertEqual(c.currency_info({}, []), ("INR", False))
+		self.assertEqual(c.currency_info({"X": None}, ["X"]), ("INR", False))
+
 
 class SiteTests(IntegrationTestCase):
 	"""NEEDS A BENCH SITE with seeded demo data (2026-10-21 in range). Run via bench run-tests."""
@@ -176,11 +266,32 @@ class SiteTests(IntegrationTestCase):
 
 		direct = frappe.db.sql(
 			"SELECT COALESCE(SUM(net_total),0) FROM `tabPOS Invoice` "
-			"WHERE docstatus=1 AND is_return=0 AND posting_date=%s",
+			"WHERE docstatus=1 AND posting_date=%s",  # includes returns (negative net_total)
 			(self.PINNED,),
 		)[0][0]
 		b = get_brief(self.PINNED)
 		self.assertAlmostEqual(b["slides"][0]["value"], float(direct), places=2)
+
+	def test_payment_mix_cash_nets_change(self):
+		import frappe
+
+		from ury.ury.api.chairman import get_brief
+
+		b = get_brief(self.PINNED)
+		end = frappe.utils.getdate(self.PINNED)
+		start = end - frappe.utils.datetime.timedelta(days=6)
+		amt = frappe.db.sql(
+			"SELECT COALESCE(SUM(s.amount),0) FROM `tabSales Invoice Payment` s JOIN `tabPOS Invoice` p ON s.parent=p.name "
+			"WHERE s.parenttype='POS Invoice' AND s.mode_of_payment='Cash' AND p.docstatus=1 AND p.posting_date BETWEEN %s AND %s",
+			(start, end),
+		)[0][0]
+		chg = frappe.db.sql(
+			"SELECT COALESCE(SUM(change_amount),0) FROM `tabPOS Invoice` WHERE docstatus=1 AND posting_date BETWEEN %s AND %s",
+			(start, end),
+		)[0][0]
+		cash = {r["label"]: r["value"] for r in b["slides"][2]["chart"]["series"]}.get("Cash", 0)
+		self.assertAlmostEqual(cash, float(amt) - float(chg), places=2)
+		self.assertEqual(b["slides"][2]["basis"], "payments_received")
 
 	def test_invalid_date_and_permission(self):
 		import frappe

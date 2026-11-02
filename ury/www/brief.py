@@ -1,5 +1,6 @@
+import hashlib
+
 import frappe
-import frappe.sessions
 
 no_cache = 1
 sitemap = 0
@@ -20,6 +21,11 @@ def canonical_redirect(path, query_string=""):
 	return BRIEF_URL + (f"?{query_string}" if query_string else "")
 
 
+def user_key(user, site):
+	"""Opaque per-user/site key (never the raw email) for client cache isolation."""
+	return hashlib.sha256(f"{user}|{site}".encode()).hexdigest()[:16]
+
+
 def get_context(context):
 	"""Chairman Brief PWA page (/ury/brief/). Guests are sent to login."""
 	request = getattr(frappe.local, "request", None)
@@ -34,6 +40,6 @@ def get_context(context):
 		raise frappe.Redirect
 
 	context.no_cache = 1
-	context.csrf_token = frappe.sessions.get_csrf_token()
+	context.brief_user_key = user_key(frappe.session.user, frappe.local.site)
 	context.build_version = frappe.utils.get_build_version()
 	return context

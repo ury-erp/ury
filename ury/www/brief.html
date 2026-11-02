@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="brief-user" content="{{ brief_user_key }}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14110f" media="(prefers-color-scheme: dark)">
@@ -89,9 +90,10 @@ header.bar h1{margin:0;font-size:.9rem;font-weight:650;letter-spacing:.04em;text
 </style>
 </head>
 <body>
-<div class="app" id="app" data-sample-url="/assets/ury/brief/brief.sample.json" data-api="/api/method/ury.ury.api.chairman.get_brief" data-login="/login?redirect-to=/ury/brief">
+<div class="app" id="app" data-sample-url="/assets/ury/brief/brief.sample.json" data-api="/api/method/ury.ury.api.chairman.get_brief" data-login="/login?redirect-to=/ury/brief/">
   <header class="bar">
     <h1>URY Brief</h1>
+    <button type="button" id="signout" style="min-height:44px;min-width:44px;font:inherit;border-radius:.5rem;border:1px solid var(--muted);background:transparent;color:var(--ink);cursor:pointer">Sign out</button>
     <button type="button" id="install" hidden style="min-height:44px;min-width:44px;font:inherit;border-radius:.5rem;border:1px solid var(--muted);background:transparent;color:var(--ink);cursor:pointer">Add to home screen</button>
   </header>
   <p class="banner" id="banner" role="status" hidden></p>
@@ -121,6 +123,7 @@ header.bar h1{margin:0;font-size:.9rem;font-weight:650;letter-spacing:.04em;text
   var nextBtn = document.getElementById("next");
   var live = document.getElementById("live");
   var banner = document.getElementById("banner");
+  var USER_KEY_STORE = "ury-brief-user";
   var NS = "http://www.w3.org/2000/svg";
   var COLORS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
   var slideCount = 0;
@@ -211,11 +214,12 @@ header.bar h1{margin:0;font-size:.9rem;font-weight:650;letter-spacing:.04em;text
     var d = slide.delta_pct;
     var tone = slide.tone || "neutral";
     if (d == null) { return null; }
-    var pct = Math.abs(Math.round(d * 1000) / 10);
+    // Server owns the rounding (delta_label) so the chip always agrees with the headline.
+    var label = slide.delta_label != null ? String(slide.delta_label) : (Math.abs(Math.round(d * 1000) / 10) + "%");
     var arrow = d > 0.0005 ? "\u25B2" : d < -0.0005 ? "\u25BC" : "\u25AC";
     var sign = d > 0.0005 ? "+" : d < -0.0005 ? "-" : "";
-    var chip = el("span", "chip " + tone, arrow + " " + sign + pct + "%");
-    chip.setAttribute("aria-label", (d >= 0 ? "Up " : "Down ") + pct + " percent versus comparison period");
+    var chip = el("span", "chip " + tone, arrow + " " + sign + label);
+    chip.setAttribute("aria-label", (d >= 0 ? "Up " : "Down ") + label + " versus comparison period");
     return chip;
   }
 
@@ -342,7 +346,72 @@ header.bar h1{margin:0;font-size:.9rem;font-weight:650;letter-spacing:.04em;text
     else if (e.key === "ArrowRight") { goTo(current + 1); }
   });
 
-  /* load */
+  /* ---- identity / cache isolation ---- */
+  function swPost(msg) {
+    try {
+      if ("serviceWorker" in navigator) {
+        var c = navigator.serviceWorker.controller;
+        if (c) { c.postMessage(msg); }
+      }
+    } catch (e) {}
+  }
+  function wipeCaches() {
+    try {
+      if (window.caches) {
+        return caches.keys().then(function (keys) {
+          return Promise.all(keys.filter(function (k) { return k.indexOf("ury-brief-") === 0; }).map(function (k) { return caches.delete(k); }));
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    return Promise.resolve();
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  function showSignIn() {
+    lsDel(USER_KEY_STORE);
+    setBanner("");
+    slideCount = 0;
+    dotsEl.textContent = "";
+    showState("Please sign in", "Your session has ended or you do not have access to the brief.", LOGIN, "Sign in");
+  }
+
+  function checkUser() {
+    var meta = document.querySelector('meta[name="brief-user"]');
+    var key = meta ? meta.getAttribute("content") : "";
+    var prev = lsGet(USER_KEY_STORE);
+    if (key && prev !== key) {
+      /* different (or first-seen) user: drop any cached data before rendering */
+      swPost({ type: "LOGOUT" });
+      return wipeCaches().then(function () { lsSet(USER_KEY_STORE, key); });
+    }
+    return Promise.resolve();
+  }
+
+  document.getElementById("signout").addEventListener("click", function () {
+    var done = false;
+    function finish() {
+      if (done) { return; }
+      done = true;
+      swPost({ type: "LOGOUT" });
+      wipeCaches().then(function () {
+        lsDel(USER_KEY_STORE);
+        location.href = "/login";
+      });
+    }
+    try {
+      fetch("/api/method/logout", { method: "POST", credentials: "same-origin" }).then(finish, finish);
+    } catch (e) { finish(); }
+  });
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", function (e) {
+      if (e.data && e.data.type === "AUTH_LOST") { showSignIn(); }
+    });
+  }
+
+  /* load: no date param unless the URL has one, so the server picks its default day */
   var params = new URLSearchParams(location.search);
   var url;
   if (params.get("sample") === "1") { url = SAMPLE; }
@@ -352,14 +421,26 @@ header.bar h1{margin:0;font-size:.9rem;font-weight:650;letter-spacing:.04em;text
   }
   var isSample = params.get("sample") === "1";
 
-  fetch(url, { credentials: "same-origin", headers: { "Accept": "application/json" } })
+  checkUser().then(function () {
+    return fetch(url, { credentials: "same-origin", headers: { "Accept": "application/json" } });
+  })
     .then(function (res) {
       if (res.status === 401 || res.status === 403) {
-        showState("Please sign in", "Your session has ended or you do not have access to the brief.", LOGIN, "Sign in");
+        showSignIn();
         return null;
       }
-      if (!res.ok) { throw new Error("HTTP " + res.status); }
       var fromCache = res.headers.get("X-Brief-Source") === "cache";
+      if (res.status === 503) {
+        return res.json().then(function (j) {
+          if (j && j.offline) {
+            showState("You are offline", "No saved brief is available yet. Connect once to load it.");
+            setBanner("Offline");
+            return null;
+          }
+          throw new Error("HTTP 503");
+        });
+      }
+      if (!res.ok) { throw new Error("HTTP " + res.status); }
       return res.json().then(function (j) {
         var brief = isSample ? j : j.message;
         render(brief, fromCache && !isSample);
