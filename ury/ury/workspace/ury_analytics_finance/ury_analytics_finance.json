@@ -1,0 +1,49 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"70791fe204\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB10 Margin & Cost\",\"col\":4}},{\"id\":\"77689370b3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB11 Wastage & Shrinkage\",\"col\":4}},{\"id\":\"8138d52c97\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB15 Leakage\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:32.211107",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "wallet",
+ "is_hidden": 0,
+ "label": "URY Analytics Finance",
+ "links": [],
+ "modified": "2026-11-03 05:07:32.427821",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Finance",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "URY Admin"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB10 Margin & Cost",
+   "type": "URL",
+   "url": "/insights/dashboards/9hniog0q73"
+  },
+  {
+   "label": "DB11 Wastage & Shrinkage",
+   "type": "URL",
+   "url": "/insights/dashboards/8t5fak6mge"
+  },
+  {
+   "label": "DB15 Leakage",
+   "type": "URL",
+   "url": "/insights/dashboards/6810njdu1j"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Finance",
+ "type": "Workspace"
+}

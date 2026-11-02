@@ -1,0 +1,39 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"942a6d8ff4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB14 Data Quality & Readiness\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:32.477763",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "shield-check",
+ "is_hidden": 0,
+ "label": "URY Analytics Quality",
+ "links": [],
+ "modified": "2026-11-03 05:07:32.577264",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Quality",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Admin"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB14 Data Quality & Readiness",
+   "type": "URL",
+   "url": "/insights/dashboards/9g3cho4dvl"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Quality",
+ "type": "Workspace"
+}

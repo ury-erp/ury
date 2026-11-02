@@ -1,0 +1,39 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"57088a0cce\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB07 Table & Floor Timing\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:31.907360",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "layout-grid",
+ "is_hidden": 0,
+ "label": "URY Analytics Floor",
+ "links": [],
+ "modified": "2026-11-03 05:07:32.012914",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Floor",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Captain"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB07 Table & Floor Timing",
+   "type": "URL",
+   "url": "/insights/dashboards/97mu7marvn"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Floor",
+ "type": "Workspace"
+}

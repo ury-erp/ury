@@ -1,0 +1,52 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"1d615c8d1c\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB01 Company / Owner Overview\",\"col\":4}},{\"id\":\"827044e73c\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB16 Chairman Brief Cross-check\",\"col\":4}},{\"id\":\"942a6d8ff4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB14 Data Quality & Readiness\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:30.897611",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "chart-line",
+ "is_hidden": 0,
+ "label": "URY Analytics Owner",
+ "links": [],
+ "modified": "2026-11-03 05:07:31.098691",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Owner",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "URY Admin"
+  },
+  {
+   "role": "URY Chairman"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB01 Company / Owner Overview",
+   "type": "URL",
+   "url": "/insights/dashboards/994d77ru95"
+  },
+  {
+   "label": "DB16 Chairman Brief Cross-check",
+   "type": "URL",
+   "url": "/insights/dashboards/9of8skpq4l"
+  },
+  {
+   "label": "DB14 Data Quality & Readiness",
+   "type": "URL",
+   "url": "/insights/dashboards/9g3cho4dvl"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Owner",
+ "type": "Workspace"
+}

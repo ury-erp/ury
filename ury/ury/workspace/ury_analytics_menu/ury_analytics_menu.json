@@ -1,0 +1,39 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"b6e3f85b59\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB04 Menu & Category\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:31.421677",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "book-open",
+ "is_hidden": 0,
+ "label": "URY Analytics Menu",
+ "links": [],
+ "modified": "2026-11-03 05:07:31.543231",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Menu",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB04 Menu & Category",
+   "type": "URL",
+   "url": "/insights/dashboards/69ts8lndkk"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Menu",
+ "type": "Workspace"
+}
