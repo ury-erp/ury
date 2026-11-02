@@ -1,6 +1,7 @@
 import hashlib
 
 import frappe
+import frappe.sessions
 
 no_cache = 1
 sitemap = 0
@@ -41,5 +42,6 @@ def get_context(context):
 
 	context.no_cache = 1
 	context.brief_user_key = user_key(frappe.session.user, frappe.local.site)
+	context.csrf_token = frappe.sessions.get_csrf_token()
 	context.build_version = frappe.utils.get_build_version()
 	return context

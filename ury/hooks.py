@@ -352,7 +352,8 @@ scheduler_events = {
 		]
 	},
 	"daily": [
-		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
+		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks",
+		"ury.chairman_jobs.purge_chairman_audio",
 	]
 # 	"all": [
 # 		"ury.tasks.all"

@@ -1,0 +1,25 @@
+.call{--call-ok:#16a34a;--call-bad:#dc2626;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:1rem;height:100%;padding:.75rem 1rem 1rem;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari","Noto Sans Arabic","Noto Sans Malayalam","Kohinoor Devanagari","Geeza Pro","Malayalam Sangam MN",sans-serif;color:var(--ink)}
+.call-note{margin:0;font-size:.8rem;color:var(--muted);background:var(--neu-bg);padding:.4rem .75rem;border-radius:.6rem}
+.call-who{display:flex;flex-direction:column;align-items:center;gap:.35rem;width:100%}
+.call-ring{--lvl:0;width:11rem;height:11rem;border-radius:50%;display:grid;place-items:center;margin-bottom:.75rem;box-shadow:0 0 0 calc(.2rem + var(--lvl)*1.1rem) color-mix(in srgb,var(--accent) 30%,transparent);transition:box-shadow .08s linear}
+.call-avatar{width:8rem;height:8rem;border-radius:50%;display:grid;place-items:center;font-size:3rem;font-weight:700;background:var(--accent);color:var(--bg)}
+.call[data-state=failed] .call-avatar{background:var(--bad)}
+.call[data-state=ended] .call-avatar{background:var(--muted)}
+.call[data-state=ringing] .call-ring{animation:call-pulse 1.2s ease-in-out infinite}
+.call-name{margin:0;font-size:1.4rem}
+.call-status{margin:0;font-size:1.5rem;font-weight:700}
+.call-time{margin:0;font-variant-numeric:tabular-nums;color:var(--muted)}
+.call-speaker{margin:0;font-size:.85rem;color:var(--muted);min-height:1.2em}
+.call-line{margin:.25rem 0 0;max-width:20rem;font-size:.95rem}
+.call-actions{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.call-btn{min-height:56px;min-width:96px;padding:0 1.4rem;border-radius:999px;border:1px solid var(--muted);background:transparent;color:var(--ink);font-size:1rem;font-weight:650;cursor:pointer}
+.call-btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.call-start,.call-retry{background:var(--call-ok);border-color:var(--call-ok);color:#fff}
+.call-end{background:var(--call-bad);border-color:var(--call-bad);color:#fff}
+.call-back{min-height:44px;min-width:44px;background:transparent;border:0;color:var(--accent);font-size:.9rem;text-decoration:underline;cursor:pointer}
+.call button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+@keyframes call-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){
+  .call *{animation:none!important;transition:none!important}
+  .call-ring{box-shadow:0 0 0 .3rem color-mix(in srgb,var(--accent) 30%,transparent)}
+}

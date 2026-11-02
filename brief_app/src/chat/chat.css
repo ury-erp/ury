@@ -1,0 +1,36 @@
+.chat{flex:1;min-height:0;display:flex;flex-direction:column;max-width:46rem;width:100%;margin:0 auto;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari","Noto Sans Arabic","Noto Sans Malayalam","Kohinoor Devanagari","Geeza Pro","Malayalam Sangam MN",sans-serif}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:.5rem 1rem;display:flex;flex-direction:column;gap:.6rem}
+.intro{margin:auto 0;text-align:center;display:flex;flex-direction:column;gap:.6rem;align-items:center}
+.intro h2{margin:0;font-size:1.3rem}
+.starters{display:flex;flex-direction:column;gap:.5rem;width:100%}
+.starter{min-height:44px;padding:.5rem 1rem;border-radius:999px;border:1px solid var(--muted);background:var(--card);color:var(--ink);cursor:pointer;font-size:.85rem}
+.msg{display:flex;flex-direction:column;max-width:88%;gap:.15rem}
+.msg.user{align-self:flex-end;align-items:flex-end}
+.msg.assistant{align-self:flex-start;align-items:flex-start}
+.bubble{padding:.55rem .8rem;border-radius:1rem;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
+.user .bubble{background:var(--btn);color:var(--btn-ink);border-bottom-right-radius:.3rem}
+.assistant .bubble{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:.3rem}
+.bubble p{margin:0}
+.md p{margin:0 0 .4rem}.md p:last-child{margin:0}
+.md ul{margin:.2rem 0 .4rem;padding-inline-start:1.1rem}
+.tag{display:block;font-size:.7rem;opacity:.75;margin-bottom:.15rem}
+.meta{font-size:.7rem;color:var(--muted);display:flex;align-items:center;gap:.4rem}
+.meta.err{color:var(--bad)}
+.retry{min-height:44px;min-width:44px;padding:0 .7rem;border-radius:.5rem;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;font-size:.75rem}
+.typing{display:flex;gap:.25rem;align-items:center;min-height:1.6rem}
+.typing i{width:.4rem;height:.4rem;border-radius:50%;background:var(--muted);animation:bl 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.player{display:flex;align-items:center;gap:.5rem;margin-top:.35rem}
+.play{width:44px;height:44px;flex:none;border-radius:50%;border:1px solid var(--muted);background:transparent;color:var(--ink);cursor:pointer;font-size:.8rem}
+.prog{flex:1;min-width:4rem;height:.3rem;border-radius:99px;background:var(--line);overflow:hidden}
+.prog span{display:block;height:100%;background:var(--accent)}
+.composer{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-top:1px solid var(--line);background:var(--bg)}
+.composer input{flex:1;min-width:0;min-height:44px;padding:0 .9rem;border-radius:999px;border:1px solid var(--muted);background:var(--card);color:var(--ink);font:inherit;font-size:.9rem}
+.icon,.send{width:44px;height:44px;flex:none;border-radius:50%;border:1px solid var(--muted);background:transparent;color:var(--ink);cursor:pointer;font-size:1rem}
+.send{background:var(--btn);color:var(--btn-ink);border:0}
+.send:disabled,.icon:disabled{opacity:.4;cursor:default}
+.composer.rec{justify-content:space-between}
+.rec-dot{width:.7rem;height:.7rem;border-radius:50%;background:var(--bad);animation:bl 1s infinite}
+.timer{flex:1;font-variant-numeric:tabular-nums;font-weight:650}
+.mic-err{margin:0 1rem .25rem;padding:.5rem .75rem;border-radius:.6rem;background:var(--bad-bg);color:var(--bad);font-size:.8rem;display:flex;flex-direction:column;align-items:flex-start;gap:.3rem}

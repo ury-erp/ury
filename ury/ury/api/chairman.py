@@ -7,6 +7,7 @@
 # be unit-tested without a Frappe site.
 
 from datetime import timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 import frappe
 from frappe.utils import getdate, now_datetime
@@ -14,7 +15,10 @@ from frappe.utils import getdate, now_datetime
 SCHEMA_VERSION = 1
 CURRENCY = "INR"
 LOCALE = "en-IN"
-ALLOWED_ROLES = ("System Manager", "URY Chairman")
+ALLOWED_ROLES = {"URY Chairman"}
+# Test-only hook: Administrator is NOT allowed in production. Tests set this True explicitly.
+ALLOW_ADMINISTRATOR_FOR_TESTS = False
+COMPARE_LABEL = "vs same day last week"
 DRILL_DASHBOARD = "/insights/dashboards/58aq35af28"
 UNSPECIFIED = "Unspecified"
 TONE_THRESHOLD = 0.02
@@ -33,12 +37,12 @@ def format_inr_compact(value):
 	"""
 	value = float(value or 0)
 	sign = "-" if value < 0 else ""
-	n = abs(value)
-	units = [(1e7, "Cr"), (1e5, "L"), (1e3, "K"), (1, "")]
+	n = Decimal(str(abs(value)))
+	units = [(10**7, "Cr"), (10**5, "L"), (10**3, "K"), (1, "")]
 	idx = next(i for i, (size, _) in enumerate(units) if n >= size or size == 1)
 	while True:
 		size, suffix = units[idx]
-		num = round(n / size, 1 if suffix else 0)
+		num = (n / size).quantize(Decimal("0.1") if suffix else Decimal("1"), rounding=ROUND_HALF_UP)
 		limit = 1000 if suffix == "" else 100
 		if num >= limit and idx > 0:
 			idx -= 1
@@ -145,10 +149,10 @@ def yesterday_headline(value, compare, delta, day):
 		return frappe._("Yesterday {0}, no sales last {1}").format(amount, weekday)
 	pct = pct_text(delta)
 	if tone_for(delta) == "neutral":
-		return frappe._("Yesterday {0}, flat vs last {1}").format(amount, weekday)
+		return frappe._("Yesterday {0}, flat {1}").format(amount, frappe._(COMPARE_LABEL))
 	if delta > 0:
-		return frappe._("Yesterday {0}, up {1}% vs last {2}").format(amount, pct, weekday)
-	return frappe._("Yesterday {0}, down {1}% vs last {2}").format(amount, pct, weekday)
+		return frappe._("Yesterday {0}, up {1}% {2}").format(amount, pct, frappe._(COMPARE_LABEL))
+	return frappe._("Yesterday {0}, down {1}% {2}").format(amount, pct, frappe._(COMPARE_LABEL))
 
 
 def share_pct(part, total):
@@ -200,8 +204,12 @@ def spark_series(dates, per_day):
 
 def _check_role():
 	user = frappe.session.user
-	if user == "Administrator":
+	if user == "Administrator" and ALLOW_ADMINISTRATOR_FOR_TESTS:
 		return
+	# frappe.get_roles("Administrator") returns every role in the system, so the role
+	# intersection below would let Administrator in. Refuse these identities outright.
+	if user in ("Administrator", "Guest"):
+		frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
 	if set(frappe.get_roles(user)) & set(ALLOWED_ROLES):
 		return
 	frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
@@ -300,6 +308,7 @@ def slide_yesterday(day, rows):
 		"compare": compare,
 		"delta_pct": None if delta is None else round(delta, 4),
 		"delta_label": None if delta is None else pct_text(delta) + "%",
+		"compare_label": frappe._(COMPARE_LABEL),
 		"tone": tone_for(delta),
 		"orders": orders.get(day, 0),
 		"orders_compare": orders.get(prev, 0),
@@ -373,6 +382,37 @@ def slide_payment_mix(day):
 	}
 
 
+DECK_ORDER = (
+	"yesterday",
+	"mtd_target",
+	"branch_ranking",
+	"channel_mix",
+	"top_bottom_items",
+	"payment_mix",
+	"leakage",
+	"cashup",
+)
+
+
+def order_slides(slides):
+	"""Deck order; unknown ids keep their relative position after the known ones."""
+	rank = {sid: i for i, sid in enumerate(DECK_ORDER)}
+	return sorted(slides, key=lambda s: rank.get(s.get("id"), len(rank)))
+
+
+def compute_features():
+	"""{huf, voice_call}. Never raises: any failure means both flags off."""
+	out = {"huf": False, "voice_call": False}
+	try:
+		settings = "URY Chairman Settings"
+		agent = frappe.db.get_single_value(settings, "chat_agent")
+		out["huf"] = bool("huf" in frappe.get_installed_apps() and agent)
+		out["voice_call"] = bool(frappe.db.get_single_value(settings, "voice_call_enabled"))
+	except Exception:
+		pass
+	return out
+
+
 @frappe.whitelist()
 def get_brief(date=None):
 	"""Chairman Brief for business day `date` (default yesterday, system time zone; must be within
@@ -384,6 +424,13 @@ def get_brief(date=None):
 	companies, branches = _scope(start, day)
 	currency, mixed = currency_info(_company_currencies(companies), companies)
 	slides = [slide_yesterday(day, rows), slide_channel_mix(day, rows), slide_payment_mix(day)]
+	try:
+		from ury.ury.api import chairman_slides
+
+		slides += chairman_slides.build_slides(day)
+	except Exception:
+		frappe.log_error(title="Chairman brief: extra slides failed")
+	slides = order_slides(slides)
 	scope = {"companies": companies, "branches": branches}
 	out = {
 		"schema_version": SCHEMA_VERSION,
@@ -393,6 +440,7 @@ def get_brief(date=None):
 		"locale": LOCALE,
 		"scope": scope,
 		"slides": slides,
+		"features": compute_features(),
 	}
 	if mixed:
 		scope["note"] = "Multiple company currencies in scope; amounts are not converted."

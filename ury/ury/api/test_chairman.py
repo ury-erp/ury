@@ -68,15 +68,33 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.format_inr_compact(0), "₹0")
 		self.assertEqual(c.format_inr_compact(None), "₹0")
 
+	def test_formatter_half_up(self):
+		self.assertEqual(c.format_inr_compact(125000), "₹1.3L")
+		self.assertEqual(c.format_inr_compact(1250), "₹1.3K")
+		self.assertEqual(c.format_inr_compact(12500000), "₹1.3Cr")
+		self.assertEqual(c.format_inr_compact(-125000), "-₹1.3L")
+
+	def test_roles_and_label(self):
+		self.assertEqual(c.ALLOWED_ROLES, {"URY Chairman"})
+		self.assertFalse(c.ALLOW_ADMINISTRATOR_FOR_TESTS)
+		self.assertEqual(c.COMPARE_LABEL, "vs same day last week")
+
+	def test_branch_scope_helpers(self):
+		perms = {"Branch": [{"doc": "A"}]}
+		self.assertEqual(c.allowed_from_perms(perms, "Branch"), ["A"])
+		self.assertEqual(c.intersect_scope(["A"], {"A", "B"}), ["A"])
+		self.assertEqual(c.intersect_scope(["B"], {"A"}), [])
+		self.assertIsNone(c.allowed_from_perms({}, "Branch"))
+
 	def test_formatter_negative(self):
 		self.assertEqual(c.format_inr_compact(-1500), "-₹1.5K")
 		self.assertEqual(c.format_inr_compact(-50), "-₹50")
 
 	def test_headline_up_down_flat(self):
 		d = date(2026, 10, 21)  # Wednesday
-		self.assertEqual(c.yesterday_headline(120000, 111000, 0.081, d), "Yesterday ₹1.2L, up 8.1% vs last Wednesday")
-		self.assertEqual(c.yesterday_headline(90000, 100000, -0.1, d), "Yesterday ₹90K, down 10% vs last Wednesday")
-		self.assertEqual(c.yesterday_headline(100500, 100000, 0.005, d), "Yesterday ₹1L, flat vs last Wednesday")
+		self.assertEqual(c.yesterday_headline(120000, 111000, 0.081, d), "Yesterday ₹1.2L, up 8.1% vs same day last week")
+		self.assertEqual(c.yesterday_headline(90000, 100000, -0.1, d), "Yesterday ₹90K, down 10% vs same day last week")
+		self.assertEqual(c.yesterday_headline(100500, 100000, 0.005, d), "Yesterday ₹1L, flat vs same day last week")
 
 	def test_headline_empty(self):
 		d = date(2026, 10, 21)
@@ -237,10 +255,53 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.currency_info({"X": None}, ["X"]), ("INR", False))
 
 
+class FeaturesTests(unittest.TestCase):
+	"""compute_features / order_slides: pure, frappe calls patched."""
+
+	def _run(self, installed, values):
+		from unittest import mock
+
+		fr = sys.modules["frappe"]
+		with (
+			mock.patch.object(fr, "get_installed_apps", lambda: installed, create=True),
+			mock.patch.object(fr, "db", types.SimpleNamespace(get_single_value=lambda dt, f: values.get(f)), create=True),
+		):
+			return c.compute_features()
+
+	def test_flag_off_when_huf_missing(self):
+		self.assertEqual(self._run(["frappe", "ury"], {"chat_agent": "A", "voice_call_enabled": 1}), {"huf": False, "voice_call": True})
+
+	def test_flag_off_without_agent(self):
+		self.assertFalse(self._run(["frappe", "huf"], {"chat_agent": "", "voice_call_enabled": 0})["huf"])
+
+	def test_flag_on(self):
+		self.assertEqual(self._run(["frappe", "huf"], {"chat_agent": "A", "voice_call_enabled": 0}), {"huf": True, "voice_call": False})
+
+	def test_never_raises(self):
+		from unittest import mock
+
+		fr = sys.modules["frappe"]
+		boom = types.SimpleNamespace(get_single_value=mock.Mock(side_effect=RuntimeError("x")))
+		with mock.patch.object(fr, "db", boom, create=True):
+			self.assertEqual(c.compute_features(), {"huf": False, "voice_call": False})
+
+	def test_deck_order(self):
+		ids = ["cashup", "yesterday", "zzz", "leakage", "mtd_target", "channel_mix", "payment_mix"]
+		self.assertEqual([s["id"] for s in c.order_slides([{"id": i} for i in ids])],
+			["yesterday", "mtd_target", "channel_mix", "payment_mix", "leakage", "cashup", "zzz"])
+
+
 class SiteTests(IntegrationTestCase):
 	"""NEEDS A BENCH SITE with seeded demo data (2026-10-21 in range). Run via bench run-tests."""
 
 	PINNED = "2026-10-21"
+
+	def setUp(self):
+		self._orig_admin = c.ALLOW_ADMINISTRATOR_FOR_TESTS
+		c.ALLOW_ADMINISTRATOR_FOR_TESTS = True  # explicit test hook; off in production
+
+	def tearDown(self):
+		c.ALLOW_ADMINISTRATOR_FOR_TESTS = self._orig_admin
 
 	def test_shape(self):
 		import frappe
@@ -251,7 +312,8 @@ class SiteTests(IntegrationTestCase):
 		self.assertEqual(b["schema_version"], 1)
 		self.assertEqual(b["date"], self.PINNED)
 		self.assertEqual(b["currency"], "INR")
-		self.assertEqual([s["id"] for s in b["slides"]], ["yesterday", "channel_mix", "payment_mix"])
+		self.assertEqual([s["id"] for s in b["slides"]], list(c.DECK_ORDER))
+		self.assertEqual(set(b["features"]), {"huf", "voice_call"})
 		for s in b["slides"]:
 			for k in ("title", "headline", "value", "compare", "delta_pct", "tone", "chart", "drill", "data_quality"):
 				self.assertIn(k, s)
@@ -289,9 +351,9 @@ class SiteTests(IntegrationTestCase):
 			"SELECT COALESCE(SUM(change_amount),0) FROM `tabPOS Invoice` WHERE docstatus=1 AND posting_date BETWEEN %s AND %s",
 			(start, end),
 		)[0][0]
-		cash = {r["label"]: r["value"] for r in b["slides"][2]["chart"]["series"]}.get("Cash", 0)
+		cash = {r["label"]: r["value"] for r in next(x for x in b["slides"] if x["id"] == "payment_mix")["chart"]["series"]}.get("Cash", 0)
 		self.assertAlmostEqual(cash, float(amt) - float(chg), places=2)
-		self.assertEqual(b["slides"][2]["basis"], "payments_received")
+		self.assertEqual(next(x for x in b["slides"] if x["id"] == "payment_mix")["basis"], "payments_received")
 
 	def test_invalid_date_and_permission(self):
 		import frappe
@@ -300,6 +362,56 @@ class SiteTests(IntegrationTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			get_brief("not-a-date")
+
+	def test_administrator_denied_without_hook(self):
+		import frappe
+
+		c.ALLOW_ADMINISTRATOR_FOR_TESTS = False
+		frappe.set_user("Administrator")
+		with self.assertRaises(frappe.PermissionError):
+			c.get_brief(self.PINNED)
+
+	def test_branch_user_permission_scoping(self):
+		"""User A (restricted to branch A) never sees branch B; unrestricted sees both."""
+		import frappe
+
+		rows = frappe.db.sql(
+			"SELECT branch, COUNT(*) FROM `tabPOS Invoice` WHERE docstatus=1 AND branch IS NOT NULL "
+			"AND branch != '' GROUP BY branch ORDER BY COUNT(*) DESC LIMIT 2"
+		)
+		if len(rows) < 2:
+			self.skipTest("need POS invoices in at least two branches")
+		branch_a, branch_b = rows[0][0], rows[1][0]
+		email = "chairman.scope.test@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc(
+				{"doctype": "User", "email": email, "first_name": "Scope", "send_welcome_email": 0}
+			).insert(ignore_permissions=True)
+		user = frappe.get_doc("User", email)
+		user.add_roles("URY Chairman")
+		for perm in frappe.get_all("User Permission", filters={"user": email, "allow": "Branch"}, pluck="name"):
+			frappe.delete_doc("User Permission", perm, force=True, ignore_permissions=True)
+		frappe.get_doc(
+			{"doctype": "User Permission", "user": email, "allow": "Branch", "for_value": branch_a}
+		).insert(ignore_permissions=True)
+		frappe.clear_cache(user=email)
+		c.ALLOW_ADMINISTRATOR_FOR_TESTS = False
+		try:
+			frappe.set_user(email)
+			b = c.get_brief(self.PINNED)
+			self.assertEqual(b["scope"]["branches"], [branch_a])
+			self.assertNotIn(branch_b, b["scope"]["branches"])
+			# Slide 1 equals SQL restricted to branch A only
+			start = frappe.utils.getdate(self.PINNED)
+			direct = frappe.db.sql(
+				"SELECT COALESCE(SUM(net_total),0) FROM `tabPOS Invoice` "
+				"WHERE docstatus=1 AND posting_date=%s AND branch=%s",
+				(start, branch_a),
+			)[0][0]
+			self.assertAlmostEqual(b["slides"][0]["value"], float(direct), places=2)
+		finally:
+			frappe.set_user("Administrator")
+			frappe.db.rollback()
 
 
 if __name__ == "__main__":

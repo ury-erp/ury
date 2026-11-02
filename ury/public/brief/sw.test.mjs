@@ -8,54 +8,12 @@ const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "sw.js"),
 (0, eval)(src);
 const h = globalThis.__briefSwHelpers;
 
-test("helpers exposed and cache name versioned", () => {
-	assert.ok(h);
-	assert.ok(h.CACHE_NAME.startsWith("ury-brief-"));
-	assert.equal(h.KEEP, 7);
-});
-
-test("cacheKey keeps full query, drops hash", () => {
-	const k = h.cacheKey("https://a.test/api/method/ury.ury.api.chairman.get_brief?date=2026-10-21#x");
-	assert.equal(k, "/api/method/ury.ury.api.chairman.get_brief?date=2026-10-21");
-});
-
-test("cacheKey differs per date", () => {
-	const b = "https://a.test/api/method/ury.ury.api.chairman.get_brief";
-	assert.notEqual(h.cacheKey(b + "?date=2026-10-21"), h.cacheKey(b + "?date=2026-10-22"));
-});
-
-test("keysToTrim keeps newest 7", () => {
-	const keys = Array.from({ length: 10 }, (_, i) => "k" + i);
-	assert.deepEqual(h.keysToTrim(keys, 7), ["k0", "k1", "k2"]);
-	assert.deepEqual(h.keysToTrim(keys.slice(0, 7), 7), []);
-	assert.deepEqual(h.keysToTrim([], 7), []);
-});
-
-test("decorateHeaders sets X-Brief-Source and preserves others", () => {
-	const out = h.decorateHeaders({ "content-type": "application/json" }, "cache");
-	assert.equal(out.get("X-Brief-Source"), "cache");
-	assert.equal(out.get("content-type"), "application/json");
-	assert.equal(h.decorateHeaders(out, "network").get("x-brief-source"), "network");
-});
-
-test("route classification", () => {
-	assert.ok(h.isBriefApi("/api/method/ury.ury.api.chairman.get_brief"));
-	assert.ok(!h.isBriefApi("/api/method/frappe.ping"));
-	assert.ok(h.isShellNavigation("/ury/brief"));
-	assert.ok(h.isShellNavigation("/ury/brief/"));
-	assert.ok(!h.isShellNavigation("/ury/briefcase"));
-	assert.ok(h.isSwScript("/ury/brief/sw.js"));
-});
-
-test("staleCacheNames only touches ury-brief- prefix", () => {
-	const names = ["ury-brief-v0", "ury-brief-v1", "ury-serve-shell-v1", "other"];
-	assert.deepEqual(h.staleCacheNames(names, "ury-brief-v1"), ["ury-brief-v0"]);
-	assert.deepEqual(h.staleCacheNames(["ury-brief-old", h.CACHE_NAME], h.CACHE_NAME), ["ury-brief-old"]);
-});
-
 /* ---- fake Cache Storage ---- */
 const ORIGIN = "https://a.test";
 const API = ORIGIN + "/api/method/ury.ury.api.chairman.get_brief";
+const KEY = "/api/method/ury.ury.api.chairman.get_brief";
+const UA = "userAAAA";
+const UB = "userBBBB";
 function k(key) { return typeof key === "string" ? key : new URL(key.url).pathname + new URL(key.url).search; }
 function fakeCaches(initial = {}) {
 	const stores = new Map(Object.entries(initial).map(([n, e]) => [n, new Map(Object.entries(e))]));
@@ -74,7 +32,11 @@ function fakeCaches(initial = {}) {
 		async match(key) { for (const [n] of stores) { const r = await mk(n).match(key); if (r) return r; } }
 	};
 }
-function jsonRes(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
+function metaFor(user) { return { [h.META_CACHE]: { "/__ury_brief_user__": new Response(user) } }; }
+function allKeys(c) { return [...c.stores.values()].flatMap((m) => [...m.keys()]); }
+function jsonRes(body, status = 200, headers = {}) {
+	return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+}
 function withUrl(res, url, redirected = false) {
 	Object.defineProperty(res, "url", { value: url });
 	Object.defineProperty(res, "redirected", { value: redirected });
@@ -84,86 +46,233 @@ function deps(c, fetchImpl, extra = {}) {
 	const sent = [];
 	return { caches: c, fetch: fetchImpl, notify: (m) => sent.push(m), timeoutMs: 30, sent, ...extra };
 }
-const req = (u) => ({ url: u, method: "GET" });
-const N = () => h.CACHE_NAME;
+const req = (u, user, init = {}) => ({ url: u, method: "GET", headers: new Headers(user ? { "X-Brief-User": user } : {}), ...init });
+const U = (user) => h.userCacheName(user);
 
-test("brief: network-first returns network response and stores it", async () => {
+/* ---- versioning / pure helpers ---- */
+
+test("cache names are versioned and per-user", () => {
+	assert.ok(h.STATIC_CACHE.startsWith("ury-brief-") && h.STATIC_CACHE.endsWith("-static"));
+	assert.ok(h.VERSION_PREFIX.includes("__BUILD_VERSION__"), "placeholder replaced server-side by brief_sw.py");
+	assert.equal(U(UA), h.VERSION_PREFIX + "u-" + UA);
+	assert.notEqual(U(UA), U(UB));
+	assert.equal(U(""), "");
+	assert.equal(h.KEEP, 7);
+});
+
+test("sanitizeUser rejects unsafe or empty keys", () => {
+	assert.equal(h.sanitizeUser("abcd1234"), "abcd1234");
+	for (const bad of ["", "ab", "a/b/cdef", "x y zz", "../../x", null, 5, "a".repeat(200)]) {
+		assert.equal(h.sanitizeUser(bad), "", String(bad));
+	}
+});
+
+test("cacheKey keeps full query, drops hash; differs per date", () => {
+	assert.equal(h.cacheKey(API + "?date=2026-10-21#x"), KEY + "?date=2026-10-21");
+	assert.notEqual(h.cacheKey(API + "?date=2026-10-21"), h.cacheKey(API + "?date=2026-10-22"));
+});
+
+test("keysToTrim keeps newest 7", () => {
+	const keys = Array.from({ length: 10 }, (_, i) => "k" + i);
+	assert.deepEqual(h.keysToTrim(keys, 7), ["k0", "k1", "k2"]);
+	assert.deepEqual(h.keysToTrim([], 7), []);
+});
+
+test("decorateHeaders sets X-Brief-Source and preserves others", () => {
+	const out = h.decorateHeaders({ "content-type": "application/json" }, "cache");
+	assert.equal(out.get("X-Brief-Source"), "cache");
+	assert.equal(out.get("content-type"), "application/json");
+});
+
+test("never-cache list: chat, huf, files, socket.io", () => {
+	for (const u of [
+		ORIGIN + "/api/method/ury.ury.api.chairman_chat.send",
+		ORIGIN + "/api/method/huf.ai.agent.chat.get_history?conversation_id=1",
+		ORIGIN + "/files/voice.webm",
+		ORIGIN + "/private/files/x.pdf",
+		ORIGIN + "/socket.io/?EIO=4&transport=polling",
+		ORIGIN + "/api/method/x?cmd=huf.ai.chat",
+		ORIGIN + "/api/method/ury.ury.api.chairman%5Fchat.speak"
+	]) assert.ok(h.isNeverCache(u), u);
+	assert.ok(!h.isNeverCache(API));
+	assert.ok(!h.isNeverCache(ORIGIN + "/assets/ury/brief/dist/index-abc.js"));
+});
+
+test("route: same-origin /ury/brief scope; skips chat/huf/files/socket.io, POST, cross-origin, other api", () => {
+	const r = (url, init = {}) => h.route({ url, method: "GET", ...init }, ORIGIN);
+	assert.equal(r(API), "brief");
+	assert.equal(r(ORIGIN + "/ury/brief/", { mode: "navigate" }), "shell");
+	assert.equal(r(ORIGIN + "/ury/brief/slide/2", { mode: "navigate" }), "shell");
+	assert.equal(r(ORIGIN + "/ury/briefcase", { mode: "navigate" }), "skip");
+	assert.equal(r(ORIGIN + "/ury/brief/sw.js"), "skip");
+	assert.equal(r(ORIGIN + "/assets/ury/brief/dist/index-abc.js"), "asset");
+	assert.equal(r(ORIGIN + "/api/method/ury.ury.api.chairman_chat.send"), "skip");
+	assert.equal(r(ORIGIN + "/api/method/huf.ai.agent.chat.get_history"), "skip");
+	assert.equal(r(ORIGIN + "/files/a.mp3"), "skip");
+	assert.equal(r(ORIGIN + "/socket.io/?EIO=4"), "skip");
+	assert.equal(r(ORIGIN + "/api/method/frappe.ping"), "skip");
+	assert.equal(r(API, { method: "POST" }), "skip");
+	assert.equal(r("https://evil.test/api/method/ury.ury.api.chairman.get_brief"), "skip");
+});
+
+test("storable refuses audio, no-store, errors and never-cache urls", () => {
+	assert.ok(h.storable(jsonRes({})));
+	assert.ok(!h.storable(new Response("x", { headers: { "content-type": "audio/mpeg" } })));
+	assert.ok(!h.storable(new Response("x", { headers: { "content-type": "video/webm" } })));
+	assert.ok(!h.storable(jsonRes({}, 200, { "cache-control": "no-store" })));
+	assert.ok(!h.storable(jsonRes({}, 500)));
+	assert.ok(!h.storable(withUrl(jsonRes({}), ORIGIN + "/api/method/huf.ai.x")));
+});
+
+test("staleCacheNames only touches ury-brief- prefix and never meta", () => {
+	const names = ["ury-brief-v0-static", h.STATIC_CACHE, h.META_CACHE, "ury-serve-shell-v1", "other"];
+	assert.deepEqual(h.staleCacheNames(names, [h.STATIC_CACHE]), ["ury-brief-v0-static"]);
+});
+
+/* ---- brief data ---- */
+
+test("brief: network-first returns network response and stores it in the user cache", async () => {
 	const c = fakeCaches();
-	const d = deps(c, async () => jsonRes({ message: { v: 1 } }));
-	const res = await h.briefFetch(req(API), d);
+	const res = await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({ message: { v: 1 } })));
 	assert.equal(res.headers.get("X-Brief-Source"), "network");
 	assert.deepEqual(await res.json(), { message: { v: 1 } });
-	assert.ok(c.stores.get(N()).has("/api/method/ury.ury.api.chairman.get_brief"));
+	assert.ok(c.stores.get(U(UA)).has(KEY));
+	assert.equal(await h.getUser({ caches: c }), UA);
+});
+
+test("brief: unknown user is never stored and never served from cache", async () => {
+	const c = fakeCaches({ [U(UA)]: { [KEY]: jsonRes({ v: "A" }) } });
+	const r1 = await h.briefFetch(req(API), deps(c, async () => jsonRes({ v: "net" })));
+	assert.deepEqual(await r1.json(), { v: "net" });
+	assert.equal(c.stores.get(U(UA)).size, 1);
+	const r2 = await h.briefFetch(req(API), deps(c, async () => { throw new Error("offline"); }));
+	assert.equal(r2.status, 503);
+	assert.deepEqual(await r2.json(), { offline: true });
 });
 
 test("brief: slow network past timeout falls back to cache", async () => {
-	const key = "/api/method/ury.ury.api.chairman.get_brief";
-	const c = fakeCaches({ [N()]: { [key]: jsonRes({ message: { v: "old" } }) } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({ message: { v: "old" } }) } });
 	const d = deps(c, () => new Promise((r) => setTimeout(() => r(jsonRes({ message: { v: "new" } })), 300)));
 	const res = await h.briefFetch(req(API), d);
 	assert.equal(res.headers.get("X-Brief-Source"), "cache");
 	assert.equal((await res.json()).message.v, "old");
 });
 
-test("brief: network failure with cache serves cache", async () => {
-	const key = "/api/method/ury.ury.api.chairman.get_brief?date=2026-10-01";
-	const c = fakeCaches({ [N()]: { [key]: jsonRes({ message: { v: "c" } }) } });
-	const res = await h.briefFetch(req(API + "?date=2026-10-01"), deps(c, async () => { throw new Error("offline"); }));
-	assert.equal(res.headers.get("X-Brief-Source"), "cache");
-});
-
 test("brief: offline without cache returns 503 JSON {offline:true}", async () => {
-	const res = await h.briefFetch(req(API), deps(fakeCaches(), async () => { throw new Error("offline"); }));
+	const res = await h.briefFetch(req(API, UA), deps(fakeCaches(), async () => { throw new Error("offline"); }));
 	assert.equal(res.status, 503);
 	assert.match(res.headers.get("content-type"), /application\/json/);
 	assert.deepEqual(await res.json(), { offline: true });
 });
 
-test("brief: 401 evicts entry, wipes all ury-brief caches, notifies AUTH_LOST", async () => {
-	const key = "/api/method/ury.ury.api.chairman.get_brief";
-	const c = fakeCaches({ [N()]: { [key]: jsonRes({}) }, "ury-brief-old": { a: jsonRes({}) }, other: { a: jsonRes({}) } });
+test("brief: 401 evicts and wipes every ury-brief cache, notifies AUTH_LOST", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({}) }, [h.STATIC_CACHE]: { a: jsonRes({}) }, "ury-brief-old": {}, other: { a: jsonRes({}) } });
 	const d = deps(c, async () => jsonRes({}, 401));
-	const res = await h.briefFetch(req(API), d);
+	const res = await h.briefFetch(req(API, UA), d);
 	assert.equal(res.status, 401);
 	assert.deepEqual([...c.stores.keys()], ["other"]);
 	assert.deepEqual(d.sent, [{ type: "AUTH_LOST" }]);
 });
 
-test("brief: 403 behaves like 401", async () => {
-	const c = fakeCaches({ [N()]: {} });
+test("brief: 403 behaves like 401 (even for unknown user)", async () => {
+	const c = fakeCaches({ [U(UA)]: { [KEY]: jsonRes({}) } });
 	const d = deps(c, async () => jsonRes({}, 403));
 	await h.briefFetch(req(API), d);
 	assert.equal(c.stores.size, 0);
-	assert.equal(d.sent.length, 1);
+	assert.deepEqual(d.sent, [{ type: "AUTH_LOST" }]);
+});
+
+test("brief: no-store or audio responses are returned but not stored", async () => {
+	const c = fakeCaches();
+	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({}, 200, { "cache-control": "no-store" })));
+	await h.briefFetch(req(API + "?date=2026-10-01", UA), deps(c, async () => new Response("x", { headers: { "content-type": "audio/mpeg" } })));
+	assert.equal(c.stores.get(U(UA)).size, 0);
 });
 
 test("brief: keeps newest 7 entries", async () => {
 	const c = fakeCaches();
 	for (let i = 1; i <= 10; i++) {
-		await h.briefFetch(req(API + "?date=2026-10-" + String(i).padStart(2, "0")), deps(c, async () => jsonRes({ i })));
+		await h.briefFetch(req(API + "?date=2026-10-" + String(i).padStart(2, "0"), UA), deps(c, async () => jsonRes({ i })));
 	}
-	const keys = [...c.stores.get(N()).keys()];
+	const keys = [...c.stores.get(U(UA)).keys()];
 	assert.equal(keys.length, 7);
 	assert.ok(keys[0].endsWith("2026-10-04") && keys[6].endsWith("2026-10-10"));
 });
 
-test("shell: ok brief page is cached and returned", async () => {
+/* ---- cross-user isolation ---- */
+
+test("no cross-user leakage: user B never sees user A's cached brief", async () => {
 	const c = fakeCaches();
+	await h.briefFetch(req(API, UA), deps(c, async () => jsonRes({ who: "A" })));
+	assert.ok(c.stores.has(U(UA)));
+	/* B arrives offline on the same device */
+	const res = await h.briefFetch(req(API, UB), deps(c, async () => { throw new Error("offline"); }));
+	assert.equal(res.status, 503);
+	assert.deepEqual(await res.json(), { offline: true });
+	assert.ok(!c.stores.has(U(UA)), "A's cache wiped on user change");
+	assert.ok(![...c.stores.keys()].some((n) => n.includes(UA)), "no cache name for A remains");
+	assert.ok(!allKeys(c).includes(KEY), "no brief JSON remains anywhere");
+	assert.equal(await h.getUser({ caches: c }), UB);
+});
+
+test("SET_USER with a different user wipes user caches but keeps static assets", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({}), "/ury/brief": new Response("A shell") }, [h.STATIC_CACHE]: { "/assets/ury/brief/offline.html": new Response("off") } });
+	await h.onMessage({ type: "SET_USER", user: UB }, deps(c, null));
+	assert.ok(!c.stores.has(U(UA)));
+	assert.ok(c.stores.get(h.STATIC_CACHE).has("/assets/ury/brief/offline.html"));
+	assert.equal(await h.getUser({ caches: c }), UB);
+});
+
+test("SET_USER with same user keeps data; with invalid user clears identity and data", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({}) } });
+	await h.onMessage({ type: "SET_USER", user: UA }, deps(c, null));
+	assert.ok(c.stores.get(U(UA)).has(KEY));
+	await h.onMessage({ type: "SET_USER", user: "bad user!" }, deps(c, null));
+	assert.ok(!c.stores.has(U(UA)));
+	assert.equal(await h.getUser({ caches: c }), "");
+});
+
+test("header user switch wipes previous user's shell too", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("A shell") } });
+	await h.briefFetch(req(API, UB), deps(c, async () => jsonRes({ who: "B" })));
+	assert.ok(!c.stores.has(U(UA)));
+	const shell = await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => { throw new Error("offline"); }));
+	assert.notEqual(shell && shell.type !== "error" ? await shell.text() : "", "A shell");
+});
+
+/* ---- logout ---- */
+
+test("LOGOUT message wipes all ury-brief caches (incl. meta) and notifies", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({}) }, [h.STATIC_CACHE]: {}, "ury-brief-b": {}, keep: {} });
+	const d = deps(c, null);
+	await h.onMessage({ type: "LOGOUT" }, d);
+	assert.deepEqual([...c.stores.keys()], ["keep"]);
+	assert.deepEqual(d.sent, [{ type: "LOGOUT_DONE" }]);
+	assert.equal(await h.getUser({ caches: c }), "");
+});
+
+/* ---- shell ---- */
+
+test("shell: ok brief page is cached per user and returned", async () => {
+	const c = fakeCaches(metaFor(UA));
 	const page = withUrl(new Response("<html>"), ORIGIN + "/ury/brief/");
 	const res = await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => page));
 	assert.equal(res, page);
-	assert.ok(c.stores.get(N()).has("/ury/brief"));
+	assert.ok(c.stores.get(U(UA)).has("/ury/brief"));
 });
 
-test("shell: redirected responses are never cached", async () => {
+test("shell: not cached when user unknown, or response no-store/redirected", async () => {
 	const c = fakeCaches();
-	const r = withUrl(new Response("<html>"), ORIGIN + "/ury/brief/", true);
-	await h.shellFetch(req(ORIGIN + "/ury/brief"), deps(c, async () => r));
-	assert.equal(c.stores.get(N())?.has("/ury/brief") ?? false, false);
+	await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => withUrl(new Response("<html>"), ORIGIN + "/ury/brief/")));
+	assert.equal(allKeys(c).includes("/ury/brief"), false);
+	const c2 = fakeCaches(metaFor(UA));
+	await h.shellFetch(req(ORIGIN + "/ury/brief"), deps(c2, async () => withUrl(new Response("<html>"), ORIGIN + "/ury/brief/", true)));
+	await h.shellFetch(req(ORIGIN + "/ury/brief"), deps(c2, async () => withUrl(new Response("<html>", { headers: { "cache-control": "no-store" } }), ORIGIN + "/ury/brief/")));
+	assert.equal(allKeys(c2).includes("/ury/brief"), false);
 });
 
 test("shell: redirect to /login wipes caches and returns the response", async () => {
-	const c = fakeCaches({ [N()]: { "/ury/brief": new Response("A shell") } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("A shell") } });
 	const r = withUrl(new Response("login"), ORIGIN + "/login?redirect-to=/ury/brief/", true);
 	const res = await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => r));
 	assert.equal(res, r);
@@ -171,42 +280,66 @@ test("shell: redirect to /login wipes caches and returns the response", async ()
 });
 
 test("shell: 403 wipes caches", async () => {
-	const c = fakeCaches({ [N()]: { "/ury/brief": new Response("A shell") } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("A shell") } });
 	await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => withUrl(new Response("no", { status: 403 }), ORIGIN + "/ury/brief/")));
 	assert.equal(c.stores.size, 0);
 });
 
-test("shell: offline falls back to cached shell only on fetch throw", async () => {
-	const c = fakeCaches({ [N()]: { "/ury/brief": new Response("cached shell") } });
-	const res = await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => { throw new Error("offline"); }));
-	assert.equal(await res.text(), "cached shell");
+test("shell: offline serves current user's cached shell, else offline page", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("cached shell") }, [h.STATIC_CACHE]: { [h.OFFLINE_URL]: new Response("offline page") } });
+	const off = async () => { throw new Error("offline"); };
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, off))).text(), "cached shell");
+	await h.onMessage({ type: "LOGOUT" }, deps(c, null));
+	c.stores.set(h.STATIC_CACHE, new Map([[h.OFFLINE_URL, new Response("offline page")]]));
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, off))).text(), "offline page");
 });
 
 test("shell: online prefers network over cached shell", async () => {
-	const c = fakeCaches({ [N()]: { "/ury/brief": new Response("stale") } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("stale") } });
 	const res = await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, async () => withUrl(new Response("fresh"), ORIGIN + "/ury/brief/")));
 	assert.equal(await res.text(), "fresh");
 });
 
-test("LOGOUT wipe removes every ury-brief cache only", async () => {
-	const c = fakeCaches({ "ury-brief-a": {}, "ury-brief-b": {}, keep: {} });
-	await h.wipeAll({ caches: c });
-	assert.deepEqual([...c.stores.keys()], ["keep"]);
+/* ---- static assets / install / activate ---- */
+
+test("asset: network-first into static cache, cache on failure, audio never stored", async () => {
+	const c = fakeCaches();
+	const js = ORIGIN + "/assets/ury/brief/dist/index-abc.js";
+	await h.assetFetch(req(js), deps(c, async () => new Response("code", { headers: { "content-type": "text/javascript" } })));
+	assert.equal(await (await h.assetFetch(req(js), deps(c, async () => { throw new Error("x"); }))).text(), "code");
+	const mp3 = ORIGIN + "/assets/ury/brief/dist/beep.mp3";
+	await h.assetFetch(req(mp3), deps(c, async () => new Response("a", { headers: { "content-type": "audio/mpeg" } })));
+	assert.ok(!c.stores.get(h.STATIC_CACHE).has("/assets/ury/brief/dist/beep.mp3"));
 });
 
-test("activate deletes stale ury-brief caches but keeps current", async () => {
-	const c = fakeCaches({ [N()]: {}, "ury-brief-old": {}, other: {} });
-	await h.activate({ caches: c });
-	assert.deepEqual([...c.stores.keys()].sort(), [N(), "other"].sort());
+test("distUrls reads vite manifest, rejects traversal/absolute/audio", () => {
+	const urls = h.distUrls({
+		"index.html": { file: "assets/index-1.js", css: ["assets/index-1.css"], assets: ["assets/logo.svg", "assets/ding.mp3"] },
+		x: { file: "../../../private/files/x" }, y: { file: "https://evil.test/a.js" }, z: { file: "/files/a.js" }
+	});
+	assert.deepEqual(urls, [
+		"/assets/ury/brief/dist/assets/index-1.js",
+		"/assets/ury/brief/dist/assets/index-1.css",
+		"/assets/ury/brief/dist/assets/logo.svg"
+	]);
 });
 
-test("install fails when offline page is missing, tolerates missing icons", async () => {
+test("install: offline page required, icons and dist best-effort", async () => {
 	const mk = (failOn) => {
 		const c = fakeCaches();
 		const open = c.open.bind(c);
-		c.open = async (n) => { const x = await open(n); x.add = async (u) => { if (u.includes(failOn)) throw new Error("404"); }; return x; };
+		c.open = async (n) => { const x = await open(n); const add = x.add; x.add = async (u) => { if (u.includes(failOn)) throw new Error("404"); return add(u); }; return x; };
 		return c;
 	};
-	await assert.rejects(h.install({ caches: mk("offline.html") }));
-	await h.install({ caches: mk("icon-192.png") });
+	await assert.rejects(h.install({ caches: mk("offline.html"), fetch: async () => jsonRes({}) }));
+	const c = mk("icon-192.png");
+	await h.install({ caches: c, fetch: async () => jsonRes({ "index.html": { file: "assets/i.js" } }) });
+	assert.ok(c.stores.get(h.STATIC_CACHE).has("/assets/ury/brief/dist/assets/i.js"));
+	await h.install({ caches: mk("nothing"), fetch: async () => { throw new Error("no manifest"); } });
+});
+
+test("activate deletes stale ury-brief caches, keeps static, meta and current user's cache", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: {}, [U(UB)]: {}, [h.STATIC_CACHE]: {}, "ury-brief-old-u-x": {}, other: {} });
+	await h.activate({ caches: c });
+	assert.deepEqual([...c.stores.keys()].sort(), [h.META_CACHE, U(UA), h.STATIC_CACHE, "other"].sort());
 });
