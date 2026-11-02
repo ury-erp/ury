@@ -266,6 +266,7 @@ def _compact_slide(slide, keys=()):
 # ---------------------------------------------------------------- tools (reuse builders)
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_day_summary(date=None):
 	"""Net sales and order count for one day, compared with the same weekday a week earlier.
@@ -279,6 +280,7 @@ def get_day_summary(date=None):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_month_to_date(date=None):
 	"""Net sales from the 1st of the month up to the date, against the same number of days last
@@ -290,6 +292,7 @@ def get_month_to_date(date=None):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_branch_ranking(date=None):
 	"""Branches ranked by net sales for the day, with month-to-date for each. Only branches the
@@ -309,6 +312,7 @@ def get_branch_ranking(date=None):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_leakage_week(date=None):
 	"""Cancellations (count, value, top reason) and discounts for the 7 days ending on the date."""
@@ -319,6 +323,7 @@ def get_leakage_week(date=None):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_cashup_week(date=None):
 	"""Cash-up (till closing) results for the 7 days ending on the date: how many closings were
@@ -334,6 +339,7 @@ def get_cashup_week(date=None):
 # ---------------------------------------------------------------- tools (small new reads)
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_sales_range(start_date, end_date):
 	"""Net sales and order count for a date range (max 366 days), with a per-day list and the
@@ -369,6 +375,7 @@ def get_sales_range(start_date, end_date):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_top_bottom_dishes(start_date, end_date, limit=DEFAULT_LIMIT):
 	"""Best and worst selling dishes (by net sales) for a date range, with quantity sold.
@@ -406,6 +413,7 @@ def get_top_bottom_dishes(start_date, end_date, limit=DEFAULT_LIMIT):
 	}
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_order_type_and_payment_mix(start_date, end_date):
 	"""How sales split by order type (dine in, takeaway, delivery...) as net sales, and by
@@ -443,6 +451,7 @@ def get_order_type_and_payment_mix(start_date, end_date):
 	}
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_cancellations(start_date, end_date):
 	"""Cancelled invoices for a date range: count, value, and a split by the reason given."""
@@ -475,6 +484,7 @@ def get_cancellations(start_date, end_date):
 	}
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_kitchen_speed(start_date, end_date):
 	"""How fast the kitchen is for a date range: average and median minutes from the order
@@ -498,6 +508,7 @@ def get_kitchen_speed(start_date, end_date):
 	return out
 
 
+@frappe.whitelist(methods=["POST"])
 @guarded
 def get_ideas_context(start_date, end_date):
 	"""Facts only, no advice, for brainstorming ideas to grow sales or cut waste over a date

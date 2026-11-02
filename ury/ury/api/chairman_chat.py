@@ -485,7 +485,32 @@ def history(conversation, limit=HISTORY_DEFAULT_LIMIT):
 	from huf.ai.agent.chat import get_history
 
 	frappe.local.response_headers["Cache-Control"] = "no-store"
-	return get_history(conversation_id=conversation, limit=coerce_history_limit(limit))
+	msgs = get_history(conversation_id=conversation, limit=coerce_history_limit(limit))
+	return attach_message_ids(conversation, msgs)
+
+
+def attach_message_ids(conversation, msgs):
+	"""Huf's history rows carry no Agent Message name; the app needs it for speak(). Match by
+	role and creation timestamp (newest-aligned) and add `id`; leave rows unmatched if unsure."""
+	if not isinstance(msgs, list):
+		return msgs
+	rows = frappe.get_all(
+		"Agent Message",
+		filters={"conversation": conversation},
+		fields=["name", "role", "creation"],
+		order_by="creation asc",
+	)
+	by_key = {}
+	for r in rows:
+		by_key.setdefault((str(r.creation)[:19], r.role), []).append(r.name)
+	for m in msgs:
+		if not isinstance(m, dict) or m.get("id") or m.get("name"):
+			continue
+		role = "agent" if m.get("role") in ("agent", "assistant") else m.get("role")
+		hit = by_key.get((str(m.get("creation"))[:19], role)) or by_key.get((str(m.get("creation"))[:19], m.get("role")))
+		if hit:
+			m["id"] = hit.pop(0)
+	return msgs
 
 
 def _uploaded_audio():
