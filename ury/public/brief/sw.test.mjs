@@ -14,6 +14,8 @@ const API = ORIGIN + "/api/method/ury.ury.api.chairman.get_brief";
 const KEY = "/api/method/ury.ury.api.chairman.get_brief";
 const UA = "userAAAA";
 const UB = "userBBBB";
+const SESSION_A = "a%40x.test";
+const stamped = (body) => h.stamp(new Response(body), "a@x.test", Date.now());
 function k(key) { return typeof key === "string" ? key : new URL(key.url).pathname + new URL(key.url).search; }
 function fakeCaches(initial = {}) {
 	const stores = new Map(Object.entries(initial).map(([n, e]) => [n, new Map(Object.entries(e))]));
@@ -44,7 +46,7 @@ function withUrl(res, url, redirected = false) {
 }
 function deps(c, fetchImpl, extra = {}) {
 	const sent = [];
-	return { caches: c, fetch: fetchImpl, notify: (m) => sent.push(m), timeoutMs: 30, sent, ...extra };
+	return { caches: c, fetch: fetchImpl, notify: (m) => sent.push(m), timeoutMs: 30, sent, cookieUser: async () => SESSION_A, ...extra };
 }
 const req = (u, user, init = {}) => ({ url: u, method: "GET", headers: new Headers(user ? { "X-Brief-User": user } : {}), ...init });
 const U = (user) => h.userCacheName(user);
@@ -154,7 +156,7 @@ test("brief: unknown user is never stored and never served from cache", async ()
 });
 
 test("brief: slow network past timeout falls back to cache", async () => {
-	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: jsonRes({ message: { v: "old" } }) } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { [KEY]: h.stamp(jsonRes({ message: { v: "old" } }), "a@x.test", Date.now()) } });
 	const d = deps(c, () => new Promise((r) => setTimeout(() => r(jsonRes({ message: { v: "new" } })), 300)));
 	const res = await h.briefFetch(req(API), d);
 	assert.equal(res.headers.get("X-Brief-Source"), "cache");
@@ -348,7 +350,7 @@ test("shell: 403 wipes caches", async () => {
 });
 
 test("shell: offline serves current user's cached shell, else offline page", async () => {
-	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("cached shell") }, [h.STATIC_CACHE]: { [h.OFFLINE_URL]: new Response("offline page") } });
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": stamped("cached shell") }, [h.STATIC_CACHE]: { [h.OFFLINE_URL]: new Response("offline page") } });
 	const off = async () => { throw new Error("offline"); };
 	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), deps(c, off))).text(), "cached shell");
 	await h.onMessage({ type: "LOGOUT" }, deps(c, null));
@@ -404,4 +406,85 @@ test("activate deletes stale ury-brief caches, keeps static, meta and current us
 	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: {}, [U(UB)]: {}, [h.STATIC_CACHE]: {}, "ury-brief-old-u-x": {}, other: {} });
 	await h.activate({ caches: c });
 	assert.deepEqual([...c.stores.keys()].sort(), [h.META_CACHE, U(UA), h.STATIC_CACHE, "other"].sort());
+});
+
+/* ---- M1: offline data requires proof of the same session user, and is max 24h old ---- */
+
+const SIGN_IN = "Sign in to see your brief";
+async function primeA(c, now) {
+	const d = deps(c, null, { now: () => now });
+	d.fetch = async () => jsonRes({ v: "A" }, 200, { "cache-control": "no-store" });
+	await h.briefFetch(req(API, UA), d);
+	d.fetch = async () => withUrl(new Response("A shell"), ORIGIN + "/ury/brief/");
+	await h.shellFetch(req(ORIGIN + "/ury/brief/"), d);
+}
+const offlineDeps = (c, extra) => deps(c, async () => { throw new Error("offline"); }, extra);
+const seed = () => fakeCaches({ [h.STATIC_CACHE]: { [h.OFFLINE_URL]: new Response("offline page") } });
+
+test("M1: same session user reopening offline gets cached shell and brief", async () => {
+	const c = seed(); const t0 = 1_000_000;
+	await primeA(c, t0);
+	const d = offlineDeps(c, { now: () => t0 + 60_000 });
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), d)).text(), "A shell");
+	const b = await h.briefFetch(req(API, UA), d);
+	assert.equal(b.headers.get("X-Brief-Source"), "cache");
+	assert.deepEqual(await b.json(), { v: "A" });
+	/* no SET_USER/header yet on reopen: still served (stored-user + matching cookie) */
+	assert.equal((await h.briefFetch(req(API), d)).headers.get("X-Brief-Source"), "cache");
+});
+
+test("M1: logged out elsewhere (Guest/no cookie) or different session user is blocked offline", async () => {
+	for (const cookie of ["Guest", "", null, "b%40x.test", async () => { throw new Error("no cookieStore"); }]) {
+		const c = seed(); const t0 = 1_000_000;
+		await primeA(c, t0);
+		const cu = typeof cookie === "function" ? cookie : async () => cookie;
+		const d = offlineDeps(c, { now: () => t0 + 60_000, cookieUser: cu });
+		const shell = await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), d)).text();
+		assert.ok(shell.includes(SIGN_IN), "shell blocked for cookie " + cookie);
+		assert.ok(!shell.includes("A shell"));
+		const b = await h.briefFetch(req(API, UA), d);
+		assert.equal(b.status, 503);
+		assert.deepEqual(await b.json(), { offline: true });
+	}
+});
+
+test("M1: no cookieStore support at all (deps without cookieUser) never serves cached data", async () => {
+	const c = seed(); await primeA(c, 1_000_000);
+	const d = offlineDeps(c, { now: () => 1_000_001, cookieUser: undefined });
+	assert.ok((await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), d)).text()).includes(SIGN_IN));
+	assert.equal((await h.briefFetch(req(API, UA), d)).status, 503);
+});
+
+test("M1: cache older than 24h is not served offline; exactly 24h still is", async () => {
+	const c = seed(); const t0 = 1_000_000;
+	await primeA(c, t0);
+	const ok = offlineDeps(c, { now: () => t0 + h.MAX_AGE_MS });
+	assert.equal(await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), ok)).text(), "A shell");
+	const old = offlineDeps(c, { now: () => t0 + h.MAX_AGE_MS + 1 });
+	assert.ok((await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), old)).text()).includes(SIGN_IN));
+	assert.equal((await h.briefFetch(req(API, UA), old)).status, 503);
+	/* clock moved backwards also fails closed */
+	assert.equal((await h.briefFetch(req(API, UA), offlineDeps(c, { now: () => t0 - 1 }))).status, 503);
+});
+
+test("M1: unstamped legacy entries are never served offline", async () => {
+	const c = fakeCaches({ ...metaFor(UA), [U(UA)]: { "/ury/brief": new Response("legacy"), [KEY]: jsonRes({ v: 1 }) } });
+	const d = offlineDeps(c);
+	assert.ok((await (await h.shellFetch(req(ORIGIN + "/ury/brief/"), d)).text()).includes(SIGN_IN));
+	assert.equal((await h.briefFetch(req(API, UA), d)).status, 503);
+});
+
+test("M1: online fallback (timeout) also requires proof", async () => {
+	const c = seed(); const t0 = 1_000_000;
+	await primeA(c, t0);
+	const slow = () => new Promise((r) => setTimeout(() => r(jsonRes({ v: "new" })), 300));
+	const res = await h.briefFetch(req(API, UA), deps(c, slow, { now: () => t0 + 1, cookieUser: async () => "Guest" }));
+	assert.equal(res.status, 503);
+});
+
+test("normalizeCookieUser: decodes, Guest and junk become empty", () => {
+	assert.equal(h.normalizeCookieUser("a%40x.test"), "a@x.test");
+	assert.equal(h.normalizeCookieUser("Guest"), "");
+	assert.equal(h.normalizeCookieUser(undefined), "");
+	assert.equal(h.normalizeCookieUser("%E0%A4%A"), "");
 });

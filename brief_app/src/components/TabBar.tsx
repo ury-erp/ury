@@ -1,8 +1,9 @@
 export type Tab = "brief" | "ask" | "call";
 
-export default function TabBar({ tab, onTab, huf }: { tab: Tab; onTab: (t: Tab) => void; huf: boolean }) {
+export default function TabBar({ tab, onTab, huf, voice }: { tab: Tab; onTab: (t: Tab) => void; huf: boolean; voice?: boolean }) {
   const tabs: { id: Tab; label: string }[] = [{ id: "brief", label: "Brief" }];
-  if (huf) tabs.push({ id: "ask", label: "Ask" }, { id: "call", label: "Call" });
+  if (huf) tabs.push({ id: "ask", label: "Ask" });
+  if (huf && voice) tabs.push({ id: "call", label: "Call" });
   return (
     <nav className="tabs" aria-label="Sections">
       {tabs.map((t) => (

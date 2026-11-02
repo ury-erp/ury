@@ -14,6 +14,12 @@
  *    audio/video and no-store responses are never stored, EXCEPT the shell document and
  *    the get_brief response, which ignore no-store (Frappe sends it on every response)
  *    but only when written into the per-user cache of a valid user key.
+ *  - Offline proof (review M1): every cached shell/brief entry is stamped with the Frappe
+ *    session user (user_id cookie, read via CookieStore) and the time it was stored. Offline,
+ *    a cached entry is served only if the current user_id cookie is present, not Guest, and
+ *    equals the stamp, and the entry is younger than MAX_AGE_MS (24h). A logout anywhere
+ *    (desk, another tab) resets user_id to Guest, so the previous user's data is never shown;
+ *    the shell then gets a "Sign in to see your brief" page instead.
  */
 (function () {
 	"use strict";
@@ -33,6 +39,15 @@
 	var OFFLINE_URL = "/assets/ury/brief/offline.html";
 	var KEEP = 7;
 	var TIMEOUT_MS = 6000;
+	var MAX_AGE_MS = 24 * 60 * 60 * 1000;
+	var STAMP_USER = "X-Brief-Session-User";
+	var STAMP_AT = "X-Brief-Cached-At";
+	var SIGN_IN_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+		'<meta name="viewport" content="width=device-width,initial-scale=1"><title>Chairman Brief</title>' +
+		'<style>body{font-family:system-ui,sans-serif;margin:0;padding:48px 16px;text-align:center;background:#fff;color:#111}' +
+		'@media (prefers-color-scheme:dark){body{background:#111;color:#eee}}</style></head><body>' +
+		'<h1>Sign in to see your brief</h1><p>You are offline and this device has no saved brief for the signed-in user. ' +
+		'Connect and sign in to load it.</p></body></html>';
 	var BRIEF_API = "/api/method/ury.ury.api.chairman.get_brief";
 	var NEVER_CACHE = ["chairman_chat", "huf.", "/files/", "/socket.io"];
 	var ICONS = [
@@ -129,6 +144,40 @@
 			promise.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
 		});
 	}
+	/** Frappe user_id cookie value -> session user, "" when absent or Guest. */
+	function normalizeCookieUser(v) {
+		if (typeof v !== "string" || !v) { return ""; }
+		try { v = decodeURIComponent(v); } catch (e) { return ""; }
+		return v === "Guest" ? "" : v;
+	}
+	/** Copy of `response` stamped with the session user and store time. */
+	function stamp(response, sessionUser, now) {
+		var hd = new Headers(response.headers);
+		hd.set(STAMP_USER, encodeURIComponent(sessionUser || ""));
+		hd.set(STAMP_AT, String(now));
+		return new Response(response.body, { status: response.status, statusText: response.statusText, headers: hd });
+	}
+	/** Cached entry may be served offline: stamped for this exact session user and not expired. */
+	function provenFresh(cached, sessionUser, now) {
+		if (!cached || !sessionUser) { return false; }
+		var su;
+		try { su = decodeURIComponent(cached.headers.get(STAMP_USER) || ""); } catch (e) { return false; }
+		var at = Number(cached.headers.get(STAMP_AT));
+		if (!su || su !== sessionUser || !isFinite(at)) { return false; }
+		var age = now - at;
+		return age >= 0 && age <= MAX_AGE_MS;
+	}
+	function nowOf(deps) { return deps.now ? deps.now() : Date.now(); }
+	function sessionUserOf(deps) {
+		if (!deps.cookieUser) { return Promise.resolve(""); }
+		return Promise.resolve().then(deps.cookieUser).then(normalizeCookieUser, function () { return ""; });
+	}
+	function signInPage() {
+		return new Response(SIGN_IN_HTML, {
+			status: 200,
+			headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Brief-Source": "sign-in" }
+		});
+	}
 	function headerUser(request) {
 		try { return sanitizeUser(request.headers && request.headers.get(USER_HEADER)); } catch (e) { return ""; }
 	}
@@ -180,8 +229,10 @@
 			return Promise.all(keysToTrim(briefs, KEEP).map(function (r) { return cache.delete(r); }));
 		});
 	}
-	function store(cache, key, response) {
-		return cache.delete(key).then(function () { return cache.put(key, response); }).then(function () { return trim(cache); });
+	function store(cache, key, response, deps) {
+		return sessionUserOf(deps).then(function (su) {
+			return cache.delete(key).then(function () { return cache.put(key, stamp(response, su, nowOf(deps))); });
+		}).then(function () { return trim(cache); });
 	}
 
 	function authLost(deps) {
@@ -202,7 +253,9 @@
 			}
 			return deps.caches.open(name).then(function (cache) {
 				function fallback() {
-					return cache.match(key).then(function (cached) { return cached ? decorate(cached, "cache") : offlineJson(); });
+					return Promise.all([cache.match(key), sessionUserOf(deps)]).then(function (x) {
+						return provenFresh(x[0], x[1], nowOf(deps)) ? decorate(x[0], "cache") : offlineJson();
+					});
 				}
 				return cache.match(key).then(function (cached) {
 					var net = deps.fetch(request);
@@ -212,7 +265,7 @@
 						}
 						/* name is a valid per-user cache here, request is get_brief: no-store ignored */
 						if (storable(res, isBriefApi(pathOf(request.url)))) {
-							return store(cache, key, res.clone()).then(function () { return decorate(res, "network"); });
+							return store(cache, key, res.clone(), deps).then(function () { return decorate(res, "network"); });
 						}
 						return cached ? fallback() : decorate(res, "network");
 					}, fallback);
@@ -235,14 +288,21 @@
 			return getUser(deps).then(function (user) {
 				var name = userCacheName(user);
 				if (!name) { return res; } /* no-store override applies only with a valid user key */
-				return deps.caches.open(name).then(function (cache) { return cache.put(SHELL_KEY, res.clone()); })
+				return Promise.all([deps.caches.open(name), sessionUserOf(deps)]).then(function (x) {
+					return x[0].put(SHELL_KEY, stamp(res.clone(), x[1], nowOf(deps)));
+				})
 					.then(function () { return res; }, function () { return res; });
 			});
 		}, function () {
 			return getUser(deps).then(function (user) {
 				var name = userCacheName(user);
 				if (!name) { return null; }
-				return deps.caches.open(name).then(function (cache) { return cache.match(SHELL_KEY); });
+				return Promise.all([deps.caches.open(name).then(function (cache) { return cache.match(SHELL_KEY); }), sessionUserOf(deps)])
+					.then(function (x) {
+						if (!x[0]) { return null; }
+						/* a cached shell exists but this session cannot prove it owns it */
+						return provenFresh(x[0], x[1], nowOf(deps)) ? x[0] : signInPage();
+					});
 			}).then(function (cached) { return cached || offlinePage(deps); });
 		});
 	}
@@ -335,7 +395,8 @@
 
 	var helpers = {
 		CACHE_PREFIX: CACHE_PREFIX, STATIC_CACHE: STATIC_CACHE, META_CACHE: META_CACHE, VERSION_PREFIX: VERSION_PREFIX,
-		KEEP: KEEP, TIMEOUT_MS: TIMEOUT_MS, USER_HEADER: USER_HEADER, OFFLINE_URL: OFFLINE_URL,
+		KEEP: KEEP, MAX_AGE_MS: MAX_AGE_MS, normalizeCookieUser: normalizeCookieUser, provenFresh: provenFresh, stamp: stamp,
+		TIMEOUT_MS: TIMEOUT_MS, USER_HEADER: USER_HEADER, OFFLINE_URL: OFFLINE_URL,
 		cacheKey: cacheKey, isBriefApi: isBriefApi, isShellNavigation: isShellNavigation, isSwScript: isSwScript,
 		isNeverCache: isNeverCache, sanitizeUser: sanitizeUser, userCacheName: userCacheName, keysToTrim: keysToTrim,
 		staleCacheNames: staleCacheNames, briefCacheNames: briefCacheNames, decorateHeaders: decorateHeaders,
@@ -360,6 +421,10 @@
 			caches: caches,
 			fetch: function (r) { return fetch(r); },
 			timeoutMs: TIMEOUT_MS,
+			cookieUser: function () {
+				if (!self.cookieStore || typeof self.cookieStore.get !== "function") { return ""; }
+				return self.cookieStore.get("user_id").then(function (c) { return c ? c.value : ""; }, function () { return ""; });
+			},
 			notify: function (m) { event.waitUntil(notifyClients(m)); }
 		};
 	}

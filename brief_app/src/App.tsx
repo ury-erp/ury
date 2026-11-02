@@ -59,7 +59,8 @@ export default function App() {
   const auth = authLost || res?.kind === "auth";
   const brief = res?.kind === "ok" && !auth ? res.brief : null;
   const huf = !!brief?.features?.huf;
-  const active: Tab = huf ? tab : "brief";
+  const voice = huf && !!brief?.features?.voice_call;
+  const active: Tab = !huf || (tab === "call" && !voice) ? "brief" : tab;
 
   let body;
   if (auth) {
@@ -93,7 +94,7 @@ export default function App() {
       {res?.kind === "ok" && res.fromCache && <p className="banner" role="status">Showing {timeOf(res.brief.as_of)} brief, offline</p>}
       {res?.kind === "offline" && <p className="banner" role="status">Offline</p>}
       {body}
-      <TabBar tab={active} onTab={setTab} huf={huf} />
+      <TabBar tab={active} onTab={setTab} huf={huf} voice={voice} />
       {sheet && <InstallSheet platform={detectPlatform()} canPrompt={canPrompt} onPrompt={prompt} onClose={() => setSheet(false)} />}
     </div>
   );

@@ -15,7 +15,7 @@
 *{box-sizing:border-box}
 html{font-size:20px}
 html,body,#root{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.4;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari","Noto Sans Arabic","Noto Sans Malayalam","Kohinoor Devanagari","Geeza Pro","Malayalam Sangam MN",sans-serif;line-height:1.4;-webkit-text-size-adjust:100%}
 a{color:var(--accent)}
 button{font:inherit}
 .app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -80,3 +80,4 @@ button{font:inherit}
 .bar-amt{font-weight:700}
 .bar-track{grid-column:1/-1;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .bar-fill{display:block;height:100%;background:var(--c1);border-radius:4px}
+.slide-no{margin:0;font-size:.7rem;color:var(--muted)}

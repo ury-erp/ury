@@ -40,12 +40,42 @@
 #   No frappe.set_user impersonation is used anywhere.
 # ======================================================================
 #
+# AGENT POLICY (review H1/H2): _require_agent() refuses, fail closed with
+# PermissionError, unless the configured Huf Agent
+#   * has only "Custom Function" tools whose function_path is
+#     "ury.ury.api.chairman_tools.<name>" for a name in chairman_tools.TOOLS
+#     (no Get/Create/Update/Delete Document, SQL/report, GET/POST HTTP, Run Agent,
+#     Code Execution, memory, client-side tools ...);
+#   * has no MCP servers, skills, SSH connections, and code execution, SSH,
+#     remote desktop, local desktop MCP, lazy tools and memory tools are off;
+#   * has max_turns between 1 and MAX_AGENT_TURNS (Huf reads Agent.max_turns as
+#     its tool-iteration cap; run_agent_sync has no per-call cap, and 0 means
+#     Huf's default of 20);
+#   * is closed to non-chairmen on Huf's own endpoints: allow_guest and
+#     allow_all_users off, allowed_users empty, allowed_roles non-empty and a
+#     subset of ALLOWED_ROLES. Huf's check_agent_access (huf/ai/agent/access.py)
+#     ALSO always admits the agent owner, System Manager and holders of the
+#     agent.view_all / agent.edit capabilities; that cannot be closed from ury,
+#     so those users can run the agent via Huf's native chat. They are trusted
+#     admins and the tools themselves still require URY Chairman (guarded).
+#
+# LIMITS (review M3): per-user cache counters: RATE_LIMIT_MESSAGES text
+# messages/min (send, start-with-message) and RATE_LIMIT_AUDIO audio calls/min
+# (send_audio, speak); messages capped at MAX_MESSAGE_CHARS and a conversation
+# at MAX_CONVERSATION_MESSAGES Agent Messages.
+# DEPLOYMENT: runs are inline in a gunicorn web worker (LLM loop + STT/TTS).
+# Set gunicorn --timeout to at least 180 s (bench: http_timeout in
+# common_site_config / `bench config http_timeout 180`, then `bench setup
+# supervisor`) and size --workers so a few concurrent chairmen cannot starve
+# the POS (e.g. workers >= 2 x expected concurrent chairmen + POS load).
+#
 # Huf is a SOFT dependency: it is imported lazily; without it (or without a
 # configured agent) start() returns {"enabled": False}.
 
 import asyncio
 import base64
 import binascii
+import time
 import uuid
 
 import frappe
@@ -79,6 +109,28 @@ AUDIO_MIME_EXT = {
 	"audio/flac": "flac",
 }
 FORBIDDEN_TOOL_USERS = {"Administrator", "Guest"}
+
+MAX_MESSAGE_CHARS = 4000
+MAX_CONVERSATION_MESSAGES = 200
+MAX_AGENT_TURNS = 8
+RATE_LIMIT_MESSAGES = 20  # per user per minute
+RATE_LIMIT_AUDIO = 6  # per user per minute
+RATE_WINDOW_SECONDS = 60
+HISTORY_DEFAULT_LIMIT = 100
+HISTORY_MAX_LIMIT = 100
+
+TOOLS_MODULE = "ury.ury.api.chairman_tools"
+ALLOWED_TOOL_TYPES = {"Custom Function"}
+# Agent checkbox fields that grant capabilities beyond our read-only tools.
+FORBIDDEN_AGENT_FLAGS = (
+	"allow_code_execution",
+	"allow_ssh",
+	"allow_remote_desktop",
+	"enable_lazy_tools",
+	"enable_memory_search_tool",
+	"enable_memory_write_tool",
+)
+FORBIDDEN_AGENT_TABLES = ("agent_mcp_server", "agent_skill", "ssh_connections", "allowed_users")
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -138,6 +190,133 @@ def with_language_hint(message, language):
 	return f"{message}\n\n[Language: {name}. Reply in {name}.]"
 
 
+def coerce_history_limit(limit):
+	"""Non-numeric/None -> default; clamp to 1..HISTORY_MAX_LIMIT. Never raises."""
+	try:
+		n = int(str(limit).strip())
+	except (TypeError, ValueError):
+		return HISTORY_DEFAULT_LIMIT
+	return max(1, min(n, HISTORY_MAX_LIMIT))
+
+
+def validate_message(message):
+	"""Return the stripped message; raise ValidationError if empty or too long."""
+	text = str(message or "").strip()
+	if not text:
+		frappe.throw(_("message is required"), frappe.ValidationError)
+	if len(text) > MAX_MESSAGE_CHARS:
+		frappe.throw(
+			_("Message is too long (max {0} characters)").format(MAX_MESSAGE_CHARS), frappe.ValidationError
+		)
+	return text
+
+
+def allowed_tool_paths():
+	"""function_paths the chairman agent may carry (lazy import of chairman_tools)."""
+	try:
+		from ury.ury.api.chairman_tools import TOOLS
+	except ImportError:  # pure unit run from this directory
+		from chairman_tools import TOOLS
+	return {f"{TOOLS_MODULE}.{t['name']}" for t in TOOLS}
+
+
+def _get(obj, key, default=None):
+	if isinstance(obj, dict):
+		return obj.get(key, default)
+	return getattr(obj, key, default)
+
+
+def agent_policy_violations(agent_doc, tool_functions, allowed_paths, allowed_roles=ALLOWED_ROLES):
+	"""Pure check. agent_doc: Agent (doc or dict); tool_functions: one dict per
+	agent_tool row with keys name, types, function_path (None if the linked Agent
+	Tool Function is missing). Returns a list of violation strings (empty = ok)."""
+	v = []
+	rows = _get(agent_doc, "agent_tool") or []
+	if not rows:
+		v.append("agent has no tools")
+	if len(tool_functions) != len(rows):
+		v.append("agent tool rows could not all be resolved")
+	for tf in tool_functions:
+		if not tf:
+			v.append("agent tool links a missing Agent Tool Function")
+			continue
+		label = tf.get("name") or "?"
+		if tf.get("types") not in ALLOWED_TOOL_TYPES:
+			v.append(f"tool {label} has forbidden type {tf.get('types')!r}")
+		if (tf.get("function_path") or "").strip() not in allowed_paths:
+			v.append(f"tool {label} function_path {tf.get('function_path')!r} is not a chairman tool")
+	for f in FORBIDDEN_AGENT_FLAGS:
+		if _get(agent_doc, f):
+			v.append(f"agent has {f} enabled")
+	if (_get(agent_doc, "desktop_access_local_mcp") or "off") != "off":
+		v.append("agent has desktop_access_local_mcp enabled")
+	for t in FORBIDDEN_AGENT_TABLES:
+		if _get(agent_doc, t):
+			v.append(f"agent has rows in {t}")
+	turns = _get(agent_doc, "max_turns") or 0
+	if not (1 <= int(turns) <= MAX_AGENT_TURNS):
+		v.append(f"agent max_turns must be 1..{MAX_AGENT_TURNS} (is {turns})")
+	if _get(agent_doc, "allow_guest"):
+		v.append("agent allows Guest")
+	if _get(agent_doc, "allow_all_users"):
+		v.append("agent allows all users")
+	roles = {_get(r, "role") for r in (_get(agent_doc, "allowed_roles") or [])}
+	if not roles:
+		v.append("agent allowed_roles must list URY Chairman")
+	elif not roles <= set(allowed_roles):
+		v.append(f"agent allowed_roles include non-chairman roles {sorted(roles - set(allowed_roles))}")
+	return v
+
+
+def _tool_functions(agent_doc):
+	out = []
+	for row in agent_doc.get("agent_tool") or []:
+		tf = (
+			frappe.db.get_value(
+				"Agent Tool Function", row.tool, ["name", "types", "function_path"], as_dict=True
+			)
+			if row.tool
+			else None
+		)
+		out.append(dict(tf) if tf else None)
+	return out
+
+
+def assert_agent_policy(agent_doc):
+	violations = agent_policy_violations(agent_doc, _tool_functions(agent_doc), allowed_tool_paths())
+	if violations:
+		frappe.log_error(
+			"\n".join(violations), f"URY chairman chat: agent {agent_doc.name} refused by policy"
+		)
+		frappe.throw(
+			_("Chairman chat agent is not safely configured; refused. Ask an administrator to check the error log."),
+			frappe.PermissionError,
+		)
+
+
+def rate_check(bucket, limit, user=None):
+	"""Per-user fixed-window counter in redis; raise TooManyRequestsError over limit."""
+	user = user or frappe.session.user
+	window = int(time.time() // RATE_WINDOW_SECONDS)
+	cache = frappe.cache
+	key = cache.make_key(f"ury_chairman_rl:{bucket}:{user}:{window}")
+	n = cache.incr(key)
+	if n == 1:
+		cache.expire(key, RATE_WINDOW_SECONDS + 5)
+	if n > limit:
+		frappe.throw(
+			_("Too many requests. Please wait a minute and try again."),
+			getattr(frappe, "TooManyRequestsError", frappe.ValidationError),
+		)
+
+
+def _assert_conversation_room(conversation):
+	if frappe.db.count("Agent Message", {"conversation": conversation}) >= MAX_CONVERSATION_MESSAGES:
+		frappe.throw(
+			_("This conversation is full. Please start a new one."), frappe.ValidationError
+		)
+
+
 # ---------------------------------------------------------------- huf seams
 
 
@@ -179,7 +358,9 @@ def _require_agent():
 		frappe.throw(_("Chairman chat is not enabled"), frappe.ValidationError)
 	from huf.ai.agent.access import assert_agent_access
 
-	assert_agent_access(frappe.get_doc("Agent", agent), user=frappe.session.user)
+	agent_doc = frappe.get_doc("Agent", agent)
+	assert_agent_policy(agent_doc)
+	assert_agent_access(agent_doc, user=frappe.session.user)
 	return agent
 
 
@@ -214,15 +395,20 @@ def _run_inline(agent, conversation, prompt):
 	"""Run the agent inline as the session user (see RUN-AS FINDING). Fail closed if queued."""
 	from huf.ai.agent.integration import run_agent_sync
 
-	result = run_agent_sync(
-		agent_name=agent,
-		prompt=prompt,
-		provider=frappe.db.get_value("Agent", agent, "provider"),
-		model=frappe.db.get_value("Agent", agent, "model"),
-		channel_id="Chat",
-		conversation_id=conversation,
-		now=1,
-	)
+	# chairman_tools.guarded calls assert_chairman_tool_context(flags.chairman_conversation_id)
+	frappe.flags.chairman_conversation_id = conversation
+	try:
+		result = run_agent_sync(
+			agent_name=agent,
+			prompt=prompt,
+			provider=frappe.db.get_value("Agent", agent, "provider"),
+			model=frappe.db.get_value("Agent", agent, "model"),
+			channel_id="Chat",
+			conversation_id=conversation,
+			now=1,
+		)
+	finally:
+		frappe.flags.chairman_conversation_id = None
 	if isinstance(result, dict) and (result.get("queued") or result.get("status") == "Queued"):
 		if result.get("agent_run_id"):
 			_fail_run(result["agent_run_id"], "URY chairman chat refuses queued execution")
@@ -271,6 +457,8 @@ def start(message=None, language=None):
 	conversation = _new_conversation(agent)
 	out = {"enabled": True, "conversation_id": conversation, "run": None}
 	if message and str(message).strip():
+		message = validate_message(message)
+		rate_check("msg", RATE_LIMIT_MESSAGES)
 		out["run"] = _run_inline(agent, conversation, with_language_hint(message, language))
 	return out
 
@@ -278,10 +466,11 @@ def start(message=None, language=None):
 @frappe.whitelist(methods=["POST"])
 def send(conversation, message, language=None):
 	_check_role()
+	message = validate_message(message)
+	rate_check("msg", RATE_LIMIT_MESSAGES)
 	agent = _require_agent()
 	_own_conversation(conversation, agent)
-	if not message or not str(message).strip():
-		frappe.throw(_("message is required"), frappe.ValidationError)
+	_assert_conversation_room(conversation)
 	return {
 		"conversation_id": conversation,
 		"run": _run_inline(agent, conversation, with_language_hint(message, language)),
@@ -289,14 +478,14 @@ def send(conversation, message, language=None):
 
 
 @frappe.whitelist(methods=["GET", "POST"])
-def history(conversation, limit=200):
+def history(conversation, limit=HISTORY_DEFAULT_LIMIT):
 	_check_role()
 	agent = _require_agent()
 	_own_conversation(conversation, agent)
 	from huf.ai.agent.chat import get_history
 
 	frappe.local.response_headers["Cache-Control"] = "no-store"
-	return get_history(conversation_id=conversation, limit=min(int(limit or 200), 500))
+	return get_history(conversation_id=conversation, limit=coerce_history_limit(limit))
 
 
 def _uploaded_audio():
@@ -312,9 +501,11 @@ def _uploaded_audio():
 @frappe.whitelist(methods=["POST"])
 def send_audio(conversation=None, b64data=None, mime=None, language=None):
 	_check_role()
+	rate_check("audio", RATE_LIMIT_AUDIO)
 	agent = _require_agent()
 	if conversation:
 		_own_conversation(conversation, agent)
+		_assert_conversation_room(conversation)
 
 	content, upload_mime = _uploaded_audio()
 	if content is None:
@@ -362,6 +553,7 @@ def send_audio(conversation=None, b64data=None, mime=None, language=None):
 @frappe.whitelist(methods=["POST"])
 def speak(message_id):
 	_check_role()
+	rate_check("audio", RATE_LIMIT_AUDIO)
 	agent = _require_agent()
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	msg = frappe.db.get_value(
@@ -380,25 +572,38 @@ def speak(message_id):
 	# Message). We re-store it under our purge prefix and delete Huf's copy so
 	# retention applies (Huf names it generated_audio_*, which our purge ignores).
 	res = asyncio.run(handle_generate_audio(input=text, agent_name=agent, conversation_id=None))
-	if not res or not res.get("success"):
-		return {"success": False, "error": (res or {}).get("error") or "Speech generation failed"}
-	audio = res.get("audio") or {}
-	fmt = (audio.get("format") or "mp3").lower()
-	huf_file = frappe.get_doc("File", audio["file_id"])
-	content = huf_file.get_content()
-	ours = frappe.get_doc(
-		{
-			"doctype": "File",
-			"file_name": voice_file_name(fmt),
-			"is_private": 1,
-			"content": content,
-			"attached_to_doctype": "Agent Conversation",
-			"attached_to_name": msg.conversation,
+	huf_file_id = ((res or {}).get("audio") or {}).get("file_id") if isinstance(res, dict) else None
+	try:
+		if not res or not res.get("success"):
+			return {"success": False, "error": (res or {}).get("error") or "Speech generation failed"}
+		audio = res.get("audio") or {}
+		fmt = (audio.get("format") or "mp3").lower()
+		content = frappe.get_doc("File", audio["file_id"]).get_content()
+		ours = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": voice_file_name(fmt),
+				"is_private": 1,
+				"content": content,
+				"attached_to_doctype": "Agent Conversation",
+				"attached_to_name": msg.conversation,
+			}
+		).insert(ignore_permissions=True)
+		return {
+			"success": True,
+			"audio_url": ours.file_url,
+			"mime": f"audio/{'mpeg' if fmt == 'mp3' else fmt}",
 		}
-	).insert(ignore_permissions=True)
-	frappe.delete_doc("File", huf_file.name, ignore_permissions=True, force=True)
-	return {
-		"success": True,
-		"audio_url": ours.file_url,
-		"mime": f"audio/{'mpeg' if fmt == 'mp3' else fmt}",
-	}
+	finally:
+		_delete_huf_file(huf_file_id)
+
+
+def _delete_huf_file(file_id):
+	"""Always remove Huf's generated_audio_* copy (review M2); never mask the real error."""
+	if not file_id:
+		return
+	try:
+		if frappe.db.exists("File", file_id):
+			frappe.delete_doc("File", file_id, ignore_permissions=True, force=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "URY chairman chat: could not delete Huf TTS file")

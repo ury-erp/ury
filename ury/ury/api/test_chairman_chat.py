@@ -107,6 +107,232 @@ class PureTests(unittest.TestCase):
 		self.assertNotIn("English", cc.with_language_hint("x", "hi"))
 
 
+def _fake_frappe(**over):
+	"""MagicMock frappe for cc with real throw/exception classes."""
+	f = mock.MagicMock()
+	f.ValidationError = frappe.ValidationError
+	f.PermissionError = frappe.PermissionError
+	f.TooManyRequestsError = type("TooManyRequestsError", (Exception,), {})
+
+	def _throw(msg, exc=Exception):
+		raise exc(msg)
+
+	f.throw = _throw
+	f.session.user = "chair@example.com"
+	f.flags = SimpleNamespace(chairman_conversation_id=None)
+	for k, v in over.items():
+		setattr(f, k, v)
+	return f
+
+
+PATHS = {"ury.ury.api.chairman_tools.get_day_summary", "ury.ury.api.chairman_tools.get_sales_range"}
+
+
+def _good_agent(**over):
+	a = {
+		"name": "URY Chairman Assistant",
+		"agent_tool": [SimpleNamespace(tool="T1"), SimpleNamespace(tool="T2")],
+		"max_turns": 6,
+		"allow_guest": 0,
+		"allow_all_users": 0,
+		"allowed_users": [],
+		"allowed_roles": [SimpleNamespace(role="URY Chairman")],
+		"agent_mcp_server": [],
+		"agent_skill": [],
+		"ssh_connections": [],
+		"desktop_access_local_mcp": "off",
+	}
+	a.update(over)
+	return a
+
+
+def _good_tools():
+	return [
+		{"name": "T1", "types": "Custom Function", "function_path": "ury.ury.api.chairman_tools.get_day_summary"},
+		{"name": "T2", "types": "Custom Function", "function_path": "ury.ury.api.chairman_tools.get_sales_range"},
+	]
+
+
+class PolicyAndLimitTests(unittest.TestCase):
+	"""Mock-based; run under plain python and under bench."""
+
+	def test_good_agent_passes(self):
+		self.assertEqual(cc.agent_policy_violations(_good_agent(), _good_tools(), PATHS), [])
+
+	def test_unknown_or_wrong_type_tool_refused(self):
+		bad = _good_tools()
+		bad[1] = {"name": "T2", "types": "Custom Function", "function_path": "frappe.client.get_list"}
+		self.assertTrue(cc.agent_policy_violations(_good_agent(), bad, PATHS))
+		for kind in ("Get List", "Create Document", "POST", "GET", "Get Report Result", "Run Agent", "Code Execution"):
+			bad = _good_tools()
+			bad[0] = dict(bad[0], types=kind)
+			self.assertTrue(cc.agent_policy_violations(_good_agent(), bad, PATHS), kind)
+		self.assertTrue(cc.agent_policy_violations(_good_agent(), [_good_tools()[0], None], PATHS))
+		self.assertTrue(cc.agent_policy_violations(_good_agent(agent_tool=[]), [], PATHS))
+
+	def test_mcp_flags_and_access_refused(self):
+		cases = [
+			{"agent_mcp_server": [SimpleNamespace(mcp_server="X")]},
+			{"agent_skill": [SimpleNamespace(skill="S")]},
+			{"allow_code_execution": 1},
+			{"allow_ssh": 1},
+			{"enable_memory_write_tool": 1},
+			{"enable_lazy_tools": 1},
+			{"desktop_access_local_mcp": "allowed"},
+			{"allow_guest": 1},
+			{"allow_all_users": 1},
+			{"allowed_users": [SimpleNamespace(user="x@example.com")]},
+			{"allowed_roles": []},
+			{"allowed_roles": [SimpleNamespace(role="URY Chairman"), SimpleNamespace(role="Employee")]},
+			{"max_turns": 0},
+			{"max_turns": cc.MAX_AGENT_TURNS + 1},
+		]
+		for over in cases:
+			self.assertTrue(cc.agent_policy_violations(_good_agent(**over), _good_tools(), PATHS), over)
+
+	def test_assert_agent_policy_fails_closed(self):
+		doc = SimpleNamespace(**_good_agent())
+		doc.get = lambda k, d=None: getattr(doc, k, d)
+		f = _fake_frappe()
+		f.db.get_value.side_effect = lambda dt, n, *a, **k: {
+			"T1": _good_tools()[0], "T2": dict(_good_tools()[1], types="Delete Document")
+		}[n]
+		with mock.patch.object(cc, "frappe", f), mock.patch.object(cc, "allowed_tool_paths", return_value=PATHS):
+			with self.assertRaises(frappe.PermissionError):
+				cc.assert_agent_policy(doc)
+		f.log_error.assert_called_once()
+
+	def test_allowed_tool_paths_match_tools(self):
+		try:
+			paths = cc.allowed_tool_paths()
+		except ImportError as e:  # chairman_tools needs frappe.query_builder etc.
+			self.skipTest(f"chairman_tools not importable: {e}")
+		self.assertIn("ury.ury.api.chairman_tools.get_day_summary", paths)
+		self.assertTrue(all(p.startswith("ury.ury.api.chairman_tools.") for p in paths))
+
+	def test_history_limit_coercion(self):
+		self.assertEqual(cc.coerce_history_limit("abc"), cc.HISTORY_DEFAULT_LIMIT)
+		self.assertEqual(cc.coerce_history_limit(None), cc.HISTORY_DEFAULT_LIMIT)
+		self.assertEqual(cc.coerce_history_limit("0"), 1)
+		self.assertEqual(cc.coerce_history_limit(-5), 1)
+		self.assertEqual(cc.coerce_history_limit("1e9"), cc.HISTORY_DEFAULT_LIMIT)
+		self.assertEqual(cc.coerce_history_limit(10**9), 100)
+		self.assertEqual(cc.coerce_history_limit(" 25 "), 25)
+
+	def test_message_length_cap(self):
+		self.assertEqual(cc.validate_message("  hi "), "hi")
+		self.assertEqual(len(cc.validate_message("x" * cc.MAX_MESSAGE_CHARS)), cc.MAX_MESSAGE_CHARS)
+		for bad in ("", "   ", None, "x" * (cc.MAX_MESSAGE_CHARS + 1)):
+			with self.assertRaises(frappe.ValidationError):
+				cc.validate_message(bad)
+
+	def test_rate_check_per_user(self):
+		store = {}
+		f = _fake_frappe()
+		f.cache.make_key = lambda k: k
+		f.cache.incr = lambda k: store.__setitem__(k, store.get(k, 0) + 1) or store[k]
+		with mock.patch.object(cc, "frappe", f):
+			for _i in range(3):
+				cc.rate_check("audio", 3)
+			with self.assertRaises(f.TooManyRequestsError):
+				cc.rate_check("audio", 3)
+			cc.rate_check("audio", 3, user="other@example.com")  # separate bucket
+			cc.rate_check("msg", 3)
+		f.cache.expire.assert_called()
+
+	def test_send_rate_limited_and_length_checked_before_agent(self):
+		f = _fake_frappe()
+		with mock.patch.object(cc, "frappe", f), mock.patch.object(cc, "_check_role"), mock.patch.object(
+			cc, "rate_check", side_effect=f.TooManyRequestsError("slow")
+		) as rc, mock.patch.object(cc, "_require_agent") as ra:
+			with self.assertRaises(f.TooManyRequestsError):
+				cc.send(conversation="C", message="hi")
+			rc.assert_called_with("msg", cc.RATE_LIMIT_MESSAGES)
+			with self.assertRaises(frappe.ValidationError):
+				cc.send(conversation="C", message="x" * 5000)
+			ra.assert_not_called()
+
+	def test_audio_endpoints_rate_limited(self):
+		f = _fake_frappe()
+		for fn, kw in ((cc.send_audio, {"b64data": "AAAA", "mime": "audio/webm"}), (cc.speak, {"message_id": "M"})):
+			with mock.patch.object(cc, "frappe", f), mock.patch.object(cc, "_check_role"), mock.patch.object(
+				cc, "rate_check", side_effect=f.TooManyRequestsError("slow")
+			) as rc, mock.patch.object(cc, "_require_agent") as ra:
+				with self.assertRaises(f.TooManyRequestsError):
+					fn(**kw)
+				rc.assert_called_with("audio", cc.RATE_LIMIT_AUDIO)
+				ra.assert_not_called()
+
+	def test_conversation_message_cap(self):
+		f = _fake_frappe()
+		f.db.count.return_value = cc.MAX_CONVERSATION_MESSAGES
+		with mock.patch.object(cc, "frappe", f):
+			with self.assertRaises(frappe.ValidationError):
+				cc._assert_conversation_room("C")
+			f.db.count.return_value = 3
+			cc._assert_conversation_room("C")
+
+	def _speak(self, f, gen_result):
+		async def fake_gen(**kw):
+			if isinstance(gen_result, Exception):
+				raise gen_result
+			return gen_result
+
+		media = types.ModuleType("huf.ai.handlers.media")
+		media.handle_generate_audio = fake_gen
+		f.db.get_value.return_value = SimpleNamespace(conversation="C", content="hello", role="assistant")
+		f.local.response_headers = {}
+		with mock.patch.dict(sys.modules, {"huf.ai.handlers.media": media}), mock.patch.object(
+			cc, "frappe", f
+		), mock.patch.object(cc, "_check_role"), mock.patch.object(cc, "rate_check"), mock.patch.object(
+			cc, "_require_agent", return_value="A"
+		), mock.patch.object(cc, "_own_conversation"):
+			return cc.speak("M1")
+
+	def test_speak_deletes_huf_file_on_success(self):
+		f = _fake_frappe()
+		f.get_doc.return_value.file_url = "/private/files/x.mp3"
+		out = self._speak(f, {"success": True, "audio": {"file_id": "HUF1", "format": "mp3"}})
+		self.assertTrue(out["success"])
+		f.delete_doc.assert_called_once_with("File", "HUF1", ignore_permissions=True, force=True)
+
+	def test_speak_deletes_huf_file_on_failure_result(self):
+		f = _fake_frappe()
+		out = self._speak(f, {"success": False, "error": "x", "audio": {"file_id": "HUF2"}})
+		self.assertFalse(out["success"])
+		f.delete_doc.assert_called_once_with("File", "HUF2", ignore_permissions=True, force=True)
+
+	def test_speak_deletes_huf_file_when_copy_raises(self):
+		f = _fake_frappe()
+		f.get_doc.side_effect = OSError("disk full")
+		with self.assertRaises(OSError):
+			self._speak(f, {"success": True, "audio": {"file_id": "HUF3", "format": "mp3"}})
+		f.delete_doc.assert_called_once_with("File", "HUF3", ignore_permissions=True, force=True)
+
+	def test_run_inline_sets_and_clears_conversation_flag(self):
+		f = _fake_frappe()
+		seen = []
+
+		def fake_run_agent_sync(**kw):
+			seen.append(f.flags.chairman_conversation_id)  # what guarded() would read
+			return {"success": True}
+
+		def boom(**kw):
+			seen.append(f.flags.chairman_conversation_id)
+			raise RuntimeError("model down")
+
+		integ = types.ModuleType("huf.ai.agent.integration")
+		with mock.patch.dict(sys.modules, {"huf.ai.agent.integration": integ}), mock.patch.object(cc, "frappe", f):
+			integ.run_agent_sync = fake_run_agent_sync
+			cc._run_inline("A", "CONV-1", "hi")
+			self.assertIsNone(f.flags.chairman_conversation_id)
+			integ.run_agent_sync = boom
+			with self.assertRaises(RuntimeError):
+				cc._run_inline("A", "CONV-2", "hi")
+			self.assertIsNone(f.flags.chairman_conversation_id)
+		self.assertEqual(seen, ["CONV-1", "CONV-2"])
+
+
 def _huf_installed():
 	try:
 		return "huf" in frappe.get_installed_apps()
@@ -293,6 +519,35 @@ class SiteTests(IntegrationTestCase):
 		for call in ras.call_args_list:
 			self.assertEqual(call.kwargs.get("now"), 1)
 		self.assertIn("Reply in Hindi", ras.call_args_list[0].kwargs["prompt"])
+
+	@unittest.skipUnless(_huf_installed(), "huf not installed")
+	def test_require_agent_refuses_unsafe_real_agent_doc(self):
+		"""H1 on a real (unsaved) Huf Agent doc: MCP row / open access / no tools => refused."""
+		agent = frappe.new_doc("Agent")
+		agent.name = "URY Chairman Unsafe Test"
+		agent.max_turns = 5
+		agent.append("agent_mcp_server", {})
+		agent.allow_all_users = 1
+		frappe.set_user(CHAIR_A)
+		with mock.patch.object(cc, "_enabled_agent", return_value=agent.name), mock.patch.object(
+			frappe, "get_doc", return_value=agent
+		), mock.patch.object(frappe, "log_error") as log:
+			with self.assertRaises(frappe.PermissionError):
+				cc._require_agent()
+		self.assertIn("agent_mcp_server", log.call_args.args[0])
+
+	@unittest.skipUnless(_huf_installed(), "huf not installed")
+	def test_history_bad_limit_is_not_500(self):
+		import huf.ai.agent.chat as chat
+
+		frappe.set_user(CHAIR_A)
+		with mock.patch.object(cc, "_require_agent", return_value="A"), mock.patch.object(
+			cc, "_own_conversation"
+		), mock.patch.object(chat, "get_history", return_value=[]) as gh:
+			cc.history(conversation="C", limit="abc")
+			self.assertEqual(gh.call_args.kwargs["limit"], cc.HISTORY_DEFAULT_LIMIT)
+			cc.history(conversation="C", limit="9999")
+			self.assertEqual(gh.call_args.kwargs["limit"], 100)
 
 	@unittest.skipUnless(_huf_installed(), "huf not installed")
 	def test_wrapper_fails_closed_if_huf_queues(self):
