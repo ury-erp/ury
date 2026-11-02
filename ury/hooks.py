@@ -88,6 +88,12 @@ website_route_rules = [
     {"from_route": "/ury/serve", "to_route": "serve"},
     {"from_route": "/ury/serve/", "to_route": "serve"},
     {"from_route": "/ury/serve/<path:app_path>", "to_route": "serve"},
+    # Chairman Brief PWA (executive slides) — same shape as Serve above; the
+    # SW rule precedes the page rule so /ury/brief/sw.js is not swallowed.
+    {"from_route": "/ury/brief/sw.js", "to_route": "brief-sw.js"},
+    {"from_route": "/ury/brief", "to_route": "brief"},
+    {"from_route": "/ury/brief/", "to_route": "brief"},
+    {"from_route": "/ury/brief/<path:app_path>", "to_route": "brief"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},

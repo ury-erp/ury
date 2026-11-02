@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-11-02T07:02:11",
+  "date": "2026-11-01",
+  "currency": "INR",
+  "locale": "en-IN",
+  "scope": {"companies": ["URY Demo Co"], "branches": ["Main Branch", "Airport Kiosk"]},
+  "slides": [
+    {
+      "id": "yesterday",
+      "title": "Yesterday, 1 Nov",
+      "headline": "Yesterday ₹1.2L, up 8% vs last Saturday",
+      "value": 123450.5,
+      "compare": 114300.0,
+      "delta_pct": 0.0801,
+      "orders": 212,
+      "orders_compare": 198,
+      "tone": "good",
+      "chart": {"type": "spark", "series": [
+        {"label": "2026-10-26", "value": 98200.0},
+        {"label": "2026-10-27", "value": 104750.25},
+        {"label": "2026-10-28", "value": 99800.0},
+        {"label": "2026-10-29", "value": 112300.75},
+        {"label": "2026-10-30", "value": 131900.0},
+        {"label": "2026-10-31", "value": 142600.5},
+        {"label": "2026-11-01", "value": 123450.5}
+      ]},
+      "drill": "/insights/dashboards/58aq35af28",
+      "data_quality": "ok"
+    },
+    {
+      "id": "channel_mix",
+      "title": "Channel mix, last 7 days",
+      "headline": "Dine In leads with 46% of the week",
+      "value": 813001.5,
+      "compare": null,
+      "delta_pct": null,
+      "tone": "neutral",
+      "chart": {"type": "donut", "series": [
+        {"label": "Dine In", "value": 374000.0},
+        {"label": "Take Away", "value": 187500.5},
+        {"label": "Delivery", "value": 142000.0},
+        {"label": "Online", "value": 76501.0},
+        {"label": "Unspecified", "value": 33000.0}
+      ]},
+      "drill": "/insights/dashboards/58aq35af28",
+      "data_quality": "ok"
+    },
+    {
+      "id": "payment_mix",
+      "title": "Payment mix, last 7 days",
+      "headline": "UPI is 55% of payments",
+      "value": 853650.0,
+      "compare": null,
+      "delta_pct": null,
+      "tone": "neutral",
+      "chart": {"type": "donut", "series": [
+        {"label": "UPI", "value": 469500.0},
+        {"label": "Card", "value": 213400.0},
+        {"label": "Cash", "value": 149750.0},
+        {"label": "Wallet", "value": 21000.0}
+      ]},
+      "drill": null,
+      "data_quality": "ok"
+    }
+  ]
+}

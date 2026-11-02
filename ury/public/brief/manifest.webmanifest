@@ -1,0 +1,19 @@
+{
+  "id": "/ury/brief/",
+  "name": "URY Brief",
+  "short_name": "Brief",
+  "description": "Daily executive brief for URY restaurants",
+  "start_url": "/ury/brief/",
+  "scope": "/ury/brief/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f4ef",
+  "theme_color": "#ffffff",
+  "lang": "en",
+  "icons": [
+    {"src": "/assets/ury/brief/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/ury/brief/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/ury/brief/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/assets/ury/brief/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
