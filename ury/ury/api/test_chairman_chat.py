@@ -102,7 +102,8 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(cc.normalize_language("ar_AE"), "ar")
 		self.assertIsNone(cc.normalize_language(None))
 		self.assertIsNone(cc.normalize_language("fr"))
-		self.assertEqual(cc.with_language_hint("hello", None), "hello")
+		self.assertTrue(cc.with_language_hint("hello", None).startswith("hello\n\n[Today is "))
+		self.assertNotIn("[Language", cc.with_language_hint("hello", None))
 		self.assertIn("Reply in Malayalam", cc.with_language_hint("x", "ml"))
 		self.assertNotIn("English", cc.with_language_hint("x", "hi"))
 

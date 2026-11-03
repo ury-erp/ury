@@ -31,8 +31,8 @@ export const langHint = () => { const l = getPrefs().language; return l === "aut
 
 type Raw = Record<string, unknown>;
 
-/** The server appends a "[Language: X. Reply in X.]" hint to stored user text; never show it. */
-const LANG_HINT = /\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$/;
+/** The server appends "[Language: ...]" and "[Today is ...]" hints to stored user text; never show them. */
+const LANG_HINT = /(?:\s*\[(?:Language: |Today is )[^\]]*\])+\s*$/;
 
 export function normalize(m: Raw): ChatMessage {
   const role = String(m.role ?? m.sender ?? "").toLowerCase();

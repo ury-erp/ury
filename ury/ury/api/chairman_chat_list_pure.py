@@ -1,5 +1,6 @@
 """Frappe-free helpers for the owner chat list/rename/delete endpoints (unit-testable)."""
 
+import datetime
 import re
 
 AUTO_TITLE_PREFIX = "Conversation with "  # Huf's auto-generated conversation title
@@ -8,11 +9,30 @@ PREVIEW_MAX = 120
 LIST_DEFAULT_LIMIT = 40
 LIST_MAX_LIMIT = 100
 
-_HINT_TAIL = re.compile(r"\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$")
+# Trailing "[Language: ...]" and/or "[Today is ...]" blocks, any order, repeated.
+_HINT_TAIL = re.compile(r"(?:\s*\[(?:Language: |Today is )[^\]]*\])+\s*$")
+
+
+def date_hint(today=None):
+	"""Second hint line: the SITE date, so the agent never guesses the year. `today` injectable."""
+	if today is None:
+		import frappe
+
+		today = frappe.utils.getdate(frappe.utils.nowdate())
+	if isinstance(today, datetime.datetime):
+		today = today.date()
+	elif isinstance(today, str):
+		today = datetime.date.fromisoformat(today[:10])
+	y = today - datetime.timedelta(days=1)
+	return (
+		f"[Today is {today:%A} {today.isoformat()}; yesterday was {y:%A} {y.isoformat()}. "
+		f"For 'yesterday' use {y.isoformat()} (or leave the date empty); only use {today.isoformat()} for 'today'. "
+		"Use exact YYYY-MM-DD dates and never guess the year.]"
+	)
 
 
 def strip_language_hint(text):
-	"""Remove the trailing language hint added by with_language_hint (for titles/previews)."""
+	"""Remove the trailing language/date hints added by with_language_hint (for titles/previews)."""
 	return _HINT_TAIL.sub("", text or "").strip()
 
 
