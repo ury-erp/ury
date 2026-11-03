@@ -3,11 +3,13 @@
 *{box-sizing:border-box}
 html{font-size:16px}
 html,body,#root{margin:0;height:100%}
+html,body{position:fixed;inset:0;width:100%;overflow:hidden;overscroll-behavior:none}
+:root{--safe-b:max(env(safe-area-inset-bottom),12px)}
 body{background:hsl(var(--background));color:hsl(var(--foreground));font-family:var(--font-sans);font-size:var(--text-sm);line-height:1.43;letter-spacing:var(--tracking-body);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
 a{color:hsl(var(--primary))}
 button{font:inherit;letter-spacing:inherit}
 :focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
-.app{display:flex;flex-direction:column;width:100%;max-width:48rem;margin:0 auto;height:100vh;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);box-sizing:border-box}
+.app{display:flex;flex-direction:column;width:100%;max-width:48rem;margin:0 auto;height:100vh;height:var(--app-h,100dvh);padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);box-sizing:border-box}
 @media (min-width:768px){body{background:hsl(var(--muted))}.app{border-inline:1px solid hsl(var(--border));background:hsl(var(--background))}}
 
 /* Top bar (chat shell) */
@@ -75,7 +77,7 @@ button{font:inherit;letter-spacing:inherit}
 .dot[aria-current="true"]::before{background:hsl(var(--primary))}
 
 /* Tab bar */
-.tabs{display:flex;flex:0 0 auto;background:hsl(var(--card));padding-bottom:env(safe-area-inset-bottom)}
+.tabs{display:flex;flex:0 0 auto;background:hsl(var(--card));padding-bottom:var(--safe-b)}
 .tabs button{flex:1;height:3.5rem;border:0;background:transparent;color:hsl(var(--muted-foreground));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:color var(--dur) var(--ease)}
 .tab-ico{width:64px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background var(--dur) var(--ease)}
 .tab-label{font-size:11px;line-height:14px;font-weight:500}
@@ -169,7 +171,7 @@ button.tile{cursor:pointer}
 .empty{padding:var(--space-6) 0;text-align:center;color:hsl(var(--muted-foreground))}
 .text-btn{border:0;background:transparent;color:hsl(var(--primary));font:inherit;font-weight:600;cursor:pointer}
 /* ask dock */
-.dock{flex:none;padding:var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));background:hsl(var(--background));border-top:1px solid hsl(var(--border))}
+.dock{flex:none;padding:var(--space-3) var(--space-4) calc(var(--space-3) + var(--safe-b));background:hsl(var(--background));border-top:1px solid hsl(var(--border))}
 .chips{display:flex;gap:var(--space-2);overflow-x:auto;padding-bottom:var(--space-3);scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .askrow{display:flex;align-items:center;gap:var(--space-2)}
@@ -209,3 +211,4 @@ button.tile{cursor:pointer}
 @media (min-width:900px){.today-body{padding-inline:var(--space-6)}}
 input,textarea,select{font-size:max(16px,1em)}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;overscroll-behavior:none}
+html[data-kb] .dock{padding-block-end:var(--space-3)}html[data-kb] .tabs{display:none}
