@@ -1,5 +1,8 @@
 <template>
   <div class="mx-auto p-6 mb-16 relative">
+    <div v-if="socketStale" role="status" class="fixed bottom-0 inset-x-0 p-3 bg-red-600 text-white text-center z-50">
+      Realtime offline or resyncing — board may be stale.
+    </div>
     <!-- Alert Modal div start-->
     <div
       v-if="this.showModal"
@@ -37,6 +40,26 @@
     </div>
     <!-- Alert Modal div end-->
 
+    <div v-if="actionError" role="alert" class="mb-4 rounded-lg bg-red-50 border border-red-500 p-4 text-red-700">
+      {{ actionError }}
+    </div>
+
+    <div v-if="branch" class="mb-4">
+      <button @click="fetchRecentServed" :disabled="loadingServed" class="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
+        {{ loadingServed ? "Loading…" : "Recently served · Recall" }}
+      </button>
+      <div v-if="showRecentServed" class="mt-3 rounded-lg border p-3">
+        <p class="mb-2 text-gray-500">Recall is available for 15 minutes after serving.</p>
+        <p v-if="!recentServed.length && !loadingServed" class="text-gray-500">No recently served tickets.</p>
+        <div v-for="served in recentServed" :key="served.name" class="flex justify-between items-center py-2">
+          <span>{{ served.table_takeaway || !served.restaurant_table ? "Takeaway" : served.restaurant_table }} · {{ daily_order_number ? served.order_no : served.invoice.slice(-4) }}</span>
+          <button @click="recallOrder(served)" :disabled="recalling[served.name]" class="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
+            {{ recalling[served.name] ? "Recalling…" : "Recall" }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="kot.filter(k => k.production === production).length === 0 && !loadingKots" class="text-center py-10 text-gray-500 text-xl">
       No active orders for {{ production }}
     </div>
@@ -46,7 +69,7 @@
     >
       <div v-for="kot in this.kot" :key="kot.name">
         <div
-          :class="[kot.color]"
+          :class="[kot.color, { 'ring-4 ring-red-600': kot.late }]"
           class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-90 h-auto masonry-item"
           style="margin-top: 28px"
           v-if="!kot.showDiv && kot.production === production"
@@ -58,12 +81,13 @@
               class="absolute inset-0 bg-white z-50 opacity-80 rounded-2xl flex flex-col justify-center items-center"
             >
               <button
-                @click="
+                @click.stop="
                   kot.type === 'Cancelled' || kot.type === 'Partially cancelled'
                     ? confirmOrder(kot)
                     : serveOrder(kot)
                 "
                 :class="[{ hidden: !kot.isRotated }]"
+                :disabled="!!pendingServes[kot.name] || !!confirming[kot.name]"
                 class="py-2 px-6 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out"
               >
                 {{
@@ -119,6 +143,7 @@
                   class="font-inter font-semibold text-2xl leading-10"
                 >
                   {{ kot.timeRemaining }}
+                  <span v-if="kot.late" class="block text-sm text-red-700 leading-4">LATE</span>
                 </div>
               </div>
               <div
@@ -180,7 +205,10 @@
               </div>
             
           </div>
-          <!-- You can add more item/quantity pairs here as needed -->
+          <div v-if="pendingServes[kot.name]" class="mt-3 flex justify-between items-center text-blue-700">
+            <span>{{ pendingServes[kot.name].sending ? "Serving…" : "Serving in 5 seconds…" }}</span>
+            <button v-if="!pendingServes[kot.name].sending" @click.stop="undoServe(kot)" class="rounded border border-blue-600 px-3 py-1 font-semibold">Undo</button>
+          </div>
         </div>
       </div>
     </div>
@@ -244,6 +272,7 @@
 import { FrappeApp } from "frappe-js-sdk";
 import Masonry from "masonry-layout";
 import io from "socket.io-client";
+import { canRecallKot, isKotLate, kitchenErrorMessage, recentServedQuery, rememberKot } from "./kitchen-actions.js";
 
 let host = window.location.hostname;
 let port = window.location.port;
@@ -296,6 +325,12 @@ export default {
   data() {
     return {
       kot: [],
+      knownKots: new Set(),
+      socketStale: true,
+      socketActive: false,
+      socketHandlers: {},
+      resyncGeneration: 0,
+      lastSocketAudioFile: null,
       masonry: null,
       call: frappe.call(),
       branch: "",
@@ -313,7 +348,16 @@ export default {
       daily_order_number:0,
       loadingKots: true,
       kotErrorAlert: null,
-      showKotErrorAlert: false
+      showKotErrorAlert: false,
+      actionError: "",
+      pendingServes: {},
+      confirming: {},
+      recalling: {},
+      recentServed: [],
+      showRecentServed: false,
+      loadingServed: false,
+      serverTimeOffset: 0,
+      timeInterval: null,
     };
   },
   methods: {
@@ -338,33 +382,44 @@ export default {
           });
       });
     },
-    fetchKOT() {
+    fetchKOT(resync = false) {
+      const generation = this.resyncGeneration;
       return new Promise((resolve, reject) => {
         try {
           this.call
             .get("ury.ury.api.ury_kot_display.kot_list", {})
             .then((result) => {
+              if (generation !== this.resyncGeneration) { resolve(); return; }
+              const missedTickets = resync && result.message.KOT.some(
+                kot => kot.production === this.production && !this.knownKots.has(kot.name)
+              );
               console.log(result,"..............result")
               this.branch = result.message.Branch;
+              this.serverTimeOffset = new Date(result.message.server_time.replace(" ", "T")).getTime() - Date.now();
               this.kot_alert_time = result.message.kot_alert_time;
               this.audio_alert = result.message.audio_alert;
               this.daily_order_number = result.message.daily_order_number;
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot_error_channel = `kot_error_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
+              this.kot.forEach(kot => this.knownKots.add(kot.name));
               this.loadingKots = false;
               this.updateQtyColorTable();
               this.updateTimeRemaining();
               this.masonryLoading();
+              const audioFile = result.message.audio_file || this.lastSocketAudioFile;
+              if (missedTickets && this.audio_alert === 1 && audioFile) {
+                this.playAlertSound(audioFile);
+              }
               resolve();
             })
             .catch((error) => {
               console.error(error);
-              this.loadingKots = false;
+              if (generation === this.resyncGeneration) this.loadingKots = false;
               reject(error);
             });
         } catch (error) {
-          this.loadingKots = false;
+          if (generation === this.resyncGeneration) this.loadingKots = false;
           reject(error);
         }
       });
@@ -373,41 +428,85 @@ export default {
       this.masonryLoading();
       kot.isRotated = !kot.isRotated;
     },
-    confirmOrder(kot) {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString();
-      this.call
-        .post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
+    async confirmOrder(kot) {
+      if (this.confirming[kot.name]) return;
+      this.confirming[kot.name] = true;
+      this.actionError = "";
+      try {
+        await this.call.post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
           name: kot.name,
-        })
-        .then((result) => {
-          // kot.isHidden = !kot.isHidden;
-          kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
-
-          this.removeAllItemsFromLocalStorage(kot);
-          this.masonryLoading();
-        })
-        .catch((error) => console.error(error));
+        });
+        this.kot = this.kot.filter(card => card.name !== kot.name);
+        this.removeAllItemsFromLocalStorage(kot);
+      } catch (error) {
+        this.actionError = kitchenErrorMessage(error, `Could not confirm ${kot.name}. Please try again.`);
+      } finally {
+        delete this.confirming[kot.name];
+        this.masonryLoading();
+      }
     },
-    async serveOrder(kot) {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString();
-
-      this.call
-        .post("ury.ury.api.ury_kot_display.serve_kot", {
-          name: kot.name,
-          time: this.currentTime,
-        })
-        .then((result) => {
-          // kot.isHidden = !kot.isHidden;
-          kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
-
+    serveOrder(kot) {
+      if (this.pendingServes[kot.name]) return;
+      this.actionError = "";
+      kot.isRotated = false;
+      this.pendingServes[kot.name] = { timer: null, sending: false };
+      const pending = this.pendingServes[kot.name];
+      pending.timer = setTimeout(async () => {
+        pending.sending = true;
+        try {
+          await this.call.post("ury.ury.api.ury_kot_display.serve_kot", { name: kot.name });
+          this.kot = this.kot.filter(card => card.name !== kot.name);
           this.removeAllItemsFromLocalStorage(kot);
+          if (this.showRecentServed) await this.fetchRecentServed();
+        } catch (error) {
+          this.actionError = kitchenErrorMessage(error, `Could not serve ${kot.name}. Please try again.`);
+        } finally {
+          delete this.pendingServes[kot.name];
           this.masonryLoading();
-        })
-        .catch((error) => console.error(error));
+        }
+      }, 5000);
+      this.masonryLoading();
+    },
+    undoServe(kot) {
+      const pending = this.pendingServes[kot.name];
+      if (!pending || pending.sending) return;
+      clearTimeout(pending.timer);
+      delete this.pendingServes[kot.name];
+      this.masonryLoading();
+    },
+    cancelPendingServes() {
+      Object.values(this.pendingServes).forEach(pending => {
+        if (!pending.sending) clearTimeout(pending.timer);
+      });
+    },
+    async fetchRecentServed() {
+      if (this.loadingServed) return;
+      this.loadingServed = true;
+      this.showRecentServed = true;
+      this.actionError = "";
+      try {
+        const now = new Date(Date.now() + this.serverTimeOffset);
+        const result = await this.call.get("frappe.client.get_list", recentServedQuery(this.branch, this.production, now));
+        this.recentServed = result.message.filter(kot => canRecallKot(kot, now));
+      } catch (error) {
+        this.actionError = kitchenErrorMessage(error, "Could not load recently served tickets. Please try again.");
+      } finally {
+        this.loadingServed = false;
+      }
+    },
+    async recallOrder(kot) {
+      if (this.recalling[kot.name]) return;
+      this.recalling[kot.name] = true;
+      this.actionError = "";
+      try {
+        await this.call.post("ury.ury.api.ury_kot_display.recall_kot", { name: kot.name });
+        this.recentServed = this.recentServed.filter(card => card.name !== kot.name);
+        await this.fetchKOT();
+      } catch (error) {
+        this.actionError = kitchenErrorMessage(error, `Could not recall ${kot.name}. Please try again.`);
+      } finally {
+        delete this.recalling[kot.name];
+      }
     },
 
     async orderDelayNotify(kot) {
@@ -525,7 +624,8 @@ export default {
         ) {
           this.orderDelayNotify(kot);
         }
-        if (minutes >= this.kot_alert_time) {
+        kot.late = isKotLate(minutes, this.kot_alert_time);
+        if (kot.late) {
           kot.timecolor = "text-[#DC0000]";
         } else {
           kot.timecolor = "text-black";
@@ -533,7 +633,7 @@ export default {
       });
     },
     calculateTimeRemaining(targetTime) {
-      const currentTime = new Date();
+      const currentTime = new Date(Date.now() + this.serverTimeOffset);
       const [targetHours, targetMinutes, targetSeconds] = targetTime.split(":");
       const targetDate = new Date(
         currentTime.getFullYear(),
@@ -544,7 +644,7 @@ export default {
         targetSeconds
       );
 
-      const timeDifference = currentTime - targetDate;
+      const timeDifference = Math.max(0, currentTime - targetDate);
       const hoursRemaining = Math.floor(timeDifference / 3600000);
       const minutesRemaining = Math.floor((timeDifference % 3600000) / 60000);
 
@@ -606,6 +706,7 @@ export default {
     },
   },
   mounted() {
+    this.socketActive = true;
     window.addEventListener("online", this.handleOnline);
     window.addEventListener("offline", this.handleOffline);
     document.addEventListener("click", this.hideAudioAlertMessage);
@@ -616,10 +717,24 @@ export default {
     this.auth()
       .then(() => {
         self.fetchKOT().then(() => {
+          if (!this.socketActive) return;
+          this.socketStale = !socket.connected;
           if (this.audio_alert === 1) {
             this.showAudioAlertMessage = true;
           }
-          socket.on(this.kot_channel, (doc) => {
+          this.socketHandlers = {
+            connect: () => {
+              const generation = ++this.resyncGeneration;
+              this.socketStale = true;
+              this.fetchKOT(true).then(() => {
+                if (generation === this.resyncGeneration) this.socketStale = !socket.connected;
+              }).catch(console.error);
+            },
+            disconnect: () => { ++this.resyncGeneration; this.socketStale = true; },
+          };
+          this.socketHandlers[this.kot_channel] = (doc) => {
+            if (doc.audio_file) this.lastSocketAudioFile = doc.audio_file;
+            if (!rememberKot(this.knownKots, doc.kot)) return;
             if (this.audio_alert === 1) {
               this.playAlertSound(doc.audio_file);
             }
@@ -643,10 +758,10 @@ export default {
               }
             },1500)
             localStorage.setItem("kot_time", doc.kot.time);
-          });
+          };
 
           // New socket listener for KOT error alerts (delayed orders)
-          socket.on(this.kot_error_channel, (doc) => {
+          this.socketHandlers[this.kot_error_channel] = (doc) => {
             // Look up the matching KOT in the local array to get table/order info
             const matchingKot = this.kot.find(k => k.name === doc.kot);
 
@@ -661,16 +776,23 @@ export default {
             setTimeout(() => {
               this.hideKotErrorAlert();
             }, 8000);
-          });
+          };
+          for (const [channel, handler] of Object.entries(this.socketHandlers)) socket.on(channel, handler);
         });
       })
       .catch((error) => {
         console.error("Authentication error:", error);
         this.showModal = true;
       });
-    setInterval(this.updateTimeRemaining, 60000);
+    this.timeInterval = setInterval(this.updateTimeRemaining, 60000);
   },
-  beforeDestroy() {
+  beforeUnmount() {
+    this.socketActive = false;
+    ++this.resyncGeneration;
+    for (const [channel, handler] of Object.entries(this.socketHandlers)) socket.off(channel, handler);
+    this.cancelPendingServes();
+    clearInterval(this.timeInterval);
+    window.removeEventListener("resize", this.masonryLoading);
     window.removeEventListener("online", this.handleOnline);
     window.removeEventListener("offline", this.handleOffline);
     document.removeEventListener("click", this.hideAudioAlertMessage);
