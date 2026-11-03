@@ -1,0 +1,148 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"cf875878bd\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Today</b></span>\",\"col\":12}},{\"id\":\"2dfb2ebf47\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Net Sales Today\",\"col\":3}},{\"id\":\"652488cbfe\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Bills Today\",\"col\":3}},{\"id\":\"a0e8bafa5a\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Average Bill Today\",\"col\":3}},{\"id\":\"17bb8abf7f\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Unsettled Bills\",\"col\":3}},{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"1d615c8d1c\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB01 Company / Owner Overview\",\"col\":4}},{\"id\":\"827044e73c\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB16 Chairman Brief Cross-check\",\"col\":4}},{\"id\":\"942a6d8ff4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB14 Data Quality & Readiness\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"b59381b910\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales & Averages\",\"col\":4}},{\"id\":\"b597baeb61\",\"type\":\"card\",\"data\":{\"card_name\":\"Statements\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:30.897611",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "chart-line",
+ "is_hidden": 0,
+ "label": "URY Analytics Owner",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "chart-line",
+   "is_query_report": 0,
+   "label": "Sales & Averages",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Month Wise Sales",
+   "link_count": 0,
+   "link_to": "Month Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Sales",
+   "link_count": 0,
+   "link_to": "Daywise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Average Bill Value",
+   "link_count": 0,
+   "link_to": "Average Bill Value",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Avg Per Cover",
+   "link_count": 0,
+   "link_to": "APC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "icon": "wallet",
+   "is_query_report": 0,
+   "label": "Statements",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Aggregated P&L",
+   "link_count": 0,
+   "link_to": "Aggregated Profit and Loss Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily P&L",
+   "link_count": 0,
+   "link_to": "URY Daily P and L",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:10:57.285625",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Owner",
+ "number_cards": [
+  {
+   "label": "URY Net Sales Today",
+   "number_card_name": "URY Net Sales Today"
+  },
+  {
+   "label": "URY Bills Today",
+   "number_card_name": "URY Bills Today"
+  },
+  {
+   "label": "URY Average Bill Today",
+   "number_card_name": "URY Average Bill Today"
+  },
+  {
+   "label": "URY Unsettled Bills",
+   "number_card_name": "URY Unsettled Bills"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "URY Admin"
+  },
+  {
+   "role": "URY Owner"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB01 Company / Owner Overview",
+   "type": "URL",
+   "url": "/insights/dashboards/994d77ru95"
+  },
+  {
+   "label": "DB16 Owner Brief Cross-check",
+   "type": "URL",
+   "url": "/insights/dashboards/9of8skpq4l"
+  },
+  {
+   "label": "DB14 Data Quality & Readiness",
+   "type": "URL",
+   "url": "/insights/dashboards/9g3cho4dvl"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Owner",
+ "type": "Workspace"
+}

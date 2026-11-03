@@ -1,0 +1,196 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"cf875878bd\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Today</b></span>\",\"col\":12}},{\"id\":\"6f05de72b3\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Wastage Today\",\"col\":3}},{\"id\":\"aa598e36ac\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Cancelled Bills Today\",\"col\":3}},{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"70791fe204\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB10 Margin & Cost\",\"col\":4}},{\"id\":\"77689370b3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB11 Wastage & Shrinkage\",\"col\":4}},{\"id\":\"8138d52c97\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB15 Leakage\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"b597baeb61\",\"type\":\"card\",\"data\":{\"card_name\":\"Statements\",\"col\":4}},{\"id\":\"5dbd5c1260\",\"type\":\"card\",\"data\":{\"card_name\":\"Margin & Cost\",\"col\":4}},{\"id\":\"7a2f31f4fd\",\"type\":\"card\",\"data\":{\"card_name\":\"Wastage & Leakage\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:32.211107",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "wallet",
+ "is_hidden": 0,
+ "label": "URY Analytics Finance",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "wallet",
+   "is_query_report": 0,
+   "label": "Statements",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Aggregated P&L",
+   "link_count": 0,
+   "link_to": "Aggregated Profit and Loss Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daily P&L",
+   "link_count": 0,
+   "link_to": "URY Daily P and L",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "icon": "chart-line",
+   "is_query_report": 0,
+   "label": "Margin & Cost",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Food Cost & Margin",
+   "link_count": 0,
+   "link_to": "Food Cost and Margin Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Food Cost Yesterday",
+   "link_count": 0,
+   "link_to": "Food Cost Yesterday",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Last Purchase Price Hike",
+   "link_count": 0,
+   "link_to": "Last Purchase Price Hike",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Purchase Trend",
+   "link_count": 0,
+   "link_to": "Monthly Purchase Trend and Cost Impact",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "icon": "shield-check",
+   "is_query_report": 0,
+   "label": "Wastage & Leakage",
+   "link_count": 5,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Wastage and Damage",
+   "link_count": 0,
+   "link_to": "Wastage and Damage Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Short-Excess",
+   "link_count": 0,
+   "link_to": "Short-Excess Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Correction",
+   "link_count": 0,
+   "link_to": "Stock Correction Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Aggregate Stock Overview",
+   "link_count": 0,
+   "link_to": "Aggregate Stock Overview",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cancelled Invoices",
+   "link_count": 0,
+   "link_to": "Cancelled Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:11:01.977673",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Finance",
+ "number_cards": [
+  {
+   "label": "URY Wastage Today",
+   "number_card_name": "URY Wastage Today"
+  },
+  {
+   "label": "URY Cancelled Bills Today",
+   "number_card_name": "URY Cancelled Bills Today"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "URY Admin"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB10 Margin & Cost",
+   "type": "URL",
+   "url": "/insights/dashboards/9hniog0q73"
+  },
+  {
+   "label": "DB11 Wastage & Shrinkage",
+   "type": "URL",
+   "url": "/insights/dashboards/8t5fak6mge"
+  },
+  {
+   "label": "DB15 Leakage",
+   "type": "URL",
+   "url": "/insights/dashboards/6810njdu1j"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Finance",
+ "type": "Workspace"
+}

@@ -1,0 +1,165 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"cf875878bd\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Today</b></span>\",\"col\":12}},{\"id\":\"5589d87f38\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Sales Today\",\"col\":3}},{\"id\":\"652488cbfe\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Bills Today\",\"col\":3}},{\"id\":\"a0e8bafa5a\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Average Bill Today\",\"col\":3}},{\"id\":\"17bb8abf7f\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Unsettled Bills\",\"col\":3}},{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"2098495829\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB02 Branch Daily Manager\",\"col\":4}},{\"id\":\"aa4e16e9d6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB03 Sales & Revenue Deep-dive\",\"col\":4}},{\"id\":\"600d7eef67\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB09 Payments & Cash-up\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"3be97ad29f\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales\",\"col\":4}},{\"id\":\"29b83fa5c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Payments & Cash-up\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:31.148520",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "layout-dashboard",
+ "is_hidden": 0,
+ "label": "URY Analytics Branch Manager",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "chart-line",
+   "is_query_report": 0,
+   "label": "Sales",
+   "link_count": 6,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Today's Sales",
+   "link_count": 0,
+   "link_to": "Today's Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Today's Invoices",
+   "link_count": 0,
+   "link_to": "Today's Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Sales",
+   "link_count": 0,
+   "link_to": "Daywise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Hourly Sales",
+   "link_count": 0,
+   "link_to": "Hourly Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Time Wise Sales",
+   "link_count": 0,
+   "link_to": "Time Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Last 10 POS Invoices",
+   "link_count": 0,
+   "link_to": "Last 10 POS Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "icon": "wallet",
+   "is_query_report": 0,
+   "label": "Payments & Cash-up",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Invoices",
+   "link_count": 0,
+   "link_to": "Daywise Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Unsettled Bills",
+   "link_count": 0,
+   "link_to": "Unsettled Bills",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:10:58.352037",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Branch Manager",
+ "number_cards": [
+  {
+   "label": "URY Sales Today",
+   "number_card_name": "URY Sales Today"
+  },
+  {
+   "label": "URY Bills Today",
+   "number_card_name": "URY Bills Today"
+  },
+  {
+   "label": "URY Average Bill Today",
+   "number_card_name": "URY Average Bill Today"
+  },
+  {
+   "label": "URY Unsettled Bills",
+   "number_card_name": "URY Unsettled Bills"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB02 Branch Daily Manager",
+   "type": "URL",
+   "url": "/insights/dashboards/674bmp1fc2"
+  },
+  {
+   "label": "DB03 Sales & Revenue Deep-dive",
+   "type": "URL",
+   "url": "/insights/dashboards/9ff12o8i1b"
+  },
+  {
+   "label": "DB09 Payments & Cash-up",
+   "type": "URL",
+   "url": "/insights/dashboards/9i01kmrvp4"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Branch Manager",
+ "type": "Workspace"
+}

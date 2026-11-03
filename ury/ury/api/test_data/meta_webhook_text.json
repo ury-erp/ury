@@ -1,0 +1,27 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "102290129340398",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {"display_phone_number": "15550783881", "phone_number_id": "106540352242922"},
+            "contacts": [{"profile": {"name": "Test Chairman"}, "wa_id": "971501234567"}],
+            "messages": [
+              {
+                "from": "971501234567",
+                "id": "wamid.HBgLOTcxNTAxMjM0NTY3FQIAEhgUM0EB",
+                "timestamp": "1762171200",
+                "text": {"body": "How were sales yesterday?"},
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

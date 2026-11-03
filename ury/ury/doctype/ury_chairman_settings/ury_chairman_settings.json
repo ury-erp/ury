@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "creation": "2026-11-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "chat_agent",
+  "voice_call_enabled",
+  "audio_retention_days",
+  "call_model",
+  "call_max_seconds",
+  "call_daily_minutes_per_user",
+  "call_voice"
+ ],
+ "fields": [
+  {
+   "description": "Name of the Huf Agent used for Owner Brief chat. Plain text (not a Link) so URY has no dependency on Huf.",
+   "fieldname": "chat_agent",
+   "fieldtype": "Data",
+   "label": "Chat Agent"
+  },
+  {
+   "default": "0",
+   "fieldname": "voice_call_enabled",
+   "fieldtype": "Check",
+   "label": "Voice Call Enabled"
+  },
+  {
+   "default": "7",
+   "description": "Owner chat audio files older than this many days are deleted daily.",
+   "fieldname": "audio_retention_days",
+   "fieldtype": "Int",
+   "label": "Audio Retention Days"
+  },
+  {
+   "default": "models/gemini-2.5-flash-native-audio-latest",
+   "description": "Gemini Live model used for Owner voice calls.",
+   "fieldname": "call_model",
+   "fieldtype": "Data",
+   "label": "Call Model"
+  },
+  {
+   "default": "300",
+   "description": "Maximum length of one voice call (30 to 900 seconds).",
+   "fieldname": "call_max_seconds",
+   "fieldtype": "Int",
+   "label": "Call Max Seconds"
+  },
+  {
+   "default": "30",
+   "description": "Daily voice call minutes allowed per user.",
+   "fieldname": "call_daily_minutes_per_user",
+   "fieldtype": "Int",
+   "label": "Call Daily Minutes Per User"
+  },
+  {
+   "default": "Puck",
+   "fieldname": "call_voice",
+   "fieldtype": "Data",
+   "label": "Call Voice"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Chairman Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "URY Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -12,9 +12,15 @@
    "link_to": "URY",
    "link_type": "Sidebar",
    "title": "URY"
+  },
+  {
+   "icon": "chart-no-axes-combined",
+   "link_to": "URY Analytics Owner",
+   "link_type": "Workspace",
+   "title": "Analytics"
   }
  ],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-11-03 07:11:13.858912",
  "modified_by": "Administrator",
  "name": "ury",
  "owner": "Administrator",

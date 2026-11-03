@@ -1,0 +1,24 @@
+/* WhatsApp onboarding sheet. Tokens only; see brief_app/DESIGN.md. */
+.wa-body{display:flex;flex-direction:column;gap:var(--space-3);font-size:var(--text-sm)}
+.wa-body p{margin:0;color:hsl(var(--muted-foreground));line-height:1.45}
+.wa-field{display:flex;flex-direction:column;gap:var(--space-1-5)}
+.wa-field label{font-size:var(--text-xs);font-weight:500;color:hsl(var(--muted-foreground))}
+.wa-input{min-height:var(--touch);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--hair2));background:hsl(var(--background));color:hsl(var(--foreground));font:inherit;font-size:var(--text-base);font-variant-numeric:tabular-nums;width:100%;box-sizing:border-box}
+.wa-input:focus-visible,.wa-body button:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
+.wa-code{display:flex;align-items:center;justify-content:center;min-height:var(--touch);padding:var(--space-3);border-radius:var(--radius-lg);border:1px solid hsl(var(--hair2));background:hsl(var(--muted));font-family:var(--font-mono);font-size:var(--text-3xl);font-weight:600;letter-spacing:.12em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.wa-steps{margin:0;padding-inline-start:1.25rem;display:flex;flex-direction:column;gap:var(--space-1-5)}
+.wa-steps b{font-weight:600;white-space:nowrap}
+.wa-body .wa-note{padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--warning-tint-border));background:hsl(var(--warning-tint));color:hsl(var(--warning-800));font-size:var(--text-xs)}
+.wa-body .wa-ok{padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--success-tint-border));background:hsl(var(--success-tint));color:hsl(var(--success-800));font-size:var(--text-sm);font-weight:500}
+.wa-body .wa-err{padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--destructive-tint-border));background:hsl(var(--destructive-tint));color:hsl(var(--destructive-800));font-size:var(--text-xs)}
+.wa-consent{display:flex;gap:var(--space-2);align-items:flex-start;font-size:var(--text-xs);color:hsl(var(--muted-foreground));line-height:1.45}
+.wa-consent input{flex:0 0 auto;width:1.25rem;height:1.25rem;margin:.125rem 0 0;accent-color:hsl(var(--primary))}
+.wa-ver{font-size:var(--text-2xs);color:hsl(var(--text-tertiary))}
+.wa-body .primary:disabled{opacity:.5;cursor:not-allowed}
+.wa-actions{display:flex;flex-direction:column;gap:var(--space-2)}
+@media (prefers-reduced-motion:reduce){.wa-body *{transition:none!important}}
+.go-state .sub{max-width:22rem}
+/* Header: a third action would squeeze the title at 360px, so the actions drop to their own row. */
+.bar:has(.wa-entry){flex-wrap:wrap}
+.bar:has(.wa-entry) h1{flex-basis:100%}
+.bar:has(.wa-entry) .bar-actions{margin-inline-start:auto}
