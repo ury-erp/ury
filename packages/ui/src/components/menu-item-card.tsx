@@ -191,7 +191,7 @@ export function MenuItemCard({
           </div>
         )}
         {unavailableMessage && (
-          <span className="absolute right-1 top-1 rounded bg-gray-900/80 px-2 py-0.5 text-[10px] font-medium text-white">
+          <span className="absolute end-1 top-1 rounded bg-gray-900/80 px-2 py-0.5 text-[10px] font-medium text-white">
             {unavailableMessage}
           </span>
         )}

@@ -16,7 +16,7 @@ import { formatCurrency } from '@ury/core';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
 import InsightFeed from '../components/dashboard/InsightFeed';
 import AskBar from '../components/chat/AskBar';
-import { t } from '../i18n';
+import { t, tData, tUser, tNotification, ltrFraction } from '../i18n';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -36,10 +36,10 @@ function getRelativeTime(creationDate: string): string {
 // Helper to format ETA minutes into readable time
 function formatETA(minutes: number | null): string {
   if (minutes === null) return t('dashboard.eta_holds');
-  if (minutes <= 90) return `~${minutes} min`;
+  if (minutes <= 90) return `~${t('dashboard.minutes_short', { n: minutes })}`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return `~${hours} hr ${mins > 0 ? `${mins} min` : ''}`.trim();
+  return `~${t('dashboard.hours_short', { n: hours })} ${mins > 0 ? t('dashboard.minutes_short', { n: mins }) : ''}`.trim();
 }
 
 // Helper to format date for open sessions display
@@ -192,7 +192,7 @@ export default function Dashboard() {
           },
           {
             label: t('dashboard.stat_active_tables'),
-            value: `${statsData.active_tables} / ${statsData.total_tables}`
+            value: ltrFraction(statsData.active_tables, statsData.total_tables)
           }
         ]);
       } catch (err) {
@@ -365,7 +365,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{t('dashboard.title')}</h1>
             <p className="mt-0.5 text-sm text-gray-500">
-              {posProfile?.branch ? `${posProfile.branch} · ` : ''}{t('dashboard.live_status')}
+              {posProfile?.branch ? `${tData(posProfile.branch)} · ` : ''}{t('dashboard.live_status')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -378,7 +378,7 @@ export default function Dashboard() {
                 <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
               </span>
-              Live
+              {t('dashboard.live_badge')}
             </span>
           </div>
         </div>
@@ -468,8 +468,8 @@ export default function Dashboard() {
                   return (
                     <div
                       key={idx}
-                      className="flex w-11 shrink-0 flex-col items-center"
-                      title={`${table.table} · ${t(stage.labelKey)}${table.minutes !== null ? ` · ${table.minutes} min` : ''}`}
+                      className="flex w-14 shrink-0 flex-col items-center"
+                      title={`${tData(table.table)} · ${t(stage.labelKey)}${table.minutes !== null ? ` · ${t('dashboard.minutes_short', { n: table.minutes })}` : ''}`}
                     >
                       <span
                         className={cn(
@@ -491,11 +491,11 @@ export default function Dashboard() {
                       </div>
                       <span
                         className={cn(
-                          'mt-1.5 w-full truncate rounded px-1 py-0.5 text-center text-[11px] font-medium',
+                          'mt-1.5 w-full break-words rounded px-1 py-0.5 text-center text-[11px] font-medium leading-tight',
                           isOver ? 'bg-red-50 text-red-700' : 'text-gray-600'
                         )}
                       >
-                        {table.table}
+                        {tData(table.table)}
                       </span>
                     </div>
                   );
@@ -559,7 +559,7 @@ export default function Dashboard() {
                   <MetricTile label={t('dashboard.metric_avg_per_cover')} value={formatCurrency(shiftMetrics.avg_per_cover)} />
                   <MetricTile
                     label={t('dashboard.metric_avg_ticket')}
-                    value={shiftMetrics.avg_ticket_minutes !== null ? `${shiftMetrics.avg_ticket_minutes} min` : '—'}
+                    value={shiftMetrics.avg_ticket_minutes !== null ? t('dashboard.minutes_short', { n: shiftMetrics.avg_ticket_minutes }) : '—'}
                   />
                 </div>
               )}
@@ -620,7 +620,7 @@ export default function Dashboard() {
                   {floorLoad.map((waiter, idx) => (
                     <div key={idx}>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-gray-700">{waiter.waiter}</span>
+                        <span className="truncate text-sm font-medium text-gray-700">{tUser(waiter.waiter)}</span>
                         <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-500">
                           {waiter.table_count}
                         </span>
@@ -656,7 +656,7 @@ export default function Dashboard() {
                         key={entry.name}
                         className="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-2"
                       >
-                        <span className="truncate text-xs font-medium text-gray-900">{entry.user}</span>
+                        <span className="truncate text-xs font-medium text-gray-900">{tUser(entry.user)}</span>
                         <span className="shrink-0 text-xs text-gray-500">
                           {formatOpenSessionDate(entry.period_start_date)}
                         </span>
@@ -702,7 +702,7 @@ export default function Dashboard() {
                 <div className="divide-y divide-gray-100">
                   {notifications.map((notification) => (
                     <div key={notification.id} className="flex items-start justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                      <p className="text-xs leading-relaxed text-gray-700">{notification.message}</p>
+                      <p className="text-xs leading-relaxed text-gray-700">{tNotification(notification.message)}</p>
                       <span className="shrink-0 whitespace-nowrap text-xs text-gray-400">
                         {notification.timestamp}
                       </span>

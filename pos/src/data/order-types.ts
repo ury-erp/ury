@@ -36,6 +36,12 @@ export const ORDER_TYPES: OrderTypes[] = [
     }
 ]
 
+import { t } from "../i18n";
+
+/** Display label for a stored order type value (values stay English: they are compared in code). */
+export const orderTypeLabel = (value: string): string =>
+    t(`order_types.${value.toLowerCase().replace(/ /g, "_")}`);
+
 export const DINE_IN="Dine In"
 export const TAKE_AWAY="Take Away"
 export const DEFAULT_ORDER_TYPE="Take Away"

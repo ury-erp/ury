@@ -1,6 +1,7 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { ArrowRightLeft, Loader2, MoreVertical, Printer, Receipt, UserRound } from 'lucide-react';
 import { Button } from '@ury/ui';
+import { t } from '../../i18n';
 
 /**
  * Captain order screen's secondary-actions overflow menu (PLAN.md §5/§6/§10:
@@ -102,14 +103,14 @@ const CaptainActionsMenu = ({
         size="icon"
         className="h-9 w-9 shrink-0 text-gray-600 hover:text-gray-900"
         onClick={handleToggle}
-        aria-label="More actions"
+        aria-label={t('captain.more_actions')}
         aria-expanded={isOpen}
       >
         <MoreVertical className="h-5 w-5" />
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-white py-1 shadow-lg">
+        <div className="absolute end-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-white py-1 shadow-lg">
           {showReprintKot && (
             <Button
               variant="ghost"
@@ -122,7 +123,7 @@ const CaptainActionsMenu = ({
               ) : (
                 <Printer className="h-4 w-4 shrink-0" />
               )}
-              Reprint KOT
+              {t('captain.reprint_kot')}
             </Button>
           )}
           {showTransferTable && (
@@ -132,7 +133,7 @@ const CaptainActionsMenu = ({
               onClick={handleTransferTable}
             >
               <ArrowRightLeft className="h-4 w-4 shrink-0" />
-              Transfer table
+              {t('captain.transfer_table')}
             </Button>
           )}
           {showTransferCaptain && (
@@ -142,7 +143,7 @@ const CaptainActionsMenu = ({
               onClick={handleTransferCaptain}
             >
               <UserRound className="h-4 w-4 shrink-0" />
-              Transfer captain
+              {t('captain.transfer_captain')}
             </Button>
           )}
           {showPrintBill && (
@@ -157,7 +158,7 @@ const CaptainActionsMenu = ({
               ) : (
                 <Receipt className="h-4 w-4 shrink-0" />
               )}
-              Print bill
+              {t('captain.print_bill')}
             </Button>
           )}
         </div>

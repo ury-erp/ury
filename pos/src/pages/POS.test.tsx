@@ -130,7 +130,7 @@ describe("POS", () => {
 
     render(<POS />);
     
-    expect(screen.getByText(/Retry/)).toBeInTheDocument();
+    expect(screen.getByText('common.retry')).toBeInTheDocument();
   });
 
   it("shows loading state", () => {

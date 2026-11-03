@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { t } from '../../i18n';
 import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner } from '@ury/ui';
@@ -65,7 +66,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search menu"
+            placeholder={t('demo.search_menu')}
             className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -80,7 +81,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 : 'bg-white text-gray-700 border-border'
             )}
           >
-            All
+            {t('demo.all')}
           </button>
           {categories.map((category) => (
             <button
@@ -100,16 +101,16 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
         {!canAddItems && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-            You can browse the menu, but you don't have permission to add items to this order.
+            {t('captain.browse_only')}
           </p>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
         {menuLoading ? (
-          <Spinner message="Loading menu…" />
+          <Spinner message={t('captain.loading_menu')} />
         ) : filteredItems.length === 0 ? (
-          <p className="text-center text-gray-500 text-sm mt-8">No items found.</p>
+          <p className="text-center text-gray-500 text-sm mt-8">{t('captain.no_items_found')}</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 pb-8">
             {filteredItems.map((item) => (

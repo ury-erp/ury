@@ -53,6 +53,7 @@ vi.mock("@ury/ui", async () => {
 
 vi.mock("../i18n", () => ({
   t: (key: string) => key,
+  tUser: (name: string | null | undefined) => name ?? "",
 }));
 
 describe("Header", () => {

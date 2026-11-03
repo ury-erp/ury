@@ -2,6 +2,7 @@ import { X, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@ury/ui';
 import { useEffect, useState } from 'react';
 import { isPermissionError } from './isPermissionError';
+import { t } from '../../i18n';
 
 interface UryInsight {
   name: string;
@@ -54,7 +55,7 @@ export default function InsightFeed({ branch }: InsightFeedProps) {
             // Not a manager — hide the card entirely rather than showing an error.
             setHidden(true);
           } else {
-            setError('Failed to load insights');
+            setError(t('dash_cards.insights_failed'));
             console.error('Error fetching insights:', err);
           }
         }
@@ -89,27 +90,27 @@ export default function InsightFeed({ branch }: InsightFeedProps) {
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-display text-lg font-semibold text-gray-900">Act now</h3>
+            <h3 className="font-display text-lg font-semibold text-gray-900">{t('dash_cards.act_now')}</h3>
           </div>
           {insights.length > 0 && (
             <span className="text-xs text-gray-500">
-              {insights.length} thing{insights.length !== 1 ? 's' : ''} worth your attention
+              {insights.length === 1 ? t('dash_cards.thing_worth_attention') : t('dash_cards.things_worth_attention', { n: insights.length })}
             </span>
           )}
         </div>
 
         {error ? (
-          <p className="text-red-600 text-sm">Failed to load insights</p>
+          <p className="text-red-600 text-sm">{t('dash_cards.insights_failed')}</p>
         ) : loading ? (
-          <p className="text-gray-600 text-sm">Loading...</p>
+          <p className="text-gray-600 text-sm">{t('common.loading')}</p>
         ) : insights.length === 0 ? (
-          <p className="text-gray-600 text-sm">Nothing needs attention right now.</p>
+          <p className="text-gray-600 text-sm">{t('dash_cards.nothing_needs_attention')}</p>
         ) : (
           <div className="space-y-3">
             {insights.map((insight) => (
               <div
                 key={insight.name}
-                className={`flex items-start gap-3 rounded border-l-4 bg-gray-50 p-3 ${RAIL_CLASS[insight.severity] ?? RAIL_CLASS.Info}`}
+                className={`flex items-start gap-3 rounded border-s-4 bg-gray-50 p-3 ${RAIL_CLASS[insight.severity] ?? RAIL_CLASS.Info}`}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{insight.title}</p>
@@ -124,7 +125,7 @@ export default function InsightFeed({ branch }: InsightFeedProps) {
                   type="button"
                   onClick={() => handleDismiss(insight.name)}
                   disabled={dismissing[insight.name]}
-                  aria-label="Dismiss"
+                  aria-label={t('common.dismiss')}
                   className="flex-shrink-0 text-gray-400 hover:text-gray-700 disabled:opacity-50"
                 >
                   <X className="w-4 h-4" />

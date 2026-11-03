@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { MenuItemCard } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
+import { t } from '../i18n';
 import {
   getAvailabilityMessage,
   getItemAvailability,
@@ -82,7 +83,7 @@ const MenuCard: FC<MenuCardProps> = ({
     ) {
       return {
         variant: 'tagDestructive',
-        text: unavailableMessage || 'Unavailable',
+        text: unavailableMessage || t('menu.unavailable'),
         showDot: false,
       };
     }
@@ -90,18 +91,18 @@ const MenuCard: FC<MenuCardProps> = ({
     if (availability.available_qty != null && availability.available_qty < 5) {
       return {
         variant: 'tagWarning',
-        text: `${availability.available_qty} left`,
+        text: t('menu.qty_left', { qty: availability.available_qty }),
         showDot: false,
       };
     }
 
     if (availability.available_qty == null) {
-      return { variant: 'tagSuccess', text: 'Available', showDot: true };
+      return { variant: 'tagSuccess', text: t('menu.available_chip'), showDot: true };
     }
 
     return {
       variant: 'tagSuccess',
-      text: `${availability.available_qty} left`,
+      text: t('menu.qty_left', { qty: availability.available_qty }),
       showDot: true,
     };
   };

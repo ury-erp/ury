@@ -2,6 +2,7 @@ import { Flame } from 'lucide-react';
 import { Card, CardContent } from '@ury/ui';
 import { useEffect, useState } from 'react';
 import { isPermissionError } from './isPermissionError';
+import { t } from '../../i18n';
 
 interface FastMovingItem {
   item: string;
@@ -47,7 +48,7 @@ export default function FastMovingItems({ branch, windowDays = 1 }: FastMovingIt
             // Not a manager — hide the card entirely rather than showing an error.
             setHidden(true);
           } else {
-            setError('Failed to load fast-moving items');
+            setError(t('dash_cards.fast_moving_failed'));
             console.error('Error fetching fast-moving items:', err);
           }
         }
@@ -71,16 +72,16 @@ export default function FastMovingItems({ branch, windowDays = 1 }: FastMovingIt
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-1">
           <Flame className="w-5 h-5 text-orange-600" />
-          <h3 className="font-display text-lg font-semibold text-gray-900">Fast Moving</h3>
+          <h3 className="font-display text-lg font-semibold text-gray-900">{t('dash_cards.fast_moving')}</h3>
         </div>
-        <p className="text-xs text-gray-500 mb-4">Based on recent sell rate, not a live stock count</p>
+        <p className="text-xs text-gray-500 mb-4">{t('dash_cards.fast_moving_hint')}</p>
 
         {error ? (
-          <p className="text-red-600 text-sm">Failed to load fast-moving items</p>
+          <p className="text-red-600 text-sm">{t('dash_cards.fast_moving_failed')}</p>
         ) : loading ? (
-          <p className="text-gray-600 text-sm">Loading...</p>
+          <p className="text-gray-600 text-sm">{t('common.loading')}</p>
         ) : items.length === 0 ? (
-          <p className="text-gray-600 text-sm">No sales activity to rank yet.</p>
+          <p className="text-gray-600 text-sm">{t('dash_cards.fast_moving_empty')}</p>
         ) : (
           <div className="space-y-2">
             {items.slice(0, 8).map((item) => (
@@ -94,8 +95,8 @@ export default function FastMovingItems({ branch, windowDays = 1 }: FastMovingIt
                     style={{ width: `${(item.sell_rate_per_hour / maxRate) * 100}%` }}
                   />
                 </div>
-                <span className="font-mono text-xs text-gray-600 w-20 text-right flex-shrink-0">
-                  {item.sell_rate_per_hour}/hr
+                <span className="font-mono text-xs text-gray-600 w-20 text-end flex-shrink-0">
+                  {t('dash_cards.per_hour', { n: item.sell_rate_per_hour })}
                 </span>
               </div>
             ))}

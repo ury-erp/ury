@@ -190,7 +190,7 @@ const TableView = () => {
         }
       } catch (e) {
         console.error(e);
-        setError('Failed to load rooms');
+        setError(t('tables.failed_to_load_rooms'));
       } finally {
         setLoadingRooms(false);
       }
@@ -259,7 +259,7 @@ const TableView = () => {
         setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
         console.error(e);
-        setError('Failed to load tables');
+        setError(t('tables.failed_to_load_tables'));
         setTables([]);
       } finally {
         setLoadingTables(false);
@@ -373,7 +373,7 @@ const TableView = () => {
     event.stopPropagation();
 
     if (!posProfile) {
-      showToast.error('POS profile not loaded yet');
+      showToast.error(t('tables.pos_profile_not_loaded'));
       return;
     }
 
@@ -383,7 +383,7 @@ const TableView = () => {
       const invoiceId = orderResponse.message?.name;
 
       if (!invoiceId) {
-        showToast.error('No active order found for this table');
+        showToast.error(t('tables.no_active_order'));
         return;
       }
 
@@ -395,7 +395,7 @@ const TableView = () => {
           posProfile.print_format
         ),
       });
-      showToast.success('Printed successfully');
+      showToast.success(t('tables.printed_successfully'));
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
@@ -634,14 +634,14 @@ const TableView = () => {
               <div className="flex flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
-                    <Spinner message="Loading rooms..." />
+                    <Spinner message={t('common.loading_rooms')} />
                   </div>
                 )}
 
                 {!loadingRooms && !hasRooms && (
                   <div className="flex items-center gap-2 text-gray-500 text-sm">
                     <AlertTriangle className="w-4 h-4" />
-                    No rooms found for this branch
+                    {t('tables.no_rooms_for_branch')}
                   </div>
                 )}
 
@@ -655,7 +655,7 @@ const TableView = () => {
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ml-2 bg-white/60">
+                      <Badge variant="outline" className="ms-2 bg-white/60">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}

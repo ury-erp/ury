@@ -110,7 +110,7 @@ const PanelActions = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("ml-auto flex items-center gap-[6px]", className)}
+      className={cn("ms-auto flex items-center gap-[6px]", className)}
       {...props}
     />
   )

@@ -257,7 +257,7 @@ export default function TableReservationTimeline({
                   <div
                     key={hour}
                     style={{ width: `${HOUR_WIDTH}px` }}
-                    className="shrink-0 border-r border-gray-200 py-2.5 px-2 text-center relative"
+                    className="shrink-0 border-e border-gray-200 py-2.5 px-2 text-center relative"
                   >
                     <span className="text-xs font-semibold text-gray-700">{hourFormatted}</span>
                     {/* 30m sub-tick */}
@@ -279,9 +279,9 @@ export default function TableReservationTimeline({
                 <div
                   key={hour}
                   style={{ width: `${HOUR_WIDTH}px` }}
-                  className="shrink-0 border-r border-gray-100 relative h-full"
+                  className="shrink-0 border-e border-gray-100 relative h-full"
                 >
-                  <div className="absolute top-0 bottom-0 right-1/2 border-r border-dashed border-gray-100/80" />
+                  <div className="absolute top-0 bottom-0 right-1/2 border-e border-dashed border-gray-100/80" />
                 </div>
               ))}
             </div>

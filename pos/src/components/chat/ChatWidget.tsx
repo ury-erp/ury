@@ -12,6 +12,7 @@ import { MessageCircle, X, Send, Sparkles, Maximize2, Minimize2 } from 'lucide-r
 import { cn, buttonVariants, ChatMarkdown } from '@ury/ui';
 import { useActiveReportContext } from './ActiveReportContext';
 import { resolveReportNavigation, navigateToReportSlug } from './reportNavigation';
+import { t } from '../../i18n';
 
 /**
  * `ChatWidget` mounts once in the app shell (see App.tsx); the ⌘K ask bar
@@ -246,7 +247,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
         {
           id: `a-err-${Date.now()}`,
           role: 'assistant',
-          text: "Sorry, that message didn't go through. Try again in a moment.",
+          text: t('ai.send_failed'),
         },
       ]);
     } finally {
@@ -281,7 +282,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 HUF
               </span>
               <span className="truncate text-sm font-medium text-foreground">
-                {activeReport ? activeReport.label : 'Ask about tonight'}
+                {activeReport ? activeReport.label : t('ai.ask_about_tonight_short')}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -297,7 +298,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 type="button"
                 onClick={() => setOpen(false)}
                 className="rounded p-1 text-muted-foreground hover:bg-muted"
-                aria-label="Close chat"
+                aria-label={t('ai.close_chat')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -310,22 +311,21 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <Sparkles className="h-5 w-5 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  The assistant isn't available right now.
+                  {t('ai.unavailable')}
                 </p>
                 {unavailableReason && (
                   <p className="text-xs text-muted-foreground/70">
-                    Dashboard data is unaffected — this only disables chat.
+                    {t('ai.unavailable_note')}
                   </p>
                 )}
               </div>
             ) : messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
                 {initializing ? (
-                  <p className="text-sm">Connecting…</p>
+                  <p className="text-sm">{t('ai.connecting')}</p>
                 ) : (
                   <p className="text-sm">
-                    Ask about {activeReport ? activeReport.label.toLowerCase() : 'tonight'} —
-                    e.g. &ldquo;which tables are running long?&rdquo;
+                    {t('ai.ask_about_example', { subject: activeReport ? activeReport.label.toLowerCase() : t('ai.tonight') })}
                   </p>
                 )}
               </div>
@@ -337,8 +337,8 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                     className={cn(
                       'min-w-0 rounded-lg px-3 py-2 text-sm leading-relaxed',
                       m.role === 'user'
-                        ? 'ml-auto max-w-[85%] whitespace-pre-wrap break-words bg-primary text-primary-foreground [overflow-wrap:anywhere]'
-                        : 'mr-auto max-w-[95%] bg-muted text-foreground'
+                        ? 'ms-auto max-w-[85%] whitespace-pre-wrap break-words bg-primary text-primary-foreground [overflow-wrap:anywhere]'
+                        : 'me-auto max-w-[95%] bg-muted text-foreground'
                     )}
                   >
                     {m.role === 'assistant' ? <ChatMarkdown>{m.text}</ChatMarkdown> : m.text}
@@ -347,7 +347,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 {sending && (
                   <div
                     className="mr-auto flex items-center gap-1 rounded-lg bg-muted px-3 py-2.5"
-                    aria-label="Assistant is typing"
+                    aria-label={t('ai.typing')}
                     role="status"
                   >
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
@@ -384,7 +384,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
                 onClick={handleSend}
                 disabled={isDisabled || sending || !draft.trim() || !conversationId}
                 className="text-primary disabled:text-muted-foreground disabled:cursor-not-allowed"
-                aria-label="Send message"
+                aria-label={t('ai.send')}
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -401,7 +401,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
             buttonVariants({ variant: 'default' }),
             'h-14 w-14 rounded-full p-0 shadow-lg transition-transform hover:scale-105'
           )}
-          aria-label="Open assistant chat"
+          aria-label={t('ai.open')}
         >
           <MessageCircle className="h-6 w-6" />
         </button>

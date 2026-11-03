@@ -175,7 +175,7 @@ const TableCard = ({
           )}
           {table.is_take_away === 1 && (
             <Badge variant="pending" className="mt-2">
-              Take away
+              {t('demo.take_away')}
             </Badge>
           )}
           {isLockedByReservation && (
@@ -202,7 +202,7 @@ const TableCard = ({
               className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
             >
               <Eye className="h-3 w-3" />
-              Preview
+              {t('demo.preview')}
             </button>
             <button
               onClick={onPrint}
@@ -212,12 +212,12 @@ const TableCard = ({
               {isPrinting ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Printing...
+                  {t('demo.printing')}
                 </>
               ) : (
                 <>
                   <Printer className="h-3 w-3" />
-                  Print
+                  {t('demo.print')}
                 </>
               )}
             </button>

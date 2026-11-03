@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { call } from '@ury/core';
 
 /**
@@ -87,11 +88,18 @@ export const AVAILABILITY_REASON_MESSAGES: Record<string, string> = {
   CONFIGURATION_ERROR: 'Temporarily unavailable',
 };
 
-const DEFAULT_UNAVAILABLE_MESSAGE = 'Currently unavailable';
+const AVAILABILITY_MESSAGE_KEYS: Record<string, string> = {
+  'Available': 'menu.available_chip',
+  'Not available today': 'menu.availability.not_today',
+  'Sold out': 'menu.availability.sold_out',
+  'Temporarily unavailable': 'menu.availability.temporarily',
+};
 
 export const getAvailabilityMessage = (reasonCode: string | null | undefined): string => {
-  if (!reasonCode) return DEFAULT_UNAVAILABLE_MESSAGE;
-  return AVAILABILITY_REASON_MESSAGES[reasonCode] ?? DEFAULT_UNAVAILABLE_MESSAGE;
+  if (!reasonCode) return t('menu.availability.default');
+  const en = AVAILABILITY_REASON_MESSAGES[reasonCode];
+  if (!en) return t('menu.availability.default');
+  return t(AVAILABILITY_MESSAGE_KEYS[en] ?? 'menu.availability.default');
 };
 
 // --- display-only cache -----------------------------------------------

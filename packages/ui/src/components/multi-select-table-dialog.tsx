@@ -129,7 +129,7 @@ export function MultiSelectTableDialog({
                         type="button"
                         onClick={() => toggle(table.name)}
                         className={cn(
-                          'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
+                          'flex items-center gap-2 rounded-lg border-2 p-3 text-start transition-all',
                           isSelected ? 'border-primary bg-primary-50' : 'border-border hover:bg-gray-50'
                         )}
                       >

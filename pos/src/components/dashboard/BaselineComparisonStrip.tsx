@@ -2,6 +2,7 @@ import { Card, CardContent } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { useEffect, useState } from 'react';
 import { isPermissionError } from './isPermissionError';
+import { t } from '../../i18n';
 
 interface BaselineComparison {
   window: string;
@@ -21,7 +22,7 @@ interface BaselineComparisonStripProps {
 }
 
 function DeltaLabel({ pct, positiveIsGood = true }: { pct: number | null; positiveIsGood?: boolean }) {
-  if (pct === null) return <span className="text-gray-500">no baseline yet</span>;
+  if (pct === null) return <span className="text-gray-500">{t('dash_cards.no_baseline')}</span>;
   const isUp = pct >= 0;
   const isGood = positiveIsGood ? isUp : !isUp;
   return (
@@ -60,7 +61,7 @@ export default function BaselineComparisonStrip({ branch }: BaselineComparisonSt
             // Not a manager — hide the card entirely rather than showing an error.
             setHidden(true);
           } else {
-            setError('Failed to load baseline comparison');
+            setError(t('dash_cards.baseline_failed'));
             console.error('Error fetching baseline comparison:', err);
           }
         }
@@ -80,37 +81,37 @@ export default function BaselineComparisonStrip({ branch }: BaselineComparisonSt
   return (
     <Card className="bg-white border border-border">
       <CardContent className="p-6">
-        <h3 className="font-display text-lg font-semibold text-gray-900">Tonight vs a normal day</h3>
+        <h3 className="font-display text-lg font-semibold text-gray-900">{t('dash_cards.baseline_title')}</h3>
         <p className="text-xs text-gray-500 mb-4">
           {comparison && comparison.sample_days > 0
-            ? `Compared against last ${comparison.sample_days} same weekday${comparison.sample_days !== 1 ? 's' : ''}, same hour`
-            : 'Compared against the same weekday and hour'}
+            ? t('dash_cards.compared_last_n', { n: comparison.sample_days })
+            : t('dash_cards.compared_same_weekday')}
         </p>
 
         {error ? (
-          <p className="text-red-600 text-sm">Failed to load baseline comparison</p>
+          <p className="text-red-600 text-sm">{t('dash_cards.baseline_failed')}</p>
         ) : loading ? (
-          <p className="text-gray-600 text-sm">Loading...</p>
+          <p className="text-gray-600 text-sm">{t('common.loading')}</p>
         ) : !comparison ? (
-          <p className="text-gray-600 text-sm">No data available</p>
+          <p className="text-gray-600 text-sm">{t('dash_cards.no_data')}</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600 mb-1">Sales so far</p>
+              <p className="text-xs text-gray-600 mb-1">{t('dash_cards.sales_so_far')}</p>
               <p className="font-mono text-xl font-semibold text-gray-900">
                 {formatCurrency(comparison.current.sales)}
               </p>
               <p className="text-xs mt-1">
                 <DeltaLabel pct={comparison.delta.sales_pct} />
-                <span className="text-gray-500"> vs usual {formatCurrency(comparison.baseline.sales)}</span>
+                <span className="text-gray-500"> {t('dash_cards.vs_usual', { value: formatCurrency(comparison.baseline.sales) })}</span>
               </p>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600 mb-1">Covers</p>
+              <p className="text-xs text-gray-600 mb-1">{t('dash_cards.covers')}</p>
               <p className="font-mono text-xl font-semibold text-gray-900">{comparison.current.covers}</p>
               <p className="text-xs mt-1">
                 <DeltaLabel pct={comparison.delta.covers_pct} />
-                <span className="text-gray-500"> vs usual {comparison.baseline.covers}</span>
+                <span className="text-gray-500"> {t('dash_cards.vs_usual', { value: comparison.baseline.covers })}</span>
               </p>
             </div>
           </div>

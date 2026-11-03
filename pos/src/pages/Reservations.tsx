@@ -609,13 +609,13 @@ export default function Reservations() {
 
                             {isMenuOpen && (
                               <div
-                                className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
+                                className="absolute end-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEdit(res)}
-                                  className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                  className="w-full text-start px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                 >
                                   <Pencil className="w-3.5 h-3.5 text-blue-600" />
                                   <span>{t('reservations.edit_action')}</span>
@@ -625,7 +625,7 @@ export default function Reservations() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenComplete(res)}
-                                    className="w-full text-left px-4 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
+                                    className="w-full text-start px-4 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
                                   >
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>{t('reservations.complete_title')}</span>
@@ -636,7 +636,7 @@ export default function Reservations() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenCancel(res)}
-                                    className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    className="w-full text-start px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
                                   >
                                     <XCircle className="w-3.5 h-3.5 text-red-600" />
                                     <span>{t('reservations.cancel_title')}</span>

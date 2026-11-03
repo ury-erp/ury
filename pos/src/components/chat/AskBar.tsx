@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useChatWidgetRef, useAiEnabled } from './ChatWidget';
+import { t } from '../../i18n';
 
 /**
  * Top-bar "Ask HUF" input (PLAN.md item 6), matching the mockup's `.ask`
@@ -33,14 +34,14 @@ export default function AskBar() {
     <button
       type="button"
       onClick={() => chatRef.current?.openAndFocus()}
-      className="flex w-full max-w-md items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-muted-foreground hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-full max-w-md items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-start text-sm text-muted-foreground hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="rounded border border-chat-accent/30 bg-chat-accent/6 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-chat-accent">
         HUF
       </span>
       <span className="flex flex-1 items-center gap-1.5 truncate">
         <Sparkles className="h-3.5 w-3.5 shrink-0" />
-        Ask about tonight…
+        {t('ai.ask_about_tonight')}
       </span>
       <span className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">
         ⌘K

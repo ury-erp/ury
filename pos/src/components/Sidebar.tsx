@@ -4,7 +4,7 @@ import { usePOSStore } from '../store/pos-store';
 import { SidebarContainer, SidebarCard, SidebarActiveIndicator, sidebarItemVariants, Button, Badge } from '@ury/ui';
 import CommentDialog from './CommentDialog';
 import { useState } from 'react';
-import { t } from '../i18n';
+import { t, tData } from '../i18n';
 
 interface SidebarProps {
   disabled?: boolean;
@@ -83,7 +83,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                       courseName={category.name}
                       className="w-4 h-4 text-gray-500 flex-shrink-0"
                     />
-                    <span className="text-start">{category.label}</span>
+                    <span className="text-start">{tData(category.label)}</span>
                   </div>
                   <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
                     {count}

@@ -57,7 +57,7 @@ const InlineEditCell = React.forwardRef<HTMLInputElement, InlineEditCellProps>(
           // Default: transparent background, minimal border (barely visible)
           "bg-transparent border border-transparent",
           // Text alignment
-          align === 'right' ? 'text-right' : 'text-left',
+          align === 'right' ? 'text-end' : 'text-start',
           // Hover: subtle border appears
           "hover:border-border hover:bg-muted",
           // Focus: visible border and background (similar to input focus state)

@@ -3,7 +3,7 @@ import { cn } from "../lib/cn"
 import { X } from "lucide-react"
 
 const drawerVariants = {
-  base: "fixed top-0 right-0 bottom-0 z-50 bg-card text-card-foreground border-l border-border flex flex-col",
+  base: "fixed top-0 end-0 bottom-0 z-50 bg-card text-card-foreground border-s border-border flex flex-col",
   open: "shadow-xl",
   closed: "",
 }

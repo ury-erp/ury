@@ -7,6 +7,7 @@ import {
   resolveServiceRequest,
   type ServiceRequest,
 } from '../../lib/service-request-api';
+import { t } from '../../i18n';
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -24,9 +25,9 @@ const POLL_INTERVAL_MS = 15000;
 function timeElapsed(requestedAt: string): string {
   const requested = new Date(requestedAt.replace(' ', 'T'));
   const minutes = Math.max(0, Math.round((Date.now() - requested.getTime()) / 60000));
-  if (minutes < 1) return 'just now';
-  if (minutes === 1) return '1 min ago';
-  return `${minutes} min ago`;
+  if (minutes < 1) return t('dashboard.relative_just_now');
+  if (minutes === 1) return t('dashboard.relative_min_ago', { n: 1 });
+  return t('dashboard.relative_min_ago', { n: minutes });
 }
 
 interface Props {
@@ -61,7 +62,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
       await load();
     } catch (error) {
       console.error('Failed to acknowledge service request:', error);
-      showToast.error('Failed to acknowledge request');
+      showToast.error(t('captain.ack_failed'));
     } finally {
       setBusyName(null);
     }
@@ -72,10 +73,10 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
     try {
       await resolveServiceRequest(name);
       setRequests((current) => current.filter((request) => request.name !== name));
-      showToast.success('Request resolved');
+      showToast.success(t('captain.resolved'));
     } catch (error) {
       console.error('Failed to resolve service request:', error);
-      showToast.error('Failed to resolve request');
+      showToast.error(t('captain.resolve_failed'));
     } finally {
       setBusyName(null);
     }
@@ -86,15 +87,15 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
   const count = requests.length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div className="fixed bottom-4 end-4 z-40 flex flex-col items-end gap-2">
       {isOpen && (
         <div className="w-80 max-w-[90vw] rounded-lg border border-border bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-border p-3">
-            <h2 className="text-sm font-semibold text-gray-900">Service Requests</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{t('captain.service_requests')}</h2>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              aria-label="Close service requests"
+              aria-label={t('captain.close_requests')}
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-4 w-4" />
@@ -103,7 +104,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
 
           <div className="max-h-80 overflow-y-auto">
             {count === 0 ? (
-              <p className="p-4 text-center text-sm text-gray-500">No open requests</p>
+              <p className="p-4 text-center text-sm text-gray-500">{t('captain.no_open_requests')}</p>
             ) : (
               requests.map((request) => (
                 <div
@@ -112,14 +113,14 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-gray-900">
-                      Table {request.table} &middot; {request.request_type}
+                      {t('captain.table_request', { table: request.table, type: request.request_type })}
                     </p>
                     <p className="flex items-center gap-1 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />
                       {timeElapsed(request.requested_at)}
                       {request.status === 'Acknowledged' && (
-                        <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-700">
-                          Acknowledged
+                        <span className="ms-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-700">
+                          {t('captain.acknowledged')}
                         </span>
                       )}
                     </p>
@@ -132,7 +133,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
                         disabled={busyName === request.name}
                         onClick={() => handleAcknowledge(request.name)}
                       >
-                        Ack
+                        {t('captain.ack')}
                       </Button>
                     )}
                     <Button
@@ -158,7 +159,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        aria-label="Toggle service requests"
+        aria-label={t('captain.toggle_requests')}
         className={cn(
           'relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-colors',
           count > 0 ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-border'
@@ -166,7 +167,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+          <span className="absolute -top-1 -end-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
             {count}
           </span>
         )}

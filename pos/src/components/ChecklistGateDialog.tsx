@@ -338,12 +338,12 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
+            <div className="flex-1 overflow-y-auto space-y-4 mb-6 pe-1">
               {rows.map((row, index) => (
                 <div key={`${row.item_label}-${index}`}>
                   <span className="text-sm font-medium text-gray-900">
                     {index + 1}. {row.item_label}
-                    {!!row.is_mandatory && <span className="text-red-600 ml-1">*</span>}
+                    {!!row.is_mandatory && <span className="text-red-600 ms-1">*</span>}
                   </span>
                   <div className="flex items-center gap-4 mt-2">
                     <label className="flex items-center gap-1.5 text-sm text-gray-900 cursor-pointer">

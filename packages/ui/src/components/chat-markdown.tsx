@@ -17,9 +17,9 @@ const components: Components = {
   h2: ({ children }) => <h3 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h3>,
   h3: ({ children }) => <h4 className="mb-1 mt-2 text-sm font-semibold first:mt-0">{children}</h4>,
   h4: ({ children }) => <h4 className="mb-1 mt-2 text-[13px] font-semibold first:mt-0">{children}</h4>,
-  ul: ({ children }) => <ul className="my-1.5 list-disc space-y-0.5 pl-4">{children}</ul>,
-  ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-0.5 pl-4">{children}</ol>,
-  li: ({ children }) => <li className="pl-0.5">{children}</li>,
+  ul: ({ children }) => <ul className="my-1.5 list-disc space-y-0.5 ps-4">{children}</ul>,
+  ol: ({ children }) => <ol className="my-1.5 list-decimal space-y-0.5 ps-4">{children}</ol>,
+  li: ({ children }) => <li className="ps-0.5">{children}</li>,
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   a: ({ children, href }) => (
     <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
@@ -27,7 +27,7 @@ const components: Components = {
     </a>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-1.5 border-l-2 border-border pl-2 text-muted-foreground">{children}</blockquote>
+    <blockquote className="my-1.5 border-s-2 border-border ps-2 text-muted-foreground">{children}</blockquote>
   ),
   hr: () => <hr className="my-2 border-border" />,
   pre: ({ children }) => (
@@ -45,7 +45,7 @@ const components: Components = {
   ),
   thead: ({ children }) => <thead className="bg-background/60">{children}</thead>,
   th: ({ children, style }) => (
-    <th style={style} className="whitespace-nowrap border-b border-border px-2 py-1 text-left font-semibold">
+    <th style={style} className="whitespace-nowrap border-b border-border px-2 py-1 text-start font-semibold">
       {children}
     </th>
   ),

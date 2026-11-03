@@ -212,7 +212,7 @@ const BillMergeDialog = ({
               disabled={isSubmitting}
               onClick={() => setSelected(row.name)}
               className={cn(
-                'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors',
+                'flex w-full items-center justify-between rounded-lg border p-3 text-start transition-colors',
                 isSelected
                   ? 'border-primary bg-primary-50/40'
                   : 'border-border hover:border-border'
@@ -222,7 +222,7 @@ const BillMergeDialog = ({
                 <p className="font-medium text-gray-900">{row.name}</p>
                 <p className="text-xs text-gray-500">
                   {row.customer_name || row.customer}
-                  {tableLabel ? ` • Table ${tableLabel}` : ''}
+                  {tableLabel ? ` • ${t('demo.table')} ${tableLabel}` : ''}
                 </p>
               </div>
               <span className="ms-3 shrink-0 text-sm font-semibold text-gray-900 tabular-nums">

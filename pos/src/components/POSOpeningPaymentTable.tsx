@@ -41,10 +41,10 @@ const POSOpeningPaymentTable = ({
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left font-medium text-gray-700 px-4 py-3">
+              <th className="text-start font-medium text-gray-700 px-4 py-3">
                 {t('pos_opening.mode_of_payment')}
               </th>
-              <th className="text-right font-medium text-gray-700 px-4 py-3 w-44">
+              <th className="text-end font-medium text-gray-700 px-4 py-3 w-44">
                 {t('pos_opening.opening_amount')}
               </th>
             </tr>
@@ -74,7 +74,7 @@ const POSOpeningPaymentTable = ({
                       }
                     }}
                     disabled={disabled || readOnly}
-                    className="text-right"
+                    className="text-end"
                     size="sm"
                     placeholder="0"
                   />

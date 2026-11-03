@@ -154,7 +154,7 @@ export function TablePickerDialog({
                           onClick={() => setSelected(table.name)}
                           variant="ghost"
                           className={cn(
-                            'flex h-auto w-full items-center gap-3 rounded-lg border p-3 text-left',
+                            'flex h-auto w-full items-center gap-3 rounded-lg border p-3 text-start',
                             isSelected ? 'border-primary bg-primary-50/40' : 'border-border'
                           )}
                         >

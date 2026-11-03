@@ -19,6 +19,7 @@ vi.mock("./CommentDialog", () => ({
 
 vi.mock("../i18n", () => ({
   t: (key: string) => key,
+  tData: (s: string) => s,
 }));
 
 vi.mock("@ury/ui", () => ({

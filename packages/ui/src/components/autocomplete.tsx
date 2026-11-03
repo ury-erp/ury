@@ -290,7 +290,7 @@ export function Autocomplete({
           aria-expanded={isOpen}
           aria-controls={listboxId}
           aria-autocomplete="list"
-          className="w-full pr-9 cursor-text"
+          className="w-full pe-9 cursor-text"
         />
         <button
           type="button"
@@ -302,7 +302,7 @@ export function Autocomplete({
             else openList()
           }}
           className={cn(
-            'absolute right-3 top-1/2 -translate-y-1/2 p-1 text-text-tertiary transition-colors',
+            'absolute end-3 top-1/2 -translate-y-1/2 p-1 text-text-tertiary transition-colors',
             disabled ? 'pointer-events-none opacity-50' : 'hover:text-foreground'
           )}
         >

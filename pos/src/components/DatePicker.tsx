@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { t } from '../i18n';
 
 interface DatePickerProps {
   id?: string;
@@ -325,7 +326,7 @@ export function DatePicker({
           onClick={handleTodayClick}
           className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
         >
-          Today
+          {t('common.today')}
         </button>
       </div>
     </div>

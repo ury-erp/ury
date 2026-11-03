@@ -58,7 +58,7 @@ const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
         </div>
 
         {/* Right-aligned section */}
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <div className="ms-auto flex items-center gap-2 flex-shrink-0">
           {amount && (
             <span className="font-mono text-xs text-muted-foreground">
               {amount}
