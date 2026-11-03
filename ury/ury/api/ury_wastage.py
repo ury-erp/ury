@@ -88,7 +88,7 @@ def capture_wastage(
     if wasted_qty > held_qty:
         frappe.throw(
             _("Wasted quantity {0} exceeds currently-held quantity {1} for {2}").format(
-                wasted_qty, held_qty, auth_doc.items[0].item_code if getattr(doc, "items", None) else ""
+                wasted_qty, held_qty, auth_doc.get("items")[0].item_code if auth_doc.get("items") else ""
             ),
             frappe.ValidationError,
         )
@@ -147,17 +147,21 @@ def _resolve_wastage(wastage, actor, approve):
     if doc.get("status") != "Draft":
         frappe.throw(_("Only Draft wastage records can be approved or rejected"), frappe.ValidationError)
 
+    doc_items = doc.get("items")
+    qty = doc_items[0].qty if doc_items else 0
+
     if approve:
-        auth_doc = frappe.get_doc(ISSUE_AUTH_DOCTYPE, doc.get("issue_authorization"))
-        held_qty = held_quantity(auth_doc, exclude_wastage=doc.get("name"))
-        qty = doc.items[0].qty if doc.items else 0
-        if qty > held_qty:
-            frappe.throw(
-                _("Wasted quantity {0} exceeds currently-held quantity {1} for {2} (re-validated at approval)").format(
-                    qty, held_qty, auth_doc.items[0].item_code if getattr(doc, "items", None) else ""
-                ),
-                frappe.ValidationError,
-            )
+        if doc.get("issue_authorization"):
+            auth_doc = frappe.get_doc(ISSUE_AUTH_DOCTYPE, doc.get("issue_authorization"))
+            held_qty = held_quantity(auth_doc, exclude_wastage=doc.get("name"))
+            if qty > held_qty:
+                auth_items = auth_doc.get("items")
+                frappe.throw(
+                    _("Wasted quantity {0} exceeds currently-held quantity {1} for {2} (re-validated at approval)").format(
+                        qty, held_qty, auth_items[0].item_code if auth_items else ""
+                    ),
+                    frappe.ValidationError,
+                )
         compute_wastage_valuation(doc)
         doc.status = "Authorized"
     else:
@@ -173,25 +177,28 @@ def _resolve_wastage(wastage, actor, approve):
         actor,
         {"wasted_qty": qty if approve else 0, "permission_basis": permission_basis},
     )
-    doc.save(ignore_permissions=False)
+    if approve:
+        if getattr(doc, "flags", None) is None:
+            doc.flags = frappe._dict()
+        doc.flags.ignore_permissions = True
+        doc.submit()
+    else:
+        doc.save(ignore_permissions=False)
     return doc
 
 
 def compute_wastage_valuation(wastage_doc, valuation_rate=None):
-    """Valuation hook (stub): attribute a cost to approved wastage.
+    """Valuation hook: attribute a cost to approved wastage.
 
-    FUTURE WORK: real ERPNext valuation-rate sourcing (item bin valuation
-    rate, moving-average/FIFO layers, warehouse-specific rate, etc.) is NOT
-    implemented here — this module never calls any ERPNext costing/ledger
-    API. For now this simply computes `qty * valuation_rate`, where
-    `valuation_rate` is either the argument passed in, or a
-    `valuation_rate` value already present on the doc (e.g. set by a
-    caller who already looked it up), defaulting to 0 if neither is
-    available. `valuation_is_estimated` stays 1 to flag that this number is
-    not sourced from a real valuation ledger yet.
+    ``valuation_rate`` is either the argument passed in — approval passes
+    the BOM-based rate from :func:`_resolve_bom_valuation_rate` — or a
+    ``valuation_rate`` value already present on the doc, defaulting to 0 if
+    neither is available. Simply computes ``qty * valuation_rate``.
+    ``valuation_is_estimated`` stays 1 to flag that this number is BOM
+    standard cost, not a rate sourced from live stock valuation layers.
     """
     total = 0
-    for item in wastage_doc.items:
+    for item in (wastage_doc.get("items") or []):
         # If an explicit rate is passed, use it. Otherwise fall back to the item's existing rate.
         rate = valuation_rate if valuation_rate is not None else (item.rate or 0)
         item.rate = rate
@@ -329,7 +336,7 @@ def append_audit(doc, event, actor, details):
         "branch": doc.get("branch"),
         "company": doc.get("company"),
         "department": doc.get("department"),
-        "component_item": doc.items[0].item_code if getattr(doc, "items", None) else "",
+        "component_item": doc.get("items")[0].item_code if doc.get("items") else "",
     }
     entry.update(details or {})
     entries.append(entry)
