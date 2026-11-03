@@ -1,4 +1,7 @@
 import json
+from datetime import timedelta
+from math import isfinite
+
 import frappe
 from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
@@ -22,9 +25,58 @@ def serve_kot(name, time=None):
     
     server_time_str = current_time.strftime("%H:%M:%S")
     
-    frappe.db.set_value("URY KOT", name, "start_time_serv", server_time_str)
-    frappe.db.set_value("URY KOT", name, "production_time", production_time_minutes)
-    frappe.db.set_value("URY KOT", name, "order_status", "Served")
+    kot_doc.db_set({
+        "start_time_serv": server_time_str,
+        "production_time": production_time_minutes,
+        "order_status": "Served",
+    })
+
+
+@frappe.whitelist(methods=["POST"])
+def recall_kot(name):
+    if frappe.request and frappe.request.method != "POST":
+        frappe.throw(_("POST requests only"), frappe.PermissionError)
+
+    kot_doc = frappe.get_doc("URY KOT", name)
+    if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+        frappe.throw(
+            _("You do not have permission to modify this KOT."),
+            frappe.PermissionError,
+        )
+
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            session_branch = None
+        else:
+            raise
+
+    if session_branch and kot_doc.branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to modify KOTs from other branches."),
+            frappe.PermissionError,
+        )
+
+    if kot_doc.order_status != "Served":
+        frappe.throw(_("Only Served KOTs can be recalled."))
+
+    # production_time records minutes from creation to serving. Unlike modified,
+    # it is not extended by a later edit and includes the date across midnight.
+    try:
+        production_minutes = float(kot_doc.production_time)
+        if not isfinite(production_minutes) or production_minutes < 0:
+            raise ValueError
+        served_at = get_datetime(kot_doc.creation) + timedelta(minutes=production_minutes)
+    except (TypeError, ValueError, OverflowError):
+        frappe.throw(_("This KOT has no valid serving time."))
+
+    elapsed = (get_datetime() - served_at).total_seconds()
+    if not 0 <= elapsed <= 15 * 60:
+        frappe.throw(_("KOTs can only be recalled within 15 minutes of serving."))
+
+    kot_doc.db_set("order_status", "Ready For Prepare")
+    kot_doc.add_comment("Comment", _("Recalled by {0}").format(frappe.session.user))
 
 
 # Function to mark it as verified in a cancel type KOT.
@@ -166,6 +218,7 @@ def kot_list():
         "KOT": KOT,
         "Dashboard": dashboard,
         "Branch": branch,
+        "server_time": today,
         "kot_alert_time": kot_alert_time,
         "audio_alert": audio_alert,
         "daily_order_number":daily_order_number
@@ -240,4 +293,3 @@ def served_kot_list():
         "audio_alert": audio_alert,
         "daily_order_number":daily_order_number
     }
-
