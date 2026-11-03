@@ -42,8 +42,8 @@ class ValidateTests(unittest.TestCase):
 
 	def test_links(self):
 		ok = {"type": "bar", "title": "t", "series": [{"label": "a", "value": 1}]}
-		good = cc.validate_card({**ok, "link": {"label": "Open", "url": "/insights/dashboards/58aq35af28"}})
-		self.assertEqual(good["link"]["url"], "/insights/dashboards/58aq35af28")
+		good = cc.validate_card({**ok, "link": {"label": "Open", "url": "/insights/dashboards/994d77ru95"}})
+		self.assertEqual(good["link"]["url"], "/insights/dashboards/994d77ru95")
 		for url in ("https://evil.com/x", "//evil.com", "javascript:alert(1)", "/insights/dashboards/A B",
 				"/insights/dashboards/x/../../y", "/insights/dashboards/", "/app/../etc", "data:text/html,x", None, 5):
 			self.assertIsNone(cc.validate_card({**ok, "link": {"label": "x", "url": url}})["link"], url)
@@ -106,8 +106,8 @@ class LinkShapeTests(unittest.TestCase):
 	def test_bare_url_string_is_normalised(self):
 		# regression: cards_for(..., link="/insights/dashboards/<id>") used to give link None
 		cards = cc.cards_for("get_branch_ranking", {"branches": [{"branch": "A", "day": {"value": 5}}]},
-			link="/insights/dashboards/58aq35af28")
-		self.assertEqual(cards[0]["link"], {"label": "Open dashboard", "url": "/insights/dashboards/58aq35af28"})
+			link="/insights/dashboards/994d77ru95")
+		self.assertEqual(cards[0]["link"], {"label": "Open dashboard", "url": "/insights/dashboards/994d77ru95"})
 		self.assertEqual(cc.validate_card({**self.OK, "link": "/app/sales-invoice"})["link"]["url"], "/app/sales-invoice")
 
 	def test_bad_or_missing_links_are_null(self):

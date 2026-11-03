@@ -37,7 +37,7 @@ class TestAnalyticsEnv(unittest.TestCase):
 		self.assertFalse(env.installed_from_apps(None))
 
 	def test_url_for(self):
-		self.assertEqual(env.url_for("owner", True), "/insights/dashboards/58aq35af28")
+		self.assertEqual(env.url_for("owner", True), "/insights/dashboards/994d77ru95")
 		self.assertIsNone(env.url_for("owner", False))
 		self.assertIsNone(env.url_for("nope", True))
 
@@ -61,7 +61,7 @@ class TestAnalyticsEnv(unittest.TestCase):
 			self.assertIsNone(env.dashboard_url())
 		with mock.patch.object(env.frappe, "get_installed_apps", create=True, return_value=["frappe", "insights"]):
 			self.assertTrue(env.insights_installed())
-			self.assertEqual(env.dashboard_url("owner"), "/insights/dashboards/58aq35af28")
+			self.assertEqual(env.dashboard_url("owner"), "/insights/dashboards/994d77ru95")
 
 
 if __name__ == "__main__":

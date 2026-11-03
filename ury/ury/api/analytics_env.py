@@ -12,7 +12,7 @@ INSIGHTS_APP = "insights"
 
 # Single registry of Insights dashboard ids (key -> id). Add new dashboards here only.
 DASHBOARDS = {
-	"owner": "58aq35af28",
+	"owner": "994d77ru95",
 }
 
 INSTALL_HINT = {

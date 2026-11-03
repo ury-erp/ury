@@ -48,7 +48,7 @@ test("dashboard fixture survives sanitize", () => {
   assert.deepEqual(d.panels.map((p) => p.span), [2, 2, 2]);
   assert.match(cardSummary(d), /Last 7 Days Sales Overview/);
   assert.match(cardSummary(d), /Total net sales/);
-  assert.equal(dashboardLink(d).url, "/insights/dashboards/58aq35af28");
+  assert.equal(dashboardLink(d).url, "/insights/dashboards/994d77ru95");
 });
 test("dashboard malformed panels dropped, caps at 6, no nesting", () => {
   const nested = { v: 2, type: "dashboard", panels: [{ card: { type: "dashboard", panels: [] } }] };

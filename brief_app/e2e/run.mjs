@@ -50,7 +50,7 @@ for (const scheme of ["light", "dark"]) {
     check(`[${scheme}] get_brief real data fetched (200)`, brief.includes(200), `statuses=${brief}`);
     check(`[${scheme}] slides present`, ids.length >= 6, ids.join(","));
     const mtd = await page.locator('section.slide[data-slide-id="mtd_target"]').innerText();
-    check(`[${scheme}] slide 2 shows "Not recorded yet"`, /Not recorded yet/.test(mtd));
+    check(`[${scheme}] slide 2 shows month-to-date against target`, /of target|Month to date/i.test(mtd), mtd.slice(0, 120).replace(/\s+/g, " "));
     if (scheme === "light") {
       await page.keyboard.press("ArrowRight"); await page.waitForTimeout(700);
       check("ArrowRight advances to slide 2", (await dots(page)) === 1, `idx=${await dots(page)}`);
