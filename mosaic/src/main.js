@@ -1,4 +1,6 @@
 import './index.css';
+import i18n, { applyDocumentLocale } from './i18n';
+applyDocumentLocale();
 import { createApp, reactive } from "vue";
 import App from "./App.vue";
 
@@ -8,6 +10,7 @@ const app = createApp(App);
 
 // Plugins
 app.use(router);
+app.use(i18n);
 
 // Global Properties,
 // components can inject this via inject: ["$auth"]

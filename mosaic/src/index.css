@@ -50,6 +50,21 @@
   src: url('./assets/fonts/geist-mono-latin-600-normal.woff2') format('woff2');
 }
 
+@font-face {
+  font-family: 'Almarai';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/almarai-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Almarai';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/almarai-700.woff2') format('woff2');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -88,3 +103,8 @@ body {
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Arabic / RTL: Almarai for all text; Latin (Western) numerals are kept. */
+html[lang='ar'] { --s: 'Almarai', 'Geist', ui-sans-serif, system-ui, sans-serif; }
+html[lang='ar'] body { letter-spacing: 0; font-size: 14px; }
+html[dir='rtl'] .truncate { text-align: start; }

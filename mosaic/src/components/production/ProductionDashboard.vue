@@ -5,11 +5,11 @@
     <div v-if="scope.error || error" role="alert" class="text-center py-10 text-[var(--rd)]">{{ scope.error || error }}</div>
     <div v-else-if="loading || scope.loading" class="text-center py-10">
       <h2 class="text-lg font-semibold" style="color: var(--t3)">
-        Loading Production Dashboard...
+        {{ __("Loading Production Dashboard...") }}
       </h2>
     </div>
 
-    <div v-else-if="!dashboard.length" class="text-center py-10 text-[var(--t3)]">No production units for the selected company and branch.</div>
+    <div v-else-if="!dashboard.length" class="text-center py-10 text-[var(--t3)]">{{ __("No production units for the selected company and branch.") }}</div>
     <!-- Production Cards -->
     <div
       v-else
@@ -31,6 +31,7 @@
 </template>
 
 <script>
+import { t } from "../../i18n";
 import ProductionCard from "./ProductionCard.vue";
 import { FrappeApp } from "frappe-js-sdk";
 import { productionScopeKey } from "../../composables/productionScope";
@@ -107,7 +108,7 @@ export default {
 
         if (request === this.requestId) this.dashboard = units;
       } catch (error) {
-        if (request === this.requestId) this.error = "Unable to load production units. Please reload to retry.";
+        if (request === this.requestId) this.error = t("Unable to load production units. Please reload to retry.");
       } finally {
         if (request === this.requestId) this.loading = false;
       }

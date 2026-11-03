@@ -2,7 +2,7 @@
   <div ref="menu" class="relative" @keydown.esc="open = false">
     <button
       type="button"
-      :aria-label="`Select Active ${label}`"
+      :aria-label="t('Select Active {0}', label)"
       :aria-expanded="open"
       :disabled="disabled"
       class="flex items-center gap-2 h-7 px-2.5 bg-[var(--sunk)] hover:bg-[var(--hover)] rounded-[7px] text-sm font-medium text-[var(--t1)] disabled:opacity-50"
@@ -17,14 +17,14 @@
         <path d="m6 9 6 6 6-6" />
       </svg>
     </button>
-    <div v-if="open" class="absolute right-0 mt-2 w-64 max-h-80 overflow-auto bg-[var(--panel)] rounded-lg shadow-lg border border-[var(--hair)] py-1.5 z-50">
-      <div class="px-3 py-1.5 text-xs font-semibold text-[var(--t3)] uppercase tracking-wider">Select Active {{ label }}</div>
+    <div v-if="open" class="absolute end-0 mt-2 w-64 max-h-80 overflow-auto bg-[var(--panel)] rounded-lg shadow-lg border border-[var(--hair)] py-1.5 z-50">
+      <div class="px-3 py-1.5 text-xs font-semibold text-[var(--t3)] ">{{ t("Select Active {0}", label) }}</div>
       <button
         v-for="option in allOptions"
         :key="option.value"
         type="button"
         :aria-pressed="modelValue === option.value"
-        class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left"
+        class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-start"
         :class="modelValue === option.value ? 'bg-[var(--ac-t)] text-[var(--ac)] font-semibold' : 'text-[var(--t1)] hover:bg-[var(--hover)]'"
         @click="select(option.value)"
       >
@@ -37,6 +37,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { t } from "../i18n";
 
 const props = defineProps({
   modelValue: { type: String, default: "all" },
@@ -49,7 +50,7 @@ const emit = defineEmits(["update:modelValue"]);
 const open = ref(false);
 const menu = ref(null);
 const allOptions = computed(() => [{ value: "all", label: props.allLabel }, ...props.options]);
-const selectedLabel = computed(() => allOptions.value.find((option) => option.value === props.modelValue)?.label || `Select ${props.label}`);
+const selectedLabel = computed(() => allOptions.value.find((option) => option.value === props.modelValue)?.label || t("Select {0}", props.label));
 
 function select(value) {
   emit("update:modelValue", value);

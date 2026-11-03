@@ -20,7 +20,7 @@
         </h2>
 
         <p class="text-xs" style="color: var(--t3)">
-          Production Unit
+          {{ __("Production Unit") }}
         </p>
       </div>
     </div>
@@ -35,7 +35,7 @@
         </div>
 
         <div class="text-xs mt-1" style="color: var(--t3)">
-          Active
+          {{ __("Active") }}
         </div>
       </div>
 
@@ -46,7 +46,7 @@
         </div>
 
         <div class="text-xs mt-1" style="color: var(--t3)">
-          Served
+          {{ __("Served") }}
         </div>
       </div>
 
@@ -57,7 +57,7 @@
         </div>
 
         <div class="text-xs mt-1" style="color: var(--t3)">
-          Total
+          {{ __("Total") }}
         </div>
       </div>
 
@@ -66,7 +66,7 @@
     <!-- Footer -->
     <div class="mt-4 pt-3" style="border-top: 1px solid var(--hair)">
       <span class="text-xs" style="color: var(--t4)">
-        Click to view KOTs
+        {{ __("Click to view KOTs") }}
       </span>
     </div>
 
