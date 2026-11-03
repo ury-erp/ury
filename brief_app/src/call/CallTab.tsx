@@ -1,3 +1,4 @@
+import { getPrefs } from "../settings/prefs";
 import { useEffect, useRef, useState } from "react";
 import "./call.css";
 import { MockCallEngine } from "./MockCallEngine";
@@ -47,7 +48,8 @@ async function fetchCaps(): Promise<CallCaps | null> {
 }
 
 function hintLang(): CallLang {
-  const l = (navigator.language || "en").slice(0, 2).toLowerCase();
+  const pref = getPrefs().language;
+  const l = (pref !== "auto" ? pref : navigator.language || "en").slice(0, 2).toLowerCase();
   return (["en", "hi", "ar", "ml"] as const).find((c) => c === l) ?? "en";
 }
 

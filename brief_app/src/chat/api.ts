@@ -1,5 +1,6 @@
 // All HTTP for the Ask tab lives here. Adjust names/shapes in one place.
 import type { ChatMessage } from "./types";
+import { getPrefs } from "../settings/prefs";
 import { sanitizeCards } from "./cardFormat";
 
 const BASE = "/api/method/ury.ury.api.chairman_chat.";
@@ -26,7 +27,7 @@ async function call<T = unknown>(name: string, body: Record<string, unknown> = {
 }
 
 /** Best language hint from the browser (e.g. "hi-IN"). */
-export const langHint = () => navigator.language || "en";
+export const langHint = () => { const l = getPrefs().language; return l === "auto" ? navigator.language || "en" : l; };
 
 type Raw = Record<string, unknown>;
 
@@ -75,8 +76,8 @@ function reply(r: unknown): Reply {
 }
 
 export const callCapabilities = () => call<{ available?: boolean; enabled?: boolean }>("call_capabilities");
-export const start = (message: string) => call("start", { message, lang: langHint() }).then(reply);
-export const send = (conversation: string, message: string) => call("send", { conversation, message, lang: langHint() }).then(reply);
+export const start = (message: string) => call("start", { message, language: langHint() }).then(reply);
+export const send = (conversation: string, message: string) => call("send", { conversation, message, language: langHint() }).then(reply);
 export const history = (conversation: string) => call("history", { conversation }).then(reply);
 
 function toB64(blob: Blob): Promise<string> {
@@ -90,7 +91,7 @@ function toB64(blob: Blob): Promise<string> {
 
 export async function sendAudio(conversation: string | null, blob: Blob, mime: string): Promise<Reply> {
   const b64 = await toB64(blob);
-  return call("send_audio", { conversation: conversation ?? "", b64, mime, lang: langHint() }).then(reply);
+  return call("send_audio", { conversation: conversation ?? "", b64data: b64, mime, language: langHint() }).then(reply);
 }
 
 /** Returns an object URL for the spoken reply, or null when the server has no TTS. */

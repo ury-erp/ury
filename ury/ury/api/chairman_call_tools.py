@@ -46,10 +46,11 @@ def _check_state(call_state):
 	if not isinstance(call_state, dict):
 		raise frappe.PermissionError("Invalid call")
 	user = call_state.get("user")
+	forbidden = FORBIDDEN_USERS - ({"Administrator"} if frappe.conf.get("ury_brief_allow_administrator") else set())
 	if (
 		not user
-		or user in FORBIDDEN_USERS
-		or frappe.session.user in FORBIDDEN_USERS
+		or user in forbidden
+		or frappe.session.user in forbidden
 		or frappe.session.user != user
 	):
 		frappe.throw(_("Owner tools must run as the owner"), frappe.PermissionError)

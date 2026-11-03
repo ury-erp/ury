@@ -6,6 +6,7 @@ import { Cards } from "./Card";
 import Player from "./Player";
 import { MAX_BYTES, MAX_SECONDS, Recorder, micSupported, type RecError } from "./recorder";
 import type { ChatMessage } from "./types";
+import { getPrefs, usePrefsSubscribe } from "../settings/prefs";
 
 export type { ChatMessage, ChatTabProps } from "./types";
 
@@ -15,7 +16,17 @@ const POLL_MAX = 45;
 let seq = 0;
 const lid = () => `local-${++seq}`;
 
+const MicIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0" />
+    <path d="M12 18v4" />
+  </svg>
+);
+
 export default function ChatTab() {
+  const [prefs, setPrefsState] = useState(getPrefs);
+  useEffect(() => usePrefsSubscribe(() => setPrefsState(getPrefs())), []);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [waiting, setWaiting] = useState(false);
@@ -154,9 +165,9 @@ export default function ChatTab() {
             <div className="bubble">
               {m.voice && <span className="tag">Voice message</span>}
               {m.role === "assistant" ? <Markdown text={m.text} /> : <p dir="auto">{m.voice && m.text === "Voice message" ? "Sending voice message" : m.text}</p>}
-              {m.role === "assistant" && !!m.tools && <span className="meta tools">Checked {m.tools} data {m.tools === 1 ? "source" : "sources"}</span>}
+              {m.role === "assistant" && !!m.tools && prefs.showSources && <span className="meta tools">Checked {m.tools} data {m.tools === 1 ? "source" : "sources"}</span>}
               {m.role === "assistant" && <Cards cards={m.cards} />}
-              {m.role === "assistant" && <Player id={m.id} text={m.text} />}
+              {m.role === "assistant" && prefs.readAloud && <Player id={m.id} text={m.text} />}
             </div>
             {m.state === "sending" && <span className="meta" role="status">Sending</span>}
             {m.state === "failed" && (
@@ -190,7 +201,7 @@ export default function ChatTab() {
         <form className="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <input dir="auto" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a question" aria-label="Message" enterKeyHint="send" autoComplete="off" />
           {canMic && !text.trim() ? (
-            <button type="button" className="icon mic" aria-label="Record a voice message" disabled={waiting} onClick={() => (sessionStorageSeen() ? void startRec() : setSheet(true))}>{"🎙"}</button>
+            <button type="button" className="icon mic" aria-label="Record a voice message" disabled={waiting} onClick={() => (sessionStorageSeen() ? void startRec() : setSheet(true))}><MicIcon /></button>
           ) : (
             <button type="submit" className="send" aria-label="Send message" disabled={!text.trim() || waiting}>{"➤"}</button>
           )}

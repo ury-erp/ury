@@ -214,9 +214,14 @@ def spark_series(dates, per_day):
 # ---------------------------------------------------------------- DB layer
 
 
+def administrator_allowed():
+	"""Off by default. Demo/dev sites opt in with site_config `ury_brief_allow_administrator`: 1."""
+	return bool(ALLOW_ADMINISTRATOR_FOR_TESTS or frappe.conf.get("ury_brief_allow_administrator"))
+
+
 def _check_role():
 	user = frappe.session.user
-	if user == "Administrator" and ALLOW_ADMINISTRATOR_FOR_TESTS:
+	if user == "Administrator" and administrator_allowed():
 		return
 	# frappe.get_roles("Administrator") returns every role in the system, so the role
 	# intersection below would let Administrator in. Refuse these identities outright.

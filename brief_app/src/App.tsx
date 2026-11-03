@@ -6,6 +6,7 @@ import ChatTab from "./chat/ChatTab";
 import CallTab from "./call/CallTab";
 import { announceUser, checkUser, forgetUser, loadBrief, signOut, type LoadResult } from "./api";
 import { timeOf } from "./format";
+import Settings from "./settings/Settings";
 import WhatsAppLink from "./settings/WhatsAppLink";
 import { whatsappEnabled } from "./settings/whatsappHelpers";
 
@@ -17,6 +18,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("brief");
   const [sheet, setSheet] = useState(false);
   const [wa, setWa] = useState(false);
+  const [settings, setSettings] = useState(false);
   const [authLost, setAuthLost] = useState(false);
   const [who, setWho] = useState<string | null>(null);
   const [update, setUpdate] = useState<ServiceWorker | null>(null);
@@ -95,9 +97,7 @@ export default function App() {
       <header className="bar">
         <h1>URY Brief</h1>
         <div className="bar-actions">
-          {whatsappEnabled(brief?.features) && <button type="button" className="ghost wa-entry" onClick={() => setWa(true)}>WhatsApp</button>}
-          {!isStandalone() && <button type="button" className="ghost" onClick={() => setSheet(true)}>Add to home screen</button>}
-          {(!auth || who) && <button type="button" className="ghost" onClick={() => signOut()}>Sign out</button>}
+          <button type="button" className="ghost" onClick={() => setSettings(true)}>Settings</button>
         </div>
       </header>
       {update && (
@@ -109,6 +109,14 @@ export default function App() {
       {res?.kind === "offline" && <p className="banner" role="status">Offline</p>}
       {body}
       <TabBar tab={active} onTab={setTab} huf={huf} voice={voice} />
+      {settings && (
+        <Settings
+          onClose={() => setSettings(false)}
+          onWhatsApp={whatsappEnabled(brief?.features) ? () => setWa(true) : undefined}
+          onInstall={!isStandalone() ? () => setSheet(true) : undefined}
+          onSignOut={() => signOut()}
+        />
+      )}
       {wa && <WhatsAppLink onClose={() => setWa(false)} />}
       {sheet && <InstallSheet platform={detectPlatform()} canPrompt={canPrompt} onPrompt={prompt} onClose={() => setSheet(false)} />}
     </div>
