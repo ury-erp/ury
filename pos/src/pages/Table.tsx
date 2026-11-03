@@ -1,10 +1,25 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import {
+  getRooms,
+  getTables,
+  getTableCount,
+  getVacantTablesForBranch,
+  mergeTablesBatch,
+  unmergeTables,
+  checkTableReservation,
+  createTableReservation,
+  getActiveReservations,
+  getBranchReservationSettings,
+  type Room,
+  type Table,
+  type TableReservation,
+  type BranchReservationSettings,
+} from '../lib/table-api';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups, formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
@@ -20,8 +35,9 @@ import TableMergeDialog from '../components/TableMergeDialog';
 import TableUnmergeDialog from '../components/TableUnmergeDialog';
 import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
-import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
+import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import TableReservationDialog, { type ReservationFormData } from '../components/TableReservationDialog';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -52,6 +68,100 @@ const TableView = () => {
     invoiceName: string;
     currentCaptain: string;
   } | null>(null);
+
+  // Reservation state
+  const [branchSettings, setBranchSettings] = useState<BranchReservationSettings | null>(null);
+  const [activeReservationsList, setActiveReservationsList] = useState<TableReservation[]>([]);
+  const [reservationTable, setReservationTable] = useState<Table | null>(null);
+
+  // Load branch reservation settings
+  useEffect(() => {
+    setBranchSettings(null);
+    if (!branch) return;
+    let isMounted = true;
+    getBranchReservationSettings(branch)
+      .then((settings) => {
+        if (isMounted) setBranchSettings(settings);
+      })
+      .catch((err) => {
+        console.error('Failed to load branch reservation settings', err);
+        if (isMounted) setBranchSettings(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [branch]);
+
+  const isReservationEnabled = Boolean(branchSettings && Number(branchSettings.enable_reservation) === 1);
+
+  // Periodic polling for active reservations so buffer windows and status transitions reflect in real time
+  useEffect(() => {
+    if (!branch) return;
+    let isMounted = true;
+
+    const fetchReservations = async () => {
+      if (!isMounted) return;
+      try {
+        const res = await getActiveReservations(branch);
+        if (isMounted && res) {
+          setActiveReservationsList(res);
+        }
+      } catch (_e) {
+        // Polling failure ignored
+      }
+    };
+
+    fetchReservations();
+    const intervalId = setInterval(fetchReservations, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [branch]);
+
+  // Informational toast when a table enters its reservation buffer window
+  const notifiedLockReservationsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeReservationsList || activeReservationsList.length === 0) return;
+
+    for (const res of activeReservationsList) {
+      if (res.is_lock_window_active && res.status === 'Confirmed' && res.reserved_table) {
+        const key = `${res.name || res.reserved_table}_${res.reserved_at}`;
+        if (!notifiedLockReservationsRef.current.has(key)) {
+          notifiedLockReservationsRef.current.add(key);
+          const timeStr = formatReservationTime(res.reserved_at);
+          showToast.warning(
+            t('tables.reserved_choose_another', { table: res.reserved_table, time: timeStr })
+          );
+        }
+      }
+    }
+  }, [activeReservationsList]);
+
+  // Derived reservation maps
+  const { lockActiveReservationsByTable, upcomingReservationsByTable } = useMemo(() => {
+    const lockMap = new Map<string, TableReservation>();
+    const upcomingMap = new Map<string, TableReservation>();
+
+    for (const res of activeReservationsList) {
+      const isLockActive =
+        isReservationLockWindowActive(res, branchSettings?.buffer_time) ||
+        (res.is_lock_window_active && res.status === 'Confirmed');
+      if (isLockActive && res.status === 'Confirmed') {
+        lockMap.set(res.reserved_table, res);
+      } else {
+        if (!upcomingMap.has(res.reserved_table)) {
+          upcomingMap.set(res.reserved_table, res);
+        }
+      }
+    }
+
+    return {
+      lockActiveReservationsByTable: lockMap,
+      upcomingReservationsByTable: upcomingMap,
+    };
+  }, [activeReservationsList, branchSettings?.buffer_time]);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -163,7 +273,7 @@ const TableView = () => {
     loadTables(selectedRoom);
   }, [selectedRoom, loadTables]);
 
-  const handleNavigateToPOS = (tableName: string) => {
+  const handleNavigateToPOS = async (tableName: string) => {
     if (!selectedRoom) return;
 
     // Check if user is restricted from taking table orders
@@ -172,9 +282,86 @@ const TableView = () => {
       return;
     }
 
-    setSelectedOrderType(DINE_IN);
-    setSelectedTable(tableName, selectedRoom);
-    navigate('/register');
+    // Check if table has an ongoing active order first
+    try {
+      const orderResponse = await getTableOrder(tableName);
+      const existingInvoice = orderResponse?.message;
+      if (
+        existingInvoice &&
+        existingInvoice.name &&
+        existingInvoice.docstatus === 0 &&
+        existingInvoice.invoice_printed !== 1
+      ) {
+        // Ongoing order exists - allow opening/continuing without reservation lock check
+        setSelectedOrderType(DINE_IN);
+        setSelectedTable(tableName, selectedRoom);
+        navigate('/register');
+        return;
+      }
+    } catch {
+      // Continue to check reservation if order fetch failed
+    }
+
+    // Check if table is under active reservation lock window
+    const activeLockRes = lockActiveReservationsByTable.get(tableName);
+    const isActiveLockRes =
+      activeLockRes &&
+      (activeLockRes.is_lock_window_active ||
+        isReservationLockWindowActive(activeLockRes, branchSettings?.buffer_time)) &&
+      activeLockRes.status === 'Confirmed';
+
+    if (isActiveLockRes) {
+      const timeStr = formatReservationTime(activeLockRes.reserved_at);
+      showToast.error(t('tables.reserved_choose_another', { table: tableName, time: timeStr }));
+      return;
+    }
+
+    try {
+      const reservation = await checkTableReservation(tableName);
+      const isResLocked =
+        reservation &&
+        (reservation.is_lock_window_active ||
+          isReservationLockWindowActive(reservation, branchSettings?.buffer_time)) &&
+        reservation.status === 'Confirmed';
+
+      if (isResLocked) {
+        const timeStr = formatReservationTime(reservation.reserved_at);
+        showToast.error(t('tables.reserved_choose_another', { table: tableName, time: timeStr }));
+        return;
+      }
+
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate('/register');
+    } catch {
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate('/register');
+    }
+  };
+
+  const handleReserveConfirm = async (data: ReservationFormData) => {
+    if (!reservationTable) return;
+    try {
+      await createTableReservation({
+        table: reservationTable.name,
+        customer: data.customer,
+        customer_name: data.customer_name,
+        customer_phone: data.customer_phone,
+        no_of_pax: data.no_of_pax,
+        reserved_at: data.reservedAt,
+        notes: data.notes,
+        branch: branch || undefined,
+      });
+      showToast.success(t('reservations.reserve_success'));
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      setReservationTable(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('reservations.reserve_failed'));
+      throw error;
+    }
   };
 
   const handlePreviewTable = (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
@@ -368,10 +555,18 @@ const TableView = () => {
       mergeMembers.length > 1 ? formatMergedTableLabelFromGroup(mergeMembers) : undefined;
     const canTransferTable = table.occupied === 1 && mergeMembers.length <= 1;
 
+    const isReservedLock = lockActiveReservationsByTable.has(table.name);
+    const upcomingRes = upcomingReservationsByTable.get(table.name) || null;
+    const activeRes = lockActiveReservationsByTable.get(table.name) || null;
+
     return (
     <TableCard
       key={table.name}
       table={table}
+      isReserved={isReservedLock}
+      upcomingReservation={upcomingRes}
+      activeReservation={activeRes}
+      reservationEnabled={isReservationEnabled}
       mergeGroupLabel={mergeGroupLabel}
       className={className}
       menuOpen={menuOpenForTable === table.name}
@@ -381,6 +576,7 @@ const TableView = () => {
       onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
       onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
       showCaptainTransfer={showCaptainTransfer}
+      onReserve={isReservationEnabled ? () => setReservationTable(table) : undefined}
       onNavigate={() => handleNavigateToPOS(table.name)}
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
@@ -572,6 +768,15 @@ const TableView = () => {
         onConfirm={handleCaptainTransferConfirm}
       />
 
+      <TableReservationDialog
+        open={reservationTable !== null}
+        table={reservationTable}
+        onOpenChange={(open) => {
+          if (!open) setReservationTable(null);
+        }}
+        onConfirm={handleReserveConfirm}
+      />
+
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-border">
         <div className="max-w-screen-xl mx-auto">
@@ -588,6 +793,12 @@ const TableView = () => {
               <div className="w-4 h-4 bg-blue-50/40 border border-blue-200/70 rounded"></div>
               <span>{t('tables.merged')}</span>
             </div>
+            {isReservationEnabled && (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-primary-50 border border-primary-400 rounded"></div>
+                <span>{t('tables.reserved_badge')}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

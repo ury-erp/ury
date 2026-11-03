@@ -48,3 +48,4 @@ export * from './components/confirm-dialog';
 export * from './components/customer-picker';
 export * from './components/segmented-control';
 export * from './components/chat-markdown';
+export * from './components/searchable-select';

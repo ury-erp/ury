@@ -35,6 +35,10 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_orders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
+  } else if (location.pathname === '/reservations') {
+    searchPlaceholder = t('header.search_placeholder_reservations');
+    searchValue = searchQuery;
+    searchOnChange = (e) => setSearchQuery(e.target.value);
   } else if (location.pathname === '/register') {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;

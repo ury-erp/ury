@@ -5,9 +5,18 @@ import TableSelectionDialog from "./TableSelectionDialog";
 
 const getRoomsMock = vi.fn();
 const getTablesMock = vi.fn();
+const getActiveReservationsMock = vi.fn();
+const checkTableReservationMock = vi.fn();
+const getTableOrderMock = vi.fn();
 vi.mock("../lib/table-api", () => ({
   getRooms: (...args: any[]) => getRoomsMock(...args),
   getTables: (...args: any[]) => getTablesMock(...args),
+  getActiveReservations: (...args: any[]) => getActiveReservationsMock(...args),
+  checkTableReservation: (...args: any[]) => checkTableReservationMock(...args),
+}));
+
+vi.mock("../lib/order-api", () => ({
+  getTableOrder: (...args: any[]) => getTableOrderMock(...args),
 }));
 
 vi.mock("../store/pos-store", () => ({
@@ -24,6 +33,8 @@ vi.mock("../store/pos-store", () => ({
 vi.mock("../lib/table-utils", () => ({
   getMergeGroupMembers: () => [],
   formatMergedTableLabelFromGroup: () => null,
+  formatReservationTime: () => '',
+  isReservationLockWindowActive: () => false,
 }));
 
 vi.mock("../i18n", () => ({
@@ -57,6 +68,9 @@ describe("TableSelectionDialog", () => {
     vi.resetAllMocks();
     getRoomsMock.mockResolvedValue(mockRooms);
     getTablesMock.mockResolvedValue(mockTables);
+    getActiveReservationsMock.mockResolvedValue([]);
+    checkTableReservationMock.mockResolvedValue(null);
+    getTableOrderMock.mockResolvedValue({ message: null });
     localStorage.clear();
     sessionStorage.clear();
   });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react'
-import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react'
+import { ArrowRightLeft, Calendar, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react'
 import { Button } from './button'
 
 export interface TableActionsMenuLabels {
@@ -8,6 +8,7 @@ export interface TableActionsMenuLabels {
   unmergeTables: string
   transferTable: string
   transferCaptain: string
+  reserveTable?: string
 }
 
 export interface TableActionsMenuProps {
@@ -20,6 +21,7 @@ export interface TableActionsMenuProps {
   onUnmerge?: () => void
   onTransferTable?: () => void
   onTransferCaptain?: () => void
+  onReserve?: () => void
   showCaptainTransfer?: boolean
   labels: TableActionsMenuLabels
 }
@@ -34,6 +36,7 @@ export function TableActionsMenu({
   onUnmerge,
   onTransferTable,
   onTransferCaptain,
+  onReserve,
   showCaptainTransfer = false,
   labels,
 }: TableActionsMenuProps) {
@@ -91,6 +94,12 @@ export function TableActionsMenu({
     onTransferCaptain?.()
   }
 
+  const handleReserve = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    onOpenChange(false)
+    onReserve?.()
+  }
+
   const hasAvailableActions = isAvailable
   const hasOccupiedActions =
     isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain))
@@ -116,6 +125,16 @@ export function TableActionsMenu({
         <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-white py-1 shadow-lg">
           {isAvailable && (
             <>
+              {onReserve && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleReserve}
+                >
+                  <Calendar className="h-4 w-4 shrink-0" />
+                  {labels.reserveTable}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"

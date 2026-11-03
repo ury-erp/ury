@@ -34,6 +34,10 @@ vi.mock("./pages/Table", () => ({
   default: () => <div data-testid="table-page">Table</div>,
 }));
 
+vi.mock("./pages/Reservations", () => ({
+  default: () => <div data-testid="reservations-page">Reservations</div>,
+}));
+
 vi.mock("./pages/Dashboard", () => ({
   default: () => <div data-testid="dashboard-page">Dashboard</div>,
 }));

@@ -31,8 +31,9 @@ const badgeVariants = cva(
         danger: "border-transparent bg-destructive/10 text-destructive",
         info: "border-transparent bg-primary-100 text-primary-800",
         pending: "border-transparent bg-warning-100 text-warning-800",
-        completed: "border-transparent bg-success-100 text-success-800",
-        cancelled: "border-transparent bg-muted text-muted-foreground",
+        completed: "border-transparent bg-primary-100 text-primary-800",
+        cancelled: "border-transparent bg-destructive/10 text-destructive",
+        noshow: "border-transparent bg-orange-100 text-orange-800",
         // Tint-based variants matching the `.tag` mockup spec (ury-pos.html
         // lines 110-113). Distinct from `success`/`warning`/`danger`/`info`
         // above, which use the `-100`/`-800` pair and are already relied on
