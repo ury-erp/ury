@@ -190,6 +190,7 @@
     "order_moved_to_draft": "Order moved to Draft after printing."
   },
   "orders": {
+    "print_warning": "Late {{time}}",
     "no_orders_found": "No orders found",
     "click_to_view": "Click on any order card to view its details",
     "status_title": "Order Status",
