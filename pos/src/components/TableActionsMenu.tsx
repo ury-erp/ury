@@ -11,6 +11,7 @@ interface TableActionsMenuProps {
   onUnmerge?: () => void;
   onTransferTable?: () => void;
   onTransferCaptain?: () => void;
+  onReserve?: () => void;
   showCaptainTransfer?: boolean;
 }
 
@@ -22,6 +23,7 @@ const TableActionsMenu = ({
   onUnmerge,
   onTransferTable,
   onTransferCaptain,
+  onReserve,
   showCaptainTransfer = false,
 }: TableActionsMenuProps) => {
   const isAvailable = table.occupied === 0;
@@ -39,6 +41,7 @@ const TableActionsMenu = ({
       onUnmerge={onUnmerge}
       onTransferTable={onTransferTable}
       onTransferCaptain={onTransferCaptain}
+      onReserve={onReserve}
       showCaptainTransfer={showCaptainTransfer}
       labels={{
         tableActions: t('tables.table_actions'),
@@ -46,6 +49,7 @@ const TableActionsMenu = ({
         unmergeTables: t('tables.unmerge_tables'),
         transferTable: t('tables.transfer_table'),
         transferCaptain: t('tables.transfer_captain'),
+        reserveTable: t('tables.reserve_table'),
       }}
     />
   );

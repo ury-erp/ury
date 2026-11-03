@@ -14,6 +14,17 @@ vi.mock("../lib/table-api", () => ({
   getVacantTablesForBranch: vi.fn().mockResolvedValue([]),
   mergeTablesBatch: vi.fn().mockResolvedValue(undefined),
   unmergeTables: vi.fn().mockResolvedValue(undefined),
+  getActiveReservations: vi.fn().mockResolvedValue([]),
+  checkTableReservation: vi.fn().mockResolvedValue(null),
+  createTableReservation: vi.fn().mockResolvedValue({}),
+  getBranchReservationSettings: vi.fn().mockResolvedValue({
+    enable_reservation: 0,
+    buffer_time: 30,
+    grace_period: 15,
+    avg_table_time_last_day: 0,
+    avg_table_time_last_week: 0,
+    calculated_duration: 90,
+  }),
 }));
 
 // Mock table utilities
@@ -22,6 +33,8 @@ vi.mock("../lib/table-utils", () => ({
   formatMergedTableLabelFromGroup: vi.fn(() => ""),
   getTableRenderGroups: (tables: any[]) => tables.map((t) => [t]),
   sortTablesByMergeGroups: (tables: any[]) => tables,
+  formatReservationTime: vi.fn(() => ""),
+  isReservationLockWindowActive: vi.fn(() => false),
 }));
 
 // Mock order API

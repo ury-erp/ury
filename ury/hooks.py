@@ -322,6 +322,10 @@ doc_events = {
         ],
         "on_submit": [
             "ury.ury.hooks.ury_pos_closing_entry.submit_stock_correction",
+            "ury.ury.hooks.ury_pos_closing_entry.update_branch_avg_times",
+        ],
+        "on_cancel": [
+            "ury.ury.hooks.ury_pos_closing_entry.update_branch_avg_times",
         ],
         },
     "Quality Review": {
@@ -356,6 +360,7 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
+			"ury.ury.api.reservation_scheduler.process_reservation_no_shows",
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
@@ -633,6 +638,12 @@ fixtures = [
                     "Branch-custom_aggregators",
                     "Branch-custom_make_unpaid",
                     "Branch-custom_no_taxes",
+                    "Branch-custom_reservation_settings_section",
+                    "Branch-custom_enable_reservation",
+                    "Branch-custom_buffer_time",
+                    "Branch-custom_grace_period",
+                    "Branch-custom_avg_table_time_last_day",
+                    "Branch-custom_avg_table_time_last_week",
                     "Price List-restaurant_menu",
                     "POS Profile-custom_enable_discount",
                     "POS Invoice-custom_comments",

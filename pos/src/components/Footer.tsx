@@ -1,14 +1,18 @@
 import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   Gauge,
   ShoppingCart,
   Armchair,
   ReceiptText,
   Wallet,
+  BookLock,
   Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
+import { usePOSStore } from '../store/pos-store';
+import { getBranchReservationSettings } from '../lib/table-api';
 
 /**
  * The bottom rail is a *same-app* router. Cross-app jumps (the management SPA
@@ -22,11 +26,41 @@ import { t } from '../i18n';
  * ClipboardList) that were indistinguishable mid-shift.
  */
 const Footer = () => {
+  const { posProfile } = usePOSStore();
+  const branch = posProfile?.branch ?? null;
+  const [reservationEnabled, setReservationEnabled] = useState(false);
+
+  useEffect(() => {
+    setReservationEnabled(false);
+    if (!branch) {
+      return;
+    }
+
+    let isMounted = true;
+    getBranchReservationSettings(branch)
+      .then((settings) => {
+        if (isMounted) {
+          setReservationEnabled(Number(settings?.enable_reservation) === 1);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setReservationEnabled(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [branch]);
 
   const navItems = [
     { icon: Gauge, label: t('footer.dashboard'), path: '/dashboard' },
     { icon: ShoppingCart, label: t('footer.pos'), path: '/register' },
     { icon: Armchair, label: t('footer.tables'), path: '/tables' },
+    ...(reservationEnabled
+      ? [{ icon: BookLock, label: t('footer.reservations'), path: '/reservations' }]
+      : []),
     { icon: ReceiptText, label: t('footer.orders'), path: '/orders' },
     { icon: Wallet, label: t('footer.sessions'), path: '/open-entries' },
     { icon: Settings, label: t('footer.settings'), path: '/settings' },
