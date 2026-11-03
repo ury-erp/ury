@@ -201,6 +201,12 @@
   --grid-gap: 0.875rem;   /* 14px */
   --panel-x: 1rem; --panel-y: 0.875rem;
   --touch: 2.75rem;       /* 44px minimum tap target */
+  --touch-lg: 3rem;       /* 48px primary touch target (one-surface home) */
+  --row-h: 4.5rem;        /* 72px list row */
+  --dock-h: 4rem;         /* 64px ask dock field */
+  --radius-card: 1.5rem;  /* 24px feed card */
+  --radius-tile: 1.25rem; /* 20px KPI tile */
+  --radius-pill: 999px;
   /* borders-radius-shadow.md */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

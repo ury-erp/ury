@@ -1,4 +1,4 @@
-// Tiny hash router: #/brief, #/ask, #/ask/<id|new>, #/call. Tabs replace, views push, so Back pops view -> list -> Brief -> exit.
+// Tiny hash router: #/ (Today), #/ask (chats sheet), #/ask/<id|new>, #/call. Tabs replace, views push, so Back pops view -> list -> Brief -> exit.
 import { useEffect, useState } from "react";
 
 export type Route =
@@ -16,7 +16,7 @@ export function parse(hash: string): Route {
 
 export function href(r: Route): string {
   if (r.name === "thread") return `#/ask/${encodeURIComponent(r.id)}`;
-  return `#/${r.name}`;
+  return r.name === "brief" ? "#/" : `#/${r.name}`;
 }
 
 /** Cold deep link into a thread: put the chat list underneath so Back has somewhere to go. */

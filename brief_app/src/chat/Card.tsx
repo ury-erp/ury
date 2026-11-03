@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import DashboardIsland from "../components/DashboardIsland";
+import { extractDashboardId, isIslandAvailable } from "../island/capability";
 import { Bars, Spark } from "../components/Charts";
 import { cardSummary, dashboardLink, fmtDelta, fmtKpiValue, fmtValue, goodDirection, hideLoneKpiLabel, sameText, panelSubtitle, panelTitle, safeLink, toneClass, trendGlyph, trendWord, type Card, type DashboardPanel } from "./cardFormat";
 
@@ -74,6 +77,21 @@ function Panel({ p, dashTitle }: { p: DashboardPanel; dashTitle?: string }) {
   );
 }
 
+/** In-app island embed when the link is an Insights dashboard and islands are available; otherwise the plain link. */
+function DashLink({ url, label }: { url: string; label: string }) {
+  const id = extractDashboardId(url, location.origin);
+  const [ok, setOk] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (id) isIslandAvailable().then(setOk); }, [id]);
+  if (!id || !ok) return <a className="card-link" href={url} target="_blank" rel="noopener noreferrer">{label}</a>;
+  return (
+    <>
+      <button type="button" className="card-link" onClick={() => setOpen(true)}>{label}</button>
+      {open && <DashboardIsland id={id} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 function DashboardCard({ card }: { card: Card }) {
   const link = dashboardLink(card);
   return (
@@ -85,7 +103,7 @@ function DashboardCard({ card }: { card: Card }) {
       </header>
       <div className="dash-grid">{(card.panels ?? []).map((p, i) => <Panel key={p.id ?? i} p={p} dashTitle={card.title} />)}</div>
       {card.footnote && <p className="dash-foot" dir="auto">{card.footnote}</p>}
-      {link && <a className="card-link" href={link.url} target="_blank" rel="noopener noreferrer">{link.label || "Open dashboard"}</a>}
+      {link && <DashLink url={link.url} label={link.label || "Open dashboard"} />}
     </figure>
   );
 }
@@ -113,7 +131,7 @@ export default function CardView({ card }: { card: Card }) {
         <Body c={card} />
       </div>
       {card.ai_composed === true && <p className="card-note">Composed by the assistant from your data. Check the dashboard to confirm.</p>}
-      {link && <a className="card-link" href={link.url} target="_blank" rel="noopener noreferrer">Open dashboard</a>}
+      {link && <DashLink url={link.url} label="Open dashboard" />}
     </figure>
   );
 }

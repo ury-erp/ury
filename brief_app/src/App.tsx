@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import Deck from "./components/Deck";
 import TopBar from "./components/TopBar";
-import TabBar, { type Tab } from "./components/TabBar";
 import InstallSheet, { detectPlatform, isStandalone } from "./components/InstallSheet";
+import WhatsAppLink from "./settings/WhatsAppLink";
+import { whatsappEnabled } from "./settings/whatsappHelpers";
+import DashboardIsland from "./components/DashboardIsland";
+import Today from "./TodayHome";
 import ChatTab from "./chat/ChatTab";
-import CallTab from "./call/CallTab";
+import ChatsSheet from "./chat/ChatsSheet";
+import { useChats } from "./chat/useChats";
+import { queueHandoff } from "./chat/handoff";
+import CallOverlay, { openCall } from "./call/CallOverlay";
 import { announceUser, checkUser, forgetUser, loadBrief, signOut, type LoadResult } from "./api";
 import { timeOf } from "./format";
 import Settings from "./settings/Settings";
-import WhatsAppLink from "./settings/WhatsAppLink";
-import { whatsappEnabled } from "./settings/whatsappHelpers";
+import { push, replace, back, seedStack, useRoute } from "./router";
 
 type BIPEvent = Event & { prompt: () => Promise<void> };
 const LOGIN = "/login?redirect-to=/ury/brief/";
 
+const initials = (n: string) => {
+  const base = n.split("@")[0].split(/[\s._-]+/).filter(Boolean);
+  return ((base[0]?.[0] ?? "B") + (base.length > 1 ? base[1][0] : "")).toUpperCase();
+};
+
 export default function App() {
   const [res, setRes] = useState<LoadResult | null>(null);
-  const [tab, setTab] = useState<Tab>("brief");
-  const [sheet, setSheet] = useState(false);
+  useState(seedStack);
+  const route = useRoute();
+  const [dash, setDash] = useState<string | null>(null);
+  const [me, setMe] = useState<string | null>(null);
   const [wa, setWa] = useState(false);
+  const sheetPushed = useRef(false);
+  const [sheet, setSheet] = useState(false);
   const [settings, setSettings] = useState(false);
   const [authLost, setAuthLost] = useState(false);
   const [who, setWho] = useState<string | null>(null);
@@ -74,9 +87,25 @@ export default function App() {
   const brief = res?.kind === "ok" && !auth ? res.brief : null;
   const huf = !!brief?.features?.huf;
   const voice = huf && !!brief?.features?.voice_call;
-  const active: Tab = !huf || (tab === "call" && !voice) ? "brief" : tab;
 
-  let body;
+  const chats = useChats(huf);
+  const view = !huf ? "brief" : route.name === "call" && !voice ? "brief" : route.name;
+  useEffect(() => { if (view === "brief" || view === "ask") chats.reload(); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!brief) return;
+    fetch("/api/method/frappe.auth.get_logged_user", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setMe(j?.message && j.message !== "Guest" ? String(j.message) : null))
+      .catch(() => setMe(null));
+  }, [!!brief]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ask = (q: string) => { queueHandoff({ text: q }); push({ name: "thread", id: "new" }); };
+  const mic = () => { queueHandoff({ mic: true }); push({ name: "thread", id: "new" }); };
+  const seeAll = () => { sheetPushed.current = true; push({ name: "ask" }); };
+  const closeSheet = () => { if (sheetPushed.current) { sheetPushed.current = false; back(); } else replace({ name: "brief" }); };
+  const leaveThread = () => { if (history.length > 1) back(); else replace({ name: "brief" }); };
+
+  let body = null;
   if (auth) {
     body = who
       ? <div className="state"><h2>No access to the brief</h2><p className="sub">You are signed in as {who}, which cannot open the brief. Sign out and use an owner account.</p><button type="button" className="primary" onClick={() => signOut()}>Sign out</button></div>
@@ -87,22 +116,16 @@ export default function App() {
     body = <div className="state"><h2>You are offline</h2><p className="sub">No saved brief is available yet. Connect once to load it.</p></div>;
   } else if (res.kind === "error") {
     body = <div className="state"><h2>Brief unavailable</h2><p className="sub">Could not load the brief. Check your connection and try again.</p><button type="button" className="primary" onClick={load}>Try again</button></div>;
-  } else if (active === "brief") {
-    body = <Deck slides={res.brief.slides} />;
-  } else {
-    body = active === "ask" ? <ChatTab /> : <CallTab onBack={() => setTab("ask")} />;
   }
+
+  const threadRoute = route.name === "thread" && huf ? route : null;
+  const threadTitle = threadRoute ? chats.rows?.find((r) => r.id === threadRoute.id)?.title : undefined;
+  const name = brief?.scope?.companies?.length ? brief.scope.companies.join(", ") : "URY Brief";
+  const installable = !isStandalone() ? () => setSheet(true) : undefined;
 
   return (
     <div className="app">
-      <TopBar
-        subtitle={brief ? timeOf(brief.as_of) : ""}
-        onCall={huf && voice ? () => setTab("call") : undefined}
-        onSettings={() => setSettings(true)}
-        onWhatsApp={whatsappEnabled(brief?.features) ? () => setWa(true) : undefined}
-        onInstall={!isStandalone() ? () => setSheet(true) : undefined}
-        onSignOut={() => signOut()}
-      />
+      {!brief && <TopBar title="URY Brief" initials={initials(who || "B")} onSettings={() => setSettings(true)} onInstall={installable} onSignOut={() => signOut()} />}
       {update && (
         <p className="banner" role="status">New version available.
           <button type="button" onClick={() => update.postMessage({ type: "SKIP_WAITING" })}>Reload</button>
@@ -111,7 +134,31 @@ export default function App() {
       {res?.kind === "ok" && res.fromCache && <p className="banner" role="status">Showing {timeOf(res.brief.as_of)} brief, offline</p>}
       {res?.kind === "offline" && <p className="banner" role="status">Offline</p>}
       {body}
-      <TabBar tab={active} onTab={setTab} huf={huf} voice={voice} />
+      {brief && (
+        <Today
+          brief={brief} title={name} subtitle={timeOf(brief.as_of) ? `Updated ${timeOf(brief.as_of)}` : ""} initials={initials(me || name)}
+          huf={huf} voice={voice} chats={chats} hidden={!!threadRoute}
+          onAsk={ask} onMic={mic} onCall={openCall}
+          onOpenChat={(id) => push({ name: "thread", id })} onSeeAll={seeAll} onDashboard={setDash}
+          onSettings={() => setSettings(true)} onInstall={installable} onSignOut={() => signOut()}
+          onWhatsApp={whatsappEnabled(brief.features) ? () => setWa(true) : undefined}
+        />
+      )}
+      {threadRoute && (
+        <ChatTab
+          id={threadRoute.id} title={threadTitle} onBack={leaveThread} onCall={voice ? openCall : undefined}
+          onStarted={(id) => replace({ name: "thread", id })}
+        />
+      )}
+      {view === "ask" && <ChatsSheet chats={chats} onClose={closeSheet} onOpen={(id) => push({ name: "thread", id })} />}
+      {view === "call" && <CallOverlay />}
+      {dash && <DashboardIsland id={dash} onClose={() => setDash(null)} />}
+      {chats.undo && (
+        <div className="snack" role="status">
+          <span dir="auto">Deleted &ldquo;{chats.undo.title.slice(0, 24)}&rdquo;</span>
+          <button type="button" onClick={chats.undoRemove}>Undo</button>
+        </div>
+      )}
       {settings && <Settings onClose={() => setSettings(false)} />}
       {wa && <WhatsAppLink onClose={() => setWa(false)} />}
       {sheet && <InstallSheet platform={detectPlatform()} canPrompt={canPrompt} onPrompt={prompt} onClose={() => setSheet(false)} />}

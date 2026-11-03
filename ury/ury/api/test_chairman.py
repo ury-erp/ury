@@ -398,9 +398,25 @@ class SiteTests(IntegrationTestCase):
 		import frappe
 
 		c.ALLOW_ADMINISTRATOR_FOR_TESTS = False
-		frappe.set_user("Administrator")
-		with self.assertRaises(frappe.PermissionError):
-			c.get_brief(self.PINNED)
+		frappe.conf.ury_brief_allow_administrator = 0  # site opted out
+		try:
+			frappe.set_user("Administrator")
+			with self.assertRaises(frappe.PermissionError):
+				c.get_brief(self.PINNED)
+		finally:
+			frappe.conf.pop("ury_brief_allow_administrator", None)
+
+	def test_administrator_allowed_by_default(self):
+		import frappe
+
+		c.ALLOW_ADMINISTRATOR_FOR_TESTS = False
+		frappe.conf.pop("ury_brief_allow_administrator", None)
+		self.assertTrue(c.administrator_allowed())
+		frappe.conf.ury_brief_allow_administrator = 0
+		try:
+			self.assertFalse(c.administrator_allowed())
+		finally:
+			frappe.conf.pop("ury_brief_allow_administrator", None)
 
 	def test_branch_user_permission_scoping(self):
 		"""User A (restricted to branch A) never sees branch B; unrestricted sees both."""

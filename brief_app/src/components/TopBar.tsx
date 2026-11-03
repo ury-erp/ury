@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { KebabIcon, PhoneIcon } from "./Icons";
-import { getPrefs, setPrefs, type Theme } from "../settings/prefs";
+import { SparkleIcon, SettingsIcon, InstallIcon, LogoutIcon } from "./Icons";
+import { getPrefs, setPrefs, usePrefsSubscribe, type Theme } from "../settings/prefs";
 
 interface Props {
+  title: string;
   subtitle?: string;
-  onCall?: () => void;
+  initials: string;
   onSettings: () => void;
-  onWhatsApp?: () => void;
   onInstall?: () => void;
+  onWhatsApp?: () => void;
   onSignOut: () => void;
 }
 
-export default function TopBar({ subtitle, onCall, onSettings, onWhatsApp, onInstall, onSignOut }: Props) {
+export default function TopBar({ title, subtitle, initials, onSettings, onInstall, onWhatsApp, onSignOut }: Props) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => getPrefs().theme);
+  useEffect(() => usePrefsSubscribe(() => setTheme(getPrefs().theme)), []);
   const wrap = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -42,30 +44,27 @@ export default function TopBar({ subtitle, onCall, onSettings, onWhatsApp, onIns
   return (
     <header className="topbar">
       <div className="topbar-title">
-        <h1>URY Brief</h1>
+        <h1 dir="auto">{title}</h1>
         {subtitle ? <p className="topbar-sub">{subtitle}</p> : null}
       </div>
-      {onCall && (
-        <button type="button" className="icon-btn" aria-label="Call" onClick={onCall}><PhoneIcon size={24} /></button>
-      )}
       <div className="topbar-menu" ref={wrap}>
-        <button ref={btn} type="button" className="icon-btn" aria-label="More options" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          <KebabIcon size={24} />
-        </button>
+        <button ref={btn} type="button" className="avatar" aria-label="Account menu" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{initials}</button>
         {open && (
           <div className="menu" role="menu" ref={menu}>
-            <button type="button" role="menuitem" onClick={pick(onSettings)}>Settings</button>
-            {onWhatsApp && <button type="button" role="menuitem" onClick={pick(onWhatsApp)}>WhatsApp</button>}
-            {onInstall && <button type="button" role="menuitem" onClick={pick(onInstall)}>Add to home screen</button>}
-            <div className="menu-theme" role="group" aria-label="Theme">
-              {(["system", "light", "dark"] as Theme[]).map((t) => (
-                <button key={t} type="button" role="menuitemradio" aria-checked={theme === t} onClick={() => { setTheme(t); setPrefs({ theme: t }); }}>
-                  {t === "system" ? "Auto" : t === "light" ? "Light" : "Dark"}
-                </button>
-              ))}
+            <div className="menu-theme" role="group" aria-label="Appearance">
+              <p className="menu-lbl">Appearance</p>
+              <div className="seg">
+                {(["system", "light", "dark"] as Theme[]).map((t) => (
+                  <button key={t} type="button" role="menuitemradio" aria-checked={theme === t} aria-pressed={theme === t} onClick={() => { setTheme(t); setPrefs({ theme: t }); }}>
+                    {t === "system" ? "Auto" : t === "light" ? "Light" : "Dark"}
+                  </button>
+                ))}
+              </div>
             </div>
-            <hr />
-            <button type="button" role="menuitem" onClick={pick(onSignOut)}>Sign out</button>
+            <button type="button" role="menuitem" onClick={pick(onSettings)}><SettingsIcon size={22} />Settings</button>
+            {onWhatsApp && <button type="button" role="menuitem" onClick={pick(onWhatsApp)}><SparkleIcon size={22} />WhatsApp</button>}
+            {onInstall && <button type="button" role="menuitem" onClick={pick(onInstall)}><InstallIcon size={22} />Add to home screen</button>}
+            <button type="button" role="menuitem" className="danger" onClick={pick(onSignOut)}><LogoutIcon size={22} />Sign out</button>
           </div>
         )}
       </div>

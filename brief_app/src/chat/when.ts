@@ -49,3 +49,12 @@ export function groupKey(date: Date, now: Date, locale = "en-GB"): { key: string
   const label = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(date);
   return { key: `${date.getFullYear()}-${date.getMonth()}`, label };
 }
+
+/** Chat-list time: "14:32" today, "Yesterday", weekday within 6 days, then "3 Nov" / "3 Nov 2025". */
+export function rowTime(date: Date, now: Date, locale = "en-GB"): string {
+  const days = calendarDiff(date, now);
+  if (days <= 0) return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  if (days === 1) return "Yesterday";
+  if (days <= 6) return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date);
+  return shortDate(date, now, locale);
+}

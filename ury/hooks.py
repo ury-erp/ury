@@ -230,6 +230,7 @@ after_migrate = [
     "ury.ury.ai_tools.agent_seeding.after_migrate",
     "ury.setup_customizations.hide_setup_sidebar_options",
     "ury.ury.desk_islands.after_migrate",
+    "ury.ury.brief_admin.ensure_default",
 ]
 
 # The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)

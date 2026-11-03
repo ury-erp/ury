@@ -82,7 +82,11 @@ function reply(r: unknown): Reply {
 export const callCapabilities = () => call<{ available?: boolean; enabled?: boolean }>("call_capabilities");
 export const start = (message: string) => call("start", { message, language: langHint() }).then(reply);
 export const send = (conversation: string, message: string) => call("send", { conversation, message, language: langHint() }).then(reply);
-export interface ConversationRow { id: string; title: string; last_at: string; created_at: string }
+export interface ConversationRow {
+  id: string; title: string; last_at: string; created_at: string;
+  /** optional richer fields from conversations() */
+  preview?: string; pending?: boolean; started_by_voice?: boolean; last_role?: string;
+}
 export const conversations = () => call<ConversationRow[]>("conversations").then((r) => (Array.isArray(r) ? r : []));
 export const history = (conversation: string) => call("history", { conversation }).then(reply);
 
@@ -115,3 +119,5 @@ export async function speak(messageId: string): Promise<string | null> {
   const f = await fetch(url, { credentials: "same-origin" });
   return f.ok ? URL.createObjectURL(await f.blob()) : null;
 }
+export const renameConversation = (conversation: string, title: string) => call("rename_conversation", { conversation, title });
+export const deleteConversation = (conversation: string) => call("delete_conversation", { conversation });

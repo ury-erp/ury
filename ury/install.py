@@ -43,6 +43,9 @@ def after_install():
     try:
         print("Setting up URY...")
         setup()
+        from ury.ury.brief_admin import ensure_default
+
+        ensure_default()
 
         click.secho("Thank you for installing URY App!", fg="green")
 

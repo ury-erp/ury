@@ -6,10 +6,10 @@ import { Cards } from "./Card";
 import Player from "./Player";
 import Waveform from "./Waveform";
 import { MAX_BYTES, MAX_SECONDS, Recorder, micSupported, type RecError } from "./recorder";
-import History from "./History";
+import { takeHandoff } from "./handoff";
 import { dayKey, dayLabel } from "./when";
 import type { ChatMessage } from "./types";
-import { MicIcon, SendIcon, CloseIcon, TickIcon, DoubleTickIcon, HistoryIcon, NewChatIcon } from "../components/Icons";
+import { MicIcon, SendIcon, CloseIcon, TickIcon, DoubleTickIcon, BackIcon, PhoneIcon } from "../components/Icons";
 import { getPrefs, usePrefsSubscribe } from "../settings/prefs";
 
 export type { ChatMessage, ChatTabProps } from "./types";
@@ -23,7 +23,17 @@ const stampOf = (id: string) => { let t = firstSeen.get(id); if (!t) { t = Date.
 const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const lid = () => `local-${++seq}`;
 
-export default function ChatTab() {
+export interface ThreadProps {
+  /** conversation id, or "new" */
+  id: string;
+  title?: string;
+  onBack: () => void;
+  onCall?: () => void;
+  /** a new chat got its server id (caller swaps the route to it) */
+  onStarted: (id: string) => void;
+}
+
+export default function ChatTab({ id: routeId, title, onBack, onCall, onStarted }: ThreadProps) {
   const [prefs, setPrefsState] = useState(getPrefs);
   useEffect(() => usePrefsSubscribe(() => setPrefsState(getPrefs())), []);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
@@ -33,9 +43,6 @@ export default function ChatTab() {
   const [secs, setSecs] = useState(0);
   const [micErr, setMicErr] = useState<RecError | null>(null);
   const [sheet, setSheet] = useState(false);
-  const [histOpen, setHistOpen] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const histBtn = useRef<HTMLButtonElement>(null);
   const loadTok = useRef(0);
   const conv = useRef<string | null>(null);
   const rec = useRef<Recorder | null>(null);
@@ -44,6 +51,8 @@ export default function ChatTab() {
   const end = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   const canMic = micSupported();
+  const onStartedRef = useRef(onStarted);
+  onStartedRef.current = onStarted;
   const ta = useRef<HTMLTextAreaElement>(null);
   const coarse = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
   useEffect(() => {
@@ -82,7 +91,7 @@ export default function ChatTab() {
   const patch = (id: string, p: Partial<ChatMessage>) => setMsgs((c) => c.map((m) => (m.id === id ? { ...m, ...p } : m)));
 
   const afterReply = (r: api.Reply) => {
-    if (r.conversation) { conv.current = r.conversation; setActiveId(r.conversation); }
+    if (r.conversation) { const first = !conv.current; conv.current = r.conversation; if (first) onStartedRef.current(r.conversation); }
     if (r.messages.length) merge(r.messages);
     if (!r.messages.length || r.messages[r.messages.length - 1].role !== "assistant" || r.pending) startPolling();
     else setWaiting(false);
@@ -156,8 +165,6 @@ export default function ChatTab() {
 
   const cancelRec = () => { rec.current?.cancel(); rec.current = null; stopTimer(); };
 
-  const closeHist = useCallback(() => { setHistOpen(false); setTimeout(() => histBtn.current?.focus(), 0); }, []);
-
   const resetState = () => {
     loadTok.current++;
     clearTimeout(poll.current);
@@ -165,11 +172,9 @@ export default function ChatTab() {
     setWaiting(false); setMicErr(null); setText(""); setMsgs([]);
   };
 
-  const newChat = () => { resetState(); conv.current = null; setActiveId(null); setHistOpen(false); };
-
   const openChat = async (id: string) => {
     resetState();
-    conv.current = id; setActiveId(id); closeHist();
+    conv.current = id;
     const tok = loadTok.current;
     setWaiting(true);
     try {
@@ -183,14 +188,29 @@ export default function ChatTab() {
     }
   };
 
+  // Route drives which conversation is open. A "new" chat that just got an id keeps its live state.
+  useEffect(() => {
+    if (routeId === "new") {
+      if (conv.current) return;
+      const h = takeHandoff();
+      if (h?.text) void sendText(h.text);
+      else if (h?.mic) (sessionStorageSeen() ? void startRec() : setSheet(true));
+      return;
+    }
+    if (routeId !== conv.current) void openChat(routeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeId]);
+
+  const heading = title || msgs.find((m) => m.role === "user")?.text || "New chat";
   const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
 
   return (
     <section className="chat" aria-label="Ask">
-      <div className="subbar">
-        <button ref={histBtn} type="button" className="sub-btn" aria-label="Chat history" aria-haspopup="dialog" onClick={() => setHistOpen(true)}><HistoryIcon size={24} /></button>
-        <button type="button" className="sub-btn" aria-label="New chat" onClick={newChat}><NewChatIcon size={24} /></button>
-      </div>
+      <header className="thread-bar">
+        <button type="button" className="sub-btn" aria-label="Back" onClick={onBack}><BackIcon size={24} className="mirror" /></button>
+        <h1 className="thread-title" dir="auto">{heading}</h1>
+        {onCall && <button type="button" className="sub-btn" aria-label="Call" onClick={onCall}><PhoneIcon size={24} /></button>}
+      </header>
       <div className="msgs" role="log" aria-live="polite" aria-label="Conversation">
         {msgs.length === 0 && (
           <div className="intro">
@@ -276,8 +296,6 @@ export default function ChatTab() {
           )}
         </form>
       )}
-
-      {histOpen && <History activeId={activeId} onPick={(id) => void openChat(id)} onClose={closeHist} />}
 
       {sheet && (
         <div className="scrim" role="dialog" aria-modal="true" aria-label="Microphone">

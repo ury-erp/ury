@@ -87,6 +87,11 @@ try:
 except ImportError:  # pure unit run from this directory
 	from chairman import ALLOWED_ROLES, _check_role
 
+try:
+	from ury.ury.api.chairman_chat_list_pure import clean_rename_title, coerce_list_limit, conversation_row
+except ImportError:  # pure unit run from this directory
+	from chairman_chat_list_pure import clean_rename_title, coerce_list_limit, conversation_row
+
 FAST_PATH_ENABLED = True  # kill switch for the pre-LLM router (no system setting by design)
 
 SETTINGS_DOCTYPE = "URY Chairman Settings"
@@ -681,7 +686,9 @@ def assert_chairman_tool_context(conversation_id=None):
 	"""Call at the top of every chairman agent tool. Fails closed unless the tool
 	executes as an URY Owner who owns the conversation (never Administrator)."""
 	user = frappe.session.user
-	if user == "Administrator" and frappe.conf.get("ury_brief_allow_administrator"):
+	from ury.ury.api.chairman import administrator_allowed
+
+	if user == "Administrator" and administrator_allowed():
 		pass
 	elif user in FORBIDDEN_TOOL_USERS or not (set(frappe.get_roles(user)) & set(ALLOWED_ROLES)):
 		frappe.throw(_("Owner tools must run as the owner"), frappe.PermissionError)
@@ -763,32 +770,59 @@ _HINT_TAIL = re.compile(r"\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$")
 
 @frappe.whitelist(methods=["GET", "POST"])
 def conversations(limit=40):
-	"""The signed-in owner's recent chats, newest first: name, title (first question), last activity."""
+	"""The signed-in owner's recent chats, newest first, from ONE grouped query:
+	id, title, preview (last message), last_role, pending (last message is the owner's,
+	i.e. unanswered), started_by_voice, last_at, created_at."""
 	_check_role()
 	agent = _require_agent()
 	frappe.local.response_headers["Cache-Control"] = "no-store"
-	n = max(1, min(int(str(limit).strip() or 40), 100)) if str(limit).strip().isdigit() else 40
-	rows = frappe.get_all(
-		"Agent Conversation",
-		filters={"agent": agent, "owner": frappe.session.user},
-		fields=["name", "modified", "creation"],
-		order_by="modified desc",
-		limit=n,
+	n = coerce_list_limit(limit)
+	rows = frappe.db.sql(
+		"""
+		SELECT c.name, c.title, c.modified, c.creation,
+			MIN(CASE WHEN m.role = 'user' THEN m.creation END) AS first_user_at,
+			SUBSTRING_INDEX(GROUP_CONCAT(CASE WHEN m.role = 'user' THEN m.content END
+				ORDER BY m.creation ASC SEPARATOR X'1F'), X'1F', 1) AS first_user,
+			SUBSTRING_INDEX(GROUP_CONCAT(m.role ORDER BY m.creation DESC SEPARATOR X'1F'), X'1F', 1) AS last_role,
+			SUBSTRING_INDEX(GROUP_CONCAT(m.content ORDER BY m.creation DESC SEPARATOR X'1F'), X'1F', 1) AS last_content,
+			EXISTS (SELECT 1 FROM `tabFile` f
+				WHERE f.attached_to_doctype = 'Agent Conversation' AND f.attached_to_name = c.name
+				AND f.file_name LIKE %(voice)s) AS started_by_voice
+		FROM `tabAgent Conversation` c
+		JOIN `tabAgent Message` m ON m.conversation = c.name AND m.kind = 'Message'
+			AND m.role IN ('user', 'agent')
+		WHERE c.agent = %(agent)s AND c.owner = %(owner)s
+		GROUP BY c.name
+		HAVING first_user_at IS NOT NULL
+		ORDER BY c.modified DESC
+		LIMIT %(n)s
+		""",
+		{"agent": agent, "owner": frappe.session.user, "voice": VOICE_PREFIX + "%", "n": n},
+		as_dict=True,
 	)
-	out = []
-	for r in rows:
-		first = frappe.get_all(
-			"Agent Message",
-			filters={"conversation": r.name, "role": "user", "kind": "Message"},
-			fields=["content"],
-			order_by="creation asc",
-			limit=1,
-		)
-		if not first:
-			continue
-		title = _HINT_TAIL.sub("", first[0].content or "").strip().replace("\n", " ")
-		out.append({"id": r.name, "title": title[:80] or "Conversation", "last_at": str(r.modified), "created_at": str(r.creation)})
-	return out
+	return [conversation_row(r) for r in rows]
+
+
+@frappe.whitelist(methods=["POST"])
+def rename_conversation(conversation, title):
+	_check_role()
+	agent = _require_agent()
+	_own_conversation(conversation, agent)
+	title = clean_rename_title(title)
+	if not title:
+		frappe.throw(_("title is required"), frappe.ValidationError)
+	frappe.db.set_value("Agent Conversation", conversation, "title", title, update_modified=False)
+	return {"id": conversation, "title": title}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_conversation(conversation):
+	_check_role()
+	agent = _require_agent()
+	_own_conversation(conversation, agent)
+	frappe.db.delete("Agent Message", {"conversation": conversation})
+	frappe.delete_doc("Agent Conversation", conversation, ignore_permissions=True, force=True)
+	return {"id": conversation, "deleted": True}
 
 
 def attach_message_ids(conversation, msgs):

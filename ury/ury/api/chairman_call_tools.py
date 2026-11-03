@@ -46,7 +46,9 @@ def _check_state(call_state):
 	if not isinstance(call_state, dict):
 		raise frappe.PermissionError("Invalid call")
 	user = call_state.get("user")
-	forbidden = FORBIDDEN_USERS - ({"Administrator"} if frappe.conf.get("ury_brief_allow_administrator") else set())
+	from ury.ury.api.chairman import administrator_allowed
+
+	forbidden = FORBIDDEN_USERS - ({"Administrator"} if administrator_allowed() else set())
 	if (
 		not user
 		or user in forbidden

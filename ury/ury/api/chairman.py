@@ -16,7 +16,7 @@ SCHEMA_VERSION = 1
 CURRENCY = "INR"
 LOCALE = "en-IN"
 ALLOWED_ROLES = {"URY Owner"}
-# Test-only hook: Administrator is NOT allowed in production. Tests set this True explicitly.
+# Test-only hook that forces Administrator allowed. The real switch is administrator_allowed() below.
 ALLOW_ADMINISTRATOR_FOR_TESTS = False
 COMPARE_LABEL = "vs same day last week"
 UNSPECIFIED = "Unspecified"
@@ -214,9 +214,16 @@ def spark_series(dates, per_day):
 # ---------------------------------------------------------------- DB layer
 
 
+ADMIN_CONF_KEY = "ury_brief_allow_administrator"
+
+
 def administrator_allowed():
-	"""Off by default. Demo/dev sites opt in with site_config `ury_brief_allow_administrator`: 1."""
-	return bool(ALLOW_ADMINISTRATOR_FOR_TESTS or frappe.conf.get("ury_brief_allow_administrator"))
+	"""Administrator is an owner for the brief by default. A site opts out with site_config
+	`ury_brief_allow_administrator`: 0. Install/migrate write the explicit default (ury.ury.brief_admin)."""
+	if ALLOW_ADMINISTRATOR_FOR_TESTS:
+		return True
+	v = frappe.conf.get(ADMIN_CONF_KEY)
+	return True if v is None else str(v).strip().lower() not in ("0", "false", "no", "")
 
 
 def _check_role():
