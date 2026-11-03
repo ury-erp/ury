@@ -32,10 +32,14 @@ SETTINGS_DEFAULTS = {
 }
 
 
+OLD_CALL_MODEL = "models/gemini-2.5-flash-native-audio-latest"  # the former default, never a deliberate choice
+
+
 def _fill_empty_settings():
 	try:
 		for field, value in SETTINGS_DEFAULTS.items():
-			if not frappe.db.get_single_value("URY Chairman Settings", field):
+			current = frappe.db.get_single_value("URY Chairman Settings", field)
+			if not current or (field == "call_model" and current == OLD_CALL_MODEL):
 				frappe.db.set_single_value("URY Chairman Settings", field, value)
 	except Exception:
 		frappe.log_error(title="URY Brief: could not set default settings")

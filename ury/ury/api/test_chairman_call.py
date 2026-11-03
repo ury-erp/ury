@@ -272,12 +272,21 @@ class TestStart(CallBase):
 		self.assertLess(expire, "9999")
 		self.assertTrue(expire > new_session)
 
+	def test_default_model_language_code_only_when_chosen(self):
+		self.assertEqual(cl.DEFAULT_MODEL, "models/gemini-3.8-live")
+		self.start("hi")
+		self.assertEqual(self.mint.call_args[0][0]["generationConfig"]["speechConfig"]["languageCode"], "hi-IN")
+		self.f.cache.d = {k: v for k, v in self.f.cache.d.items() if "rl:" not in k and "lock" not in k}
+		self.start(None)
+		self.assertNotIn("languageCode", self.mint.call_args[0][0]["generationConfig"]["speechConfig"])
+
 	def test_language_mapping(self):
+		self.settings["call_model"] = "models/gemini-2.5-flash-native-audio-latest"
 		expect = {"en": "en-IN", "hi": "hi-IN", "ar": cl.LANGUAGE_BCP47["ar"], "ml": "ml-IN", "fr": "en-IN", None: "en-IN"}
 		for lang, code in expect.items():
 			call = self.start(lang)
 			setup = self.mint.call_args[0][0]
-			# default model is native-audio: no languageCode (Gemini rejects it), language is in the instruction
+			# native-audio model: no languageCode (Gemini rejects it), language is in the instruction
 			self.assertNotIn("languageCode", setup["generationConfig"]["speechConfig"])
 			self.assertEqual(cl.LANGUAGE_BCP47[lang if lang in cl.LANGUAGE_BCP47 else "en"], code)
 			cl.end_call(call["call_id"])
