@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-IN" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="brief-user" content="{{ brief_user_key }}">
+<meta name="brief-build" content="{{ build_version }}">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#020817" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>URY Brief</title>
+<link rel="manifest" href="/assets/ury/brief/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/assets/ury/brief/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/ury/brief/dist/assets/app.css?v={{ build_version }}">
+<style>html,body{margin:0;background:hsl(60 11.1% 98.2%)}@media (prefers-color-scheme:dark){html:not([data-theme=light]),html:not([data-theme=light]) body{background:hsl(222.2 84% 4.9%)}}html[data-theme=dark],html[data-theme=dark] body{background:hsl(222.2 84% 4.9%)}</style>
+</head>
+<body>
+<script>window.csrf_token = {{ csrf_token | tojson }};</script>
+<div id="root"></div>
+<noscript><p style="padding:2rem;font-family:system-ui">JavaScript is required to show your daily slides.</p></noscript>
+<script type="module" src="/assets/ury/brief/dist/assets/app.js?v={{ build_version }}"></script>
+</body>
+</html>

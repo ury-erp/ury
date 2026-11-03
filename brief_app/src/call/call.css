@@ -1,0 +1,42 @@
+/* Call tab. Tokens only (see ../tokens.css and ../../DESIGN.md). */
+.call{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:var(--space-4);height:100%;padding:var(--space-3) var(--space-4) var(--space-4);text-align:center;font-family:var(--font-sans);color:hsl(var(--foreground))}
+.call-note{margin:0;font-size:var(--text-xs);color:hsl(var(--muted-foreground));background:hsl(var(--muted));padding:var(--space-2) var(--space-3);border-radius:var(--radius-md)}
+.call-who{display:flex;flex-direction:column;align-items:center;gap:var(--space-1-5);width:100%}
+.call-ring{--lvl:0;width:10rem;height:10rem;border-radius:50%;display:grid;place-items:center;margin-bottom:var(--space-3);box-shadow:0 0 0 calc(.2rem + var(--lvl)*1.1rem) hsl(var(--primary) / .3);transition:box-shadow .08s linear}
+.call-avatar{width:7rem;height:7rem;border-radius:50%;display:grid;place-items:center;font-size:var(--text-3xl);font-weight:600;background:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.call[data-state=failed] .call-avatar{background:hsl(var(--destructive));color:hsl(var(--destructive-foreground))}
+.call[data-state=ended] .call-avatar{background:hsl(var(--muted));color:hsl(var(--muted-foreground))}
+.call[data-state=ringing] .call-ring{animation:call-pulse 1.2s ease-in-out infinite}
+.call-name{margin:0;font-size:var(--text-xl);line-height:1.75rem;font-weight:600}
+.call-status{margin:0;font-size:var(--text-lg);font-weight:600}
+.call-time{margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:hsl(var(--muted-foreground))}
+.call-speaker{margin:0;font-size:var(--text-xs);color:hsl(var(--muted-foreground));min-height:1.2em}
+.call-line{margin:var(--space-1) 0 0;max-width:20rem;font-size:var(--text-sm)}
+.call-actions{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
+.call-btn{min-height:3rem;min-width:6rem;padding:0 var(--space-5);border-radius:var(--radius-md);border:1px solid hsl(var(--hair2));background:transparent;color:hsl(var(--foreground));font-size:var(--text-sm);font-weight:500;cursor:pointer;transition:background-color var(--dur) var(--ease)}
+.call-btn:hover{background:hsl(var(--accent))}
+.call-btn[aria-pressed=true]{background:hsl(var(--primary));border-color:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.call-start,.call-retry{background:hsl(var(--success));border-color:hsl(var(--success));color:hsl(var(--success-foreground));box-shadow:var(--shadow-sm)}
+.call-start:hover,.call-retry:hover{background:hsl(var(--success));filter:brightness(1.08);color:hsl(var(--success-foreground))}
+.call-end{background:hsl(var(--destructive));border-color:hsl(var(--destructive));color:hsl(var(--destructive-foreground));box-shadow:var(--shadow-sm)}
+.call-end:hover{background:hsl(var(--destructive));filter:brightness(1.1);color:hsl(var(--destructive-foreground))}
+.call-back{min-height:var(--touch);min-width:var(--touch);background:transparent;border:0;color:hsl(var(--primary));font-size:var(--text-sm);font-weight:500;text-decoration:underline;cursor:pointer}
+.call button:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
+@keyframes call-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){
+  .call *{animation:none!important;transition:none!important}
+  .call-ring{box-shadow:0 0 0 .3rem hsl(var(--primary) / .3)}
+}
+.call-note-sub{background:transparent;padding:0}
+.call-lang{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:hsl(var(--muted-foreground))}
+.call-lang select{min-height:var(--touch);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--hair2));background:hsl(var(--background));color:hsl(var(--foreground));font:inherit}
+.call-lang select:disabled{opacity:.6}
+.call-left{margin:0;font-size:var(--text-sm);color:hsl(var(--muted-foreground))}
+.call-left span{font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:hsl(var(--foreground))}
+.call-left .call-left-low{color:hsl(var(--destructive));font-weight:600}
+.call-meter{--lvl:0;display:block;width:10rem;height:.5rem;border-radius:var(--radius-full,9999px);background:hsl(var(--muted));overflow:hidden;visibility:hidden}
+.call-meter[data-on=true]{visibility:visible}
+.call-meter i{display:block;height:100%;width:calc(var(--lvl)*100%);background:hsl(var(--primary));transition:width .08s linear}
+.call-error{margin:var(--space-1) 0 0;max-width:20rem;font-size:var(--text-sm);color:hsl(var(--destructive))}
+.call[dir=rtl] .call-who,.call[dir=rtl] .call-actions{direction:rtl}
+.call-lang{margin-bottom:var(--space-5)}.call-note-sub{margin-top:calc(var(--space-2)*-1)}

@@ -1,0 +1,53 @@
+{
+  "tool_name": "ury_chairman_compose_card",
+  "description": "Draw a custom card ONLY when no other tool returns the visual the user wants and show_card cannot do it. Every number must be copied from results of the other tools in this conversation; NEVER invent, estimate or compute new figures. type: kpi (up to 4 labelled numbers), bar (1 to 12), line (2 to 12 points in order). Pass labels and values (same length; values are plain numbers like 1250.5, no commas or units); fmt is money, int, pct or mins. Tables are not available here: use show_card with the matching tool. At most 3 composed cards per reply.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.compose_card",
+  "parameters": [
+    {
+      "label": "Type",
+      "fieldname": "type",
+      "type": "string",
+      "required": 1,
+      "description": "",
+      "options": "kpi\nbar\nline"
+    },
+    {
+      "label": "Title",
+      "fieldname": "title",
+      "type": "string",
+      "required": 1,
+      "description": "Card title, up to 60 characters."
+    },
+    {
+      "label": "Labels",
+      "fieldname": "labels",
+      "type": "array",
+      "required": 0,
+      "description": "kpi/bar/line: one label per value."
+    },
+    {
+      "label": "Values",
+      "fieldname": "values",
+      "type": "array",
+      "required": 0,
+      "description": "kpi/bar/line: plain numbers as text, e.g. \"1250.5\" (no commas or units), taken from tool results."
+    },
+    {
+      "label": "Fmt",
+      "fieldname": "fmt",
+      "type": "string",
+      "required": 0,
+      "description": "How to show the values. Default int.",
+      "options": "money\nint\npct\nmins"
+    },
+    {
+      "label": "Subtitle",
+      "fieldname": "subtitle",
+      "type": "string",
+      "required": 0,
+      "description": "Optional, e.g. the period. Up to 80 characters."
+    }
+  ]
+}

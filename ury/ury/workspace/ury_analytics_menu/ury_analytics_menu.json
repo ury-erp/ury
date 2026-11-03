@@ -1,0 +1,158 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"b6e3f85b59\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB04 Menu & Category\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"17d3bcdcb1\",\"type\":\"card\",\"data\":{\"card_name\":\"Items & Categories\",\"col\":4}},{\"id\":\"1272887b20\",\"type\":\"card\",\"data\":{\"card_name\":\"Customers\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:31.421677",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "book-open",
+ "is_hidden": 0,
+ "label": "URY Analytics Menu",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "utensils-crossed",
+   "is_query_report": 0,
+   "label": "Items & Categories",
+   "link_count": 7,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Wise Qty",
+   "link_count": 0,
+   "link_to": "Item Wise Qty",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Menu Course Sales",
+   "link_count": 0,
+   "link_to": "Menu Course Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Order Type Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Order Type Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Service Wise Sales",
+   "link_count": 0,
+   "link_to": "Service Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Product Categorization",
+   "link_count": 0,
+   "link_to": "Product Categorization",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Department Sales Yesterday",
+   "link_count": 0,
+   "link_to": "Department Sales Yesterday",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "icon": "users",
+   "is_query_report": 0,
+   "label": "Customers",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Customer Data",
+   "link_count": 0,
+   "link_to": "Customer Data",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Repeated Customers",
+   "link_count": 0,
+   "link_to": "Repeated Customers",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Customer Details",
+   "link_count": 0,
+   "link_to": "Daywise Customer Details",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:10:59.048040",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Menu",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB04 Menu & Category",
+   "type": "URL",
+   "url": "/insights/dashboards/69ts8lndkk"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Menu",
+ "type": "Workspace"
+}

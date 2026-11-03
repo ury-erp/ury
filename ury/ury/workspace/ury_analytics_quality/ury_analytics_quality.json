@@ -1,0 +1,59 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"942a6d8ff4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB14 Data Quality & Readiness\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"e668c77656\",\"type\":\"card\",\"data\":{\"card_name\":\"Audit Tools\",\"col\":4}}]",
+ "creation": "2026-11-03 05:07:32.477763",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "icon": "shield-check",
+ "is_hidden": 0,
+ "label": "URY Analytics Quality",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "shield-check",
+   "is_query_report": 0,
+   "label": "Audit Tools",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Authority Shadow Comparison",
+   "link_count": 0,
+   "link_to": "Stock Authority Shadow Comparison Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:11:02.207256",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Analytics Quality",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Admin"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "DB14 Data Quality & Readiness",
+   "type": "URL",
+   "url": "/insights/dashboards/9g3cho4dvl"
+  }
+ ],
+ "standard": 1,
+ "title": "URY Analytics Quality",
+ "type": "Workspace"
+}

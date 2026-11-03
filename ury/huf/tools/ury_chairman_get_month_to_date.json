@@ -1,0 +1,16 @@
+{
+  "tool_name": "ury_chairman_get_month_to_date",
+  "description": "Net sales from the 1st of the month up to the date, against the same number of days last month. There is no sales target in the system, so no target comparison is available.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_month_to_date",
+  "parameters": [
+    {
+      "label": "Date",
+      "fieldname": "date",
+      "type": "string",
+      "required": 0,
+      "description": "Business day, YYYY-MM-DD. Leave out for yesterday."
+    }
+  ]
+}

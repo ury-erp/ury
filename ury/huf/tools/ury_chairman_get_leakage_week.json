@@ -1,0 +1,16 @@
+{
+  "tool_name": "ury_chairman_get_leakage_week",
+  "description": "Cancellations (count, value, top reason) and discounts for the 7 days ending on the date.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_leakage_week",
+  "parameters": [
+    {
+      "label": "Date",
+      "fieldname": "date",
+      "type": "string",
+      "required": 0,
+      "description": "Business day, YYYY-MM-DD. Leave out for yesterday."
+    }
+  ]
+}

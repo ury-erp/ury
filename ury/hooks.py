@@ -39,6 +39,7 @@ app_include_js = [
     "/assets/ury/js/restrict_customer_group_change.js",
     "/assets/ury/js/ury_order_checklist.js",
     "/assets/ury/js/autofetch_fields.js",
+    "/assets/ury/js/insights_guard.js",
 ]
 
 # include js, css files in header of web template
@@ -88,6 +89,14 @@ website_route_rules = [
     {"from_route": "/ury/serve", "to_route": "serve"},
     {"from_route": "/ury/serve/", "to_route": "serve"},
     {"from_route": "/ury/serve/<path:app_path>", "to_route": "serve"},
+    # Chairman Brief PWA (executive slides) — same shape as Serve above; the
+    # /ury/brief itself is served by Huf (HUF App "brief", www_template brief_app); only the WhatsApp
+    # token landing page needs a route rule.
+    {"from_route": "/ury/brief/go", "to_route": "brief_app"},
+    # Pass-through rules so the /ury/<path> catch-all below does not swallow what Huf serves.
+    {"from_route": "/ury/brief/sw.js", "to_route": "ury/brief/sw.js"},
+    {"from_route": "/ury/brief/", "to_route": "ury/brief"},
+    {"from_route": "/ury/brief", "to_route": "ury/brief"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -176,6 +185,7 @@ ury_demo_transaction_doctypes = [
 # site (every CI run) gets URY's Custom Field fixtures but none of its
 # DocPerms. See ury.install.ensure_role_permissions for the full write-up.
 after_install = "ury.install.after_install"
+boot_session = "ury.ury.boot_insights.boot_session"
 
 # Uninstallation
 # ------------
@@ -221,6 +231,8 @@ override_doctype_class = {
 after_migrate = [
     "ury.ury.ai_tools.agent_seeding.after_migrate",
     "ury.setup_customizations.hide_setup_sidebar_options",
+    "ury.ury.desk_islands.after_migrate",
+    "ury.ury.brief_admin.ensure_default",
 ]
 
 # The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)
@@ -235,6 +247,17 @@ before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
 # Hook on document methods and events
 
 doc_events = {
+    "WhatsApp Message": {
+        "after_insert": "ury.ury.api.chairman_whatsapp.on_incoming",
+    },
+    "User": {
+        "validate": ["ury.ury.analytics_access.on_user_validate"],
+        "on_update": [
+            "ury.ury.api.chairman_wa_identity.on_user_update",
+            "ury.ury.analytics_access.on_user_update",
+        ],
+        "on_trash": "ury.ury.api.chairman_wa_identity.on_user_trash",
+    },
     "POS Invoice": {
         "before_insert": "ury.ury.hooks.ury_pos_invoice.before_insert",
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
@@ -342,11 +365,13 @@ scheduler_events = {
 		# sweeps rows that reached neither, so capacity is not leaked
 		# forever. Hourly is ample for a job whose TTL is measured in a day.
 		"0 * * * *":[
-			"ury.ury.api.ury_reservation_service.expire_stale_reservations_scheduled"
+			"ury.ury.api.ury_reservation_service.expire_stale_reservations_scheduled",
+			"ury.chairman_jobs.purge_chairman_whatsapp",
 		]
 	},
 	"daily": [
-		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
+		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks",
+		"ury.chairman_jobs.purge_chairman_audio",
 	]
 # 	"all": [
 # 		"ury.tasks.all"
@@ -408,6 +433,10 @@ website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # Sets Service-Worker-Allowed + JS content-type for the Serve PWA worker.
+before_request = [
+    "ury.ury.api.wa_signature.guard_whatsapp_webhook",
+    "ury.ury.api.chairman_link.guard_brief_only_session",
+]
 after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
 website_redirects = [
@@ -415,7 +444,10 @@ website_redirects = [
         "source": "/setup-wizard",
         "target": "/ury/setup-wizard/0",
         "redirect_http_status": 302,
-    }
+    },
+    # /brief is the short link to URY Brief.
+    {"source": "/brief", "target": "/ury/brief/", "redirect_http_status": 302},
+    {"source": "/brief/", "target": "/ury/brief/", "redirect_http_status": 302},
 ]
 
 extend_bootinfo = [
@@ -466,6 +498,7 @@ extend_bootinfo = [
 # not installed — an unused hook value is simply never read.
 # See tracks/sa-ai-reports-dashboard/HUF_API_NOTES.md for how this was confirmed.
 huf_tools = "ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS"
+huf_brief_data_provider = "ury.ury.api.brief_provider.get_brief_data"
 
 fixtures = [
     {

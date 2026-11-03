@@ -1,0 +1,19 @@
+{
+  "manifest_version": 1,
+  "app_id": "brief",
+  "title": "URY Brief",
+  "description": "The owner's daily brief and chat analyst.",
+  "version": "1.0.0",
+  "route": "/ury/brief",
+  "icon": "bar-chart-2",
+  "category": "Analyze",
+  "launch_mode": "route",
+  "permission_method": "ury.ury.api.chairman.brief_access",
+  "delivery": "portal",
+  "theme_color": "#ffffff",
+  "scope": "/ury/brief/",
+  "static_routes": [
+    "sw.js"
+  ],
+  "www_template": "brief_app"
+}
