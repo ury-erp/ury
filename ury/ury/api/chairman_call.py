@@ -35,7 +35,7 @@ WS_URL = (
 )
 TOKEN_URL = "https://generativelanguage.googleapis.com/v1alpha/auth_tokens"
 TOKEN_TIMEOUT = 15
-DEFAULT_MODEL = "models/gemini-2.5-flash-native-audio-latest"
+DEFAULT_MODEL = "models/gemini-3.8-live"
 DEFAULT_VOICE = "Puck"
 DEFAULT_MAX_SECONDS = 300
 MIN_SECONDS, MAX_SECONDS = 30, 900

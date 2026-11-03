@@ -19,3 +19,23 @@ def ensure_default():
 			frappe.db.set_single_value("URY Chairman Settings", "chat_agent", AGENT)
 	except Exception:
 		frappe.log_error(title="URY Brief: could not set chat agent")
+	_fill_empty_settings()
+
+
+# Safe defaults, applied only when the field is empty. voice_call_enabled is deliberately NOT set (stays off).
+SETTINGS_DEFAULTS = {
+	"call_model": "models/gemini-3.8-live",
+	"call_voice": "Puck",
+	"call_max_seconds": 300,
+	"call_daily_minutes_per_user": 30,
+	"audio_retention_days": 7,
+}
+
+
+def _fill_empty_settings():
+	try:
+		for field, value in SETTINGS_DEFAULTS.items():
+			if not frappe.db.get_single_value("URY Chairman Settings", field):
+				frappe.db.set_single_value("URY Chairman Settings", field, value)
+	except Exception:
+		frappe.log_error(title="URY Brief: could not set default settings")
