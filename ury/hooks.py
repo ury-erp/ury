@@ -193,8 +193,10 @@ doc_events = {
         },
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
-        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"
-        },
+        "validate": "ury.ury.hooks.ury_pos_closing_entry.validate",
+        "on_submit": "ury.ury.hooks.ury_pos_closing_entry.on_submit",
+        "on_cancel": "ury.ury.hooks.ury_pos_closing_entry.on_cancel",
+    },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
 	}    
@@ -206,7 +208,8 @@ doc_events = {
 scheduler_events = {
     "cron":{
 		"* * * * *":[
-			"ury.ury.api.ury_kot_validation.kotValidationThread"
+			"ury.ury.api.ury_kot_validation.kotValidationThread",
+			"ury.ury.api.reservation_scheduler.process_reservation_no_shows"
 		]
 	}
 # 	"all": [
@@ -400,6 +403,12 @@ fixtures = [
                     "Branch-custom_aggregators",
                     "Branch-custom_make_unpaid",
                     "Branch-custom_no_taxes",
+                    "Branch-custom_reservation_settings_section",
+                    "Branch-custom_enable_reservation",
+                    "Branch-custom_buffer_time",
+                    "Branch-custom_grace_period",
+                    "Branch-custom_avg_table_time_last_day",
+                    "Branch-custom_avg_table_time_last_week",
                     "Price List-restaurant_menu",
                     "POS Profile-custom_enable_discount",
                     "POS Invoice-custom_comments",
