@@ -291,7 +291,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        if (profile && profile.country) {
+        if (profile && profile.country && 'custom_invoice_warning_time' in profile) {
           set({ 
             posProfile: profile, 
             profileLoading: false,

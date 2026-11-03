@@ -17,6 +17,23 @@ standard_format = "templates/print_formats/standard.html"
 from frappe.www.printview import validate_print_permission
 
 
+def _mark_invoice_printed(invoice_name, was_printed=None, update_modified=True):
+	"""Mark a POS Invoice as printed.
+
+	The printing time is recorded only on the first print (the 0 -> 1 transition
+	of invoice_printed), so reprints do not reset the time-limit warning.
+	Pass ``was_printed`` when the caller has already read invoice_printed.
+	"""
+	if was_printed is None:
+		was_printed = frappe.db.get_value("POS Invoice", invoice_name, "invoice_printed")
+	values = {"invoice_printed": 1}
+	if not was_printed:
+		values["custom_printing_time"] = frappe.utils.now_datetime()
+	frappe.db.set_value(
+		"POS Invoice", invoice_name, values, update_modified=update_modified
+	)
+
+
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -67,10 +84,10 @@ def network_printing(
                 )
 
                 if restaurant_table and invoice_printed == 0:
-                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                    _mark_invoice_printed(name, was_printed=0)
                     release_merge_cluster_tables(restaurant_table)
                 else:
-                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                    _mark_invoice_printed(name, was_printed=invoice_printed)
 
                 from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
                 trigger_manufacture_on_bill_print(name)
@@ -138,9 +155,7 @@ def qz_print_update(invoice):
         
         if table == None or table == "":
             # Update invoice_printed
-            frappe.db.set_value(
-                "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-            )
+            _mark_invoice_printed(invoice, update_modified=False)
             
             # Validate the update
             new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
@@ -151,9 +166,7 @@ def qz_print_update(invoice):
 
             if invoice_printed == 0:
                 # Update invoice_printed
-                frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-                )
+                _mark_invoice_printed(invoice, was_printed=0, update_modified=False)
 
                 release_merge_cluster_tables(table)
                 # Validate both updates
@@ -191,7 +204,7 @@ def print_pos_page(doctype, name, print_format):
     invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
 
     if invoice_printed == 0:
-        frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+        _mark_invoice_printed(name, was_printed=0)
 
         if restaurant_table:
             release_merge_cluster_tables(restaurant_table)

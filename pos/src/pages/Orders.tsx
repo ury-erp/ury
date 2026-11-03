@@ -37,6 +37,11 @@ import {
 import { parseFrappeError } from '@ury/core';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+import {
+  getPrintWarningState,
+  formatFrappeDatetime,
+  type PrintWarningInput,
+} from '../lib/invoice-print-warning';
 
 function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
   if (!order.restaurant_table) return null;
@@ -86,6 +91,23 @@ export default function Orders() {
   } = useRootStore();
 
   const posStore = usePOSStore();
+  const printWarningMinutes = posStore.posProfile?.custom_invoice_warning_time ?? 0;
+  const [clockNow, setClockNow] = React.useState(() => Date.now());
+  useEffect(() => {
+    if (!printWarningMinutes) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [printWarningMinutes]);
+
+  const renderPrintWarning = (order: PrintWarningInput) => {
+    const warning = getPrintWarningState(order, printWarningMinutes, clockNow);
+    if (!warning.exceeded) return null;
+    return (
+      <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50">
+        {warning.elapsedLabel}
+      </Badge>
+    );
+  };
   const navigate = useNavigate();
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
@@ -313,7 +335,14 @@ export default function Orders() {
       showToast.success(t('success.printed'));
       // Locally update selectedOrder.invoice_printed to 1
       if (selectedOrder && typeof selectedOrder === 'object') {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
+        const wasPrinted = Number(selectedOrder.invoice_printed) === 1;
+        selectOrder({
+          ...selectedOrder,
+          invoice_printed: 1,
+          custom_printing_time: wasPrinted
+            ? selectedOrder.custom_printing_time ?? null
+            : formatFrappeDatetime(new Date()),
+        });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
@@ -483,6 +512,7 @@ export default function Orders() {
                         <Badge variant={getBadgeVariant(order.status)}>
                           {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
                         </Badge>
+                        {renderPrintWarning(order)}
                       </div>
                     </div>
                     {mergedBill && order.custom_merged_pos_invoice && (
