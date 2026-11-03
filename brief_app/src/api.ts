@@ -80,8 +80,8 @@ function showSignOutError() {
   const el = document.createElement("div");
   el.setAttribute("role", "alert");
   el.textContent = "Could not sign out. Try again.";
-  el.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#b3261e;" +
-    "color:#fff;padding:10px 16px;border-radius:8px;z-index:99999;font:14px system-ui,sans-serif";
+  el.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:hsl(var(--destructive));" +
+    "color:hsl(var(--destructive-foreground));padding:12px 16px;border-radius:6px;box-shadow:var(--shadow-xl);z-index:99999;font:14px var(--font-sans)";
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 6000);
 }

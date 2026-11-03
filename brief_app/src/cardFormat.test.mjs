@@ -1,7 +1,7 @@
 // node --test src/*.test.mjs
 import test from "node:test";
 import assert from "node:assert";
-import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary } from "./chat/cardFormat.ts";
+import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary, panelTitle, panelSubtitle, dashboardLink, trendGlyph, toneClass } from "./chat/cardFormat.ts";
 import { readFileSync } from "node:fs";
 const live = JSON.parse(readFileSync("/tmp/cards.json", "utf8") || "{}");
 
@@ -37,4 +37,43 @@ test("live samples survive sanitize and summarize", () => {
     assert.equal(out.length, cards.length);
     for (const c of out) assert.ok(cardSummary(c).length > 0);
   }
+});
+
+const dash = JSON.parse(readFileSync("/tmp/dash_one.json", "utf8"));
+const kpi = { v: 1, type: "kpi", title: "K", kpis: [{ label: "a", value: 1, fmt: "int", trend: "up", tone: "good", delta: 0.1 }] };
+test("dashboard fixture survives sanitize", () => {
+  const [d] = sanitizeCards([dash]);
+  assert.equal(d.type, "dashboard");
+  assert.equal(d.panels.length, 3);
+  assert.deepEqual(d.panels.map((p) => p.span), [2, 2, 2]);
+  assert.match(cardSummary(d), /Last 7 Days Sales Overview/);
+  assert.match(cardSummary(d), /Total net sales/);
+  assert.equal(dashboardLink(d).url, "/insights/dashboards/58aq35af28");
+});
+test("dashboard malformed panels dropped, caps at 6, no nesting", () => {
+  const nested = { v: 2, type: "dashboard", panels: [{ card: { type: "dashboard", panels: [] } }] };
+  const many = { v: 2, type: "dashboard", title: "m", panels: Array.from({ length: 9 }, () => ({ card: kpi })) };
+  const mixed = { v: 2, type: "dashboard", panels: [null, { card: { type: "pie" } }, { card: { type: "bar" } }, { card: kpi, span: 7, composed: "yes" }] };
+  assert.deepEqual(sanitizeCards([nested, { type: "dashboard" }, { type: "dashboard", panels: "x" }]), []);
+  assert.equal(sanitizeCards([many])[0].panels.length, 6);
+  const [m] = sanitizeCards([mixed]);
+  assert.equal(m.panels.length, 1);
+  assert.equal(m.panels[0].span, 2);
+  assert.equal(m.panels[0].composed, false);
+});
+test("dashboard helpers", () => {
+  assert.equal(panelTitle({ card: { title: "c" }, title: "p" }), "p");
+  assert.equal(panelTitle({ card: { title: "c" } }), "c");
+  assert.equal(panelSubtitle({ card: { type: "kpi" } }), "");
+  assert.equal(trendGlyph("up"), "▲");
+  assert.equal(trendGlyph("down"), "▼");
+  assert.equal(trendGlyph(null), "");
+  assert.equal(toneClass("good"), "tone-good");
+  assert.equal(toneClass("bad"), "tone-bad");
+  assert.equal(toneClass("weird"), "tone-neutral");
+  const unsafe = sanitizeCards([{ type: "dashboard", panels: [{ card: { ...kpi, link: { url: "https://evil.com" } } }] }])[0];
+  assert.equal(dashboardLink(unsafe), null);
+});
+test("kpi summary includes trend", () => {
+  assert.match(cardSummary(kpi), /a 1 up \+10%/);
 });

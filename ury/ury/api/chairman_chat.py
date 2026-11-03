@@ -445,11 +445,15 @@ def run_with_cards(agent, conversation, prompt):
 	Tools run in this process (now=1), so they publish cards on frappe.flags.chairman_cards;
 	Huf's run result carries no tool outputs. Returns (run_result, cards)."""
 	frappe.flags.chairman_cards = []
+	frappe.flags.chairman_composed_cards = 0
+	frappe.flags.chairman_card_registry = None
 	try:
 		run = _run_inline(agent, conversation, prompt)
 		cards = select_cards(frappe.flags.chairman_cards)
 	finally:
 		frappe.flags.chairman_cards = None
+		frappe.flags.chairman_composed_cards = 0
+		frappe.flags.chairman_card_registry = None
 	if cards:
 		_persist_cards(conversation, cards)
 	return run, cards
@@ -558,6 +562,10 @@ def select_cards(raw, limit=None):
 	mod = _cards_mod()
 	limit = limit or mod.MAX_CARDS
 	raw = list(raw or [])
+	dashboards = [c for c in raw if isinstance(c, dict) and c.get("type") == "dashboard"]
+	if dashboards:
+		# A composed dashboard is the answer; loose single cards beside it only duplicate its panels.
+		return mod.limit_cards(dashboards[:1], limit)
 	if len(raw) > limit:
 		raw.reverse()
 	return mod.limit_cards(raw, limit)
@@ -632,12 +640,16 @@ def try_fast_path(agent, conversation, message, language=None):
 		lang = normalize_language(language) or router.detect_language(message)
 		frappe.flags.chairman_conversation_id = conversation
 		frappe.flags.chairman_cards = []
+		frappe.flags.chairman_composed_cards = 0
+		frappe.flags.chairman_card_registry = None
 		try:
 			res = router.answer(intent, lang)
 			armed = list(frappe.flags.chairman_cards or [])
 		finally:
 			frappe.flags.chairman_conversation_id = None
 			frappe.flags.chairman_cards = None
+			frappe.flags.chairman_composed_cards = 0
+			frappe.flags.chairman_card_registry = None
 		if not res or not res.get("reply"):
 			return None
 		cards = select_cards(armed)

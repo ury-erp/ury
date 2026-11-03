@@ -18,6 +18,7 @@ agent seeding step creates one Huf Agent Tool per entry, with function_path
 Amounts are net of tax (net sales) unless the tool says otherwise.
 """
 
+import json
 import math
 import re
 from datetime import timedelta
@@ -37,7 +38,7 @@ FREE_TEXT_KEYS = frozenset(
 )
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
 MAX_COMPOSED_CARDS_PER_REPLY = 3
-CARD_PASSTHROUGH_TOOLS = frozenset({"show_card", "compose_card"})  # build their own cards
+CARD_PASSTHROUGH_TOOLS = frozenset({"show_card", "compose_card", "compose_dashboard"})  # build their own cards
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -227,10 +228,46 @@ def _tool_cards(tool_name, result):
 		cards = chairman_cards.cards_for(tool_name, result, link=url)
 	except Exception:
 		return []
+	return _publish_cards(cards)
+
+
+def _sink():
 	sink = getattr(getattr(frappe, "flags", None), "chairman_cards", None)
-	if isinstance(sink, list):
-		sink.extend(cards)
-	return cards
+	return sink if isinstance(sink, list) else None
+
+
+def _card_registry():
+	"""{id: card} for every card published in this reply, ids c1, c2, ... in publication order.
+	The registry is separate from the sink so ids stay stable when compose_dashboard replaces
+	member cards in the sink. Cards found in the sink but not yet registered (e.g. put there by the
+	chat layer) get the next ids. Returns None when no reply armed the sink."""
+	sink = _sink()
+	if sink is None:
+		return None
+	reg = getattr(frappe.flags, "chairman_card_registry", None)
+	if not isinstance(reg, dict):
+		reg = {}
+		frappe.flags.chairman_card_registry = reg
+	known = {id(c) for c in reg.values()}
+	for c in sink:
+		if id(c) not in known:
+			reg["c%d" % (len(reg) + 1)] = c
+			known.add(id(c))
+	return reg
+
+
+def _publish_cards(cards):
+	"""Append `cards` (plain, as the PWA/PNG consume them) to the reply's sink and register their ids.
+	Returns copies with an extra "id" field for the tool result, so the agent can pass ids to
+	compose_dashboard. The sink and registry hold the plain cards; validate_card drops unknown keys,
+	so the id never reaches the PWA. Without an armed sink the cards are returned unchanged."""
+	reg = _card_registry()
+	if reg is None:
+		return cards
+	_sink().extend(cards)
+	reg = _card_registry()
+	by_obj = {id(c): i for i, c in reg.items()}
+	return [{**c, "id": by_obj[id(c)]} for c in cards]
 
 
 def guarded(fn):
@@ -588,19 +625,33 @@ def _cards_mod():
 	return chairman_cards
 
 
+_PLAIN_DECIMAL = re.compile(r"-?(0|[1-9][0-9]{0,15})(\.[0-9]{1,6})?")
+
+
 def _number_list(values, name):
-	"""list of finite real numbers within chairman_cards bounds; booleans and strings rejected."""
+	"""list of finite real numbers within chairman_cards bounds. Huf declares every array of a custom
+	tool as array<string>, so numeric strings are accepted, but only plain decimals: optional minus,
+	digits, optional fraction (e.g. "12", "-3.5"). No whitespace, '+', separators ("1,250"), exponent,
+	hex, nan/inf. Booleans, None and other types are rejected."""
 	cc = _cards_mod()
 	if not isinstance(values, (list, tuple)) or not values:
 		raise ValueError(f"{name} must be a non-empty list of numbers.")
 	out = []
 	for v in values:
-		if isinstance(v, bool) or not isinstance(v, (int, float)):
+		if isinstance(v, bool):
 			raise ValueError(f"{name} must contain only numbers.")
-		f = float(v)
+		if isinstance(v, str):
+			if not _PLAIN_DECIMAL.fullmatch(v):
+				raise ValueError(f"{name} must contain only plain numbers like 12 or 3.5 (no commas, units or exponents).")
+			n = float(v) if "." in v else int(v)
+		elif isinstance(v, (int, float)):
+			n = v
+		else:
+			raise ValueError(f"{name} must contain only numbers.")
+		f = float(n)
 		if not math.isfinite(f) or abs(f) > cc.NUM_MAX:
 			raise ValueError(f"{name} contains a number that is not finite or is too large.")
-		out.append(v)
+		out.append(n)
 	return out
 
 
@@ -698,22 +749,82 @@ def show_card(tool, start_date=None, end_date=None, date=None):
 
 @frappe.whitelist(methods=["POST"])
 @guarded
-def compose_card(type, title, labels=None, values=None, fmt="int", subtitle=None, cols=None, rows=None):
+def compose_card(type, title, labels=None, values=None, fmt="int", subtitle=None):
 	"""Draw a custom card ONLY when no other tool returns the visual the user wants and show_card
 	cannot do it. Every number must be copied from results of the other tools in this
 	conversation; NEVER invent, estimate or compute new figures. type: kpi (up to 4 labelled
-	numbers), bar (1 to 12), line (2 to 12 points in order), table (cols up to 4, rows up to 8).
-	For kpi/bar/line pass labels and values (same length, values are plain numbers, no text);
-	fmt is money, int, pct or mins. For table pass cols and rows. At most 3 composed cards per
-	reply."""
+	numbers), bar (1 to 12), line (2 to 12 points in order). Pass labels and values (same length;
+	values are plain numbers like 1250.5, no commas or units); fmt is money, int, pct or mins. Tables
+	are not available here: use show_card with the matching tool. At most 3 composed cards per reply."""
+	# Design decision: Huf flattens every array parameter of a custom tool to array<string>, so a
+	# nested rows array cannot be declared; tables stay preset-only (build_composed_card keeps its
+	# pure table path for tests/future use but compose_card never exposes it).
+	if type == "table":
+		raise ValueError("Tables cannot be composed; use show_card with the tool that returns the table.")
 	if _composed_count() >= MAX_COMPOSED_CARDS_PER_REPLY:
 		raise ValueError(f"At most {MAX_COMPOSED_CARDS_PER_REPLY} composed cards per reply; use the numbers in text instead.")
-	card = build_composed_card(type, title, labels, values, fmt, subtitle, cols, rows)
+	card = build_composed_card(type, title, labels, values, fmt, subtitle)
 	_bump_composed_count()
-	sink = getattr(getattr(frappe, "flags", None), "chairman_cards", None)
-	if isinstance(sink, list):
-		sink.append(card)
-	return {"cards": [card], "note": "Composed from numbers supplied by the assistant, not a preset report."}
+	return {"cards": _publish_cards([card]), "note": "Composed from numbers supplied by the assistant, not a preset report."}
+
+
+def _id_list(value, name):
+	"""Huf declares arrays as array<string>; also tolerate a JSON list or comma-separated text."""
+	if value is None:
+		return None
+	if isinstance(value, str):
+		try:
+			parsed = json.loads(value)
+		except ValueError:
+			parsed = None
+		value = parsed if isinstance(parsed, list) else [v.strip() for v in value.split(",") if v.strip()]
+	if not isinstance(value, (list, tuple)):
+		raise ValueError(f"{name} must be a list of text values.")
+	return [str(v).strip() if v is not None else "" for v in value]
+
+
+@frappe.whitelist(methods=["POST"])
+@guarded
+def compose_dashboard(title, card_ids, subtitle=None, subtext=None, footnote=None, columns=2, captions=None):
+	"""Combine 2 to 6 cards already produced in THIS reply into ONE dashboard card. First call the data
+	tools (or show_card) and read the "id" of each returned card (c1, c2, ...), then pass those ids in
+	card_ids in display order. Optional captions: one short line per card, same order and length as
+	card_ids (use an empty text to skip), copied from tool results; never invent numbers. columns: 1
+	for line or bar charts with many points, 2 only for small kpi or bar panels. At most 1 dashboard
+	per reply and at most 4 rows. The dashboard replaces the individual cards in the reply."""
+	cols = str(columns).strip() if columns is not None else "2"
+	if cols not in ("1", "2"):
+		raise ValueError("columns must be 1 or 2.")
+	ids = _id_list(card_ids, "card_ids")
+	if not ids:
+		raise ValueError("card_ids must list the ids of cards produced in this reply.")
+	caps = _id_list(captions, "captions")
+	sink, reg = _sink(), _card_registry()
+	if sink is None or reg is None:
+		raise ValueError("No cards are available in this reply; call the data tools first.")
+	if any(isinstance(c, dict) and c.get("type") == "dashboard" for c in sink):
+		raise ValueError("Only one dashboard per reply.")
+	if _composed_count() >= MAX_COMPOSED_CARDS_PER_REPLY:
+		raise ValueError(f"At most {MAX_COMPOSED_CARDS_PER_REPLY} composed cards per reply; use the numbers in text instead.")
+	spec = {"title": title, "subtitle": subtitle, "subtext": subtext, "footnote": footnote, "columns": cols, "card_ids": ids}
+	if caps is not None:
+		spec["captions"] = caps
+	dash = _cards_mod().validate_dashboard(spec, reg)  # ValueError -> ValidationError for the agent
+	members = {id(reg[i]) for i in ids}
+	pos = next((n for n, c in enumerate(sink) if id(c) in members), len(sink))
+	rest = [c for c in sink if id(c) not in members]
+	pos = min(pos, len(rest))
+	rest.insert(pos, dash)
+	sink[:] = rest  # in place: the chat layer holds the same list object
+	_bump_composed_count()
+	return {"cards": _publish_cards_registered(dash), "note": "One dashboard card replaces the individual cards in the reply."}
+
+
+def _publish_cards_registered(dash):
+	"""Register the dashboard (already in the sink) and return it with its id."""
+	reg = _card_registry()
+	by_obj = {id(c): i for i, c in reg.items()}
+	return [{**dash, "id": by_obj[id(dash)]}]
 
 
 # ---------------------------------------------------------------- registry
@@ -778,20 +889,27 @@ TOOLS = [
 		("tool",),
 	),
 	_entry(
+		compose_dashboard,
+		{
+			"title": {"type": "string", "description": "Dashboard title, up to 60 characters."},
+			"card_ids": {"type": "array", "items": {"type": "string"}, "description": "2 to 6 card ids (c1, c2, ...) from the \"id\" field of cards returned by tools in this reply, in display order."},
+			"subtitle": {"type": "string", "description": "Optional, e.g. the period. Up to 90 characters."},
+			"subtext": {"type": "string", "description": "Optional second line, up to 100 characters."},
+			"footnote": {"type": "string", "description": "Optional footnote, up to 140 characters."},
+			"columns": {"type": "string", "enum": ["1", "2"], "description": "1 for line/bar charts with many points; 2 only for small kpi/bar panels. Default 2."},
+			"captions": {"type": "array", "items": {"type": "string"}, "description": "Optional: one short caption per card, same order and length as card_ids; empty text to skip. Copy from tool results."},
+		},
+		("title", "card_ids"),
+	),
+	_entry(
 		compose_card,
 		{
-			"type": {"type": "string", "enum": ["kpi", "bar", "line", "table"]},
+			"type": {"type": "string", "enum": ["kpi", "bar", "line"]},
 			"title": {"type": "string", "description": "Card title, up to 60 characters."},
 			"labels": {"type": "array", "items": {"type": "string"}, "description": "kpi/bar/line: one label per value."},
-			"values": {"type": "array", "items": {"type": "number"}, "description": "kpi/bar/line: plain numbers taken from tool results."},
+			"values": {"type": "array", "items": {"type": "string"}, "description": "kpi/bar/line: plain numbers as text, e.g. \"1250.5\" (no commas or units), taken from tool results."},
 			"fmt": {"type": "string", "enum": ["money", "int", "pct", "mins"], "description": "How to show the values. Default int."},
 			"subtitle": {"type": "string", "description": "Optional, e.g. the period. Up to 80 characters."},
-			"cols": {"type": "array", "items": {"type": "string"}, "description": "table only: 1 to 4 column names."},
-			"rows": {
-				"type": "array",
-				"items": {"type": "array", "items": {"type": ["string", "number"]}},
-				"description": "table only: up to 8 rows, one cell per column.",
-			},
 		},
 		("type", "title"),
 	),

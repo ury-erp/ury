@@ -1,25 +1,29 @@
-.call{--call-ok:#16a34a;--call-bad:#dc2626;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:1rem;height:100%;padding:.75rem 1rem 1rem;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari","Noto Sans Arabic","Noto Sans Malayalam","Kohinoor Devanagari","Geeza Pro","Malayalam Sangam MN",sans-serif;color:var(--ink)}
-.call-note{margin:0;font-size:.8rem;color:var(--muted);background:var(--neu-bg);padding:.4rem .75rem;border-radius:.6rem}
-.call-who{display:flex;flex-direction:column;align-items:center;gap:.35rem;width:100%}
-.call-ring{--lvl:0;width:11rem;height:11rem;border-radius:50%;display:grid;place-items:center;margin-bottom:.75rem;box-shadow:0 0 0 calc(.2rem + var(--lvl)*1.1rem) color-mix(in srgb,var(--accent) 30%,transparent);transition:box-shadow .08s linear}
-.call-avatar{width:8rem;height:8rem;border-radius:50%;display:grid;place-items:center;font-size:3rem;font-weight:700;background:var(--accent);color:var(--bg)}
-.call[data-state=failed] .call-avatar{background:var(--bad)}
-.call[data-state=ended] .call-avatar{background:var(--muted)}
+/* Call tab. Tokens only (see ../tokens.css and ../../DESIGN.md). */
+.call{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:var(--space-4);height:100%;padding:var(--space-3) var(--space-4) var(--space-4);text-align:center;font-family:var(--font-sans);color:hsl(var(--foreground))}
+.call-note{margin:0;font-size:var(--text-xs);color:hsl(var(--muted-foreground));background:hsl(var(--muted));padding:var(--space-2) var(--space-3);border-radius:var(--radius-md)}
+.call-who{display:flex;flex-direction:column;align-items:center;gap:var(--space-1-5);width:100%}
+.call-ring{--lvl:0;width:10rem;height:10rem;border-radius:50%;display:grid;place-items:center;margin-bottom:var(--space-3);box-shadow:0 0 0 calc(.2rem + var(--lvl)*1.1rem) hsl(var(--primary) / .3);transition:box-shadow .08s linear}
+.call-avatar{width:7rem;height:7rem;border-radius:50%;display:grid;place-items:center;font-size:var(--text-3xl);font-weight:600;background:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.call[data-state=failed] .call-avatar{background:hsl(var(--destructive));color:hsl(var(--destructive-foreground))}
+.call[data-state=ended] .call-avatar{background:hsl(var(--muted));color:hsl(var(--muted-foreground))}
 .call[data-state=ringing] .call-ring{animation:call-pulse 1.2s ease-in-out infinite}
-.call-name{margin:0;font-size:1.4rem}
-.call-status{margin:0;font-size:1.5rem;font-weight:700}
-.call-time{margin:0;font-variant-numeric:tabular-nums;color:var(--muted)}
-.call-speaker{margin:0;font-size:.85rem;color:var(--muted);min-height:1.2em}
-.call-line{margin:.25rem 0 0;max-width:20rem;font-size:.95rem}
-.call-actions{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
-.call-btn{min-height:56px;min-width:96px;padding:0 1.4rem;border-radius:999px;border:1px solid var(--muted);background:transparent;color:var(--ink);font-size:1rem;font-weight:650;cursor:pointer}
-.call-btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
-.call-start,.call-retry{background:var(--call-ok);border-color:var(--call-ok);color:#fff}
-.call-end{background:var(--call-bad);border-color:var(--call-bad);color:#fff}
-.call-back{min-height:44px;min-width:44px;background:transparent;border:0;color:var(--accent);font-size:.9rem;text-decoration:underline;cursor:pointer}
-.call button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.call-name{margin:0;font-size:var(--text-xl);line-height:1.75rem;font-weight:600}
+.call-status{margin:0;font-size:var(--text-lg);font-weight:600}
+.call-time{margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:hsl(var(--muted-foreground))}
+.call-speaker{margin:0;font-size:var(--text-xs);color:hsl(var(--muted-foreground));min-height:1.2em}
+.call-line{margin:var(--space-1) 0 0;max-width:20rem;font-size:var(--text-sm)}
+.call-actions{display:flex;gap:var(--space-3);justify-content:center;flex-wrap:wrap}
+.call-btn{min-height:3rem;min-width:6rem;padding:0 var(--space-5);border-radius:var(--radius-md);border:1px solid hsl(var(--hair2));background:transparent;color:hsl(var(--foreground));font-size:var(--text-sm);font-weight:500;cursor:pointer;transition:background-color var(--dur) var(--ease)}
+.call-btn:hover{background:hsl(var(--accent))}
+.call-btn[aria-pressed=true]{background:hsl(var(--primary));border-color:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.call-start,.call-retry{background:hsl(var(--success));border-color:hsl(var(--success));color:hsl(var(--success-foreground));box-shadow:var(--shadow-sm)}
+.call-start:hover,.call-retry:hover{background:hsl(var(--success));filter:brightness(1.08);color:hsl(var(--success-foreground))}
+.call-end{background:hsl(var(--destructive));border-color:hsl(var(--destructive));color:hsl(var(--destructive-foreground));box-shadow:var(--shadow-sm)}
+.call-end:hover{background:hsl(var(--destructive));filter:brightness(1.1);color:hsl(var(--destructive-foreground))}
+.call-back{min-height:var(--touch);min-width:var(--touch);background:transparent;border:0;color:hsl(var(--primary));font-size:var(--text-sm);font-weight:500;text-decoration:underline;cursor:pointer}
+.call button:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
 @keyframes call-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 @media (prefers-reduced-motion:reduce){
   .call *{animation:none!important;transition:none!important}
-  .call-ring{box-shadow:0 0 0 .3rem color-mix(in srgb,var(--accent) 30%,transparent)}
+  .call-ring{box-shadow:0 0 0 .3rem hsl(var(--primary) / .3)}
 }

@@ -708,3 +708,13 @@ class MaxRoundsTests(unittest.TestCase):
 		run, changed = cc.clean_run({"response": "Agent stopped after max rounds of tool calls."})
 		self.assertEqual(run["response"], cc.MAX_ROUNDS_REPLY)
 		self.assertEqual(changed, cc.MAX_ROUNDS_REPLY)
+
+
+class DashboardSelectTests(unittest.TestCase):
+	def test_dashboard_replaces_loose_cards(self):
+		def kpi(title):
+			return {"v": 1, "type": "kpi", "title": title, "kpis": [{"label": "a", "value": 1, "fmt": "int"}]}
+		panels = [{"card": kpi("A"), "id": "c1", "composed": False, "span": 2}, {"card": kpi("B"), "id": "c2", "composed": False, "span": 2}]
+		dash = {"v": 2, "type": "dashboard", "title": "D", "panels": panels, "ai_composed": True}
+		out = cc.select_cards([kpi("x"), dash, kpi("y")])
+		self.assertEqual([c["type"] for c in out], ["dashboard"])

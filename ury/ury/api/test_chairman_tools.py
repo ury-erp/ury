@@ -311,7 +311,9 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(out["note"], t.TOOL_NOTE)
 		self.assertEqual(out["cards"][0]["type"], "bar")
 		self.assertEqual(out["cards"][0]["link"]["url"], "/insights/dashboards/abc123")
-		self.assertEqual(sink, out["cards"])
+		self.assertEqual(out["cards"][0]["id"], "c1")
+		self.assertNotIn("id", sink[0])  # sink holds plain cards; id only in the tool result
+		self.assertEqual(sink, [{k: v for k, v in out["cards"][0].items() if k != "id"}])
 
 	def test_guard_cards_have_null_link_without_insights(self):
 		slides = types.SimpleNamespace(slide_branch_ranking=lambda d: {
@@ -356,8 +358,85 @@ class PureTests(unittest.TestCase):
 		self.assertTrue(c["ai_composed"])
 		self.assertEqual(c["title"], "Sales by day")
 		self.assertEqual([p["value"] for p in c["series"]], [10.0, 20.5])
-		self.assertEqual(sink, out["cards"])
+		self.assertEqual(c["id"], "c1")
+		self.assertEqual(sink, [{k: v for k, v in c.items() if k != "id"}])
 		self.assertEqual(flags.chairman_composed_cards, 1)
+
+	# ---- compose_dashboard
+	def _dash_env(self, cards, count=0):
+		sink = list(cards)
+		flags = _FlagsStub(chairman_cards=sink, chairman_composed_cards=count, get=lambda k: None)
+		return sink, flags, mock.patch.object(t.frappe, "flags", flags, create=True)
+
+	@staticmethod
+	def _bar(title, n=3):
+		return {"v": 1, "type": "bar", "title": title, "fmt": "money",
+			"series": [{"label": "L%d" % i, "value": float(i + 1)} for i in range(n)]}
+
+	def _call(self, ctx, *a, **kw):
+		with mock.patch.object(t, "_chairman", return_value=FakeChairman()), mock.patch.object(
+				t, "_chat", return_value=FakeChat()), ctx:
+			return t.compose_dashboard(*a, **kw)
+
+	def test_compose_dashboard_replaces_members_and_counts_once(self):
+		extra = self._bar("Other")
+		sink, flags, ctx = self._dash_env([self._bar("A"), extra, self._bar("B")])
+		out = self._call(ctx, "Week", ["c3", "c1"], subtitle="W1", columns="2", captions=["cap b", ""])
+		self.assertEqual([c["type"] for c in sink], ["dashboard", "bar"])  # at first member's slot
+		self.assertIs(sink[1], extra)
+		d = sink[0]
+		self.assertEqual([p["card"]["title"] for p in d["panels"]], ["B", "A"])
+		self.assertEqual(d["panels"][0]["caption"], "cap b")
+		self.assertEqual(flags.chairman_composed_cards, 1)
+		self.assertEqual(out["cards"][0]["type"], "dashboard")
+		self.assertEqual(out["cards"][0]["id"], "c4")
+
+	def test_compose_dashboard_tolerates_string_args(self):
+		sink, _f, ctx = self._dash_env([self._bar("A"), self._bar("B")])
+		self._call(ctx, "T", '["c1", "c2"]', columns=1, captions='["x", "y"]')
+		self.assertEqual(len(sink), 1)
+		self.assertEqual([p["span"] for p in sink[0]["panels"]], [2, 2])
+		sink, _f, ctx = self._dash_env([self._bar("A"), self._bar("B")])
+		self._call(ctx, "T", "c1, c2")
+		self.assertEqual(sink[0]["type"], "dashboard")
+
+	def test_compose_dashboard_errors_are_validation_errors(self):
+		cases = [
+			(dict(title="T", card_ids=["c1", "c9"]), "unknown card id"),
+			(dict(title="T", card_ids=["c1"]), "panels"),
+			(dict(title="T", card_ids=["c1", "c2"], columns="3"), "columns"),
+			(dict(title="T", card_ids=["c1", "c2"], captions=["a"]), "captions"),
+		]
+		for kw, msg in cases:
+			sink, _f, ctx = self._dash_env([self._bar("A"), self._bar("B")])
+			with self.assertRaises(frappe.ValidationError) as cm:
+				self._call(ctx, **kw)
+			self.assertIn(msg, str(cm.exception))
+			self.assertEqual(len(sink), 2)  # untouched on failure
+
+	def test_compose_dashboard_caps(self):
+		sink, _f, ctx = self._dash_env([self._bar("A"), self._bar("B")], count=t.MAX_COMPOSED_CARDS_PER_REPLY)
+		with self.assertRaises(frappe.ValidationError):
+			self._call(ctx, "T", ["c1", "c2"])
+		sink, _f, ctx = self._dash_env([self._bar("A"), self._bar("B")])
+		self._call(ctx, "T", ["c1", "c2"])
+		sink.extend([self._bar("C"), self._bar("D")])
+		with mock.patch.object(t.frappe, "flags", _f, create=True), self.assertRaises(frappe.ValidationError) as cm:
+			self._call(mock.patch.object(t.frappe, "flags", _f, create=True), "T2", ["c3", "c4"])
+		self.assertIn("one dashboard", str(cm.exception).lower())
+
+	def test_compose_dashboard_ids_stable_after_replacement(self):
+		sink, flags, ctx = self._dash_env([self._bar("A"), self._bar("B")])
+		with ctx:
+			self._call(mock.patch.object(t.frappe, "flags", flags, create=True), "T", ["c1", "c2"])
+			new = t._publish_cards([self._bar("C")])
+		self.assertEqual(new[0]["id"], "c4")  # c3 is the dashboard
+
+	def test_compose_dashboard_registered(self):
+		self.assertIn("compose_dashboard", t.TOOLS_BY_NAME)
+		self.assertIn("compose_dashboard", t.CARD_PASSTHROUGH_TOOLS)
+		self.assertNotIn("compose_dashboard", t.TOOLS_BY_NAME["show_card"]["parameters"]["properties"]["tool"]["enum"])
+		self.assertEqual(t.TOOLS_BY_NAME["compose_dashboard"]["parameters"]["required"], ["title", "card_ids"])
 
 	def test_compose_card_kinds(self):
 		c = t.build_composed_card("kpi", "K", ["A", "B"], [1, 2])
@@ -371,7 +450,19 @@ class PureTests(unittest.TestCase):
 	def test_compose_card_rejects_bad_input(self):
 		bad = [
 			("bar", "T", ["a", "b"], [1]),  # mixed lengths
-			("bar", "T", ["a"], ["1"]),  # string value
+			("bar", "T", ["a"], ["x"]),  # non-numeric string
+			("bar", "T", ["a"], ["1,250.50"]),
+			("bar", "T", ["a"], ["nan"]),
+			("bar", "T", ["a"], ["inf"]),
+			("bar", "T", ["a"], ["1e999"]),
+			("bar", "T", ["a"], ["1e3"]),
+			("bar", "T", ["a"], [" "]),
+			("bar", "T", ["a"], [" 1"]),
+			("bar", "T", ["a"], ["0x10"]),
+			("bar", "T", ["a"], [""]),
+			("bar", "T", ["a"], ["+1"]),
+			("bar", "T", ["a"], ["9" * 17]),
+			("bar", "T", ["a"], [None]),
 			("bar", "T", ["a"], [True]),
 			("bar", "T", ["a"], [float("nan")]),
 			("bar", "T", ["a"], [float("inf")]),
@@ -401,6 +492,22 @@ class PureTests(unittest.TestCase):
 			with self.assertRaises(ValueError, msg=str(kw)):
 				t.build_composed_card("table", "T", **kw)
 
+	def test_number_list_accepts_plain_numeric_strings(self):
+		self.assertEqual(t._number_list(["12", "-3.5", "0", 4, 2.5], "v"), [12, -3.5, 0, 4, 2.5])
+		c = t.build_composed_card("bar", "T", ["a", "b"], ["10", "20.5"])
+		self.assertEqual([x["value"] for x in c["series"]], [10, 20.5])
+
+	def test_compose_card_is_preset_only_for_tables(self):
+		props = next(x for x in t.TOOLS if x["name"] == "compose_card")["parameters"]["properties"]
+		self.assertNotIn("rows", props)
+		self.assertNotIn("cols", props)
+		self.assertEqual(props["type"]["enum"], ["kpi", "bar", "line"])
+		ctx, flags = self._ctx()
+		with mock.patch.object(t, "_chairman", return_value=FakeChairman()), mock.patch.object(t, "_chat", return_value=FakeChat()), ctx:
+			with self.assertRaises(frappe.ValidationError):
+				t.compose_card("table", "T", ["a"], [1])
+		self.assertEqual(flags.chairman_composed_cards, 0)
+
 	def test_compose_card_cap_per_reply(self):
 		ctx, flags = self._ctx()
 		with mock.patch.object(t, "_chairman", return_value=FakeChairman()), mock.patch.object(t, "_chat", return_value=FakeChat()), ctx:
@@ -429,7 +536,8 @@ class PureTests(unittest.TestCase):
 			out = t.show_card("get_branch_ranking", date="2026-10-01")
 		self.assertEqual(out["cards"][0]["type"], "bar")
 		self.assertNotIn("ai_composed", out["cards"][0])
-		self.assertEqual(sink, out["cards"])  # collected once, not doubled
+		self.assertEqual(len(sink), 1)  # collected once, not doubled
+		self.assertEqual(out["cards"][0]["id"], "c1")
 
 	def test_show_card_range_tool_and_defaults(self):
 		fake = FakeChairman()
