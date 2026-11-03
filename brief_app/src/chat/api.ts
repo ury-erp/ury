@@ -103,7 +103,7 @@ export async function speak(messageId: string): Promise<string | null> {
   const ct = res.headers.get("Content-Type") || "";
   if (ct.startsWith("audio/") || ct === "application/octet-stream") return URL.createObjectURL(await res.blob());
   const j = await res.json().catch(() => null);
-  const url = j?.message?.url ?? j?.message?.file_url ?? j?.message;
+  const url = j?.message?.audio_url ?? j?.message?.url ?? j?.message?.file_url ?? j?.message;
   if (typeof url !== "string" || !url) return null;
   const f = await fetch(url, { credentials: "same-origin" });
   return f.ok ? URL.createObjectURL(await f.blob()) : null;
