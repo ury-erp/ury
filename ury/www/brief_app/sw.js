@@ -25,7 +25,16 @@
 	"use strict";
 
 	var CACHE_PREFIX = "ury-brief-";
-	var BUILD = "__BUILD_VERSION__";
+	/* Build version comes from the registration URL (sw.js?v=<build>), so this file is static.
+	 * The literal legacy placeholder (if a server still leaves it in) counts as "dev". */
+	function deriveBuild(href) {
+		var v = "";
+		try { v = new URL(href).searchParams.get("v") || ""; } catch (e) { v = ""; }
+		v = v.replace(/[^A-Za-z0-9._-]/g, "");
+		if (!v || v === "BUILDVERSION" || v.indexOf("__BUILD_VERSION__") !== -1) return "dev";
+		return v;
+	}
+	var BUILD = deriveBuild(typeof self !== "undefined" && self.location ? self.location.href : "");
 	var VERSION_PREFIX = CACHE_PREFIX + BUILD + "-";
 	var STATIC_CACHE = VERSION_PREFIX + "static";
 	var META_CACHE = CACHE_PREFIX + "meta";
@@ -394,6 +403,7 @@
 	}
 
 	var helpers = {
+		deriveBuild: deriveBuild, BUILD: BUILD,
 		CACHE_PREFIX: CACHE_PREFIX, STATIC_CACHE: STATIC_CACHE, META_CACHE: META_CACHE, VERSION_PREFIX: VERSION_PREFIX,
 		KEEP: KEEP, MAX_AGE_MS: MAX_AGE_MS, normalizeCookieUser: normalizeCookieUser, provenFresh: provenFresh, stamp: stamp,
 		TIMEOUT_MS: TIMEOUT_MS, USER_HEADER: USER_HEADER, OFFLINE_URL: OFFLINE_URL,

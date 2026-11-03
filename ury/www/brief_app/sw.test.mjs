@@ -55,11 +55,24 @@ const U = (user) => h.userCacheName(user);
 
 test("cache names are versioned and per-user", () => {
 	assert.ok(h.STATIC_CACHE.startsWith("ury-brief-") && h.STATIC_CACHE.endsWith("-static"));
-	assert.ok(h.VERSION_PREFIX.includes("__BUILD_VERSION__"), "placeholder replaced server-side by brief_sw.py");
+	assert.equal(h.BUILD, "dev", "no ?v= in this context");
+	assert.equal(h.VERSION_PREFIX, "ury-brief-dev-");
 	assert.equal(U(UA), h.VERSION_PREFIX + "u-" + UA);
 	assert.notEqual(U(UA), U(UB));
 	assert.equal(U(""), "");
 	assert.equal(h.KEEP, 7);
+});
+
+test("deriveBuild reads ?v=, sanitises, falls back to dev", () => {
+	const b = (u) => h.deriveBuild(u);
+	assert.equal(b("https://a.test/ury/brief/sw.js?v=abc.1_2-3"), "abc.1_2-3");
+	assert.equal(b("https://a.test/ury/brief/sw.js?v=a/b%20c<x>"), "abcx");
+	assert.equal(b("https://a.test/ury/brief/sw.js"), "dev");
+	assert.equal(b("https://a.test/ury/brief/sw.js?v="), "dev");
+	assert.equal(b("https://a.test/ury/brief/sw.js?v=%2F%2F"), "dev");
+	assert.equal(b("https://a.test/ury/brief/sw.js?v=__BUILD_VERSION__"), "dev");
+	assert.equal(b("not a url"), "dev");
+	assert.equal(b(""), "dev");
 });
 
 test("sanitizeUser rejects unsafe or empty keys", () => {

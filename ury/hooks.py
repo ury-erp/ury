@@ -90,11 +90,13 @@ website_route_rules = [
     {"from_route": "/ury/serve/", "to_route": "serve"},
     {"from_route": "/ury/serve/<path:app_path>", "to_route": "serve"},
     # Chairman Brief PWA (executive slides) — same shape as Serve above; the
-    # SW rule precedes the page rule so /ury/brief/sw.js is not swallowed.
-    {"from_route": "/ury/brief/sw.js", "to_route": "brief-sw.js"},
-    {"from_route": "/ury/brief", "to_route": "brief"},
-    {"from_route": "/ury/brief/", "to_route": "brief"},
-    {"from_route": "/ury/brief/<path:app_path>", "to_route": "brief"},
+    # /ury/brief itself is served by Huf (HUF App "brief", www_template brief_app); only the WhatsApp
+    # token landing page needs a route rule.
+    {"from_route": "/ury/brief/go", "to_route": "brief_app"},
+    # Pass-through rules so the /ury/<path> catch-all below does not swallow what Huf serves.
+    {"from_route": "/ury/brief/sw.js", "to_route": "ury/brief/sw.js"},
+    {"from_route": "/ury/brief/", "to_route": "ury/brief"},
+    {"from_route": "/ury/brief", "to_route": "ury/brief"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -442,7 +444,10 @@ website_redirects = [
         "source": "/setup-wizard",
         "target": "/ury/setup-wizard/0",
         "redirect_http_status": 302,
-    }
+    },
+    # /brief is the short link to URY Brief.
+    {"source": "/brief", "target": "/ury/brief/", "redirect_http_status": 302},
+    {"source": "/brief/", "target": "/ury/brief/", "redirect_http_status": 302},
 ]
 
 extend_bootinfo = [

@@ -9,7 +9,7 @@ sitemap = 0
 
 
 BRIEF_URL = "/ury/brief/"
-_DIST = os.path.join(os.path.dirname(__file__), "..", "public", "brief", "dist", "assets")
+_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "public", "brief", "dist", "assets")
 
 
 def asset_version():
@@ -18,18 +18,6 @@ def asset_version():
 		return str(int(max(os.path.getmtime(os.path.join(_DIST, f)) for f in ("app.js", "app.css"))))
 	except OSError:
 		return frappe.utils.get_build_version()
-
-
-def canonical_redirect(path, query_string=""):
-	"""Target for a slash-less /ury/brief, else None.
-
-	The service worker scope and manifest are /ury/brief/ (trailing slash). A
-	page loaded at /ury/brief sits outside that scope, so the worker never
-	controls it and offline reload cannot work. Keep any query (?date=...).
-	"""
-	if (path or "").rstrip("/") != "/ury/brief" or (path or "").endswith("/"):
-		return None
-	return BRIEF_URL + (f"?{query_string}" if query_string else "")
 
 
 def is_go_path(path):
@@ -42,15 +30,16 @@ def user_key(user, site):
 
 
 def get_context(context):
-	"""Chairman Brief PWA page (/ury/brief/). Guests are sent to login."""
+	"""Page context for URY Brief. Huf's portal renderer serves it at /ury/brief/ and has already redirected
+	Guests, checked brief_access and fixed the trailing slash; /ury/brief/go (the WhatsApp token landing page)
+	reaches it through a website_route_rule. Any other path (for example Frappe's own /brief_app) is a 404 so
+	the shell is never reachable without Huf's access check."""
 	request = getattr(frappe.local, "request", None)
-	if request is not None:
-		target = canonical_redirect(request.path, (request.query_string or b"").decode())
-		if target:
-			frappe.local.flags.redirect_location = target
-			raise frappe.Redirect
+	path = (getattr(request, "path", "") or "") if request is not None else ""
+	if request is not None and not (path.rstrip("/") == "/ury/brief" or path.startswith("/ury/brief/")):
+		raise frappe.PageDoesNotExistError
 
-	if request is not None and is_go_path(request.path):
+	if request is not None and is_go_path(path):
 		# Token landing page: static shell, no user data, never cached, no referrer.
 		context.no_cache = 1
 		context.brief_user_key = ""
@@ -60,10 +49,6 @@ def get_context(context):
 		h.set("Cache-Control", "no-store, max-age=0")
 		h.set("Referrer-Policy", "no-referrer")
 		return context
-
-	if frappe.session.user == "Guest":
-		frappe.local.flags.redirect_location = f"/login?redirect-to={BRIEF_URL}"
-		raise frappe.Redirect
 
 	context.no_cache = 1
 	context.brief_user_key = user_key(frappe.session.user, frappe.local.site)

@@ -23,6 +23,19 @@ const initials = (n: string) => {
   return ((base[0]?.[0] ?? "B") + (base.length > 1 ? base[1][0] : "")).toUpperCase();
 };
 
+function briefBuild(): string {
+  const meta = document.querySelector('meta[name="brief-build"]')?.getAttribute("content");
+  if (meta) return meta;
+  for (const s of Array.from(document.querySelectorAll("script[src]"))) {
+    const src = s.getAttribute("src") || "";
+    if (/\/app\.js(\?|$)/.test(src)) {
+      const v = src.split("?")[1] && new URLSearchParams(src.split("?")[1]).get("v");
+      if (v) return v;
+    }
+  }
+  return "dev";
+}
+
 export default function App() {
   const [res, setRes] = useState<LoadResult | null>(null);
   useState(seedStack);
@@ -48,7 +61,7 @@ export default function App() {
     if (!("serviceWorker" in navigator)) return () => window.removeEventListener("beforeinstallprompt", onBip);
     const onMsg = (e: MessageEvent) => { if (e.data?.type === "AUTH_LOST") { forgetUser(); setAuthLost(true); } };
     navigator.serviceWorker.addEventListener("message", onMsg);
-    navigator.serviceWorker.register("/ury/brief/sw.js", { scope: "/ury/brief/" }).then((reg) => {
+    navigator.serviceWorker.register("/ury/brief/sw.js?v=" + encodeURIComponent(briefBuild()), { scope: "/ury/brief/" }).then((reg) => {
       if (reg.waiting && navigator.serviceWorker.controller) setUpdate(reg.waiting);
       reg.addEventListener("updatefound", () => {
         const w = reg.installing;

@@ -9,8 +9,11 @@
   "category": "Analyze",
   "launch_mode": "route",
   "permission_method": "ury.ury.api.chairman.brief_access",
-  "delivery": "spa-deep-link",
+  "delivery": "portal",
   "theme_color": "#ffffff",
   "scope": "/ury/brief/",
-  "static_routes": []
+  "static_routes": [
+    "sw.js"
+  ],
+  "www_template": "brief_app"
 }
