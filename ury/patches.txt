@@ -40,3 +40,4 @@ ury.patches.v3_39.add_agent_message_chairman_cards
 ury.patches.v3_40.grant_insights_analytics_access
 ury.patches.v3_41.rename_chairman_role_to_owner
 ury.patches.v3_42.brief_huf_portal_delivery
+ury.patches.v3_43.set_pos_invoice_type

@@ -12,6 +12,9 @@ def after_install():
 
 def hide_setup_sidebar_options():
 	"""Hide Access, Email, Data, and Integrations options from the Setup sidebar."""
+	if not frappe.db.table_exists("Sidebar Item"):
+		return
+
 	items_to_hide = (
 		# Access
 		"Access",
