@@ -18,7 +18,7 @@ button{font:inherit;letter-spacing:inherit}
 .icon-btn{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:0;padding:0;display:grid;place-items:center;background:transparent;color:hsl(var(--foreground));cursor:pointer}
 .icon-btn:hover{background:hsl(var(--accent))}
 .topbar-menu{position:relative;flex:0 0 auto}
-.menu{position:absolute;top:calc(100% + 4px);right:0;z-index:40;min-width:12rem;padding:4px 0;border-radius:8px;background:hsl(var(--popover));color:hsl(var(--popover-foreground));border:1px solid hsl(var(--border));box-shadow:var(--shadow-xl);display:flex;flex-direction:column}
+.menu{position:absolute;top:calc(100% + 4px);z-index:40;min-width:12rem;padding:4px 0;border-radius:8px;background:hsl(var(--popover));color:hsl(var(--popover-foreground));border:1px solid hsl(var(--border));box-shadow:var(--shadow-xl);display:flex;flex-direction:column}
 .menu button{height:48px;padding:0 16px;border:0;background:transparent;color:inherit;font-size:15px;text-align:start;cursor:pointer;white-space:nowrap}
 .menu button:hover,.menu button:focus-visible{background:hsl(var(--accent));outline:none}
 .menu-theme{display:flex;gap:4px;padding:6px 8px}
@@ -116,7 +116,7 @@ body{background:hsl(var(--background));color:hsl(var(--foreground))}
 .topbar{border-bottom:0;height:auto;min-height:4rem;padding:var(--space-3) var(--space-5) var(--space-2)}
 .topbar h1{font-size:17px;font-weight:600}
 .avatar{width:var(--touch-lg);height:var(--touch-lg);border-radius:50%;border:0;background:hsl(var(--primary-tint));color:hsl(var(--primary));font:inherit;font-weight:700;cursor:pointer}
-.menu{inset-inline-end:0;right:auto;min-width:14.5rem;padding:var(--space-1-5);border-radius:var(--radius-xl)}
+.menu{inset-inline-end:0;inset-inline-start:auto;min-width:14.5rem;max-width:calc(100vw - 2rem);padding:var(--space-1-5);border-radius:var(--radius-xl)}
 .menu button{display:flex;align-items:center;gap:var(--space-3);width:100%;height:var(--touch-lg);padding:0 var(--space-3);border-radius:var(--radius-md)}
 .menu button.danger,.actions button.danger{color:hsl(var(--destructive-800))}
 .menu .menu-theme{display:block;padding:var(--space-1-5) var(--space-1-5) var(--space-3);border-bottom:1px solid hsl(var(--border));margin-bottom:var(--space-1-5)}
