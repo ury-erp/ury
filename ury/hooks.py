@@ -39,6 +39,7 @@ app_include_js = [
     "/assets/ury/js/restrict_customer_group_change.js",
     "/assets/ury/js/ury_order_checklist.js",
     "/assets/ury/js/autofetch_fields.js",
+    "/assets/ury/js/insights_guard.js",
 ]
 
 # include js, css files in header of web template
@@ -182,6 +183,7 @@ ury_demo_transaction_doctypes = [
 # site (every CI run) gets URY's Custom Field fixtures but none of its
 # DocPerms. See ury.install.ensure_role_permissions for the full write-up.
 after_install = "ury.install.after_install"
+boot_session = "ury.ury.boot_insights.boot_session"
 
 # Uninstallation
 # ------------
@@ -241,6 +243,10 @@ before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
 # Hook on document methods and events
 
 doc_events = {
+    "User": {
+        "on_update": "ury.ury.api.chairman_wa_identity.on_user_update",
+        "on_trash": "ury.ury.api.chairman_wa_identity.on_user_trash",
+    },
     "POS Invoice": {
         "before_insert": "ury.ury.hooks.ury_pos_invoice.before_insert",
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
@@ -415,6 +421,7 @@ website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # Sets Service-Worker-Allowed + JS content-type for the Serve PWA worker.
+before_request = ["ury.ury.api.wa_signature.guard_whatsapp_webhook"]
 after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
 website_redirects = [
