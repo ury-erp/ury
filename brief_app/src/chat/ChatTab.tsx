@@ -154,6 +154,7 @@ export default function ChatTab() {
             <div className="bubble">
               {m.voice && <span className="tag">Voice message</span>}
               {m.role === "assistant" ? <Markdown text={m.text} /> : <p dir="auto">{m.voice && m.text === "Voice message" ? "Sending voice message" : m.text}</p>}
+              {m.role === "assistant" && !!m.tools && <span className="meta tools">Checked {m.tools} data {m.tools === 1 ? "source" : "sources"}</span>}
               {m.role === "assistant" && <Cards cards={m.cards} />}
               {m.role === "assistant" && <Player id={m.id} text={m.text} />}
             </div>

@@ -42,6 +42,19 @@ export function normalize(m: Raw): ChatMessage {
   };
 }
 
+const TOOL_ROW = /^\s*(Requesting Tool:|Tool Result:|Arguments:)/;
+
+/** Tool-call rows never show: they collapse into a count on the next assistant answer. */
+export function foldTools(msgs: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  let n = 0;
+  for (const m of msgs) {
+    if (m.role === "assistant" && TOOL_ROW.test(m.text)) { n++; continue; }
+    if (m.role === "assistant" && n) { out.push({ ...m, tools: n }); n = 0; } else out.push(m);
+  }
+  return out;
+}
+
 export interface Reply {
   conversation?: string;
   transcript?: string;
@@ -56,7 +69,7 @@ function reply(r: unknown): Reply {
   return {
     conversation: (o.conversation ?? o.conversation_id ?? o.name) as string | undefined,
     transcript: (o.transcript ?? o.text) as string | undefined,
-    messages: list.map(normalize),
+    messages: foldTools(list.map(normalize)),
     pending: o.pending === true || st === "queued" || st === "started" || st === "running",
   };
 }

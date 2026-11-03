@@ -9,6 +9,8 @@ export interface ChatMessage {
   /** structured visual cards rendered under the text (never spoken) */
   cards?: Card[];
   state: MsgState;
+  /** number of data lookups behind this answer (tool rows are never shown) */
+  tools?: number;
   /** true when the user text came from a voice message transcript */
   voice?: boolean;
   /** retry payload for failed local messages */
