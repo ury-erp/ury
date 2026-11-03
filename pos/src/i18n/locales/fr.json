@@ -190,7 +190,6 @@
     "order_moved_to_draft": "Commande déplacée en brouillon après impression."
   },
   "orders": {
-    "print_warning": "En retard {{time}}",
     "no_orders_found": "Aucune commande trouvée",
     "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
     "status_title": "Statut de la commande",

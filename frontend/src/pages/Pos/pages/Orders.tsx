@@ -131,7 +131,7 @@ export default function Orders() {
     if (!warning.exceeded) return null;
     return (
       <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50">
-        {t('orders.print_warning', { time: warning.elapsedLabel })}
+        {warning.elapsedLabel}
       </Badge>
     );
   };

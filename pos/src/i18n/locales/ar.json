@@ -195,7 +195,6 @@
     "order_moved_to_draft": "تم نقل الطلب إلى المسودات بعد الطباعة."
   },
   "orders": {
-    "print_warning": "متأخر {{time}}",
     "no_orders_found": "لم يتم العثور على طلبات",
     "click_to_view": "انقر على أي بطاقة طلب لعرض تفاصيلها",
     "status_title": "حالة الطلب",
