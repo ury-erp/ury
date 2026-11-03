@@ -92,8 +92,9 @@ CHAIRMAN_READ = (
 # role -> doctypes that get a read-only Custom DocPerm if the role lacks read there today.
 READ_GRANTS = {
 	"URY Owner": CHAIRMAN_READ,
-	"URY Admin": ("POS Invoice", "URY KOT", "URY Yield Check"),
-	"Accounts Manager": ("URY Wastage",),
+	# DB10 (Margin and cost) also reads the two URY cost doctypes: without them Insights shows silent zeros.
+	"URY Admin": ("POS Invoice", "URY KOT", "URY Yield Check", "URY Cost Variance Snapshot", "URY Daily P and L"),
+	"Accounts Manager": ("URY Wastage", "URY Cost Variance Snapshot", "URY Daily P and L"),
 }
 
 _WRITE_PTYPES = ("write", "create", "delete", "submit", "cancel", "amend")
