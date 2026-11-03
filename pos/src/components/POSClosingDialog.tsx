@@ -140,7 +140,7 @@ function buildRows(
     rows.set(detail.mode_of_payment, {
       mode_of_payment: detail.mode_of_payment,
       opening_amount: Number(detail.opening_amount) || 0,
-      expected_amount: 0,
+      expected_amount: Number(detail.opening_amount) || 0,
       closing_amount: 0,
       difference: 0,
     });
@@ -149,7 +149,7 @@ function buildRows(
   Object.entries(expectedByMode).forEach(([mode, expected]) => {
     const existing = rows.get(mode);
     if (existing) {
-      existing.expected_amount = expected;
+      existing.expected_amount += expected;
     } else {
       rows.set(mode, {
         mode_of_payment: mode,
