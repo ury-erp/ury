@@ -178,13 +178,13 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const notice =
     choice.kind === "gemini_live"
       ? "Voice calls use the assistant with read-only data."
-      : choice.notice ?? (caps && !caps.available ? callErrorMessage(caps.reason) : "Live voice calls are coming soon; this screen is a preview.");
-  const unavailable = choice.kind === "mock" && !!caps && !caps.available;
+      : !caps ? "Checking whether voice calls are available…" : choice.notice ?? callErrorMessage(caps.reason);
+  // Never offer the simulated engine to a real user: no live engine means no call button.
+  const unavailable = choice.kind === "mock" && !engine;
 
   return (
     <section className="call" data-state={state} data-engine={choice.kind} dir={dir} aria-label="Voice call">
       <p className="call-note" role={unavailable ? "alert" : undefined} dir="auto">{notice}</p>
-      {unavailable && <p className="call-note call-note-sub">You can still try the preview below.</p>}
       <div className="call-who">
         <label className="call-lang">
           <span className="call-lang-label">Language</span>
@@ -223,7 +223,7 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
           <button className="call-btn call-retry" onClick={start}>Try again</button>
         )}
         {(state === "idle" || state === "ended") && (
-          <button className="call-btn call-start" onClick={start} aria-label="Start call">Call</button>
+          <button className="call-btn call-start" onClick={start} aria-label="Start call" disabled={unavailable}>Call</button>
         )}
         {inCall && (
           <>
