@@ -492,6 +492,7 @@ extend_bootinfo = [
 # not installed — an unused hook value is simply never read.
 # See tracks/sa-ai-reports-dashboard/HUF_API_NOTES.md for how this was confirmed.
 huf_tools = "ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS"
+huf_brief_data_provider = "ury.ury.api.brief_provider.get_brief_data"
 
 fixtures = [
     {
