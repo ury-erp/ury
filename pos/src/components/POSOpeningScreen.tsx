@@ -364,7 +364,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
           {zeroBalanceConfirmed && totalOpeningBalance <= 0 && (
             <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
-              <p className="text-orange-700 text-sm">{t('pos_opening.zero_balance_warning')}</p>
+              <p className="text-orange-700 text-sm">{t('pos_opening.zero_balance_warning', { amount: formatCurrency(0) })}</p>
             </div>
           )}
 

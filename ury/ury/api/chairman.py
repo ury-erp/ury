@@ -13,7 +13,9 @@ import frappe
 from frappe.utils import getdate, now_datetime
 
 SCHEMA_VERSION = 1
-CURRENCY = "INR"
+# INR is only the fallback when the site has no default currency configured.
+FALLBACK_CURRENCY = "INR"
+CURRENCY = FALLBACK_CURRENCY
 LOCALE = "en-IN"
 ALLOWED_ROLES = {"URY Owner"}
 # Test-only hook that forces Administrator allowed. The real switch is administrator_allowed() below.
@@ -42,20 +44,59 @@ def _drill():
 	return analytics_env.dashboard_url("owner")
 
 
-def format_inr_compact(value):
-	"""INR compact: Cr (1e7), L (1e5), K (1e3), else plain; one decimal, '.0' dropped.
+def site_currency():
+	"""Default currency of the site: default Company currency, then the global default, then INR."""
+	code = None
+	try:
+		import erpnext
 
+		code = erpnext.get_default_currency()
+	except Exception:
+		code = None
+	if not code:
+		try:
+			code = frappe.defaults.get_global_default("currency")
+		except Exception:
+			code = None
+	return code or FALLBACK_CURRENCY
+
+
+def locale_for(currency):
+	return "en-IN" if currency == "INR" else "en"
+
+
+def currency_symbol(currency):
+	"""Currency doc symbol, else the ISO code. SAR uses its code: card/PNG fonts do not carry the new sign."""
+	if currency == "INR":
+		return "\u20b9"
+	if currency == "SAR":
+		return "SAR "
+	try:
+		symbol = frappe.db.get_value("Currency", currency, "symbol")
+	except Exception:
+		symbol = None
+	return symbol or f"{currency} "
+
+
+def format_inr_compact(value, currency=None):
+	"""Compact money in the site currency (name kept for callers; INR output is unchanged).
+
+	INR: Cr (1e7), L (1e5), K (1e3), else plain; one decimal, '.0' dropped. Other currencies: B, M, K.
 	The unit is promoted AFTER rounding: 99999 -> 100.0K -> '₹1L', 9999999 -> '₹1Cr'.
 	"""
+	currency = currency or site_currency()
 	value = float(value or 0)
 	sign = "-" if value < 0 else ""
 	n = Decimal(str(abs(value)))
-	units = [(10**7, "Cr"), (10**5, "L"), (10**3, "K"), (1, "")]
+	if currency == "INR":
+		units = [(10**7, "Cr"), (10**5, "L"), (10**3, "K"), (1, "")]
+	else:
+		units = [(10**9, "B"), (10**6, "M"), (10**3, "K"), (1, "")]
 	idx = next(i for i, (size, _) in enumerate(units) if n >= size or size == 1)
 	while True:
 		size, suffix = units[idx]
 		num = (n / size).quantize(Decimal("0.1") if suffix else Decimal("1"), rounding=ROUND_HALF_UP)
-		limit = 1000 if suffix == "" else 100
+		limit = 1000 if suffix == "" else (100 if currency == "INR" else 1000)
 		if num >= limit and idx > 0:
 			idx -= 1
 			continue
@@ -63,7 +104,7 @@ def format_inr_compact(value):
 	text = f"{num:.1f}" if suffix else f"{num:.0f}"
 	if text.endswith(".0"):
 		text = text[:-2]
-	return f"{sign}₹{text}{suffix}"
+	return f"{sign}{currency_symbol(currency)}{text}{suffix}"
 
 
 def pct_text(delta):
@@ -122,12 +163,12 @@ def intersect_scope(allowed, present):
 	return sorted(set(allowed) & set(present))
 
 
-def currency_info(currency_by_company, companies, default=CURRENCY):
+def currency_info(currency_by_company, companies, default=None):
 	"""(currency, mixed). Single distinct currency among companies in scope -> it; else default + mixed."""
 	cur = {currency_by_company.get(c) for c in companies if currency_by_company.get(c)}
 	if len(cur) == 1:
 		return next(iter(cur)), False
-	return default, len(cur) > 1
+	return default or site_currency(), len(cur) > 1
 
 
 def window_dates(day, days=WINDOW_DAYS):
@@ -498,7 +539,7 @@ def get_brief(date=None):
 		"as_of": now_datetime().isoformat(),
 		"date": day.isoformat(),
 		"currency": currency,
-		"locale": LOCALE,
+		"locale": locale_for(currency),
 		"scope": scope,
 		"slides": slides,
 		"features": compute_features(),

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage } from '@ury/core';
+import { storage, siteCurrencyCode, currencyDisplaySymbol } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -244,7 +244,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   customerGroups: [],
   territories: [],
   selectedAggregator: null,
-  currency: storage.getItem('currency') || 'INR',
+  currency: siteCurrencyCode() || storage.getItem('currency') || 'INR',
   currencySymbol: storage.getItem('currencySymbol') || null,
   tableOrder: null,
   isInitializing: true,
@@ -295,7 +295,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           set({ 
             posProfile: profile, 
             profileLoading: false,
-            currency: profile.currency || 'INR'
+            currency: profile.currency || siteCurrencyCode() || 'INR'
           });
           if (!storage.getItem('currencySymbol')) {
             await get().fetchCurrencySymbol();
@@ -311,7 +311,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ 
         posProfile: combinedProfile, 
         profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
+        currency: combinedProfile.currency || siteCurrencyCode() || 'INR'
       });
       
       if (!storage.getItem('currencySymbol')) {
@@ -330,14 +330,15 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       const currency = get().currency;
       const response = await getCurrencyInfo(currency);
-      const { symbol } = response;
+      const symbol = currencyDisplaySymbol(currency, response.symbol);
       
       set({ currencySymbol: symbol });
       storage.setItem('currencySymbol', symbol);
     } catch (error) {
       console.error('Error fetching currency symbol:', error);
-      set({ currencySymbol: get().currency });
-      storage.setItem('currencySymbol', get().currency);
+      const fb = currencyDisplaySymbol(get().currency);
+      set({ currencySymbol: fb });
+      storage.setItem('currencySymbol', fb);
     }
   },
 

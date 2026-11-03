@@ -60,6 +60,16 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.format_inr_compact(9999999), "₹1Cr")
 		self.assertEqual(c.format_inr_compact(10000000), "₹1Cr")
 
+	def test_formatter_other_currencies_use_international_units(self):
+		# INR keeps K/L/Cr; every other currency uses K/M/B and its own symbol (code when the doc has none).
+		self.assertEqual(c.format_inr_compact(1500, "INR"), "₹1.5K")
+		self.assertEqual(c.format_inr_compact(999999, "USD").endswith("1M"), True)
+		self.assertTrue(c.format_inr_compact(2500000, "AED").endswith("2.5M"))
+		self.assertTrue(c.format_inr_compact(-3200000000, "AED").startswith("-"))
+		self.assertEqual(c.format_inr_compact(1500, "SAR"), "SAR 1.5K")
+		self.assertEqual(c.locale_for("INR"), "en-IN")
+		self.assertEqual(c.locale_for("SAR"), "en")
+
 	def test_formatter_rounding_and_dot_zero(self):
 		self.assertEqual(c.format_inr_compact(120000), "₹1.2L")
 		self.assertEqual(c.format_inr_compact(1500), "₹1.5K")

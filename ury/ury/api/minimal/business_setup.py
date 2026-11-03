@@ -272,7 +272,7 @@ def _run_configure_data(data, results, user):
             comp_doc = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": default_company,
-                "default_currency": "INR"
+                "default_currency": frappe.defaults.get_global_default("currency") or "INR"
             })
             comp_doc.insert(ignore_permissions=True)
             

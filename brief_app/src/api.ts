@@ -1,4 +1,5 @@
 import type { Brief } from "./types";
+import { setBriefCurrency } from "./chat/cardFormat";
 
 export type LoadResult =
   | { kind: "ok"; brief: Brief; fromCache: boolean }
@@ -27,6 +28,7 @@ export async function loadBrief(): Promise<LoadResult> {
     if (!res.ok) return { kind: "error" };
     const j = await res.json();
     const brief: Brief = sample ? j : j.message;
+    setBriefCurrency(brief?.currency);
     return { kind: "ok", brief, fromCache: !sample && res.headers.get("X-Brief-Source") === "cache" };
   } catch {
     return { kind: "error" };

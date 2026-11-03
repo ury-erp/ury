@@ -5,6 +5,7 @@ import TableLayoutView from "./TableLayoutView";
 
 vi.mock("@ury/core", () => ({
   formatInvoiceTime: (time: string) => new Date(time).toLocaleString(),
+  formatCurrency: (n: number) => String(n),
   call: vi.fn(),
 }));
 

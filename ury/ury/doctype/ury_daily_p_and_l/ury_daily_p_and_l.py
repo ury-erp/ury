@@ -639,7 +639,11 @@ class URYDailyPandL(Document):
 	
 	@frappe.whitelist()
 	def get_proft_loss_details(self):
+		# Site/company default currency; INR only when nothing is configured.
+		import erpnext
+
+		currency = erpnext.get_default_currency() or frappe.defaults.get_global_default("currency") or "INR"
 		return frappe.render_template(
 			"ury/doctype/ury_daily_p_and_l/profit_loss_details.html",
-			{"data": self, "currency": "INR"},
+			{"data": self, "currency": currency},
 		)

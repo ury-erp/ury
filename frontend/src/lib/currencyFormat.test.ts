@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   formatCompactCurrency,
   formatCurrency,
   getActiveCurrency,
   MIXED_CURRENCY,
   setActiveCurrency,
+  currencyDisplaySymbol,
+  siteCurrencyCode,
+  SAR_SIGN,
 } from '@ury/core';
 
 describe('formatCurrency (@ury/core)', () => {
@@ -57,5 +60,62 @@ describe('formatCompactCurrency (@ury/core)', () => {
   it('uses K/M/B for other currencies', () => {
     expect(formatCompactCurrency(1500000, { code: 'AED', symbol: 'AED' })).toBe('AED1.5M');
     expect(formatCompactCurrency(8200, 'OMR')).toBe('OMR8.2K');
+  });
+});
+
+describe('site currency resolution and Saudi riyal sign (@ury/core)', () => {
+  const setBoot = (currency?: string) => {
+    (globalThis as unknown as { frappe?: unknown }).frappe = currency ? { boot: { sysdefaults: { currency } } } : undefined;
+  };
+  afterEach(() => {
+    setBoot(undefined);
+    setActiveCurrency(undefined);
+    localStorage.clear();
+    document.documentElement.removeAttribute('dir');
+    document.documentElement.removeAttribute('lang');
+    vi.restoreAllMocks();
+  });
+
+  it('INR default is unchanged when there is no boot', () => {
+    expect(siteCurrencyCode()).toBeNull();
+    expect(formatCurrency(1234567.5)).toBe('₹ 12,34,567.5');
+    expect(formatCompactCurrency(600000)).toBe('₹6L');
+  });
+
+  it('uses the site currency from the boot payload when none is passed', () => {
+    setBoot('USD');
+    expect(siteCurrencyCode()).toBe('USD');
+    expect(formatCurrency(1234.5, { code: 'USD', symbol: '$' })).toBe('$ 1,234.5');
+    expect(formatCurrency(1234567)).toBe('USD 1,234,567');
+    expect(formatCompactCurrency(2500000)).toBe('USD2.5M');
+  });
+
+  it('SAR always renders the official sign, whatever the Currency doc holds', () => {
+    expect(SAR_SIGN).toBe('\u20C1');
+    expect(currencyDisplaySymbol('SAR', '\uFDFC')).toBe(SAR_SIGN);
+    expect(formatCurrency(1234.5, { code: 'SAR', symbol: '\uFDFC' })).toBe(`${SAR_SIGN} 1,234.5`);
+    setBoot('SAR');
+    expect(formatCurrency(10)).toBe(`${SAR_SIGN} 10`);
+  });
+
+  it('AED uses the Currency doc symbol, then the ISO code', () => {
+    expect(formatCurrency(50, { code: 'AED', symbol: 'د.إ' })).toBe('د.إ 50');
+    setBoot('AED');
+    expect(formatCurrency(1500)).toBe('AED 1,500');
+    expect(formatCompactCurrency(1500000, 'AED')).toBe('AED1.5M');
+  });
+
+  it('isolates the amount LTR in an RTL UI (LRI..PDI, amount then symbol)', () => {
+    document.documentElement.setAttribute('dir', 'rtl');
+    expect(formatCurrency(1234.5, { code: 'SAR' })).toBe(`\u20661,234.5 ${SAR_SIGN}\u2069`);
+    expect(formatCurrency(1234.5, { code: 'AED', symbol: 'AED' })).toBe('\u20661,234.5 AED\u2069');
+    expect(formatCompactCurrency(1500000, { code: 'AED', symbol: 'AED' })).toBe('\u20661.5MAED\u2069');
+  });
+
+  it('Arabic lang attribute also counts as RTL; LTR leaves no isolation marks', () => {
+    document.documentElement.setAttribute('lang', 'ar');
+    expect(formatCurrency(10, 'USD')).toBe('\u206610 USD\u2069');
+    document.documentElement.setAttribute('lang', 'en');
+    expect(formatCurrency(10, 'USD')).toBe('USD 10');
   });
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatCurrency as formatMoney } from '@ury/core';
 import { Page, PageHeader, Section, Panel, Spinner, Input, Button, Select, DatePicker, DataTable, type DataTableColumn } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
@@ -60,7 +61,7 @@ const useCurrentRoles = () => {
 };
 
 const formatCurrency = (value: number | undefined): string =>
-  value === undefined ? '—' : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  value === undefined ? '—' : formatMoney(value);
 
 export const DepartmentProfitabilityPage: React.FC = () => {
   const { activeBranch, selectedBranch } = useBranchContext();

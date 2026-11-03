@@ -601,7 +601,7 @@
             <div v-if="recentOrders.changeAmount > 0" class="mt-4 p-4 bg-gray-50 rounded-lg">
               <div class="flex justify-between items-center mt-2 text-green-600">
                 <span class="text-lg font-medium">Change Amount:</span>
-                <span class="text-lg">₹ {{ recentOrders.changeAmount.toFixed(2) }}</span>
+                <span class="text-lg">{{ invoiceData.currency }} {{ recentOrders.changeAmount.toFixed(2) }}</span>
               </div>
             </div>
             <div class="flex justify-end">

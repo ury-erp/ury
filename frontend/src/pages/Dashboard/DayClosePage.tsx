@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatCurrency as formatMoney } from '@ury/core';
 import { Page, Section, Panel, Spinner, Input, Button, DatePicker, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
@@ -57,7 +58,7 @@ const useCurrentRoles = () => {
 };
 
 const formatCurrency = (value: number | undefined): string =>
-  value === undefined ? '—' : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  value === undefined ? '—' : formatMoney(value);
 
 const varianceTone = (variance: number): 'success' | 'warning' | 'danger' | 'neutral' => {
   if (variance === 0) return 'neutral';

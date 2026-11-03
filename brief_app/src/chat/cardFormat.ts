@@ -65,15 +65,37 @@ export function sanitizeCards(raw: unknown): Card[] {
   return out;
 }
 
-const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
-const inr2 = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+// Currency of the brief (payload `currency`, i.e. the company/site default). INR until a brief is loaded.
+let briefCurrency = "INR";
+export function setBriefCurrency(code?: string | null) {
+  if (code) briefCurrency = code;
+}
+export function getBriefCurrency(): string {
+  return briefCurrency;
+}
+/** Symbol for a currency code (INR rupee, SAR sign U+20C1, else Intl narrow symbol, else the code). */
+export function currencySymbol(code: string): string {
+  if (code === "INR") return "\u20b9";
+  if (code === "SAR") return "\u20c1";
+  try {
+    const part = new Intl.NumberFormat("en", { style: "currency", currency: code, currencyDisplay: "narrowSymbol" })
+      .formatToParts(0).find((p) => p.type === "currency");
+    return part?.value || code;
+  } catch {
+    return code;
+  }
+}
+// Indian digit grouping only for INR; every other currency groups internationally.
+const numFmt = (max: number) => new Intl.NumberFormat(briefCurrency === "INR" ? "en-IN" : "en", { maximumFractionDigits: max });
+const inr = { format: (n: number) => numFmt(0).format(n) };
+const inr2 = { format: (n: number) => numFmt(2).format(n) };
 
 export function fmtValue(v: unknown, fmt?: string): string {
   if (v == null || v === "") return "–";
   if (typeof v === "string") return v;
   if (!Number.isFinite(v as number)) return "–";
   const n = v as number;
-  if (fmt === "money") return (n < 0 ? "-" : "") + "₹" + inr.format(Math.abs(n));
+  if (fmt === "money") return (n < 0 ? "-" : "") + currencySymbol(briefCurrency) + inr.format(Math.abs(n));
   if (fmt === "pct") return inr2.format(n) + "%";
   if (fmt === "int") return inr.format(n);
   return inr2.format(n);
@@ -81,10 +103,10 @@ export function fmtValue(v: unknown, fmt?: string): string {
 
 /** KPI headline: full figure up to 99,99,999; from 1Cr up it is abbreviated (same K/L/Cr rule as format.ts) so it fits a 360px tile. */
 export function fmtKpiValue(v: unknown, fmt?: string): string {
-  if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) < 1e7 || (fmt !== "money" && fmt !== "int")) return fmtValue(v, fmt);
+  if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) < 1e7 || briefCurrency !== "INR" || (fmt !== "money" && fmt !== "int")) return fmtValue(v, fmt);
   let t = (Math.round((Math.abs(v) / 1e7) * 10) / 10).toFixed(1);
   if (t.endsWith(".0")) t = t.slice(0, -2);
-  return (v < 0 ? "-" : "") + (fmt === "money" ? "₹" : "") + t + "Cr";
+  return (v < 0 ? "-" : "") + (fmt === "money" ? currencySymbol(briefCurrency) : "") + t + "Cr";
 }
 
 export const sameText = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();

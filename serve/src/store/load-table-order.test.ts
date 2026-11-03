@@ -8,6 +8,7 @@ vi.mock('@ury/core', () => ({
     post: vi.fn(),
   },
   storage: { setItem: vi.fn(), getItem: vi.fn() },
+  siteCurrencyCode: () => null,
 }))
 
 vi.mock('../lib/menu-api', () => ({

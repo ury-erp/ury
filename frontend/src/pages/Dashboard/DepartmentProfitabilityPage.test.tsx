@@ -7,6 +7,7 @@ vi.mock('@ury/core', () => ({
   getLoggedUser: vi.fn(),
   getUserRoles: vi.fn(),
   call: vi.fn(),
+  formatCurrency: (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 }));
 
 vi.mock('../../context/BranchContext', () => ({

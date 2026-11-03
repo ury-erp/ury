@@ -55,29 +55,78 @@ function isIndianGrouping(code: string | null | undefined): boolean {
   return code === 'INR';
 }
 
-function legacySymbol(): string {
-  return storage.getItem('currencySymbol') || '₹';
+/** SAUDI RIYAL SIGN (U+20C1). No system font has it yet; the apps ship a one-glyph web font (sar-sign.css). */
+export const SAR_SIGN = '⃁';
+
+type BootWindow = { frappe?: { boot?: { sysdefaults?: { currency?: string } } } };
+
+/** Default currency of the site, from the Frappe boot payload (null when not booted, e.g. unit tests). */
+export function siteCurrencyCode(): string | null {
+  try {
+    const code = (globalThis as unknown as BootWindow).frappe?.boot?.sysdefaults?.currency;
+    if (code) return code;
+  } catch {
+    // no boot available
+  }
+  return null;
+}
+
+/**
+ * Display symbol for a currency. SAR always renders the official Saudi Riyal sign
+ * (the Currency doc may still hold the older rial sign or text); other currencies use
+ * the Currency doc symbol, then the ISO code. INR keeps the rupee sign.
+ */
+export function currencyDisplaySymbol(code: string | null | undefined, docSymbol?: string | null): string {
+  if (!code) return docSymbol || '';
+  if (code === 'SAR') return SAR_SIGN;
+  if (docSymbol) return docSymbol;
+  if (code === 'INR') return '₹';
+  return code;
+}
+
+/** True when the page is rendered right-to-left (Arabic UI). */
+export function isRtlUi(): boolean {
+  try {
+    const el = (globalThis as unknown as { document?: Document }).document?.documentElement;
+    if (!el) return false;
+    return el.dir === 'rtl' || (el.lang || '').toLowerCase().startsWith('ar');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Put symbol and number together. LTR UI: "SYMBOL 1,234.50". Arabic RTL UI: the amount
+ * is isolated as LTR ("1,234.50 SYMBOL", LRI..PDI) so digits/sign never reorder.
+ */
+function joinMoney(symbol: string, num: string, gap = ' '): string {
+  if (!symbol) return num;
+  if (isRtlUi()) return `⁦${num}${gap}${symbol}⁩`;
+  return `${symbol}${gap}${num}`;
+}
+
+/** Currency when a caller gives none: the site currency from boot, else the legacy rupee. */
+function fallbackCurrency(): CurrencyInfo {
+  const code = siteCurrencyCode();
+  if (code) return { code, symbol: currencyDisplaySymbol(code, code === 'INR' ? storage.getItem('currencySymbol') : null) };
+  return { code: 'INR', symbol: storage.getItem('currencySymbol') || '₹' };
 }
 
 /**
  * Format an amount with its currency.
  *
  * ``currency`` may be an ISO code or a ``CurrencyInfo``; when omitted, the
- * currency published via ``setActiveCurrency`` is used, and only when nothing
- * was published does it fall back to the legacy POS ``currencySymbol`` key.
- * A mixed currency (``code: null``) renders the bare number, never a guessed
- * symbol.
+ * currency published via ``setActiveCurrency`` is used, then the site default
+ * currency from the Frappe boot (``frappe.boot.sysdefaults.currency``), and
+ * only without a boot does it fall back to the legacy rupee. Numbers use Latin
+ * digits (``en``; Indian grouping only for INR). A mixed currency
+ * (``code: null``) renders the bare number, never a guessed symbol.
  */
 export function formatCurrency(amount: number, currency?: CurrencyInfo | string | null): string {
-  const info = resolveCurrency(currency);
-
-  if (!info) {
-    const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString('en-IN') : amount;
-    return `${legacySymbol()} ${formattedVal}`;
-  }
+  const info = resolveCurrency(currency) ?? fallbackCurrency();
 
   if (typeof amount !== 'number' || isNaN(amount)) {
-    return info.code ? `${info.symbol || info.code} ${amount}` : String(amount);
+    return info.code ? joinMoney(currencyDisplaySymbol(info.code, info.symbol), String(amount)) : String(amount);
   }
 
   if (!info.code) {
@@ -87,7 +136,7 @@ export function formatCurrency(amount: number, currency?: CurrencyInfo | string 
   const formattedVal = amount.toLocaleString(isIndianGrouping(info.code) ? 'en-IN' : 'en', {
     maximumFractionDigits: currencyFractionDigits(info.code),
   });
-  return `${info.symbol || info.code} ${formattedVal}`;
+  return joinMoney(currencyDisplaySymbol(info.code, info.symbol), formattedVal);
 }
 
 /**
@@ -96,8 +145,8 @@ export function formatCurrency(amount: number, currency?: CurrencyInfo | string 
  * (1500000 -> "AED1.5M").
  */
 export function formatCompactCurrency(amount: number, currency?: CurrencyInfo | string | null): string {
-  const info = resolveCurrency(currency);
-  const symbol = info ? (info.code ? info.symbol || info.code : '') : legacySymbol();
+  const info = resolveCurrency(currency) ?? fallbackCurrency();
+  const symbol = info.code ? currencyDisplaySymbol(info.code, info.symbol) : '';
   if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`.trim();
 
   const sign = amount < 0 ? '-' : '';
@@ -107,19 +156,19 @@ export function formatCompactCurrency(amount: number, currency?: CurrencyInfo | 
     const rounded = Math.round(value * 100) / 100;
     return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   };
+  const out = (num: string) => `${sign}${joinMoney(symbol, num, '')}`;
 
-  // Legacy callers (no published currency) keep the Indian units they had.
-  if (!info || isIndianGrouping(info.code)) {
-    if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}Cr`;
-    if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}L`;
-    if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}k`;
-    return `${sign}${symbol}${trim(abs)}`;
+  if (isIndianGrouping(info.code)) {
+    if (abs >= 1_00_00_000) return out(`${trim(abs / 1_00_00_000)}Cr`);
+    if (abs >= 1_00_000) return out(`${trim(abs / 1_00_000)}L`);
+    if (abs >= 1_000) return out(`${trim(abs / 1_000)}k`);
+    return out(trim(abs));
   }
 
-  if (abs >= 1_000_000_000) return `${sign}${symbol}${trim(abs / 1_000_000_000)}B`;
-  if (abs >= 1_000_000) return `${sign}${symbol}${trim(abs / 1_000_000)}M`;
-  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}K`;
-  return `${sign}${symbol}${trim(abs)}`;
+  if (abs >= 1_000_000_000) return out(`${trim(abs / 1_000_000_000)}B`);
+  if (abs >= 1_000_000) return out(`${trim(abs / 1_000_000)}M`);
+  if (abs >= 1_000) return out(`${trim(abs / 1_000)}K`);
+  return out(trim(abs));
 }
 
 /**
