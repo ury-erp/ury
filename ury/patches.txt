@@ -37,3 +37,4 @@ ury.patches.v3_36.delete_prefixed_dashboard_charts
 ury.patches.v3_37.delete_yield_variance_trend_chart
 ury.patches.v3_38.grant_ury_manager_read_on_authorization_and_fulfilment
 ury.patches.v3_39.add_agent_message_chairman_cards
+ury.patches.v3_40.grant_insights_analytics_access

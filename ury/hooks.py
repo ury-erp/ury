@@ -248,7 +248,11 @@ doc_events = {
         "after_insert": "ury.ury.api.chairman_whatsapp.on_incoming",
     },
     "User": {
-        "on_update": "ury.ury.api.chairman_wa_identity.on_user_update",
+        "validate": ["ury.ury.analytics_access.on_user_validate"],
+        "on_update": [
+            "ury.ury.api.chairman_wa_identity.on_user_update",
+            "ury.ury.analytics_access.on_user_update",
+        ],
         "on_trash": "ury.ury.api.chairman_wa_identity.on_user_trash",
     },
     "POS Invoice": {
