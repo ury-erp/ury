@@ -238,7 +238,6 @@ export default function ChatTab({ id: routeId, title, onBack, onCall, onStarted 
                   {m.voice && m.text === "Voice message" ? "" : m.text}
                 </p>
               )}
-              {m.role === "assistant" && !!m.tools && prefs.showSources && <span className="meta tools">Checked {m.tools} data {m.tools === 1 ? "source" : "sources"}</span>}
               {m.role === "assistant" && <Cards cards={m.cards} />}
               {m.role === "assistant" && prefs.readAloud && <Player id={m.id} text={m.text} />}
               <span className="stamp-pad" aria-hidden="true" />
@@ -301,7 +300,7 @@ export default function ChatTab({ id: routeId, title, onBack, onCall, onStarted 
         <div className="scrim" role="dialog" aria-modal="true" aria-label="Microphone">
           <div className="sheet">
             <h2>Use your microphone?</h2>
-            <p className="sub">Your voice is only recorded while you speak, then sent to answer your question. Your browser will ask for permission next.</p>
+            <p className="sub">Your voice is recorded only while you speak.</p>
             <button type="button" className="primary" onClick={() => { markSeen(); setSheet(false); void startRec(); }}>Continue</button>
             <button type="button" className="secondary" onClick={() => setSheet(false)}>Not now</button>
           </div>

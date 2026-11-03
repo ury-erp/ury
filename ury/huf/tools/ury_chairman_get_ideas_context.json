@@ -1,0 +1,23 @@
+{
+  "tool_name": "ury_chairman_get_ideas_context",
+  "description": "Facts only, no advice, for brainstorming ideas to grow sales or cut waste over a date range: sales and weekday pattern, order-type and payment mix, weakest and strongest dishes, branch spread, cancellations and discounts. The model reasons from these facts.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_ideas_context",
+  "parameters": [
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 1,
+      "description": "First day, YYYY-MM-DD."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 1,
+      "description": "Last day, YYYY-MM-DD, not in the future. Range is at most 366 days."
+    }
+  ]
+}

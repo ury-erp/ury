@@ -20,7 +20,6 @@ export function canRender(s: Slide): boolean {
   return !!s.headline || s.status === "unavailable";
 }
 
-const PLAN_NO: Record<string, number> = { yesterday: 1, mtd_target: 2, branch_ranking: 3, channel_mix: 4, top_bottom_items: 5, payment_mix: 6, leakage: 7, kitchen: 8, cashup: 9, covers: 10 };
 
 export function SlideView({ slide, index, total }: { slide: Slide; index: number; total: number }) {
   const series = slide.chart?.series || [];
@@ -32,7 +31,7 @@ export function SlideView({ slide, index, total }: { slide: Slide; index: number
         <p className="title" dir="auto">{slide.title}</p>
         <h2 dir="auto">{slide.headline}</h2>
         {slide.status === "unavailable" ? (
-          <p className="dq" dir="auto"><b>Not recorded yet:</b> this figure is not set up. It fills in once it is.</p>
+          <p className="dq" dir="auto"><b>Not recorded yet.</b></p>
         ) : spark ? (
           <>
             {slide.value != null && <div className="value">{amount(slide.value_text, slide.value)}</div>}
@@ -60,7 +59,6 @@ export function SlideView({ slide, index, total }: { slide: Slide; index: number
           </>
         ) : null}
         {slide.data_quality === "partial" && slide.status !== "unavailable" && <p className="dq" dir="auto"><b>Partial data:</b> some days or values are missing.</p>}
-        {PLAN_NO[slide.id] != null && <p className="slide-no">Slide {PLAN_NO[slide.id]}</p>}
         {slide.drill && <a className="drill" href={slide.drill}>Open full dashboard &rarr;</a>}
       </div>
     </section>

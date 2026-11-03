@@ -31,7 +31,7 @@ export default function Go() {
     <div className="app">
       <div className="state go-state">
         {state === "working"
-          ? <><h2>Opening your brief</h2><p className="sub" role="status">One moment.</p></>
+          ? <><h2>Opening your brief</h2></>
           : <><h2>This link has expired</h2><p className="sub">Links work once and last 10 minutes. Ask for a new one on WhatsApp, or sign in.</p><a className="btn" href="/login?redirect-to=/ury/brief/">Sign in</a></>}
       </div>
     </div>

@@ -170,14 +170,14 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   }
   const notice =
     choice.kind === "gemini_live"
-      ? "Voice calls use the assistant with read-only data."
+      ? ""
       : !caps ? "Checking whether voice calls are available…" : choice.notice ?? callErrorMessage(caps.reason);
   // Never offer the simulated engine to a real user: no live engine means no call button.
   const unavailable = choice.kind === "mock" && !engine;
 
   return (
     <section className="call" data-state={state} data-engine={choice.kind} dir="auto" aria-label="Voice call">
-      <p className="call-note" role={unavailable ? "alert" : undefined} dir="auto">{notice}</p>
+      {notice && <p className="call-note" role={unavailable ? "alert" : undefined} dir="auto">{notice}</p>}
       <div className="call-who">
         <div className="call-ring" ref={ringRef} data-active={live || busy} aria-hidden="true">
           <div className="call-avatar">B</div>
@@ -187,7 +187,7 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
         <p className="call-time" aria-label="Call time">{fmt(secs)}</p>
         {live && (
           <p className="call-left" aria-label="Time left">
-            Time left <span className={remaining <= 30 ? "call-left-low" : ""}>{fmt(remaining)}</span>
+            <span className={remaining <= 30 ? "call-left-low" : ""}>{fmt(remaining)}</span>
           </p>
         )}
         <span className="call-meter" ref={meterRef} data-on={live} aria-hidden="true"><i /></span>

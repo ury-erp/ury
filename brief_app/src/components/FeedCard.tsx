@@ -16,7 +16,7 @@ export default function FeedCard({ slide, onAsk, onDashboard }: Props) {
       <h3 dir="auto">{slide.title}</h3>
       <p className="sub" dir="auto">{slide.headline}</p>
       {unavailable ? (
-        <p className="dq" dir="auto"><b>Not recorded yet:</b> this figure is not set up. It fills in once it is.</p>
+        <p className="dq" dir="auto"><b>Not recorded yet.</b></p>
       ) : type === "spark" && series.length > 0 ? (
         <Spark series={series} />
       ) : type === "rank" ? (

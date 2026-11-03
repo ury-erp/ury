@@ -1,0 +1,23 @@
+{
+  "tool_name": "ury_chairman_get_kitchen_speed",
+  "description": "How fast the kitchen is for a date range: average and median minutes from the order being placed to the food being served, and to preparation starting. Based on kitchen tickets (KOT) that have times recorded.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_kitchen_speed",
+  "parameters": [
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 1,
+      "description": "First day, YYYY-MM-DD."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 1,
+      "description": "Last day, YYYY-MM-DD, not in the future. Range is at most 366 days."
+    }
+  ]
+}

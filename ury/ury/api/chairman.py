@@ -239,6 +239,21 @@ def _check_role():
 	frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
 
 
+@frappe.whitelist()
+def brief_access(user=None, app=None):
+	"""HUF App permission gate for the URY Brief launcher tile: same rule as _check_role, but returns
+	a bool and fails closed. Huf calls it as fn(user=..., app=...)."""
+	try:
+		user = user or frappe.session.user
+		if not user or user == "Guest":
+			return False
+		if user == "Administrator":
+			return bool(administrator_allowed())
+		return bool(set(frappe.get_roles(user)) & set(ALLOWED_ROLES))
+	except Exception:
+		return False
+
+
 def _today():
 	return getdate(frappe.utils.nowdate())
 

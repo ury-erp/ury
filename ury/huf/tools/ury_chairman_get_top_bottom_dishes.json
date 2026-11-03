@@ -1,0 +1,30 @@
+{
+  "tool_name": "ury_chairman_get_top_bottom_dishes",
+  "description": "Best and worst selling dishes (by net sales) for a date range, with quantity sold. The worst list only has dishes that sold at least once in the range.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_top_bottom_dishes",
+  "parameters": [
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 1,
+      "description": "First day, YYYY-MM-DD."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 1,
+      "description": "Last day, YYYY-MM-DD, not in the future. Range is at most 366 days."
+    },
+    {
+      "label": "Limit",
+      "fieldname": "limit",
+      "type": "integer",
+      "required": 0,
+      "description": "How many dishes per list, 1 to 20. Default 5."
+    }
+  ]
+}

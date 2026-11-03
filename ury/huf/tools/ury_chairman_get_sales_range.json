@@ -1,0 +1,23 @@
+{
+  "tool_name": "ury_chairman_get_sales_range",
+  "description": "Net sales and order count for a date range (max 366 days), with a per-day list and the best and worst day. Returns are netted off.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_sales_range",
+  "parameters": [
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 1,
+      "description": "First day, YYYY-MM-DD."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 1,
+      "description": "Last day, YYYY-MM-DD, not in the future. Range is at most 366 days."
+    }
+  ]
+}

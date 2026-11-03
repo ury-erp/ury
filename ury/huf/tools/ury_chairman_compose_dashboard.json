@@ -1,0 +1,59 @@
+{
+  "tool_name": "ury_chairman_compose_dashboard",
+  "description": "Combine 2 to 6 cards already produced in THIS reply into ONE dashboard card. First call the data tools (or show_card) and read the \"id\" of each returned card (c1, c2, ...), then pass those ids in card_ids in display order. Optional captions: one short line per card, same order and length as card_ids (use an empty text to skip), copied from tool results; never invent numbers. columns: 1 for line or bar charts with many points, 2 only for small kpi or bar panels. At most 1 dashboard per reply and at most 4 rows. The dashboard replaces the individual cards in the reply.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.compose_dashboard",
+  "parameters": [
+    {
+      "label": "Title",
+      "fieldname": "title",
+      "type": "string",
+      "required": 1,
+      "description": "Dashboard title, up to 60 characters."
+    },
+    {
+      "label": "Card Ids",
+      "fieldname": "card_ids",
+      "type": "array",
+      "required": 1,
+      "description": "2 to 6 card ids (c1, c2, ...) from the \"id\" field of cards returned by tools in this reply, in display order."
+    },
+    {
+      "label": "Subtitle",
+      "fieldname": "subtitle",
+      "type": "string",
+      "required": 0,
+      "description": "Optional, e.g. the period. Up to 90 characters."
+    },
+    {
+      "label": "Subtext",
+      "fieldname": "subtext",
+      "type": "string",
+      "required": 0,
+      "description": "Optional second line, up to 100 characters."
+    },
+    {
+      "label": "Footnote",
+      "fieldname": "footnote",
+      "type": "string",
+      "required": 0,
+      "description": "Optional footnote, up to 140 characters."
+    },
+    {
+      "label": "Columns",
+      "fieldname": "columns",
+      "type": "string",
+      "required": 0,
+      "description": "1 for line/bar charts with many points; 2 only for small kpi/bar panels. Default 2.",
+      "options": "1\n2"
+    },
+    {
+      "label": "Captions",
+      "fieldname": "captions",
+      "type": "array",
+      "required": 0,
+      "description": "Optional: one short caption per card, same order and length as card_ids; empty text to skip. Copy from tool results."
+    }
+  ]
+}

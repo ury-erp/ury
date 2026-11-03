@@ -72,7 +72,6 @@ function Panel({ p, dashTitle }: { p: DashboardPanel; dashTitle?: string }) {
       {sub && <p className="dash-panel-sub" dir="auto" title={sub}>{sub}</p>}
       <div className="card-body"><Body c={c} hideLabel={hideLabel} /></div>
       {p.caption && <p className="dash-caption" dir="auto">{p.caption}</p>}
-      {p.composed && <p className="card-note">Composed by the assistant</p>}
     </section>
   );
 }

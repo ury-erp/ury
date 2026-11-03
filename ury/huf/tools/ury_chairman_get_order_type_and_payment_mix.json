@@ -1,0 +1,23 @@
+{
+  "tool_name": "ury_chairman_get_order_type_and_payment_mix",
+  "description": "How sales split by order type (dine in, takeaway, delivery...) as net sales, and by payment method as money received (cash is net of change given back), for a date range.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.get_order_type_and_payment_mix",
+  "parameters": [
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 1,
+      "description": "First day, YYYY-MM-DD."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 1,
+      "description": "Last day, YYYY-MM-DD, not in the future. Range is at most 366 days."
+    }
+  ]
+}

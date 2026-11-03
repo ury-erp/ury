@@ -1,0 +1,38 @@
+{
+  "tool_name": "ury_chairman_show_card",
+  "description": "Send the chairman a visual card (image) for something one of the other tools already answers. Use this FIRST when the user says things like 'send me that as a card', 'show it as a chart' or 'give me a picture': pass the name of that tool and the same dates you used. Re-runs that tool and returns its preset card(s). Day tools take date (default yesterday); range tools take start_date and end_date. Prefer this over compose_card.",
+  "types": "Custom Function",
+  "tool_type": "URY Restaurant Tools",
+  "function_path": "ury.ury.api.chairman_tools.show_card",
+  "parameters": [
+    {
+      "label": "Tool",
+      "fieldname": "tool",
+      "type": "string",
+      "required": 1,
+      "description": "Name of the existing tool whose result to show as a card.",
+      "options": "get_day_summary\nget_month_to_date\nget_branch_ranking\nget_leakage_week\nget_cashup_week\nget_sales_range\nget_top_bottom_dishes\nget_order_type_and_payment_mix\nget_cancellations\nget_kitchen_speed\nget_ideas_context"
+    },
+    {
+      "label": "Start Date",
+      "fieldname": "start_date",
+      "type": "string",
+      "required": 0,
+      "description": "First day (range tools). Same as used for that tool."
+    },
+    {
+      "label": "End Date",
+      "fieldname": "end_date",
+      "type": "string",
+      "required": 0,
+      "description": "Last day (range tools)."
+    },
+    {
+      "label": "Date",
+      "fieldname": "date",
+      "type": "string",
+      "required": 0,
+      "description": "Business day (day tools). Leave out for yesterday."
+    }
+  ]
+}

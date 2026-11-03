@@ -1,10 +1,10 @@
 // Per-device preferences for URY Brief. localStorage can throw or be empty (private mode), so every access is guarded.
 export type Lang = "auto" | "en" | "hi" | "ar" | "ml";
 export type Theme = "system" | "light" | "dark";
-export interface Prefs { theme: Theme; language: Lang; readAloud: boolean; showSources: boolean }
+export interface Prefs { theme: Theme; language: Lang; readAloud: boolean }
 
 const KEY = "ury_brief_prefs";
-const DEFAULTS: Prefs = { theme: "system", language: "auto", readAloud: true, showSources: true };
+const DEFAULTS: Prefs = { theme: "system", language: "auto", readAloud: true };
 const LANGS: Lang[] = ["auto", "en", "hi", "ar", "ml"];
 
 export function getPrefs(): Prefs {
@@ -14,7 +14,6 @@ export function getPrefs(): Prefs {
       theme: o.theme === "light" || o.theme === "dark" ? o.theme : "system",
       language: LANGS.includes(o.language as Lang) ? (o.language as Lang) : DEFAULTS.language,
       readAloud: typeof o.readAloud === "boolean" ? o.readAloud : DEFAULTS.readAloud,
-      showSources: typeof o.showSources === "boolean" ? o.showSources : DEFAULTS.showSources,
     };
   } catch { return { ...DEFAULTS }; }
 }

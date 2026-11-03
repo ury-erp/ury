@@ -69,11 +69,6 @@ export default function Settings({ onClose }: Props) {
             <span>Show a play button on replies</span>
             <input type="checkbox" checked={p.readAloud} onChange={(e) => upd({ readAloud: e.target.checked })} />
           </label>
-          <label className="st-row">
-            <span>Show how many data sources an answer used</span>
-            <input type="checkbox" checked={p.showSources} onChange={(e) => upd({ showSources: e.target.checked })} />
-          </label>
-          <p className="st-note">These are saved on this device only.</p>
         </div>
       </div>
     </div>
