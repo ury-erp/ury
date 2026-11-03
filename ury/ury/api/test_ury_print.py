@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch, mock_open, PropertyMock
+from unittest.mock import ANY, MagicMock, patch, mock_open, PropertyMock
 import base64
 
 import frappe
@@ -13,6 +13,7 @@ from ury.ury.api.ury_print import (
 	signature_promise,
 	QZ_SIGNING_ROLES,
 	_get_qz_private_key,
+	_mark_invoice_printed,
 )
 
 
@@ -201,7 +202,8 @@ class TestQzPrintUpdate(FrappeTestCase):
 		mock_invoice = MagicMock()
 		mock_get_doc.return_value = mock_invoice
 
-		mock_db_get_value.side_effect = [None, 1]
+		# table lookup, prior invoice_printed read by the helper, post-update validation
+		mock_db_get_value.side_effect = [None, 0, 1]
 
 		result = qz_print_update("INV-001")
 
@@ -270,7 +272,12 @@ class TestPrintPosPage(FrappeTestCase):
 		call_args = mock_publish.call_args
 		self.assertIn("print_", call_args[0][0])
 
-		mock_db_set_value.assert_called_once_with("POS Invoice", "INV-001", "invoice_printed", 1)
+		mock_db_set_value.assert_called_once_with(
+			"POS Invoice",
+			"INV-001",
+			{"invoice_printed": 1, "custom_printing_time": ANY},
+			update_modified=True,
+		)
 		mock_release.assert_called_once_with("T-01")
 
 	@patch("ury.ury.api.ury_print.frappe.db.set_value")
@@ -457,3 +464,41 @@ class TestQzSigningRoles(FrappeTestCase):
 		self.assertIn("URY Admin", QZ_SIGNING_ROLES)
 		self.assertIn("URY Manager", QZ_SIGNING_ROLES)
 		self.assertIn("URY Cashier", QZ_SIGNING_ROLES)
+
+
+class TestMarkInvoicePrinted(FrappeTestCase):
+	@patch("ury.ury.api.ury_print.frappe.utils.now_datetime", return_value="2026-11-03 10:15:00")
+	@patch("ury.ury.api.ury_print.frappe.db.set_value")
+	def test_first_print_records_printing_time(self, mock_set_value, _mock_now):
+		"""The first print sets invoice_printed and custom_printing_time."""
+		_mark_invoice_printed("INV-001", was_printed=0)
+
+		mock_set_value.assert_called_once_with(
+			"POS Invoice",
+			"INV-001",
+			{"invoice_printed": 1, "custom_printing_time": "2026-11-03 10:15:00"},
+			update_modified=True,
+		)
+
+	@patch("ury.ury.api.ury_print.frappe.db.set_value")
+	def test_reprint_keeps_original_printing_time(self, mock_set_value):
+		"""A reprint must not overwrite the first print time."""
+		_mark_invoice_printed("INV-001", was_printed=1)
+
+		mock_set_value.assert_called_once_with(
+			"POS Invoice", "INV-001", {"invoice_printed": 1}, update_modified=True
+		)
+
+	@patch("ury.ury.api.ury_print.frappe.utils.now_datetime", return_value="2026-11-03 10:15:00")
+	@patch("ury.ury.api.ury_print.frappe.db.set_value")
+	@patch("ury.ury.api.ury_print.frappe.db.get_value", return_value=0)
+	def test_reads_previous_state_when_not_supplied(self, _mock_get, mock_set_value, _mock_now):
+		"""Without was_printed, the helper reads invoice_printed itself."""
+		_mark_invoice_printed("INV-001", update_modified=False)
+
+		mock_set_value.assert_called_once_with(
+			"POS Invoice",
+			"INV-001",
+			{"invoice_printed": 1, "custom_printing_time": "2026-11-03 10:15:00"},
+			update_modified=False,
+		)

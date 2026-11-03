@@ -641,6 +641,8 @@ fixtures = [
                     "POS Profile-custom_column_break_wwq3q",
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
+                    "POS Invoice-custom_printing_time",
+                    "POS Profile-custom_invoice_warning_time",
                     "POS Profile-buying_price_list",
                     "POS Profile-high_margin",
                     "POS Profile-low_margin",
