@@ -1,5 +1,6 @@
 // All HTTP for the Ask tab lives here. Adjust names/shapes in one place.
 import type { ChatMessage } from "./types";
+import { sanitizeCards } from "./cardFormat";
 
 const BASE = "/api/method/ury.ury.api.chairman_chat.";
 
@@ -37,6 +38,7 @@ export function normalize(m: Raw): ChatMessage {
     text: String(m.text ?? m.content ?? m.message ?? ""),
     state: "sent",
     voice: !!m.voice,
+    cards: sanitizeCards(m.cards),
   };
 }
 

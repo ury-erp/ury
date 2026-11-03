@@ -332,6 +332,121 @@ class PolicyAndLimitTests(unittest.TestCase):
 			self.assertIsNone(f.flags.chairman_conversation_id)
 		self.assertEqual(seen, ["CONV-1", "CONV-2"])
 
+	def test_run_with_cards_collects_caps_and_clears(self):
+		f = _fake_frappe()
+		f.db = mock.MagicMock()
+		mk = lambda i: {"type": "bar", "title": "T%d" % i, "series": [{"label": "a", "value": i}]}
+
+		def fake_run(agent, conv, prompt):
+			f.flags.chairman_cards.extend(mk(i) for i in range(5))  # what guarded() does
+			return {"success": True}
+
+		with mock.patch.object(cc, "frappe", f), mock.patch.object(cc, "_run_inline", side_effect=fake_run), \
+				mock.patch.object(cc, "_persist_cards") as persist:
+			run, cards = cc.run_with_cards("A", "CONV", "hi")
+		self.assertEqual(run, {"success": True})
+		self.assertEqual(len(cards), 3)
+		self.assertIsNone(f.flags.chairman_cards)
+		persist.assert_called_once_with("CONV", cards)
+
+	def test_run_with_cards_no_tools_no_cards(self):
+		f = _fake_frappe()
+		with mock.patch.object(cc, "frappe", f), mock.patch.object(cc, "_run_inline", return_value={"x": 1}), \
+				mock.patch.object(cc, "_persist_cards") as persist:
+			run, cards = cc.run_with_cards("A", "CONV", "hi")
+		self.assertEqual(cards, [])
+		persist.assert_not_called()
+
+class FastPathAndCleanTests(unittest.TestCase):
+	def test_strip_unterminated_artifact(self):
+		t = 'Sales are up.\n<artifact type="chart" language="jsx" title="x">const a = [...'
+		self.assertEqual(cc.strip_rich_markup(t), "Sales are up.")
+
+	def test_strip_terminated_artifact_script_style_fence(self):
+		t = (
+			'A <artifact type="x">stuff</artifact>  B\n\n\n\n<script>alert(1)</script>C<style>p{}</style>'
+			"\n```jsx\nconst X = () => <div/>;\n```\nD ```python\nprint(1)\n```"
+		)
+		out = cc.strip_rich_markup(t)
+		self.assertNotIn("artifact", out)
+		self.assertNotIn("alert", out)
+		self.assertNotIn("jsx", out)
+		self.assertIn("print(1)", out)  # non-jsx fence kept
+		self.assertNotIn("  ", out)
+		self.assertNotIn("\n\n\n", out)
+
+	def test_strip_plain_and_non_string(self):
+		self.assertEqual(cc.strip_rich_markup("  hello   world "), "hello world")
+		self.assertIsNone(cc.strip_rich_markup(None))
+
+	def test_clean_run(self):
+		run, ch = cc.clean_run({"response": "ok <artifact a>x"})
+		self.assertEqual((run["response"], ch), ("ok", "ok"))
+		same = {"response": "fine"}
+		self.assertEqual(cc.clean_run(same), (same, None))
+
+	def test_select_cards_prefers_latest(self):
+		mk = lambda t: {"type": "bar", "title": t, "series": [{"label": "a", "value": 1}]}
+		raw = [mk("Day sales"), mk("Old"), mk("Mid"), mk("Q1"), mk("Q2")]
+		out = cc.select_cards(raw)
+		self.assertEqual([c["title"] for c in out], ["Q2", "Q1", "Mid"])
+		few = cc.select_cards([mk("A"), mk("B")])
+		self.assertEqual([c["title"] for c in few], ["A", "B"])
+
+	def _patched(self, f, **kw):
+		return mock.patch.multiple(cc, frappe=f, **kw)
+
+	def test_fast_path_skips_llm_and_persists(self):
+		f = _fake_frappe()
+		f.flags = types.SimpleNamespace(chairman_cards=None, chairman_conversation_id=None)
+		intent = SimpleNamespace(name="sales_day")
+		router = mock.MagicMock()
+		router.match.return_value = intent
+		router.detect_language.return_value = "en"
+		card = {"type": "bar", "title": "Day", "series": [{"label": "a", "value": 1}]}
+
+		def ans(i, lang):
+			self.assertEqual(f.flags.chairman_conversation_id, "CONV")
+			f.flags.chairman_cards.append(card)
+			return {"reply": "Sales: 10", "tool": "get_day_summary", "data": {}, "intent": "sales_day"}
+
+		router.answer.side_effect = ans
+		with self._patched(f, _router_mod=lambda: router), \
+				mock.patch.object(cc, "_store_fast_turn") as store, \
+				mock.patch.object(cc, "_run_inline") as llm, \
+				mock.patch.object(cc, "_today", create=True), \
+				mock.patch.dict(sys.modules, {"ury.ury.api.chairman": mock.MagicMock(_today=lambda: date(2026, 11, 2))}):
+			run, cards, fast = cc.run_turn("A", "CONV", "yesterday's sales")
+		llm.assert_not_called()
+		self.assertTrue(fast)
+		self.assertEqual(run["response"], "Sales: 10")
+		self.assertEqual(len(cards), 1)
+		store.assert_called_once()
+		self.assertIsNone(f.flags.chairman_cards)
+
+	def test_fast_path_falls_through(self):
+		f = _fake_frappe()
+		f.flags = types.SimpleNamespace(chairman_cards=None, chairman_conversation_id=None)
+		for res in (None, RuntimeError("boom")):
+			router = mock.MagicMock()
+			router.match.return_value = SimpleNamespace()
+			router.detect_language.return_value = "en"
+			if isinstance(res, Exception):
+				router.answer.side_effect = res
+			else:
+				router.answer.return_value = res
+			with self._patched(f, _router_mod=lambda r=router: r), \
+					mock.patch.dict(sys.modules, {"ury.ury.api.chairman": mock.MagicMock(_today=lambda: date(2026, 11, 2))}), \
+					mock.patch.object(cc, "run_clean", return_value=({"response": "llm"}, [])) as llm:
+				run, cards, fast = cc.run_turn("A", "CONV", "why")
+			self.assertFalse(fast)
+			self.assertEqual(run, {"response": "llm"})
+			llm.assert_called_once()
+
+	def test_kill_switch(self):
+		with mock.patch.object(cc, "FAST_PATH_ENABLED", False):
+			self.assertIsNone(cc.try_fast_path("A", "C", "yesterday's sales"))
+
 
 def _huf_installed():
 	try:
@@ -586,3 +701,10 @@ class SiteTests(IntegrationTestCase):
 		self.assertEqual(ras.call_args.kwargs["now"], 1)
 		frappe.set_user("Administrator")
 		f.delete()
+
+
+class MaxRoundsTests(unittest.TestCase):
+	def test_max_rounds_reply_replaced(self):
+		run, changed = cc.clean_run({"response": "Agent stopped after max rounds of tool calls."})
+		self.assertEqual(run["response"], cc.MAX_ROUNDS_REPLY)
+		self.assertEqual(changed, cc.MAX_ROUNDS_REPLY)

@@ -75,6 +75,7 @@
 import asyncio
 import base64
 import binascii
+import re
 import time
 import uuid
 
@@ -85,6 +86,8 @@ try:
 	from ury.ury.api.chairman import ALLOWED_ROLES, _check_role
 except ImportError:  # pure unit run from this directory
 	from chairman import ALLOWED_ROLES, _check_role
+
+FAST_PATH_ENABLED = True  # kill switch for the pre-LLM router (no system setting by design)
 
 SETTINGS_DOCTYPE = "URY Chairman Settings"
 VOICE_PREFIX = "ury-brief-voice-"  # chairman_jobs purge matches this prefix
@@ -419,6 +422,246 @@ def _run_inline(agent, conversation, prompt):
 	return result
 
 
+CARDS_FIELD = "chairman_cards"
+
+
+def _cards_mod():
+	try:
+		from ury.ury.api import chairman_cards
+	except ImportError:
+		import chairman_cards
+	return chairman_cards
+
+
+def _cards_field_exists():
+	try:
+		return bool(frappe.get_meta("Agent Message").has_field(CARDS_FIELD))
+	except Exception:
+		return False
+
+
+def run_with_cards(agent, conversation, prompt):
+	"""_run_inline plus the cards the guarded tools produced during the run (max 3, validated).
+	Tools run in this process (now=1), so they publish cards on frappe.flags.chairman_cards;
+	Huf's run result carries no tool outputs. Returns (run_result, cards)."""
+	frappe.flags.chairman_cards = []
+	try:
+		run = _run_inline(agent, conversation, prompt)
+		cards = select_cards(frappe.flags.chairman_cards)
+	finally:
+		frappe.flags.chairman_cards = None
+	if cards:
+		_persist_cards(conversation, cards)
+	return run, cards
+
+
+def _persist_cards(conversation, cards):
+	"""Store cards JSON on the newest assistant message of the run so history() can re-attach
+	them. Best effort: skipped (response still carries cards) when the custom field is absent."""
+	try:
+		if not _cards_field_exists():
+			return
+		name = frappe.db.get_value(
+			"Agent Message",
+			{"conversation": conversation, "role": "agent", "kind": "Message"},
+			"name",
+			order_by="conversation_index desc, creation desc",
+		)
+		if name:
+			frappe.db.set_value("Agent Message", name, CARDS_FIELD, frappe.as_json(cards), update_modified=False)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "URY chairman chat: could not persist cards")
+
+
+def attach_cards(conversation, msgs):
+	"""Add `cards` (re-validated) to history rows whose Agent Message stored some."""
+	if not isinstance(msgs, list) or not _cards_field_exists():
+		return msgs
+	ids = [m["id"] for m in msgs if isinstance(m, dict) and m.get("id")]
+	if not ids:
+		return msgs
+	stored = dict(
+		frappe.get_all(
+			"Agent Message",
+			filters={"name": ["in", ids], CARDS_FIELD: ["is", "set"]},
+			fields=["name", CARDS_FIELD],
+			as_list=True,
+		)
+	)
+	for m in msgs:
+		raw = stored.get(m.get("id")) if isinstance(m, dict) else None
+		if not raw:
+			continue
+		try:
+			cards = _cards_mod().limit_cards(frappe.parse_json(raw))
+		except Exception:
+			cards = []
+		if cards:
+			m["cards"] = cards
+	return msgs
+
+
+# ---------------------------------------------------------------- reply cleaning / card choice
+
+_ARTIFACT_BLOCK = re.compile(r"<artifact\b[^>]*>.*?</artifact\s*>", re.I | re.S)
+_ARTIFACT_OPEN_TAIL = re.compile(r"<artifact\b.*\Z", re.I | re.S)  # unterminated: drop to end
+_ARTIFACT_STRAY = re.compile(r"</?artifact\b[^>]*>?", re.I)
+_SCRIPT_STYLE = re.compile(r"<(script|style)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+_SCRIPT_STYLE_TAIL = re.compile(r"<(?:script|style)\b.*\Z", re.I | re.S)
+_FENCE = re.compile(r"```[ \t]*([A-Za-z0-9_+-]*)[^\n]*\n(.*?)(?:```|\Z)", re.S)
+_JSX_LANGS = {"jsx", "tsx", "react", "javascriptreact"}
+_JSX_BODY = re.compile(r"import\s+React|from\s+['\"]react['\"]|<[A-Z][A-Za-z0-9]*[\s/>]|return\s*\(\s*<", re.S)
+
+
+def _drop_jsx_fence(m):
+	lang, body = m.group(1).lower(), m.group(2)
+	return "" if lang in _JSX_LANGS or _JSX_BODY.search(body) else m.group(0)
+
+
+MAX_ROUNDS_PREFIX = "Agent stopped after max rounds"
+MAX_ROUNDS_REPLY = "That question needs more digging than I could finish. Please ask about one period or one topic at a time, for example yesterday's sales or last week's top dishes."
+
+
+def strip_rich_markup(text):
+	"""Remove model-emitted rich blocks the chairman UI cannot render: <artifact ...> blocks
+	(also unterminated), script/style tags and code fences holding jsx; collapse whitespace.
+	Pure. Non-strings pass through unchanged."""
+	if not isinstance(text, str):
+		return text
+	t = _ARTIFACT_BLOCK.sub(" ", text)
+	t = _ARTIFACT_OPEN_TAIL.sub(" ", t)
+	t = _ARTIFACT_STRAY.sub(" ", t)
+	t = _SCRIPT_STYLE.sub(" ", t)
+	t = _SCRIPT_STYLE_TAIL.sub(" ", t)
+	t = _FENCE.sub(_drop_jsx_fence, t)
+	t = re.sub(r"[ \t\r\f\v]+", " ", t)
+	t = re.sub(r" ?\n ?", "\n", t)
+	t = re.sub(r"\n{3,}", "\n\n", t)
+	return t.strip()
+
+
+def clean_run(run):
+	"""Return `run` with response text stripped; (run, changed_text_or_None)."""
+	if isinstance(run, dict) and isinstance(run.get("response"), str):
+		cleaned = strip_rich_markup(run["response"])
+		if cleaned.startswith(MAX_ROUNDS_PREFIX):
+			cleaned = MAX_ROUNDS_REPLY
+		if cleaned != run["response"]:
+			return {**run, "response": cleaned}, cleaned
+	return run, None
+
+
+def select_cards(raw, limit=None):
+	"""Validated cards for a run. Tools append to the flag list in call order; with more than
+	MAX_CARDS the question's own (latest) tool calls win over incidental earlier ones, so the
+	list is reversed (newest first) before dedupe/limit. <= MAX_CARDS keeps call order."""
+	mod = _cards_mod()
+	limit = limit or mod.MAX_CARDS
+	raw = list(raw or [])
+	if len(raw) > limit:
+		raw.reverse()
+	return mod.limit_cards(raw, limit)
+
+
+def _persist_clean_reply(conversation, cleaned):
+	"""Best effort: store the stripped text on the newest assistant message so history()
+	shows what the live reply showed."""
+	try:
+		name = frappe.db.get_value(
+			"Agent Message",
+			{"conversation": conversation, "role": "agent", "kind": "Message"},
+			"name",
+			order_by="conversation_index desc, creation desc",
+		)
+		if name:
+			frappe.db.set_value("Agent Message", name, "content", cleaned, update_modified=False)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "URY chairman chat: could not persist cleaned reply")
+
+
+def run_clean(agent, conversation, prompt):
+	"""run_with_cards + strip_rich_markup on the reply (and the stored message)."""
+	run, cards = run_with_cards(agent, conversation, prompt)
+	run, changed = clean_run(run)
+	if changed is not None:
+		_persist_clean_reply(conversation, changed)
+	return run, cards
+
+
+# ---------------------------------------------------------------- fast path (WP7)
+
+
+def _router_mod():
+	try:
+		from ury.ury.api import chairman_router
+	except ImportError:
+		import chairman_router
+	return chairman_router
+
+
+def _store_fast_turn(agent, conversation, user_text, reply, cards):
+	"""Persist user + agent Agent Messages exactly as Huf's ConversationManager.add_message does
+	(role "user"/"agent", kind "Message", next conversation_index)."""
+	from huf.ai.conversation_manager import ConversationManager
+
+	conv_doc = frappe.get_doc("Agent Conversation", conversation)
+	cm = ConversationManager(agent_name=agent, channel="Chat")
+	provider = frappe.db.get_value("Agent", agent, "provider")
+	model = frappe.db.get_value("Agent", agent, "model")
+	cm.add_message(conversation=conv_doc, role="user", content=user_text, provider=provider, model=model, agent=agent)
+	cm.add_message(conversation=conv_doc, role="agent", content=reply, provider=provider, model=model, agent=agent)
+	if cards:
+		_persist_cards(conversation, cards)
+
+
+def try_fast_path(agent, conversation, message, language=None):
+	"""Deterministic answer for simple data questions, or None (caller runs the LLM).
+	The tool runs through the guarded chairman tool in this process, so role, chairman-context
+	and conversation-ownership checks still apply. Never raises."""
+	if not FAST_PATH_ENABLED:
+		return None
+	try:
+		router = _router_mod()
+		try:
+			from ury.ury.api.chairman import _today
+		except ImportError:
+			from chairman import _today
+		intent = router.match(message, _today())
+		if not intent:
+			return None
+		lang = normalize_language(language) or router.detect_language(message)
+		frappe.flags.chairman_conversation_id = conversation
+		frappe.flags.chairman_cards = []
+		try:
+			res = router.answer(intent, lang)
+			armed = list(frappe.flags.chairman_cards or [])
+		finally:
+			frappe.flags.chairman_conversation_id = None
+			frappe.flags.chairman_cards = None
+		if not res or not res.get("reply"):
+			return None
+		cards = select_cards(armed)
+		if not cards:
+			cards = _cards_mod().cards_for(res.get("tool"), res.get("data"))
+		reply = strip_rich_markup(res["reply"])
+		_store_fast_turn(agent, conversation, message, reply, cards)
+		run = {"success": True, "response": reply, "status": "Success", "conversation_id": conversation,
+			"fast_path": True, "intent": res.get("intent"), "tool": res.get("tool")}
+		return run, cards
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "URY chairman chat: fast path failed, using LLM")
+		return None
+
+
+def run_turn(agent, conversation, message, language=None):
+	"""Fast path first, else the LLM. Returns (run, cards, fast_path)."""
+	fast = try_fast_path(agent, conversation, message, language)
+	if fast:
+		return fast[0], fast[1], True
+	run, cards = run_clean(agent, conversation, with_language_hint(message, language))
+	return run, cards, False
+
+
 # ---------------------------------------------------------------- tool guard (for WP H2)
 
 
@@ -455,11 +698,13 @@ def start(message=None, language=None):
 		return {"enabled": False}
 	agent = _require_agent()
 	conversation = _new_conversation(agent)
-	out = {"enabled": True, "conversation_id": conversation, "run": None}
+	out = {"enabled": True, "conversation_id": conversation, "run": None, "cards": []}
 	if message and str(message).strip():
 		message = validate_message(message)
 		rate_check("msg", RATE_LIMIT_MESSAGES)
-		out["run"] = _run_inline(agent, conversation, with_language_hint(message, language))
+		out["run"], out["cards"], fast = run_turn(agent, conversation, message, language)
+		if fast:
+			out["fast_path"] = True
 	return out
 
 
@@ -471,10 +716,11 @@ def send(conversation, message, language=None):
 	agent = _require_agent()
 	_own_conversation(conversation, agent)
 	_assert_conversation_room(conversation)
-	return {
-		"conversation_id": conversation,
-		"run": _run_inline(agent, conversation, with_language_hint(message, language)),
-	}
+	run, cards, fast = run_turn(agent, conversation, message, language)
+	out = {"conversation_id": conversation, "run": run, "cards": cards}
+	if fast:
+		out["fast_path"] = True
+	return out
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -486,7 +732,7 @@ def history(conversation, limit=HISTORY_DEFAULT_LIMIT):
 
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	msgs = get_history(conversation_id=conversation, limit=coerce_history_limit(limit))
-	return attach_message_ids(conversation, msgs)
+	return attach_cards(conversation, attach_message_ids(conversation, msgs))
 
 
 def attach_message_ids(conversation, msgs):
@@ -566,13 +812,18 @@ def send_audio(conversation=None, b64data=None, mime=None, language=None):
 	if not transcript or transcript == "[Silence]":
 		return {"success": False, "conversation_id": conversation, "error": "No speech detected"}
 
-	return {
+	run, cards, fast = run_turn(agent, conversation, transcript, lang)
+	out = {
 		"success": True,
 		"conversation_id": conversation,
 		"transcript": transcript,
 		"language": lang or res.get("language"),
-		"run": _run_inline(agent, conversation, with_language_hint(transcript, lang)),
+		"run": run,
+		"cards": cards,
 	}
+	if fast:
+		out["fast_path"] = True
+	return out
 
 
 @frappe.whitelist(methods=["POST"])

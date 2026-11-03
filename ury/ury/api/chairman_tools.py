@@ -18,6 +18,7 @@ agent seeding step creates one Huf Agent Tool per entry, with function_path
 Amounts are net of tax (net sales) unless the tool says otherwise.
 """
 
+import math
 import re
 from datetime import timedelta
 from functools import wraps
@@ -35,6 +36,8 @@ FREE_TEXT_KEYS = frozenset(
 	{"label", "dish", "branch", "reason", "top_reason", "cancel_reason", "item_name", "item", "notes", "note_text", "remarks"}
 )
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+MAX_COMPOSED_CARDS_PER_REPLY = 3
+CARD_PASSTHROUGH_TOOLS = frozenset({"show_card", "compose_card"})  # build their own cards
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -210,6 +213,26 @@ def _conversation_id():
 		return None
 
 
+def _tool_cards(tool_name, result):
+	"""Validated visual cards for a tool result, [] on any failure. Also appended to
+	frappe.flags.chairman_cards when the chat runner armed it, so the chat layer can return
+	them without parsing Huf's records. Never touches the numeric fields of `result`."""
+	try:
+		try:
+			from ury.ury.api import analytics_env, chairman_cards
+		except ImportError:
+			import analytics_env
+			import chairman_cards
+		url = analytics_env.dashboard_url("owner")  # None when Insights is absent
+		cards = chairman_cards.cards_for(tool_name, result, link=url)
+	except Exception:
+		return []
+	sink = getattr(getattr(frappe, "flags", None), "chairman_cards", None)
+	if isinstance(sink, list):
+		sink.extend(cards)
+	return cards
+
+
 def guarded(fn):
 	"""Role check, chairman-context check (not Administrator/Guest, owns the conversation when
 	one is known), then input errors become ValidationErrors; the output is sanitised."""
@@ -227,6 +250,8 @@ def guarded(fn):
 			if "note" in out:
 				out["context_note"] = out.pop("note")
 			out["note"] = TOOL_NOTE
+			if fn.__name__ not in CARD_PASSTHROUGH_TOOLS:
+				out["cards"] = _tool_cards(fn.__name__, out)
 		return out
 
 	return wrapper
@@ -552,6 +577,145 @@ def get_ideas_context(start_date, end_date):
 	}
 
 
+# ---------------------------------------------------------------- tools (card requests)
+
+
+def _cards_mod():
+	try:
+		from ury.ury.api import chairman_cards
+	except ImportError:
+		import chairman_cards
+	return chairman_cards
+
+
+def _number_list(values, name):
+	"""list of finite real numbers within chairman_cards bounds; booleans and strings rejected."""
+	cc = _cards_mod()
+	if not isinstance(values, (list, tuple)) or not values:
+		raise ValueError(f"{name} must be a non-empty list of numbers.")
+	out = []
+	for v in values:
+		if isinstance(v, bool) or not isinstance(v, (int, float)):
+			raise ValueError(f"{name} must contain only numbers.")
+		f = float(v)
+		if not math.isfinite(f) or abs(f) > cc.NUM_MAX:
+			raise ValueError(f"{name} contains a number that is not finite or is too large.")
+		out.append(v)
+	return out
+
+
+def _composed_count():
+	try:
+		return int(getattr(frappe.flags, "chairman_composed_cards", 0) or 0)
+	except Exception:
+		return 0
+
+
+def _bump_composed_count():
+	try:
+		frappe.flags.chairman_composed_cards = _composed_count() + 1
+	except Exception:
+		pass
+
+
+def build_composed_card(type, title, labels=None, values=None, fmt="int", subtitle=None, cols=None, rows=None):
+	"""Pure: validate agent-supplied numbers and return a sanitised v1 card with ai_composed=True.
+	Raises ValueError for anything malformed; nothing is silently truncated or dropped."""
+	cc = _cards_mod()
+	if type not in cc.CARD_TYPES:
+		raise ValueError("type must be one of: " + ", ".join(cc.CARD_TYPES) + ".")
+	if fmt not in cc.FMTS:
+		raise ValueError("fmt must be one of: " + ", ".join(cc.FMTS) + ".")
+	if not isinstance(title, str) or not title.strip():
+		raise ValueError("title is required.")
+	card = {"type": type, "title": title, "subtitle": subtitle, "ai_composed": True}
+	if type == "table":
+		if not isinstance(cols, (list, tuple)) or not cols or len(cols) > cc.MAX_COLS:
+			raise ValueError(f"cols must be a list of 1 to {cc.MAX_COLS} column names.")
+		if not isinstance(rows, (list, tuple)) or not rows or len(rows) > cc.MAX_ROWS:
+			raise ValueError(f"rows must be a list of 1 to {cc.MAX_ROWS} rows.")
+		clean_rows = []
+		for r in rows:
+			if not isinstance(r, (list, tuple)) or len(r) != len(cols):
+				raise ValueError("every row must be a list with one cell per column.")
+			cells = []
+			for c in r:
+				if isinstance(c, bool) or c is None or isinstance(c, (list, tuple, dict)):
+					raise ValueError("cells must be text or numbers.")
+				if isinstance(c, (int, float)):
+					_number_list([c], "cells")
+				cells.append(c)
+			clean_rows.append(cells)
+		card.update(cols=[str(c) for c in cols], rows=clean_rows)
+	else:
+		nums = _number_list(values, "values")
+		if not isinstance(labels, (list, tuple)) or len(labels) != len(nums):
+			raise ValueError("labels and values must be lists of the same length.")
+		if not all(isinstance(x, str) and x.strip() for x in labels):
+			raise ValueError("labels must be non-empty text.")
+		cap = cc.MAX_KPIS if type == "kpi" else cc.MAX_POINTS
+		if len(nums) > cap:
+			raise ValueError(f"A {type} card takes at most {cap} values.")
+		if type == "line" and len(nums) < 2:
+			raise ValueError("A line card needs at least 2 points.")
+		if type == "kpi":
+			card["kpis"] = [{"label": l, "value": v, "fmt": fmt} for l, v in zip(labels, nums)]
+		else:
+			card["series"] = [{"label": l, "value": v} for l, v in zip(labels, nums)]
+			card["fmt"] = fmt
+	valid = cc.validate_card(card)
+	if valid is None:
+		raise ValueError("The card is empty or invalid after cleaning.")
+	items = valid.get("kpis") or valid.get("series") or valid.get("rows") or []
+	expected = len(card.get("kpis") or card.get("series") or card.get("rows") or [])
+	if len(items) != expected or (type == "table" and any(len(a) != len(b) for a, b in zip(valid["rows"], card["rows"]))):
+		raise ValueError("Some labels or values were empty after cleaning.")
+	return valid
+
+
+@frappe.whitelist(methods=["POST"])
+@guarded
+def show_card(tool, start_date=None, end_date=None, date=None):
+	"""Send the chairman a visual card (image) for something one of the other tools already
+	answers. Use this FIRST when the user says things like 'send me that as a card', 'show it
+	as a chart' or 'give me a picture': pass the name of that tool and the same dates you used.
+	Re-runs that tool and returns its preset card(s). Day tools take date (default yesterday);
+	range tools take start_date and end_date. Prefer this over compose_card."""
+	allowed = [n for n in TOOLS_BY_NAME if n not in CARD_PASSTHROUGH_TOOLS]
+	if tool not in allowed:
+		raise ValueError("tool must be one of: " + ", ".join(allowed) + ".")
+	func = TOOLS_BY_NAME[tool]["func"]
+	props = TOOLS_BY_NAME[tool]["parameters"]["properties"]
+	if "start_date" in props:
+		fallback = date or (_today() - timedelta(days=1)).isoformat()
+		kwargs = {"start_date": start_date or date or fallback, "end_date": end_date or date or start_date or fallback}
+	else:
+		kwargs = {"date": date or end_date or start_date}
+	inner = func(**kwargs)  # runs guarded: role check, scoping, validation, card collection
+	cards = (inner or {}).get("cards") or []
+	return {"cards": cards, "note": "" if cards else "That tool has no visual card for this data."}
+
+
+@frappe.whitelist(methods=["POST"])
+@guarded
+def compose_card(type, title, labels=None, values=None, fmt="int", subtitle=None, cols=None, rows=None):
+	"""Draw a custom card ONLY when no other tool returns the visual the user wants and show_card
+	cannot do it. Every number must be copied from results of the other tools in this
+	conversation; NEVER invent, estimate or compute new figures. type: kpi (up to 4 labelled
+	numbers), bar (1 to 12), line (2 to 12 points in order), table (cols up to 4, rows up to 8).
+	For kpi/bar/line pass labels and values (same length, values are plain numbers, no text);
+	fmt is money, int, pct or mins. For table pass cols and rows. At most 3 composed cards per
+	reply."""
+	if _composed_count() >= MAX_COMPOSED_CARDS_PER_REPLY:
+		raise ValueError(f"At most {MAX_COMPOSED_CARDS_PER_REPLY} composed cards per reply; use the numbers in text instead.")
+	card = build_composed_card(type, title, labels, values, fmt, subtitle, cols, rows)
+	_bump_composed_count()
+	sink = getattr(getattr(frappe, "flags", None), "chairman_cards", None)
+	if isinstance(sink, list):
+		sink.append(card)
+	return {"cards": [card], "note": "Composed from numbers supplied by the assistant, not a preset report."}
+
+
 # ---------------------------------------------------------------- registry
 
 _DATE = {"type": "string", "description": "Date as YYYY-MM-DD."}
@@ -577,6 +741,12 @@ def _entry(func, props, required=()):
 	}
 
 
+_PRESET_NAMES = [
+	"get_day_summary", "get_month_to_date", "get_branch_ranking", "get_leakage_week", "get_cashup_week",
+	"get_sales_range", "get_top_bottom_dishes", "get_order_type_and_payment_mix", "get_cancellations",
+	"get_kitchen_speed", "get_ideas_context",
+]
+
 TOOLS = [
 	_entry(get_day_summary, _DAY_PROPS),
 	_entry(get_month_to_date, _DAY_PROPS),
@@ -593,6 +763,38 @@ TOOLS = [
 	_entry(get_cancellations, _RANGE_PROPS, ("start_date", "end_date")),
 	_entry(get_kitchen_speed, _RANGE_PROPS, ("start_date", "end_date")),
 	_entry(get_ideas_context, _RANGE_PROPS, ("start_date", "end_date")),
+	_entry(
+		show_card,
+		{
+			"tool": {
+				"type": "string",
+				"enum": [n for n in _PRESET_NAMES],
+				"description": "Name of the existing tool whose result to show as a card.",
+			},
+			"start_date": {**_DATE, "description": "First day (range tools). Same as used for that tool."},
+			"end_date": {**_DATE, "description": "Last day (range tools)."},
+			"date": {**_DATE, "description": "Business day (day tools). Leave out for yesterday."},
+		},
+		("tool",),
+	),
+	_entry(
+		compose_card,
+		{
+			"type": {"type": "string", "enum": ["kpi", "bar", "line", "table"]},
+			"title": {"type": "string", "description": "Card title, up to 60 characters."},
+			"labels": {"type": "array", "items": {"type": "string"}, "description": "kpi/bar/line: one label per value."},
+			"values": {"type": "array", "items": {"type": "number"}, "description": "kpi/bar/line: plain numbers taken from tool results."},
+			"fmt": {"type": "string", "enum": ["money", "int", "pct", "mins"], "description": "How to show the values. Default int."},
+			"subtitle": {"type": "string", "description": "Optional, e.g. the period. Up to 80 characters."},
+			"cols": {"type": "array", "items": {"type": "string"}, "description": "table only: 1 to 4 column names."},
+			"rows": {
+				"type": "array",
+				"items": {"type": "array", "items": {"type": ["string", "number"]}},
+				"description": "table only: up to 8 rows, one cell per column.",
+			},
+		},
+		("type", "title"),
+	),
 ]
 
 TOOLS_BY_NAME = {t["name"]: t for t in TOOLS}

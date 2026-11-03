@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./chat.css";
 import * as api from "./api";
 import Markdown from "./markdown";
+import { Cards } from "./Card";
 import Player from "./Player";
 import { MAX_BYTES, MAX_SECONDS, Recorder, micSupported, type RecError } from "./recorder";
 import type { ChatMessage } from "./types";
@@ -153,6 +154,7 @@ export default function ChatTab() {
             <div className="bubble">
               {m.voice && <span className="tag">Voice message</span>}
               {m.role === "assistant" ? <Markdown text={m.text} /> : <p dir="auto">{m.voice && m.text === "Voice message" ? "Sending voice message" : m.text}</p>}
+              {m.role === "assistant" && <Cards cards={m.cards} />}
               {m.role === "assistant" && <Player id={m.id} text={m.text} />}
             </div>
             {m.state === "sending" && <span className="meta" role="status">Sending</span>}
