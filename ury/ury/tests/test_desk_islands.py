@@ -66,7 +66,7 @@ class FakeStore:
 				return store.claim if f == "insights_dashboard" else False
 
 		fr.get_installed_apps = lambda: ["frappe", "ury"] + (["insights"] if store.insights else [])
-		fr.get_meta = lambda dt: Meta()
+		fr.get_meta = lambda dt, cached=True: Meta()
 		fr.get_all = lambda dt, filters=None, **kw: [
 			r["name"] for r in store.insights_rows if r["title"] == filters["title"]
 		]
