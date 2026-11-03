@@ -79,6 +79,24 @@ export function fmtValue(v: unknown, fmt?: string): string {
   return inr2.format(n);
 }
 
+/** KPI headline: full figure up to 99,99,999; from 1Cr up it is abbreviated (same K/L/Cr rule as format.ts) so it fits a 360px tile. */
+export function fmtKpiValue(v: unknown, fmt?: string): string {
+  if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) < 1e7 || (fmt !== "money" && fmt !== "int")) return fmtValue(v, fmt);
+  let t = (Math.round((Math.abs(v) / 1e7) * 10) / 10).toFixed(1);
+  if (t.endsWith(".0")) t = t.slice(0, -2);
+  return (v < 0 ? "-" : "") + (fmt === "money" ? "₹" : "") + t + "Cr";
+}
+
+export const sameText = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+/** A lone KPI whose label repeats the panel title would print the same words twice: hide the label visually. */
+export function hideLoneKpiLabel(c: Card, title?: string): boolean {
+  return c.type === "kpi" && (c.kpis ?? []).length === 1 && sameText(c.kpis![0].label, title);
+}
+/** Only an explicit "up" or "down" colours peaks/lows by meaning; anything else is off. */
+export function goodDirection(c: Card): "up" | "down" | undefined {
+  return c.good_direction === "up" || c.good_direction === "down" ? c.good_direction : undefined;
+}
+
 /** delta is a ratio (0.0009 = +0.09%). */
 export function fmtDelta(d: number | null | undefined): { text: string; dir: "up" | "down" | "flat" } | null {
   if (d == null || !Number.isFinite(d)) return null;

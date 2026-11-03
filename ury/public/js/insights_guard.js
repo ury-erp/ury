@@ -3,6 +3,8 @@
 (function () {
 	const KEY = "ury_insights_banner_dismissed";
 	const cfg = () => (frappe.boot && frappe.boot.ury_insights) || { installed: true };
+	// Server fills the real site name; this only covers a leftover placeholder.
+	const siteCmd = (cmd) => String(cmd || "").replace("<site>", (frappe.boot && frappe.boot.sitename) || window.location.hostname);
 	const isIns = (a) => (a.getAttribute("href") || "").indexOf("/insights/") === 0;
 
 	// Shortcut widgets carry no href in the DOM, so the /insights/ labels are read from the
@@ -47,7 +49,7 @@
 		if (hint) {
 			msg.textContent = hint.title + ": ";
 			const code = document.createElement("code");
-			code.textContent = hint.cmd;
+			code.textContent = siteCmd(hint.cmd);
 			msg.appendChild(code);
 		} else {
 			msg.textContent = "Analytics needs Frappe Insights; ask your administrator.";
@@ -58,7 +60,7 @@
 			const copy = document.createElement("button");
 			copy.className = "btn btn-xs btn-default";
 			copy.textContent = __("Copy");
-			copy.onclick = () => frappe.utils.copy_to_clipboard(hint.cmd);
+			copy.onclick = () => frappe.utils.copy_to_clipboard(siteCmd(hint.cmd));
 			bar.appendChild(copy);
 		}
 		const x = document.createElement("button");

@@ -31,6 +31,11 @@ class TestBootInsights(unittest.TestCase):
 		self.assertFalse(r["installed"])
 		self.assertIn("bench get-app insights", r["install_hint"]["cmd"])
 
+	def test_hint_has_real_site(self):
+		fr.local = types.SimpleNamespace(site="demo.localhost")
+		r = self._boot(["frappe"], ["System Manager"])
+		self.assertIn("--site demo.localhost ", r["install_hint"]["cmd"])
+
 	def test_missing_other_gets_no_hint(self):
 		r = self._boot(["frappe"], ["Waiter"])
 		self.assertEqual(r, {"installed": False, "install_hint": None})

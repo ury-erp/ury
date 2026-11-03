@@ -1,0 +1,39 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-11-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "company",
+  "column_break_1",
+  "period_start",
+  "period_end",
+  "target_amount"
+ ],
+ "fields": [
+  {"fieldname": "branch", "fieldtype": "Link", "in_list_view": 1, "in_standard_filter": 1, "label": "Branch", "options": "Branch", "reqd": 1},
+  {"fieldname": "company", "fieldtype": "Link", "label": "Company", "options": "Company"},
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+  {"fieldname": "period_start", "fieldtype": "Date", "in_list_view": 1, "label": "Period Start", "reqd": 1},
+  {"fieldname": "period_end", "fieldtype": "Date", "in_list_view": 1, "label": "Period End", "reqd": 1},
+  {"fieldname": "target_amount", "fieldtype": "Currency", "in_list_view": 1, "label": "Target Amount (Net Sales)", "reqd": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Sales Target",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "URY Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "URY Chairman", "read": 1}
+ ],
+ "sort_field": "period_start",
+ "sort_order": "DESC",
+ "states": []
+}

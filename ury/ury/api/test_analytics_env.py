@@ -49,6 +49,12 @@ class TestAnalyticsEnv(unittest.TestCase):
 		off["install_hint"]["cmd"] = "x"
 		self.assertNotEqual(env.INSTALL_HINT["cmd"], "x")
 
+	def test_flag_substitutes_site(self):
+		off = env.insights_flag(False, "demo.localhost")
+		self.assertIn("--site demo.localhost ", off["install_hint"]["cmd"])
+		self.assertNotIn("<site>", off["install_hint"]["cmd"])
+		self.assertIn("<site>", env.INSTALL_HINT["cmd"])
+
 	def test_seam_with_patched_apps(self):
 		with mock.patch.object(env.frappe, "get_installed_apps", create=True, return_value=["frappe", "erpnext", "ury"]):
 			self.assertFalse(env.insights_installed())

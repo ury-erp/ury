@@ -1,4 +1,4 @@
-import type { CallState, StartOptions, TranscriptEvent, VoiceCallEngine } from "./types";
+import type { CallState, StartOptions, TranscriptEvent, VoiceCallEngine } from "./types.ts";
 
 export interface MockOptions {
   /** Delay between state steps in ms. */

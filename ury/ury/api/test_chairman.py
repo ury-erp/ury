@@ -269,13 +269,44 @@ class FeaturesTests(unittest.TestCase):
 			return c.compute_features()
 
 	def test_flag_off_when_huf_missing(self):
-		self.assertEqual(self._run(["frappe", "ury"], {"chat_agent": "A", "voice_call_enabled": 1}), {"huf": False, "voice_call": True})
+		from unittest import mock
+
+		mod = types.ModuleType("ury.ury.api.chairman_call")
+		mod.call_capabilities = lambda: {"available": True}
+		with mock.patch.dict(sys.modules, {"ury.ury.api.chairman_call": mod}):
+			import ury.ury.api as pkg
+
+			with mock.patch.object(pkg, "chairman_call", mod, create=True):
+				self.assertEqual(self._run(["frappe", "ury"], {"chat_agent": "A", "voice_call_enabled": 1}), {"huf": False, "voice_call": True})
 
 	def test_flag_off_without_agent(self):
 		self.assertFalse(self._run(["frappe", "huf"], {"chat_agent": "", "voice_call_enabled": 0})["huf"])
 
 	def test_flag_on(self):
 		self.assertEqual(self._run(["frappe", "huf"], {"chat_agent": "A", "voice_call_enabled": 0}), {"huf": True, "voice_call": False})
+
+	def test_voice_call_requires_capabilities_available(self):
+		from unittest import mock
+
+		mod = types.ModuleType("ury.ury.api.chairman_call")
+		for avail, want in ((True, True), (False, False)):
+			mod.call_capabilities = lambda a=avail: {"available": a}
+			with mock.patch.dict(sys.modules, {"ury.ury.api.chairman_call": mod}):
+				import ury.ury.api as pkg
+
+				with mock.patch.object(pkg, "chairman_call", mod, create=True):
+					self.assertEqual(self._run(["frappe", "ury"], {"voice_call_enabled": 1})["voice_call"], want)
+
+	def test_voice_call_capabilities_error_means_off(self):
+		from unittest import mock
+
+		mod = types.ModuleType("ury.ury.api.chairman_call")
+		mod.call_capabilities = mock.Mock(side_effect=RuntimeError("x"))
+		with mock.patch.dict(sys.modules, {"ury.ury.api.chairman_call": mod}):
+			import ury.ury.api as pkg
+
+			with mock.patch.object(pkg, "chairman_call", mod, create=True):
+				self.assertFalse(self._run(["frappe", "ury"], {"voice_call_enabled": 1})["voice_call"])
 
 	def test_never_raises(self):
 		from unittest import mock

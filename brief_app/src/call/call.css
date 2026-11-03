@@ -27,3 +27,16 @@
   .call *{animation:none!important;transition:none!important}
   .call-ring{box-shadow:0 0 0 .3rem hsl(var(--primary) / .3)}
 }
+.call-note-sub{background:transparent;padding:0}
+.call-lang{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:hsl(var(--muted-foreground))}
+.call-lang select{min-height:var(--touch);padding:0 var(--space-3);border-radius:var(--radius-md);border:1px solid hsl(var(--hair2));background:hsl(var(--background));color:hsl(var(--foreground));font:inherit}
+.call-lang select:disabled{opacity:.6}
+.call-left{margin:0;font-size:var(--text-sm);color:hsl(var(--muted-foreground))}
+.call-left span{font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:hsl(var(--foreground))}
+.call-left .call-left-low{color:hsl(var(--destructive));font-weight:600}
+.call-meter{--lvl:0;display:block;width:10rem;height:.5rem;border-radius:var(--radius-full,9999px);background:hsl(var(--muted));overflow:hidden;visibility:hidden}
+.call-meter[data-on=true]{visibility:visible}
+.call-meter i{display:block;height:100%;width:calc(var(--lvl)*100%);background:hsl(var(--primary));transition:width .08s linear}
+.call-error{margin:var(--space-1) 0 0;max-width:20rem;font-size:var(--text-sm);color:hsl(var(--destructive))}
+.call[dir=rtl] .call-who,.call[dir=rtl] .call-actions{direction:rtl}
+.call-lang{margin-bottom:var(--space-5)}.call-note-sub{margin-top:calc(var(--space-2)*-1)}

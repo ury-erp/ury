@@ -32,6 +32,6 @@ export interface Brief {
   currency?: string;
   locale?: string;
   scope?: { companies: string[]; branches: string[]; note?: string };
-  features?: { huf?: boolean; voice_call?: boolean };
+  features?: { huf?: boolean; voice_call?: boolean; whatsapp?: boolean };
   slides: Slide[];
 }

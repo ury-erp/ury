@@ -106,6 +106,22 @@ class PureTests(unittest.TestCase):
 		bottom = [{"label": "Naan", "value": 75.0}]
 		self.assertEqual(s.items_headline(top, bottom), "Top seller Pizza (₹1.3L), weakest Naan (₹75)")
 
+	def test_target_pace(self):
+		self.assertEqual(s.target_pace(100, 100), (1.0, "ahead"))
+		self.assertEqual(s.target_pace(95, 100), (0.95, "on"))
+		self.assertEqual(s.target_pace(90, 100), (0.9, "on"))
+		self.assertEqual(s.target_pace(89, 100)[1], "behind")
+		self.assertEqual(s.target_pace(50, 0), (None, None))
+		self.assertEqual([s.pace_tone(p) for p in ("ahead", "on", "behind", None)], ["good", "neutral", "bad", "neutral"])
+
+	def test_prorate_targets(self):
+		rows = [
+			{"period_start": date(2026, 10, 1), "period_end": date(2026, 10, 31), "target_amount": 3100},
+			{"period_start": date(2026, 11, 1), "period_end": date(2026, 11, 30), "target_amount": 999},
+		]
+		self.assertEqual(s.prorate_targets(rows, date(2026, 10, 10)), (3100.0, 1000.0, 1))
+		self.assertEqual(s.prorate_targets(rows, date(2026, 12, 1)), (0.0, 0.0, 0))
+
 	def test_mtd_headline(self):
 		self.assertEqual(
 			s.mtd_headline(618750.0, 313680.0, 0.9725),
@@ -226,6 +242,23 @@ class SiteTests(IntegrationTestCase):
 			self.assertIn(sl["status"], ("ok", "unavailable"))
 			self.assertIn("series", sl["chart"])
 
+	def test_mtd_target_slide(self):
+		day = self._day()
+		rows = s._target_rows(day)
+		sl = s.slide_mtd_target(day)
+		if rows:
+			full, prorated, _n = s.prorate_targets(rows, day)
+			self.assertEqual(sl["status"], "ok")
+			self.assertAlmostEqual(sl["target_amount"], full, places=2)
+			self.assertAlmostEqual(sl["target_prorated"], prorated, places=2)
+			self.assertEqual(sl["tone"], s.pace_tone(sl["pace"]))
+		else:
+			self.assertEqual(sl["status"], "unavailable")
+			self.assertEqual(sl["unavailable_reason"], "no_target_for_period")
+		far = s.slide_mtd_target(self._day("2099-01-15"))
+		self.assertEqual(far["status"], "unavailable")
+		self.assertEqual(far["unavailable_reason"], "no_target_for_period")
+
 	def test_mtd_matches_sql_and_target_unavailable(self):
 		day = self._day()
 		(m0, m1), (p0, p1) = s.month_ranges(day)
@@ -233,9 +266,11 @@ class SiteTests(IntegrationTestCase):
 		mtd = float(_sql(sql, (m0, m1))[0][0])
 		prev = float(_sql(sql, (p0, p1))[0][0])
 		sl = s.slide_mtd_target(day)
-		self.assertEqual(sl["status"], "unavailable")
-		self.assertEqual(sl["unavailable_reason"], "no_sales_target_doctype")
 		self.assertAlmostEqual(sl["value"], mtd, places=2)
+		if sl.get("target_prorated") is not None:
+			# a target covers the month: `compare` is the pro-rated target, not last month
+			self.assertAlmostEqual(sl["compare"], sl["target_prorated"], places=2)
+			return
 		self.assertAlmostEqual(sl["compare"], prev, places=2)
 		if prev:
 			self.assertAlmostEqual(sl["delta_pct"], round((mtd - prev) / prev, 4), places=4)
@@ -347,7 +382,7 @@ class SiteTests(IntegrationTestCase):
 		"""A user permitted only for another branch sees nothing; permitted for the data's branch sees the same as unrestricted."""
 		day = self._day()
 		cday = self._day(self.CASHUP_DAY)
-		branch = _sql("SELECT branch FROM `tabPOS Invoice` WHERE docstatus=1 AND branch IS NOT NULL LIMIT 1")[0][0]
+		branches = [r[0] for r in _sql("SELECT DISTINCT branch FROM `tabPOS Invoice` WHERE docstatus=1 AND branch IS NOT NULL")]
 		base = {x["id"]: x for x in s.build_slides(day)}
 		base_cash = s.slide_cashup(cday)
 
@@ -360,7 +395,8 @@ class SiteTests(IntegrationTestCase):
 		self.assertEqual(slides["leakage"]["cancellations"]["count"], 0)
 		self.assertEqual(cash["entries"], 0)
 
-		with mock.patch("frappe.permissions.get_user_permissions", return_value={"Branch": [{"doc": branch}]}):
+		# permitted for every branch with data: identical to unrestricted
+		with mock.patch("frappe.permissions.get_user_permissions", return_value={"Branch": [{"doc": b} for b in branches]}):
 			slides = {x["id"]: x for x in s.build_slides(day)}
 			cash = s.slide_cashup(cday)
 		self.assertEqual(slides["mtd_target"]["value"], base["mtd_target"]["value"])
@@ -368,6 +404,13 @@ class SiteTests(IntegrationTestCase):
 		self.assertEqual(slides["leakage"]["cancellations"], base["leakage"]["cancellations"])
 		# closing entries have branch NULL: scope resolves through POS Profile.branch
 		self.assertEqual(cash["entries"], base_cash["entries"])
+
+		# a single branch sees no more than the unrestricted total, and only its own rows
+		if len(branches) > 1:
+			with mock.patch("frappe.permissions.get_user_permissions", return_value={"Branch": [{"doc": branches[0]}]}):
+				one = {x["id"]: x for x in s.build_slides(day)}
+			self.assertLess(one["mtd_target"]["value"], base["mtd_target"]["value"])
+			self.assertEqual([b["label"] for b in one["branch_ranking"]["branches"]], [branches[0]])
 
 
 if __name__ == "__main__":

@@ -1091,6 +1091,85 @@
    "icon": null
   },
   {
+   "type": "Section Break",
+   "label": "Analytics",
+   "icon": "chart-no-axes-combined",
+   "indent": 1,
+   "collapsible": 1,
+   "keep_closed": 0
+  },
+  {
+   "type": "Link",
+   "label": "Overview",
+   "link_type": "Workspace",
+   "link_to": "URY Analytics Owner",
+   "child": 1,
+   "indent": 0
+  },
+  {
+   "type": "Link",
+   "label": "Branch Manager",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Branch Manager",
+   "icon": "store"
+  },
+  {
+   "type": "Link",
+   "label": "Menu",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Menu",
+   "icon": "utensils-crossed"
+  },
+  {
+   "type": "Link",
+   "label": "Kitchen",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Kitchen",
+   "icon": "chef-hat"
+  },
+  {
+   "type": "Link",
+   "label": "Floor",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Floor",
+   "icon": "armchair"
+  },
+  {
+   "type": "Link",
+   "label": "People",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics People",
+   "icon": "users"
+  },
+  {
+   "type": "Link",
+   "label": "Finance",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Finance",
+   "icon": "wallet"
+  },
+  {
+   "type": "Link",
+   "label": "Quality",
+   "link_type": "Workspace",
+   "child": 1,
+   "indent": 0,
+   "link_to": "URY Analytics Quality",
+   "icon": "shield-check"
+  },
+  {
    "added": 0,
    "child": 0,
    "collapsible": 1,
@@ -1522,7 +1601,7 @@
    "icon": null
   }
  ],
- "modified": "2026-10-23 12:00:00.000000",
+ "modified": "2026-11-03 07:11:09.242648",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",

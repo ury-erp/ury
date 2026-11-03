@@ -1,0 +1,30 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["message_id", "wa_number", "user", "kind", "intent", "fast_path", "card_count", "card_hash", "outcome"],
+ "fields": [
+  {"fieldname": "message_id", "fieldtype": "Data", "label": "Meta Message ID", "in_list_view": 1, "unique": 1, "read_only": 1, "length": 140},
+  {"fieldname": "wa_number", "fieldtype": "Data", "label": "WhatsApp Number (masked)", "read_only": 1},
+  {"fieldname": "user", "fieldtype": "Link", "label": "User", "options": "User", "read_only": 1, "in_list_view": 1},
+  {"fieldname": "kind", "fieldtype": "Data", "label": "Kind", "read_only": 1},
+  {"fieldname": "intent", "fieldtype": "Data", "label": "Intent", "read_only": 1},
+  {"fieldname": "fast_path", "fieldtype": "Check", "label": "Fast Path", "read_only": 1},
+  {"fieldname": "card_count", "fieldtype": "Int", "label": "Cards Sent", "read_only": 1},
+  {"fieldname": "card_hash", "fieldtype": "Data", "label": "Card Hash(es)", "read_only": 1},
+  {"fieldname": "outcome", "fieldtype": "Data", "label": "Outcome", "in_list_view": 1, "in_standard_filter": 1, "read_only": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Chairman WhatsApp Audit",
+ "owner": "Administrator",
+ "permissions": [{"read": 1, "report": 1, "role": "System Manager"}],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

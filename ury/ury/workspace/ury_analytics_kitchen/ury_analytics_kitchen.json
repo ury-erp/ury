@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"8749ba37cb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB05 Department & Production\",\"col\":4}},{\"id\":\"32047e48d7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB06 Kitchen Timing & KOT SLA\",\"col\":4}},{\"id\":\"d1bc0a7239\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB12 Yield & Recipe Adherence\",\"col\":4}},{\"id\":\"464ee935e3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB13 Production Plan vs Actual\",\"col\":4}}]",
+ "content": "[{\"id\":\"cf875878bd\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Today</b></span>\",\"col\":12}},{\"id\":\"0283e20fd1\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Open KOTs\",\"col\":3}},{\"id\":\"8ffdabfdf0\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"URY Failed Yield Checks\",\"col\":3}},{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"8749ba37cb\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB05 Department & Production\",\"col\":4}},{\"id\":\"32047e48d7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB06 Kitchen Timing & KOT SLA\",\"col\":4}},{\"id\":\"d1bc0a7239\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB12 Yield & Recipe Adherence\",\"col\":4}},{\"id\":\"464ee935e3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB13 Production Plan vs Actual\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"9c9f655139\",\"type\":\"card\",\"data\":{\"card_name\":\"Kitchen Timing\",\"col\":4}}]",
  "creation": "2026-11-03 05:07:31.594698",
  "custom_blocks": [],
  "docstatus": 0,
@@ -8,12 +8,81 @@
  "icon": "chef-hat",
  "is_hidden": 0,
  "label": "URY Analytics Kitchen",
- "links": [],
- "modified": "2026-11-03 05:07:31.856413",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "chef-hat",
+   "is_query_report": 0,
+   "label": "Kitchen Timing",
+   "link_count": 5,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pending KOTs",
+   "link_count": 0,
+   "link_to": "Pending KOTs",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise KOT Delay",
+   "link_count": 0,
+   "link_to": "Daywise KOT Delay",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cancelled KOTs",
+   "link_count": 0,
+   "link_to": "Cancelled KOT's",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Hourly Production Time",
+   "link_count": 0,
+   "link_to": "Hourly Production Time",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Table & Production Time",
+   "link_count": 0,
+   "link_to": "Average Table Time and Production Time",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:10:59.842063",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Analytics Kitchen",
- "number_cards": [],
+ "number_cards": [
+  {
+   "label": "URY Open KOTs",
+   "number_card_name": "URY Open KOTs"
+  },
+  {
+   "label": "URY Failed Yield Checks",
+   "number_card_name": "URY Failed Yield Checks"
+  }
+ ],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,

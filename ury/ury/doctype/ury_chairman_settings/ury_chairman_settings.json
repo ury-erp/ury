@@ -6,7 +6,11 @@
  "field_order": [
   "chat_agent",
   "voice_call_enabled",
-  "audio_retention_days"
+  "audio_retention_days",
+  "call_model",
+  "call_max_seconds",
+  "call_daily_minutes_per_user",
+  "call_voice"
  ],
  "fields": [
   {
@@ -27,6 +31,33 @@
    "fieldname": "audio_retention_days",
    "fieldtype": "Int",
    "label": "Audio Retention Days"
+  },
+  {
+   "default": "models/gemini-2.5-flash-native-audio-latest",
+   "description": "Gemini Live model used for Chairman voice calls.",
+   "fieldname": "call_model",
+   "fieldtype": "Data",
+   "label": "Call Model"
+  },
+  {
+   "default": "300",
+   "description": "Maximum length of one voice call (30 to 900 seconds).",
+   "fieldname": "call_max_seconds",
+   "fieldtype": "Int",
+   "label": "Call Max Seconds"
+  },
+  {
+   "default": "30",
+   "description": "Daily voice call minutes allowed per user.",
+   "fieldname": "call_daily_minutes_per_user",
+   "fieldtype": "Int",
+   "label": "Call Daily Minutes Per User"
+  },
+  {
+   "default": "Puck",
+   "fieldname": "call_voice",
+   "fieldtype": "Data",
+   "label": "Call Voice"
   }
  ],
  "index_web_pages_for_search": 1,

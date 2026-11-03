@@ -69,7 +69,7 @@ export function Bars({ series, ranked = false, goodDir }: { series: Point[]; ran
     <ul className="bars">
       {series.map((p, i) => (
         <li key={`${p.label}-${i}`} className={cls(i) || undefined}>
-          <span className="bar-label">{ranked && <b className="bar-rank">{i + 1}</b>}{p.label}</span>
+          <span className="bar-label" title={p.label}>{ranked && <b className="bar-rank">{i + 1}</b>}{p.label}</span>
           <span className="bar-amt">{amount(p.value_text, p.value)}</span>
           <span className="bar-track" aria-hidden="true">
             <span className="bar-fill" style={{ width: `${Math.max(0, ((Number(p.value) || 0) / max) * 100).toFixed(1)}%` }} />

@@ -17,6 +17,12 @@ PAD = 56
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "public", "fonts", "brief")
 RTL_LANGS = ("ar",)
 AI_NOTE = "Composed by assistant from your data - verify on the dashboard"
+AI_NOTES = {
+	"hi": "सहायक ने आपके डेटा से बनाया - डैशबोर्ड पर जाँचें",
+	"ar": "أنشأه المساعد من بياناتك - تحقق منه في لوحة المعلومات",
+	"ml": "അസിസ്റ്റന്റ് നിങ്ങളുടെ ഡാറ്റയിൽ നിന്ന് തയ്യാറാക്കിയത് - ഡാഷ്ബോർഡിൽ പരിശോധിക്കുക",
+}
+VS_PRIOR = {"en": "vs prior", "hi": "पिछले से", "ar": "عن السابق", "ml": "മുൻപ്"}
 
 def hsl_to_rgb(spec):
 	"""'341.5 75.3% 38.0%' (design-token channel string) -> (r, g, b) ints."""
@@ -73,12 +79,19 @@ def _script(text):
 	return "latin"
 
 
+def _mask_bytes(mask):
+	"""Bytes of a font mask; newer Pillow returns a bare ImagingCore without tobytes()."""
+	if hasattr(mask, "tobytes"):
+		return bytes(mask.tobytes())
+	return bytes(Image.Image()._new(mask).tobytes())
+
+
 def _has_rupee(font):
 	"""True when `font` draws a real rupee glyph: its rendering must differ from the font's own missing-glyph
 	(notdef) box and must not be blank. Works for any object with getmask (injectable in tests)."""
 	try:
-		rupee = bytes(font.getmask("\u20b9").tobytes())
-		notdef = bytes(font.getmask("\U0010fffe").tobytes())
+		rupee = _mask_bytes(font.getmask("\u20b9"))
+		notdef = _mask_bytes(font.getmask("\U0010fffe"))
 		return bool(rupee.strip(b"\x00")) and rupee != notdef
 	except Exception:
 		return False
@@ -297,7 +310,7 @@ def _body_kpi(ctx, d, card, y):
 				_arrow(d, ax, ry + 17, trend, color)
 			if ds:
 				tx0, tx1 = (x + 28, x + tw - 28 - 40) if ctx.rtl else (x + 28 + 40, x + tw - 28)
-				_text(ctx, d, tx0, tx1, ry, ds + " vs prior", 28, color, bold=True)
+				_text(ctx, d, tx0, tx1, ry, ds + " " + VS_PRIOR.get(ctx.lang, VS_PRIOR["en"]), 28, color, bold=True)
 	rows = (len(kpis) + 1) // 2
 	return y + rows * th + (rows - 1) * gap + 32
 
@@ -422,7 +435,7 @@ def _footer(ctx, d, card, y, today):
 	d.line((PAD, y, WIDTH - PAD, y), fill=t["line"], width=2)
 	y += 20
 	if card.get("ai_composed"):
-		_text(ctx, d, PAD, WIDTH - PAD, y, AI_NOTE, 26, t["warn"], bold=True)
+		_text(ctx, d, PAD, WIDTH - PAD, y, AI_NOTES.get(ctx.lang, AI_NOTE), 26, t["warn"], bold=True)
 		y += 42
 	_text(ctx, d, PAD, WIDTH - PAD, y, f"URY · {today}", 26, t["muted"])
 	return y + 56
@@ -514,7 +527,7 @@ def _paint_dashboard(ctx, d, dash, today):
 			y = _para(ctx, d, y, p["caption"], 28, t["fg"], 3, line_h=38)
 		if p.get("composed"):
 			y += 4
-			_text(ctx, d, PAD, WIDTH - PAD, y, AI_NOTE, 24, t["warn"], bold=True)
+			_text(ctx, d, PAD, WIDTH - PAD, y, AI_NOTES.get(ctx.lang, AI_NOTE), 24, t["warn"], bold=True)
 			y += 38
 		y += 20
 	d.line((PAD, y, WIDTH - PAD, y), fill=t["line"], width=2)

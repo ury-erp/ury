@@ -1,7 +1,7 @@
 // node --test src/*.test.mjs
 import test from "node:test";
 import assert from "node:assert";
-import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary, panelTitle, panelSubtitle, dashboardLink, trendGlyph, toneClass } from "./chat/cardFormat.ts";
+import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary, panelTitle, panelSubtitle, dashboardLink, trendGlyph, toneClass, fmtKpiValue, sameText, hideLoneKpiLabel, goodDirection } from "./chat/cardFormat.ts";
 import { readFileSync } from "node:fs";
 const live = JSON.parse(readFileSync("/tmp/cards.json", "utf8") || "{}");
 
@@ -76,4 +76,30 @@ test("dashboard helpers", () => {
 });
 test("kpi summary includes trend", () => {
   assert.match(cardSummary(kpi), /a 1 up \+10%/);
+});
+
+test("fmtKpiValue abbreviates from 1Cr, keeps smaller figures in full", () => {
+  assert.equal(fmtKpiValue(9999999, "money"), "₹99,99,999");
+  assert.equal(fmtKpiValue(99999999, "money"), "₹10Cr");
+  assert.equal(fmtKpiValue(123456789, "money"), "₹12.3Cr");
+  assert.equal(fmtKpiValue(-25000000, "int"), "-2.5Cr");
+  assert.equal(fmtKpiValue(99999999, "pct"), fmtValue(99999999, "pct"));
+  assert.equal(fmtKpiValue("n/a", "money"), "n/a");
+  assert.equal(fmtKpiValue(null, "money"), "–");
+});
+test("dedupe: lone KPI label repeating the panel title is hidden", () => {
+  const one = (label) => ({ type: "kpi", kpis: [{ label, value: 1 }] });
+  assert.equal(sameText(" Net Sales ", "net sales"), true);
+  assert.equal(sameText("a", undefined), false);
+  assert.equal(sameText("", ""), false);
+  assert.equal(hideLoneKpiLabel(one("Net sales"), "net sales"), true);
+  assert.equal(hideLoneKpiLabel(one("Orders"), "Net sales"), false);
+  assert.equal(hideLoneKpiLabel({ type: "kpi", kpis: [{ label: "a", value: 1 }, { label: "a", value: 2 }] }, "a"), false);
+  assert.equal(hideLoneKpiLabel({ type: "bar", series: [] }, "a"), false);
+});
+test("good_direction accepts only up or down", () => {
+  assert.equal(goodDirection({ type: "bar", good_direction: "down" }), "down");
+  assert.equal(goodDirection({ type: "bar", good_direction: "up" }), "up");
+  assert.equal(goodDirection({ type: "bar", good_direction: "sideways" }), undefined);
+  assert.equal(goodDirection({ type: "bar" }), undefined);
 });

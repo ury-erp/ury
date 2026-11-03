@@ -350,6 +350,9 @@ def get_month_to_date(date=None):
 	day = _day(date)
 	slide = _slides().slide_mtd_target(day)
 	out = _compact_slide(slide, ("compare_basis",))
+	for key in ("target_amount", "target_prorated", "target_pct", "target_pct_full", "pace", "last_month_same_days"):
+		if key in slide:
+			out[key] = slide[key]
 	out["date"] = day.isoformat()
 	return out
 

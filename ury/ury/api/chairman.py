@@ -414,6 +414,21 @@ def order_slides(slides):
 	return sorted(slides, key=lambda s: rank.get(s.get("id"), len(rank)))
 
 
+def _voice_call_available(enabled):
+	"""enabled AND chairman_call reports available. Lazy and never raises; if the call module is not
+	installed yet, the kill-switch flag alone decides."""
+	if not enabled:
+		return False
+	try:
+		from ury.ury.api import chairman_call
+	except ImportError:
+		return True
+	try:
+		return bool((chairman_call.call_capabilities() or {}).get("available"))
+	except Exception:
+		return False
+
+
 def compute_features():
 	"""{huf, voice_call}. Never raises: any failure means both flags off."""
 	out = {"huf": False, "voice_call": False}
@@ -421,9 +436,14 @@ def compute_features():
 		settings = "URY Chairman Settings"
 		agent = frappe.db.get_single_value(settings, "chat_agent")
 		out["huf"] = bool("huf" in frappe.get_installed_apps() and agent)
-		out["voice_call"] = bool(frappe.db.get_single_value(settings, "voice_call_enabled"))
+		out["voice_call"] = _voice_call_available(
+			bool(frappe.db.get_single_value(settings, "voice_call_enabled"))
+		)
 	except Exception:
 		pass
+	# Present only when the site opts in, so existing consumers see an unchanged shape.
+	if frappe.conf.get("ury_whatsapp_enabled"):
+		out["whatsapp"] = True
 	return out
 
 

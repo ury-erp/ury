@@ -56,8 +56,9 @@ button{font:inherit;letter-spacing:inherit}
 .nav{display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-1) var(--space-4)}
 .nav>button{min-width:var(--touch);min-height:var(--touch);border:1px solid hsl(var(--hair2));border-radius:var(--radius-md);font-size:var(--text-base);font-weight:600;color:hsl(var(--secondary-foreground));background:hsl(var(--secondary));cursor:pointer}
 .nav>button:disabled{opacity:.4;cursor:default}
-.dots{display:flex;min-width:0}
-.dot{width:1.5rem;flex:0 1 1.5rem;min-width:.875rem;height:var(--touch);border:0;background:transparent;padding:0;cursor:pointer;display:grid;place-items:center}
+.dots{display:flex;min-width:0;overflow-x:auto;scrollbar-width:none}
+.dots::-webkit-scrollbar{display:none}
+.dot{width:var(--touch);flex:0 0 var(--touch);min-width:var(--touch);height:var(--touch);border:0;background:transparent;padding:0;cursor:pointer;display:grid;place-items:center}
 .dot::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:hsl(var(--hair2));transition:background-color var(--dur) var(--ease)}
 .dot[aria-current="true"]::before{background:hsl(var(--primary))}
 

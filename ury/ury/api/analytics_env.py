@@ -38,9 +38,17 @@ def url_for(key, installed):
 	return f"/insights/dashboards/{dashboard_id}"
 
 
-def insights_flag(installed):
+def install_hint_for(site=None):
+	"""Copy of INSTALL_HINT with the `<site>` placeholder replaced by the real site name (when known)."""
+	hint = dict(INSTALL_HINT)
+	if site:
+		hint["cmd"] = hint["cmd"].replace("<site>", str(site))
+	return hint
+
+
+def insights_flag(installed, site=None):
 	"""Payload flag for clients: {installed, install_hint}; hint only when absent."""
-	return {"installed": bool(installed), "install_hint": None if installed else dict(INSTALL_HINT)}
+	return {"installed": bool(installed), "install_hint": None if installed else install_hint_for(site)}
 
 
 # ---------------------------------------------------------------- frappe layer

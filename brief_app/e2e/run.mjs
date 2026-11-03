@@ -160,36 +160,29 @@ await guard("no-role user", async () => {
 });
 
 // ---------- 4. Flag off: no tabs, no chairman_chat ----------
-async function setChatAgent(value) {
-  // The bench has a real chat agent; scenarios that need chat off clear it and restore it.
-  const base = cfg.baseURL;
-  const login = await fetch(base + "/api/method/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usr: "Administrator", pwd: process.env.BENCH_ADMIN_PASSWORD || "admin" }) });
-  const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
-  const h = { cookie, "content-type": "application/json" };
-  const cur = (await (await fetch(base + "/api/resource/URY Chairman Settings/URY Chairman Settings", { headers: h })).json()).data?.chat_agent || "";
-  await fetch(base + "/api/resource/URY Chairman Settings/URY Chairman Settings", { method: "PUT", headers: h, body: JSON.stringify({ chat_agent: value ?? "" }) });
-  return cur;
-}
-
+// The bench has a real chat agent, so this scenario forces features.huf=false by rewriting the
+// get_brief response in the browser (service worker blocked so the route sees the request).
+// It never touches the shared bench settings.
 await guard("flag off", async () => {
-  const prevAgent = await setChatAgent("");
-  try {
-    const ctx = await newCtx();
-    await login(ctx, env.chair);
-    const page = await ctx.newPage();
-    const chat = [];
-    ctx.on("request", (r) => { if (/chairman_chat|huf/i.test(r.url())) chat.push(r.url()); });
-    await page.goto("/ury/brief/");
-    await page.waitForSelector("section.slide");
-    await page.reload(); await page.waitForSelector("section.slide"); await page.waitForTimeout(1500);
-    const tabs = await page.$$eval(".tabs button", (b) => b.map((x) => x.textContent));
-    check("features.huf=false: only Brief tab", JSON.stringify(tabs) === '["Brief"]', JSON.stringify(tabs));
-    check("no Ask/Call controls in DOM", (await page.getByRole("button", { name: /^(Ask|Call)$/ }).count()) === 0);
-    check("zero chairman_chat/huf requests", chat.length === 0, JSON.stringify(chat));
-    await ctx.close();
-  } finally {
-    await setChatAgent(prevAgent);
-  }
+  const ctx = await newCtx({ serviceWorkers: "block" });
+  await login(ctx, env.chair);
+  await ctx.route("**/api/method/ury.ury.api.chairman.get_brief*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.message) body.message.features = { ...(body.message.features || {}), huf: false, voice_call: false };
+    await route.fulfill({ response: res, json: body });
+  });
+  const page = await ctx.newPage();
+  const chat = [];
+  ctx.on("request", (r) => { if (/chairman_chat|chairman_call|huf/i.test(r.url())) chat.push(r.url()); });
+  await page.goto("/ury/brief/");
+  await page.waitForSelector("section.slide");
+  await page.reload(); await page.waitForSelector("section.slide"); await page.waitForTimeout(1500);
+  const tabs = await page.$$eval(".tabs button", (b) => b.map((x) => x.textContent));
+  check("features.huf=false: only Brief tab", JSON.stringify(tabs) === '["Brief"]', JSON.stringify(tabs));
+  check("no Ask/Call controls in DOM", (await page.getByRole("button", { name: /^(Ask|Call)$/ }).count()) === 0);
+  check("zero chairman_chat/huf requests", chat.length === 0, JSON.stringify(chat));
+  await ctx.close();
 });
 
 // ---------- 5. Mocked huf: Call tab, Ask tab, Arabic ----------

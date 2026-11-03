@@ -103,6 +103,11 @@
 .dash-panel .card-kpis{grid-template-columns:repeat(auto-fit,minmax(7rem,1fr))}
 .dash-panel .card-kpi-val{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .dash-panel .card-kpi dd{flex-wrap:wrap}
+.dash-grid{align-items:stretch}
+.dash-panel .card-body{flex:1 1 auto;min-width:0}
+.dash-panel .card-kpi-val{font-size:clamp(1rem,7cqi,1.125rem);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.dash-panel .bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-kpi-val{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 
 /* Peak/low markers follow meaning (good_direction), with arrow + text */
 .card-peaks{margin:0;display:flex;flex-wrap:wrap;gap:0 var(--space-3);font-size:var(--text-2xs);line-height:1rem;font-weight:500}

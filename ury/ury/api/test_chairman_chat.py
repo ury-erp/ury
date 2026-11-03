@@ -513,6 +513,21 @@ class SiteTests(IntegrationTestCase):
 		out = cc.call_capabilities()
 		self.assertFalse(out["available"])
 
+	def test_call_languages_constant(self):
+		self.assertEqual(cc.CALL_LANGUAGES, ["en", "hi", "ar", "ml"])
+
+	def test_call_capabilities_delegates_when_module_present(self):
+		import types
+
+		frappe.set_user(CHAIR_A)
+		mod = types.ModuleType("ury.ury.api.chairman_call")
+		mod.call_capabilities = lambda: {"available": True, "marker": 1}
+		with mock.patch.dict(sys.modules, {"ury.ury.api.chairman_call": mod}):
+			import ury.ury.api as pkg
+
+			with mock.patch.object(pkg, "chairman_call", mod, create=True):
+				self.assertEqual(cc.call_capabilities()["marker"], 1)
+
 	# ---- tool guard
 
 	def test_tool_guard_rejects_administrator_and_non_owner(self):

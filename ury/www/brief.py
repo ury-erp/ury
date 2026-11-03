@@ -22,6 +22,10 @@ def canonical_redirect(path, query_string=""):
 	return BRIEF_URL + (f"?{query_string}" if query_string else "")
 
 
+def is_go_path(path):
+	return (path or "").rstrip("/") == "/ury/brief/go"
+
+
 def user_key(user, site):
 	"""Opaque per-user/site key (never the raw email) for client cache isolation."""
 	return hashlib.sha256(f"{user}|{site}".encode()).hexdigest()[:16]
@@ -35,6 +39,17 @@ def get_context(context):
 		if target:
 			frappe.local.flags.redirect_location = target
 			raise frappe.Redirect
+
+	if request is not None and is_go_path(request.path):
+		# Token landing page: static shell, no user data, never cached, no referrer.
+		context.no_cache = 1
+		context.brief_user_key = ""
+		context.csrf_token = ""
+		context.build_version = frappe.utils.get_build_version()
+		h = frappe.local.response_headers
+		h.set("Cache-Control", "no-store, max-age=0")
+		h.set("Referrer-Policy", "no-referrer")
+		return context
 
 	if frappe.session.user == "Guest":
 		frappe.local.flags.redirect_location = f"/login?redirect-to={BRIEF_URL}"

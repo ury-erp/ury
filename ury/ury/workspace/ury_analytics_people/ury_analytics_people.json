@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"c677b48d9a\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB08 Employee Performance\",\"col\":4}}]",
+ "content": "[{\"id\":\"1b1f584899\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Dashboards</b></span>\",\"col\":12}},{\"id\":\"c677b48d9a\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"DB08 Employee Performance\",\"col\":4}},{\"id\":\"8266b221ea\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Detail reports</b></span>\",\"col\":12}},{\"id\":\"7d6b7bd21b\",\"type\":\"card\",\"data\":{\"card_name\":\"Employee Reports\",\"col\":4}}]",
  "creation": "2026-11-03 05:07:32.060905",
  "custom_blocks": [],
  "docstatus": 0,
@@ -8,8 +8,98 @@
  "icon": "users",
  "is_hidden": 0,
  "label": "URY Analytics People",
- "links": [],
- "modified": "2026-11-03 05:07:32.160210",
+ "links": [
+  {
+   "hidden": 0,
+   "icon": "users",
+   "is_query_report": 0,
+   "label": "Employee Reports",
+   "link_count": 8,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Sales",
+   "link_count": 0,
+   "link_to": "Employee Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Service Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Service Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Wise ACC",
+   "link_count": 0,
+   "link_to": "Employee Wise ACC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Wise APC",
+   "link_count": 0,
+   "link_to": "Employee Wise APC",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Stats Yesterday",
+   "link_count": 0,
+   "link_to": "Employee Stats Yesterday",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Stats Details Yesterday",
+   "link_count": 0,
+   "link_to": "Employee Stats Details Yesterday",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Details Yesterday",
+   "link_count": 0,
+   "link_to": "Employee Details Yesterday",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-03 07:11:00.897751",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Analytics People",

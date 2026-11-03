@@ -243,6 +243,9 @@ before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
 # Hook on document methods and events
 
 doc_events = {
+    "WhatsApp Message": {
+        "after_insert": "ury.ury.api.chairman_whatsapp.on_incoming",
+    },
     "User": {
         "on_update": "ury.ury.api.chairman_wa_identity.on_user_update",
         "on_trash": "ury.ury.api.chairman_wa_identity.on_user_trash",
@@ -354,7 +357,8 @@ scheduler_events = {
 		# sweeps rows that reached neither, so capacity is not leaked
 		# forever. Hourly is ample for a job whose TTL is measured in a day.
 		"0 * * * *":[
-			"ury.ury.api.ury_reservation_service.expire_stale_reservations_scheduled"
+			"ury.ury.api.ury_reservation_service.expire_stale_reservations_scheduled",
+			"ury.chairman_jobs.purge_chairman_whatsapp",
 		]
 	},
 	"daily": [
@@ -421,7 +425,10 @@ website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # Sets Service-Worker-Allowed + JS content-type for the Serve PWA worker.
-before_request = ["ury.ury.api.wa_signature.guard_whatsapp_webhook"]
+before_request = [
+    "ury.ury.api.wa_signature.guard_whatsapp_webhook",
+    "ury.ury.api.chairman_link.guard_brief_only_session",
+]
 after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
 website_redirects = [

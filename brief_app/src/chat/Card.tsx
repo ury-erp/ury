@@ -1,5 +1,5 @@
 import { Bars, Spark } from "../components/Charts";
-import { cardSummary, dashboardLink, fmtDelta, fmtValue, panelSubtitle, panelTitle, safeLink, toneClass, trendGlyph, trendWord, type Card, type DashboardPanel } from "./cardFormat";
+import { cardSummary, dashboardLink, fmtDelta, fmtKpiValue, fmtValue, goodDirection, hideLoneKpiLabel, sameText, panelSubtitle, panelTitle, safeLink, toneClass, trendGlyph, trendWord, type Card, type DashboardPanel } from "./cardFormat";
 
 function Body({ c, hideLabel = false }: { c: Card; hideLabel?: boolean }) {
   if (c.type === "kpi") {
@@ -13,7 +13,7 @@ function Body({ c, hideLabel = false }: { c: Card; hideLabel?: boolean }) {
             <div key={`${k.label}-${i}`} className="card-kpi">
               <dt className={hideLabel ? "sr-only" : undefined}>{k.label}</dt>
               <dd>
-                <bdi className="card-kpi-val">{fmtValue(k.value, k.fmt)}</bdi>
+                <bdi className="card-kpi-val" title={fmtValue(k.value, k.fmt)}>{fmtKpiValue(k.value, k.fmt)}</bdi>
                 {toned && (glyph || d) ? (
                   <span className={`card-delta ${toneClass(k.tone)}`}>
                     {glyph && <span className="card-trend" aria-hidden="true">{glyph}</span>}
@@ -42,7 +42,7 @@ function Body({ c, hideLabel = false }: { c: Card; hideLabel?: boolean }) {
       </div>
     );
   }
-  const gd = c.good_direction === "up" || c.good_direction === "down" ? c.good_direction : undefined;
+  const gd = goodDirection(c);
   const series = (c.series ?? []).map((p) => ({ label: String(p.label), value: Number(p.value) || 0, value_text: fmtValue(p.value, c.fmt) }));
   if (c.type === "line") {
     return (
@@ -56,12 +56,12 @@ function Body({ c, hideLabel = false }: { c: Card; hideLabel?: boolean }) {
   return <><Bars series={series} goodDir={gd} />{gd && <PeakKey series={series} gd={gd} />}</>;
 }
 
-const same = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+const same = sameText;
 
 function Panel({ p, dashTitle }: { p: DashboardPanel; dashTitle?: string }) {
   let title = panelTitle(p); const sub = panelSubtitle(p);
   const c = { ...p.card, title: undefined, subtitle: undefined };
-  const hideLabel = p.card.type === "kpi" && (p.card.kpis ?? []).length === 1 && same(p.card.kpis![0].label, title);
+  const hideLabel = hideLoneKpiLabel(p.card, title);
   if (same(title, dashTitle)) title = "";
   return (
     <section className={`dash-panel span-${p.span}`} aria-label={title || undefined}>

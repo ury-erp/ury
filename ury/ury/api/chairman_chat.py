@@ -693,9 +693,18 @@ def assert_chairman_tool_context(conversation_id=None):
 # ---------------------------------------------------------------- endpoints
 
 
+CALL_LANGUAGES = ["en", "hi", "ar", "ml"]
+
+
 @frappe.whitelist(methods=["GET", "POST"])
 def call_capabilities():
 	_check_role()
+	try:
+		from ury.ury.api import chairman_call
+	except ImportError:
+		chairman_call = None
+	if chairman_call is not None:
+		return chairman_call.call_capabilities()
 	return {
 		"available": False,
 		"voice_call_enabled": bool(_settings_value("voice_call_enabled")),

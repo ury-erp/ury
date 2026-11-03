@@ -1,23 +1,18 @@
 import type { CallState, StartOptions, TranscriptEvent, VoiceCallEngine } from "./types";
 
 /**
- * STUB. Not implemented yet.
- *
- * Later this class will wrap Huf's voice session API (server side, reached only
- * through a ury whitelisted wrapper, never imported here):
- *   - start_session(agent, conversation_id)  -> opens a session, returns the engine
- *     connection details (signed_url or sidecar_ws_path) for the browser WebSocket.
- *   - send_to_session(...)                   -> pushes text/control to the live session.
- *   - end_session(...)                       -> hangs up and releases the session.
- * Until then every method throws NotImplementedError so nothing silently pretends to call.
+ * @deprecated Huf has no Gemini Live path; use `GeminiLiveCallEngine` from "./GeminiLiveCallEngine".
+ * Kept as a self-contained stub (not a re-export) so node's strip-types test loader, which needs
+ * explicit file extensions, can still import it; every method throws NotImplementedError.
  */
 export class NotImplementedError extends Error {
   constructor(what: string) {
-    super(`${what} is not implemented: live voice calls are not available yet.`);
+    super(`${what} is not implemented: use GeminiLiveCallEngine for live voice calls.`);
     this.name = "NotImplementedError";
   }
 }
 
+/** @deprecated see file header. */
 export class HufCallEngine implements VoiceCallEngine {
   async start(_opts?: StartOptions): Promise<void> {
     throw new NotImplementedError("HufCallEngine.start");

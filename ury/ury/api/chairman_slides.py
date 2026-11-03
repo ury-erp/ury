@@ -8,7 +8,7 @@
 # chairman.py, which will import this module). Role checks are the caller's job
 # (get_brief). Pure helpers take plain values and are unit-testable without a site.
 #
-#   2 mtd_target      MTD net sales; target doctype does not exist -> status "unavailable"
+#   2 mtd_target      MTD net sales vs URY Sales Target; no covering row / no doctype -> "unavailable"
 #                     (MTD vs same days last month is still reported as the fallback)
 #   3 branch_ranking  net sales per branch for day D, MTD alongside, ranked
 #   5 top_bottom_items top 3 / bottom 3 items by net_amount, window D-6..D
@@ -130,6 +130,48 @@ def mtd_headline(mtd, prev, delta):
 	word = frappe._("up") if delta > 0 else frappe._("down")
 	return head + frappe._("Month to date {0}, {1} {2}% vs same days last month").format(
 		amount, word, chairman.pct_text(delta)
+	)
+
+
+def target_pace(mtd, prorated):
+	"""(pct_of_prorated_target as a fraction or None, pace 'ahead'|'on'|'behind'|None).
+	>= 100% ahead, < 90% behind, otherwise on pace. No target (<= 0) -> (None, None)."""
+	if not prorated or prorated <= 0:
+		return None, None
+	ratio = float(mtd or 0) / float(prorated)
+	if ratio >= 1:
+		return ratio, "ahead"
+	if ratio < 0.9:
+		return ratio, "behind"
+	return ratio, "on"
+
+
+def pace_tone(pace):
+	return {"ahead": "good", "behind": "bad"}.get(pace, "neutral")
+
+
+def prorate_targets(rows, day):
+	"""rows: [{period_start, period_end, target_amount}]. Only rows covering `day` count.
+	Returns (full_total, prorated_total, n_rows); prorated = target * elapsed/period days."""
+	full = prorated = 0.0
+	n = 0
+	for r in rows:
+		start, end = getdate(r["period_start"]), getdate(r["period_end"])
+		if not (start <= day <= end):
+			continue
+		amount = float(r.get("target_amount") or 0)
+		total_days = (end - start).days + 1
+		elapsed = (day - start).days + 1
+		full += amount
+		prorated += amount * elapsed / total_days
+		n += 1
+	return money(full), money(prorated), n
+
+
+def target_headline(mtd, pct, pace):
+	chairman = _chairman()
+	return frappe._("Month to date {0}, {1}% of target (pace: {2})").format(
+		chairman.format_inr_compact(mtd), chairman.pct_text(pct), frappe._(pace)
 	)
 
 
@@ -329,6 +371,17 @@ def _daily_net(start, end):
 	return {getdate(r["posting_date"]): float(r["total"] or 0) for r in rows}
 
 
+def _target_rows(day):
+	"""URY Sales Target rows covering `day` within the caller's Company/Branch scope.
+	None when the doctype is missing."""
+	if not frappe.db.exists("DocType", "URY Sales Target"):
+		return None
+	st = frappe.qb.DocType("URY Sales Target")
+	q = frappe.qb.from_(st).where(st.period_start <= day).where(st.period_end >= day)
+	q = _scope(q, st.company, st.branch, st.target_amount)
+	return q.select(st.period_start, st.period_end, st.target_amount).run(as_dict=True)
+
+
 def slide_mtd_target(day):
 	(mtd_start, mtd_end), (prev_start, prev_end) = month_ranges(day)
 	per_day = _daily_net(prev_start, mtd_end)
@@ -340,6 +393,38 @@ def slide_mtd_target(day):
 		{"label": frappe._("Last month"), "value": prev},
 		{"label": frappe._("This month"), "value": mtd},
 	]
+	target = _target_rows(day)
+	if target is not None:
+		full, prorated, n = prorate_targets(target, day)
+		pct, pace = target_pace(mtd, prorated)
+		if n and pace:
+			return _slide(
+				"mtd_target",
+				frappe._("Month to date vs target"),
+				target_headline(mtd, pct, pace),
+				value=mtd,
+				compare=prorated,
+				delta_pct=round(pct - 1, 4),
+				delta_label=chairman.pct_text(pct) + "%",
+				tone=pace_tone(pace),
+				chart={
+					"type": "bar",
+					"series": [
+						{"label": frappe._("Month to date"), "value": mtd},
+						{"label": frappe._("Target so far"), "value": prorated},
+						{"label": frappe._("Full month target"), "value": full},
+					],
+				},
+				compare_basis="prorated_target",
+				target_amount=full,
+				target_prorated=prorated,
+				target_pct=round(pct, 4),
+				target_pct_full=round(mtd / full, 4) if full else None,
+				pace=pace,
+				target_rows=n,
+				last_month_same_days=prev,
+			)
+	reason = "no_sales_target_doctype" if target is None else "no_target_for_period"
 	return _slide(
 		"mtd_target",
 		frappe._("Month to date"),
@@ -351,7 +436,7 @@ def slide_mtd_target(day):
 		tone=chairman.tone_for(delta),
 		chart={"type": "bar", "series": series},
 		status="unavailable",
-		unavailable_reason="no_sales_target_doctype",
+		unavailable_reason=reason,
 		compare_basis="same_days_last_month",
 		data_quality="partial",
 	)

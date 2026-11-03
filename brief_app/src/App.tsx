@@ -6,6 +6,8 @@ import ChatTab from "./chat/ChatTab";
 import CallTab from "./call/CallTab";
 import { announceUser, checkUser, forgetUser, loadBrief, signOut, type LoadResult } from "./api";
 import { timeOf } from "./format";
+import WhatsAppLink from "./settings/WhatsAppLink";
+import { whatsappEnabled } from "./settings/whatsappHelpers";
 
 type BIPEvent = Event & { prompt: () => Promise<void> };
 const LOGIN = "/login?redirect-to=/ury/brief/";
@@ -14,6 +16,7 @@ export default function App() {
   const [res, setRes] = useState<LoadResult | null>(null);
   const [tab, setTab] = useState<Tab>("brief");
   const [sheet, setSheet] = useState(false);
+  const [wa, setWa] = useState(false);
   const [authLost, setAuthLost] = useState(false);
   const [update, setUpdate] = useState<ServiceWorker | null>(null);
   const deferred = useRef<BIPEvent | null>(null);
@@ -82,6 +85,7 @@ export default function App() {
       <header className="bar">
         <h1>URY Brief</h1>
         <div className="bar-actions">
+          {whatsappEnabled(brief?.features) && <button type="button" className="ghost wa-entry" onClick={() => setWa(true)}>WhatsApp</button>}
           {!isStandalone() && <button type="button" className="ghost" onClick={() => setSheet(true)}>Add to home screen</button>}
           <button type="button" className="ghost" onClick={() => signOut()}>Sign out</button>
         </div>
@@ -95,6 +99,7 @@ export default function App() {
       {res?.kind === "offline" && <p className="banner" role="status">Offline</p>}
       {body}
       <TabBar tab={active} onTab={setTab} huf={huf} voice={voice} />
+      {wa && <WhatsAppLink onClose={() => setWa(false)} />}
       {sheet && <InstallSheet platform={detectPlatform()} canPrompt={canPrompt} onPrompt={prompt} onClose={() => setSheet(false)} />}
     </div>
   );
