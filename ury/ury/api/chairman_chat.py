@@ -758,6 +758,39 @@ def history(conversation, limit=HISTORY_DEFAULT_LIMIT):
 	return attach_cards(conversation, attach_message_ids(conversation, msgs))
 
 
+_HINT_TAIL = re.compile(r"\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$")
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def conversations(limit=40):
+	"""The signed-in owner's recent chats, newest first: name, title (first question), last activity."""
+	_check_role()
+	agent = _require_agent()
+	frappe.local.response_headers["Cache-Control"] = "no-store"
+	n = max(1, min(int(str(limit).strip() or 40), 100)) if str(limit).strip().isdigit() else 40
+	rows = frappe.get_all(
+		"Agent Conversation",
+		filters={"agent": agent, "owner": frappe.session.user},
+		fields=["name", "modified", "creation"],
+		order_by="modified desc",
+		limit=n,
+	)
+	out = []
+	for r in rows:
+		first = frappe.get_all(
+			"Agent Message",
+			filters={"conversation": r.name, "role": "user", "kind": "Message"},
+			fields=["content"],
+			order_by="creation asc",
+			limit=1,
+		)
+		if not first:
+			continue
+		title = _HINT_TAIL.sub("", first[0].content or "").strip().replace("\n", " ")
+		out.append({"id": r.name, "title": title[:80] or "Conversation", "last_at": str(r.modified), "created_at": str(r.creation)})
+	return out
+
+
 def attach_message_ids(conversation, msgs):
 	"""Huf's history rows carry no Agent Message name; the app needs it for speak(). Match by
 	role and creation timestamp (newest-aligned) and add `id`; leave rows unmatched if unsure."""

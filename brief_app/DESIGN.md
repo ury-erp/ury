@@ -12,3 +12,11 @@ Source of truth: `/Users/safwan/Code/URY/ury-design` (AGENTS.md, docs/). `src/to
 - Dashboard card grids: `display:grid; gap:var(--grid-gap)`; one column at 360px, `repeat(auto-fit,minmax(9rem,1fr))` for number cards; panels fill their cell (`width:100%`, `min-width:0`) and own their padding.
 - Charts: series colours are `hsl(var(--chart-1..5))` (aliases for primary, warning, success, chat-accent, text-tertiary; the design system has no chart tokens, so these flip with dark mode). Tracks use `--hair2`. Pie/donut: stroke width from the 120 viewBox, legend rows with swatch, name (ellipsis), `%` muted, amount in mono; do not encode meaning in colour alone and cap at 5 slices plus "Other".
 - Links to dashboards are secondary/ghost buttons (hairline `--hair2` border, foreground text), never filled black or primary pills.
+
+## Chat shell (WhatsApp pattern)
+
+- `.app`: max-width 48rem, centred, 100dvh; at >=768px a 1px `--border` inline border over a `--muted` body. Safe-area top/left/right on `.app`; safe-area bottom on `.tabs`.
+- Top bar: 3.5rem tall, padding `0 8px 0 16px`, 1px bottom border; title 17px/600, one-line subtitle 12px muted (brief as-of time). Right side: 40px circular transparent icon buttons with 24px glyphs (Call, only when voice is available; Kebab overflow menu).
+- Overflow menu: popover anchored top-right, `role=menu`, 48px items at 15px, radius 8px, shadow, min-width 12rem; Escape/outside click closes; first item focused on open. Items: Settings, WhatsApp (if enabled), Add to home screen (if not standalone), hairline, Sign out.
+- Settings sheet: profile row (40px initials avatar + "Signed in as"), icon Close button in the header.
+- Tab bar: 3.5rem + safe-area bottom, no top line; 24px icon over an 11px/500 label; active item shows a 64x32 radius-16 `--accent` pill behind the icon with primary text colour.

@@ -2,6 +2,7 @@
 import type { ChatMessage } from "./types";
 import { getPrefs } from "../settings/prefs";
 import { sanitizeCards } from "./cardFormat";
+import { parseServerTime } from "./when";
 
 const BASE = "/api/method/ury.ury.api.chairman_chat.";
 
@@ -31,15 +32,19 @@ export const langHint = () => { const l = getPrefs().language; return l === "aut
 
 type Raw = Record<string, unknown>;
 
+/** The server appends a "[Language: X. Reply in X.]" hint to stored user text; never show it. */
+const LANG_HINT = /\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$/;
+
 export function normalize(m: Raw): ChatMessage {
   const role = String(m.role ?? m.sender ?? "").toLowerCase();
   return {
     id: String(m.id ?? m.name ?? m.message_id ?? Math.random().toString(36).slice(2)),
     role: role === "user" || role === "human" ? "user" : "assistant",
-    text: String(m.text ?? m.content ?? m.message ?? ""),
+    text: String(m.text ?? m.content ?? m.message ?? "").replace(LANG_HINT, ""),
     state: "sent",
     voice: !!m.voice,
     cards: sanitizeCards(m.cards),
+    at: parseServerTime(m.creation ?? m.created_at)?.getTime(),
   };
 }
 
@@ -78,6 +83,8 @@ function reply(r: unknown): Reply {
 export const callCapabilities = () => call<{ available?: boolean; enabled?: boolean }>("call_capabilities");
 export const start = (message: string) => call("start", { message, language: langHint() }).then(reply);
 export const send = (conversation: string, message: string) => call("send", { conversation, message, language: langHint() }).then(reply);
+export interface ConversationRow { id: string; title: string; last_at: string; created_at: string }
+export const conversations = () => call<ConversationRow[]>("conversations").then((r) => (Array.isArray(r) ? r : []));
 export const history = (conversation: string) => call("history", { conversation }).then(reply);
 
 function toB64(blob: Blob): Promise<string> {

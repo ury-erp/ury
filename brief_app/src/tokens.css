@@ -68,11 +68,12 @@
   --white: 0 0% 100%;
   --black: 0 0% 0%;
   --radius: 0.5rem;
+  --chat-bg: 60 6% 90%;
 }
 
 /* ---- Colour: copied from ury-design/dist/tokens.css .dark ---- */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --primary: 342 78% 58%;
     --primary-foreground: 222.2 84% 4.9%;
     --primary-tint: 342 45% 14%;
@@ -118,10 +119,63 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
     --chat-accent: 251 65% 54%;
+    --chat-bg: 222.2 60% 6%;
     --white: 0 0% 100%;
     --black: 0 0% 0%;
   }
 }
+
+/* Manual override from the in-app theme pick. */
+:root[data-theme="dark"] {
+    --primary: 342 78% 58%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --primary-tint: 342 45% 14%;
+    --primary-tint-border: 342 40% 24%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --warning-800: 30 92% 65%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 26 52% 12%;
+    --warning-tint: 41 40% 14%;
+    --warning-tint-border: 41 38% 24%;
+    --success-800: 141 72% 68%;
+    --success: 142 69% 48%;
+    --success-foreground: 145 80% 8%;
+    --success-tint: 145 35% 13%;
+    --success-tint-border: 145 32% 22%;
+    --destructive-800: 0 72% 58%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --destructive-tint: 0 40% 14%;
+    --destructive-tint-border: 0 36% 24%;
+    --gray-100: 240 20% 15%;
+    --gray-200: 240 15% 20%;
+    --gray-300: 240 10% 25%;
+    --gray-500: 240 6% 35%;
+    --gray-700: 240 4% 45%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 45% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --text-tertiary: 215 15% 48%;
+    --text-quaternary: 215 12% 34%;
+    --rail: 222.2 30% 9%;
+    --hair: 217.2 25% 16%;
+    --hair2: 217.2 22% 22%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    --chat-accent: 251 65% 54%;
+    --chat-bg: 222.2 60% 6%;
+    --white: 0 0% 100%;
+    --black: 0 0% 0%;
+  }
 
 /* ---- Scales: hand-written from ury-design docs (not generated) ---- */
 :root {

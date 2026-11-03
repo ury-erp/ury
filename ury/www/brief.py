@@ -1,4 +1,5 @@
 import hashlib
+import os
 
 import frappe
 import frappe.sessions
@@ -8,6 +9,15 @@ sitemap = 0
 
 
 BRIEF_URL = "/ury/brief/"
+_DIST = os.path.join(os.path.dirname(__file__), "..", "public", "brief", "dist", "assets")
+
+
+def asset_version():
+	"""Changes whenever the PWA bundle is rebuilt, so browsers never pair new JS with cached old CSS."""
+	try:
+		return str(int(max(os.path.getmtime(os.path.join(_DIST, f)) for f in ("app.js", "app.css"))))
+	except OSError:
+		return frappe.utils.get_build_version()
 
 
 def canonical_redirect(path, query_string=""):
@@ -45,7 +55,7 @@ def get_context(context):
 		context.no_cache = 1
 		context.brief_user_key = ""
 		context.csrf_token = ""
-		context.build_version = frappe.utils.get_build_version()
+		context.build_version = asset_version()
 		h = frappe.local.response_headers
 		h.set("Cache-Control", "no-store, max-age=0")
 		h.set("Referrer-Policy", "no-referrer")
@@ -58,5 +68,5 @@ def get_context(context):
 	context.no_cache = 1
 	context.brief_user_key = user_key(frappe.session.user, frappe.local.site)
 	context.csrf_token = frappe.sessions.get_csrf_token()
-	context.build_version = frappe.utils.get_build_version()
+	context.build_version = asset_version()
 	return context

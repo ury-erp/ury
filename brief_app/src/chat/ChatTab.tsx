@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import "./chat.css";
 import * as api from "./api";
 import Markdown from "./markdown";
 import { Cards } from "./Card";
 import Player from "./Player";
+import Waveform from "./Waveform";
 import { MAX_BYTES, MAX_SECONDS, Recorder, micSupported, type RecError } from "./recorder";
+import History from "./History";
+import { dayKey, dayLabel } from "./when";
 import type { ChatMessage } from "./types";
+import { MicIcon, SendIcon, CloseIcon, TickIcon, DoubleTickIcon, HistoryIcon, NewChatIcon } from "../components/Icons";
 import { getPrefs, usePrefsSubscribe } from "../settings/prefs";
 
 export type { ChatMessage, ChatTabProps } from "./types";
@@ -14,15 +18,10 @@ const STARTERS = ["How were sales yesterday?", "Which dishes should I push?"];
 const POLL_MS = 2000;
 const POLL_MAX = 45;
 let seq = 0;
+const firstSeen = new Map<string, number>();
+const stampOf = (id: string) => { let t = firstSeen.get(id); if (!t) { t = Date.now(); firstSeen.set(id, t); } return t; };
+const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const lid = () => `local-${++seq}`;
-
-const MicIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="9" y="2" width="6" height="12" rx="3" />
-    <path d="M5 11a7 7 0 0 0 14 0" />
-    <path d="M12 18v4" />
-  </svg>
-);
 
 export default function ChatTab() {
   const [prefs, setPrefsState] = useState(getPrefs);
@@ -34,6 +33,10 @@ export default function ChatTab() {
   const [secs, setSecs] = useState(0);
   const [micErr, setMicErr] = useState<RecError | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const histBtn = useRef<HTMLButtonElement>(null);
+  const loadTok = useRef(0);
   const conv = useRef<string | null>(null);
   const rec = useRef<Recorder | null>(null);
   const timer = useRef<number>();
@@ -41,13 +44,20 @@ export default function ChatTab() {
   const end = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   const canMic = micSupported();
+  const ta = useRef<HTMLTextAreaElement>(null);
+  const coarse = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+  useEffect(() => {
+    const el = ta.current; if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 6 * 20)}px`;
+  }, [text, recording]);
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; clearInterval(timer.current); clearTimeout(poll.current); rec.current?.cancel(); }; }, []);
   useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [msgs, waiting]);
 
   /** Server messages are the truth; keep only local items still in flight or failed. */
   const merge = (server: ChatMessage[]) =>
-    setMsgs((cur) => [...server, ...cur.filter((m) => m.id.startsWith("local-") && (m.state !== "sent") )]);
+    setMsgs((cur) => [...server.map((m) => (m.at ? m : { ...m, at: stampOf(m.id) })), ...cur.filter((m) => m.id.startsWith("local-") && (m.state !== "sent") )]);
 
   const startPolling = useCallback(() => {
     clearTimeout(poll.current);
@@ -72,7 +82,7 @@ export default function ChatTab() {
   const patch = (id: string, p: Partial<ChatMessage>) => setMsgs((c) => c.map((m) => (m.id === id ? { ...m, ...p } : m)));
 
   const afterReply = (r: api.Reply) => {
-    if (r.conversation) conv.current = r.conversation;
+    if (r.conversation) { conv.current = r.conversation; setActiveId(r.conversation); }
     if (r.messages.length) merge(r.messages);
     if (!r.messages.length || r.messages[r.messages.length - 1].role !== "assistant" || r.pending) startPolling();
     else setWaiting(false);
@@ -81,7 +91,7 @@ export default function ChatTab() {
   const sendText = async (body: string, existing?: string) => {
     const id = existing ?? lid();
     if (existing) patch(id, { state: "sending" });
-    else setMsgs((c) => [...c, { id, role: "user", text: body, state: "sending", retry: { kind: "text", text: body } }]);
+    else setMsgs((c) => [...c, { id, at: Date.now(), role: "user", text: body, state: "sending", retry: { kind: "text", text: body } }]);
     setWaiting(true);
     try {
       const r = conv.current ? await api.send(conv.current, body) : await api.start(body);
@@ -96,7 +106,7 @@ export default function ChatTab() {
   const sendBlob = async (blob: Blob, mime: string, existing?: string) => {
     const id = existing ?? lid();
     if (existing) patch(id, { state: "sending" });
-    else setMsgs((c) => [...c, { id, role: "user", text: "Voice message", voice: true, state: "sending", retry: { kind: "audio", blob, mime } }]);
+    else setMsgs((c) => [...c, { id, at: Date.now(), role: "user", text: "Voice message", voice: true, state: "sending", retry: { kind: "audio", blob, mime } }]);
     setWaiting(true);
     try {
       const r = await api.sendAudio(conv.current, blob, mime);
@@ -146,10 +156,41 @@ export default function ChatTab() {
 
   const cancelRec = () => { rec.current?.cancel(); rec.current = null; stopTimer(); };
 
+  const closeHist = useCallback(() => { setHistOpen(false); setTimeout(() => histBtn.current?.focus(), 0); }, []);
+
+  const resetState = () => {
+    loadTok.current++;
+    clearTimeout(poll.current);
+    if (rec.current) cancelRec();
+    setWaiting(false); setMicErr(null); setText(""); setMsgs([]);
+  };
+
+  const newChat = () => { resetState(); conv.current = null; setActiveId(null); setHistOpen(false); };
+
+  const openChat = async (id: string) => {
+    resetState();
+    conv.current = id; setActiveId(id); closeHist();
+    const tok = loadTok.current;
+    setWaiting(true);
+    try {
+      const r = await api.history(id);
+      if (!alive.current || tok !== loadTok.current) return;
+      setMsgs(r.messages.map((m) => (m.at ? m : { ...m, at: stampOf(m.id) })));
+      const last = r.messages[r.messages.length - 1];
+      if (r.pending || (last && last.role !== "assistant")) startPolling(); else setWaiting(false);
+    } catch {
+      if (alive.current && tok === loadTok.current) { setWaiting(false); setMicErr("load" as RecError); }
+    }
+  };
+
   const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
 
   return (
     <section className="chat" aria-label="Ask">
+      <div className="subbar">
+        <button ref={histBtn} type="button" className="sub-btn" aria-label="Chat history" aria-haspopup="dialog" onClick={() => setHistOpen(true)}><HistoryIcon size={24} /></button>
+        <button type="button" className="sub-btn" aria-label="New chat" onClick={newChat}><NewChatIcon size={24} /></button>
+      </div>
       <div className="msgs" role="log" aria-live="polite" aria-label="Conversation">
         {msgs.length === 0 && (
           <div className="intro">
@@ -160,23 +201,44 @@ export default function ChatTab() {
             </div>
           </div>
         )}
-        {msgs.map((m) => (
-          <div key={m.id} className={`msg ${m.role}`}>
+        {msgs.map((m, i) => {
+          const first = i === 0 || msgs[i - 1].role !== m.role;
+          const at = m.at ? hhmm(m.at) : "";
+          const day = m.at ? dayKey(new Date(m.at)) : "";
+          const prevDay = i > 0 && msgs[i - 1].at ? dayKey(new Date(msgs[i - 1].at!)) : "";
+          const chip = m.at && day !== prevDay ? dayLabel(new Date(m.at), new Date(), api.langHint()) : "";
+          return (
+          <Fragment key={m.id}>
+          {chip && <div className="day-chip" role="separator" aria-label={chip}>{chip}</div>}
+          <div className={`msg ${m.role}${first ? " first" : ""}`}>
             <div className="bubble">
-              {m.voice && <span className="tag">Voice message</span>}
-              {m.role === "assistant" ? <Markdown text={m.text} /> : <p dir="auto">{m.voice && m.text === "Voice message" ? "Sending voice message" : m.text}</p>}
+              {m.role === "assistant" ? <Markdown text={m.text} /> : (
+                <p dir="auto">
+                  {m.voice && <span className="voice"><MicIcon size={14} />Voice message{m.text !== "Voice message" ? ": " : ""}</span>}
+                  {m.voice && m.text === "Voice message" ? "" : m.text}
+                </p>
+              )}
               {m.role === "assistant" && !!m.tools && prefs.showSources && <span className="meta tools">Checked {m.tools} data {m.tools === 1 ? "source" : "sources"}</span>}
               {m.role === "assistant" && <Cards cards={m.cards} />}
               {m.role === "assistant" && prefs.readAloud && <Player id={m.id} text={m.text} />}
+              <span className="stamp-pad" aria-hidden="true" />
+              <span className="stamp">
+                {at}
+                {m.role === "user" && m.state === "failed" && <span className="fail" aria-hidden="true">!</span>}
+                {m.role === "user" && m.state === "sending" && <TickIcon size={16} />}
+                {m.role === "user" && m.state === "sent" && <DoubleTickIcon size={16} />}
+              </span>
             </div>
-            {m.state === "sending" && <span className="meta" role="status">Sending</span>}
+            {m.state === "sending" && <span className="sr-only" role="status">Sending</span>}
             {m.state === "failed" && (
               <span className="meta err" role="alert">Not sent.
                 <button type="button" className="retry" onClick={() => retry(m)}>Try again</button>
               </span>
             )}
           </div>
-        ))}
+          </Fragment>
+          );
+        })}
         {waiting && <div className="msg assistant"><div className="bubble typing" role="status" aria-label="Assistant is typing"><i /><i /><i /></div></div>}
         <div ref={end} />
       </div>
@@ -186,27 +248,36 @@ export default function ChatTab() {
           {micErr === "denied" && "Microphone access is blocked. Allow the microphone for this site in your browser or phone settings, then tap the mic again."}
           {micErr === "unsupported" && "Voice messages are not available on this device. You can still type."}
           {micErr === "failed" && "The recording could not be sent. Please try again."}
+          {(micErr as string) === "load" && "Could not open that chat. Check your connection and try again."}
           <button type="button" className="retry" onClick={() => setMicErr(null)}>Dismiss</button>
         </p>
       )}
 
       {recording ? (
         <div className="composer rec" role="group" aria-label="Recording">
-          <button type="button" className="icon" aria-label="Cancel recording" onClick={cancelRec}>{"✕"}</button>
-          <span className="rec-dot" aria-hidden="true" />
-          <span className="timer" role="timer" aria-label={`Recording ${mmss} of 1:00`}>{mmss} / 1:00</span>
-          <button type="button" className="send" aria-label="Send voice message" onClick={() => void stopRec()}>{"➤"}</button>
+          <div className="field rec-pill">
+            <button type="button" className="cancel" aria-label="Cancel recording" onClick={cancelRec}><CloseIcon size={22} /></button>
+            <span className="rec-dot" aria-hidden="true" />
+            <span className="timer" role="timer" aria-label={`Recording ${mmss} of 1:00`}>{mmss}</span>
+            <Waveform getLevel={() => rec.current?.level() ?? 0} />
+          </div>
+          <button type="button" className="act" aria-label="Send voice message" onClick={() => void stopRec()}><SendIcon size={22} /></button>
         </div>
       ) : (
         <form className="composer" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-          <input dir="auto" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a question" aria-label="Message" enterKeyHint="send" autoComplete="off" />
+          <div className="field">
+            <textarea ref={ta} dir="auto" rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask a question" aria-label="Message" enterKeyHint="send" autoComplete="off"
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} />
+          </div>
           {canMic && !text.trim() ? (
-            <button type="button" className="icon mic" aria-label="Record a voice message" disabled={waiting} onClick={() => (sessionStorageSeen() ? void startRec() : setSheet(true))}><MicIcon /></button>
+            <button type="button" className="act mic" aria-label="Record a voice message" disabled={waiting} onClick={() => (sessionStorageSeen() ? void startRec() : setSheet(true))}><MicIcon size={22} /></button>
           ) : (
-            <button type="submit" className="send" aria-label="Send message" disabled={!text.trim() || waiting}>{"➤"}</button>
+            <button type="submit" className="act" aria-label="Send message" disabled={!text.trim() || waiting}><SendIcon size={22} /></button>
           )}
         </form>
       )}
+
+      {histOpen && <History activeId={activeId} onPick={(id) => void openChat(id)} onClose={closeHist} />}
 
       {sheet && (
         <div className="scrim" role="dialog" aria-modal="true" aria-label="Microphone">

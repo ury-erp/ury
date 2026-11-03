@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { speak, langHint } from "./api";
+import { PlayIcon, PauseIcon } from "../components/Icons";
 
 let current: { stop: () => void } | null = null;
 
@@ -61,7 +62,7 @@ export default function Player({ id, text }: { id: string; text: string }) {
   return (
     <div className="player">
       <button type="button" className="play" aria-label={label} disabled={state === "loading"} onClick={click}>
-        {state === "playing" ? "❚❚" : state === "loading" ? "…" : "▶"}
+        {state === "playing" ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
       </button>
       <div className="prog" role="progressbar" aria-label="Playback progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
         <span style={{ width: `${progress * 100}%` }} />

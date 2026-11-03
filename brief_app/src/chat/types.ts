@@ -9,6 +9,8 @@ export interface ChatMessage {
   /** structured visual cards rendered under the text (never spoken) */
   cards?: Card[];
   state: MsgState;
+  /** creation time, ms epoch (history rows without one are stamped on arrival) */
+  at?: number;
   /** number of data lookups behind this answer (tool rows are never shown) */
   tools?: number;
   /** true when the user text came from a voice message transcript */

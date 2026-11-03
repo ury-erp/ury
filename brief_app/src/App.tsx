@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Deck from "./components/Deck";
+import TopBar from "./components/TopBar";
 import TabBar, { type Tab } from "./components/TabBar";
 import InstallSheet, { detectPlatform, isStandalone } from "./components/InstallSheet";
 import ChatTab from "./chat/ChatTab";
@@ -94,12 +95,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="bar">
-        <h1>URY Brief</h1>
-        <div className="bar-actions">
-          <button type="button" className="ghost" onClick={() => setSettings(true)}>Settings</button>
-        </div>
-      </header>
+      <TopBar
+        subtitle={brief ? timeOf(brief.as_of) : ""}
+        onCall={huf && voice ? () => setTab("call") : undefined}
+        onSettings={() => setSettings(true)}
+        onWhatsApp={whatsappEnabled(brief?.features) ? () => setWa(true) : undefined}
+        onInstall={!isStandalone() ? () => setSheet(true) : undefined}
+        onSignOut={() => signOut()}
+      />
       {update && (
         <p className="banner" role="status">New version available.
           <button type="button" onClick={() => update.postMessage({ type: "SKIP_WAITING" })}>Reload</button>
@@ -109,14 +112,7 @@ export default function App() {
       {res?.kind === "offline" && <p className="banner" role="status">Offline</p>}
       {body}
       <TabBar tab={active} onTab={setTab} huf={huf} voice={voice} />
-      {settings && (
-        <Settings
-          onClose={() => setSettings(false)}
-          onWhatsApp={whatsappEnabled(brief?.features) ? () => setWa(true) : undefined}
-          onInstall={!isStandalone() ? () => setSheet(true) : undefined}
-          onSignOut={() => signOut()}
-        />
-      )}
+      {settings && <Settings onClose={() => setSettings(false)} />}
       {wa && <WhatsAppLink onClose={() => setWa(false)} />}
       {sheet && <InstallSheet platform={detectPlatform()} canPrompt={canPrompt} onPrompt={prompt} onClose={() => setSheet(false)} />}
     </div>

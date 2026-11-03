@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getPrefs, setPrefs, type Lang } from "./prefs";
+import { getPrefs, setPrefs, type Lang, type Theme } from "./prefs";
+import { CloseIcon } from "../components/Icons";
 import "./settings.css";
 
 const LANG_NAMES: { code: Lang; label: string }[] = [
@@ -12,12 +13,14 @@ const LANG_NAMES: { code: Lang; label: string }[] = [
 
 interface Props {
   onClose: () => void;
-  onWhatsApp?: () => void;
-  onInstall?: () => void;
-  onSignOut: () => void;
 }
 
-export default function Settings({ onClose, onWhatsApp, onInstall, onSignOut }: Props) {
+const initials = (n: string) => {
+  const base = n.split("@")[0].split(/[\s._-]+/).filter(Boolean);
+  return ((base[0]?.[0] ?? "?") + (base.length > 1 ? base[1][0] : "")).toUpperCase();
+};
+
+export default function Settings({ onClose }: Props) {
   const [p, setP] = useState(getPrefs);
   const [who, setWho] = useState<string | null>(null);
   const upd = (v: Parameters<typeof setPrefs>[0]) => setP(setPrefs(v));
@@ -37,9 +40,25 @@ export default function Settings({ onClose, onWhatsApp, onInstall, onSignOut }: 
   return (
     <div className="scrim" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+        <div className="st-head">
+          <h2>Settings</h2>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}><CloseIcon size={24} /></button>
+        </div>
         <div className="st-body">
-          {who && <p className="st-who">Signed in as {who}</p>}
+          {who && (
+            <div className="st-profile">
+              <span className="st-avatar" aria-hidden="true">{initials(who)}</span>
+              <p className="st-who">Signed in as {who}</p>
+            </div>
+          )}
+          <div className="st-field">
+            <label htmlFor="st-theme">Appearance</label>
+            <select id="st-theme" className="st-select" value={p.theme} onChange={(e) => upd({ theme: e.target.value as Theme })}>
+              <option value="system">Automatic (device setting)</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
           <div className="st-field">
             <label htmlFor="st-lang">Language for chat and calls</label>
             <select id="st-lang" className="st-select" value={p.language} onChange={(e) => upd({ language: e.target.value as Lang })}>
@@ -55,13 +74,7 @@ export default function Settings({ onClose, onWhatsApp, onInstall, onSignOut }: 
             <input type="checkbox" checked={p.showSources} onChange={(e) => upd({ showSources: e.target.checked })} />
           </label>
           <p className="st-note">These are saved on this device only.</p>
-          <div className="st-actions">
-            {onWhatsApp && <button type="button" className="secondary" onClick={() => { onClose(); onWhatsApp(); }}>WhatsApp</button>}
-            {onInstall && <button type="button" className="secondary" onClick={() => { onClose(); onInstall(); }}>Add to home screen</button>}
-            <button type="button" className="secondary" onClick={onSignOut}>Sign out</button>
-          </div>
         </div>
-        <button type="button" className="secondary" onClick={onClose}>Close</button>
       </div>
     </div>
   );
