@@ -88,9 +88,21 @@ except ImportError:  # pure unit run from this directory
 	from chairman import ALLOWED_ROLES, _check_role
 
 try:
-	from ury.ury.api.chairman_chat_list_pure import clean_rename_title, coerce_list_limit, conversation_row
+	from ury.ury.api.chairman_chat_list_pure import (
+		clean_rename_title,
+		coerce_list_limit,
+		conversation_row,
+		date_hint,
+		strip_language_hint,
+	)
 except ImportError:  # pure unit run from this directory
-	from chairman_chat_list_pure import clean_rename_title, coerce_list_limit, conversation_row
+	from chairman_chat_list_pure import (
+		clean_rename_title,
+		coerce_list_limit,
+		conversation_row,
+		date_hint,
+		strip_language_hint,
+	)
 
 FAST_PATH_ENABLED = True  # kill switch for the pre-LLM router (no system setting by design)
 
@@ -191,11 +203,13 @@ def normalize_language(language):
 
 
 def with_language_hint(message, language):
+	"""Append the site date line always, and the language line when a language is given."""
 	code = normalize_language(language)
-	if not code:
-		return message
-	name = SUPPORTED_LANGUAGES[code]
-	return f"{message}\n\n[Language: {name}. Reply in {name}.]"
+	out = message
+	if code:
+		name = SUPPORTED_LANGUAGES[code]
+		out += f"\n\n[Language: {name}. Reply in {name}.]"
+	return out + ("\n" if code else "\n\n") + date_hint()
 
 
 def coerce_history_limit(limit):
@@ -763,9 +777,6 @@ def history(conversation, limit=HISTORY_DEFAULT_LIMIT):
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	msgs = get_history(conversation_id=conversation, limit=coerce_history_limit(limit))
 	return attach_cards(conversation, attach_message_ids(conversation, msgs))
-
-
-_HINT_TAIL = re.compile(r"\s*\[Language: [^\].]+\. Reply in [^\].]+\.\]\s*$")
 
 
 @frappe.whitelist(methods=["GET", "POST"])

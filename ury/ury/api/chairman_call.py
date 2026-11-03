@@ -35,7 +35,7 @@ WS_URL = (
 )
 TOKEN_URL = "https://generativelanguage.googleapis.com/v1alpha/auth_tokens"
 TOKEN_TIMEOUT = 15
-DEFAULT_MODEL = "models/gemini-2.5-flash-native-audio-latest"
+DEFAULT_MODEL = "models/gemini-3.8-live"
 DEFAULT_VOICE = "Puck"
 DEFAULT_MAX_SECONDS = 300
 MIN_SECONDS, MAX_SECONDS = 30, 900
@@ -156,17 +156,34 @@ def function_declarations():
 	]
 
 
+def date_context(today=None):
+	"""The model has no clock: without this it guesses dates (it asked for Oct 2025 ranges) and every
+	range tool returns empty. Dates are the site's, so 'yesterday' matches the brief."""
+	from datetime import timedelta
+
+	t = today or frappe.utils.getdate(frappe.utils.nowdate())
+	y = t - timedelta(days=1)
+	return (
+		f"Today is {t.strftime('%A')} {t.isoformat()}; yesterday was {y.strftime('%A')} {y.isoformat()}. "
+		f"When the caller says yesterday use {y.isoformat()} (or leave the date empty, which means yesterday); "
+		f"only use {t.isoformat()} when they ask about today. Use exact YYYY-MM-DD dates and never guess the year. "
+		"You have data tools: when asked about sales, orders, dishes, payments, cancellations, kitchen speed or "
+		"branches, call the matching tool first and answer from its result. Only say data is unavailable when a "
+		"tool actually returns an error or no rows."
+	)
+
+
 def build_system_instruction(instructions, language):
 	if not language:
 		return (
 			f"{(instructions or '').strip()}\n\nAnswer in the language the caller is speaking "
 			"(English, Hindi, Arabic, Malayalam or whichever they use) and switch if they switch.\n"
-			f"{VOICE_STYLE_RULES}"
+			f"{date_context()}\n{VOICE_STYLE_RULES}"
 		).strip()
 	lang = LANGUAGE_NAMES[language]
 	return (
 		f"{(instructions or '').strip()}\n\nRespond only in {lang}. "
-		f"Understand the caller in any language but always answer in {lang}.\n{VOICE_STYLE_RULES}"
+		f"Understand the caller in any language but always answer in {lang}.\n{date_context()}\n{VOICE_STYLE_RULES}"
 	).strip()
 
 

@@ -1,28 +1,12 @@
 import { fetchCsrf } from "../csrf";
 import { getPrefs } from "../settings/prefs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./call.css";
+import { BackIcon, MicIcon, PhoneIcon } from "../components/Icons";
+import { useLevel } from "./useLevel";
 import { MockCallEngine } from "./MockCallEngine";
 import { createCallEngine, callErrorMessage, type CallCaps, type CallLang, type EngineChoice } from "./engines";
 import { ACTIVE_STATES, type CallState, type TranscriptEvent, type VoiceCallEngine } from "./types";
-
-const STATUS: Record<CallState, string> = {
-  idle: "Ready to call",
-  requesting_mic: "Allow the microphone",
-  connecting: "Connecting",
-  ringing: "Ringing",
-  connected: "Connected",
-  speaking: "Assistant is speaking",
-  listening: "Listening to you",
-  reconnecting: "Reconnecting...",
-  ended: "Call ended",
-  failed: "Call failed",
-};
-
-const SPEAKER: Partial<Record<CallState, string>> = {
-  speaking: "Brief assistant",
-  listening: "You",
-};
 
 const LANGS: { code: CallLang; label: string; dir: "ltr" | "rtl" }[] = [
   { code: "en", label: "English", dir: "ltr" },
@@ -30,9 +14,6 @@ const LANGS: { code: CallLang; label: string; dir: "ltr" | "rtl" }[] = [
   { code: "ar", label: "العربية", dir: "rtl" },
   { code: "ml", label: "മലയാളം", dir: "ltr" },
 ];
-
-const MIC_HELP =
-  "Microphone access is blocked. Allow the microphone for this site in your browser or phone settings, then tap Try again.";
 
 const CAPS_URL = "/api/method/ury.ury.api.chairman_call.call_capabilities";
 
@@ -64,12 +45,26 @@ function fmt(sec: number) {
 export interface CallTabProps {
   /** Optional: inject an engine (skips capability lookup; used by tests). */
   engine?: VoiceCallEngine;
-  /** Optional: called by "Back to chat". Falls back to history.back(). */
+  /** Optional: called by the top-bar back button. Falls back to history.back(). */
   onBack?: () => void;
 }
 
+const STATUS: Record<CallState, string> = {
+  idle: "Tap to talk",
+  requesting_mic: "Allow microphone access",
+  connecting: "Connecting…",
+  ringing: "Calling…",
+  connected: "Listening",
+  speaking: "Speaking",
+  listening: "Listening",
+  reconnecting: "Reconnecting…",
+  ended: "Call ended",
+  failed: "Couldn't connect",
+};
+
 export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const [caps, setCaps] = useState<CallCaps | null>(null);
+  const [capsDone, setCapsDone] = useState(false);
   const [choice, setChoice] = useState<EngineChoice>(() => ({
     engine: engine ?? new MockCallEngine(),
     kind: "mock",
@@ -81,16 +76,20 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const [muted, setMuted] = useState(false);
   const [secs, setSecs] = useState(0);
   const [line, setLine] = useState<TranscriptEvent | null>(null);
+  const [fade, setFade] = useState(false);
   const [errText, setErrText] = useState("");
-  const ringRef = useRef<HTMLDivElement>(null);
-  const meterRef = useRef<HTMLSpanElement>(null);
+  const orbRef = useRef<HTMLDivElement>(null);
 
   const maxSecs = caps?.max_seconds && caps.max_seconds > 0 ? caps.max_seconds : 300;
 
   useEffect(() => {
     if (engine) return;
     let alive = true;
-    void fetchCaps().then((c) => alive && setCaps(c));
+    void fetchCaps().then((c) => {
+      if (!alive) return;
+      setCaps(c);
+      setCapsDone(true);
+    });
     return () => {
       alive = false;
     };
@@ -117,19 +116,25 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
       setState(s);
       if (s === "failed") setErrText(eng.error ?? "");
     });
-    const offT = eng.on("transcript", setLine);
-    const offL = eng.on("level", (rms) => {
-      const v = String(Math.max(0, Math.min(1, rms)));
-      ringRef.current?.style.setProperty("--lvl", v);
-      meterRef.current?.style.setProperty("--lvl", v);
+    const offT = eng.on("transcript", (t) => {
+      setLine(t);
+      setFade(false);
     });
     return () => {
       offS();
       offT();
-      offL();
       void eng.end().catch(() => undefined);
     };
   }, [eng]);
+
+  useLevel(eng, orbRef, state);
+
+  // Caption fades 4s after the last transcript update.
+  useEffect(() => {
+    if (!line) return;
+    const t = setTimeout(() => setFade(true), 4000);
+    return () => clearTimeout(t);
+  }, [line]);
 
   const live = ACTIVE_STATES.includes(state);
   useEffect(() => {
@@ -158,72 +163,103 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
     setMuted(m);
     eng.setMuted(m);
   };
+  const goBack = () => (onBack ? onBack() : window.history.back());
   const inCall = ["requesting_mic", "connecting", "ringing", ...ACTIVE_STATES].includes(state);
-  const busy = state === "requesting_mic" || state === "connecting" || state === "ringing";
-  const speaker = SPEAKER[state] ? (state === "listening" && muted ? "You (muted)" : SPEAKER[state]) : "";
-  const remaining = maxSecs - secs;
+  const remaining = Math.max(0, maxSecs - secs);
 
-  let failMsg = "";
-  if (state === "failed") {
-    const raw = errText.toLowerCase();
-    failMsg = /denied|notallowed|permission|blocked|microphone/.test(raw) ? MIC_HELP : errText || "The call could not be started. Check your connection and try again.";
-  }
-  const notice =
-    choice.kind === "gemini_live"
-      ? ""
-      : !caps ? "Checking whether voice calls are available…" : choice.notice ?? callErrorMessage(caps.reason);
   // Never offer the simulated engine to a real user: no live engine means no call button.
-  const unavailable = choice.kind === "mock" && !engine;
+  const checking = choice.kind === "mock" && !engine && !capsDone;
+  const unavailable = choice.kind === "mock" && !engine && capsDone;
+  const micBlocked = state === "failed" && /denied|notallowed|permission|blocked|microphone/.test(errText.toLowerCase());
+
+  let status = STATUS[state];
+  let detail = "";
+  if (state === "listening" && muted) status = "You're muted";
+  if (state === "ended") status = `Call ended · ${fmt(secs)}`;
+  if (state === "failed") {
+    status = micBlocked ? "Microphone blocked" : "Couldn't connect";
+    detail = micBlocked ? "Allow the microphone in site settings." : "Check your connection.";
+  }
+  if (state === "idle" || state === "ended") {
+    if (checking) status = "Checking availability…";
+    else if (unavailable) {
+      status = "Voice calls unavailable";
+      detail = choice.notice ?? callErrorMessage(caps?.reason);
+    }
+  }
+  const showTimer = inCall;
+  const idleHint = state === "idle" && !checking && !unavailable ? `Voice · up to ${Math.max(1, Math.round(maxSecs / 60))} min` : "";
+  const tone = remaining <= 30 ? "low" : remaining <= 60 ? "warn" : "ok";
 
   return (
-    <section className="call" data-state={state} data-engine={choice.kind} dir="auto" aria-label="Voice call">
-      {notice && <p className="call-note" role={unavailable ? "alert" : undefined} dir="auto">{notice}</p>}
-      <div className="call-who">
-        <div className="call-ring" ref={ringRef} data-active={live || busy} aria-hidden="true">
-          <div className="call-avatar">B</div>
-        </div>
-        <h2 className="call-name" dir="auto">Brief assistant</h2>
-        <p className="call-status" role="status" aria-live="polite" dir="auto">{STATUS[state]}</p>
-        <p className="call-time" aria-label="Call time">{fmt(secs)}</p>
-        {live && (
-          <p className="call-left" aria-label="Time left">
-            <span className={remaining <= 30 ? "call-left-low" : ""}>{fmt(remaining)}</span>
-          </p>
+    <section className="call" data-state={state} data-engine={choice.kind} data-muted={muted && inCall} dir="auto" aria-label="Voice call">
+      <div className="call-top">
+        <button type="button" className="call-iconbtn" aria-label="Back to chat" onClick={goBack}>
+          <BackIcon size={24} />
+        </button>
+        {inCall && (
+          <p className="call-left" data-tone={tone} aria-label="Time left">{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")} left</p>
         )}
-        <span className="call-meter" ref={meterRef} data-on={live} aria-hidden="true"><i /></span>
-        <p className="call-speaker" dir="auto">{speaker || " "}</p>
-        {line && live && (
-          <p className="call-line" dir="auto">{line.text}</p>
-        )}
-        {state === "failed" && <p className="call-error" role="alert" dir="auto">{failMsg}</p>}
       </div>
 
-      <div className="call-actions">
-        {state === "failed" && (
-          <button className="call-btn call-retry" onClick={start}>Try again</button>
-        )}
-        {(state === "idle" || state === "ended") && (
-          <button className="call-btn call-start" onClick={start} aria-label="Start call" disabled={unavailable}>Call</button>
-        )}
-        {inCall && (
-          <>
-            <button
-              className="call-btn call-mute"
-              aria-pressed={muted}
-              aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-              onClick={toggleMute}
-            >
-              {muted ? "Unmute" : "Mute"}
-            </button>
-            <button className="call-btn call-end" aria-label="End call" onClick={() => void eng.end()}>
-              End
-            </button>
-          </>
+      <div className="call-stage">
+        <div className="call-orb" ref={orbRef} aria-hidden="true">
+          <span className="orb-glow" />
+          <span className="orb-ring" style={{ "--i": 1 } as CSSProperties} />
+          <span className="orb-ring" style={{ "--i": 2 } as CSSProperties} />
+          <span className="orb-ring" style={{ "--i": 3 } as CSSProperties} />
+          <span className="orb-core">B</span>
+        </div>
+        <h2 className="call-name" dir="auto">Brief</h2>
+        <p className="call-status" role="status" aria-live="polite" dir="auto">{status}</p>
+        {detail && <p className="call-detail" dir="auto" role={state === "failed" ? "alert" : undefined}>{detail}</p>}
+        {showTimer && <p className="call-time" aria-label="Call time">{fmt(secs)}</p>}
+        {idleHint && <p className="call-time">{idleHint}</p>}
+      </div>
+
+      <div className="call-caption">
+        {line && inCall && line.text && (
+          <p className="call-line" dir="auto" data-fade={fade}>
+            {line.role === "user" && <span className="call-line-who">You: </span>}
+            {line.text}
+          </p>
         )}
       </div>
-      <button className="call-back" onClick={() => (onBack ? onBack() : window.history.back())}>
-        Back to chat
-      </button>
+
+      <div className="call-controls">
+        {unavailable && !inCall ? (
+          <button type="button" className="call-pill" onClick={goBack}>Back to chat</button>
+        ) : inCall ? (
+          <>
+            <div className="call-ctl">
+              <button type="button" className="call-round call-mute" aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
+                <MicIcon size={28} />
+              </button>
+              <span className="call-ctl-label" aria-hidden="true">{muted ? "Unmute" : "Mute"}</span>
+            </div>
+            <div className="call-ctl">
+              <button type="button" className="call-round call-end" aria-label="End" onClick={() => void eng.end()}>
+                <PhoneIcon size={28} />
+              </button>
+              <span className="call-ctl-label" aria-hidden="true">End</span>
+            </div>
+          </>
+        ) : (
+          <div className="call-ctl">
+            {(() => {
+              const label = state === "failed" ? "Try again" : state === "ended" ? "Call again" : "Call";
+              return (
+                <>
+                  <button type="button" className="call-round call-go" aria-label={label} onClick={start} disabled={checking}>
+                    <PhoneIcon size={28} />
+                  </button>
+                  <span className="call-ctl-label" aria-hidden="true">{label}</span>
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

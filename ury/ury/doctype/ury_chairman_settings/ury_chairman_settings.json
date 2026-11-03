@@ -33,7 +33,7 @@
    "label": "Audio Retention Days"
   },
   {
-   "default": "models/gemini-2.5-flash-native-audio-latest",
+   "default": "models/gemini-3.8-live",
    "description": "Gemini Live model used for Owner voice calls.",
    "fieldname": "call_model",
    "fieldtype": "Data",

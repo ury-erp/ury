@@ -1,5 +1,6 @@
 """Pure unittest tests for ury.ury.api.chairman_chat_list_pure (no frappe needed)."""
 
+import datetime
 import importlib.util
 import os
 import unittest
@@ -29,6 +30,23 @@ class TestHelpers(unittest.TestCase):
 	def test_strip_language_hint(self):
 		self.assertEqual(pure.strip_language_hint("hi" + HINT), "hi")
 		self.assertEqual(pure.strip_language_hint(None), "")
+
+	def test_strip_both_hints_any_order(self):
+		d = pure.date_hint(datetime.date(2026, 11, 3))
+		self.assertEqual(pure.strip_language_hint("hi" + HINT + "\n" + d), "hi")
+		self.assertEqual(pure.strip_language_hint("hi\n\n" + d), "hi")
+		self.assertEqual(pure.strip_language_hint("hi\n\n" + d + HINT), "hi")
+		self.assertEqual(pure.strip_language_hint("a [b] c" + HINT + "\n" + d), "a [b] c")
+		self.assertEqual(pure.clean_title("x" + HINT + "\n" + d), "x")
+
+	def test_date_hint(self):
+		self.assertEqual(
+			pure.date_hint(datetime.date(2026, 11, 3)),
+			"[Today is Tuesday 2026-11-03; yesterday was Monday 2026-11-02. For 'yesterday' use 2026-11-02 "
+			"(or leave the date empty); only use 2026-11-03 for 'today'. Use exact YYYY-MM-DD dates and never guess the year.]",
+		)
+		self.assertIn("Sunday 2025-12-28", pure.date_hint("2025-12-28"))
+		self.assertIn("yesterday was Wednesday 2025-12-31", pure.date_hint(datetime.date(2026, 1, 1)))
 
 	def test_clean_title(self):
 		self.assertEqual(pure.clean_title("a\nb" + HINT), "a b")

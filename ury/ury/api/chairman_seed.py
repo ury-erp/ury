@@ -10,7 +10,7 @@ except ImportError:  # pure unit tests run from the api directory
 AGENT = "URY Chairman Assistant"
 PROVIDER = "Google"
 MODEL = "gemini-3-flash-preview"
-TTS_MODEL = "gemini-3.1-flash-tts-preview"
+TTS_MODEL = "gemini-3.8-flash-tts"
 STT_MODEL = "gemini-flash-latest"
 
 INSTRUCTIONS = (
