@@ -18,6 +18,7 @@ export default function App() {
   const [sheet, setSheet] = useState(false);
   const [wa, setWa] = useState(false);
   const [authLost, setAuthLost] = useState(false);
+  const [who, setWho] = useState<string | null>(null);
   const [update, setUpdate] = useState<ServiceWorker | null>(null);
   const deferred = useRef<BIPEvent | null>(null);
   const [canPrompt, setCanPrompt] = useState(false);
@@ -60,6 +61,13 @@ export default function App() {
   };
 
   const auth = authLost || res?.kind === "auth";
+  useEffect(() => {
+    if (!auth) { setWho(null); return; }
+    fetch("/api/method/frappe.auth.get_logged_user", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setWho(j?.message && j.message !== "Guest" ? String(j.message) : null))
+      .catch(() => setWho(null));
+  }, [auth]);
   const brief = res?.kind === "ok" && !auth ? res.brief : null;
   const huf = !!brief?.features?.huf;
   const voice = huf && !!brief?.features?.voice_call;
@@ -67,7 +75,9 @@ export default function App() {
 
   let body;
   if (auth) {
-    body = <div className="state"><h2>Please sign in</h2><p className="sub">Your session has ended or you do not have access to the brief.</p><a className="btn" href={LOGIN}>Sign in</a></div>;
+    body = who
+      ? <div className="state"><h2>No access to the brief</h2><p className="sub">You are signed in as {who}, which cannot open the brief. Sign out and use an owner account.</p><button type="button" className="primary" onClick={() => signOut()}>Sign out</button></div>
+      : <div className="state"><h2>Please sign in</h2><p className="sub">Your session has ended or you do not have access to the brief.</p><a className="btn" href={LOGIN}>Sign in</a></div>;
   } else if (!res) {
     body = <div className="skel" aria-hidden="true" />;
   } else if (res.kind === "offline") {
@@ -87,7 +97,7 @@ export default function App() {
         <div className="bar-actions">
           {whatsappEnabled(brief?.features) && <button type="button" className="ghost wa-entry" onClick={() => setWa(true)}>WhatsApp</button>}
           {!isStandalone() && <button type="button" className="ghost" onClick={() => setSheet(true)}>Add to home screen</button>}
-          <button type="button" className="ghost" onClick={() => signOut()}>Sign out</button>
+          {(!auth || who) && <button type="button" className="ghost" onClick={() => signOut()}>Sign out</button>}
         </div>
       </header>
       {update && (
