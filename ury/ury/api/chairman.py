@@ -19,7 +19,6 @@ ALLOWED_ROLES = {"URY Chairman"}
 # Test-only hook: Administrator is NOT allowed in production. Tests set this True explicitly.
 ALLOW_ADMINISTRATOR_FOR_TESTS = False
 COMPARE_LABEL = "vs same day last week"
-DRILL_DASHBOARD = "/insights/dashboards/58aq35af28"
 UNSPECIFIED = "Unspecified"
 TONE_THRESHOLD = 0.02
 WINDOW_DAYS = 7
@@ -28,6 +27,19 @@ NULL_SHARE_LIMIT = 0.10
 
 
 # ---------------------------------------------------------------- pure helpers
+
+
+def _insights_flag():
+	from ury.ury.api import analytics_env
+
+	return analytics_env.insights_flag(analytics_env.insights_installed())
+
+
+def _drill():
+	# None when Insights is not installed (no dead /insights link); see analytics_env.
+	from ury.ury.api import analytics_env
+
+	return analytics_env.dashboard_url("owner")
 
 
 def format_inr_compact(value):
@@ -313,7 +325,7 @@ def slide_yesterday(day, rows):
 		"orders": orders.get(day, 0),
 		"orders_compare": orders.get(prev, 0),
 		"chart": {"type": "spark", "series": spark_series(dates, totals)},
-		"drill": DRILL_DASHBOARD,
+		"drill": _drill(),
 		"basis": "net_sales",
 		"data_quality": "ok",
 	}
@@ -338,7 +350,7 @@ def slide_channel_mix(day, rows):
 		"delta_pct": None,
 		"tone": "neutral",
 		"chart": {"type": "donut", "series": series},
-		"drill": DRILL_DASHBOARD,
+		"drill": _drill(),
 		"basis": "net_sales",
 		"data_quality": data_quality_for(days_with, unspecified, total),
 	}
@@ -376,7 +388,7 @@ def slide_payment_mix(day):
 		"delta_pct": None,
 		"tone": "neutral",
 		"chart": {"type": "donut", "series": series},
-		"drill": DRILL_DASHBOARD,
+		"drill": _drill(),
 		"basis": "payments_received",
 		"data_quality": "ok",
 	}
@@ -443,6 +455,7 @@ def get_brief(date=None):
 		"scope": scope,
 		"slides": slides,
 		"features": compute_features(),
+		"insights": _insights_flag(),
 	}
 	if mixed:
 		scope["note"] = "Multiple company currencies in scope; amounts are not converted."

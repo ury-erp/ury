@@ -23,7 +23,6 @@ from datetime import timedelta
 import frappe
 from frappe.utils import getdate
 
-DRILL_DASHBOARD = "/insights/dashboards/58aq35af28"
 UNSPECIFIED = "Unspecified"
 WINDOW_DAYS = 7
 TOP_N = 3
@@ -33,6 +32,13 @@ MS_PER_MIN = 60000.0
 
 
 # ---------------------------------------------------------------- pure helpers
+
+
+def _drill():
+	# None when Insights is not installed (no dead /insights link); see analytics_env.
+	from ury.ury.api import analytics_env
+
+	return analytics_env.dashboard_url("owner")
 
 
 def _chairman():
@@ -280,7 +286,7 @@ def _slide(sid, title, headline, **kw):
 		"delta_label": None,
 		"tone": "neutral",
 		"chart": {"type": "bar", "series": []},
-		"drill": DRILL_DASHBOARD,
+		"drill": _drill(),
 		"basis": "net_sales",
 		"status": "ok",
 		"data_quality": "ok",
