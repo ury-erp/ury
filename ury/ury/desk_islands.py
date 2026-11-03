@@ -126,7 +126,8 @@ def islands_supported():
 		frappe = _frappe()
 		if "insights" not in (frappe.get_installed_apps() or []):
 			return False
-		return bool(frappe.get_meta("Dashboard").has_field(CLAIM_FIELD))
+		# Uncached: during migrate the doctype sync can land after the meta was cached.
+		return bool(frappe.get_meta("Dashboard", cached=False).has_field(CLAIM_FIELD))
 	except Exception:
 		return False
 
