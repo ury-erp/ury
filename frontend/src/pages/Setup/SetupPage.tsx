@@ -7,6 +7,7 @@ import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 import { SwitchCard } from '@ury/ui';
+import { __ } from '../../i18n';
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -71,7 +72,7 @@ export default function SetupPage() {
         const formattedLangs = rawLangs
           .map((l: any) => {
             const val = typeof l === 'string' ? l : (l.name || l.value || l.label);
-            if (val === 'English') return { value: 'English', label: 'English' };
+            if (val === 'English') return { value: 'English', label: __('English') };
             if (val === 'العربية' || val === 'Arabic') return { value: 'Arabic', label: 'عربي' };
             if (val === 'Français' || val === 'French') return { value: 'French', label: 'français' };
             return null;
@@ -191,7 +192,7 @@ export default function SetupPage() {
       }
       finishSetup(pending);
     } catch (err: any) {
-      setError(err?.message || 'An error occurred during setup');
+      setError(err?.message || __('An error occurred during setup'));
       setSubmitting(false);
     }
   }, [finishSetup]);
@@ -253,7 +254,7 @@ export default function SetupPage() {
         />
         
         <div>
-          <h3 className="text-lg font-semibold text-foreground mb-4">Installation Type</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">{__('Installation Type')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {setupSchema.installationTypes?.map((type: any) => (
               <InstallationTypeCard 
@@ -268,8 +269,8 @@ export default function SetupPage() {
 
         <SwitchCard
           id="setup-ury-demo"
-          label="Set up with demo data"
-          description="Adds a sample branch, rooms, tables, menu, and POS you can change or delete later."
+          label={__('Set up with demo data')}
+          description={__('Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.')}
           checked={setupUryDemo}
           onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
           disabled={submitting}
@@ -285,8 +286,8 @@ export default function SetupPage() {
           eventName="setup_task"
           description={
             setupUryDemo
-              ? 'This can take a few minutes if demo data is on.'
-              : 'Setting things up, this usually takes less than a minute.'
+              ? __('This can take a few minutes if demo data is on.')
+              : __('Setting things up, this usually takes less than a minute.')
           }
           onStepChange={setActiveIndex}
           onReady={doApiCall}

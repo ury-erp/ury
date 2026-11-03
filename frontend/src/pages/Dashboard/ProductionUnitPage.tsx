@@ -6,6 +6,7 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { __ } from '../../i18n';
 
 interface ProductionUnitRecord {
   name: string;
@@ -199,12 +200,12 @@ export const ProductionUnitPage: React.FC = () => {
     e.preventDefault();
     const prodName = newUnit.production_unit_name.trim();
     if (!prodName) {
-      showToast.error('Production Unit Name is required');
+      showToast.error(__('Production Unit Name is required'));
       return;
     }
 
     if (!newUnit.department) {
-      showToast.error('Department is required');
+      showToast.error(__('Department is required'));
       return;
     }
 
@@ -213,13 +214,13 @@ export const ProductionUnitPage: React.FC = () => {
       .filter(g => g);
 
     if (selectedGroups.length === 0) {
-      showToast.error('Please select at least one Item Group');
+      showToast.error(__('Please select at least one Item Group'));
       return;
     }
 
     const hasDup = selectedGroups.some((group, idx) => selectedGroups.indexOf(group) !== idx);
     if (hasDup) {
-      showToast.error('Duplicate Item Groups are not allowed');
+      showToast.error(__('Duplicate Item Groups are not allowed'));
       return;
     }
 
@@ -239,7 +240,7 @@ export const ProductionUnitPage: React.FC = () => {
         item_groups: [...selectedGroups].sort(),
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
-        showToast.warning('No changes in document');
+        showToast.warning(__('No changes in document'));
         return;
       }
     }
@@ -275,10 +276,10 @@ export const ProductionUnitPage: React.FC = () => {
       }
       fetchUnits();
       setIsDrawerOpen(false);
-      showToast.success(`Production Unit ${editingUnit ? 'updated' : 'added'} successfully`);
+      showToast.success(__('Production Unit {0} successfully', [editingUnit ? 'updated' : 'added']));
     } catch (err: any) {
       console.error('Failed to save Production Unit', err);
-      let errorMessage = 'Failed to save Production Unit';
+      let errorMessage = __('Failed to save Production Unit');
       if (err._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -304,10 +305,10 @@ export const ProductionUnitPage: React.FC = () => {
       <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Production Unit</span>
+          <span>{__('Add Production Unit')}</span>
         </Button>
       </div>
 
@@ -320,25 +321,25 @@ export const ProductionUnitPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Factory className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Production Units Configured</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{__('No Production Units Configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">
-            Add production units to organize kitchen routing for item groups.
+            {__('Add production units to organize kitchen routing for item groups.')}
           </p>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Production Unit</span>
+            <span>{__('Add Production Unit')}</span>
           </Button>
         </Card>
       ) : (
         <DataTable<ProductionUnitRecord>
           columns={[
-            { key: 'production', header: 'Production Unit', render: (row) => <span className="font-semibold">{row.production || row.production_unit_name || row.name}</span> },
-            { key: 'branch', header: 'Branch', render: (row) => row.branch || 'Main' },
-            { key: 'department', header: 'Department', render: (row) => row.department || '-' },
-            { key: 'item_groups', header: 'Item Groups', render: (row) => {
+            { key: 'production', header: __('Production Unit'), render: (row) => <span className="font-semibold">{row.production || row.production_unit_name || row.name}</span> },
+            { key: 'branch', header: __('Branch'), render: (row) => row.branch || 'Main' },
+            { key: 'department', header: __('Department'), render: (row) => row.department || '-' },
+            { key: 'item_groups', header: __('Item Groups'), render: (row) => {
               let itemGroupsStr = '';
               if (Array.isArray(row.item_groups)) {
                 itemGroupsStr = row.item_groups.map((ig: any) => ig.item_group).join(', ');
@@ -347,12 +348,12 @@ export const ProductionUnitPage: React.FC = () => {
               }
               return itemGroupsStr || '-';
             }},
-            { key: 'actions', header: 'Actions', align: 'right', render: (row) => (
+            { key: 'actions', header: __('Actions'), align: 'right', render: (row) => (
               <Button
                 variant="ghost"
                 onClick={() => openEditDrawer(row)}
                 className="text-gray-500 hover:text-primary"
-                title="Edit Production Unit"
+                title={__('Edit Production Unit')}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
@@ -366,61 +367,60 @@ export const ProductionUnitPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingUnit ? 'Edit Production Unit' : 'Add Production Unit'}
+        title={editingUnit ? __('Edit Production Unit') : __('Add Production Unit')}
       >
         <form onSubmit={handleSaveUnit} className="space-y-5 text-sm">
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">
-              Production Unit Name <span className="text-red-500">*</span>
+              {__('Production Unit Name')} <span className="text-red-500">*</span>
             </label>
             <Input
               value={newUnit.production_unit_name}
               onChange={(e) => setNewUnit({ ...newUnit, production_unit_name: e.target.value })}
               required
-              placeholder="e.g. Main Kitchen, Bar"
+              placeholder={__('e.g. Main Kitchen, Bar')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">
-              Branch <span className="text-red-500">*</span>
+              {__('Branch')} <span className="text-red-500">*</span>
             </label>
             <SearchableSelect
               id="branch"
               value={newUnit.branch}
               onChange={(_, val) => setNewUnit({ ...newUnit, branch: val, pos_profile: '' })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
-              placeholder="Select Branch..."
+              placeholder={__('Select Branch...')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">
-              Department <span className="text-red-500">*</span>
+              {__('Department')} <span className="text-red-500">*</span>
             </label>
             <SearchableSelect
               id="department"
               value={newUnit.department}
               onChange={(_, val) => setNewUnit({ ...newUnit, department: val })}
               options={departments.map(d => ({ value: d.name, label: d.name }))}
-              placeholder="Select Department..."
+              placeholder={__('Select Department...')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">
-              POS Profile
+              {__('POS Profile')}
             </label>
             <SearchableSelect
               id="pos_profile"
               value={newUnit.pos_profile}
               onChange={(_, val) => setNewUnit({ ...newUnit, pos_profile: val })}
               options={posProfiles.map(p => ({ value: p.name, label: p.name }))}
-              placeholder="Select POS Profile..."
+              placeholder={__('Select POS Profile...')}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Options are limited to POS Profiles for the selected Branch. Branch and Warehouse
-              on this unit are always taken from the chosen POS Profile when it is saved.
+              {__('Options are limited to POS Profiles for the selected Branch. Branch and Warehouse on this unit are always taken from the chosen POS Profile when it is saved.')}
             </p>
           </div>
 
@@ -428,7 +428,7 @@ export const ProductionUnitPage: React.FC = () => {
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <label className="block font-semibold text-gray-700 text-sm">
-                Item Groups <span className="text-red-500">*</span>
+                {__('Item Groups')} <span className="text-red-500">*</span>
               </label>
             </div>
 
@@ -454,11 +454,11 @@ export const ProductionUnitPage: React.FC = () => {
                         id={`item-group-${index}`}
                         value={row.item_group}
                         options={filteredOptions}
-                        placeholder="Select Item Group..."
+                        placeholder={__('Select Item Group...')}
                         onChange={(_, value) => {
                           const isDup = itemGroupRows.some((r, rIdx) => r.item_group === value && rIdx !== index);
                           if (isDup) {
-                            showToast.error('This Item Group is already selected');
+                            showToast.error(__('This Item Group is already selected'));
                             return;
                           }
                           const updatedRows = [...itemGroupRows];
@@ -476,7 +476,7 @@ export const ProductionUnitPage: React.FC = () => {
                           setItemGroupRows(itemGroupRows.filter((_, idx) => idx !== index));
                         }}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-auto shrink-0"
-                        title="Delete Row"
+                        title={__('Delete Row')}
                       >
                         <Trash2 className="w-5 h-5" />
                       </Button>
@@ -495,7 +495,7 @@ export const ProductionUnitPage: React.FC = () => {
               className="w-full py-2 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 text-xs font-semibold mt-2"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Item Group</span>
+              <span>{__('Add Item Group')}</span>
             </Button>
           </div>
 
@@ -507,14 +507,14 @@ export const ProductionUnitPage: React.FC = () => {
               disabled={saving}
               className="font-semibold"
             >
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button
               type="submit"
               disabled={saving}
               className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{editingUnit ? 'Save Changes' : 'Save Unit'}</span>
+              <span>{editingUnit ? __('Save Changes') : __('Save Unit')}</span>
             </Button>
           </div>
         </form>

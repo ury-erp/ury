@@ -6,6 +6,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface ServiceRow {
   order_type: string;
@@ -21,10 +22,10 @@ interface ServiceWiseSalesData {
 }
 
 const columns: DataTableColumn<ServiceRow>[] = [
-  { key: 'order_type', header: 'Order Type' },
-  { key: 'order_count', header: 'Orders', align: 'right' },
-  { key: 'revenue', header: 'Revenue', render: (r) => formatCurrency(r.revenue), align: 'right' },
-  { key: 'avg_order_value', header: 'Avg Order Value', render: (r) => formatCurrency(r.avg_order_value), align: 'right' },
+  { key: 'order_type', header: __('Order Type') },
+  { key: 'order_count', header: __('Orders'), align: 'right' },
+  { key: 'revenue', header: __('Revenue'), render: (r) => formatCurrency(r.revenue), align: 'right' },
+  { key: 'avg_order_value', header: __('Avg Order Value'), render: (r) => formatCurrency(r.avg_order_value), align: 'right' },
   { key: 'percentage_of_total', header: '% of Total', render: (r) => `${r.percentage_of_total}%`, align: 'right' },
 ];
 
@@ -50,7 +51,7 @@ export function ServiceWiseSales() {
       });
       setData(res.message ?? (res as unknown as ServiceWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +64,8 @@ export function ServiceWiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Service Wise Sales"
-        description={`Revenue by order type ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Service Wise Sales')}
+        description={__('Revenue by order type {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -75,21 +76,21 @@ export function ServiceWiseSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Revenue', value: formatCurrency(data.summary.total_revenue) },
-              { label: 'Total Orders', value: data.summary.total_orders },
-              { label: 'Avg Order Value', value: formatCurrency(data.summary.avg_order_value) },
+              { label: __('Total Revenue'), value: formatCurrency(data.summary.total_revenue) },
+              { label: __('Total Orders'), value: data.summary.total_orders },
+              { label: __('Avg Order Value'), value: formatCurrency(data.summary.avg_order_value) },
             ]}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-2">
               <PieChartCard
-                title="Revenue by Order Type"
+                title={__('Revenue by Order Type')}
                 data={data.by_service_type}
                 dataKey="revenue"
                 nameKey="order_type"

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useConfigure, RoomData, TableData } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { __ } from '../../../i18n';
 
 /** Below this total, there's no real "many tables" problem yet , leave every group open. */
 const COLLAPSE_THRESHOLD = 10;
@@ -42,7 +43,7 @@ function TableRow({ table, renameTable, updateTableSeats, deleteTable, canDelete
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1">
           <label htmlFor={`table-name-${table.id}`} className="sr-only">
-            Table name
+            {__('Table name')}
           </label>
           <Input
             id={`table-name-${table.id}`}
@@ -50,14 +51,14 @@ function TableRow({ table, renameTable, updateTableSeats, deleteTable, canDelete
             value={nameDraft}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNameDraft(e.target.value)}
             onBlur={commitName}
-            placeholder="e.g. T-01"
+            placeholder={__('e.g. T-01')}
             className="w-full text-sm bg-background"
           />
         </div>
 
         <div className="space-y-1">
           <label htmlFor={`table-seats-${table.id}`} className="sr-only">
-            Seats
+            {__('Seats')}
           </label>
           <Input
             id={`table-seats-${table.id}`}
@@ -67,7 +68,7 @@ function TableRow({ table, renameTable, updateTableSeats, deleteTable, canDelete
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               updateTableSeats(table.id, parseInt(e.target.value, 10) || 0)
             }
-            placeholder="Seats"
+            placeholder={__('Seats')}
             className="w-full text-sm bg-background"
           />
         </div>
@@ -79,7 +80,7 @@ function TableRow({ table, renameTable, updateTableSeats, deleteTable, canDelete
           variant="danger"
           size="icon"
           onClick={() => deleteTable(table.id)}
-          aria-label="Delete table"
+          aria-label={__('Delete table')}
           className="text-destructive hover:text-destructive hover:bg-destructive-tint self-end md:self-center shrink-0 p-2 h-auto"
         >
           <Trash2 className="w-4 h-4" />
@@ -138,16 +139,16 @@ function RoomGroup({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex items-center gap-2 text-left text-sm font-semibold text-foreground flex-1 min-w-0"
+          className="flex items-center gap-2 text-start text-sm font-semibold text-foreground flex-1 min-w-0"
         >
           {expanded ? (
             <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
           ) : (
-            <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground rtl:-scale-x-100" />
           )}
-          <span className="truncate">{room.name || 'Untitled room'}</span>
+          <span className="truncate">{room.name || __('Untitled room')}</span>
           <span className="text-xs font-normal text-muted-foreground shrink-0">
-            {roomTables.length} table{roomTables.length === 1 ? '' : 's'}
+            {roomTables.length === 1 ? __('1 table') : __('{0} tables', [roomTables.length])}
           </span>
         </button>
 
@@ -155,7 +156,7 @@ function RoomGroup({
           <div className="flex items-center gap-2 shrink-0">
             {flash && <span className="text-xs text-primary">{flash}</span>}
             <label htmlFor={`bulk-seats-${room.id}`} className="sr-only">
-              Set seats for all tables in {room.name}
+              {__('Set seats for all tables in')} {room.name}
             </label>
             <Input
               id={`bulk-seats-${room.id}`}
@@ -163,11 +164,11 @@ function RoomGroup({
               min={1}
               value={bulkSeats}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBulkSeats(e.target.value)}
-              placeholder="Seats"
+              placeholder={__('Seats')}
               className="w-20 text-sm bg-background"
             />
             <Button type="button" variant="outline" onClick={applyBulkSeats}>
-              Set seats for all
+              {__('Set seats for all')}
             </Button>
           </div>
         )}
@@ -177,7 +178,7 @@ function RoomGroup({
         <div className="p-4 pt-2 space-y-1 divide-y divide-border">
           {roomTables.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">
-              No tables yet , set a table count for this room in the Rooms section to add tables here.
+              {__('No tables yet , set a table count for this room in the Rooms section to add tables here.')}
             </p>
           ) : (
             roomTables.map((table) => (
@@ -236,7 +237,7 @@ export function TableSection() {
 
         {orphanTables.length > 0 && (
           <div className="rounded-lg border border-border bg-card p-4 space-y-1 divide-y divide-border">
-            <p className="text-xs font-medium text-muted-foreground pb-2">Other tables</p>
+            <p className="text-xs font-medium text-muted-foreground pb-2">{__('Other tables')}</p>
             {orphanTables.map((table) => (
               <TableRow
                 key={table.id}

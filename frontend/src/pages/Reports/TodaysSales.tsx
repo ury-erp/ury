@@ -5,6 +5,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
+import { __ } from '../../i18n';
 
 interface TodaySalesData {
   branch: string | null;
@@ -66,16 +67,16 @@ interface ItemWiseSalesData {
 const REFRESH_INTERVAL_MS = 15000;
 
 const serviceColumns: DataTableColumn<ServiceRow>[] = [
-  { key: 'order_type', header: 'Order Type' },
+  { key: 'order_type', header: __('Order Type') },
   { key: 'order_count', header: '# Orders', align: 'right' },
-  { key: 'revenue', header: 'Revenue', render: (r) => formatCurrency(r.revenue), align: 'right' },
+  { key: 'revenue', header: __('Revenue'), render: (r) => formatCurrency(r.revenue), align: 'right' },
   { key: 'percentage_of_total', header: '% of Total', render: (r) => `${r.percentage_of_total}%`, align: 'right' },
 ];
 
 const topItemColumns: DataTableColumn<ItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'qty', header: 'Qty', align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'item_name', header: __('Item') },
+  { key: 'qty', header: __('Qty'), align: 'right' },
+  { key: 'amount', header: __('Amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 export function TodaysSales() {
@@ -117,7 +118,7 @@ export function TodaysSales() {
       setServiceData(serviceRes.message ?? (serviceRes as unknown as ServiceWiseSalesData));
       setTopItemsData(topItemsRes.message ?? (topItemsRes as unknown as ItemWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -137,13 +138,13 @@ export function TodaysSales() {
 
   const kpiItems: KpiItemProps[] = data
     ? [
-        { label: 'Total Invoices', value: data.total_invoices },
-        { label: 'Item Total', value: formatCurrency(data.item_total) },
-        { label: 'Total Taxes & Charges', value: formatCurrency(data.total_taxes_and_charges) },
-        { label: 'Grand Total', value: formatCurrency(data.grand_total), tone: 'success' },
-        { label: 'Round Off', value: formatCurrency(data.round_off) },
+        { label: __('Total Invoices'), value: data.total_invoices },
+        { label: __('Item Total'), value: formatCurrency(data.item_total) },
+        { label: __('Total Taxes & Charges'), value: formatCurrency(data.total_taxes_and_charges) },
+        { label: __('Grand Total'), value: formatCurrency(data.grand_total), tone: 'success' },
+        { label: __('Round Off'), value: formatCurrency(data.round_off) },
         {
-          label: 'Cash Discounts',
+          label: __('Cash Discounts'),
           value: formatCurrency(data.cash_discounts),
           hint: data.cash_discounts !== 0 ? (data.cash_discounts < 0 ? 'given away' : 'owed to house') : undefined,
         },
@@ -153,13 +154,13 @@ export function TodaysSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Today's Sales"
+        title={__("Today's Sales")}
         description={`${data ? `${data.day_of_week}, ${data.query_date}` : 'Live sales snapshot'}${activeBranchId === 'all' ? ' · All Branches' : ''}`}
         actions={
           <>
             <DatePicker
               id="report-date"
-              aria-label="Report date"
+              aria-label={__('Report date')}
               value={date}
               maxDate={toApiDate(new Date())}
               onChange={(_id, next) => setDate(next)}
@@ -167,7 +168,7 @@ export function TodaysSales() {
             />
             {data && (
               <span className="text-xs text-muted-foreground">
-                Updated {new Date(data.last_updated_at).toLocaleTimeString()}
+                {__('Updated')} {new Date(data.last_updated_at).toLocaleTimeString()}
               </span>
             )}
           </>
@@ -181,13 +182,13 @@ export function TodaysSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip items={kpiItems} />
 
           <BarChartCard
-            title="Sales by Time of Day"
+            title={__('Sales by Time of Day')}
             data={timeWiseData?.intervals ?? []}
             xKey="interval_label"
             yKeys={['sales']}
@@ -197,7 +198,7 @@ export function TodaysSales() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-2">
               <PieChartCard
-                title="Revenue by Order Type"
+                title={__('Revenue by Order Type')}
                 data={serviceData?.by_service_type ?? []}
                 dataKey="revenue"
                 nameKey="order_type"
@@ -214,7 +215,7 @@ export function TodaysSales() {
 
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              Top Selling Items Today
+              {__('Top Selling Items Today')}
             </h2>
             <DataTable
               columns={topItemColumns}

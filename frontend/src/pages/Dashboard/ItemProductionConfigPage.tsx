@@ -19,6 +19,7 @@ import { dashboardService } from '../../services/dashboard';
 import { searchLinkOptions, withSelectedOption, type LinkFilter } from '../../services/linkSearch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { __ } from '../../i18n';
 
 interface ItemProductionConfigRecord {
   name: string;
@@ -330,10 +331,10 @@ export const ItemProductionConfigPage: React.FC = () => {
       }
       fetchConfigs();
       setIsDrawerOpen(false);
-      showToast.success(`Item Production Configuration ${editingConfig ? 'updated' : 'added'} successfully`);
+      showToast.success(__('Item Production Configuration {0} successfully', [editingConfig ? 'updated' : 'added']));
     } catch (err: any) {
       console.error('Failed to save Item Production Configuration', err);
-      let errorMessage = 'Failed to save Item Production Configuration';
+      let errorMessage = __('Failed to save Item Production Configuration');
       if (err._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -360,10 +361,10 @@ export const ItemProductionConfigPage: React.FC = () => {
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Item Production Configuration</span>
+          <span>{__('Add Item Production Configuration')}</span>
         </Button>
       </div>
 
@@ -374,26 +375,26 @@ export const ItemProductionConfigPage: React.FC = () => {
           </div>
         ) : configs.length === 0 ? (
           <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
-            <span>Map items to production units and departments to enable kitchen/bar routing.</span>
+            <span>{__('Map items to production units and departments to enable kitchen/bar routing.')}</span>
             <Button
               onClick={openAddDrawer}
               variant="chrome"
               size="compactSm"
-              className="ml-auto"
+              className="ms-auto"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Config</span>
+              <span>{__('Add Config')}</span>
             </Button>
           </div>
         ) : (
           <DataTable<ItemProductionConfigRecord>
             columns={[
-              { key: 'item', header: 'Item', render: (row) => <span className="font-semibold">{row.item}</span> },
-              { key: 'branch', header: 'Branch', render: (row) => row.branch },
-              { key: 'department', header: 'Department', render: (row) => row.department || '-' },
-              { key: 'production_unit', header: 'Production Unit', render: (row) => row.production_unit || '-' },
-              { key: 'production_policy', header: 'Policy', render: (row) => row.production_policy || '-' },
-              { key: 'active', header: 'Active', align: 'right', render: (row) => (row.active ? 'Yes' : 'No') },
+              { key: 'item', header: __('Item'), render: (row) => <span className="font-semibold">{row.item}</span> },
+              { key: 'branch', header: __('Branch'), render: (row) => row.branch },
+              { key: 'department', header: __('Department'), render: (row) => row.department || '-' },
+              { key: 'production_unit', header: __('Production Unit'), render: (row) => row.production_unit || '-' },
+              { key: 'production_policy', header: __('Policy'), render: (row) => row.production_policy || '-' },
+              { key: 'active', header: __('Active'), align: 'right', render: (row) => (row.active ? 'Yes' : 'No') },
             ]}
             rows={configs}
             onRowClick={openEditDrawer}
@@ -404,12 +405,12 @@ export const ItemProductionConfigPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingConfig ? 'Edit Item Production Configuration' : 'Add Item Production Configuration'}
+        title={editingConfig ? __('Edit Item Production Configuration') : __('Add Item Production Configuration')}
       >
         <form onSubmit={handleSave} className="space-y-4 text-sm">
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="item">
-              Item
+              {__('Item')}
             </label>
             <Autocomplete
               id="item"
@@ -426,13 +427,13 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('item', query, form)}
               options={linkOptions.item}
               searching={!!linkSearching.item}
-              placeholder="Search Item"
+              placeholder={__('Search Item')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="branch">
-              Branch
+              {__('Branch')}
             </label>
             <Autocomplete
               id="branch"
@@ -449,13 +450,13 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('branch', query, form)}
               options={linkOptions.branch}
               searching={!!linkSearching.branch}
-              placeholder="Search Branch"
+              placeholder={__('Search Branch')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="department">
-              Department
+              {__('Department')}
             </label>
             <Autocomplete
               id="department"
@@ -464,13 +465,13 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('department', query, form)}
               options={linkOptions.department}
               searching={!!linkSearching.department}
-              placeholder="Search Department (optional)"
+              placeholder={__('Search Department (optional)')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="production_unit">
-              Production Unit
+              {__('Production Unit')}
             </label>
             <Autocomplete
               id="production_unit"
@@ -479,13 +480,13 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('production_unit', query, form)}
               options={linkOptions.production_unit}
               searching={!!linkSearching.production_unit}
-              placeholder="Search Production Unit (optional)"
+              placeholder={__('Search Production Unit (optional)')}
             />
           </div>
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="production_policy">
-              Production Policy
+              {__('Production Policy')}
             </label>
             <Select
               id="production_policy"
@@ -500,7 +501,7 @@ export const ItemProductionConfigPage: React.FC = () => {
                     : {}),
                 }));
               }}
-              placeholder="Select Policy (optional)"
+              placeholder={__('Select Policy (optional)')}
             >
               {displayPolicyOptions.map((opt) => (
                 <SelectItem key={opt} value={opt}>
@@ -513,7 +514,7 @@ export const ItemProductionConfigPage: React.FC = () => {
           {form.production_policy === 'BUNDLE' && (
             <div>
               <label className="block font-semibold text-muted-foreground mb-1" htmlFor="product_bundle">
-                Product Bundle
+                {__('Product Bundle')}
               </label>
               <Autocomplete
                 id="product_bundle"
@@ -522,16 +523,16 @@ export const ItemProductionConfigPage: React.FC = () => {
                 onSearch={(query) => runLinkSearch('product_bundle', query, form)}
                 options={linkOptions.product_bundle}
                 searching={!!linkSearching.product_bundle}
-                placeholder={form.item ? 'Search Product Bundle' : 'Select an Item first'}
+                placeholder={form.item ? __('Search Product Bundle') : __('Select an Item first')}
                 disabled={!form.item}
               />
-              <p className="text-xs text-text-tertiary mt-1">Product Bundle must belong to the selected Item.</p>
+              <p className="text-xs text-text-tertiary mt-1">{__('Product Bundle must belong to the selected Item.')}</p>
             </div>
           )}
 
           {form.production_policy === 'PRE_PRODUCED' && (
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Sourcing Mode</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Sourcing Mode')}</label>
               <Select
                 id="sourcing_mode"
                 value={form.sourcing_mode}
@@ -549,7 +550,7 @@ export const ItemProductionConfigPage: React.FC = () => {
           {form.production_policy === 'PRE_PRODUCED' && form.sourcing_mode === 'EXTERNAL_RECEIPT' && (
             <div>
               <label className="block font-semibold text-muted-foreground mb-1" htmlFor="external_receiving_warehouse">
-                External Receiving Warehouse
+                {__('External Receiving Warehouse')}
               </label>
               <Autocomplete
                 id="external_receiving_warehouse"
@@ -558,14 +559,14 @@ export const ItemProductionConfigPage: React.FC = () => {
                 onSearch={(query) => runLinkSearch('external_receiving_warehouse', query, form)}
                 options={linkOptions.external_receiving_warehouse}
                 searching={!!linkSearching.external_receiving_warehouse}
-                placeholder="Search Warehouse (optional)"
+                placeholder={__('Search Warehouse (optional)')}
               />
             </div>
           )}
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="bom">
-              BOM
+              {__('BOM')}
             </label>
             <Autocomplete
               id="bom"
@@ -574,18 +575,18 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('bom', query, form)}
               options={linkOptions.bom}
               searching={!!linkSearching.bom}
-              placeholder={form.item ? 'Search BOM' : 'Select an Item first'}
+              placeholder={form.item ? __('Search BOM') : __('Select an Item first')}
               disabled={!form.item}
             />
-            <p className="text-xs text-text-tertiary mt-1">BOM must belong to the selected Item.</p>
+            <p className="text-xs text-text-tertiary mt-1">{__('BOM must belong to the selected Item.')}</p>
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Availability Mode</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Availability Mode')}</label>
             <Select
               value={form.availability_mode}
               onChange={(e) => setForm({ ...form, availability_mode: e.target.value })}
-              placeholder="Select Availability Mode (optional)"
+              placeholder={__('Select Availability Mode (optional)')}
             >
               {AVAILABILITY_MODE_OPTIONS.map((opt) => (
                 <SelectItem key={opt} value={opt}>
@@ -595,15 +596,14 @@ export const ItemProductionConfigPage: React.FC = () => {
             </Select>
             {form.availability_mode === 'Stock Available' && (
               <p className="text-xs text-text-tertiary mt-1">
-                Stock Available checks warehouse stock or recipe capacity directly and bypasses all
-                Sales Plan restrictions for this item.
+                {__('Stock Available checks warehouse stock or recipe capacity directly and bypasses all Sales Plan restrictions for this item.')}
               </p>
             )}
           </div>
 
           <div>
             <label className="block font-semibold text-muted-foreground mb-1" htmlFor="direct_retail_warehouse">
-              Direct Retail Warehouse
+              {__('Direct Retail Warehouse')}
             </label>
             <Autocomplete
               id="direct_retail_warehouse"
@@ -612,7 +612,7 @@ export const ItemProductionConfigPage: React.FC = () => {
               onSearch={(query) => runLinkSearch('direct_retail_warehouse', query, form)}
               options={linkOptions.direct_retail_warehouse}
               searching={!!linkSearching.direct_retail_warehouse}
-              placeholder="Search Warehouse (optional)"
+              placeholder={__('Search Warehouse (optional)')}
             />
           </div>
 
@@ -624,7 +624,7 @@ export const ItemProductionConfigPage: React.FC = () => {
               onChange={(e) => setForm({ ...form, active: e.target.checked })}
             />
             <label htmlFor="active" className="font-semibold text-muted-foreground">
-              Active
+              {__('Active')}
             </label>
           </div>
 
@@ -642,12 +642,12 @@ export const ItemProductionConfigPage: React.FC = () => {
               }
             />
             <label htmlFor="controlled_by_sales_plan" className="font-semibold text-muted-foreground">
-              Controlled by Sales Plan
+              {__('Controlled by Sales Plan')}
             </label>
           </div>
 
           {form.controlled_by_sales_plan && (
-            <div className="flex items-center gap-2 pl-6">
+            <div className="flex items-center gap-2 ps-6">
               <Checkbox
                 id="allow_over_plan_sale"
                 size="sm"
@@ -655,14 +655,14 @@ export const ItemProductionConfigPage: React.FC = () => {
                 onChange={(e) => setForm({ ...form, allow_over_plan_sale: e.target.checked })}
               />
               <label htmlFor="allow_over_plan_sale" className="font-semibold text-muted-foreground">
-                Allow Over-Plan Sale
+                {__('Allow Over-Plan Sale')}
               </label>
             </div>
           )}
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-border">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button
               type="submit"
@@ -671,7 +671,7 @@ export const ItemProductionConfigPage: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 {saving && <Spinner className="w-4 h-4" hideMessage />}
-                <span>{saving ? 'Saving...' : editingConfig ? 'Save Changes' : 'Save Configuration'}</span>
+                <span>{saving ? __('Saving...') : editingConfig ? __('Save Changes') : __('Save Configuration')}</span>
               </div>
             </Button>
           </div>

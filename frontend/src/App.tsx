@@ -67,6 +67,7 @@ import { EmployeeCommission } from './pages/Reports/EmployeeCommission';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
+import { __ } from './i18n';
 
 // `/ury/pos/*` — pos/ route tree merged in per PLAN.md
 // tracks/sa-app-consolidation §7 Phase 1. Lazy-loaded per route (not just
@@ -90,7 +91,7 @@ function PosRouteFallback() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-muted-foreground">{__('Loading…')}</p>
       </div>
     </div>
   );
@@ -139,7 +140,7 @@ function SetupGuard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{__('Loading…')}</p>
         </div>
       </div>
     );

@@ -7,6 +7,7 @@ import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { __ } from '../../i18n';
 
 interface UryRoomRecord {
   name: string;
@@ -158,7 +159,7 @@ export const RoomPage: React.FC = () => {
           block_takeaway: newRoom.block_takeaway ? 1 : 0,
         };
         if (JSON.stringify(original) === JSON.stringify(current)) {
-          showToast.warning('No changes in document');
+          showToast.warning(__('No changes in document'));
           setSaving(false);
           return;
         }
@@ -204,11 +205,11 @@ export const RoomPage: React.FC = () => {
           },
         });
       }
-      showToast.success('Room saved');
+      showToast.success(__('Room saved'));
       fetchRooms();
       setIsDrawerOpen(false);
     } catch (err: any) {
-      showToast.error(err.message || 'Failed to save room');
+      showToast.error(err.message || __('Failed to save room'));
       console.error('Failed to save URY Room', err);
     } finally {
       setSaving(false);
@@ -221,10 +222,10 @@ export const RoomPage: React.FC = () => {
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Room</span>
+          <span>{__('Add Room')}</span>
         </Button>
       </div>
 
@@ -237,37 +238,37 @@ export const RoomPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Layers className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Rooms Configured</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{__('No Rooms Configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">
-            Add dining rooms or zones to organize your tables.
+            {__('Add dining rooms or zones to organize your tables.')}
           </p>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Room</span>
+            <span>{__('Add Room')}</span>
           </Button>
         </Card>
       ) : (
         <>
           {(() => {
             const roomColumns: DataTableColumn<UryRoomRecord>[] = [
-              { key: 'name', header: 'Room Name' },
+              { key: 'name', header: __('Room Name') },
               {
                 key: 'room_type',
-                header: 'Room Type',
+                header: __('Room Type'),
                 render: (room) => (
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                    <Layers className="w-3 h-3 mr-1" />
-                    {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
+                    <Layers className="w-3 h-3 me-1" />
+                    {room.room_type === 'NON-AC' ? __('Non-AC') : (room.room_type || 'General')}
                   </Badge>
                 ),
               },
-              { key: 'branch', header: 'Branch', render: (room) => room.branch || 'Main' },
+              { key: 'branch', header: __('Branch'), render: (room) => room.branch || 'Main' },
               {
                 key: 'name',
-                header: 'Actions',
+                header: __('Actions'),
                 align: 'right',
                 render: (room) => (
                   <Button variant="ghost" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
@@ -277,7 +278,7 @@ export const RoomPage: React.FC = () => {
               },
             ];
 
-            return <DataTable columns={roomColumns} rows={rooms} isLoading={loading} emptyMessage="No rooms configured." />;
+            return <DataTable columns={roomColumns} rows={rooms} isLoading={loading} emptyMessage={__('No rooms configured.')} />;
           })()}
         </>
       )}
@@ -286,11 +287,11 @@ export const RoomPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingRoom ? 'Edit Room' : 'Add Room'}
+        title={editingRoom ? __('Edit Room') : __('Add Room')}
       >
         <form onSubmit={handleSaveRoom} className="space-y-4 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Room Name</label>
+            <label className="block font-semibold text-gray-700 mb-1">{__('Room Name')}</label>
             <Input
               value={newRoom.room_name}
               onChange={(e) => setNewRoom({ ...newRoom, room_name: e.target.value })}
@@ -299,47 +300,47 @@ export const RoomPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Room Type</label>
+            <label className="block font-semibold text-gray-700 mb-1">{__('Room Type')}</label>
             <SearchableSelect
               id="room_type"
               value={newRoom.room_type}
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'NON-AC', label: 'Non-AC' },
+                { value: 'NON-AC', label: __('Non-AC') },
               ]}
             />
           </div>
 
           {/* Branch field */}
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Branch</label>
+            <label className="block font-semibold text-gray-700 mb-1">{__('Branch')}</label>
             <SearchableSelect
               id="branch"
               value={newRoom.branch}
               onChange={(_, value) => setNewRoom({ ...newRoom, branch: value })}
               options={[
-                { value: '', label: 'Select Branch' },
+                { value: '', label: __('Select Branch') },
                 ...branches.map(b => ({ value: b.name, label: b.name }))
               ]}
             />
           </div>
 
           <div className="pt-4 border-t border-gray-100">
-            <h3 className="font-semibold text-gray-900 mb-3">Printer Configuration</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">{__('Printer Configuration')}</h3>
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Switch
                   id="kot_printing"
                   checked={newRoom.kot_printing}
                   onCheckedChange={(checked) => setNewRoom({ ...newRoom, kot_printing: checked })}
                 />
-                <label htmlFor="kot_printing" className="text-gray-700 cursor-pointer">Enable KOT Printing for this room</label>
+                <label htmlFor="kot_printing" className="text-gray-700 cursor-pointer">{__('Enable KOT Printing for this room')}</label>
               </div>
 
               {newRoom.kot_printing && (
                 <div>
-                  <label className="block font-medium text-gray-700 mb-1">Print Format</label>
+                  <label className="block font-medium text-gray-700 mb-1">{__('Print Format')}</label>
                   <Input
                     value={newRoom.print_format}
                     onChange={(e) => setNewRoom({ ...newRoom, print_format: e.target.value })}
@@ -347,13 +348,13 @@ export const RoomPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Switch
                   id="block_takeaway"
                   checked={newRoom.block_takeaway}
                   onCheckedChange={(checked) => setNewRoom({ ...newRoom, block_takeaway: checked })}
                 />
-                <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
+                <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">{__('Block Takeaway / Delivery Printing')}</label>
               </div>
 
             </div>
@@ -361,7 +362,7 @@ export const RoomPage: React.FC = () => {
 
           <div className="pt-4 border-t border-gray-100">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Printer Settings</h3>
+              <h3 className="font-semibold text-gray-900">{__('Printer Settings')}</h3>
               <Button
                 type="button"
                 variant="outline"
@@ -370,18 +371,18 @@ export const RoomPage: React.FC = () => {
                 }}
                 className="text-primary border-primary"
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add
+                <Plus className="w-3 h-3 me-1" />
+                {__('Add')}
               </Button>
             </div>
 
             {printerSettings.length === 0 ? (
-              <p className="text-sm text-gray-500 py-3">No printer settings configured</p>
+              <p className="text-sm text-gray-500 py-3">{__('No printer settings configured')}</p>
             ) : (
               <div className="space-y-3">
                 {printerSettings.map((setting, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-200">
-                    <div className="flex items-center space-x-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <Switch
                         checked={setting.bill === 1}
                         onCheckedChange={(checked) => {
@@ -390,7 +391,7 @@ export const RoomPage: React.FC = () => {
                           setPrinterSettings(updated);
                         }}
                       />
-                      <label className="text-sm text-gray-700 cursor-pointer">Bill</label>
+                      <label className="text-sm text-gray-700 cursor-pointer">{__('Bill')}</label>
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -403,7 +404,7 @@ export const RoomPage: React.FC = () => {
                           setPrinterSettings(updated);
                         }}
                         options={[
-                          { value: '', label: 'Select Printer' },
+                          { value: '', label: __('Select Printer') },
                           ...networkPrinters.map(p => ({ value: p.name, label: p.name }))
                         ]}
                       />
@@ -427,10 +428,10 @@ export const RoomPage: React.FC = () => {
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {editingRoom ? 'Save Changes' : 'Save Room'}
+              {editingRoom ? __('Save Changes') : __('Save Room')}
             </Button>
           </div>
         </form>

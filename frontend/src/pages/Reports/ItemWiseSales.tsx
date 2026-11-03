@@ -6,6 +6,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface ItemRow {
   item_code: string;
@@ -26,11 +27,11 @@ interface ItemWiseSalesData {
 const PAGE_SIZE = 50;
 
 const columns: DataTableColumn<ItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty', align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
-  { key: 'avg_price', header: 'Avg Price', render: (r) => formatCurrency(r.avg_price), align: 'right' },
+  { key: 'item_name', header: __('Item') },
+  { key: 'item_group', header: __('Group'), render: (r) => r.item_group || '—' },
+  { key: 'qty', header: __('Qty'), align: 'right' },
+  { key: 'amount', header: __('Amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'avg_price', header: __('Avg Price'), render: (r) => formatCurrency(r.avg_price), align: 'right' },
   { key: 'pct_of_total_amount', header: '% of Total', render: (r) => `${r.pct_of_total_amount}%`, align: 'right' },
 ];
 
@@ -61,7 +62,7 @@ export function ItemWiseSales() {
       });
       setData(res.message ?? (res as unknown as ItemWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -80,17 +81,17 @@ export function ItemWiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Item Wise Sales"
-        description={`Best-selling items ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Item Wise Sales')}
+        description={__('Best-selling items {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={
           <>
             <Input
               type="text"
-              placeholder="Search items..."
+              placeholder={__('Search items...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-40"
-              aria-label="Search items"
+              aria-label={__('Search items')}
             />
             <DateRangeFilter value={range} onChange={setRange} />
           </>
@@ -106,9 +107,9 @@ export function ItemWiseSales() {
       {data && (
         <KpiStrip
           items={[
-            { label: 'Unique Items Sold', value: data.summary.unique_items },
-            { label: 'Total Qty', value: data.summary.total_qty },
-            { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
+            { label: __('Unique Items Sold'), value: data.summary.unique_items },
+            { label: __('Total Qty'), value: data.summary.total_qty },
+            { label: __('Total Amount'), value: formatCurrency(data.summary.total_amount) },
           ]}
         />
       )}
@@ -118,18 +119,18 @@ export function ItemWiseSales() {
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Page {pagination.page} of {pagination.total_pages}
+            {__('Page {0} of {1}', [pagination.page, pagination.total_pages])}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="w-4 h-4" /> Prev
+              <ChevronLeft className="w-4 h-4 rtl:-scale-x-100" /> {__('Prev')}
             </Button>
             <Button
               variant="outline"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next <ChevronRight className="w-4 h-4" />
+              {__('Next')} <ChevronRight className="w-4 h-4 rtl:-scale-x-100" />
             </Button>
           </div>
         </div>

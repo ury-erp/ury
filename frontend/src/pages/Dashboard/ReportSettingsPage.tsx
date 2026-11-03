@@ -13,6 +13,7 @@ import {
 import { Button, Input, Select, SelectItem, Card, Spinner, Switch, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { __ } from '../../i18n';
 
 interface FixedExpenseItem {
   id: string;
@@ -54,7 +55,7 @@ function expenseAmountColumns<T extends ExpenseAmountRow>(
   return [
     {
       key: 'expense',
-      header: 'Expense',
+      header: __('Expense'),
       render: (row) => (
         <Input
           size="compact"
@@ -69,7 +70,7 @@ function expenseAmountColumns<T extends ExpenseAmountRow>(
     },
     {
       key: 'amount',
-      header: 'Amount ($)',
+      header: __('Amount ($)'),
       render: (row) => (
         <Input
           size="compact"
@@ -87,7 +88,7 @@ function expenseAmountColumns<T extends ExpenseAmountRow>(
     },
     {
       key: 'action',
-      header: 'Action',
+      header: __('Action'),
       align: 'right',
       render: (row) => (
         <button
@@ -250,7 +251,7 @@ export const ReportSettingsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to fetch report settings:', err);
-      showToast.error('Failed to load report settings');
+      showToast.error(__('Failed to load report settings'));
     } finally {
       setLoading(false);
     }
@@ -309,7 +310,7 @@ export const ReportSettingsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!branchToFetch) {
-      showToast.error('No branch selected');
+      showToast.error(__('No branch selected'));
       return;
     }
 
@@ -381,7 +382,7 @@ export const ReportSettingsPage: React.FC = () => {
       };
 
       if (JSON.stringify(original) === JSON.stringify(current)) {
-        showToast.warning('No changes in document');
+        showToast.warning(__('No changes in document'));
         return;
       }
     }
@@ -440,10 +441,10 @@ export const ReportSettingsPage: React.FC = () => {
         await call('frappe.client.insert', { doc: docToSave });
       }
 
-      showToast.success('Report settings saved successfully');
+      showToast.success(__('Report settings saved successfully'));
       await fetchReportSettings();
     } catch (err: any) {
-      showToast.error(err.message || 'Failed to save report settings');
+      showToast.error(err.message || __('Failed to save report settings'));
     } finally {
       setSaving(false);
     }
@@ -457,7 +458,7 @@ export const ReportSettingsPage: React.FC = () => {
     );
   }
 
-  const branchLabel = activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Selected Branch');
+  const branchLabel = activeBranchId === 'all' ? __('All Branches') : (activeBranch?.name || __('Selected Branch'));
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-8">
@@ -469,8 +470,8 @@ export const ReportSettingsPage: React.FC = () => {
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">URY Report Settings</h1>
-              <p className="text-sm text-muted-foreground">Configure financial parameters, overhead cost basis, and operational shifts for <span className="font-semibold text-primary">{branchLabel}</span></p>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">{__('URY Report Settings')}</h1>
+              <p className="text-sm text-muted-foreground">{__('Configure financial parameters, overhead cost basis, and operational shifts for')} <span className="font-semibold text-primary">{branchLabel}</span></p>
             </div>
           </div>
           <Button
@@ -479,7 +480,7 @@ export const ReportSettingsPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            Save
+            {__('Save')}
           </Button>
         </Card>
 
@@ -490,15 +491,15 @@ export const ReportSettingsPage: React.FC = () => {
           <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('businessHours')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-50 text-primary flex items-center justify-center">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">1. Business Hours & Shift Cutoffs</h2>
-                  <p className="text-xs text-muted-foreground">Extended operating hours and reporting cut-off time offsets.</p>
+                  <h2 className="text-lg font-bold text-foreground">{__('1. Business Hours & Shift Cutoffs')}</h2>
+                  <p className="text-xs text-muted-foreground">{__('Extended operating hours and reporting cut-off time offsets.')}</p>
                 </div>
               </div>
               {openSections.businessHours ? (
@@ -513,24 +514,24 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card className="flex items-center justify-between rounded-xl">
                     <div>
-                      <span className="text-sm font-semibold text-foreground block">Extended Hours</span>
-                      <span className="text-xs text-muted-foreground">Enable shift calculation beyond midnight (00:00).</span>
+                      <span className="text-sm font-semibold text-foreground block">{__('Extended Hours')}</span>
+                      <span className="text-xs text-muted-foreground">{__('Enable shift calculation beyond midnight (00:00).')}</span>
                     </div>
                     <Switch checked={extendedHours} onCheckedChange={setExtendedHours} />
                   </Card>
 
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Hours Offset (hours)
+                      {__('Hours Offset (hours)')}
                     </label>
                     <Input
                       type="number"
                       value={hoursOffset}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHoursOffset(Number(e.target.value))}
-                      placeholder="e.g. 4 for 4:00 AM cutoff"
+                      placeholder={__('e.g. 4 for 4:00 AM cutoff')}
                     />
                     <span className="text-xs text-muted-foreground mt-1 block">
-                      Sales before this offset hour will be attributed to the previous business date.
+                      {__('Sales before this offset hour will be attributed to the previous business date.')}
                     </span>
                   </div>
                 </div>
@@ -542,15 +543,15 @@ export const ReportSettingsPage: React.FC = () => {
           <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('costConfig')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Calculator className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">2. Cost Configuration</h2>
-                  <p className="text-xs text-muted-foreground">Buying price lists, asset depreciation rates, and utility overhead allocations.</p>
+                  <h2 className="text-lg font-bold text-foreground">{__('2. Cost Configuration')}</h2>
+                  <p className="text-xs text-muted-foreground">{__('Buying price lists, asset depreciation rates, and utility overhead allocations.')}</p>
                 </div>
               </div>
               {openSections.costConfig ? (
@@ -565,18 +566,18 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Buying Price List
+                      {__('Buying Price List')}
                     </label>
                     <Select value={buyingPriceList} onValueChange={(val: string) => setBuyingPriceList(val)}>
-                      <SelectItem value="Standard Buying">Standard Buying</SelectItem>
-                      <SelectItem value="Wholesale Price List">Wholesale Price List</SelectItem>
-                      <SelectItem value="Vendor Cost Basis">Vendor Cost Basis</SelectItem>
+                      <SelectItem value="Standard Buying">{__('Standard Buying')}</SelectItem>
+                      <SelectItem value="Wholesale Price List">{__('Wholesale Price List')}</SelectItem>
+                      <SelectItem value="Vendor Cost Basis">{__('Vendor Cost Basis')}</SelectItem>
                     </Select>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Depreciation Rate (%)
+                      {__('Depreciation Rate (%)')}
                     </label>
                     <Input
                       type="number"
@@ -588,7 +589,7 @@ export const ReportSettingsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Electricity Charges ($ / month)
+                      {__('Electricity Charges ($ / month)')}
                     </label>
                     <Input
                       type="number"
@@ -605,15 +606,15 @@ export const ReportSettingsPage: React.FC = () => {
           <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('expenses')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-card/80 transition-colors text-start"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                   <Receipt className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">3. Expenses Tables</h2>
-                  <p className="text-xs text-muted-foreground">Manage direct, indirect, percentage, headcount, and consumable recurring cost tables.</p>
+                  <h2 className="text-lg font-bold text-foreground">{__('3. Expenses Tables')}</h2>
+                  <p className="text-xs text-muted-foreground">{__('Manage direct, indirect, percentage, headcount, and consumable recurring cost tables.')}</p>
                 </div>
               </div>
               {openSections.expenses ? (
@@ -630,11 +631,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Direct Fixed Expenses</h3>
-                      <p className="text-xs text-muted-foreground">Kitchen gas, raw material logistics, and direct production costs.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Direct Fixed Expenses')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Kitchen gas, raw material logistics, and direct production costs.')}</p>
                     </div>
                     <Button onClick={addDirectFixed}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -643,7 +644,7 @@ export const ReportSettingsPage: React.FC = () => {
                       setDirectFixedExpenses((current) => current.filter((item) => item.id !== id))
                     )}
                     rows={directFixedExpenses}
-                    emptyMessage="No direct fixed expenses yet."
+                    emptyMessage={__('No direct fixed expenses yet.')}
                   />
                 </div>
 
@@ -651,11 +652,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Indirect Fixed Expenses</h3>
-                      <p className="text-xs text-muted-foreground">Building leases, software subscriptions, insurance, and administrative fees.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Indirect Fixed Expenses')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Building leases, software subscriptions, insurance, and administrative fees.')}</p>
                     </div>
                     <Button onClick={addIndirectFixed}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -664,7 +665,7 @@ export const ReportSettingsPage: React.FC = () => {
                       setIndirectFixedExpenses((current) => current.filter((item) => item.id !== id))
                     )}
                     rows={indirectFixedExpenses}
-                    emptyMessage="No indirect fixed expenses yet."
+                    emptyMessage={__('No indirect fixed expenses yet.')}
                   />
                 </div>
 
@@ -672,11 +673,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Percentage Expenses</h3>
-                      <p className="text-xs text-muted-foreground">Payment processor rates, delivery aggregator cuts, and royalties.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Percentage Expenses')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Payment processor rates, delivery aggregator cuts, and royalties.')}</p>
                     </div>
                     <Button onClick={addPercentageExpense}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -684,7 +685,7 @@ export const ReportSettingsPage: React.FC = () => {
                     columns={[
                       {
                         key: 'expense',
-                        header: 'Expense',
+                        header: __('Expense'),
                         render: (row) => (
                           <Input
                             size="compact"
@@ -701,7 +702,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                       {
                         key: 'percent',
-                        header: 'Percentage (%)',
+                        header: __('Percentage (%)'),
                         render: (row) => (
                           <Input
                             size="compact"
@@ -720,7 +721,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                       {
                         key: 'percentage_type',
-                        header: 'Percentage Type',
+                        header: __('Percentage Type'),
                         render: (row) => (
                           <Select
                             value={row.percentage_type}
@@ -732,15 +733,15 @@ export const ReportSettingsPage: React.FC = () => {
                               )
                             }
                           >
-                            <SelectItem value="Gross Sales">Gross Sales</SelectItem>
-                            <SelectItem value="Net Sales">Net Sales</SelectItem>
-                            <SelectItem value="Online Orders">Online Orders</SelectItem>
+                            <SelectItem value="Gross Sales">{__('Gross Sales')}</SelectItem>
+                            <SelectItem value="Net Sales">{__('Net Sales')}</SelectItem>
+                            <SelectItem value="Online Orders">{__('Online Orders')}</SelectItem>
                           </Select>
                         ),
                       },
                       {
                         key: 'action',
-                        header: 'Action',
+                        header: __('Action'),
                         align: 'right',
                         render: (row) => (
                           <button
@@ -756,7 +757,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                     ] satisfies DataTableColumn<PercentageExpenseItem>[]}
                     rows={percentageExpenses}
-                    emptyMessage="No percentage expenses yet."
+                    emptyMessage={__('No percentage expenses yet.')}
                   />
                 </div>
 
@@ -764,11 +765,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Employee Costs</h3>
-                      <p className="text-xs text-muted-foreground">Staff role monthly compensation and headcount count.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Employee Costs')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Staff role monthly compensation and headcount count.')}</p>
                     </div>
                     <Button onClick={addEmployeeCost}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -777,7 +778,7 @@ export const ReportSettingsPage: React.FC = () => {
                       setEmployeeCosts((current) => current.filter((item) => item.id !== id))
                     )}
                     rows={employeeCosts}
-                    emptyMessage="No employee costs yet."
+                    emptyMessage={__('No employee costs yet.')}
                   />
                 </div>
 
@@ -785,11 +786,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Monthly Fixed Expenses</h3>
-                      <p className="text-xs text-muted-foreground">Recurring monthly telecom, maintenance, and sanitation overheads.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Monthly Fixed Expenses')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Recurring monthly telecom, maintenance, and sanitation overheads.')}</p>
                     </div>
                     <Button onClick={addMonthlyExpense}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -798,7 +799,7 @@ export const ReportSettingsPage: React.FC = () => {
                       setMonthlyFixedExpenses((current) => current.filter((item) => item.id !== id))
                     )}
                     rows={monthlyFixedExpenses}
-                    emptyMessage="No monthly fixed expenses yet."
+                    emptyMessage={__('No monthly fixed expenses yet.')}
                   />
                 </div>
 
@@ -806,11 +807,11 @@ export const ReportSettingsPage: React.FC = () => {
                 <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold text-foreground">Consumables Budget</h3>
-                      <p className="text-xs text-muted-foreground">Thermal paper rolls, take-away packaging, and disposable supplies.</p>
+                      <h3 className="text-sm font-bold text-foreground">{__('Consumables Budget')}</h3>
+                      <p className="text-xs text-muted-foreground">{__('Thermal paper rolls, take-away packaging, and disposable supplies.')}</p>
                     </div>
                     <Button onClick={addConsumable}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Row
+                      <Plus className="w-4 h-4 me-1" /> {__('Add Row')}
                     </Button>
                   </div>
 
@@ -818,7 +819,7 @@ export const ReportSettingsPage: React.FC = () => {
                     columns={[
                       {
                         key: 'material',
-                        header: 'Material',
+                        header: __('Material'),
                         render: (row) => (
                           <Input
                             size="compact"
@@ -835,7 +836,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                       {
                         key: 'cost_per_unit',
-                        header: 'Cost Per Unit ($)',
+                        header: __('Cost Per Unit ($)'),
                         render: (row) => (
                           <Input
                             size="compact"
@@ -855,7 +856,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                       {
                         key: 'action',
-                        header: 'Action',
+                        header: __('Action'),
                         align: 'right',
                         render: (row) => (
                           <button
@@ -871,7 +872,7 @@ export const ReportSettingsPage: React.FC = () => {
                       },
                     ] satisfies DataTableColumn<ConsumableItem>[]}
                     rows={consumables}
-                    emptyMessage="No consumables yet."
+                    emptyMessage={__('No consumables yet.')}
                   />
                 </div>
 

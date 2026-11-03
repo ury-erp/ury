@@ -33,6 +33,7 @@ import SideDrawer from '../../components/layout/SideDrawer';
 import { PageToolbar } from '../../components/layout/PageToolbar';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { DeskLink } from '../../components/DeskLink';
+import { __ } from '../../i18n';
 
 export interface ItemRecord {
   name: string;
@@ -199,7 +200,7 @@ export const ItemMasterPage: React.FC = () => {
       setItems(list);
     } catch (err: any) {
       console.error('Failed to fetch items', err);
-      showToast.error(err?.message || 'Failed to load items from ERPNext');
+      showToast.error(err?.message || __('Failed to load items from ERPNext'));
       setItems([]);
     } finally {
       setLoading(false);
@@ -391,7 +392,7 @@ export const ItemMasterPage: React.FC = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      showToast.error('Image size must be under 5MB');
+      showToast.error(__('Image size must be under 5MB'));
       return;
     }
 
@@ -403,10 +404,10 @@ export const ItemMasterPage: React.FC = () => {
         image: fileUrl,
         image_name: file.name,
       }));
-      showToast.success('Image uploaded successfully');
+      showToast.success(__('Image uploaded successfully'));
     } catch (err: any) {
       console.error('Failed to upload image', err);
-      showToast.error(`Failed to upload image: ${err?.message || 'Server error'}`);
+      showToast.error(__('Failed to upload image: {0}', [err?.message || 'Server error']));
       e.target.value = '';
     } finally {
       setUploadingImage(false);
@@ -421,19 +422,19 @@ export const ItemMasterPage: React.FC = () => {
     const cleanItemCode = formData.item_code.trim();
 
     if (!cleanItemName) {
-      showToast.error('Item Name is required');
+      showToast.error(__('Item Name is required'));
       return;
     }
     if (!cleanItemCode) {
-      showToast.error('Item Code is required');
+      showToast.error(__('Item Code is required'));
       return;
     }
     if (!formData.item_group) {
-      showToast.error('Item Group is required');
+      showToast.error(__('Item Group is required'));
       return;
     }
     if (!formData.stock_uom) {
-      showToast.error('Stock UOM is required');
+      showToast.error(__('Stock UOM is required'));
       return;
     }
 
@@ -480,7 +481,7 @@ export const ItemMasterPage: React.FC = () => {
           fieldname: commonFields,
         });
 
-        showToast.success('Item updated successfully');
+        showToast.success(__('Item updated successfully'));
       } else {
         await call('frappe.client.insert', {
           doc: {
@@ -490,14 +491,14 @@ export const ItemMasterPage: React.FC = () => {
           },
         });
 
-        showToast.success('Item created successfully in ERPNext');
+        showToast.success(__('Item created successfully in ERPNext'));
       }
 
       setIsDrawerOpen(false);
       await fetchItems();
     } catch (err: any) {
       console.error('Failed to save Item', err);
-      let errorMsg = 'Failed to save item';
+      let errorMsg = __('Failed to save item');
       if (err?._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -533,7 +534,7 @@ export const ItemMasterPage: React.FC = () => {
         name: itemToDelete.name,
       });
 
-      showToast.success(`Item "${itemToDelete.item_name || itemToDelete.name}" deleted successfully`);
+      showToast.success(__('Item "{0}" deleted successfully', [itemToDelete.item_name || itemToDelete.name]));
       setIsDeleteDialogOpen(false);
       if (isDrawerOpen && editingItem?.name === itemToDelete.name) {
         setIsDrawerOpen(false);
@@ -542,7 +543,7 @@ export const ItemMasterPage: React.FC = () => {
       await fetchItems();
     } catch (err: any) {
       console.error('Failed to delete Item', err);
-      let errorMsg = 'Failed to delete item';
+      let errorMsg = __('Failed to delete item');
       if (err?._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -558,7 +559,7 @@ export const ItemMasterPage: React.FC = () => {
       }
 
       showToast.error(
-        `${errorMsg}. If this item is linked to existing transactions in ERPNext, deactivate it by toggling Disabled instead.`
+        __('{0}. If this item is linked to existing transactions in ERPNext, deactivate it by toggling Disabled instead.', [errorMsg])
       );
     } finally {
       setDeleting(false);
@@ -583,11 +584,11 @@ export const ItemMasterPage: React.FC = () => {
         value: newStatus,
       });
       showToast.success(
-        `Item "${item.item_name}" ${newStatus ? 'disabled' : 'enabled'}`
+        __('Item "{0}" {1}', [item.item_name, newStatus ? 'disabled' : 'enabled'])
       );
     } catch (err: any) {
       console.error('Failed to update status', err);
-      showToast.error(err?.message || 'Failed to update item status');
+      showToast.error(err?.message || __('Failed to update item status'));
       // Revert on failure
       fetchItems();
     }
@@ -597,7 +598,7 @@ export const ItemMasterPage: React.FC = () => {
   const columns: DataTableColumn<ItemRecord>[] = [
     {
       key: 'item_name',
-      header: 'Item',
+      header: __('Item'),
       render: (item) => (
         <div className="flex items-center gap-3">
           <div
@@ -608,7 +609,7 @@ export const ItemMasterPage: React.FC = () => {
                 setPreviewImageUrl(item.image);
               }
             }}
-            title={item.image ? 'Click to preview' : 'No image'}
+            title={item.image ? __('Click to preview') : __('No image')}
           >
             {item.image ? (
               <img
@@ -623,7 +624,7 @@ export const ItemMasterPage: React.FC = () => {
           <div className="min-w-0">
             <button
               onClick={() => openEditDrawer(item)}
-              className="font-medium text-foreground hover:text-primary text-left truncate block transition-colors max-w-xs"
+              className="font-medium text-foreground hover:text-primary text-start truncate block transition-colors max-w-xs"
               title={item.item_name}
             >
               {item.item_name}
@@ -637,13 +638,13 @@ export const ItemMasterPage: React.FC = () => {
     },
     {
       key: 'item_group',
-      header: 'Group',
+      header: __('Group'),
       render: (item) => (
         <Badge
           variant="outline"
           className="border-hair bg-muted/60 text-muted-foreground text-xs font-normal"
         >
-          {item.item_group || 'All Item Groups'}
+          {item.item_group || __('All Item Groups')}
         </Badge>
       ),
     },
@@ -652,13 +653,13 @@ export const ItemMasterPage: React.FC = () => {
       header: 'UOM',
       render: (item) => (
         <span className="text-xs text-muted-foreground font-medium">
-          {item.stock_uom || 'Nos'}
+          {item.stock_uom || __('Nos')}
         </span>
       ),
     },
     {
       key: 'standard_rate',
-      header: 'Rate',
+      header: __('Rate'),
       align: 'right',
       render: (item) => (
         <span className="font-semibold text-foreground tabular-nums text-sm">
@@ -668,27 +669,27 @@ export const ItemMasterPage: React.FC = () => {
     },
     {
       key: 'is_sales_item',
-      header: 'Features',
+      header: __('Features'),
       render: (item) => (
         <div className="flex items-center gap-1 flex-wrap">
           {item.is_sales_item ? (
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-500/20 text-emerald-600 bg-emerald-500/10 dark:text-emerald-400">
-              Sales
+              {__('Sales')}
             </Badge>
           ) : null}
           {item.is_stock_item ? (
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-blue-500/20 text-blue-600 bg-blue-500/10 dark:text-blue-400">
-              Stock
+              {__('Stock')}
             </Badge>
           ) : null}
           {item.include_item_in_manufacturing ? (
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-purple-500/20 text-purple-600 bg-purple-500/10 dark:text-purple-400">
-              Mfg
+              {__('Mfg')}
             </Badge>
           ) : null}
           {item.is_disposable ? (
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-500/20 text-amber-600 bg-amber-500/10 dark:text-amber-400">
-              Disposable
+              {__('Disposable')}
             </Badge>
           ) : null}
         </div>
@@ -696,20 +697,20 @@ export const ItemMasterPage: React.FC = () => {
     },
     {
       key: 'disabled',
-      header: 'Status',
+      header: __('Status'),
       render: (item) => (
         <button
           onClick={(e) => handleToggleDisabled(item, e)}
           className="inline-flex items-center cursor-pointer group"
-          title={item.disabled ? 'Click to Enable' : 'Click to Disable'}
+          title={item.disabled ? __('Click to Enable') : __('Click to Disable')}
         >
           {item.disabled ? (
             <Badge variant="destructive" className="text-[11px] py-0.5 px-2 font-medium">
-              Disabled
+              {__('Disabled')}
             </Badge>
           ) : (
             <Badge variant="tagSuccess" className="text-[11px] py-0.5 px-2 font-medium">
-              Active
+              {__('Active')}
             </Badge>
           )}
         </button>
@@ -717,7 +718,7 @@ export const ItemMasterPage: React.FC = () => {
     },
     {
       key: 'name',
-      header: 'Actions',
+      header: __('Actions'),
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-1">
@@ -725,14 +726,14 @@ export const ItemMasterPage: React.FC = () => {
           <button
             onClick={() => openEditDrawer(item)}
             className="p-1.5 text-muted-foreground hover:text-primary hover:bg-hair rounded-md transition-colors"
-            title="Edit Item"
+            title={__('Edit Item')}
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => openDeleteDialog(item)}
             className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-            title="Delete Item"
+            title={__('Delete Item')}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -756,7 +757,7 @@ export const ItemMasterPage: React.FC = () => {
                   ? 'bg-card shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="List View"
+              title={__('List View')}
             >
               <List className="w-4 h-4" />
             </button>
@@ -767,7 +768,7 @@ export const ItemMasterPage: React.FC = () => {
                   ? 'bg-card shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="Grid View"
+              title={__('Grid View')}
             >
               <Grid className="w-4 h-4" />
             </button>
@@ -775,18 +776,18 @@ export const ItemMasterPage: React.FC = () => {
 
           {/* Search Box */}
           <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-muted-foreground absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
               type="text"
-              placeholder="Search items or codes..."
+              placeholder={__('Search items or codes...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-3 h-9 text-xs w-full bg-card"
+              className="ps-9 pe-3 h-9 text-xs w-full bg-card"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded"
+                className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -800,10 +801,10 @@ export const ItemMasterPage: React.FC = () => {
               value={groupFilter}
               onChange={(_, val) => setGroupFilter(val)}
               options={[
-                { value: 'all', label: 'All Groups' },
+                { value: 'all', label: __('All Groups') },
                 ...itemGroups.map((g) => ({ value: g.name, label: g.name })),
               ]}
-              placeholder="All Groups"
+              placeholder={__('All Groups')}
             />
           </div>
 
@@ -814,15 +815,15 @@ export const ItemMasterPage: React.FC = () => {
               value={statusFilter}
               onChange={(_, val) => setStatusFilter(val)}
               options={[
-                { value: 'all', label: 'All Status' },
-                { value: 'active', label: 'Active Only' },
-                { value: 'disabled', label: 'Disabled Only' },
-                { value: 'sales', label: 'Sales Items' },
-                { value: 'stock', label: 'Stock Items' },
-                { value: 'purchase', label: 'Purchase Items' },
-                { value: 'mfg', label: 'Manufacturing' },
+                { value: 'all', label: __('All Status') },
+                { value: 'active', label: __('Active Only') },
+                { value: 'disabled', label: __('Disabled Only') },
+                { value: 'sales', label: __('Sales Items') },
+                { value: 'stock', label: __('Stock Items') },
+                { value: 'purchase', label: __('Purchase Items') },
+                { value: 'mfg', label: __('Manufacturing') },
               ]}
-              placeholder="All Status"
+              placeholder={__('All Status')}
             />
           </div>
         </div>
@@ -833,7 +834,7 @@ export const ItemMasterPage: React.FC = () => {
             variant="outline"
             className="h-8 px-2.5 border-hair bg-muted text-muted-foreground text-xs font-medium shrink-0"
           >
-            {filteredItems.length} {filteredItems.length === 1 ? 'Item' : 'Items'}
+            {filteredItems.length} {filteredItems.length === 1 ? __('Item') : __('Items')}
           </Badge>
 
           <Button
@@ -842,7 +843,7 @@ export const ItemMasterPage: React.FC = () => {
             onClick={() => fetchItems(true)}
             disabled={refreshing || loading}
             className="h-9 px-2.5"
-            title="Sync with ERPNext"
+            title={__('Sync with ERPNext')}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
@@ -852,7 +853,7 @@ export const ItemMasterPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs whitespace-nowrap h-9 text-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Item</span>
+            <span>{__('Add Item')}</span>
           </Button>
         </div>
       </PageToolbar>
@@ -867,18 +868,18 @@ export const ItemMasterPage: React.FC = () => {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Package className="w-8 h-8 text-primary" />
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Items Found</h3>
+          <h3 className="text-xl font-bold text-foreground mb-2">{__('No Items Found')}</h3>
           <p className="text-muted-foreground mb-8 max-w-sm text-sm">
             {search || groupFilter !== 'all' || statusFilter !== 'all'
-              ? 'No items match your selected filters. Try resetting the filters or search term.'
-              : 'No items found. Create your first item to start organizing your menu and POS!'}
+              ? __('No items match your selected filters. Try resetting the filters or search term.')
+              : __('No items found. Create your first item to start organizing your menu and POS!')}
           </p>
           <Button
             onClick={openAddDrawer}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs px-6"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Item</span>
+            <span>{__('Add Item')}</span>
           </Button>
         </Card>
       ) : viewMode === 'grid' ? (
@@ -908,14 +909,14 @@ export const ItemMasterPage: React.FC = () => {
                 )}
 
                 {/* Status Badge in Corner */}
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 end-2">
                   {item.disabled ? (
                     <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shadow-xs">
-                      Disabled
+                      {__('Disabled')}
                     </Badge>
                   ) : (
                     <Badge variant="tagSuccess" className="text-[10px] px-1.5 py-0 shadow-xs">
-                      Active
+                      {__('Active')}
                     </Badge>
                   )}
                 </div>
@@ -927,8 +928,8 @@ export const ItemMasterPage: React.FC = () => {
                       e.stopPropagation();
                       setPreviewImageUrl(item.image || null);
                     }}
-                    className="absolute bottom-2 right-2 p-1 bg-black/50 text-white rounded-md hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Preview Image"
+                    className="absolute bottom-2 end-2 p-1 bg-black/50 text-white rounded-md hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={__('Preview Image')}
                   >
                     <Eye className="w-3.5 h-3.5" />
                   </button>
@@ -947,14 +948,14 @@ export const ItemMasterPage: React.FC = () => {
                   <div className="flex items-center gap-1.5 mb-2 text-[11px] text-muted-foreground">
                     <span className="font-mono truncate">{item.item_code || item.name}</span>
                     <span>•</span>
-                    <span className="truncate">{item.item_group || 'General'}</span>
+                    <span className="truncate">{item.item_group || __('General')}</span>
                   </div>
                 </div>
 
                 {/* Rate & Bottom Actions */}
                 <div className="pt-2 border-t border-hair/60 mt-auto flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-muted-foreground block -mb-0.5">Rate</span>
+                    <span className="text-xs text-muted-foreground block -mb-0.5">{__('Rate')}</span>
                     <span className="font-bold text-foreground text-sm tabular-nums">
                       {formatCurrency(item.standard_rate || 0)}
                     </span>
@@ -967,7 +968,7 @@ export const ItemMasterPage: React.FC = () => {
                         openDeleteDialog(item);
                       }}
                       className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                      title="Delete Item"
+                      title={__('Delete Item')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -977,7 +978,7 @@ export const ItemMasterPage: React.FC = () => {
                         openEditDrawer(item);
                       }}
                       className="p-1.5 text-muted-foreground hover:text-primary hover:bg-hair rounded-md transition-colors"
-                      title="Edit Item"
+                      title={__('Edit Item')}
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -993,7 +994,7 @@ export const ItemMasterPage: React.FC = () => {
           <DataTable
             columns={columns}
             rows={filteredItems}
-            emptyMessage="No items found matching criteria."
+            emptyMessage={__('No items found matching criteria.')}
             onRowClick={(row) => openEditDrawer(row)}
           />
         </div>
@@ -1003,28 +1004,28 @@ export const ItemMasterPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingItem ? `Edit Item: ${editingItem.item_name}` : 'Add New Item'}
+        title={editingItem ? __('Edit Item: {0}', [editingItem.item_name]) : __('Add New Item')}
       >
         <form onSubmit={handleSaveItem} className="space-y-4 text-sm">
           {/* Top Bar for Edit Mode: DeskLink */}
           {editingItem && (
             <div className="flex items-center justify-between pb-3 border-b border-border text-xs">
               <span className="text-muted-foreground">
-                ERPNext ID: <span className="font-mono font-medium text-foreground">{editingItem.name}</span>
+                {__('ERPNext ID:')} <span className="font-mono font-medium text-foreground">{editingItem.name}</span>
               </span>
-              <DeskLink doctype="Item" name={editingItem.name} label="Open in ERPNext Desk" />
+              <DeskLink doctype="Item" name={editingItem.name} label={__('Open in ERPNext Desk')} />
             </div>
           )}
 
           {/* Item Name */}
           <div>
             <label className="block font-semibold text-muted-foreground mb-1">
-              Item Name <span className="text-destructive">*</span>
+              {__('Item Name')} <span className="text-destructive">*</span>
             </label>
             <Input
               value={formData.item_name}
               onChange={(e) => handleItemNameChange(e.target.value)}
-              placeholder="e.g. Chicken Mandi, Cold Coffee"
+              placeholder={__('e.g. Chicken Mandi, Cold Coffee')}
               required
             />
           </div>
@@ -1032,7 +1033,7 @@ export const ItemMasterPage: React.FC = () => {
           {/* Item Code (ID in ERPNext) */}
           <div>
             <label className="block font-semibold text-muted-foreground mb-1">
-              Item Code / ID <span className="text-destructive">*</span>
+              {__('Item Code / ID')} <span className="text-destructive">*</span>
             </label>
             <Input
               value={formData.item_code}
@@ -1040,11 +1041,11 @@ export const ItemMasterPage: React.FC = () => {
                 setCodeManuallyEdited(true);
                 setFormData({ ...formData, item_code: e.target.value });
               }}
-              placeholder="e.g. CM-01 or unique code"
+              placeholder={__('e.g. CM-01 or unique code')}
               required
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Unique identifier stored in ERPNext. Renaming will update linked records automatically.
+              {__('Unique identifier stored in ERPNext. Renaming will update linked records automatically.')}
             </p>
           </div>
 
@@ -1052,27 +1053,27 @@ export const ItemMasterPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-muted-foreground mb-1">
-                Item Group <span className="text-destructive">*</span>
+                {__('Item Group')} <span className="text-destructive">*</span>
               </label>
               <SearchableSelect
                 id="item-group"
                 value={formData.item_group}
                 onChange={(_, val) => setFormData({ ...formData, item_group: val })}
                 options={itemGroups.map((g) => ({ value: g.name, label: g.name }))}
-                placeholder="Select Item Group"
+                placeholder={__('Select Item Group')}
                 strict={false}
               />
             </div>
             <div>
               <label className="block font-semibold text-muted-foreground mb-1">
-                Stock UOM <span className="text-destructive">*</span>
+                {__('Stock UOM')} <span className="text-destructive">*</span>
               </label>
               <SearchableSelect
                 id="stock-uom"
                 value={formData.stock_uom}
                 onChange={(_, val) => setFormData({ ...formData, stock_uom: val })}
                 options={uoms.map((u) => ({ value: u.name, label: u.name }))}
-                placeholder="Select Unit of Measure"
+                placeholder={__('Select Unit of Measure')}
                 strict={false}
               />
             </div>
@@ -1081,7 +1082,7 @@ export const ItemMasterPage: React.FC = () => {
           {/* Standard Selling Rate */}
           <div>
             <label className="block font-semibold text-muted-foreground mb-1">
-              Standard Selling Rate ({currencySymbol})
+              {__('Standard Selling Rate (')}{currencySymbol})
             </label>
             <Input
               type="number"
@@ -1096,20 +1097,20 @@ export const ItemMasterPage: React.FC = () => {
           {/* Image Upload & Preview */}
           <div className="space-y-2 pt-1">
             <label className="block font-semibold text-muted-foreground mb-1">
-              Item Image
+              {__('Item Image')}
             </label>
             {formData.image ? (
               <div className="flex items-center gap-3 p-2.5 rounded-lg border border-hair bg-muted/40">
                 <img
                   src={formData.image}
-                  alt="Item Preview"
+                  alt={__('Item Preview')}
                   className="w-14 h-14 rounded-md object-cover border border-hair cursor-pointer shrink-0"
                   onClick={() => setPreviewImageUrl(formData.image)}
-                  title="Click to preview"
+                  title={__('Click to preview')}
                 />
                 <div className="flex-1 min-w-0 text-xs">
                   <p className="font-medium text-foreground truncate">
-                    {formData.image_name || 'Uploaded Image'}
+                    {formData.image_name || __('Uploaded Image')}
                   </p>
                   <p className="text-[11px] text-muted-foreground truncate font-mono">
                     {formData.image}
@@ -1122,7 +1123,7 @@ export const ItemMasterPage: React.FC = () => {
                   onClick={() => setFormData({ ...formData, image: '', image_name: '' })}
                   className="text-destructive hover:bg-destructive/10 text-xs shrink-0"
                 >
-                  Remove
+                  {__('Remove')}
                 </Button>
               </div>
             ) : (
@@ -1144,10 +1145,10 @@ export const ItemMasterPage: React.FC = () => {
                     <Upload className="w-5 h-5 text-muted-foreground" />
                   )}
                   <span className="text-xs font-semibold text-primary">
-                    {uploadingImage ? 'Uploading Image...' : 'Click to Upload Image'}
+                    {uploadingImage ? __('Uploading Image...') : __('Click to Upload Image')}
                   </span>
                   <span className="text-[11px] text-muted-foreground">
-                    PNG, JPG, WebP up to 5MB
+                    {__('PNG, JPG, WebP up to 5MB')}
                   </span>
                 </label>
               </div>
@@ -1157,12 +1158,12 @@ export const ItemMasterPage: React.FC = () => {
           {/* Description */}
           <div>
             <label className="block font-semibold text-muted-foreground mb-1">
-              Description / Notes
+              {__('Description / Notes')}
             </label>
             <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Add optional notes or item details..."
+              placeholder={__('Add optional notes or item details...')}
               rows={2}
             />
           </div>
@@ -1170,17 +1171,17 @@ export const ItemMasterPage: React.FC = () => {
           {/* Feature Toggles Partition */}
           <div className="pt-2 border-t border-hair space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
-              Item Properties & Controls
+              {__('Item Properties & Controls')}
             </span>
 
             {/* Is Sales Item */}
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-sales" className="font-medium text-foreground block cursor-pointer">
-                  Is Sales Item
+                  {__('Is Sales Item')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Available for selling in URY POS & Sales Invoices
+                  {__('Available for selling in URY POS & Sales Invoices')}
                 </p>
               </div>
               <Switch
@@ -1194,10 +1195,10 @@ export const ItemMasterPage: React.FC = () => {
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-stock" className="font-medium text-foreground block cursor-pointer">
-                  Maintain Stock
+                  {__('Maintain Stock')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Track inventory levels & warehouse movements
+                  {__('Track inventory levels & warehouse movements')}
                 </p>
               </div>
               <Switch
@@ -1209,10 +1210,10 @@ export const ItemMasterPage: React.FC = () => {
 
             {/* Conditional Stock Fields */}
             {formData.is_stock_item && (
-              <div className="grid grid-cols-2 gap-3 pl-3 pr-1 py-1 border-l-2 border-primary/40 bg-muted/10 rounded-r-lg">
+              <div className="grid grid-cols-2 gap-3 ps-3 pe-1 py-1 border-s-2 border-primary/40 bg-muted/10 rounded-e-lg">
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                    Opening Stock
+                    {__('Opening Stock')}
                   </label>
                   <Input
                     type="number"
@@ -1226,7 +1227,7 @@ export const ItemMasterPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                    Valuation Rate ({currencySymbol})
+                    {__('Valuation Rate (')}{currencySymbol})
                   </label>
                   <Input
                     type="number"
@@ -1245,10 +1246,10 @@ export const ItemMasterPage: React.FC = () => {
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-purchase" className="font-medium text-foreground block cursor-pointer">
-                  Is Purchase Item
+                  {__('Is Purchase Item')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Allow purchasing from suppliers / raw material orders
+                  {__('Allow purchasing from suppliers / raw material orders')}
                 </p>
               </div>
               <Switch
@@ -1262,10 +1263,10 @@ export const ItemMasterPage: React.FC = () => {
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-mfg" className="font-medium text-foreground block cursor-pointer">
-                  Include in Manufacturing
+                  {__('Include in Manufacturing')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Allow creating BOMs & production work orders
+                  {__('Allow creating BOMs & production work orders')}
                 </p>
               </div>
               <Switch
@@ -1279,10 +1280,10 @@ export const ItemMasterPage: React.FC = () => {
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-disposable" className="font-medium text-foreground block cursor-pointer">
-                  Is Disposable Item
+                  {__('Is Disposable Item')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Packaging, container, or cutlery charged during takeaway/delivery
+                  {__('Packaging, container, or cutlery charged during takeaway/delivery')}
                 </p>
               </div>
               <Switch
@@ -1296,10 +1297,10 @@ export const ItemMasterPage: React.FC = () => {
             <div className="flex items-center justify-between p-2.5 rounded-lg border border-hair bg-muted/20">
               <div>
                 <label htmlFor="is-disabled" className="font-medium text-foreground block cursor-pointer">
-                  Disabled / Inactive
+                  {__('Disabled / Inactive')}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Hide item from POS, menu ordering, and new sales
+                  {__('Hide item from POS, menu ordering, and new sales')}
                 </p>
               </div>
               <Switch
@@ -1320,7 +1321,7 @@ export const ItemMasterPage: React.FC = () => {
                 className="text-destructive hover:bg-destructive/10 border-destructive/20 text-xs font-semibold flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete</span>
+                <span>{__('Delete')}</span>
               </Button>
             ) : (
               <div />
@@ -1334,7 +1335,7 @@ export const ItemMasterPage: React.FC = () => {
                 disabled={saving}
                 className="text-xs"
               >
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button
                 type="submit"
@@ -1344,13 +1345,9 @@ export const ItemMasterPage: React.FC = () => {
                 {saving ? (
                   <div className="flex items-center gap-1.5">
                     <Spinner className="w-3.5 h-3.5" />
-                    <span>Saving...</span>
+                    <span>{__('Saving...')}</span>
                   </div>
-                ) : editingItem ? (
-                  'Save Changes'
-                ) : (
-                  'Create Item'
-                )}
+                ) : editingItem ? (__('Save Changes')) : (__('Create Item'))}
               </Button>
             </div>
           </div>
@@ -1361,9 +1358,9 @@ export const ItemMasterPage: React.FC = () => {
       <ConfirmDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
-        title="Delete Item"
-        description={`Are you sure you want to permanently delete "${itemToDelete?.item_name || itemToDelete?.name}" (${itemToDelete?.item_code || itemToDelete?.name})? This will delete the item from ERPNext and URY.`}
-        confirmLabel="Delete Item"
+        title={__('Delete Item')}
+        description={__('Are you sure you want to permanently delete "{0}" ({1})? This will delete the item from ERPNext and URY.', [(itemToDelete?.item_name || itemToDelete?.name) ?? "", (itemToDelete?.item_code || itemToDelete?.name) ?? ""])}
+        confirmLabel={__('Delete Item')}
         confirmVariant="danger"
         isSubmitting={deleting}
         onConfirm={handleConfirmDelete}
@@ -1382,14 +1379,14 @@ export const ItemMasterPage: React.FC = () => {
             >
               <button
                 onClick={() => setPreviewImageUrl(null)}
-                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
-                title="Close"
+                className="absolute top-4 end-4 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                title={__('Close')}
               >
                 <X className="w-5 h-5" />
               </button>
               <img
                 src={previewImageUrl}
-                alt="Item Preview"
+                alt={__('Item Preview')}
                 className="max-h-[80vh] w-auto object-contain rounded-lg mx-auto"
               />
             </div>

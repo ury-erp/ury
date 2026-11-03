@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Button, Card, Page } from '@ury/ui';
 import { Check } from 'lucide-react';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
+import { __ } from '../../i18n';
 
 interface WizardLayoutProps {
   step: 1 | 2;
@@ -37,17 +38,17 @@ export function WizardLayout({
       {/* Header bar — mirrors components/layout/Header.tsx */}
       <header className="w-full border-b border-border bg-background">
         <div className={`${SHELL} h-12 flex items-center justify-between gap-4`}>
-          <div className="flex items-center space-x-4 min-w-0">
-            <img src={uryLogo} alt="URY Logo" className="h-8 w-auto shrink-0" />
+          <div className="flex items-center gap-4 min-w-0">
+            <img src={uryLogo} alt={__('URY Logo')} className="h-8 w-auto shrink-0" />
             <div className="hidden sm:block h-4 w-px bg-border shrink-0" />
-            <span className="text-sm font-semibold text-foreground truncate">Let's get your restaurant ready</span>
+            <span className="text-sm font-semibold text-foreground truncate">{__("Let's get your restaurant ready")}</span>
           </div>
 
           {/* 2-step breadcrumb (Setup, Configure) */}
           <div className="hidden sm:flex items-center gap-2 shrink-0">
-            <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
+            <BreadcrumbStep label={__('Setup')} state={step === 1 ? 'active' : 'done'} />
             <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
-            <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
+            <BreadcrumbStep label={__('Configure')} state={step === 2 ? 'active' : 'upcoming'} />
           </div>
         </div>
       </header>
@@ -63,7 +64,7 @@ export function WizardLayout({
           <div className="flex items-center">
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
-                Previous
+                {__('Previous')}
               </Button>
             )}
           </div>
@@ -71,7 +72,7 @@ export function WizardLayout({
           <div className="flex items-center gap-4">
             {secondaryAction}
             <Button variant="default" onClick={onNext} disabled={isNextDisabled || isNextLoading} className="px-6">
-              {isNextLoading ? 'Working...' : nextLabel}
+              {isNextLoading ? __('Working...') : nextLabel}
             </Button>
           </div>
         </div>

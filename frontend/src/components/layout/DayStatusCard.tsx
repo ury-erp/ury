@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { uryDashboardService, type NeedsAttentionItem, type PlanStatus } from '../../services/dashboard';
+import { __, uiLocale } from '../../i18n';
 
 type PhaseKey = 'Plan' | 'Issue' | 'Prep' | 'Service' | 'Count' | 'Close';
 
@@ -33,7 +34,7 @@ const getToday = (): string => {
 };
 
 const formatCardDate = (isoDate: string): string =>
-  new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
+  new Date(`${isoDate}T00:00:00`).toLocaleDateString(uiLocale(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -46,7 +47,7 @@ interface PhaseSegmentProps {
 
 const PhaseSegment: React.FC<PhaseSegmentProps> = ({ label, state }) => (
   <span
-    title={label}
+    title={__(label)}
     className={`h-[3px] flex-1 rounded-sm ${
       state === 'done' ? 'bg-success-500' : state === 'current' ? 'bg-primary' : 'bg-muted'
     }`}
@@ -108,7 +109,7 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
   if (isCollapsed) {
     return (
       <div
-        title={loading ? 'Loading…' : error ? 'Status unavailable' : planStatus?.status ?? 'No plan yet'}
+        title={loading ? __('Loading…') : error ? __('Status unavailable') : __(planStatus?.status ?? 'No plan yet')}
         className="mx-2 mt-0.5 mb-2.5 p-1.5 rounded-lg border border-border bg-card flex flex-col items-center gap-1.5"
       >
         <span
@@ -144,7 +145,7 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
               loading ? 'bg-muted' : error ? 'bg-destructive' : 'bg-success-500'
             }`}
           />
-          {loading ? 'Loading…' : error ? 'Status unavailable' : planStatus?.status ?? 'No plan yet'}
+          {loading ? __('Loading…') : error ? __('Status unavailable') : __(planStatus?.status ?? 'No plan yet')}
         </span>
       </div>
 
@@ -160,15 +161,15 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
 
       <div className="flex items-center text-[11px] text-muted-foreground">
         {loading ? (
-          <span className="text-text-tertiary">Loading…</span>
+          <span className="text-text-tertiary">{__('Loading…')}</span>
         ) : (
           <>
             <Badge variant={attentionCount > 0 ? 'warning' : 'success'} size="sm">
               {attentionCount}
             </Badge>
-            <span className="ml-1.5">need attention</span>
-            <Link to="/service" className="ml-auto text-primary font-medium hover:underline">
-              Open →
+            <span className="ms-1.5">{__('need attention')}</span>
+            <Link to="/service" className="ms-auto text-primary font-medium hover:underline">
+              {__('Open')} <span className="inline-block rtl:-scale-x-100">→</span>
             </Link>
           </>
         )}

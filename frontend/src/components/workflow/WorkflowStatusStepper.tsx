@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge, Button } from '@ury/ui';
 import { useWorkflowStatus } from '../../hooks/useWorkflowStatus';
+import { __ } from '../../i18n';
 
 export interface WorkflowStatusStepperProps {
   doctype: string;
@@ -40,7 +41,7 @@ export const WorkflowStatusStepper: React.FC<WorkflowStatusStepperProps> = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2" aria-label={`${doctype} status`}>
+      <div className="flex flex-wrap items-center gap-2" aria-label={__('{0} status', [doctype])}>
         {status.states.map((state, index) => {
           const isActive = index === activeIndex;
           const isComplete = activeIndex >= 0 && index < activeIndex;
@@ -78,7 +79,7 @@ export const WorkflowStatusStepper: React.FC<WorkflowStatusStepperProps> = ({
               title={restricted ? actionRestrictedReason : undefined}
               className="gap-2"
             >
-              <span>{applying ? 'Updating...' : action.action}</span>
+              <span>{applying ? __('Updating...') : action.action}</span>
             </Button>
           );
         })}

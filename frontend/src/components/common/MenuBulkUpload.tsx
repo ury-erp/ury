@@ -2,6 +2,7 @@ import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import { Button } from '@ury/ui';
 import { Upload, FileText, X, Download } from 'lucide-react';
 import { parseMenuCsv, ParsedMenuRow } from '../../utils/csvParser';
+import { __ } from '../../i18n';
 
 interface MenuBulkUploadProps {
   onItemsParsed: (items: ParsedMenuRow[]) => void;
@@ -46,7 +47,7 @@ export function MenuBulkUpload({
       const rows = parseMenuCsv(text);
 
       if (rows.length === 0) {
-        setImportError("Couldn't read that file, make sure it matches the template format.");
+        setImportError(__("Couldn't read that file, make sure it matches the template format."));
         setFile(null);
         return;
       }
@@ -55,7 +56,7 @@ export function MenuBulkUpload({
       setImportMessage(`Imported ${rows.length} item${rows.length === 1 ? '' : 's'} from ${selectedFile.name}, review and edit below.`);
       messageTimeoutRef.current = setTimeout(() => setImportMessage(null), 5000);
     } catch {
-      setImportError("Couldn't read that file, make sure it matches the template format.");
+      setImportError(__("Couldn't read that file, make sure it matches the template format."));
       setFile(null);
     }
   };
@@ -96,7 +97,7 @@ export function MenuBulkUpload({
           download 
           className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
         >
-          <Download className="w-3.5 h-3.5" /> Download Template
+          <Download className="w-3.5 h-3.5" /> {__('Download Template')}
         </a>
       </div>
 
@@ -114,7 +115,7 @@ export function MenuBulkUpload({
             <FileText className="w-4 h-4 text-primary" />
             <div>
               <p className="text-xs font-medium text-foreground">{currentFile.name}</p>
-              <p className="text-[10px] text-muted-foreground">{(currentFile.size / 1024).toFixed(1)} KB</p>
+              <p className="text-[10px] text-muted-foreground">{(currentFile.size / 1024).toFixed(1)} {__('KB')}</p>
             </div>
           </div>
           <Button
@@ -126,7 +127,7 @@ export function MenuBulkUpload({
               setImportError(null);
             }}
             className="text-muted-foreground hover:text-red-600 p-1 h-auto"
-            title="Remove File"
+            title={__('Remove File')}
           >
             <X className="w-4 h-4" />
           </Button>
@@ -145,9 +146,9 @@ export function MenuBulkUpload({
         >
           <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1.5" />
           <p className="text-xs font-medium text-gray-700">
-            Drag &amp; drop CSV file here, or <span className="text-primary hover:underline font-semibold">browse</span>
+            {__('Drag & drop CSV file here, or')} <span className="text-primary hover:underline font-semibold">{__('browse')}</span>
           </p>
-          <p className="text-[10px] text-gray-500 mt-0.5">Supports CSV files only</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">{__('Supports CSV files only')}</p>
         </div>
       )}
 

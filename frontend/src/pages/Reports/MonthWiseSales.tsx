@@ -3,6 +3,7 @@ import { call, formatCurrency } from '@ury/core';
 import { KpiStrip, DataTable, type DataTableColumn, Select, PageHeader } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
+import { __ } from '../../i18n';
 
 interface MonthRow {
   year: number;
@@ -28,13 +29,13 @@ interface MonthWiseSalesData {
 }
 
 const columns: DataTableColumn<MonthRow>[] = [
-  { key: 'month', header: 'Month' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'taxes', header: 'Taxes', render: (r) => formatCurrency(r.taxes), align: 'right' },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
+  { key: 'month', header: __('Month') },
+  { key: 'item_total', header: __('Item Total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'taxes', header: __('Taxes'), render: (r) => formatCurrency(r.taxes), align: 'right' },
+  { key: 'grand_total', header: __('Grand Total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
   {
     key: 'growth_percentage',
-    header: 'Growth',
+    header: __('Growth'),
     align: 'right',
     render: (r) =>
       r.growth_percentage === null ? '—' : `${r.growth_percentage > 0 ? '+' : ''}${r.growth_percentage}%`,
@@ -61,7 +62,7 @@ export function MonthWiseSales() {
       });
       setData(res.message ?? (res as unknown as MonthWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +75,8 @@ export function MonthWiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Month Wise Sales"
-        description={`Monthly revenue trend ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Month Wise Sales')}
+        description={__('Monthly revenue trend {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={
           <Select
             value={monthsBack}
@@ -83,7 +84,7 @@ export function MonthWiseSales() {
           >
             {MONTH_OPTIONS.map((m) => (
               <option key={m} value={m}>
-                Last {m} months
+                {__('Last {0} months', [m])}
               </option>
             ))}
           </Select>
@@ -97,20 +98,20 @@ export function MonthWiseSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Revenue', value: formatCurrency(data.summary.total_revenue) },
-              { label: 'Avg Monthly', value: formatCurrency(data.summary.average_monthly_revenue) },
-              { label: 'Best Month', value: data.summary.best_month ?? '—' },
-              { label: 'Weakest Month', value: data.summary.worst_month ?? '—' },
+              { label: __('Total Revenue'), value: formatCurrency(data.summary.total_revenue) },
+              { label: __('Avg Monthly'), value: formatCurrency(data.summary.average_monthly_revenue) },
+              { label: __('Best Month'), value: data.summary.best_month ?? '—' },
+              { label: __('Weakest Month'), value: data.summary.worst_month ?? '—' },
             ]}
           />
 
           <BarChartCard
-            title="Monthly Grand Total"
+            title={__('Monthly Grand Total')}
             data={data.data}
             xKey="month"
             yKeys={['grand_total']}

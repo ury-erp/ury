@@ -7,6 +7,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { DeskLink } from '../../components/DeskLink';
 import { startOfMonth, endOfDay } from 'date-fns';
 import { toApiDate } from '../../lib/reportDate';
+import { __ } from '../../i18n';
 
 interface InvoiceRow {
   date: string;
@@ -29,11 +30,11 @@ interface DaywiseInvoicesData {
 }
 
 const columns: DataTableColumn<InvoiceRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'time', header: 'Time' },
+  { key: 'date', header: __('Date') },
+  { key: 'time', header: __('Time') },
   {
     key: 'invoice',
-    header: 'Invoice',
+    header: __('Invoice'),
     render: (r) => (
       <span className="inline-flex items-center gap-1.5">
         {r.invoice}
@@ -42,12 +43,12 @@ const columns: DataTableColumn<InvoiceRow>[] = [
       </span>
     ),
   },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
-  { key: 'received_amount', header: 'Received', render: (r) => formatCurrency(r.received_amount), align: 'right' },
-  { key: 'cash_discounts', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discounts), align: 'right' },
-  { key: 'payment_mode', header: 'Payment Mode', render: (r) => r.payment_mode || '—' },
+  { key: 'item_total', header: __('Item Total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'total_taxes', header: __('Taxes'), render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'grand_total', header: __('Grand Total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
+  { key: 'received_amount', header: __('Received'), render: (r) => formatCurrency(r.received_amount), align: 'right' },
+  { key: 'cash_discounts', header: __('Cash Discounts'), render: (r) => formatCurrency(r.cash_discounts), align: 'right' },
+  { key: 'payment_mode', header: __('Payment Mode'), render: (r) => r.payment_mode || '—' },
 ];
 
 const PAGE_SIZE = 50;
@@ -77,7 +78,7 @@ export function DaywiseInvoices() {
       });
       setData(res.message ?? (res as unknown as DaywiseInvoicesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -96,8 +97,8 @@ export function DaywiseInvoices() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daywise Invoices"
-        description={`Invoice-level detail ${activeBranchId === 'all' ? '· All Branches' : ''}${pagination ? ` · ${pagination.total} invoices` : ''}`}
+        title={__('Daywise Invoices')}
+        description={__('Invoice-level detail {0}{1}', [activeBranchId === 'all' ? '· All Branches' : '', pagination ? ` · ${pagination.total} invoices` : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -112,7 +113,7 @@ export function DaywiseInvoices() {
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Page {pagination.page} of {pagination.total_pages}
+            {__('Page {0} of {1}', [pagination.page, pagination.total_pages])}
           </span>
           <div className="flex gap-2">
             <Button
@@ -120,14 +121,14 @@ export function DaywiseInvoices() {
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              <ChevronLeft className="w-4 h-4" /> Prev
+              <ChevronLeft className="w-4 h-4 rtl:-scale-x-100" /> {__('Prev')}
             </Button>
             <Button
               variant="outline"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next <ChevronRight className="w-4 h-4" />
+              {__('Next')} <ChevronRight className="w-4 h-4 rtl:-scale-x-100" />
             </Button>
           </div>
         </div>

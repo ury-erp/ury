@@ -7,6 +7,7 @@ import {
   stockReservationService,
   StockReservationRow,
 } from '../../services/stockReservation';
+import { __ } from '../../i18n';
 
 export const STOCK_RESERVATION_ALLOWED_ROLES = [
   'Production Manager',
@@ -81,9 +82,9 @@ export const StockReservationRoleGate: React.FC<StockReservationRoleGateProps> =
   if (status === 'denied') {
     return (
       <Card className="w-full max-w-md p-6 text-center" data-testid="stock-reservation-access-denied">
-        <h2 className="mb-2 text-lg font-semibold text-foreground">Access Denied</h2>
+        <h2 className="mb-2 text-lg font-semibold text-foreground">{__('Access Denied')}</h2>
         <p className="text-muted-foreground">
-          You need the Production Manager, Stock Manager, or System Manager role to view this section.
+          {__('You need the Production Manager, Stock Manager, or System Manager role to view this section.')}
         </p>
       </Card>
     );
@@ -116,7 +117,7 @@ const StockReservationContent: React.FC = () => {
       } catch (err) {
         if (!cancelled) {
           setReservations([]);
-          setError('Unable to load stock reservation data.');
+          setError(__('Unable to load stock reservation data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -131,16 +132,16 @@ const StockReservationContent: React.FC = () => {
   return (
     <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-foreground">Stock Reservations</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Stock Reservations')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Monitor active stock reservations and inventory holds.
+          {__('Monitor active stock reservations and inventory holds.')}
         </p>
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
         <Section>
           <Card className="p-10 text-center text-sm text-text-tertiary">
-            Select a branch to view its reservations.
+            {__('Select a branch to view its reservations.')}
           </Card>
         </Section>
       ) : loading ? (
@@ -156,7 +157,7 @@ const StockReservationContent: React.FC = () => {
       ) : reservations.length === 0 ? (
         <Section>
           <Card className="p-8 text-center text-sm text-text-tertiary">
-            No active stock reservations for this branch right now.
+            {__('No active stock reservations for this branch right now.')}
           </Card>
         </Section>
       ) : (
@@ -165,28 +166,28 @@ const StockReservationContent: React.FC = () => {
             const reservationColumns: DataTableColumn<StockReservationRow>[] = [
               {
                 key: 'component_item',
-                header: 'Item',
+                header: __('Item'),
                 render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
               },
               {
                 key: 'qty',
-                header: 'Qty',
+                header: __('Qty'),
                 align: 'right',
                 render: (row) => <span className="text-muted-foreground">{formatQty(row.qty)}</span>,
               },
               {
                 key: 'warehouse',
-                header: 'Warehouse',
+                header: __('Warehouse'),
                 render: (row) => <span className="text-muted-foreground">{row.warehouse}</span>,
               },
               {
                 key: 'order_ref',
-                header: 'Order Ref',
+                header: __('Order Ref'),
                 render: (row) => <span className="font-mono text-xs text-muted-foreground">{row.order_ref}</span>,
               },
               {
                 key: 'status',
-                header: 'Status',
+                header: __('Status'),
                 render: (row) => (
                   <Badge size="tag" variant={getStatusBadgeVariant(row.status)}>
                     {row.status}
@@ -195,12 +196,12 @@ const StockReservationContent: React.FC = () => {
               },
               {
                 key: 'expires_at',
-                header: 'Expires',
+                header: __('Expires'),
                 render: (row) => <span className="text-muted-foreground">{formatDateTime(row.expires_at)}</span>,
               },
               {
                 key: 'actions',
-                header: 'Actions',
+                header: __('Actions'),
                 render: (row) => (
                   <div className="flex items-center gap-2">
                     <DeskLink doctype="URY Stock Reservation" name={row.name} iconOnly />
@@ -208,7 +209,7 @@ const StockReservationContent: React.FC = () => {
                 ),
               },
             ];
-            return <DataTable columns={reservationColumns} rows={reservations} emptyMessage="No reservations found." />;
+            return <DataTable columns={reservationColumns} rows={reservations} emptyMessage={__('No reservations found.')} />;
           })()}
         </Section>
       )}

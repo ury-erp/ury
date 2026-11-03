@@ -6,6 +6,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface DayRow {
   date: string;
@@ -26,11 +27,11 @@ interface RepeatedCustomersData {
 }
 
 const columns: DataTableColumn<DayRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'total_customers', header: 'Total', align: 'right' },
-  { key: 'new_customers', header: 'New', align: 'right' },
-  { key: 'repeat_customers', header: 'Repeat', align: 'right' },
-  { key: 'repeat_rate_percent', header: 'Repeat Rate', render: (r) => `${r.repeat_rate_percent}%`, align: 'right' },
+  { key: 'date', header: __('Date') },
+  { key: 'total_customers', header: __('Total'), align: 'right' },
+  { key: 'new_customers', header: __('New'), align: 'right' },
+  { key: 'repeat_customers', header: __('Repeat'), align: 'right' },
+  { key: 'repeat_rate_percent', header: __('Repeat Rate'), render: (r) => `${r.repeat_rate_percent}%`, align: 'right' },
 ];
 
 export function RepeatedCustomers() {
@@ -55,7 +56,7 @@ export function RepeatedCustomers() {
       });
       setData(res.message ?? (res as unknown as RepeatedCustomersData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -68,8 +69,8 @@ export function RepeatedCustomers() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Repeated Customers"
-        description={`New vs. repeat visits ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Repeated Customers')}
+        description={__('New vs. repeat visits {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -80,20 +81,20 @@ export function RepeatedCustomers() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Visits', value: data.summary.total_customers },
-              { label: 'New Customers', value: data.summary.new_customers },
-              { label: 'Repeat Visits', value: data.summary.repeat_customers },
-              { label: 'Avg Repeat Rate', value: `${data.summary.avg_repeat_rate_percent}%` },
+              { label: __('Total Visits'), value: data.summary.total_customers },
+              { label: __('New Customers'), value: data.summary.new_customers },
+              { label: __('Repeat Visits'), value: data.summary.repeat_customers },
+              { label: __('Avg Repeat Rate'), value: `${data.summary.avg_repeat_rate_percent}%` },
             ] satisfies KpiItemProps[]}
           />
 
           <BarChartCard
-            title="New vs Repeat Visits"
+            title={__('New vs Repeat Visits')}
             data={data.rows}
             xKey="date"
             yKeys={['new_customers', 'repeat_customers']}

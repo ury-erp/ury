@@ -15,6 +15,7 @@ import { call } from '@ury/core';
 import { SearchableSelect, Option } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { useBranchContext } from '../../context/BranchContext';
+import { __ } from '../../i18n';
 
 interface SelfOrderingProfile {
   name: string;
@@ -117,7 +118,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
       );
       setProfiles(records);
     } catch {
-      showToast('Failed to load profiles', 'error');
+      showToast(__('Failed to load profiles'), 'error');
       setProfiles([]);
     } finally {
       setLoading(false);
@@ -226,7 +227,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
     e.preventDefault();
 
     if (!formData.profile_name || !formData.restaurant || !formData.pos_profile) {
-      showToast('Please fill in all required fields', 'error');
+      showToast(__('Please fill in all required fields'), 'error');
       return;
     }
 
@@ -261,17 +262,17 @@ export const SelfOrderingProfilePage: React.FC = () => {
           name: editingProfile.name,
           fieldname: docData,
         });
-        showToast('Profile updated successfully', 'success');
+        showToast(__('Profile updated successfully'), 'success');
       } else {
         await call('frappe.client.insert', docData);
-        showToast('Profile created successfully', 'success');
+        showToast(__('Profile created successfully'), 'success');
       }
 
       await fetchProfiles();
       setShowForm(false);
       resetForm();
     } catch (err: any) {
-      showToast(err?.message || 'Failed to save profile', 'error');
+      showToast(err?.message || __('Failed to save profile'), 'error');
     } finally {
       setSaving(false);
     }
@@ -287,10 +288,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
         doctype: 'URY Self Ordering Profile',
         name: profile.name,
       });
-      showToast('Profile deleted successfully', 'success');
+      showToast(__('Profile deleted successfully'), 'success');
       await fetchProfiles();
     } catch (err: any) {
-      showToast(err?.message || 'Failed to delete profile', 'error');
+      showToast(err?.message || __('Failed to delete profile'), 'error');
     }
   };
 
@@ -312,13 +313,13 @@ export const SelfOrderingProfilePage: React.FC = () => {
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Self Ordering Profiles</h1>
-              <p className="text-sm text-text-tertiary">Manage QR & kiosk ordering configurations</p>
+              <h1 className="text-2xl font-bold text-foreground">{__('Self Ordering Profiles')}</h1>
+              <p className="text-sm text-text-tertiary">{__('Manage QR & kiosk ordering configurations')}</p>
             </div>
           </div>
           <Button onClick={() => handleOpenForm()}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Profile
+            <Plus className="w-4 h-4 me-2" />
+            {__('New Profile')}
           </Button>
         </div>
 
@@ -327,7 +328,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
           <Card className="rounded-xl">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-bold text-foreground">
-                {editingProfile ? 'Edit Profile' : 'Create New Profile'}
+                {editingProfile ? __('Edit Profile') : __('Create New Profile')}
               </h2>
               <button
                 onClick={() => {
@@ -348,7 +349,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   onClick={() => toggleSection('profileInfo')}
                   className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-foreground">Profile Info</h3>
+                  <h3 className="text-sm font-bold text-foreground">{__('Profile Info')}</h3>
                   {openSections.profileInfo ? (
                     <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
@@ -361,7 +362,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                          Profile Name *
+                          {__('Profile Name *')}
                         </label>
                         <Input
                           type="text"
@@ -369,14 +370,14 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           onChange={(e) =>
                             setFormData({ ...formData, profile_name: e.target.value })
                           }
-                          placeholder="e.g., Main Branch QR"
+                          placeholder={__('e.g., Main Branch QR')}
                           required
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                          Restaurant *
+                          {__('Restaurant *')}
                         </label>
                         <SearchableSelect
                           id="restaurant"
@@ -391,7 +392,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                          Branch *
+                          {__('Branch *')}
                         </label>
                         <SearchableSelect
                           id="branch"
@@ -406,7 +407,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                          POS Profile *
+                          {__('POS Profile *')}
                         </label>
                         <SearchableSelect
                           id="pos_profile"
@@ -421,7 +422,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                          Default Customer
+                          {__('Default Customer')}
                         </label>
                         <SearchableSelect
                           id="default_customer"
@@ -435,7 +436,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       </div>
 
                       <div className="flex items-end">
-                        <label className="flex items-center space-x-2 cursor-pointer">
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <Checkbox
                             size="sm"
                             checked={formData.enabled}
@@ -443,7 +444,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                               setFormData({ ...formData, enabled: e.target.checked })
                             }
                           />
-                          <span className="text-sm font-medium text-muted-foreground">Enabled</span>
+                          <span className="text-sm font-medium text-muted-foreground">{__('Enabled')}</span>
                         </label>
                       </div>
                     </div>
@@ -458,7 +459,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   onClick={() => toggleSection('orderingModes')}
                   className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-foreground">Ordering Modes</h3>
+                  <h3 className="text-sm font-bold text-foreground">{__('Ordering Modes')}</h3>
                   {openSections.orderingModes ? (
                     <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
@@ -468,7 +469,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                 {openSections.orderingModes && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_qr_table_ordering}
@@ -476,10 +477,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_qr_table_ordering: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">QR Table Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('QR Table Ordering')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_qr_pickup_ordering}
@@ -487,10 +488,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_qr_pickup_ordering: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">QR Pickup Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('QR Pickup Ordering')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_kiosk_ordering}
@@ -498,10 +499,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_kiosk_ordering: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Kiosk Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Kiosk Ordering')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.allow_add_to_running_table}
@@ -509,7 +510,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, allow_add_to_running_table: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Allow Add to Running Table</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Allow Add to Running Table')}</span>
                     </label>
                   </div>
                 )}
@@ -522,7 +523,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   onClick={() => toggleSection('productDisplay')}
                   className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-foreground">Product Display</h3>
+                  <h3 className="text-sm font-bold text-foreground">{__('Product Display')}</h3>
                   {openSections.productDisplay ? (
                     <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
@@ -532,7 +533,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                 {openSections.productDisplay && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_product_detail_page}
@@ -540,10 +541,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_product_detail_page: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Product Detail Page</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Product Detail Page')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.show_item_images}
@@ -551,10 +552,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, show_item_images: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Show Item Images</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Show Item Images')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.show_item_descriptions}
@@ -562,10 +563,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, show_item_descriptions: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Show Item Descriptions</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Show Item Descriptions')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_item_notes}
@@ -573,7 +574,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_item_notes: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Enable Item Notes</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Enable Item Notes')}</span>
                     </label>
                   </div>
                 )}
@@ -586,7 +587,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   onClick={() => toggleSection('billingPayment')}
                   className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-foreground">Billing & Payment</h3>
+                  <h3 className="text-sm font-bold text-foreground">{__('Billing & Payment')}</h3>
                   {openSections.billingPayment ? (
                     <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
@@ -596,7 +597,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
                 {openSections.billingPayment && (
                   <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_request_bill}
@@ -604,10 +605,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_request_bill: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Enable Request Bill</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Enable Request Bill')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_customer_payment}
@@ -615,10 +616,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_customer_payment: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Enable Customer Payment</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Enable Customer Payment')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_payment_link}
@@ -626,10 +627,10 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_payment_link: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Enable Payment Link</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Enable Payment Link')}</span>
                     </label>
 
-                    <label className="flex items-center space-x-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         size="sm"
                         checked={formData.enable_pay_at_counter}
@@ -637,7 +638,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                           setFormData({ ...formData, enable_pay_at_counter: e.target.checked })
                         }
                         />
-                      <span className="text-sm font-medium text-muted-foreground">Enable Pay at Counter</span>
+                      <span className="text-sm font-medium text-muted-foreground">{__('Enable Pay at Counter')}</span>
                     </label>
                   </div>
                 )}
@@ -650,7 +651,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   onClick={() => toggleSection('session')}
                   className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-foreground">Session</h3>
+                  <h3 className="text-sm font-bold text-foreground">{__('Session')}</h3>
                   {openSections.session ? (
                     <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
@@ -662,7 +663,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   <div className="p-4 bg-card">
                     <div className="max-w-xs">
                       <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-                        Session Idle Timeout (Minutes)
+                        {__('Session Idle Timeout (Minutes)')}
                       </label>
                       <Input
                         type="number"
@@ -690,12 +691,12 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   {saving ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      Saving...
+                      {__('Saving...')}
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      Save Profile
+                      {__('Save Profile')}
                     </>
                   )}
                 </Button>
@@ -707,7 +708,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   }}
                   className="bg-muted text-foreground hover:bg-muted-foreground"
                 >
-                  Cancel
+                  {__('Cancel')}
                 </Button>
               </div>
             </form>
@@ -720,24 +721,24 @@ export const SelfOrderingProfilePage: React.FC = () => {
             {profiles.length === 0 ? (
               <div className="p-12 text-center">
                 <Settings className="w-12 h-12 text-text-tertiary mx-auto mb-3" />
-                <p className="text-text-tertiary font-medium mb-4">No profiles configured yet</p>
+                <p className="text-text-tertiary font-medium mb-4">{__('No profiles configured yet')}</p>
                 <Button onClick={() => handleOpenForm()}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create First Profile
+                  <Plus className="w-4 h-4 me-2" />
+                  {__('Create First Profile')}
                 </Button>
               </div>
             ) : (
               <DataTable<SelfOrderingProfile>
                 columns={[
-                  { key: 'profile_name', header: 'Profile Name', render: (row) => <span className="font-medium">{row.profile_name}</span> },
-                  { key: 'branch', header: 'Branch', render: (row) => row.branch },
-                  { key: 'enabled', header: 'Status', render: (row) => (
+                  { key: 'profile_name', header: __('Profile Name'), render: (row) => <span className="font-medium">{row.profile_name}</span> },
+                  { key: 'branch', header: __('Branch'), render: (row) => row.branch },
+                  { key: 'enabled', header: __('Status'), render: (row) => (
                     <Badge size="tag" variant={row.enabled === 1 ? 'tagSuccess' : 'cancelled'}>
-                      {row.enabled === 1 ? 'Enabled' : 'Disabled'}
+                      {row.enabled === 1 ? __('Enabled') : __('Disabled')}
                     </Badge>
                   )},
-                  { key: 'actions', header: 'Actions', align: 'right', render: (row) => (
-                    <div className="space-x-2 flex justify-end">
+                  { key: 'actions', header: __('Actions'), align: 'right', render: (row) => (
+                    <div className="gap-2 flex justify-end">
                       <button
                         onClick={() => handleOpenForm(row)}
                         className="p-1.5 text-primary hover:bg-primary-tint rounded-md transition-colors"

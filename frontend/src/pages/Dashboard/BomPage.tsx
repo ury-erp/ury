@@ -27,6 +27,7 @@ import SideDrawer from '../../components/layout/SideDrawer';
 import { PageToolbar } from '../../components/layout/PageToolbar';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { DeskLink } from '../../components/DeskLink';
+import { __ } from '../../i18n';
 
 export interface BomItemRow {
   name?: string;
@@ -272,12 +273,12 @@ export const BomPage: React.FC = () => {
 
       setBoms(mergedBoms);
       if (isManualRefresh) {
-        showToast.success('BOMs synced with ERPNext');
+        showToast.success(__('BOMs synced with ERPNext'));
         fetchBranchBoms();
       }
     } catch (err: any) {
       console.error('Failed to fetch BOMs', err);
-      showToast.error(err?.message || 'Failed to load BOMs from ERPNext');
+      showToast.error(err?.message || __('Failed to load BOMs from ERPNext'));
       setBoms([]);
     } finally {
       setLoading(false);
@@ -397,7 +398,7 @@ export const BomPage: React.FC = () => {
   const columns: DataTableColumn<BomRecord>[] = [
     {
       key: 'item',
-      header: 'Finished Product',
+      header: __('Finished Product'),
       render: (bom) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary border border-hair">
@@ -406,7 +407,7 @@ export const BomPage: React.FC = () => {
           <div className="flex flex-col">
             <button
               onClick={() => openViewDrawer(bom)}
-              className="text-left font-semibold text-foreground hover:text-primary transition-colors text-xs"
+              className="text-start font-semibold text-foreground hover:text-primary transition-colors text-xs"
             >
               {bom.item_name || bom.item}
             </button>
@@ -423,7 +424,7 @@ export const BomPage: React.FC = () => {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: __('Status'),
       render: (bom) => {
         const statusInfo = getBomStatus(bom);
         return (
@@ -432,7 +433,7 @@ export const BomPage: React.FC = () => {
               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs border ${statusInfo.badgeClass}`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
-              <span>{statusInfo.label}</span>
+              <span>{__(statusInfo.label)}</span>
             </span>
           </div>
         );
@@ -440,13 +441,13 @@ export const BomPage: React.FC = () => {
     },
     {
       key: 'components',
-      header: 'Raw Materials',
+      header: __('Raw Materials'),
       render: (bom) => {
         const count = bom.items?.length || 0;
         return (
           <div className="flex flex-col text-xs">
             <span className="font-medium text-foreground">
-              {count} {count === 1 ? 'component' : 'components'}
+              {count} {count === 1 ? __('component') : __('components')}
             </span>
             {count > 0 && (
               <span
@@ -454,7 +455,7 @@ export const BomPage: React.FC = () => {
                 title={bom.items?.map((i) => i.item_name || i.item_code).join(', ')}
               >
                 {bom.items?.slice(0, 2).map((i) => i.item_name || i.item_code).join(', ')}
-                {count > 2 ? `, +${count - 2} more` : ''}
+                {count > 2 ? __(', +{0} more', [count - 2]) : ''}
               </span>
             )}
           </div>
@@ -463,7 +464,7 @@ export const BomPage: React.FC = () => {
     },
     {
       key: 'cost',
-      header: 'Total Cost',
+      header: __('Total Cost'),
       align: 'right',
       render: (bom) => {
         const total = bom.total_cost || bom.raw_material_cost || 0;
@@ -474,7 +475,7 @@ export const BomPage: React.FC = () => {
             </span>
             {bom.raw_material_cost !== undefined && (
               <span className="text-[11px] text-muted-foreground">
-                RM: {formatCurrency(bom.raw_material_cost)}
+                {__('RM:')} {formatCurrency(bom.raw_material_cost)}
               </span>
             )}
           </div>
@@ -483,7 +484,7 @@ export const BomPage: React.FC = () => {
     },
     {
       key: 'company',
-      header: 'Company',
+      header: __('Company'),
       render: (bom) => (
         <span className="text-xs text-muted-foreground truncate max-w-[140px] block" title={bom.company}>
           {bom.company}
@@ -492,7 +493,7 @@ export const BomPage: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Actions',
+      header: __('Actions'),
       align: 'right',
       render: (bom) => (
         <div className="flex items-center justify-end gap-1.5">
@@ -500,7 +501,7 @@ export const BomPage: React.FC = () => {
           <button
             onClick={() => openViewDrawer(bom)}
             className="p-1.5 text-muted-foreground hover:text-primary hover:bg-hair rounded-md transition-colors"
-            title="View BOM Details"
+            title={__('View BOM Details')}
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
@@ -516,10 +517,10 @@ export const BomPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Layers className="w-6 h-6 text-primary" />
-            <span>Bill of Materials (BOM)</span>
+            <span>{__('Bill of Materials (BOM)')}</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            View recipe configurations, raw materials, and production costs from ERPNext
+            {__('View recipe configurations, raw materials, and production costs from ERPNext')}
           </p>
         </div>
       </div>
@@ -528,13 +529,13 @@ export const BomPage: React.FC = () => {
       <PageToolbar>
         <div className="flex flex-1 items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search BOM or item..."
+              placeholder={__('Search BOM or item...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-xs"
+              className="ps-9 h-9 text-xs"
             />
           </div>
 
@@ -543,8 +544,8 @@ export const BomPage: React.FC = () => {
               id="bom-item-filter"
               value={itemFilter}
               onChange={(_, val) => setItemFilter(val)}
-              options={[{ value: 'all', label: 'All Finished Goods' }, ...finishedItemsWithOptions]}
-              placeholder="Filter by Finished Item"
+              options={[{ value: 'all', label: __('All Finished Goods') }, ...finishedItemsWithOptions]}
+              placeholder={__('Filter by Finished Item')}
             />
           </div>
 
@@ -554,14 +555,14 @@ export const BomPage: React.FC = () => {
               value={statusFilter}
               onChange={(_, val) => setStatusFilter(val)}
               options={[
-                { value: 'all', label: 'All Statuses' },
-                { value: 'Default', label: 'Default' },
-                { value: 'Active', label: 'Active' },
-                { value: 'Not active', label: 'Not active' },
-                { value: 'Draft', label: 'Draft' },
-                { value: 'Cancelled', label: 'Cancelled' },
+                { value: 'all', label: __('All Statuses') },
+                { value: 'Default', label: __('Default') },
+                { value: 'Active', label: __('Active') },
+                { value: 'Not active', label: __('Not active') },
+                { value: 'Draft', label: __('Draft') },
+                { value: 'Cancelled', label: __('Cancelled') },
               ]}
-              placeholder="Filter by Status"
+              placeholder={__('Filter by Status')}
             />
           </div>
         </div>
@@ -575,7 +576,7 @@ export const BomPage: React.FC = () => {
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="List View"
+              title={__('List View')}
             >
               <List className="w-4 h-4" />
             </button>
@@ -586,7 +587,7 @@ export const BomPage: React.FC = () => {
                   ? 'bg-card text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
-              title="Grid View"
+              title={__('Grid View')}
             >
               <Grid className="w-4 h-4" />
             </button>
@@ -596,7 +597,7 @@ export const BomPage: React.FC = () => {
             variant="outline"
             className="h-8 px-2.5 border-hair bg-muted text-muted-foreground text-xs font-medium shrink-0"
           >
-            {filteredBoms.length} {filteredBoms.length === 1 ? 'BOM' : 'BOMs'}
+            {filteredBoms.length} {filteredBoms.length === 1 ? __('BOM') : __('BOMs')}
           </Badge>
 
           <Button
@@ -605,7 +606,7 @@ export const BomPage: React.FC = () => {
             onClick={() => fetchBoms(true)}
             disabled={refreshing || loading}
             className="h-9 px-2.5"
-            title="Sync with ERPNext"
+            title={__('Sync with ERPNext')}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
@@ -622,11 +623,11 @@ export const BomPage: React.FC = () => {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5 text-primary">
             <Layers className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Bill of Materials Found</h3>
+          <h3 className="text-xl font-bold text-foreground mb-2">{__('No Bill of Materials Found')}</h3>
           <p className="text-muted-foreground max-w-sm text-sm">
             {search || itemFilter !== 'all' || statusFilter !== 'all'
-              ? 'No BOMs match your selected search or filters. Try adjusting your search query.'
-              : 'No Bill of Materials found in ERPNext. BOMs created in ERPNext will appear here.'}
+              ? __('No BOMs match your selected search or filters. Try adjusting your search query.')
+              : __('No Bill of Materials found in ERPNext. BOMs created in ERPNext will appear here.')}
           </p>
         </Card>
       ) : viewMode === 'grid' ? (
@@ -670,7 +671,7 @@ export const BomPage: React.FC = () => {
                     className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] border ${statusInfo.badgeClass}`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
-                    <span>{statusInfo.label}</span>
+                    <span>{__(statusInfo.label)}</span>
                   </span>
 
                   <Badge variant="outline" className="border-hair bg-muted/60 text-[10px] px-1.5 py-0 font-medium">
@@ -681,13 +682,13 @@ export const BomPage: React.FC = () => {
                 {/* Cost & Raw Materials Summary */}
                 <div className="bg-muted/40 rounded-lg p-2.5 text-xs space-y-1.5 mb-3 border border-hair">
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Total Cost:</span>
+                    <span className="text-muted-foreground">{__('Total Cost:')}</span>
                     <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-muted-foreground">Raw Materials:</span>
+                    <span className="text-muted-foreground">{__('Raw Materials:')}</span>
                     <span className="text-foreground font-medium">
-                      {count} {count === 1 ? 'item' : 'items'}
+                      {count} {count === 1 ? __('item') : __('items')}
                     </span>
                   </div>
                 </div>
@@ -697,7 +698,7 @@ export const BomPage: React.FC = () => {
                   <div className="text-[11px] text-muted-foreground border-t border-hair pt-2 mb-3 space-y-1 flex-1">
                     {bom.items?.slice(0, 3).map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center truncate">
-                        <span className="truncate pr-2">{item.item_name || item.item_code}</span>
+                        <span className="truncate pe-2">{item.item_name || item.item_code}</span>
                         <span className="font-mono text-[10px] text-foreground/80 shrink-0">
                           {item.qty} {item.uom}
                         </span>
@@ -705,7 +706,7 @@ export const BomPage: React.FC = () => {
                     ))}
                     {count > 3 && (
                       <div className="text-[10px] text-primary/80 italic pt-0.5">
-                        +{count - 3} more raw materials
+                        +{count - 3} {__('more raw materials')}
                       </div>
                     )}
                   </div>
@@ -725,7 +726,7 @@ export const BomPage: React.FC = () => {
                     className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>View Details</span>
+                    <span>{__('View Details')}</span>
                   </button>
                 </div>
               </div>
@@ -738,7 +739,7 @@ export const BomPage: React.FC = () => {
           <DataTable
             columns={columns}
             rows={filteredBoms}
-            emptyMessage="No Bill of Materials found"
+            emptyMessage={__('No Bill of Materials found')}
             onRowClick={(bom) => openViewDrawer(bom)}
           />
         </div>
@@ -748,7 +749,7 @@ export const BomPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title="Bill of Materials Details"
+        title={__('Bill of Materials Details')}
         subtitle={selectedBom?.name}
         maxWidth="max-w-3xl"
       >
@@ -757,7 +758,7 @@ export const BomPage: React.FC = () => {
             {loadingDoc && (
               <div className="p-2 bg-muted/40 rounded-md text-xs text-muted-foreground flex items-center gap-2">
                 <Spinner className="w-3 h-3 text-primary" />
-                <span>Loading latest authoritative details from ERPNext...</span>
+                <span>{__('Loading latest authoritative details from ERPNext...')}</span>
               </div>
             )}
 
@@ -765,7 +766,7 @@ export const BomPage: React.FC = () => {
             <div className="flex items-center justify-between p-3.5 bg-card rounded-lg border border-hair flex-wrap gap-2">
               <div>
                 <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block">
-                  Status
+                  {__('Status')}
                 </span>
                 <div className="flex items-center gap-2 mt-1">
                   {(() => {
@@ -775,29 +776,29 @@ export const BomPage: React.FC = () => {
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs border ${statusInfo.badgeClass}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
-                        <span>{statusInfo.label}</span>
+                        <span>{__(statusInfo.label)}</span>
                       </span>
                     );
                   })()}
 
                   {selectedBom.docstatus === 1 ? (
                     <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[10px]">
-                      Submitted (docstatus 1)
+                      {__('Submitted (docstatus 1)')}
                     </Badge>
                   ) : selectedBom.docstatus === 2 ? (
                     <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
-                      Cancelled (docstatus 2)
+                      {__('Cancelled (docstatus 2)')}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px]">
-                      Draft (docstatus 0)
+                      {__('Draft (docstatus 0)')}
                     </Badge>
                   )}
                 </div>
               </div>
 
-              <div className="text-right">
-                <DeskLink doctype="BOM" name={selectedBom.name} label="Open in ERPNext Desk" />
+              <div className="text-end">
+                <DeskLink doctype="BOM" name={selectedBom.name} label={__('Open in ERPNext Desk')} />
               </div>
             </div>
 
@@ -805,36 +806,36 @@ export const BomPage: React.FC = () => {
             <div className="bg-muted/30 p-3.5 rounded-lg border border-hair space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Boxes className="w-3.5 h-3.5 text-primary" />
-                <span>Finished Product (Output)</span>
+                <span>{__('Finished Product (Output)')}</span>
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Item to Manufacture:</span>
+                  <span className="text-muted-foreground block text-[11px]">{__('Item to Manufacture:')}</span>
                   <span className="font-semibold text-foreground text-sm block">
                     {selectedBom.item_name || selectedBom.item}
                   </span>
                   <span className="font-mono text-muted-foreground text-[11px] block">
-                    Code: {selectedBom.item}
+                    {__('Code:')} {selectedBom.item}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Output Quantity:</span>
+                  <span className="text-muted-foreground block text-[11px]">{__('Output Quantity:')}</span>
                   <span className="font-semibold text-foreground text-sm block">
                     {selectedBom.quantity} {selectedBom.uom}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Company:</span>
+                  <span className="text-muted-foreground block text-[11px]">{__('Company:')}</span>
                   <span className="font-medium text-foreground block">{selectedBom.company}</span>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Costing Method:</span>
+                  <span className="text-muted-foreground block text-[11px]">{__('Costing Method:')}</span>
                   <span className="font-medium text-foreground block">
-                    {selectedBom.rm_cost_as_per || 'Valuation Rate'}
+                    {selectedBom.rm_cost_as_per || __('Valuation Rate')}
                     {selectedBom.buying_price_list ? ` (${selectedBom.buying_price_list})` : ''}
                   </span>
                 </div>
@@ -845,26 +846,26 @@ export const BomPage: React.FC = () => {
             <div className="bg-muted/30 p-3.5 rounded-lg border border-hair space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Coins className="w-3.5 h-3.5 text-primary" />
-                <span>Cost Summary</span>
+                <span>{__('Cost Summary')}</span>
               </h4>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="bg-card p-2.5 rounded-md border border-hair">
-                  <span className="text-[11px] text-muted-foreground block">Raw Material Cost:</span>
+                  <span className="text-[11px] text-muted-foreground block">{__('Raw Material Cost:')}</span>
                   <span className="text-sm font-semibold text-foreground">
                     {formatCurrency(selectedBom.raw_material_cost || 0)}
                   </span>
                 </div>
 
                 <div className="bg-card p-2.5 rounded-md border border-hair">
-                  <span className="text-[11px] text-muted-foreground block">Operating Cost:</span>
+                  <span className="text-[11px] text-muted-foreground block">{__('Operating Cost:')}</span>
                   <span className="text-sm font-semibold text-foreground">
                     {formatCurrency(selectedBom.operating_cost || 0)}
                   </span>
                 </div>
 
                 <div className="bg-card p-2.5 rounded-md border border-hair col-span-2 sm:col-span-1">
-                  <span className="text-[11px] text-muted-foreground block">Total Cost:</span>
+                  <span className="text-[11px] text-muted-foreground block">{__('Total Cost:')}</span>
                   <span className="text-base font-bold text-foreground">
                     {formatCurrency(selectedBom.total_cost || selectedBom.raw_material_cost || 0)}
                   </span>
@@ -872,7 +873,7 @@ export const BomPage: React.FC = () => {
               </div>
 
               <div className="text-[11px] text-muted-foreground flex justify-between items-center pt-1 border-t border-hair">
-                <span>Calculated Unit Cost:</span>
+                <span>{__('Calculated Unit Cost:')}</span>
                 <span className="font-semibold text-foreground">
                   {formatCurrency(
                     (selectedBom.total_cost || selectedBom.raw_material_cost || 0) / (selectedBom.quantity || 1)
@@ -887,21 +888,21 @@ export const BomPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5 text-primary" />
-                  <span>Raw Materials / Components ({selectedBom.items?.length || 0})</span>
+                  <span>{__('Raw Materials / Components (')}{selectedBom.items?.length || 0})</span>
                 </h4>
               </div>
 
               <div className="border border-hair rounded-lg overflow-hidden bg-card">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-start text-xs">
                     <thead>
                       <tr className="bg-muted/60 border-b border-hair text-muted-foreground">
                         <th className="py-2 px-3 font-semibold w-10">#</th>
-                        <th className="py-2 px-3 font-semibold">Item</th>
-                        <th className="py-2 px-3 font-semibold text-right">Quantity</th>
-                        <th className="py-2 px-3 font-semibold">UOM</th>
-                        <th className="py-2 px-3 font-semibold text-right">Rate</th>
-                        <th className="py-2 px-3 font-semibold text-right">Amount</th>
+                        <th className="py-2 px-3 font-semibold">{__('Item')}</th>
+                        <th className="py-2 px-3 font-semibold text-end">{__('Quantity')}</th>
+                        <th className="py-2 px-3 font-semibold">{__('UOM')}</th>
+                        <th className="py-2 px-3 font-semibold text-end">{__('Rate')}</th>
+                        <th className="py-2 px-3 font-semibold text-end">{__('Amount')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-hair">
@@ -920,16 +921,16 @@ export const BomPage: React.FC = () => {
                               </span>
                               {row.bom_no && (
                                 <span className="text-[10px] text-primary block">
-                                  Sub-BOM: {row.bom_no}
+                                  {__('Sub-BOM:')} {row.bom_no}
                                 </span>
                               )}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-medium">{row.qty}</td>
+                            <td className="py-2.5 px-3 text-end font-medium">{row.qty}</td>
                             <td className="py-2.5 px-3 text-muted-foreground">{row.uom}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
+                            <td className="py-2.5 px-3 text-end font-mono text-muted-foreground">
                               {formatCurrency(row.rate || 0)}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-semibold font-mono text-foreground">
+                            <td className="py-2.5 px-3 text-end font-semibold font-mono text-foreground">
                               {formatCurrency(row.amount || 0)}
                             </td>
                           </tr>
@@ -937,7 +938,7 @@ export const BomPage: React.FC = () => {
                       ) : (
                         <tr>
                           <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                            No raw material components defined in this BOM.
+                            {__('No raw material components defined in this BOM.')}
                           </td>
                         </tr>
                       )}
@@ -948,9 +949,9 @@ export const BomPage: React.FC = () => {
                 {/* Total Summary Footer inside Table */}
                 <div className="bg-muted/40 p-3 flex items-center justify-between border-t border-hair text-xs">
                   <span className="font-medium text-muted-foreground">
-                    Total Materials Cost ({selectedBom.items?.length || 0} items):
+                    {__('Total Materials Cost ({0} items):', [selectedBom.items?.length || 0])}
                   </span>
-                  <div className="text-right">
+                  <div className="text-end">
                     <span className="text-base font-bold text-foreground">
                       {formatCurrency(selectedBom.raw_material_cost || 0)}
                     </span>
@@ -963,7 +964,7 @@ export const BomPage: React.FC = () => {
             {selectedBom.description && (
               <div className="bg-muted/30 p-3.5 rounded-lg border border-hair space-y-1.5 text-xs">
                 <span className="font-semibold text-muted-foreground text-[11px] uppercase tracking-wider block">
-                  Description / Recipe Notes
+                  {__('Description / Recipe Notes')}
                 </span>
                 <p className="text-foreground whitespace-pre-wrap leading-relaxed">
                   {selectedBom.description}
@@ -973,14 +974,14 @@ export const BomPage: React.FC = () => {
 
             {/* Drawer Footer with Close and DeskLink */}
             <div className="pt-3 border-t border-hair flex items-center justify-between gap-2.5">
-              <DeskLink doctype="BOM" name={selectedBom.name} label="Open in ERPNext Desk" />
+              <DeskLink doctype="BOM" name={selectedBom.name} label={__('Open in ERPNext Desk')} />
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsDrawerOpen(false)}
                 className="text-xs"
               >
-                Close
+                {__('Close')}
               </Button>
             </div>
           </div>

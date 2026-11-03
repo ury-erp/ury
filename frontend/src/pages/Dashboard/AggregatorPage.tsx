@@ -5,6 +5,7 @@ import { Plus, Store, Edit2 } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle, DataTable, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { __ } from '../../i18n';
 
 interface AggregatorSetting {
   name?: string;
@@ -192,11 +193,11 @@ export const AggregatorPage: React.FC = () => {
       await fetchDropdownOptions();
       setIsAddOpen(false);
       setNewAggregatorName('');
-      showToast.success('Aggregator created successfully');
+      showToast.success(__('Aggregator created successfully'));
     } catch (err: any) {
       console.error('Failed to create aggregator:', err);
       const errorMessage = err?.message || err?.responseJSON?.message || String(err);
-      showToast.error(`Failed to create aggregator: ${errorMessage}`);
+      showToast.error(__('Failed to create aggregator: {0}', [errorMessage]));
     } finally {
       setSaving(false);
     }
@@ -226,7 +227,7 @@ export const AggregatorPage: React.FC = () => {
     if (!branchToUpdate) return;
 
     if (!editForm.aggregator || !editForm.aggregator.trim()) {
-      showToast.error('Aggregator Name is required');
+      showToast.error(__('Aggregator Name is required'));
       return;
     }
 
@@ -241,7 +242,7 @@ export const AggregatorPage: React.FC = () => {
       mode_of_payment: editForm.mode_of_payment || '',
     };
     if (JSON.stringify(original) === JSON.stringify(current)) {
-      showToast.warning('No changes in document');
+      showToast.warning(__('No changes in document'));
       return;
     }
 
@@ -289,13 +290,13 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      showToast.success('Aggregator updated successfully');
+      showToast.success(__('Aggregator updated successfully'));
       setEditingIndex(null);
       await fetchBranchAggregators();
       await fetchDropdownOptions();
     } catch (err: any) {
       console.error('Failed to update aggregator:', err);
-      showToast.error(err?.message || 'Failed to update aggregator');
+      showToast.error(err?.message || __('Failed to update aggregator'));
     } finally {
       setSaving(false);
     }
@@ -309,11 +310,11 @@ export const AggregatorPage: React.FC = () => {
       <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-border flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={handleOpenAddModal}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           disabled={!hasBranch}
         >
           <Plus className="w-4 h-4" />
-          <span>Add Aggregator</span>
+          <span>{__('Add Aggregator')}</span>
         </Button>
       </div>
 
@@ -327,17 +328,17 @@ export const AggregatorPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Store className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Aggregators Found</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-1">{__('No Aggregators Found')}</h3>
           <p className="text-muted-foreground mb-6 max-w-sm">
-            Add aggregators like Zomato, Swiggy to configure aggregator settings.
+            {__('Add aggregators like Zomato, Swiggy to configure aggregator settings.')}
           </p>
           <Button
             onClick={handleOpenAddModal}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
             disabled={!hasBranch}
           >
             <Plus className="w-4 h-4" />
-            <span>Add Aggregator</span>
+            <span>{__('Add Aggregator')}</span>
           </Button>
         </Card>
       ) : (
@@ -348,14 +349,14 @@ export const AggregatorPage: React.FC = () => {
                 const columns: DataTableColumn<AggregatorSetting>[] = [
                   {
                     key: 'aggregator',
-                    header: 'Aggregator',
+                    header: __('Aggregator'),
                     render: (row) => <span className="font-semibold text-foreground">{row.aggregator || row.customer || row.name || '-'}</span>
                   },
-                  { key: 'price_list', header: 'Price List', render: (row) => row.price_list || '-' },
-                  { key: 'mode_of_payment', header: 'Mode of Payment', render: (row) => row.mode_of_payments || row.mode_of_payment || '-' },
+                  { key: 'price_list', header: __('Price List'), render: (row) => row.price_list || '-' },
+                  { key: 'mode_of_payment', header: __('Mode of Payment'), render: (row) => row.mode_of_payments || row.mode_of_payment || '-' },
                   {
                     key: 'actions',
-                    header: 'Actions',
+                    header: __('Actions'),
                     align: 'right',
                     render: (row) => {
                       const idx = aggregators.findIndex(item => item.aggregator === row.aggregator);
@@ -364,7 +365,7 @@ export const AggregatorPage: React.FC = () => {
                           variant="ghost"
                           onClick={() => handleEditAggregator(row, idx)}
                           className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
-                          title="Edit Aggregator"
+                          title={__('Edit Aggregator')}
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
@@ -383,15 +384,15 @@ export const AggregatorPage: React.FC = () => {
       <Dialog open={isAddOpen} onOpenChange={(open) => !open && setIsAddOpen(false)}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setIsAddOpen(false)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Aggregator')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateAggregator} className="space-y-4 text-sm mt-4">
             <div>
               <label className="block font-semibold text-foreground mb-1.5">
-                Aggregator Name <span className="text-red-500">*</span>
+                {__('Aggregator Name')} <span className="text-red-500">*</span>
               </label>
               <Input
-                placeholder="e.g. Swiggy, Zomato"
+                placeholder={__('e.g. Swiggy, Zomato')}
                 value={newAggregatorName}
                 onChange={(e) => setNewAggregatorName(e.target.value)}
                 required
@@ -400,10 +401,10 @@ export const AggregatorPage: React.FC = () => {
 
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
               <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>Save</span>
+                <span>{__('Save')}</span>
               </Button>
             </div>
           </form>
@@ -414,12 +415,12 @@ export const AggregatorPage: React.FC = () => {
       <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && setEditingIndex(null)}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setEditingIndex(null)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Edit Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Edit Aggregator')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4 text-sm mt-4">
             <div>
               <label className="block font-semibold text-foreground mb-1.5">
-                Aggregator Name <span className="text-red-500">*</span>
+                {__('Aggregator Name')} <span className="text-red-500">*</span>
               </label>
               <Input
                 value={editForm.aggregator}
@@ -429,39 +430,39 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-foreground mb-1.5">Price List</label>
+              <label className="block font-semibold text-foreground mb-1.5">{__('Price List')}</label>
               <SearchableSelect
                 id="edit_price_list"
                 value={editForm.price_list || ''}
                 onChange={(_, val) => setEditForm(p => ({ ...p, price_list: val }))}
                 options={[
-                  { value: '', label: 'Select Price List...' },
+                  { value: '', label: __('Select Price List...') },
                   ...priceLists.map(pl => ({ value: pl.name, label: pl.name }))
                 ]}
-                placeholder="Select Price List..."
+                placeholder={__('Select Price List...')}
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-foreground mb-1.5">Mode of Payment</label>
+              <label className="block font-semibold text-foreground mb-1.5">{__('Mode of Payment')}</label>
               <SearchableSelect
                 id="edit_mode_of_payment"
                 value={editForm.mode_of_payment || ''}
                 onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val, mode_of_payments: val }))}
                 options={[
-                  { value: '', label: 'Select Mode of Payment...' },
+                  { value: '', label: __('Select Mode of Payment...') },
                   ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
                 ]}
-                placeholder="Select Mode of Payment..."
+                placeholder={__('Select Mode of Payment...')}
               />
             </div>
 
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
               <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>Save</span>
+                <span>{__('Save')}</span>
               </Button>
             </div>
           </form>

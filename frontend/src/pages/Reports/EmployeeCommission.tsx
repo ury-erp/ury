@@ -7,6 +7,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface CommissionSettings {
   enabled: boolean;
@@ -61,13 +62,13 @@ interface EmployeeCommissionData {
 
 const columns: DataTableColumn<EmployeeCommissionRow>[] = [
   { key: 'rank', header: '#', align: 'center' },
-  { key: 'employee_name', header: 'Employee' },
-  { key: 'designation', header: 'Designation', render: (r) => r.designation || '—' },
-  { key: 'attributed_invoices', header: 'Invoices', align: 'right' },
-  { key: 'attributed_base', header: 'Attributed Base', render: (r) => formatCurrency(r.attributed_base), align: 'right' },
-  { key: 'effective_rate', header: 'Effective Rate', render: (r) => `${r.effective_rate.toFixed(2)}%`, align: 'right' },
-  { key: 'rate_source', header: 'Rate Source', render: (r) => r.rate_source && <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-1 rounded">{r.rate_source}</span> },
-  { key: 'commission_amount', header: 'Commission', render: (r) => <span className="font-semibold">{formatCurrency(r.commission_amount)}</span>, align: 'right' },
+  { key: 'employee_name', header: __('Employee') },
+  { key: 'designation', header: __('Designation'), render: (r) => r.designation || '—' },
+  { key: 'attributed_invoices', header: __('Invoices'), align: 'right' },
+  { key: 'attributed_base', header: __('Attributed Base'), render: (r) => formatCurrency(r.attributed_base), align: 'right' },
+  { key: 'effective_rate', header: __('Effective Rate'), render: (r) => `${r.effective_rate.toFixed(2)}%`, align: 'right' },
+  { key: 'rate_source', header: __('Rate Source'), render: (r) => r.rate_source && <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-1 rounded">{r.rate_source}</span> },
+  { key: 'commission_amount', header: __('Commission'), render: (r) => <span className="font-semibold">{formatCurrency(r.commission_amount)}</span>, align: 'right' },
 ];
 
 export function EmployeeCommission() {
@@ -95,7 +96,7 @@ export function EmployeeCommission() {
       });
       setData(res.message ?? (res as unknown as EmployeeCommissionData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -140,22 +141,22 @@ export function EmployeeCommission() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Employee Commission"
-          description={`Commission tracking ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+          title={__('Employee Commission')}
+          description={__('Commission tracking {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
           actions={<DateRangeFilter value={range} onChange={setRange} />}
         />
 
         <div className="flex flex-col items-center justify-center py-16 px-4 rounded-lg border border-dashed border-gray-300 bg-gray-50">
           <DollarSign className="w-12 h-12 text-gray-400 mb-4" />
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Commission Tracking is Not Enabled</h2>
+          <h2 className="text-lg font-semibold text-gray-700 mb-2">{__('Commission Tracking is Not Enabled')}</h2>
           <p className="text-sm text-gray-600 mb-6 text-center max-w-sm">
-            Enable commission tracking in settings to see employee commission data.
+            {__('Enable commission tracking in settings to see employee commission data.')}
           </p>
           <a
             href="/commission-settings"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
           >
-            Go to Settings
+            {__('Go to Settings')}
           </a>
         </div>
       </div>
@@ -165,8 +166,8 @@ export function EmployeeCommission() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employee Commission"
-        description={`Commission breakdown by employee ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Employee Commission')}
+        description={__('Commission breakdown by employee {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -181,38 +182,38 @@ export function EmployeeCommission() {
           {/* Unattributed invoices warning */}
           {data.unattributed.invoices > 0 && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {data.unattributed.invoices} invoices ({formatCurrency(data.unattributed.base)}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.
+              {__("{0} invoices ({1}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.", [data.unattributed.invoices, formatCurrency(data.unattributed.base)])}
             </div>
           )}
 
           {/* Tier period warning */}
           {data.tier_period_partial && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Tier attainment is provisional for a partial period — rates may change once the full period is included.
+              {__('Tier attainment is provisional for a partial period — rates may change once the full period is included.')}
             </div>
           )}
 
           {/* Policy strip */}
           <div className="text-xs text-muted-foreground bg-gray-50 rounded-md px-3 py-2 border border-gray-200">
-            <span className="font-medium">Commission Base:</span> {data.settings.commission_base} ·
-            <span className="font-medium ml-2">Attribution:</span> {data.settings.attribution_mode} ·
-            {data.settings.include_returns && <span className="font-medium ml-2">Includes Returns</span>}
+            <span className="font-medium">{__('Commission Base:')}</span> {data.settings.commission_base} ·
+            <span className="font-medium ms-2">{__('Attribution:')}</span> {data.settings.attribution_mode} ·
+            {data.settings.include_returns && <span className="font-medium ms-2">{__('Includes Returns')}</span>}
           </div>
 
           {/* Stat cards */}
           <KpiStrip
             items={[
-              { label: 'Total Commission', value: formatCurrency(data.summary.total_commission) },
-              { label: 'Total Attributed Base', value: formatCurrency(data.summary.total_base) },
-              { label: 'Employees Earning', value: data.summary.total_employees },
-              { label: 'Effective Blended Rate', value: `${blendedRate.toFixed(2)}%` },
+              { label: __('Total Commission'), value: formatCurrency(data.summary.total_commission) },
+              { label: __('Total Attributed Base'), value: formatCurrency(data.summary.total_base) },
+              { label: __('Employees Earning'), value: data.summary.total_employees },
+              { label: __('Effective Blended Rate'), value: `${blendedRate.toFixed(2)}%` },
             ] satisfies KpiItemProps[]}
           />
 
           {/* Top 10 chart */}
           {top10.length >= 2 && (
             <BarChartCard
-              title={`Top ${Math.min(10, top10.length)} Earners by Commission`}
+              title={__('Top {0} Earners by Commission', [Math.min(10, top10.length)])}
               data={top10}
               xKey="employee_name"
               yKeys={['commission_amount']}
@@ -234,9 +235,9 @@ export function EmployeeCommission() {
 
         {/* Expanded detail section */}
         {expandedEmployee && (
-          <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-md">
+          <div className="border-s-4 border-blue-500 bg-blue-50 p-4 rounded-md">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Period Details</h3>
+              <h3 className="font-semibold text-sm">{__('Period Details')}</h3>
               <button
                 onClick={() => {
                   setExpandedEmployee(null);
@@ -249,7 +250,7 @@ export function EmployeeCommission() {
             </div>
 
             {detailLoading ? (
-              <div className="text-sm text-muted-foreground">Loading details…</div>
+              <div className="text-sm text-muted-foreground">{__('Loading details…')}</div>
             ) : detailData && typeof detailData === 'object' ? (
               <div className="space-y-2">
                 {Array.isArray((detailData as any).periods) ? (
@@ -257,30 +258,30 @@ export function EmployeeCommission() {
                     <div key={idx} className="flex items-center justify-between text-xs bg-white p-2 rounded border border-blue-200">
                       <div>
                         <span className="font-medium">{period.period}</span>
-                        {period.branch && <span className="text-muted-foreground ml-2">({period.branch})</span>}
+                        {period.branch && <span className="text-muted-foreground ms-2">({period.branch})</span>}
                       </div>
                       <div className="flex gap-4">
                         <div>
-                          <span className="text-muted-foreground">Base: </span>
+                          <span className="text-muted-foreground">{__('Base:')} </span>
                           <span className="font-medium">{formatCurrency(period.base)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Rate: </span>
+                          <span className="text-muted-foreground">{__('Rate:')} </span>
                           <span className="font-medium">{period.rate.toFixed(2)}%</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Commission: </span>
+                          <span className="text-muted-foreground">{__('Commission:')} </span>
                           <span className="font-medium">{formatCurrency(period.commission)}</span>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-xs text-muted-foreground">No period data available</div>
+                  <div className="text-xs text-muted-foreground">{__('No period data available')}</div>
                 )}
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground">Failed to load details</div>
+              <div className="text-sm text-muted-foreground">{__('Failed to load details')}</div>
             )}
           </div>
         )}

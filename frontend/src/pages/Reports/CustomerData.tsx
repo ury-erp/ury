@@ -6,6 +6,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface CustomerSuggestion {
   name: string;
@@ -46,17 +47,17 @@ interface CustomerListingRow {
 }
 
 const columns: DataTableColumn<InvoiceRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'invoice', header: 'Invoice' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'date', header: __('Date') },
+  { key: 'invoice', header: __('Invoice') },
+  { key: 'amount', header: __('Amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 const listingColumns: DataTableColumn<CustomerListingRow>[] = [
-  { key: 'customer_name', header: 'Customer' },
-  { key: 'mobile_number', header: 'Mobile', render: (r) => r.mobile_number || '—' },
-  { key: 'visit_count', header: 'Visits', align: 'right' },
-  { key: 'first_visit', header: 'First Visit' },
-  { key: 'last_visit', header: 'Last Visit' },
+  { key: 'customer_name', header: __('Customer') },
+  { key: 'mobile_number', header: __('Mobile'), render: (r) => r.mobile_number || '—' },
+  { key: 'visit_count', header: __('Visits'), align: 'right' },
+  { key: 'first_visit', header: __('First Visit') },
+  { key: 'last_visit', header: __('Last Visit') },
 ];
 
 export function CustomerData() {
@@ -116,7 +117,7 @@ export function CustomerData() {
       } catch (err) {
         if (!cancelled) {
           setListingRows([]);
-          setListingError(err instanceof Error ? err.message : 'Unable to load the customer list.');
+          setListingError(err instanceof Error ? err.message : __('Unable to load the customer list.'));
         }
       } finally {
         if (!cancelled) setListingLoading(false);
@@ -142,7 +143,7 @@ export function CustomerData() {
       });
       setData(res.message ?? (res as unknown as CustomerDataResult));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -155,8 +156,8 @@ export function CustomerData() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Customer Data"
-        description="Per-customer purchase history"
+        title={__('Customer Data')}
+        description={__('Per-customer purchase history')}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -165,7 +166,7 @@ export function CustomerData() {
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <Input
             type="text"
-            placeholder="Search customer by name..."
+            placeholder={__('Search customer by name...')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -173,7 +174,7 @@ export function CustomerData() {
               setData(null);
             }}
             className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
-            aria-label="Search customer by name"
+            aria-label={__('Search customer by name')}
           />
         </div>
         {suggestions.length > 0 && !selectedCustomer && (
@@ -186,7 +187,7 @@ export function CustomerData() {
                   setQuery(s.customer_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
+                className="w-full text-start px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
               >
                 <span>{s.customer_name}</span>
                 {s.mobile_no && <span className="text-xs text-muted-foreground">{s.mobile_no}</span>}
@@ -202,15 +203,15 @@ export function CustomerData() {
         </div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">{__('Loading…')}</div>}
 
       {data && !isLoading && (
         <>
           <KpiStrip
             items={[
-              { label: 'Visits', value: data.summary.visit_count },
-              { label: 'Total Spend', value: formatCurrency(data.summary.total_spend) },
-              { label: 'Avg Spend / Visit', value: formatCurrency(data.summary.avg_spend) },
+              { label: __('Visits'), value: data.summary.visit_count },
+              { label: __('Total Spend'), value: formatCurrency(data.summary.total_spend) },
+              { label: __('Avg Spend / Visit'), value: formatCurrency(data.summary.avg_spend) },
             ] satisfies KpiItemProps[]}
           />
           <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
@@ -228,7 +229,7 @@ export function CustomerData() {
             columns={listingColumns}
             rows={listingRows}
             isLoading={listingLoading}
-            emptyMessage="No customers visited in this range."
+            emptyMessage={__('No customers visited in this range.')}
             onRowClick={(row) => {
               setSelectedCustomer(row.customer_name);
               setQuery(row.customer_name);

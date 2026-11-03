@@ -1,6 +1,7 @@
 import { formatCurrency, type CurrencyInfo } from '@ury/core';
 import type { KpiItemProps } from '@ury/ui';
 import type { DashboardStats } from '../services/dashboard';
+import { __ } from '../i18n';
 
 export type BuildDashboardStatsKpiOptions = {
   /** When true, return em-dash placeholders instead of numbers. */
@@ -14,10 +15,10 @@ export type BuildDashboardStatsKpiOptions = {
 };
 
 const LOADING_ITEMS: KpiItemProps[] = [
-  { label: "Today's Sales", value: '—' },
-  { label: 'Orders Today', value: '—' },
-  { label: 'Avg. Order Value', value: '—' },
-  { label: 'Active Tables', value: '—' },
+  { label: __("Today's Sales"), value: '—' },
+  { label: __('Orders Today'), value: '—' },
+  { label: __('Avg. Order Value'), value: '—' },
+  { label: __('Active Tables'), value: '—' },
 ];
 
 /**
@@ -53,24 +54,24 @@ export function buildDashboardStatsKpiItems(
 
   return [
     {
-      label: "Today's Sales",
+      label: __("Today's Sales"),
       value: salesValue,
       tone: 'success',
-      hint: isMixed ? 'Multiple currencies — not summed' : undefined,
+      hint: isMixed ? __('Multiple currencies — not summed') : undefined,
     },
     {
-      label: 'Orders Today',
+      label: __('Orders Today'),
       value: String(ordersToday),
     },
     {
-      label: 'Avg. Order Value',
+      label: __('Avg. Order Value'),
       value: avgValue,
     },
     {
-      label: 'Active Tables',
+      label: __('Active Tables'),
       value: `${activeTables} / ${totalTables}`,
       tone: occupancy >= 0.85 ? 'warning' : undefined,
-      hint: occupancy >= 0.85 ? 'Floor nearly full' : undefined,
+      hint: occupancy >= 0.85 ? __('Floor nearly full') : undefined,
     },
   ];
 }

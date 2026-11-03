@@ -4,6 +4,7 @@ import { Page, Section, Button, Checkbox, Input, Select, SelectItem, Spinner, sh
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { __ } from '../../i18n';
 
 interface YieldStandardsRecord {
   name: string;
@@ -96,12 +97,12 @@ export const YieldStandardsPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.item) {
-      showToast.error('Please select an item');
+      showToast.error(__('Please select an item'));
       return;
     }
     // Validate that if Yield Tracked is enabled, Yield Percent must be set
     if (form.custom_yield_tracked && (!form.custom_yield_percent || form.custom_yield_percent <= 0)) {
-      showToast.error('Set a Yield Percent before enabling Yield Tracked.');
+      showToast.error(__('Set a Yield Percent before enabling Yield Tracked.'));
       return;
     }
     setSaving(true);
@@ -116,10 +117,10 @@ export const YieldStandardsPage: React.FC = () => {
 
       fetchItems();
       setIsDrawerOpen(false);
-      showToast.success('Yield standards updated successfully');
+      showToast.success(__('Yield standards updated successfully'));
     } catch (err: any) {
       console.error('Failed to save Yield Standards', err);
-      let errorMessage = 'Failed to save Yield Standards';
+      let errorMessage = __('Failed to save Yield Standards');
       if (err._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -158,10 +159,10 @@ export const YieldStandardsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Set Yield Standards</span>
+          <span>{__('Set Yield Standards')}</span>
         </Button>
       </div>
 
@@ -172,41 +173,41 @@ export const YieldStandardsPage: React.FC = () => {
           </div>
         ) : items.length === 0 ? (
           <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
-            <span>Define yield standards for stock items to track production efficiency.</span>
+            <span>{__('Define yield standards for stock items to track production efficiency.')}</span>
             <Button
               onClick={openAddDrawer}
               variant="chrome"
               size="compactSm"
-              className="ml-auto"
+              className="ms-auto"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Set Standards</span>
+              <span>{__('Set Standards')}</span>
             </Button>
           </div>
         ) : (
           <DataTable<YieldStandardsRecord>
             columns={[
-              { key: 'name', header: 'Item Code', render: (row) => <span className="font-semibold">{row.name}</span> },
-              { key: 'item_name', header: 'Item Name', render: (row) => row.item_name || '-' },
+              { key: 'name', header: __('Item Code'), render: (row) => <span className="font-semibold">{row.name}</span> },
+              { key: 'item_name', header: __('Item Name'), render: (row) => row.item_name || '-' },
               {
                 key: 'custom_yield_tracked',
-                header: 'Yield Tracked',
+                header: __('Yield Tracked'),
                 render: (row) => (row.custom_yield_tracked ? '✓' : ''),
               },
               {
                 key: 'custom_yield_percent',
-                header: 'Yield %',
+                header: __('Yield %'),
                 align: 'right',
                 render: (row) => formatYieldPercent(row.custom_yield_percent),
               },
               {
                 key: 'custom_yield_check_cadence',
-                header: 'Check Cadence',
+                header: __('Check Cadence'),
                 render: (row) => formatCheckCadence(row.custom_yield_check_cadence),
               },
               {
                 key: 'custom_yield_check_interval_days',
-                header: 'Interval (Days)',
+                header: __('Interval (Days)'),
                 align: 'right',
                 render: (row) => formatIntervalDays(row.custom_yield_check_interval_days),
               },
@@ -220,17 +221,17 @@ export const YieldStandardsPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingItem ? 'Edit Yield Standards' : 'Set Yield Standards'}
+        title={editingItem ? __('Edit Yield Standards') : __('Set Yield Standards')}
       >
         <form onSubmit={handleSave} className="space-y-4 text-sm">
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Item</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Item')}</label>
             <SearchableSelect
               id="item"
               value={form.item}
               onChange={(_, val) => setForm({ ...form, item: val })}
               options={itemOptions.map((i) => ({ value: i.name, label: i.item_name || i.name }))}
-              placeholder="Select Item"
+              placeholder={__('Select Item')}
               strict
               disabled={!!editingItem}
             />
@@ -244,26 +245,26 @@ export const YieldStandardsPage: React.FC = () => {
               onChange={(e) => setForm({ ...form, custom_yield_tracked: e.target.checked })}
             />
             <label htmlFor="custom_yield_tracked" className="font-semibold text-muted-foreground">
-              Track Yield
+              {__('Track Yield')}
             </label>
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Yield %</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Yield %')}</label>
             <Input
               type="number"
               value={form.custom_yield_percent}
               onChange={(e) => setForm({ ...form, custom_yield_percent: parseFloat(e.target.value) || 0 })}
-              placeholder="Enter yield percentage"
+              placeholder={__('Enter yield percentage')}
               min="0"
               max="100"
               step="0.01"
             />
-            <p className="text-xs text-text-tertiary mt-1">Expected yield percentage (0-100).</p>
+            <p className="text-xs text-text-tertiary mt-1">{__('Expected yield percentage (0-100).')}</p>
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Check Cadence</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Check Cadence')}</label>
             <Select
               value={form.custom_yield_check_cadence}
               onChange={(e) => setForm({ ...form, custom_yield_check_cadence: e.target.value })}
@@ -274,27 +275,27 @@ export const YieldStandardsPage: React.FC = () => {
                 </SelectItem>
               ))}
             </Select>
-            <p className="text-xs text-text-tertiary mt-1">How often to check yield standards.</p>
+            <p className="text-xs text-text-tertiary mt-1">{__('How often to check yield standards.')}</p>
           </div>
 
           {form.custom_yield_check_cadence === 'Interval' && (
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Check Interval (Days)</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Check Interval (Days)')}</label>
               <Input
                 type="number"
                 value={form.custom_yield_check_interval_days}
                 onChange={(e) => setForm({ ...form, custom_yield_check_interval_days: parseInt(e.target.value) || 0 })}
-                placeholder="Enter interval in days"
+                placeholder={__('Enter interval in days')}
                 min="1"
                 step="1"
               />
-              <p className="text-xs text-text-tertiary mt-1">Number of days between yield checks.</p>
+              <p className="text-xs text-text-tertiary mt-1">{__('Number of days between yield checks.')}</p>
             </div>
           )}
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-border">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button
               type="submit"
@@ -303,7 +304,7 @@ export const YieldStandardsPage: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 {saving && <Spinner className="w-4 h-4" />}
-                <span>{saving ? 'Saving...' : 'Save Standards'}</span>
+                <span>{saving ? __('Saving...') : __('Save Standards')}</span>
               </div>
             </Button>
           </div>

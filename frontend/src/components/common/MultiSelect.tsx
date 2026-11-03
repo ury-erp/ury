@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown, Check } from 'lucide-react';
 import { Badge } from '@ury/ui';
+import { __ } from '../../i18n';
 
 export interface MultiSelectOption {
   value: string;
@@ -133,7 +134,7 @@ export function MultiSelect({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Filter roles..."
+            placeholder={__('Filter roles...')}
             className="w-full px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-primary"
             onClick={(e) => e.stopPropagation()}
           />
@@ -158,7 +159,7 @@ export function MultiSelect({
           );
         })
       ) : (
-        <div className="px-3 py-2 text-sm text-gray-400">No matching options</div>
+        <div className="px-3 py-2 text-sm text-gray-400">{__('No matching options')}</div>
       )}
     </div>
   ) : null;

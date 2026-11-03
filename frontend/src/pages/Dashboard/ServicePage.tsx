@@ -22,6 +22,7 @@ import {
   departmentProfitabilityService,
   ProfitabilityRow,
 } from '../../services/departmentProfitability';
+import { __ } from '../../i18n';
 
 /**
  * Service page: the real-time "how is the shift going right now" view.
@@ -137,7 +138,7 @@ export const ServicePage: React.FC = () => {
       setShiftMetrics(null);
       setNeedsAttention([]);
       setDepartmentRows([]);
-      setError('Select a specific branch above to view its Service page.');
+      setError(__('Select a specific branch above to view its Service page.'));
       setLoading(false);
       return () => {
         cancelled = true;
@@ -174,12 +175,12 @@ export const ServicePage: React.FC = () => {
               referenceDoctype.includes('wastage')
             ) {
               mapped.action = {
-                label: 'Review',
+                label: __('Review'),
                 onClick: () => navigate('/department-stock'),
               };
             } else if (referenceDoctype.includes('sales plan')) {
               mapped.action = {
-                label: 'Review',
+                label: __('Review'),
                 onClick: () => navigate('/sales-plan'),
               };
             }
@@ -188,7 +189,7 @@ export const ServicePage: React.FC = () => {
         );
       } catch {
         if (!cancelled) {
-          setError('Unable to load Service page data.');
+          setError(__('Unable to load Service page data.'));
           setShiftMetrics(null);
           setNeedsAttention([]);
         }
@@ -235,7 +236,7 @@ export const ServicePage: React.FC = () => {
         if (!cancelled) {
           setDepartmentRows([]);
           setHasCostData(false);
-          setDepartmentRevenueError(err instanceof Error ? err.message : 'Unable to load revenue by department.');
+          setDepartmentRevenueError(err instanceof Error ? err.message : __('Unable to load revenue by department.'));
         }
       }
     })();
@@ -270,7 +271,7 @@ export const ServicePage: React.FC = () => {
       } catch (err) {
         if (!cancelled) {
           setActivityRows([]);
-          setDepartmentActivityError(err instanceof Error ? err.message : 'Unable to load activity by department.');
+          setDepartmentActivityError(err instanceof Error ? err.message : __('Unable to load activity by department.'));
         }
       }
     })();
@@ -283,26 +284,26 @@ export const ServicePage: React.FC = () => {
   const kpiItems = useMemo(() => {
     if (!shiftMetrics) return [];
     const items = [
-      { label: 'Net Sales', value: formatCurrency(shiftMetrics.sales) },
-      { label: 'Covers', value: shiftMetrics.covers.toLocaleString() },
-      { label: 'Avg / Cover', value: formatCurrency(shiftMetrics.avg_per_cover) },
+      { label: __('Net Sales'), value: formatCurrency(shiftMetrics.sales) },
+      { label: __('Covers'), value: shiftMetrics.covers.toLocaleString() },
+      { label: __('Avg / Cover'), value: formatCurrency(shiftMetrics.avg_per_cover) },
     ];
     // avg_ticket_minutes has a real backend field but is a duration, not a
     // currency amount -- surfaced separately with its own unit rather than
     // folded into avg ticket value like the mockup's "Avg ticket" KPI (which
     // has no equivalent real field here).
     if (shiftMetrics.avg_ticket_minutes !== undefined && shiftMetrics.avg_ticket_minutes !== null) {
-      items.push({ label: 'Avg Ticket Time', value: `${shiftMetrics.avg_ticket_minutes.toFixed(0)} min` });
+      items.push({ label: __('Avg Ticket Time'), value: `${shiftMetrics.avg_ticket_minutes.toFixed(0)} min` });
     }
     return items;
   }, [shiftMetrics]);
 
   const departmentColumns: DataTableColumn<DepartmentRow>[] = useMemo(() => {
     const columns: DataTableColumn<DepartmentRow>[] = [
-      { key: 'department', header: 'Department' },
+      { key: 'department', header: __('Department') },
       {
         key: 'netRevenue',
-        header: 'Net Sales',
+        header: __('Net Sales'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{formatCurrency(row.netRevenue)}</span>,
       },
@@ -313,13 +314,13 @@ export const ServicePage: React.FC = () => {
     if (hasCostData) {
       columns.push({
         key: 'postedCost',
-        header: 'Posted Cost',
+        header: __('Posted Cost'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{formatCurrency(row.postedCost)}</span>,
       });
       columns.push({
         key: 'postedGrossProfit',
-        header: 'Posted GP',
+        header: __('Posted GP'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{formatCurrency(row.postedGrossProfit)}</span>,
       });
@@ -329,28 +330,28 @@ export const ServicePage: React.FC = () => {
 
   const activityColumns: DataTableColumn<DepartmentActivityRow>[] = useMemo(
     () => [
-      { key: 'department', header: 'Department' },
+      { key: 'department', header: __('Department') },
       {
         key: 'tickets_fired',
-        header: 'Tickets Fired',
+        header: __('Tickets Fired'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{row.tickets_fired.toLocaleString()}</span>,
       },
       {
         key: 'tickets_served',
-        header: 'Tickets Served',
+        header: __('Tickets Served'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{row.tickets_served.toLocaleString()}</span>,
       },
       {
         key: 'work_orders_completed',
-        header: 'Work Orders Completed',
+        header: __('Work Orders Completed'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{row.work_orders_completed.toLocaleString()}</span>,
       },
       {
         key: 'qty_produced',
-        header: 'Qty Produced',
+        header: __('Qty Produced'),
         align: 'right',
         render: (row) => <span className={numericCellClass}>{row.qty_produced.toLocaleString()}</span>,
       },
@@ -383,11 +384,11 @@ export const ServicePage: React.FC = () => {
       )}
 
       <Section>
-        <AttentionFeed title="Needs Attention" items={needsAttention} />
+        <AttentionFeed title={__('Needs Attention')} items={needsAttention} />
       </Section>
 
       <Section data-testid="service-departments-table">
-        <h3 className="mb-2 text-sm font-semibold">Revenue by Department</h3>
+        <h3 className="mb-2 text-sm font-semibold">{__('Revenue by Department')}</h3>
         {departmentRevenueError && (
           <p className="mb-2 text-xs text-destructive" data-testid="service-departments-error">
             {departmentRevenueError}
@@ -396,13 +397,13 @@ export const ServicePage: React.FC = () => {
         <DataTable
           columns={departmentColumns}
           rows={departmentRows}
-          emptyMessage="No revenue attributed to a department for today yet."
+          emptyMessage={__('No revenue attributed to a department for today yet.')}
           onRowClick={setSelectedDepartment}
         />
       </Section>
 
       <Section data-testid="service-department-activity-table">
-        <h3 className="mb-2 text-sm font-semibold">Activity by Department</h3>
+        <h3 className="mb-2 text-sm font-semibold">{__('Activity by Department')}</h3>
         {departmentActivityError && (
           <p className="mb-2 text-xs text-destructive" data-testid="service-department-activity-error">
             {departmentActivityError}
@@ -411,7 +412,7 @@ export const ServicePage: React.FC = () => {
         <DataTable
           columns={activityColumns}
           rows={activityRows}
-          emptyMessage="No KOT tickets or completed production for today yet."
+          emptyMessage={__('No KOT tickets or completed production for today yet.')}
         />
       </Section>
 
@@ -422,14 +423,14 @@ export const ServicePage: React.FC = () => {
       >
         {selectedDepartment && (
           <>
-            <DrawerSectionLabel>Today</DrawerSectionLabel>
-            <KeyValueRow label="Net Sales" value={formatCurrency(selectedDepartment.netRevenue)} />
+            <DrawerSectionLabel>{__('Today')}</DrawerSectionLabel>
+            <KeyValueRow label={__('Net Sales')} value={formatCurrency(selectedDepartment.netRevenue)} />
             {selectedDepartment.postedCost !== undefined && (
-              <KeyValueRow label="Posted Cost" value={formatCurrency(selectedDepartment.postedCost)} />
+              <KeyValueRow label={__('Posted Cost')} value={formatCurrency(selectedDepartment.postedCost)} />
             )}
             {selectedDepartment.postedGrossProfit !== undefined && (
               <KeyValueRow
-                label="Posted Gross Profit"
+                label={__('Posted Gross Profit')}
                 value={formatCurrency(selectedDepartment.postedGrossProfit)}
               />
             )}

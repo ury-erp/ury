@@ -6,6 +6,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface EmployeeSuggestion {
   name: string;
@@ -40,16 +41,16 @@ interface EmployeeListingRow {
 }
 
 const columns: DataTableColumn<ItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty', align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'item_name', header: __('Item') },
+  { key: 'item_group', header: __('Group'), render: (r) => r.item_group || '—' },
+  { key: 'qty', header: __('Qty'), align: 'right' },
+  { key: 'amount', header: __('Amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 const listingColumns: DataTableColumn<EmployeeListingRow>[] = [
-  { key: 'employee_name', header: 'Employee' },
-  { key: 'total_invoices', header: 'Invoices', align: 'right' },
-  { key: 'sales_amount', header: 'Sales', render: (r) => formatCurrency(r.sales_amount), align: 'right' },
+  { key: 'employee_name', header: __('Employee') },
+  { key: 'total_invoices', header: __('Invoices'), align: 'right' },
+  { key: 'sales_amount', header: __('Sales'), render: (r) => formatCurrency(r.sales_amount), align: 'right' },
 ];
 
 export function EmployeeItemWiseSales() {
@@ -107,7 +108,7 @@ export function EmployeeItemWiseSales() {
       } catch (err) {
         if (!cancelled) {
           setListingRows([]);
-          setListingError(err instanceof Error ? err.message : 'Unable to load the employee list.');
+          setListingError(err instanceof Error ? err.message : __('Unable to load the employee list.'));
         }
       } finally {
         if (!cancelled) setListingLoading(false);
@@ -131,7 +132,7 @@ export function EmployeeItemWiseSales() {
       );
       setData(res.message ?? (res as unknown as EmployeeItemWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -144,8 +145,8 @@ export function EmployeeItemWiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employee Item Wise Sales"
-        description="Item breakdown per employee"
+        title={__('Employee Item Wise Sales')}
+        description={__('Item breakdown per employee')}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -154,7 +155,7 @@ export function EmployeeItemWiseSales() {
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <Input
             type="text"
-            placeholder="Search employee by name..."
+            placeholder={__('Search employee by name...')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -162,7 +163,7 @@ export function EmployeeItemWiseSales() {
               setData(null);
             }}
             className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
-            aria-label="Search employee by name"
+            aria-label={__('Search employee by name')}
           />
         </div>
         {suggestions.length > 0 && !selectedEmployee && (
@@ -175,7 +176,7 @@ export function EmployeeItemWiseSales() {
                   setQuery(s.full_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50"
+                className="w-full text-start px-3 py-2 text-sm hover:bg-blue-50"
               >
                 {s.full_name}
               </button>
@@ -190,14 +191,14 @@ export function EmployeeItemWiseSales() {
         </div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">{__('Loading…')}</div>}
 
       {data && !isLoading && (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Qty', value: data.summary.total_qty },
-              { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
+              { label: __('Total Qty'), value: data.summary.total_qty },
+              { label: __('Total Amount'), value: formatCurrency(data.summary.total_amount) },
             ] satisfies KpiItemProps[]}
           />
           <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
@@ -215,7 +216,7 @@ export function EmployeeItemWiseSales() {
             columns={listingColumns}
             rows={listingRows}
             isLoading={listingLoading}
-            emptyMessage="No employee sales recorded in this range."
+            emptyMessage={__('No employee sales recorded in this range.')}
             onRowClick={(row) => {
               setSelectedEmployee(row.employee_id);
               setQuery(row.employee_name);
