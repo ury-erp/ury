@@ -448,5 +448,15 @@
     "zero_balance_warning": "Estás abriendo con $0 en todos los modos de pago. Toca \"Confirmar y abrir\" de nuevo para continuar de todos modos.",
     "confirm_zero_balance": "Confirmar y abrir",
     "session_opened_success": "Sesión de POS abierta"
+  },
+  "login": {
+    "title": "URY Serve",
+    "username": "Usuario o correo",
+    "password": "Contraseña",
+    "login": "Iniciar sesión",
+    "logging_in": "Iniciando sesión...",
+    "sign_in": "Iniciar sesión",
+    "signing_in": "Iniciando sesión...",
+    "error_empty": "Ingresa el usuario y la contraseña."
   }
 }
