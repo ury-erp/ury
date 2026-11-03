@@ -158,3 +158,4 @@
 .hist-state{padding:48px 16px;text-align:center;color:hsl(var(--muted-foreground));display:flex;flex-direction:column;align-items:center;gap:8px;font-size:15px}
 .hist-state p{margin:0}
 .composer:focus-within{padding-block-end:6px}
+.card-link::after{content:"\203A";margin-inline-start:var(--space-1)}[dir=rtl] .card-link::after{content:"\2039"}
