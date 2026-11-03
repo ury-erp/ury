@@ -122,7 +122,7 @@
    "role": "URY Admin"
   },
   {
-   "role": "URY Chairman"
+   "role": "URY Owner"
   }
  ],
  "shortcuts": [
@@ -132,7 +132,7 @@
    "url": "/insights/dashboards/994d77ru95"
   },
   {
-   "label": "DB16 Chairman Brief Cross-check",
+   "label": "DB16 Owner Brief Cross-check",
    "type": "URL",
    "url": "/insights/dashboards/9of8skpq4l"
   },

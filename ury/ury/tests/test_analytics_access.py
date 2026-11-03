@@ -38,7 +38,7 @@ class FakeFrappe(types.ModuleType):
 		super().__init__("frappe")
 		self.installed = ["frappe", "insights"]
 		self.users = {}  # name -> dict(enabled,user_type,roles)
-		self.roles = {"Insights User", "URY Chairman", "URY Admin", "Accounts Manager"}
+		self.roles = {"Insights User", "URY Owner", "URY Admin", "Accounts Manager"}
 		self.dashboards = {}  # title -> (name, workbook)
 		self.shares = {}  # (dt,name,user) -> perms dict
 		self.perms = {}  # (dt, role) -> dict (Custom DocPerm)
@@ -183,14 +183,14 @@ class Base(unittest.TestCase):
 		for i, (title, _) in enumerate(self.m.DASHBOARD_ROLES.items()):
 			self.fk.dashboards[title] = (f"dash{i}", f"wb{i}")
 		u = self.fk.users
-		u["chair@x"] = user({"URY Chairman"})
+		u["chair@x"] = user({"URY Owner"})
 		u["mgr@x"] = user({"URY Manager"})
 		u["hr@x"] = user({"HR Manager"})
 		u["acct@x"] = user({"Accounts Manager"})
 		u["cashier@x"] = user({"URY Cashier"})
 		u["off@x"] = user({"URY Manager"}, enabled=0)
 		u["web@x"] = user({"URY Manager"}, user_type="Website User")
-		u["Administrator"] = user({"URY Admin", "URY Chairman", "System Manager"})
+		u["Administrator"] = user({"URY Admin", "URY Owner", "System Manager"})
 		u["Guest"] = user({"URY Manager"})
 		self.fk.roles |= {"URY Manager", "HR Manager"}
 
@@ -272,13 +272,13 @@ class TestShares(Base):
 class TestPerms(Base):
 	def test_read_only_grants(self):
 		self.m.apply()
-		rec = self.fk.perms[("POS Invoice", "URY Chairman")]
+		rec = self.fk.perms[("POS Invoice", "URY Owner")]
 		self.assertEqual(rec["read"], 1)
 		for p in ("write", "create", "delete", "submit", "cancel"):
 			self.assertEqual(rec.get(p, 0), 0)
 		self.assertIn(("URY Yield Check", "URY Admin"), self.fk.perms)
 		self.assertIn(("URY Wastage", "Accounts Manager"), self.fk.perms)
-		self.assertNotIn(("URY Wastage", "URY Chairman") if False else ("POS Invoice", "Accounts Manager"), self.fk.perms)
+		self.assertNotIn(("URY Wastage", "URY Owner") if False else ("POS Invoice", "Accounts Manager"), self.fk.perms)
 
 	def test_existing_read_skipped(self):
 		self.fk.std_perms.add(("POS Invoice", "URY Admin"))
@@ -289,7 +289,7 @@ class TestPerms(Base):
 	def test_missing_doctype_skipped(self):
 		self.fk.doctypes = {"POS Invoice"}
 		self.m.apply()
-		self.assertEqual([k for k in self.fk.perms if k[1] == "URY Chairman"], [("POS Invoice", "URY Chairman")])
+		self.assertEqual([k for k in self.fk.perms if k[1] == "URY Owner"], [("POS Invoice", "URY Owner")])
 
 
 class TestIdempotentAndRevert(Base):
@@ -336,9 +336,9 @@ class TestUserHooks(Base):
 		return d
 
 	def test_validate_adds_only(self):
-		d = self.make("n@x", ["URY Chairman"])
+		d = self.make("n@x", ["URY Owner"])
 		self.m.on_user_validate(d)
-		self.assertEqual([r.role for r in d["roles"]], ["URY Chairman", "Insights User"])
+		self.assertEqual([r.role for r in d["roles"]], ["URY Owner", "Insights User"])
 		self.m.on_user_validate(d)  # idempotent
 		self.assertEqual(len(d["roles"]), 2)
 
@@ -358,8 +358,8 @@ class TestUserHooks(Base):
 		self.assertEqual(len(d["roles"]), 1)
 
 	def test_update_records_and_shares_then_revert(self):
-		self.fk.users["n@x"] = user({"URY Chairman", "Insights User"})
-		d = self.make("n@x", ["URY Chairman"])
+		self.fk.users["n@x"] = user({"URY Owner", "Insights User"})
+		d = self.make("n@x", ["URY Owner"])
 		self.m.on_user_validate(d)
 		self.m.on_user_update(d)
 		self.assertIn(("Insights Dashboard v3", "dash0", "n@x"), self.fk.shares)
@@ -368,7 +368,7 @@ class TestUserHooks(Base):
 		self.assertFalse([k for k in self.fk.shares if k[2] == "n@x"])
 
 	def test_update_skips_admin(self):
-		d = self.make("Administrator", ["URY Chairman"])
+		d = self.make("Administrator", ["URY Owner"])
 		self.m.on_user_update(d)
 		self.assertFalse(self.fk.shares)
 

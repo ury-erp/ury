@@ -57,7 +57,7 @@ class TestLinkToken(unittest.TestCase):
 		self.assertEqual(sum(ok), cl.RATE_GLOBAL)
 
 	def test_refusal(self):
-		R = ["URY Chairman"]
+		R = ["URY Owner"]
 		self.assertIsNone(cl.exchange_refusal("c@x.com", 1, R))
 		self.assertEqual(cl.exchange_refusal("Administrator", 1, R), "forbidden_user")
 		self.assertEqual(cl.exchange_refusal("Guest", 1, R), "forbidden_user")

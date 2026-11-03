@@ -31,7 +31,7 @@
  "permissions": [
   {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
   {"role": "URY Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
-  {"role": "URY Chairman", "read": 1}
+  {"role": "URY Owner", "read": 1}
  ],
  "sort_field": "period_start",
  "sort_order": "DESC",

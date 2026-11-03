@@ -75,7 +75,7 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.format_inr_compact(-125000), "-₹1.3L")
 
 	def test_roles_and_label(self):
-		self.assertEqual(c.ALLOWED_ROLES, {"URY Chairman"})
+		self.assertEqual(c.ALLOWED_ROLES, {"URY Owner"})
 		self.assertFalse(c.ALLOW_ADMINISTRATOR_FOR_TESTS)
 		self.assertEqual(c.COMPARE_LABEL, "vs same day last week")
 
@@ -419,7 +419,7 @@ class SiteTests(IntegrationTestCase):
 				{"doctype": "User", "email": email, "first_name": "Scope", "send_welcome_email": 0}
 			).insert(ignore_permissions=True)
 		user = frappe.get_doc("User", email)
-		user.add_roles("URY Chairman")
+		user.add_roles("URY Owner")
 		for perm in frappe.get_all("User Permission", filters={"user": email, "allow": "Branch"}, pluck="name"):
 			frappe.delete_doc("User Permission", perm, force=True, ignore_permissions=True)
 		frappe.get_doc(

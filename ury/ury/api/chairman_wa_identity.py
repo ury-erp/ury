@@ -11,7 +11,7 @@ import secrets
 from datetime import datetime, timedelta
 
 LINK_DOCTYPE = "Chairman WhatsApp Link"
-CHAIRMAN_ROLE = "URY Chairman"
+CHAIRMAN_ROLE = "URY Owner"
 FORBIDDEN_USERS = ("Administrator", "Guest")
 OTP_TTL_MINUTES = 10
 OTP_MAX_ATTEMPTS = 5
@@ -203,7 +203,7 @@ def on_user_update(doc, method=None):
 	if not doc.enabled:
 		revoke_for_user(doc.name, "User disabled")
 	elif CHAIRMAN_ROLE not in [r.role for r in doc.get("roles") or []]:
-		revoke_for_user(doc.name, "Chairman role removed")
+		revoke_for_user(doc.name, "Owner role removed")
 
 
 def on_user_trash(doc, method=None):

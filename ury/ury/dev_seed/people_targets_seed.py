@@ -825,7 +825,7 @@ def seed():
 # ---------------------------------------------------------------------------
 
 def create_branch_chairman_user(email, branches, password=None, first_name="Chairman Test",
-		roles=("URY Chairman",), company=None):
+		roles=("URY Owner",), company=None):
 	"""Create (or update) a chairman test user whose Company/Branch User
 	Permissions restrict every query to ``branches`` (str or list).
 

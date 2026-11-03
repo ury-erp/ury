@@ -53,10 +53,10 @@ CARD_TOOLS = frozenset({"show_card", "compose_card", "compose_dashboard"})
 LANGUAGE_BCP47 = {"en": "en-IN", "hi": "hi-IN", "ar": "ar-EG", "ml": "ml-IN"}
 LANGUAGE_NAMES = {"en": "English", "hi": "Hindi", "ar": "Arabic", "ml": "Malayalam"}
 GREETINGS = {
-	"en": "Hello, I am your chairman assistant. What would you like to know?",
-	"hi": "Namaste, main aapka chairman assistant hoon. Aap kya jaanna chahenge?",
+	"en": "Hello, I am your owner assistant. What would you like to know?",
+	"hi": "Namaste, main aapka owner assistant hoon. Aap kya jaanna chahenge?",
 	"ar": "Marhaba, ana musaaidak. Madha turid an ta'rif?",
-	"ml": "Namaskaram, njan ningalude chairman assistant aanu. Entha ariyendathu?",
+	"ml": "Namaskaram, njan ningalude owner assistant aanu. Entha ariyendathu?",
 }
 VOICE_STYLE_RULES = (
 	"You are on a live voice call. Use tools for every number and fact; never invent numbers. "

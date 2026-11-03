@@ -13,7 +13,7 @@ def execute():
 					"fieldname": "chairman_cards",
 					"fieldtype": "Code",
 					"options": "JSON",
-					"label": "Chairman Cards",
+					"label": "Owner Cards",
 					"hidden": 1,
 					"read_only": 1,
 					"no_copy": 1,

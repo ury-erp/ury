@@ -27,7 +27,7 @@ RATE_WINDOW = 60
 REDIRECT = "/ury/brief/"
 KEY_PREFIX = "ury:brief_link:"
 FORBIDDEN_USERS = ("Administrator", "Guest")
-CHAIRMAN_ROLE = "URY Chairman"
+CHAIRMAN_ROLE = "URY Owner"
 
 ALLOWED_PREFIXES = ("/ury/brief/", "/assets/")
 ALLOWED_EXACT = ("/ury/brief", "/api/method/logout")
@@ -187,7 +187,7 @@ def guard_brief_only_session(*args, **kwargs):
 	request = getattr(frappe.local, "request", None)
 	if request is None or is_path_allowed(request.path):
 		return
-	raise frappe.PermissionError("This session is limited to the Chairman Brief.")
+	raise frappe.PermissionError("This session is limited to the Owner Brief.")
 
 
 try:  # frappe is absent in the pure unit-test environment

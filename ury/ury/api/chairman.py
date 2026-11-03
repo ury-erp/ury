@@ -15,7 +15,7 @@ from frappe.utils import getdate, now_datetime
 SCHEMA_VERSION = 1
 CURRENCY = "INR"
 LOCALE = "en-IN"
-ALLOWED_ROLES = {"URY Chairman"}
+ALLOWED_ROLES = {"URY Owner"}
 # Test-only hook: Administrator is NOT allowed in production. Tests set this True explicitly.
 ALLOW_ADMINISTRATOR_FOR_TESTS = False
 COMPARE_LABEL = "vs same day last week"

@@ -3,7 +3,7 @@
 """Read-only tools the Chairman Brief chat agent (Huf) may call.
 
 Every tool:
-  * re-checks the caller has the "URY Chairman" role (chairman.ALLOWED_ROLES) and refuses
+  * re-checks the caller has the "URY Owner" role (chairman.ALLOWED_ROLES) and refuses
     with a PermissionError otherwise;
   * applies the caller's Company/Branch User Permissions, because all data comes through
     chairman._base_query / chairman_slides._pi_query (or chairman._allowed for KOTs);

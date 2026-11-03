@@ -14,7 +14,7 @@
  ],
  "fields": [
   {
-   "description": "Name of the Huf Agent used for Chairman Brief chat. Plain text (not a Link) so URY has no dependency on Huf.",
+   "description": "Name of the Huf Agent used for Owner Brief chat. Plain text (not a Link) so URY has no dependency on Huf.",
    "fieldname": "chat_agent",
    "fieldtype": "Data",
    "label": "Chat Agent"
@@ -27,14 +27,14 @@
   },
   {
    "default": "7",
-   "description": "Chairman chat audio files older than this many days are deleted daily.",
+   "description": "Owner chat audio files older than this many days are deleted daily.",
    "fieldname": "audio_retention_days",
    "fieldtype": "Int",
    "label": "Audio Retention Days"
   },
   {
    "default": "models/gemini-2.5-flash-native-audio-latest",
-   "description": "Gemini Live model used for Chairman voice calls.",
+   "description": "Gemini Live model used for Owner voice calls.",
    "fieldname": "call_model",
    "fieldtype": "Data",
    "label": "Call Model"

@@ -32,7 +32,7 @@ if IntegrationTestCase:
 	class TestChairmanWhatsAppLinkSite(IntegrationTestCase):
 		"""Needs a site (bench run-tests). Written, not run by the author."""
 
-		def _user(self, email, roles=("URY Chairman",), enabled=1):
+		def _user(self, email, roles=("URY Owner",), enabled=1):
 			if frappe.db.exists("User", email):
 				frappe.delete_doc("User", email, force=1)
 			u = frappe.get_doc({"doctype": "User", "email": email, "first_name": "T", "enabled": enabled, "send_welcome_email": 0})

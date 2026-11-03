@@ -73,7 +73,7 @@ def seed():
 	names = [_tool_function(t) for t in TOOLS]
 	agent = frappe.get_doc("Agent", AGENT) if frappe.db.exists("Agent", AGENT) else frappe.new_doc("Agent")
 	agent.agent_name = AGENT
-	agent.description = "Chairman brief assistant (read-only sales analysis)."
+	agent.description = "Owner brief assistant (read-only sales analysis)."
 	agent.provider, agent.model = PROVIDER, MODEL
 	agent.stt_model, agent.tts_model = STT_MODEL, TTS_MODEL
 	agent.instructions = INSTRUCTIONS
@@ -93,7 +93,7 @@ def seed():
 	agent.allow_chat = 1
 	agent.allow_guest = agent.allow_all_users = 0
 	agent.set("agent_tool", [{"tool": n} for n in names])
-	agent.set("allowed_roles", [{"role": "URY Chairman"}])
+	agent.set("allowed_roles", [{"role": "URY Owner"}])
 	for t in ("agent_mcp_server", "agent_skill", "ssh_connections", "allowed_users"):
 		agent.set(t, [])
 	agent.flags.ignore_permissions = True

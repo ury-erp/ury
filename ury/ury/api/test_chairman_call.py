@@ -91,7 +91,7 @@ class FakeCache:
 		pass
 
 
-def _fake_frappe(user="chair@example.com", roles=("URY Chairman",)):
+def _fake_frappe(user="chair@example.com", roles=("URY Owner",)):
 	f = mock.MagicMock()
 	f.ValidationError = frappe.ValidationError
 	f.PermissionError = frappe.PermissionError
@@ -103,7 +103,7 @@ def _fake_frappe(user="chair@example.com", roles=("URY Chairman",)):
 	f.throw = _throw
 	f._ = lambda s: s
 	f.session.user = user
-	f.get_roles = lambda u=None: list(roles) if user not in ("Administrator", "Guest") else ["All", "URY Chairman"]
+	f.get_roles = lambda u=None: list(roles) if user not in ("Administrator", "Guest") else ["All", "URY Owner"]
 	f.cache = FakeCache()
 	f.db.get_value = lambda dt, n, field=None, *a, **k: {"provider": "Google", "instructions": "You are the chairman agent."}.get(field)
 	return f

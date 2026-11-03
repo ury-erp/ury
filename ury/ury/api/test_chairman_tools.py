@@ -590,7 +590,7 @@ class SiteTests(IntegrationTestCase):
 			frappe.get_doc(
 				{"doctype": "User", "email": email, "first_name": "Tools", "send_welcome_email": 0}
 			).insert(ignore_permissions=True)
-		frappe.get_doc("User", email).add_roles("URY Chairman")
+		frappe.get_doc("User", email).add_roles("URY Owner")
 		for perm in frappe.get_all("User Permission", filters={"user": email}, pluck="name"):
 			frappe.delete_doc("User Permission", perm, force=True, ignore_permissions=True)
 		frappe.clear_cache(user=email)

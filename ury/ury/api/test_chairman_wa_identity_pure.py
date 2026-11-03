@@ -15,10 +15,10 @@ class TestPure(unittest.TestCase):
 			self.assertIsNone(m.normalize_wa_number(bad))
 
 	def test_user_facts(self):
-		self.assertEqual(m.validate_user_facts("a@x.com", 1, ["URY Chairman"]), [])
-		self.assertTrue(m.validate_user_facts("Administrator", 1, ["URY Chairman"]))
-		self.assertTrue(m.validate_user_facts("Guest", 1, ["URY Chairman"]))
-		self.assertTrue(m.validate_user_facts("a@x.com", 0, ["URY Chairman"]))
+		self.assertEqual(m.validate_user_facts("a@x.com", 1, ["URY Owner"]), [])
+		self.assertTrue(m.validate_user_facts("Administrator", 1, ["URY Owner"]))
+		self.assertTrue(m.validate_user_facts("Guest", 1, ["URY Owner"]))
+		self.assertTrue(m.validate_user_facts("a@x.com", 0, ["URY Owner"]))
 		self.assertTrue(m.validate_user_facts("a@x.com", 1, ["Sales"]))
 
 	def test_otp_flow(self):

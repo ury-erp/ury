@@ -30,14 +30,14 @@ WORKBOOK_DOCTYPE = "Insights Workbook"
 
 # Users holding any of these roles get INSIGHTS_ROLE (System Manager deliberately excluded).
 INSIGHTS_ROLE_TRIGGERS = (
-	"URY Chairman",
+	"URY Owner",
 	"URY Manager",
 	"URY Admin",
 	"Accounts Manager",
 	"HR Manager",
 )
 
-_OWNER = ("System Manager", "URY Admin", "URY Chairman")
+_OWNER = ("System Manager", "URY Admin", "URY Owner")
 _BRANCH = ("URY Manager", "URY Admin")
 _FINANCE = ("Accounts Manager", "URY Admin")
 
@@ -60,9 +60,9 @@ DASHBOARD_ROLES = {
 	"Stock count and wastage": _FINANCE,  # DB11
 	"Yield and recipe": _BRANCH,  # DB12
 	"Production planning": _BRANCH,  # DB13
-	"Data readiness": ("System Manager", "URY Admin", "URY Chairman", "URY Manager"),  # DB14
+	"Data readiness": ("System Manager", "URY Admin", "URY Owner", "URY Manager"),  # DB14
 	"Leakage": _FINANCE,  # DB15
-	"Chairman brief check": _OWNER,  # DB16
+	"Owner brief check": _OWNER,  # DB16
 }
 
 # Minimal sources for the Chairman dashboards DB01, DB14, DB16 (semantic_layer.yaml / dashboards/*.yaml).
@@ -91,7 +91,7 @@ CHAIRMAN_READ = (
 
 # role -> doctypes that get a read-only Custom DocPerm if the role lacks read there today.
 READ_GRANTS = {
-	"URY Chairman": CHAIRMAN_READ,
+	"URY Owner": CHAIRMAN_READ,
 	"URY Admin": ("POS Invoice", "URY KOT", "URY Yield Check"),
 	"Accounts Manager": ("URY Wastage",),
 }

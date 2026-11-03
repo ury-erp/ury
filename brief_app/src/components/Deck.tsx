@@ -33,7 +33,7 @@ export default function Deck({ slides }: { slides: Slide[] }) {
   if (!items.length) return <div className="state"><h2>No brief yet</h2><p className="sub">There is nothing to show for this date.</p></div>;
   return (
     <>
-      <main className="deck" ref={ref} onScroll={onScroll} tabIndex={-1} aria-label="Chairman brief slides">
+      <main className="deck" ref={ref} onScroll={onScroll} tabIndex={-1} aria-label="Owner brief slides">
         {items.map((s, i) => <SlideView key={s.id} slide={s} index={i} total={items.length} />)}
       </main>
       <nav className="nav" aria-label="Slide navigation">

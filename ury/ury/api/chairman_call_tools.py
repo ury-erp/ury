@@ -52,7 +52,7 @@ def _check_state(call_state):
 		or frappe.session.user in FORBIDDEN_USERS
 		or frappe.session.user != user
 	):
-		frappe.throw(_("Chairman tools must run as the chairman"), frappe.PermissionError)
+		frappe.throw(_("Owner tools must run as the owner"), frappe.PermissionError)
 
 
 def _validate_args(spec, args):

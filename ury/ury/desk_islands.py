@@ -85,7 +85,7 @@ _ROWS = [
 		"Which dashboards have enough data to be trusted."),
 	("ury-db15-leakage", "DB15 Leakage", "Leakage",
 		"Cancellations, discounts, returns and other revenue leakage."),
-	("ury-db16-chairman-crosscheck", "DB16 Chairman cross-check", "Chairman brief check",
+	("ury-db16-chairman-crosscheck", "DB16 Owner cross-check", "Owner brief check",
 		"Cross-check of the chairman brief figures against POS data."),
 ]
 

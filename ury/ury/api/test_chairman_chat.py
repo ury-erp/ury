@@ -136,7 +136,7 @@ def _good_agent(**over):
 		"allow_guest": 0,
 		"allow_all_users": 0,
 		"allowed_users": [],
-		"allowed_roles": [SimpleNamespace(role="URY Chairman")],
+		"allowed_roles": [SimpleNamespace(role="URY Owner")],
 		"agent_mcp_server": [],
 		"agent_skill": [],
 		"ssh_connections": [],
@@ -183,7 +183,7 @@ class PolicyAndLimitTests(unittest.TestCase):
 			{"allow_all_users": 1},
 			{"allowed_users": [SimpleNamespace(user="x@example.com")]},
 			{"allowed_roles": []},
-			{"allowed_roles": [SimpleNamespace(role="URY Chairman"), SimpleNamespace(role="Employee")]},
+			{"allowed_roles": [SimpleNamespace(role="URY Owner"), SimpleNamespace(role="Employee")]},
 			{"max_turns": 0},
 			{"max_turns": cc.MAX_AGENT_TURNS + 1},
 		]
@@ -465,9 +465,9 @@ class SiteTests(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		if not frappe.db.exists("Role", "URY Chairman"):
-			frappe.get_doc({"doctype": "Role", "role_name": "URY Chairman", "desk_access": 0}).insert()
-		for email, roles in ((CHAIR_A, ["URY Chairman"]), (CHAIR_B, ["URY Chairman"]), (PLAIN, [])):
+		if not frappe.db.exists("Role", "URY Owner"):
+			frappe.get_doc({"doctype": "Role", "role_name": "URY Owner", "desk_access": 0}).insert()
+		for email, roles in ((CHAIR_A, ["URY Owner"]), (CHAIR_B, ["URY Owner"]), (PLAIN, [])):
 			if not frappe.db.exists("User", email):
 				u = frappe.get_doc(
 					{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
@@ -657,7 +657,7 @@ class SiteTests(IntegrationTestCase):
 	def test_require_agent_refuses_unsafe_real_agent_doc(self):
 		"""H1 on a real (unsaved) Huf Agent doc: MCP row / open access / no tools => refused."""
 		agent = frappe.new_doc("Agent")
-		agent.name = "URY Chairman Unsafe Test"
+		agent.name = "URY Owner Unsafe Test"
 		agent.max_turns = 5
 		agent.append("agent_mcp_server", {})
 		agent.allow_all_users = 1

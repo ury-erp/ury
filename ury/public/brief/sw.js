@@ -1,4 +1,4 @@
-/* URY Chairman Brief service worker. Scope /ury/brief/. */
+/* URY Owner Brief service worker. Scope /ury/brief/. */
 /* eslint-disable no-restricted-globals */
 /*
  * Isolation model (P1):
@@ -43,7 +43,7 @@
 	var STAMP_USER = "X-Brief-Session-User";
 	var STAMP_AT = "X-Brief-Cached-At";
 	var SIGN_IN_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-		'<meta name="viewport" content="width=device-width,initial-scale=1"><title>Chairman Brief</title>' +
+		'<meta name="viewport" content="width=device-width,initial-scale=1"><title>Owner Brief</title>' +
 		'<style>body{font-family:system-ui,sans-serif;margin:0;padding:48px 16px;text-align:center;background:#fff;color:#111}' +
 		'@media (prefers-color-scheme:dark){body{background:#111;color:#eee}}</style></head><body>' +
 		'<h1>Sign in to see your brief</h1><p>You are offline and this device has no saved brief for the signed-in user. ' +

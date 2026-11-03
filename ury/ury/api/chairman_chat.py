@@ -34,7 +34,7 @@
 #      marked Failed and the call raises - we never let it drain in the
 #      background.
 #   3. assert_chairman_tool_context() is exported for the chairman agent's
-#      tools (WP H2): it raises unless the session user holds URY Chairman,
+#      tools (WP H2): it raises unless the session user holds URY Owner,
 #      is not Administrator/Guest, and owns the conversation. So even a run
 #      that somehow drained as Administrator cannot read data.
 #   No frappe.set_user impersonation is used anywhere.
@@ -57,7 +57,7 @@
 #     ALSO always admits the agent owner, System Manager and holders of the
 #     agent.view_all / agent.edit capabilities; that cannot be closed from ury,
 #     so those users can run the agent via Huf's native chat. They are trusted
-#     admins and the tools themselves still require URY Chairman (guarded).
+#     admins and the tools themselves still require URY Owner (guarded).
 #
 # LIMITS (review M3): per-user cache counters: RATE_LIMIT_MESSAGES text
 # messages/min (send, start-with-message) and RATE_LIMIT_AUDIO audio calls/min
@@ -247,7 +247,7 @@ def agent_policy_violations(agent_doc, tool_functions, allowed_paths, allowed_ro
 		if tf.get("types") not in ALLOWED_TOOL_TYPES:
 			v.append(f"tool {label} has forbidden type {tf.get('types')!r}")
 		if (tf.get("function_path") or "").strip() not in allowed_paths:
-			v.append(f"tool {label} function_path {tf.get('function_path')!r} is not a chairman tool")
+			v.append(f"tool {label} function_path {tf.get('function_path')!r} is not an owner tool")
 	for f in FORBIDDEN_AGENT_FLAGS:
 		if _get(agent_doc, f):
 			v.append(f"agent has {f} enabled")
@@ -265,9 +265,9 @@ def agent_policy_violations(agent_doc, tool_functions, allowed_paths, allowed_ro
 		v.append("agent allows all users")
 	roles = {_get(r, "role") for r in (_get(agent_doc, "allowed_roles") or [])}
 	if not roles:
-		v.append("agent allowed_roles must list URY Chairman")
+		v.append("agent allowed_roles must list URY Owner")
 	elif not roles <= set(allowed_roles):
-		v.append(f"agent allowed_roles include non-chairman roles {sorted(roles - set(allowed_roles))}")
+		v.append(f"agent allowed_roles include non-owner roles {sorted(roles - set(allowed_roles))}")
 	return v
 
 
@@ -292,7 +292,7 @@ def assert_agent_policy(agent_doc):
 			"\n".join(violations), f"URY chairman chat: agent {agent_doc.name} refused by policy"
 		)
 		frappe.throw(
-			_("Chairman chat agent is not safely configured; refused. Ask an administrator to check the error log."),
+			_("Owner chat agent is not safely configured; refused. Ask an administrator to check the error log."),
 			frappe.PermissionError,
 		)
 
@@ -358,7 +358,7 @@ def _enabled_agent():
 def _require_agent():
 	agent = _enabled_agent()
 	if not agent:
-		frappe.throw(_("Chairman chat is not enabled"), frappe.ValidationError)
+		frappe.throw(_("Owner chat is not enabled"), frappe.ValidationError)
 	from huf.ai.agent.access import assert_agent_access
 
 	agent_doc = frappe.get_doc("Agent", agent)
@@ -416,7 +416,7 @@ def _run_inline(agent, conversation, prompt):
 		if result.get("agent_run_id"):
 			_fail_run(result["agent_run_id"], "URY chairman chat refuses queued execution")
 		frappe.throw(
-			_("Chairman chat cannot guarantee the run executes as you; refused."),
+			_("Owner chat cannot guarantee the run executes as you; refused."),
 			frappe.ValidationError,
 		)
 	return result
@@ -679,14 +679,14 @@ def run_turn(agent, conversation, message, language=None):
 
 def assert_chairman_tool_context(conversation_id=None):
 	"""Call at the top of every chairman agent tool. Fails closed unless the tool
-	executes as an URY Chairman who owns the conversation (never Administrator)."""
+	executes as an URY Owner who owns the conversation (never Administrator)."""
 	user = frappe.session.user
 	if user in FORBIDDEN_TOOL_USERS or not (set(frappe.get_roles(user)) & set(ALLOWED_ROLES)):
-		frappe.throw(_("Chairman tools must run as the chairman"), frappe.PermissionError)
+		frappe.throw(_("Owner tools must run as the owner"), frappe.PermissionError)
 	if conversation_id:
 		owner = frappe.db.get_value("Agent Conversation", conversation_id, "owner")
 		if owner != user:
-			frappe.throw(_("Chairman tools must run as the conversation owner"), frappe.PermissionError)
+			frappe.throw(_("Owner tools must run as the conversation owner"), frappe.PermissionError)
 	return user
 
 
