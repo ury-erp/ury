@@ -93,8 +93,11 @@ CHAIRMAN_READ = (
 READ_GRANTS = {
 	"URY Owner": CHAIRMAN_READ,
 	# DB10 (Margin and cost) also reads the two URY cost doctypes: without them Insights shows silent zeros.
-	"URY Admin": ("POS Invoice", "URY KOT", "URY Yield Check", "URY Cost Variance Snapshot", "URY Daily P and L"),
-	"Accounts Manager": ("URY Wastage", "URY Cost Variance Snapshot", "URY Daily P and L"),
+	# The estimated-margin tiles join invoice lines to Item, BOM and the production config (dish master data).
+	"URY Admin": ("POS Invoice", "URY KOT", "URY Yield Check", "URY Cost Variance Snapshot", "URY Daily P and L",
+		"Item", "BOM", "URY Item Production Configuration"),
+	"Accounts Manager": ("URY Wastage", "URY Cost Variance Snapshot", "URY Daily P and L",
+		"Item", "BOM", "URY Item Production Configuration"),
 }
 
 _WRITE_PTYPES = ("write", "create", "delete", "submit", "cancel", "amend")
