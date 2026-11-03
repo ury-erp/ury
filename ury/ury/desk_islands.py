@@ -32,6 +32,27 @@ ICON = "chart-column"
 INSIGHTS_DASHBOARD_DOCTYPE = "Insights Dashboard v3"
 CLAIM_FIELD = "insights_dashboard"
 
+# One distinct, valid lucide icon per dashboard (all checked against the v16 and v17 sprites), so the
+# sidebar does not show the same generic icon on every row. Unknown names fall back to ICON.
+DASHBOARD_ICONS = {
+	"ury-owner-overview": "layout-dashboard",
+	"ury-branch-daily": "store",
+	"ury-db03-sales-deep-dive": "chart-line",
+	"ury-db04-menu-category": "utensils-crossed",
+	"ury-db05-department-production": "factory",
+	"ury-db06-kitchen-timing": "timer",
+	"ury-db07-table-floor": "armchair",
+	"ury-db08-employee-performance": "users",
+	"ury-db09-payments-cashup": "banknote",
+	"ury-db10-margin-cost": "percent",
+	"ury-db11-wastage-shrinkage": "boxes",
+	"ury-db12-yield-recipe": "chef-hat",
+	"ury-db13-production-planning": "clipboard-list",
+	"ury-db14-data-quality": "database-zap",
+	"ury-db15-leakage": "octagon-alert",
+	"ury-db16-chairman-crosscheck": "shield-check",
+}
+
 # (desk_name, sidebar label, Insights dashboard title, description)
 _ROWS = [
 	("ury-owner-overview", "DB01 Owner overview", "Owner overview",
@@ -180,7 +201,7 @@ def _setup_sidebar(rows, summary):
 			"label": row["label"],
 			"link_type": "Dashboard",
 			"link_to": row["desk_name"],
-			"icon": ICON,
+			"icon": DASHBOARD_ICONS.get(row["desk_name"], ICON),
 			"open_in_new_tab": 1,
 		}
 		item = existing.get(row["desk_name"])

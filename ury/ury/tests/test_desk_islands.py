@@ -209,5 +209,14 @@ class DeskIslandsTest(unittest.TestCase):
 		self.mod.after_migrate()
 
 
+class IconTests(unittest.TestCase):
+	def test_every_dashboard_has_its_own_icon(self):
+		di = load()
+		names = [r["desk_name"] for r in di.DASHBOARDS]
+		icons = [di.DASHBOARD_ICONS[n] for n in names]
+		self.assertEqual(len(set(icons)), len(icons))
+		self.assertEqual(set(di.DASHBOARD_ICONS), set(names))
+
+
 if __name__ == "__main__":
 	unittest.main()
