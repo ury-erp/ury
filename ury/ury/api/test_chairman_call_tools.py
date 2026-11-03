@@ -133,6 +133,14 @@ class RunToolTests(Base):
 			self._run(lambda **k: {})
 
 	def test_administrator_refused_even_with_valid_state(self):
+		# Administrator is an owner by default; this covers a site that opted out.
+		from unittest import mock
+
+		from ury.ury.api import chairman as chairman_mod
+
+		optout = mock.patch.object(chairman_mod, "administrator_allowed", return_value=False)
+		optout.start()
+		self.addCleanup(optout.stop)
 		frappe.session.user = "Administrator"
 		self.state["user"] = "Administrator"
 		called = []

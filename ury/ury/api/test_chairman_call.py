@@ -150,6 +150,10 @@ class CallBase(unittest.TestCase):
 
 class TestAccess(CallBase):
 	def test_administrator_and_guest_refused(self):
+		# Administrator is an owner by default; this covers a site that opted out.
+		optout = mock.patch.object(chairman_mod, "administrator_allowed", return_value=False)
+		optout.start()
+		self.addCleanup(optout.stop)
 		for user in ("Administrator", "Guest"):
 			self.f.session.user = user
 			for fn, args in (

@@ -70,7 +70,6 @@ export interface CallTabProps {
 
 export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const [caps, setCaps] = useState<CallCaps | null>(null);
-  const [lang, setLang] = useState<CallLang>(hintLang);
   const [choice, setChoice] = useState<EngineChoice>(() => ({
     engine: engine ?? new MockCallEngine(),
     kind: "mock",
@@ -87,8 +86,6 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const meterRef = useRef<HTMLSpanElement>(null);
 
   const maxSecs = caps?.max_seconds && caps.max_seconds > 0 ? caps.max_seconds : 300;
-  const allowed = LANGS.filter((l) => !caps?.languages || caps.languages.includes(l.code));
-  const langs = allowed.length ? allowed : LANGS.slice(0, 1);
 
   useEffect(() => {
     if (engine) return;
@@ -100,13 +97,9 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   }, [engine]);
 
   useEffect(() => {
-    if (caps && !langs.some((l) => l.code === lang)) setLang(langs[0].code);
-  }, [caps, langs, lang]);
-
-  useEffect(() => {
     if (engine) return;
     let alive = true;
-    void createCallEngine(caps, { language: lang }).then((c) => {
+    void createCallEngine(caps, {}).then((c) => {
       if (!alive) return;
       if (!["idle", "ended", "failed"].includes(stateRef.current)) return;
       setChoice((prev) => (prev.kind === "mock" && c.kind === "mock" ? { ...prev, notice: c.notice } : c));
@@ -114,7 +107,7 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
     return () => {
       alive = false;
     };
-  }, [engine, caps, lang]);
+  }, [engine, caps]);
 
   useEffect(() => {
     stateRef.current = "idle";
@@ -168,7 +161,6 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const inCall = ["requesting_mic", "connecting", "ringing", ...ACTIVE_STATES].includes(state);
   const busy = state === "requesting_mic" || state === "connecting" || state === "ringing";
   const speaker = SPEAKER[state] ? (state === "listening" && muted ? "You (muted)" : SPEAKER[state]) : "";
-  const dir = LANGS.find((l) => l.code === lang)?.dir ?? "ltr";
   const remaining = maxSecs - secs;
 
   let failMsg = "";
@@ -184,22 +176,9 @@ export default function CallTab({ engine, onBack }: CallTabProps = {}) {
   const unavailable = choice.kind === "mock" && !engine;
 
   return (
-    <section className="call" data-state={state} data-engine={choice.kind} dir={dir} aria-label="Voice call">
+    <section className="call" data-state={state} data-engine={choice.kind} dir="auto" aria-label="Voice call">
       <p className="call-note" role={unavailable ? "alert" : undefined} dir="auto">{notice}</p>
       <div className="call-who">
-        <label className="call-lang">
-          <span className="call-lang-label">Language</span>
-          <select
-            value={lang}
-            disabled={inCall}
-            onChange={(e) => setLang(e.target.value as CallLang)}
-            aria-label="Call language"
-          >
-            {langs.map((l) => (
-              <option key={l.code} value={l.code} lang={l.code}>{l.label}</option>
-            ))}
-          </select>
-        </label>
         <div className="call-ring" ref={ringRef} data-active={live || busy} aria-hidden="true">
           <div className="call-avatar">B</div>
         </div>

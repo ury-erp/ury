@@ -16,7 +16,8 @@ export interface CallCaps {
 }
 
 export interface EngineOpts {
-  language: CallLang;
+  /** Omitted on purpose: the model picks the language from what the caller speaks. */
+  language?: CallLang;
   mock?: MockOptions;
   /** Passed through to GeminiLiveCallEngine (api, wsFactory, ...). */
   gemini?: Record<string, unknown>;

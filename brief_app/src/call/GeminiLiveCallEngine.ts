@@ -127,7 +127,7 @@ export class GeminiLiveCallEngine implements VoiceCallEngine {
     if (run !== this.run) return this.releaseStream();
     this.set("connecting");
     try {
-      this.session = await this.api.startCall(this.o.language ?? "en");
+      this.session = await this.api.startCall(this.o.language);
     } catch (e) {
       if (run === this.run) this.fail(startErrorMessage(e));
       return;

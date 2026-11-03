@@ -113,7 +113,7 @@ export function parseToolResult(m: unknown): CallToolResult {
 }
 
 export const callCapabilities = () => post("call_capabilities", {}).then(parseCapabilities);
-export const startCall = (language: string) => post("start_call", { language }).then(parseStartCall);
+export const startCall = (language?: string) => post("start_call", language ? { language } : {}).then(parseStartCall);
 export const callTool = (callId: string, name: string, args: unknown) =>
   post("call_tool", { call_id: callId, name, args: isObj(args) ? args : {} }).then(parseToolResult);
 export const callTurns = (callId: string, turns: CallTurn[]) =>

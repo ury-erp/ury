@@ -86,7 +86,8 @@ def _int_setting(field, default):
 
 
 def call_language(language):
-	return chairman_chat.normalize_language(language) or "en"
+	"""A supported code, or None: with no language the model picks it from what the caller speaks."""
+	return chairman_chat.normalize_language(language) or None
 
 
 def hash_call_id(call_id):
@@ -156,6 +157,12 @@ def function_declarations():
 
 
 def build_system_instruction(instructions, language):
+	if not language:
+		return (
+			f"{(instructions or '').strip()}\n\nAnswer in the language the caller is speaking "
+			"(English, Hindi, Arabic, Malayalam or whichever they use) and switch if they switch.\n"
+			f"{VOICE_STYLE_RULES}"
+		).strip()
 	lang = LANGUAGE_NAMES[language]
 	return (
 		f"{(instructions or '').strip()}\n\nRespond only in {lang}. "
@@ -168,7 +175,7 @@ def build_setup(model, voice, language, instructions):
 	# Native-audio Live models choose the language themselves and close the socket with 1007
 	# ("Unsupported language code") if languageCode is set; the system instruction carries the
 	# language lock for them. Other Live models accept an explicit code.
-	if "native-audio" not in str(model):
+	if language and "native-audio" not in str(model):
 		speech["languageCode"] = LANGUAGE_BCP47[language]
 	return {
 		"model": model,
@@ -396,7 +403,7 @@ def start_call(language=None):
 		"max_seconds": max_seconds,
 		"languages": list(LANGUAGE_BCP47),
 		"tool_names": [t["name"] for t in voice_tools()],
-		"greeting": GREETINGS[lang],
+		"greeting": GREETINGS[lang or "en"],
 	}
 
 
