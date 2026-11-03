@@ -1,5 +1,6 @@
 // All HTTP for the Ask tab lives here. Adjust names/shapes in one place.
 import type { ChatMessage } from "./types";
+import { fetchCsrf } from "../csrf";
 import { getPrefs } from "../settings/prefs";
 import { sanitizeCards } from "./cardFormat";
 import { parseServerTime } from "./when";
@@ -19,9 +20,7 @@ function csrf(): string {
 
 async function call<T = unknown>(name: string, body: Record<string, unknown> = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
-  const tok = csrf();
-  if (tok) headers["X-Frappe-CSRF-Token"] = tok;
-  const res = await fetch(BASE + name, { method: "POST", credentials: "same-origin", headers, body: JSON.stringify(body) });
+  const res = await fetchCsrf(BASE + name, { method: "POST", credentials: "same-origin", headers, body: JSON.stringify(body) });
   if (!res.ok) throw new ApiError(res.status);
   const j = await res.json().catch(() => ({}));
   return (j && "message" in j ? j.message : j) as T;

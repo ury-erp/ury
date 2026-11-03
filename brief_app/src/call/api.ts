@@ -1,6 +1,8 @@
 // HTTP for the voice call (ury.ury.api.chairman_call.*). Same CSRF/credentials handling as src/chat/api.ts.
 // Runtime shape checks are hand written (no zod). Never log tokens or call ids.
 
+import { fetchCsrf } from "../csrf";
+
 const BASE = "/api/method/ury.ury.api.chairman_call.";
 
 export class CallApiError extends Error {
@@ -21,9 +23,7 @@ function csrf(): string {
 
 async function post(name: string, body: Record<string, unknown>, keepalive = false): Promise<unknown> {
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
-  const tok = csrf();
-  if (tok) headers["X-Frappe-CSRF-Token"] = tok;
-  const res = await fetch(BASE + name, {
+  const res = await fetchCsrf(BASE + name, {
     method: "POST", credentials: "same-origin", headers, body: JSON.stringify(body), keepalive,
   });
   if (!res.ok) throw new CallApiError(res.status);

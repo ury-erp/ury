@@ -14,6 +14,8 @@ export default defineConfig({
     rollupOptions: {
       input: "src/main.tsx",
       output: {
+        // One file: a lazy chunk would import ./app.js without ?v= and pair with a stale cached copy after a rebuild.
+        inlineDynamicImports: true,
         entryFileNames: "assets/app.js",
         chunkFileNames: "assets/[name].js",
         assetFileNames: (a) => (a.names?.[0]?.endsWith(".css") ? "assets/app.css" : "assets/[name][extname]"),

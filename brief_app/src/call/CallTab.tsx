@@ -1,3 +1,4 @@
+import { fetchCsrf } from "../csrf";
 import { getPrefs } from "../settings/prefs";
 import { useEffect, useRef, useState } from "react";
 import "./call.css";
@@ -37,7 +38,7 @@ const CAPS_URL = "/api/method/ury.ury.api.chairman_call.call_capabilities";
 
 async function fetchCaps(): Promise<CallCaps | null> {
   try {
-    const res = await fetch(CAPS_URL, { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" } });
+    const res = await fetchCsrf(CAPS_URL, { method: "POST", credentials: "same-origin", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
     if (!res.ok) return null;
     const j = await res.json().catch(() => null);
     const m = j && typeof j === "object" && "message" in j ? j.message : null;
