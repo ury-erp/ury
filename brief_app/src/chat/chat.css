@@ -48,9 +48,9 @@
 .prog span{display:block;height:100%;background:hsl(var(--primary))}
 
 /* Composer */
-.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px;background:hsl(var(--chat-bg));border:0}
+.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:hsl(var(--chat-bg));border:0}
 .field{flex:1;min-width:0;display:flex;align-items:center;min-height:44px;border-radius:24px;background:hsl(var(--card));border:1px solid hsl(var(--hair2));box-shadow:0 1px 2px rgb(0 0 0 / .12);padding:0 16px}
-.field textarea{flex:1;min-width:0;resize:none;border:0;outline:0;background:transparent;color:hsl(var(--foreground));font:inherit;font-size:15px;line-height:20px;padding:12px 0;max-height:120px;overflow-y:auto}
+.field textarea{flex:1;min-width:0;resize:none;border:0;outline:0;background:transparent;color:hsl(var(--foreground));font:inherit;font-size:max(16px,1em);line-height:22px;padding:12px 0;max-height:120px;overflow-y:auto}
 .field textarea::placeholder{color:hsl(var(--text-tertiary))}
 .field:focus-within{outline:2px solid hsl(var(--ring));outline-offset:1px}
 .act{width:44px;height:44px;flex:none;border-radius:50%;border:0;padding:0;background:hsl(var(--primary));color:hsl(var(--white));cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
@@ -157,3 +157,4 @@
 .hist-row > svg:last-child{flex:none;color:hsl(var(--muted-foreground))}
 .hist-state{padding:48px 16px;text-align:center;color:hsl(var(--muted-foreground));display:flex;flex-direction:column;align-items:center;gap:8px;font-size:15px}
 .hist-state p{margin:0}
+.composer:focus-within{padding-block-end:6px}

@@ -207,3 +207,5 @@ button.tile{cursor:pointer}
 .call-overlay{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:hsl(var(--background));padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .call-overlay>.call{flex:1;min-height:0;width:100%;max-width:48rem;margin:0 auto}
 @media (min-width:900px){.today-body{padding-inline:var(--space-6)}}
+input,textarea,select{font-size:max(16px,1em)}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;overscroll-behavior:none}
