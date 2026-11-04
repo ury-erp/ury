@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { Globe, Phone, ShoppingBag, Truck, Utensils } from "lucide-react";
 
 export type OrderType = "Dine In" | "Take Away" | "Delivery" | "Phone In" | "Aggregators";
@@ -35,8 +36,6 @@ export const ORDER_TYPES: OrderTypes[] = [
         icon: Globe
     }
 ]
-
-import { t } from "../i18n";
 
 /** Display label for a stored order type value (values stay English: they are compared in code). */
 export const orderTypeLabel = (value: string): string =>

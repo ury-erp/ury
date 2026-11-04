@@ -233,7 +233,7 @@
     "failed_fetch_order": "Failed to fetch order details",
     "failed_print": "Failed to print order",
     "failed_process_order": "Failed to process order",
-    "no_active_order": "No active order found for this table",
+    "no_active_order": "No active order found",
     "qz_host_not_set": "QZ host is not set",
     "print_failed": "Print failed: {{reason}}",
     "invalid_discount": "Please enter a valid discount value",
@@ -312,7 +312,7 @@
     "last_updated": "Last Updated",
     "order_items": "Order Items",
     "started_at": "Started at:",
-    "no_active_order": "No active order found for this table",
+    "no_active_order": "No active order found",
     "loading_table_order": "Loading table order...",
     "table_name_title": "Table names are managed in backend",
     "capacity_placeholder": "Enter 1-20",
@@ -654,7 +654,7 @@
     "minutes_short": "{{n}} min",
     "hours_short": "{{n}} hr"
   },
-  "demo": {
+  "pos_ui": {
     "take_away": "Take away",
     "preview": "Preview",
     "printing": "Printing...",

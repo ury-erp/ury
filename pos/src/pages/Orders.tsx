@@ -505,7 +505,7 @@ export default function Orders() {
                       <div className="min-w-0">
                         <p className="text-xs text-gray-500">
                           {getOrderTableLabel(order)
-                            ? `${t('demo.table')} ${getOrderTableLabel(order)} • `
+                            ? `${t('pos_ui.table')} ${getOrderTableLabel(order)} • `
                             : ''}{orderTypeLabel(order.order_type)}
                         </p>
                       </div>

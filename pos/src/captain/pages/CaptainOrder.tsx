@@ -453,14 +453,14 @@ export default function CaptainOrder() {
 
       {!canModify && (
         <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">{t('demo.pax')}</span>
+          <span className="text-sm font-medium text-gray-700">{t('pos_ui.pax')}</span>
           <span className="text-sm text-gray-900">{noOfPax}</span>
         </div>
       )}
 
       {canModify && (
         <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">{t('demo.pax')}</span>
+          <span className="text-sm font-medium text-gray-700">{t('pos_ui.pax')}</span>
           <div className="flex items-center gap-3">
             <Button
               onClick={() => setNoOfPax(Math.max(MIN_PAX, noOfPax - 1))}
@@ -488,7 +488,7 @@ export default function CaptainOrder() {
       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-16">
           <ClipboardList className="w-10 h-10 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">{t('demo.no_items')}</p>
+          <p className="text-gray-500 text-sm">{t('pos_ui.no_items')}</p>
           {canModify && (
             <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
               {t('captain.browse_menu')}
@@ -622,8 +622,8 @@ export default function CaptainOrder() {
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="font-semibold text-gray-900 leading-tight">{t('demo.table')} {table}</h1>
-            <p className="text-xs text-gray-500">{isUpdatingOrder ? t('demo.updating_order') : t('demo.new_order')}</p>
+            <h1 className="font-semibold text-gray-900 leading-tight">{t('pos_ui.table')} {table}</h1>
+            <p className="text-xs text-gray-500">{isUpdatingOrder ? t('pos_ui.updating_order') : t('pos_ui.new_order')}</p>
           </div>
         </div>
 
@@ -709,7 +709,7 @@ export default function CaptainOrder() {
         {canModify && (
           <div className="bg-white border-t border-border p-3 mx-3 mb-3 rounded-lg">
             <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-sm font-semibold text-gray-700">{t('demo.total')}</span>
+              <span className="text-sm font-semibold text-gray-700">{t('pos_ui.total')}</span>
               <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
             </div>
             <Button
@@ -727,7 +727,7 @@ export default function CaptainOrder() {
               ) : isUpdatingOrder ? (
                 'Update Order'
               ) : (
-                t('demo.send_order')
+                t('pos_ui.send_order')
               )}
             </Button>
           </div>
@@ -738,7 +738,7 @@ export default function CaptainOrder() {
       {canModify && (
         <div className="sticky bottom-0 lg:hidden bg-white border-t border-border p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-sm font-semibold text-gray-700">{t('demo.total')}</span>
+            <span className="text-sm font-semibold text-gray-700">{t('pos_ui.total')}</span>
             <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
           </div>
           <Button
@@ -756,7 +756,7 @@ export default function CaptainOrder() {
             ) : isUpdatingOrder ? (
               'Update Order'
             ) : (
-              t('demo.send_order')
+              t('pos_ui.send_order')
             )}
           </Button>
         </div>

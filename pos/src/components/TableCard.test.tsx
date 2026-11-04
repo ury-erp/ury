@@ -109,8 +109,8 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.getByText("demo.preview")).toBeInTheDocument();
-    expect(screen.getByText("demo.print")).toBeInTheDocument();
+    expect(screen.getByText("pos_ui.preview")).toBeInTheDocument();
+    expect(screen.getByText("pos_ui.print")).toBeInTheDocument();
   });
 
   it("does not show preview and print buttons for available table", () => {
@@ -128,8 +128,8 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.queryByText("demo.preview")).not.toBeInTheDocument();
-    expect(screen.queryByText("demo.print")).not.toBeInTheDocument();
+    expect(screen.queryByText("pos_ui.preview")).not.toBeInTheDocument();
+    expect(screen.queryByText("pos_ui.print")).not.toBeInTheDocument();
   });
 
   it("calls onNavigate when available table is clicked", async () => {
@@ -212,7 +212,7 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.getByText("demo.printing")).toBeInTheDocument();
+    expect(screen.getByText("pos_ui.printing")).toBeInTheDocument();
   });
 
   it("renders take away badge when applicable", () => {
@@ -231,6 +231,6 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.getByText("demo.take_away")).toBeInTheDocument();
+    expect(screen.getByText("pos_ui.take_away")).toBeInTheDocument();
   });
 });

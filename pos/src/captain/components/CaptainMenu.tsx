@@ -66,7 +66,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('demo.search_menu')}
+            placeholder={t('pos_ui.search_menu')}
             className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -81,7 +81,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 : 'bg-white text-gray-700 border-border'
             )}
           >
-            {t('demo.all')}
+            {t('pos_ui.all')}
           </button>
           {categories.map((category) => (
             <button
