@@ -109,7 +109,7 @@ Machine-assisted translations; items below were flagged as uncertain. Whole file
 - Routine => روتيني; Simulated => محاكى.
 - Special Dish => طبق خاص.
 - Split By Contribution => التقسيم حسب المساهمة.
-- Retry / Lease => إعادة المحاولة / الإيجار ("lease" = job lock; unclear).
+- Retry / Lease => إعادة المحاولة / حجز المهمة (job lock).
 - Remaining Entitlement => الاستحقاق المتبقي (department stock entitlement).
 - TT Cost => تكلفة TT (acronym kept; meaning unknown).
 - RM Checklist => قائمة فحص مدير المطعم (RM assumed Restaurant Manager).
