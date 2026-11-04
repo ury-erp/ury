@@ -17,7 +17,7 @@ import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect, useRef, useState } from 'react';
-import { getActiveLanguage } from './i18n';
+import { getActiveLanguage, getActiveDirection } from './i18n';
 import { ActiveReportProvider } from './components/chat/ActiveReportContext';
 import ChatWidget, {
   ChatWidgetRefProvider,
@@ -68,7 +68,8 @@ function App() {
 
   useEffect(() => {
     const lang = getActiveLanguage();
-    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
+    // Direction comes from the locale file's _meta.direction, not a hardcoded language list.
+    const isRtl = getActiveDirection() === 'rtl';
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang || 'en';
   }, []);

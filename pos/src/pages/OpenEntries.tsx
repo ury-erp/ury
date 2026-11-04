@@ -72,9 +72,9 @@ export default function OpenEntries() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_user')}</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_period_start')}</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_pos_profile')}</th>
+                      <th className="text-start px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_user')}</th>
+                      <th className="text-start px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_period_start')}</th>
+                      <th className="text-start px-4 py-3 font-semibold text-gray-700 text-sm">{t('open_entries.col_pos_profile')}</th>
                     </tr>
                   </thead>
                   <tbody>

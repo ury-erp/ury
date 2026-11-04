@@ -101,3 +101,47 @@ export function t(key: string, params?: Record<string, string | number>): string
 
   return value.replace(/\{\{(\w+)\}\}/g, (_, k) => String(params[k] ?? `{{${k}}}`));
 }
+
+/**
+ * Translate server-side DATA labels (item groups / courses, floors, branches)
+ * through the site's Translation records, which Frappe injects into
+ * `frappe.boot.__messages`. Falls back to the source text.
+ */
+export function tData(source: string): string {
+  const m = (window as unknown as { frappe?: { boot?: { __messages?: Record<string, string> } } }).frappe?.boot?.__messages;
+  return m?.[source] ?? source;
+}
+
+
+/** Server user display name (e.g. "Administrator") through Translation records. */
+export function tUser(name: string | null | undefined): string {
+  return name ? tData(name) : '';
+}
+
+/** LTR-isolated "x / y" fraction so RTL does not reverse it (matches the Service Board). */
+export function ltrFraction(a: string | number, b: string | number): string {
+  return `\u2066${a} / ${b}\u2069`;
+}
+
+const NOTIFICATION_PATTERNS: Array<[RegExp, string, string[]]> = [
+  [/^A guest has asked for the bill$/, 'notifications.guest_bill', []],
+  [/^Draft sales plan for (.+) is ready for review$/, 'notifications.plan_draft_ready', ['date']],
+  [/^Yield below standard on a prepared item$/, 'notifications.yield_below', []],
+  [/^Today's sales plan is locked for production$/, 'notifications.plan_locked', []],
+  [/^Stock count correction posted \(short\/excess\)$/, 'notifications.stock_correction', []],
+  [/^Daily P&L for (.+) has been submitted$/, 'notifications.pnl_submitted', ['date']],
+  [/^Order # ?(\S+) Delayed$/, 'notifications.order_delayed', ['n']],
+];
+
+/** Translate server-generated notification subjects (hardcoded English in the API). */
+export function tNotification(subject: string): string {
+  for (const [re, key, names] of NOTIFICATION_PATTERNS) {
+    const m = re.exec(subject);
+    if (m) {
+      const params: Record<string, string> = {};
+      names.forEach((n, i) => { params[n] = `\u2066${m[i + 1]}\u2069`; });
+      return t(key, params);
+    }
+  }
+  return tData(subject);
+}

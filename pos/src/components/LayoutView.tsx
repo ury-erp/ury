@@ -273,7 +273,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         </div>
         {isEditMode && (
           <>
-            <div className="absolute -top-1 -right-1 bg-primary-500 text-white rounded-full p-0.5 shadow-sm">
+            <div className="absolute -top-1 -end-1 bg-primary-500 text-white rounded-full p-0.5 shadow-sm">
               <Move className="w-2 h-2" />
             </div>
           </>
@@ -369,13 +369,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       {/* Canvas Area */}
       <div className="flex-1 relative ">
         {/* Zoom Controls */}
-        <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
+        <div className="absolute top-4 start-4 z-30 flex flex-col gap-2">
           <Button
             onClick={handleZoomIn}
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Zoom In"
+            title={t('tables.zoom_in')}
           >
             <ZoomIn className="w-5 h-5" />
           </Button>
@@ -384,7 +384,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Zoom Out"
+            title={t('tables.zoom_out')}
           >
             <ZoomOut className="w-5 h-5" />
           </Button>
@@ -393,7 +393,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             variant="outline"
             size="icon"
             className="shadow-lg"
-            title="Reset Zoom & Pan"
+            title={t('tables.reset_zoom')}
           >
             <RotateCcw className="w-5 h-5" />
           </Button>
@@ -403,7 +403,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         </div>
 
         {/* Instructions */}
-        <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
+        <div className="absolute bottom-4 end-4 z-30 pointer-events-none">
           {isEditMode ? (
             <div className="bg-primary-50/90 backdrop-blur border border-primary-200 rounded-lg p-3 text-sm text-primary-800 shadow-lg">
               <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
@@ -449,7 +449,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-s border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "start-0 border-e" : "end-0")}>
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-gray-900">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}
@@ -515,11 +515,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
                   <span className="text-gray-500">X:</span>
-                  <span className="ml-1">{Math.round(selectedTableData.x)}px</span>
+                  <span className="ms-1">{Math.round(selectedTableData.x)}px</span>
                 </div>
                 <div>
                   <span className="text-gray-500">Y:</span>
-                  <span className="ml-1">{Math.round(selectedTableData.y)}px</span>
+                  <span className="ms-1">{Math.round(selectedTableData.y)}px</span>
                 </div>
               </div>
             </div>
@@ -530,11 +530,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
                   <span className="text-gray-500">W:</span>
-                  <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').width}px</span>
+                  <span className="ms-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').width}px</span>
                 </div>
                 <div>
                   <span className="text-gray-500">H:</span>
-                  <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').height}px</span>
+                  <span className="ms-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').height}px</span>
                 </div>
               </div>
             </div>

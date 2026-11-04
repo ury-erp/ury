@@ -92,8 +92,10 @@ vi.mock("./components/chat/ActiveReportContext", () => ({
   ActiveReportProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="active-report-provider">{children}</div>,
 }));
 
+const i18nState = vi.hoisted(() => ({ lang: "en", dir: "ltr" as "ltr" | "rtl" }));
 vi.mock("./i18n", () => ({
-  getActiveLanguage: () => "en",
+  getActiveLanguage: () => i18nState.lang,
+  getActiveDirection: () => i18nState.dir,
 }));
 
 vi.mock("./store/pos-store", () => ({
@@ -129,5 +131,18 @@ describe("App", () => {
   it("renders app layout", () => {
     render(<App />);
     expect(screen.getByTestId("app-layout")).toBeInTheDocument();
+  });
+
+  it("sets dir=rtl and lang=ar on the document for an RTL locale, ltr for English", () => {
+    i18nState.lang = "ar";
+    i18nState.dir = "rtl";
+    render(<App />);
+    expect(document.documentElement.dir).toBe("rtl");
+    expect(document.documentElement.lang).toBe("ar");
+    i18nState.lang = "en";
+    i18nState.dir = "ltr";
+    render(<App />);
+    expect(document.documentElement.dir).toBe("ltr");
+    expect(document.documentElement.lang).toBe("en");
   });
 });

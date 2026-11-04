@@ -1,4 +1,5 @@
 import { ExpandableSearch } from '@ury/ui';
+import { t } from '../i18n';
 
 interface SearchBarProps {
   value: string;
@@ -21,7 +22,7 @@ export default function SearchBar({
       onChange={onChange}
       isExpanded={isVisible}
       onExpandedChange={onVisibilityChange}
-      placeholder="Search menu items..."
+      placeholder={t('menu.search_placeholder')}
       disabled={disabled}
     />
   );

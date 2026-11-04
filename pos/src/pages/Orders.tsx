@@ -42,6 +42,7 @@ import {
   formatFrappeDatetime,
   type PrintWarningInput,
 } from '../lib/invoice-print-warning';
+import { orderTypeLabel } from '../data/order-types';
 
 function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
   if (!order.restaurant_table) return null;
@@ -312,9 +313,9 @@ export default function Orders() {
     } catch (err) {
       const parsedMessage = parseFrappeError(err) || (err instanceof Error ? err.message : null);
       if (isOrderTypeNotAllowedError(parsedMessage)) {
-        showToast.error(`Quantity reduction isn't allowed for ${selectedOrder.order_type} orders.`);
+        showToast.error(t('orders.qty_reduction_not_allowed', { order_type: orderTypeLabel(selectedOrder.order_type) }));
       } else if (isLastItemCannotBeRemovedError(parsedMessage)) {
-        showToast.error('This is the last item on the order. Cancel the whole order instead.');
+        showToast.error(t('orders.last_item_cannot_remove'));
       } else {
         showToast.error(parsedMessage || 'Failed to reduce item quantity.');
       }
@@ -437,7 +438,7 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('orders.failed_to_load')}</p>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -504,8 +505,8 @@ export default function Orders() {
                       <div className="min-w-0">
                         <p className="text-xs text-gray-500">
                           {getOrderTableLabel(order)
-                            ? `Table ${getOrderTableLabel(order)} • `
-                            : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
+                            ? `${t('pos_ui.table')} ${getOrderTableLabel(order)} • `
+                            : ''}{orderTypeLabel(order.order_type)}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -597,7 +598,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('orders.failed_to_load_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (
@@ -622,7 +623,7 @@ export default function Orders() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Edit order"
+                        aria-label={t('orders.edit_order')}
                         onClick={handleEditOrder}
                         disabled={editLoading}
                       >
@@ -633,7 +634,7 @@ export default function Orders() {
                         <button
                           type="button"
                           className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          aria-label="Cancel order"
+                          aria-label={t('orders.cancel_order')}
                           onClick={() => setCancelDialogOpen(true)}
                         >
                           <X className="w-4 h-4" />
@@ -782,10 +783,10 @@ export default function Orders() {
                                 )}
                               </button>
                             )}
-                            <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                            <p className="text-xs text-gray-500">{t('orders.qty_label', { qty: item.qty })}</p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <p className="text-sm font-semibold text-gray-900">
                             {formatCurrency(item.amount)}
                           </p>
@@ -823,7 +824,7 @@ export default function Orders() {
                   size="icon"
                   className="flex-shrink-0"
                   onClick={handlePrintOrder}
-                  aria-label="Print"
+                  aria-label={t('order.print')}
                   disabled={isPrinting}
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}

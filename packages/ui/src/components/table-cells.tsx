@@ -109,7 +109,7 @@ export function StatusDot({ tone, className }: StatusDotProps) {
  * <td className={numericCellClass}>1,234.56</td>
  */
 export const numericCellClass = cn(
-  "text-right",
+  "text-end",
   "font-mono",
   "tabular-nums",
   "text-[12px]"

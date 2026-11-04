@@ -74,7 +74,7 @@ export function ExpandableSearch({
             }}
             variant="ghost"
             size="sm"
-            className="absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 p-0 text-gray-400"
+            className="absolute end-2 top-1/2 h-6 w-6 -translate-y-1/2 p-0 text-gray-400"
             disabled={disabled}
             aria-label="Close search"
           >

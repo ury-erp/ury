@@ -30,13 +30,13 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-border bg-gray-50">
-            <th className="text-left py-3 px-4 font-semibold text-gray-900">
+            <th className="text-start py-3 px-4 font-semibold text-gray-900">
               {t('pos_closing.payment_mode')}
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-end py-3 px-4 font-semibold text-gray-900">
               {t('pos_closing.opening')}
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-end py-3 px-4 font-semibold text-gray-900">
               <span
                 title={t('pos_closing.help_expected')}
                 className="inline-flex items-center gap-1 cursor-help"
@@ -64,7 +64,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 </span>
               </span>
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-end py-3 px-4 font-semibold text-gray-900">
               <span
                 title={t('pos_closing.help_difference')}
                 className="inline-flex items-center gap-1 cursor-help"
@@ -100,10 +100,10 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 <td className="py-3 px-4 text-gray-900 font-medium">
                   {row.mode_of_payment}
                 </td>
-                <td className="py-3 px-4 text-right text-gray-700">
+                <td className="py-3 px-4 text-end text-gray-700">
                   {formatCurrency(row.opening_amount)}
                 </td>
-                <td className="py-3 px-4 text-right text-gray-700">
+                <td className="py-3 px-4 text-end text-gray-700">
                   {formatCurrency(row.expected_amount)}
                 </td>
                 <td className="py-3 px-4">
@@ -122,7 +122,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 </td>
                 <td
                   className={cn(
-                    'py-3 px-4 text-right font-medium',
+                    'py-3 px-4 text-end font-medium',
                     hasDifference ? 'text-red-600' : 'text-green-600'
                   )}
                 >

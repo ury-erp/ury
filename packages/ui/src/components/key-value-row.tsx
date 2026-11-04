@@ -28,7 +28,7 @@ const KeyValueRow = React.forwardRef<HTMLDivElement, KeyValueRowProps>(
       {...props}
     >
       <span className="w-[46%] shrink-0 text-muted-foreground">{label}</span>
-      <span className="ml-auto truncate font-mono text-xs text-foreground">{value}</span>
+      <span className="ms-auto truncate font-mono text-xs text-foreground">{value}</span>
     </div>
   )
 )

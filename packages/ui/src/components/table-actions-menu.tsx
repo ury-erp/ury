@@ -122,7 +122,7 @@ export function TableActionsMenu({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-white py-1 shadow-lg">
+        <div className="absolute end-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-white py-1 shadow-lg">
           {isAvailable && (
             <>
               {onReserve && (

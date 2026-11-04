@@ -128,7 +128,7 @@ describe("BaselineComparisonStrip", () => {
     render(<BaselineComparisonStrip />);
 
     await waitFor(() => {
-      expect(screen.getByText(/last 7 same weekdays/i)).toBeInTheDocument();
+      expect(screen.getByText(/last 7 same weekday/i)).toBeInTheDocument();
     });
   });
 });

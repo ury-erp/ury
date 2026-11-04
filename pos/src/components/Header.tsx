@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { t } from '../i18n';
+import { t, tUser } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Command,
@@ -158,7 +158,7 @@ const Header = () => {
               <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
                 <User className="w-3.5 h-3.5 text-white" />
               </div>
-              <span className="text-sm font-medium">{user?.full_name || 'User'}</span>
+              <span className="text-sm font-medium">{tUser(user?.full_name) || t('header.user_fallback')}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
 
@@ -166,7 +166,7 @@ const Header = () => {
             {showUserMenu && (
               <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
                 <div className="p-4 border-b border-border">
-                  <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
+                  <p className="text-sm font-medium text-gray-900">{tUser(user?.full_name) || t('header.user_fallback')}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">

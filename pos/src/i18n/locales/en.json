@@ -21,7 +21,11 @@
     "cancelling": "Cancelling...",
     "confirm_cancel": "Confirm Cancel",
     "loading_ury_pos": "Loading URY POS...",
-    "please_wait_setup": "Please wait while we set things up"
+    "please_wait_setup": "Please wait while we set things up",
+    "retry": "Retry",
+    "today": "Today",
+    "refresh": "Refresh",
+    "dismiss": "Dismiss"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -34,10 +38,21 @@
     "close_shift": "Close Shift",
     "switch_to_dashboard": "Switch to Dashboard",
     "switch_to_desk": "Switch To Desk",
-    "search_placeholder_reservations": "Search reservations by customer, table..."
+    "search_placeholder_reservations": "Search reservations by customer, table...",
+    "user_fallback": "User"
   },
   "menu": {
-    "special_items": "Special Items"
+    "special_items": "Special Items",
+    "available_chip": "Available",
+    "unavailable": "Unavailable",
+    "qty_left": "{{qty}} left",
+    "availability": {
+      "default": "Currently unavailable",
+      "not_today": "Not available today",
+      "sold_out": "Sold out",
+      "temporarily": "Temporarily unavailable"
+    },
+    "search_placeholder": "Search menu items..."
   },
   "pos_sidebar": {
     "categories": "Categories",
@@ -69,7 +84,11 @@
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
     "payment": "Payment",
-    "order_actions": "Order actions"
+    "order_actions": "Order actions",
+    "kot_sent": "Sent",
+    "kot_preparing": "Preparing",
+    "kot_ready": "Ready",
+    "kot_served": "Served"
   },
   "payment": {
     "title": "Payment",
@@ -114,7 +133,8 @@
       "session_exists_message": "A session is already open for this terminal.",
       "session_elsewhere_title": "Open Session Elsewhere",
       "session_elsewhere_message": "You have an open session at {{location}}. Continue there?"
-    }
+    },
+    "failed_to_load": "Failed to load POS"
   },
   "pos_closing": {
     "title": "Close POS",
@@ -213,7 +233,7 @@
     "failed_fetch_order": "Failed to fetch order details",
     "failed_print": "Failed to print order",
     "failed_process_order": "Failed to process order",
-    "no_active_order": "No active order found for this table",
+    "no_active_order": "No active order found",
     "qz_host_not_set": "QZ host is not set",
     "print_failed": "Print failed: {{reason}}",
     "invalid_discount": "Please enter a valid discount value",
@@ -253,7 +273,14 @@
       "previous": "Previous",
       "next": "Next",
       "page": "Page {{number}}"
-    }
+    },
+    "qty_reduction_not_allowed": "Quantity reduction isn't allowed for {{order_type}} orders.",
+    "last_item_cannot_remove": "This is the last item on the order. Cancel the whole order instead.",
+    "failed_to_load": "Failed to load orders",
+    "failed_to_load_details": "Failed to load order details",
+    "edit_order": "Edit order",
+    "cancel_order": "Cancel order",
+    "qty_label": "Qty: {{qty}}"
   },
   "tables": {
     "layout_view": "Layout View",
@@ -338,7 +365,15 @@
     "reserved_for": "Reserved for {{time}}",
     "reserved_choose_another": "Table {{table}} is reserved for {{time}}. Please choose another table.",
     "assigned_to": "Assigned to {{owner}}",
-    "table_occupied": "This table is occupied"
+    "table_occupied": "This table is occupied",
+    "failed_to_load_rooms": "Failed to load rooms",
+    "failed_to_load_tables": "Failed to load tables",
+    "pos_profile_not_loaded": "POS profile not loaded yet",
+    "printed_successfully": "Printed successfully",
+    "no_rooms_for_branch": "No rooms found for this branch",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "reset_zoom": "Reset Zoom & Pan"
   },
   "reservations": {
     "page_title": "Reservations",
@@ -615,6 +650,154 @@
     "relative_days_ago": "{{n}} days ago",
     "eta_holds": "Holds",
     "session_ago_mins": "{{m}}m ago",
-    "session_ago_hours": "{{h}}h {{m}}m ago"
+    "session_ago_hours": "{{h}}h {{m}}m ago",
+    "minutes_short": "{{n}} min",
+    "hours_short": "{{n}} hr"
+  },
+  "pos_ui": {
+    "take_away": "Take away",
+    "preview": "Preview",
+    "printing": "Printing...",
+    "print": "Print",
+    "search_menu": "Search menu",
+    "all": "All",
+    "pax": "Pax",
+    "no_items": "No items yet.",
+    "table": "Table",
+    "updating_order": "Updating order",
+    "new_order": "New order",
+    "total": "Total",
+    "send_order": "Send Order"
+  },
+  "notifications": {
+    "guest_bill": "A guest has asked for the bill",
+    "plan_draft_ready": "Draft sales plan for {{date}} is ready for review",
+    "yield_below": "Yield below standard on a prepared item",
+    "plan_locked": "Today's sales plan is locked for production",
+    "stock_correction": "Stock count correction posted (short/excess)",
+    "pnl_submitted": "Daily P&L for {{date}} has been submitted",
+    "order_delayed": "Order # {{n}} Delayed"
+  },
+  "auth": {
+    "access_denied": "Access Denied",
+    "configuration_error": "Configuration Error",
+    "profile_not_found": "POS Profile not found or not configured.",
+    "permission_required": "Permission Required",
+    "no_permission": "You do not have permission to access this application.",
+    "required_roles": "Required roles: {{roles}}",
+    "recheck": "Recheck Permissions"
+  },
+  "spotlight": {
+    "hint": "Use ↑↓ to navigate, Enter to select"
+  },
+  "screen_size": {
+    "title": "Desktop Only",
+    "designed_for": "This POS system is designed for desktop computers and tablets with larger screens.",
+    "use_v1": "You can use URY POS Version 1 for mobile devices.",
+    "switch_v1": "Switch to Version 1",
+    "current_width": "Current screen width: {{px}}px",
+    "required": "Required: 1024px or larger",
+    "mobile_note": "Mobile support will be available in a future update. Please use a device with a screen width of 1024px or larger."
+  },
+  "dash_cards": {
+    "no_baseline": "no baseline yet",
+    "baseline_title": "Tonight vs a normal day",
+    "baseline_failed": "Failed to load baseline comparison",
+    "no_data": "No data available",
+    "sales_so_far": "Sales so far",
+    "covers": "Covers",
+    "vs_usual": "vs usual {{value}}",
+    "compared_same_weekday": "Compared against the same weekday and hour",
+    "compared_last_n": "Compared against the last {{n}} same weekday(s), same hour",
+    "insights_failed": "Failed to load insights",
+    "act_now": "Act now",
+    "thing_worth_attention": "1 thing worth your attention",
+    "things_worth_attention": "{{n}} things worth your attention",
+    "nothing_needs_attention": "Nothing needs attention right now.",
+    "fast_moving": "Fast Moving",
+    "fast_moving_hint": "Based on recent sell rate, not a live stock count",
+    "fast_moving_failed": "Failed to load fast-moving items",
+    "fast_moving_empty": "No sales activity to rank yet.",
+    "per_hour": "{{n}}/hr"
+  },
+  "captain": {
+    "loading_context": "Loading captain context...",
+    "unable_load_tables": "Unable to load tables",
+    "tables": "Tables",
+    "no_rooms": "No rooms available for your account.",
+    "no_tables_in_room": "No tables found in this room.",
+    "billed_locked": "Billed / locked",
+    "unable_load_context": "Unable to load Captain context",
+    "not_permitted": "Not permitted",
+    "no_permission_take_orders": "You do not have permission to take table orders.",
+    "browse_only": "You can browse the menu, but you don't have permission to add items to this order.",
+    "no_items_found": "No items found.",
+    "loading_menu": "Loading menu…",
+    "more_actions": "More actions",
+    "reprint_kot": "Reprint KOT",
+    "transfer_table": "Transfer table",
+    "transfer_captain": "Transfer captain",
+    "print_bill": "Print bill",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "reduce_qty": "Reduce quantity",
+    "remove_item": "Remove item",
+    "undo_reduction": "Undo reduction",
+    "undo": "Undo",
+    "ack_failed": "Failed to acknowledge request",
+    "resolved": "Request resolved",
+    "resolve_failed": "Failed to resolve request",
+    "service_requests": "Service Requests",
+    "close_requests": "Close service requests",
+    "no_open_requests": "No open requests",
+    "table_request": "Table {{table}} · {{type}}",
+    "acknowledged": "Acknowledged",
+    "ack": "Ack",
+    "toggle_requests": "Toggle service requests",
+    "pos_profile_not_found": "POS profile not found.",
+    "not_logged_in": "You are not logged in.",
+    "no_modify_permission": "You do not have permission to modify this order.",
+    "add_item_first": "Add at least one item before sending the order.",
+    "select_customer_first": "Please select a customer before sending the order.",
+    "api_error": "API error",
+    "send_failed": "Failed to send the order.",
+    "cannot_resolve_item": "Unable to resolve this item for quantity reduction.",
+    "no_order_reprint": "No active order to reprint.",
+    "kot_reprinted": "KOT reprinted.",
+    "no_order_print": "No active order to print.",
+    "printed": "Printed successfully.",
+    "no_order_transfer": "No active order to transfer.",
+    "cannot_transfer_table": "Unable to transfer this table.",
+    "table_transferred": "Table transferred.",
+    "captain_transferred": "Captain transferred.",
+    "browse_menu": "Browse menu",
+    "already_ordered": "Already Ordered",
+    "new_changed": "New / Changed",
+    "reduction_pending": "Reduction Pending",
+    "unable_load_table": "Unable to load this table",
+    "back_to_tables": "Back to Tables",
+    "menu": "Menu",
+    "order_tab": "Order",
+    "no_access_table": "You don't have access to view this table's order. It may belong to another captain.",
+    "view_only": "View only — you don't have permission to modify this table's order right now.",
+    "reducing": "Reducing…",
+    "reduce_notify": "Reduce & notify kitchen",
+    "updating": "Updating…",
+    "sending": "Sending…",
+    "loading_table": "Loading table…"
+  },
+  "ai": {
+    "ask_about_tonight": "Ask about tonight…",
+    "ask_about_tonight_short": "Ask about tonight",
+    "close_chat": "Close chat",
+    "unavailable": "The assistant isn't available right now.",
+    "unavailable_note": "Dashboard data is unaffected — this only disables chat.",
+    "connecting": "Connecting…",
+    "ask_about_example": "Ask about {{subject}} — e.g. “which tables are running long?”",
+    "tonight": "tonight",
+    "typing": "Assistant is typing",
+    "send": "Send message",
+    "open": "Open assistant chat",
+    "send_failed": "Sorry, that message didn't go through. Try again in a moment."
   }
 }

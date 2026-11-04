@@ -14,15 +14,15 @@ import { syncOrder } from '../lib/order-api';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from '@ury/ui';
-import { DINE_IN } from '../data/order-types';
+import { DINE_IN, orderTypeLabel } from '../data/order-types';
 import { t } from '../i18n';
 import { useCartAvailability, cartQtyForItem, remainingHeadroom } from '../lib/cart-capacity';
 
 const KOT_BADGE: Record<KotItemState, { label: string; variant: 'cancelled' | 'warning' | 'info' | 'success' }> = {
-  QUEUED: { label: 'Sent', variant: 'cancelled' },
-  IN_PREPARATION: { label: 'Preparing', variant: 'warning' },
-  READY: { label: 'Ready', variant: 'info' },
-  SERVED: { label: 'Served', variant: 'success' },
+  QUEUED: { label: 'order.kot_sent', variant: 'cancelled' },
+  IN_PREPARATION: { label: 'order.kot_preparing', variant: 'warning' },
+  READY: { label: 'order.kot_ready', variant: 'info' },
+  SERVED: { label: 'order.kot_served', variant: 'success' },
 };
 
 const OrderPanel = () => {
@@ -132,7 +132,7 @@ const OrderPanel = () => {
 
       // Validate table selection for dine-in orders
       if (selectedOrderType === DINE_IN && !selectedTable) {
-        showToast.error(t('errors.select_table', { order_type: DINE_IN }));
+        showToast.error(t('errors.select_table', { order_type: orderTypeLabel(DINE_IN) }));
         return;
       }
 
@@ -289,7 +289,7 @@ const OrderPanel = () => {
                           variant={KOT_BADGE[kotState[item.item]].variant}
                           data-testid="kot-status-badge"
                         >
-                          {KOT_BADGE[kotState[item.item]].label}
+                          {t(KOT_BADGE[kotState[item.item]].label)}
                         </Badge>
                       )}
                     </div>

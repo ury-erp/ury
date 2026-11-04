@@ -2,6 +2,7 @@ import React from 'react';
 import { Spinner } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import ServiceRequestPanel from './ServiceRequestPanel';
+import { t } from '../../i18n';
 
 interface Props {
   children: React.ReactNode;
@@ -33,7 +34,7 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   if (isLoading) {
     return (
       <div className="min-h-screen">
-        <Spinner message="Loading captain context..." />
+        <Spinner message={t('captain.loading_context')} />
       </div>
     );
   }
@@ -43,7 +44,7 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-red-600 text-xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Unable to load Captain context</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('captain.unable_load_context')}</h2>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -55,9 +56,9 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-amber-600 text-xl mb-4">🔒</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Not permitted</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t('captain.not_permitted')}</h2>
           <p className="text-gray-600">
-            You do not have permission to take table orders.
+            {t('captain.no_permission_take_orders')}
           </p>
         </div>
       </div>

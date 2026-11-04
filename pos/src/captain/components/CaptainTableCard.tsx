@@ -4,6 +4,7 @@ import { Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import type { Table } from '../../lib/table-api';
 import type { ActiveTableOrder } from '../lib/captain-table-api';
+import { t } from '../../i18n';
 
 export type CaptainTableOwnership = 'free' | 'mine' | 'other' | 'occupied-unknown';
 
@@ -93,7 +94,7 @@ const CaptainTableCard = ({
         <span className="truncate text-lg font-bold" title={table.name}>
           {table.name}
         </span>
-        {isBilled && <Lock className="h-4 w-4 shrink-0" aria-label="Billed / locked" />}
+        {isBilled && <Lock className="h-4 w-4 shrink-0" aria-label={t('captain.billed_locked')} />}
       </div>
 
       {hasMergePartners && (

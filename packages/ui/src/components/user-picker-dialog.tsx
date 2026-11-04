@@ -134,7 +134,7 @@ export function UserPickerDialog({
                     onClick={() => setSelected(user.name)}
                     aria-pressed={isSelected}
                     className={cn(
-                      'h-auto w-full justify-start rounded-lg border p-3 text-left',
+                      'h-auto w-full justify-start rounded-lg border p-3 text-start',
                       isSelected ? 'border-primary bg-primary-50/40' : 'border-border'
                     )}
                   >

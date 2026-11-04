@@ -18,7 +18,8 @@ vi.mock("lucide-react", () => ({
 }));
 
 vi.mock("../i18n", () => ({
-  t: (key: string) => key,
+  t: (key: string, params?: Record<string, string | number>) =>
+    params ? `${key} ${Object.values(params).join(" ")}` : key,
 }));
 
 describe("AuthGuard", () => {
@@ -72,7 +73,7 @@ describe("AuthGuard", () => {
 
     render(<AuthGuard><div>Content</div></AuthGuard>);
     
-    expect(screen.getByText("Access Denied")).toBeInTheDocument();
+    expect(screen.getByText("auth.access_denied")).toBeInTheDocument();
     expect(screen.getByText("Auth failed")).toBeInTheDocument();
   });
 
@@ -92,7 +93,7 @@ describe("AuthGuard", () => {
 
     render(<AuthGuard><div>Content</div></AuthGuard>);
     
-    expect(screen.getByText("Configuration Error")).toBeInTheDocument();
+    expect(screen.getByText("auth.configuration_error")).toBeInTheDocument();
   });
 
   it("shows permission denied when user does not have access", () => {
@@ -111,7 +112,7 @@ describe("AuthGuard", () => {
 
     render(<AuthGuard><div>Content</div></AuthGuard>);
     
-    expect(screen.getByText("Permission Required")).toBeInTheDocument();
+    expect(screen.getByText("auth.permission_required")).toBeInTheDocument();
     expect(screen.getByText(/POS User/)).toBeInTheDocument();
   });
 

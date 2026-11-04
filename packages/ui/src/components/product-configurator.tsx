@@ -97,12 +97,12 @@ export function ProductConfigurator({
             <img
               src={imageUrl!}
               alt={itemName}
-              className="h-full w-full rounded-t-lg object-cover md:absolute md:inset-0 md:rounded-l-lg md:rounded-tr-none"
+              className="h-full w-full rounded-t-lg object-cover md:absolute md:inset-0 md:rounded-s-lg md:rounded-se-none"
               style={{ filter: 'saturate(0.75) brightness(0.95)' }}
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center rounded-t-lg bg-gray-200 text-4xl font-medium text-gray-400 sm:text-5xl md:absolute md:inset-0 md:rounded-l-lg md:rounded-tr-none md:text-6xl">
+            <div className="flex h-full w-full items-center justify-center rounded-t-lg bg-gray-200 text-4xl font-medium text-gray-400 sm:text-5xl md:absolute md:inset-0 md:rounded-s-lg md:rounded-se-none md:text-6xl">
               {itemName.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -111,7 +111,7 @@ export function ProductConfigurator({
             onClick={() => onOpenChange(false)}
             variant="outline"
             size="icon"
-            className="absolute right-3 top-3 bg-white shadow-lg"
+            className="absolute end-3 top-3 bg-white shadow-lg"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -185,7 +185,7 @@ export function ProductConfigurator({
                     variant="outline"
                     aria-pressed={variant.id === selectedVariantId}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-lg p-2 text-left',
+                      'flex w-full items-center justify-between rounded-lg p-2 text-start',
                       variant.id === selectedVariantId
                         ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
                         : 'border-border hover:border-blue-200'
@@ -200,7 +200,7 @@ export function ProductConfigurator({
           )}
         </div>
 
-        <div className="flex h-auto flex-col overflow-y-auto border-t border-border p-6 md:w-1/3 md:border-l md:border-t-0">
+        <div className="flex h-auto flex-col overflow-y-auto border-t border-border p-6 md:w-1/3 md:border-s md:border-t-0">
           <div className="mb-6 overflow-y-auto">
             {addonsLoading ? (
               <div className="flex items-center justify-center text-gray-500">{labels.loadingAddons}</div>
@@ -218,7 +218,7 @@ export function ProductConfigurator({
                       variant="outline"
                       aria-pressed={selectedAddonIds.includes(addon.id)}
                       className={cn(
-                        'w-full rounded-lg p-3 text-left',
+                        'w-full rounded-lg p-3 text-start',
                         selectedAddonIds.includes(addon.id)
                           ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
                           : 'border-border hover:border-blue-200'

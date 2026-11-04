@@ -46,7 +46,7 @@ describe("ScreenSizeDialog", () => {
   it("displays required screen size", () => {
     render(<ScreenSizeDialog />);
     // This text appears twice, so use queryAllByText and check at least one exists
-    const matches = screen.queryAllByText("1024px or larger");
+    const matches = screen.queryAllByText(/1024px or larger/);
     expect(matches.length).toBeGreaterThan(0);
   });
 

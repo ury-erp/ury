@@ -206,9 +206,9 @@ const TableReservationDialog = ({
                   </label>
 
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Phone className="absolute start-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      className="pl-10"
+                      className="ps-10"
                       type="tel"
                       placeholder={t('reservations.phone_placeholder')}
                       value={customerPhone}
@@ -224,9 +224,9 @@ const TableReservationDialog = ({
                   </label>
 
                   <div className="relative">
-                    <Users className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Users className="absolute start-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      className="pl-10"
+                      className="ps-10"
                       type="number"
                       min={1}
                       value={noOfPax}
@@ -262,12 +262,12 @@ const TableReservationDialog = ({
                     <Input
                       type="time"
                       step="60"
-                      className="pr-10 bg-white border border-gray-200 text-gray-700 font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                      className="pe-10 bg-white border border-gray-200 text-gray-700 font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                       value={reservationTime}
                       onChange={(e) => setReservationTime(e.target.value)}
                       disabled={loading}
                     />
-                    <Clock className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+                    <Clock className="absolute end-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
               </div>

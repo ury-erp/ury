@@ -24,14 +24,14 @@ const selectVariants = cva(
           "border-success-300 hover:border-success-400 focus-visible:border-success-500 focus-visible:ring-success-500",
       },
       // Right padding is set per-size rather than once on the base: the base's
-      // `pr-8` was being clobbered by each size's `px-*` (later class wins in
+      // `pe-8` was being clobbered by each size's `px-*` (later class wins in
       // tailwind-merge), so the chevron sat on top of long option text.
       size: {
-        default: "h-9 pl-3.5 pr-9 py-1.5 text-[13px] rounded-[7px]",
-        sm: "h-9 pl-3 pr-8 py-1.5 text-xs",
-        lg: "h-12 pl-4 pr-11 py-3 text-base",
+        default: "h-9 ps-3.5 pe-9 py-1.5 text-[13px] rounded-[7px]",
+        sm: "h-9 ps-3 pe-8 py-1.5 text-xs",
+        lg: "h-12 ps-4 pe-11 py-3 text-base",
         // Alias of `default` — see Input.
-        compactLg: "h-9 pl-3.5 pr-9 py-1.5 text-[13px] rounded-[7px]",
+        compactLg: "h-9 ps-3.5 pe-9 py-1.5 text-[13px] rounded-[7px]",
       },
     },
     defaultVariants: {
@@ -78,7 +78,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           )}
           {children}
         </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       </div>
     )
   }

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeAll } from 'vitest'
+import { initI18n } from '../i18n'
 
 function createMemoryStorage(): Storage {
   let store: Record<string, string> = {}
@@ -53,4 +54,9 @@ ensureStorage('sessionStorage')
 
 afterEach(() => {
   cleanup()
+})
+
+// Components render through t(); load the English bundle so tests assert on real copy.
+beforeAll(async () => {
+  await initI18n('en')
 })

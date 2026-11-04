@@ -248,7 +248,7 @@ export function SearchableSelect({
           error={error}
           disabled={disabled}
           autoComplete="off"
-          className="w-full pr-9 cursor-text"
+          className="w-full pe-9 cursor-text"
         />
         <div
           onClick={() => {
@@ -257,7 +257,7 @@ export function SearchableSelect({
               if (!isOpen) setIsTyping(false);
             }
           }}
-          className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 p-1 transition-colors ${
+          className={`absolute end-3 top-1/2 -translate-y-1/2 text-gray-400 p-1 transition-colors ${
             disabled ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:text-gray-600'
           }`}
         >

@@ -243,7 +243,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
 
                       if (currentActiveRes) {
                         const timeStr = formatReservationTime(currentActiveRes.reserved_at);
-                        const warningMsg = `Table ${table.name} is reserved for ${timeStr}. Please choose another table.`;
+                        const warningMsg = t('tables.reserved_choose_another', { table: table.name, time: timeStr });
                         setTableWarning(warningMsg);
                         showToast.error(warningMsg);
                         return;

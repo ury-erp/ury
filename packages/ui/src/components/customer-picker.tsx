@@ -256,9 +256,9 @@ export function CustomerPicker({
             variant="search"
             disabled={disabled}
             autoComplete="off"
-            className="pr-9"
+            className="pe-9"
           />
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           {listOpen && (
             <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
               {searching && (
@@ -295,7 +295,7 @@ export function CustomerPicker({
                       setListOpen(false)
                     }}
                   >
-                    <div className="text-left">
+                    <div className="text-start">
                       <div className="font-medium">{customer.name}</div>
                       <div className="text-xs text-gray-500">{customer.phone}</div>
                     </div>
@@ -377,9 +377,9 @@ export function CustomerPicker({
                   }}
                   required
                   disabled={creating}
-                  className="pl-10"
+                  className="ps-10"
                 />
-                <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                <Phone className="absolute start-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
               {phoneError && (
                 <p className="mt-1 text-xs text-destructive">{phoneError}</p>

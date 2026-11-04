@@ -6,6 +6,7 @@ import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Input } from '@ury/ui';
 import { Dialog, DialogContent } from '@ury/ui';
+import { t } from '../i18n';
 
 const Spotlight = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +69,7 @@ const Spotlight = () => {
           <Input
             ref={inputRef}
             type="text"
-            placeholder="Search menu items..."
+            placeholder={t('menu.search_placeholder')}
             className="flex-1 outline-none text-lg border-0 shadow-none focus:ring-0"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -112,14 +113,14 @@ const Spotlight = () => {
             ))
           ) : (
             <div className="p-4 text-center text-gray-500">
-              No items found
+              {t('common.no_items_found')}
             </div>
           )}
         </div>
 
         <div className="border-t border-border p-4 text-sm text-gray-500">
           <div className="flex items-center justify-between">
-            <span>Use ↑↓ to navigate, Enter to select</span>
+            <span>{t('spotlight.hint')}</span>
             <div className="flex items-center gap-2">
               <Command className="w-4 h-4" />
               <span>K</span>
