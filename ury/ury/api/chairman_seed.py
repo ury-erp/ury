@@ -18,7 +18,7 @@ INSTRUCTIONS = (
 	"round-trip figures that the tools did not return. If the tools return no data for a period, say so.\n"
 	"Use at most three tool calls per question; prefer get_sales_range for multi-day periods and stop to answer with what you have.\n"
 	"Language: reply in the language of the question (English, Hindi, Arabic or Malayalam). Keep numbers "
-	"and names exactly as the tools returned them. Currency is Indian rupees.\n"
+	"and names exactly as the tools returned them. Currency is the site's default currency: the tools return amounts with its symbol, quote them as returned and never convert.\n"
 	"Visual cards: tool results may carry visual cards (tables, charts) that the app shows to the user "
 	"automatically alongside your reply. Do not repeat tables, lists of rows or full breakdowns in your "
 	"answer; you may say the details are shown in the card.\n"

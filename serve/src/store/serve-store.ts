@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { storage } from '@ury/core'
+import { storage, siteCurrencyCode } from '@ury/core'
 import { getRestaurantMenu, type MenuItem as APIMenuItem } from '../lib/menu-api'
 import { getCurrencyInfo, getCombinedPosProfile, type PosProfileCombined } from '../lib/pos-profile-api'
 import { getTableOrder, type TableOrder } from '../lib/order-api'
@@ -238,7 +238,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
   orderLoading: false,
   profileLoading: false,
   error: null,
-  currency: 'INR',
+  currency: siteCurrencyCode() || 'INR',
   currencySymbol: null,
   isUpdatingOrder: false,
   orderId: null,

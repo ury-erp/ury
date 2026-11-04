@@ -1,7 +1,7 @@
 // node --test src/*.test.mjs
 import test from "node:test";
 import assert from "node:assert";
-import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary, panelTitle, panelSubtitle, dashboardLink, trendGlyph, toneClass, fmtKpiValue, sameText, hideLoneKpiLabel, goodDirection } from "./chat/cardFormat.ts";
+import { sanitizeCards, fmtValue, fmtDelta, safeLink, cardSummary, panelTitle, panelSubtitle, dashboardLink, trendGlyph, toneClass, fmtKpiValue, setBriefCurrency, currencySymbol, sameText, hideLoneKpiLabel, goodDirection } from "./chat/cardFormat.ts";
 import { readFileSync } from "node:fs";
 const live = JSON.parse(readFileSync("/tmp/cards.json", "utf8") || "{}");
 
@@ -102,4 +102,14 @@ test("good_direction accepts only up or down", () => {
   assert.equal(goodDirection({ type: "bar", good_direction: "up" }), "up");
   assert.equal(goodDirection({ type: "bar", good_direction: "sideways" }), undefined);
   assert.equal(goodDirection({ type: "bar" }), undefined);
+});
+
+test("brief money follows the payload currency, INR default unchanged", () => {
+  setBriefCurrency("INR");
+  assert.equal(fmtValue(1234567, "money"), "₹12,34,567");
+  setBriefCurrency("AED");
+  assert.equal(fmtValue(1234567, "money"), currencySymbol("AED") + "1,234,567");
+  setBriefCurrency("SAR");
+  assert.equal(fmtValue(1500, "money"), "⃁1,500");
+  setBriefCurrency("INR");
 });

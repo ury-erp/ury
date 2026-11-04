@@ -164,8 +164,24 @@ def rupee_form(fonts):
 	return "\u20b9" if fonts and all(_has_rupee(f) for f in fonts) else "Rs "
 
 
+def _currency():
+	"""Site currency for the card (INR only when none is configured)."""
+	try:
+		from ury.ury.api import chairman
+
+		return chairman.scope_currency() or chairman.site_currency()  # memoised per request
+	except Exception:
+		return "INR"
+
+
 def _rupee_sign():
-	"""Rupee form for all money on a card: probes the Latin regular and bold faces actually used (sizes 28-62)."""
+	"""Money prefix for all money on a card. Non-INR sites use the currency symbol/code; INR probes the
+	Latin regular and bold faces actually used (sizes 28-62) for the rupee glyph, else 'Rs '."""
+	cur = _currency()
+	if cur != "INR":
+		from ury.ury.api import chairman
+
+		return chairman.currency_symbol(cur)
 	if "v" not in _rupee:
 		try:
 			_rupee["v"] = rupee_form(_font("latin", sz, b) for sz in (28, 30, 62) for b in (False, True))
@@ -192,7 +208,11 @@ def fmt_number(v, decimals=0):
 	neg = v < 0
 	s = "%.*f" % (decimals, abs(v))
 	whole, _, frac = s.partition(".")
-	out = _group_in(whole) + ("." + frac if frac else "")
+	if _currency() == "INR":
+		out = _group_in(whole)
+	else:
+		out = f"{int(whole):,}"
+	out += "." + frac if frac else ""
 	return "-" + out if neg else out
 
 

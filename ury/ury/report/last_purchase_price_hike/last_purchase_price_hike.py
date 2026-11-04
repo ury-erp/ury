@@ -12,7 +12,7 @@ def execute(filters=None):
 		{"label": "Supplier", "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 150},
 		{"label": "Previous Rate", "fieldname": "previous_rate", "fieldtype": "Currency", "width": 120},
 		{"label": "Current Rate", "fieldname": "current_rate", "fieldtype": "Currency", "width": 120},
-		{"label": "Increase ₹", "fieldname": "increase_amount", "fieldtype": "Currency", "width": 120},
+		{"label": "Increase Amount", "fieldname": "increase_amount", "fieldtype": "Currency", "width": 120},
 		{"label": "Increase %", "fieldname": "increase_percent", "fieldtype": "Percent", "width": 100},
 		{"label": "Qty", "fieldname": "qty", "fieldtype": "Float", "width": 100},
 		{"label": "Invoice", "fieldname": "invoice", "fieldtype": "Link", "options": "Purchase Invoice", "width": 150},

@@ -57,6 +57,20 @@ def inner_inner_bom_process(buying_price_list, bom):
     return {"bom_buying_price": bom_buying_price, "unset_bom_items": unset_bom_items}
 
 
+def resolve_pnl_currency(branch=None):
+	"""Currency for the P&L print: the branch's company currency, else the site default, else INR."""
+	currency = None
+	if branch:
+		company = frappe.get_cached_value("Branch", branch, "company")
+		if company:
+			currency = frappe.get_cached_value("Company", company, "default_currency")
+	if not currency:
+		import erpnext
+
+		currency = erpnext.get_default_currency() or frappe.defaults.get_global_default("currency")
+	return currency or "INR"
+
+
 class URYDailyPandL(Document):
 	def cogs_sold(self):
 		report_settings = frappe.get_doc("URY Report Settings",self.branch)
@@ -639,7 +653,8 @@ class URYDailyPandL(Document):
 	
 	@frappe.whitelist()
 	def get_proft_loss_details(self):
+		currency = resolve_pnl_currency(self.get("branch"))
 		return frappe.render_template(
 			"ury/doctype/ury_daily_p_and_l/profit_loss_details.html",
-			{"data": self, "currency": "INR"},
+			{"data": self, "currency": currency},
 		)
