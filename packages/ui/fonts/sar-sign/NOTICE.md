@@ -7,14 +7,15 @@ U+20C1 SAUDI RIYAL SIGN is not in any common UI font yet. The apps ship a one-gl
 ## Source and licence
 
 The outline is built by `make_sar_font.py` (fontTools) from the stroke geometry of the Lucide
-`saudi-riyal` icon, https://github.com/lucide-icons/lucide (icons/saudi-riyal.svg).
+`saudi-riyal` icon, https://github.com/lucide-icons/lucide (icons/saudi-riyal.svg), taken from the
+`lucide-react` 0.525.0 package (`dist/esm/icons/saudi-riyal.js`).
 That icon is not one of the Feather-derived icons, so it is covered by Lucide's ISC licence only
 (permissive; allows use, modification and redistribution, including embedded in a font, provided
 the notice below is kept):
 
     ISC License
 
-    Copyright (c) 2026 Lucide Icons and Contributors
+    Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
 
     Permission to use, copy, modify, and/or distribute this software for any
     purpose with or without fee is hereby granted, provided that the above

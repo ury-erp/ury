@@ -22,7 +22,6 @@ vi.mock("../lib/invoice-api", () => ({
 
 vi.mock("@ury/core", () => ({
   formatInvoiceTime: (time: string) => "09:00 AM",
-  formatCurrency: (n: number) => String(n),
 }));
 
 vi.mock("../i18n", () => ({

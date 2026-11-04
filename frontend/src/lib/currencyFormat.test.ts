@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   formatCompactCurrency,
   formatCurrency,
+  formatFixedAmount,
   getActiveCurrency,
   MIXED_CURRENCY,
   setActiveCurrency,
@@ -117,5 +118,13 @@ describe('site currency resolution and Saudi riyal sign (@ury/core)', () => {
     expect(formatCurrency(10, 'USD')).toBe('\u206610 USD\u2069');
     document.documentElement.setAttribute('lang', 'en');
     expect(formatCurrency(10, 'USD')).toBe('USD 10');
+  });
+});
+
+describe('formatFixedAmount (@ury/core)', () => {
+  it('always shows two decimals and never adds a currency sign', () => {
+    expect(formatFixedAmount(1234.5)).toBe('1,234.50');
+    expect(formatFixedAmount(0)).toBe('0.00');
+    expect(formatFixedAmount(12)).not.toMatch(/[₹A-Z]/);
   });
 });

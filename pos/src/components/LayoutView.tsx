@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn } from '@ury/ui';
-import { formatInvoiceTime, formatCurrency } from '@ury/core';
+import { formatInvoiceTime } from '@ury/core';
 import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { getCombinedOrderTotals } from '../lib/invoice-api';
@@ -552,7 +552,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                     <div className="flex justify-between items-center pt-2 mt-2 border-t border-primary-200">
                       <span>{t('tables.total_amount')}</span>
                       <span className="font-bold text-lg text-primary-800">
-                        {formatCurrency(getCombinedOrderTotals(selectedTableOrder).roundedTotal)}
+                        {getCombinedOrderTotals(selectedTableOrder).roundedTotal.toFixed(2)}
                       </span>
                     </div>
                   )}

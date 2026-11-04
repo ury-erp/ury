@@ -70,6 +70,16 @@ class PureTests(unittest.TestCase):
 		self.assertEqual(c.locale_for("INR"), "en-IN")
 		self.assertEqual(c.locale_for("SAR"), "en")
 
+	def test_scope_currency_drives_text_and_resets(self):
+		# The resolved brief currency (not the site default) is used by every *_text string.
+		c.set_scope_currency("AED")
+		try:
+			self.assertTrue(c.format_inr_compact(2500000).endswith("2.5M"))
+			self.assertEqual(c.format_inr_compact(1500, "INR"), "₹1.5K")  # explicit wins
+		finally:
+			c.set_scope_currency(None)
+		self.assertIsNone(c.scope_currency())
+
 	def test_formatter_rounding_and_dot_zero(self):
 		self.assertEqual(c.format_inr_compact(120000), "₹1.2L")
 		self.assertEqual(c.format_inr_compact(1500), "₹1.5K")

@@ -140,6 +140,14 @@ export function formatCurrency(amount: number, currency?: CurrencyInfo | string 
 }
 
 /**
+ * Plain amount with exactly two decimals and no currency sign (Day Close, Department
+ * Profitability tables): the historical output, unchanged on every site.
+ */
+export function formatFixedAmount(amount: number): string {
+  return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
  * Compact currency for chart axes/labels. Indian units for INR
  * (600000 -> "₹6L", 12500000 -> "₹1.25Cr"), international K/M/B otherwise
  * (1500000 -> "AED1.5M").

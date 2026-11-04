@@ -19,6 +19,7 @@ export { storage } from './storage';
 export {
   formatCurrency,
   formatCompactCurrency,
+  formatFixedAmount,
   siteCurrencyCode,
   currencyDisplaySymbol,
   SAR_SIGN,

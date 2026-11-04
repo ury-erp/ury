@@ -44,8 +44,40 @@ def _drill():
 	return analytics_env.dashboard_url("owner")
 
 
+_NO_LOCAL_CACHE = {}
+
+
+def _request_cache():
+	"""Per-request scratch dict on frappe.local (a module dict when frappe.local is unavailable, e.g. pure tests)."""
+	try:
+		cache = getattr(frappe.local, "ury_chairman_cache", None)
+		if cache is None:
+			cache = frappe.local.ury_chairman_cache = {}
+		return cache
+	except Exception:
+		return _NO_LOCAL_CACHE
+
+
+def set_scope_currency(code):
+	"""Resolve the brief's scope currency once per request; compact amounts use it unless one is passed."""
+	_request_cache()["scope_currency"] = code
+
+
+def scope_currency():
+	return _request_cache().get("scope_currency")
+
+
 def site_currency():
-	"""Default currency of the site: default Company currency, then the global default, then INR."""
+	"""Default currency of the site: default Company currency, then the global default, then INR.
+
+	Resolved once per request."""
+	cache = _request_cache()
+	if "site_currency" not in cache:
+		cache["site_currency"] = _resolve_site_currency()
+	return cache["site_currency"]
+
+
+def _resolve_site_currency():
 	code = None
 	try:
 		import erpnext
@@ -72,7 +104,7 @@ def currency_symbol(currency):
 	if currency == "SAR":
 		return "SAR "
 	try:
-		symbol = frappe.db.get_value("Currency", currency, "symbol")
+		symbol = frappe.db.get_cached_value("Currency", currency, "symbol")
 	except Exception:
 		symbol = None
 	return symbol or f"{currency} "
@@ -84,7 +116,7 @@ def format_inr_compact(value, currency=None):
 	INR: Cr (1e7), L (1e5), K (1e3), else plain; one decimal, '.0' dropped. Other currencies: B, M, K.
 	The unit is promoted AFTER rounding: 99999 -> 100.0K -> '₹1L', 9999999 -> '₹1Cr'.
 	"""
-	currency = currency or site_currency()
+	currency = currency or scope_currency() or site_currency()
 	value = float(value or 0)
 	sign = "-" if value < 0 else ""
 	n = Decimal(str(abs(value)))
@@ -525,6 +557,14 @@ def get_brief(date=None):
 	rows = _daily_rows(day - timedelta(days=7), day)  # computed once, reused by slides 1 and 2
 	companies, branches = _scope(start, day)
 	currency, mixed = currency_info(_company_currencies(companies), companies)
+	set_scope_currency(currency)
+	try:
+		return _build_brief(day, rows, companies, branches, currency, mixed)
+	finally:
+		set_scope_currency(None)
+
+
+def _build_brief(day, rows, companies, branches, currency, mixed):
 	slides = [slide_yesterday(day, rows), slide_channel_mix(day, rows), slide_payment_mix(day)]
 	try:
 		from ury.ury.api import chairman_slides

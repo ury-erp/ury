@@ -169,7 +169,7 @@ def _currency():
 	try:
 		from ury.ury.api import chairman
 
-		return chairman.site_currency()
+		return chairman.scope_currency() or chairman.site_currency()  # memoised per request
 	except Exception:
 		return "INR"
 
