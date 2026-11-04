@@ -24,7 +24,6 @@ frappe.ui.form.on("Production Plan", {
 		ury_stop_polling(frm.doc.name);
 
 		if (!ury_is_eligible(frm)) {
-			frm.page.clear_primary_action();
 			frm.remove_custom_button(__("Prepare Production"));
 			return;
 		}
@@ -173,7 +172,6 @@ function ury_render_result_links(frm, result) {
 
 function ury_render_actions(frm, state) {
 	frm.page.clear_actions_menu && frm.page.clear_actions_menu();
-	frm.page.clear_primary_action();
 	frm.remove_custom_button(__("Prepare Production"));
 	frm.remove_custom_button(__("Reset Stuck Execution"));
 
