@@ -16,6 +16,6 @@ To add a language (for example `fr`):
 
 1. Create `src/locales/fr.json` mapping each English string to its translation. Keep placeholders such as `{0}` intact. Copy `ar.json` as a key list.
 2. Import it in `src/i18n.js` and add it to `catalogs`. If the language is right-to-left, add its code to `RTL`.
-3. If the language needs a specific font, add the `@font-face` and a `html[lang='fr'] { --s: ... }` rule in `src/index.css` (see Almarai for `ar`).
+3. If the language needs a specific font, add the `@font-face` and a `html[lang='fr'] { --s: ... }` rule in `src/index.css` (see Almarai for `ar`). Almarai (`src/assets/fonts/`) is licensed under the SIL Open Font License 1.1; the licence and copyright notice are in `src/assets/fonts/OFL.txt` and must stay next to the font files. Bundle any new font with its licence the same way.
 4. Use logical Tailwind utilities (`ms-*`, `me-*`, `start-*`, `end-*`, `text-start`) instead of `ml/mr/left/right` for new UI, and wrap numbers, timers and quantities in `dir="ltr"`.
 5. Run `yarn test`; `src/i18n.spec.js` checks that placeholders match between English keys and translations.
