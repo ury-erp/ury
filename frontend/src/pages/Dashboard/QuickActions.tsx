@@ -4,6 +4,7 @@ import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogF
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
 import { useCurrency, withCurrencyLabel } from '../../context/CurrencyContext';
+import { __ } from '../../i18n';
 
 type ModalType = 'menu' | 'table' | 'room' | 'branch' | 'user' | null;
 
@@ -77,8 +78,8 @@ export const QuickActions: React.FC = () => {
 
   const actionCards = [
     {
-      title: 'Open POS Terminal',
-      description: 'Launch billing counter for active restaurant orders',
+      title: __('Open POS Terminal'),
+      description: __('Launch billing counter for active restaurant orders'),
       actionText: 'Launch POS',
       color: 'bg-primary-600 hover:bg-primary-700 text-white',
       border: 'border-primary-200',
@@ -95,8 +96,8 @@ export const QuickActions: React.FC = () => {
       onClick: () => navigate('/pos'),
     },
     {
-      title: 'Add Menu Item',
-      description: 'Create new dishes, pricing, or course categories',
+      title: __('Add Menu Item'),
+      description: __('Create new dishes, pricing, or course categories'),
       actionText: '+ Add Menu',
       color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
@@ -113,8 +114,8 @@ export const QuickActions: React.FC = () => {
       onClick: () => setActiveModal('menu'),
     },
     {
-      title: 'Add Table',
-      description: 'Configure new dining table layout & seat capacity',
+      title: __('Add Table'),
+      description: __('Configure new dining table layout & seat capacity'),
       actionText: '+ Add Table',
       color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
@@ -126,8 +127,8 @@ export const QuickActions: React.FC = () => {
       onClick: () => setActiveModal('table'),
     },
     {
-      title: 'Add Room / Zone',
-      description: 'Set up AC Hall, Terrace, VIP, or Bar dining sections',
+      title: __('Add Room / Zone'),
+      description: __('Set up AC Hall, Terrace, VIP, or Bar dining sections'),
       actionText: '+ Add Zone',
       color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
@@ -144,8 +145,8 @@ export const QuickActions: React.FC = () => {
       onClick: () => setActiveModal('room'),
     },
     {
-      title: 'Add Branch',
-      description: 'Configure multi-outlet restaurant profiles & prefixes',
+      title: __('Add Branch'),
+      description: __('Configure multi-outlet restaurant profiles & prefixes'),
       actionText: '+ Add Branch',
       color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
@@ -162,8 +163,8 @@ export const QuickActions: React.FC = () => {
       onClick: () => setActiveModal('branch'),
     },
     {
-      title: 'Add User / Staff',
-      description: 'Grant cashier, captain, or manager POS permissions',
+      title: __('Add User / Staff'),
+      description: __('Grant cashier, captain, or manager POS permissions'),
       actionText: '+ Add User',
       color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
@@ -188,14 +189,14 @@ export const QuickActions: React.FC = () => {
         <div className="mb-4 rounded-[9px] bg-primary-900 text-white px-4 py-3 flex items-center justify-between text-xs font-semibold animate-fade-in">
           <span>{toastMessage}</span>
           <button onClick={() => setToastMessage(null)} className="text-primary-200 hover:text-white">
-            Dismiss
+            {__('Dismiss')}
           </button>
         </div>
       )}
 
       <div className="mb-3 flex items-center justify-between pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
-        <h2 className="text-lg font-bold text-foreground">Quick Operations & Setup</h2>
-        <span className="text-xs text-text-tertiary font-medium">Fast action shortcuts</span>
+        <h2 className="text-lg font-bold text-foreground">{__('Quick Operations & Setup')}</h2>
+        <span className="text-xs text-text-tertiary font-medium">{__('Fast action shortcuts')}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -228,30 +229,30 @@ export const QuickActions: React.FC = () => {
       <Dialog open={activeModal === 'menu'} onOpenChange={handleClose}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Menu Item</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Menu Item')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitMenu} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Item Name</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Item Name')}</label>
               <Input
-                placeholder="Paneer Tikka Masala"
+                placeholder={__('Paneer Tikka Masala')}
                 value={menuForm.name}
                 onChange={(e: any) => setMenuForm({ ...menuForm, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Course / Category</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Course / Category')}</label>
               <SearchableSelect
                 id="course"
                 value={menuForm.course}
                 onChange={(_, value) => setMenuForm({ ...menuForm, course: value })}
                 options={[
-                  { value: 'Starters', label: 'Starters / Appetizers' },
-                  { value: 'Main Course', label: 'Main Course' },
-                  { value: 'Breads', label: 'Breads & Naan' },
-                  { value: 'Dessert', label: 'Dessert' },
-                  { value: 'Beverages', label: 'Beverages' },
+                  { value: 'Starters', label: __('Starters / Appetizers') },
+                  { value: 'Main Course', label: __('Main Course') },
+                  { value: 'Breads', label: __('Breads & Naan') },
+                  { value: 'Dessert', label: __('Dessert') },
+                  { value: 'Beverages', label: __('Beverages') },
                 ]}
               />
             </div>
@@ -267,10 +268,10 @@ export const QuickActions: React.FC = () => {
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
-                Save Item
+                {__('Save Item')}
               </Button>
             </DialogFooter>
           </form>
@@ -281,20 +282,20 @@ export const QuickActions: React.FC = () => {
       <Dialog open={activeModal === 'table'} onOpenChange={handleClose}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Table</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Table')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitTable} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Table Name</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Table Name')}</label>
               <Input
-                placeholder="T-15"
+                placeholder={__('T-15')}
                 value={tableForm.name}
                 onChange={(e: any) => setTableForm({ ...tableForm, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Seating Capacity</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Seating Capacity')}</label>
               <Input
                 type="number"
                 placeholder="4"
@@ -303,25 +304,25 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Dining Room / Zone</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Dining Room / Zone')}</label>
               <SearchableSelect
                 id="room"
                 value={tableForm.room}
                 onChange={(_, value) => setTableForm({ ...tableForm, room: value })}
                 options={[
-                  { value: 'Main Dining', label: 'Main Dining' },
-                  { value: 'Terrace Garden', label: 'Terrace Garden' },
-                  { value: 'AC Family Section', label: 'AC Family Section' },
-                  { value: 'VIP Lounge', label: 'VIP Lounge' },
+                  { value: 'Main Dining', label: __('Main Dining') },
+                  { value: 'Terrace Garden', label: __('Terrace Garden') },
+                  { value: 'AC Family Section', label: __('AC Family Section') },
+                  { value: 'VIP Lounge', label: __('VIP Lounge') },
                 ]}
               />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
-                Save Table
+                {__('Save Table')}
               </Button>
             </DialogFooter>
           </form>
@@ -332,38 +333,38 @@ export const QuickActions: React.FC = () => {
       <Dialog open={activeModal === 'room'} onOpenChange={handleClose}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Dining Zone / Room</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Dining Zone / Room')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitRoom} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Zone Name</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Zone Name')}</label>
               <Input
-                placeholder="Outdoor Deck"
+                placeholder={__('Outdoor Deck')}
                 value={roomForm.name}
                 onChange={(e: any) => setRoomForm({ ...roomForm, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Zone Type</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Zone Type')}</label>
               <SearchableSelect
                 id="type"
                 value={roomForm.type}
                 onChange={(_, value) => setRoomForm({ ...roomForm, type: value })}
                 options={[
-                  { value: 'AC', label: 'AC Dining' },
-                  { value: 'Non-AC', label: 'Non-AC Dining' },
-                  { value: 'Rooftop', label: 'Rooftop / Open Air' },
-                  { value: 'Bar', label: 'Bar & Lounge' },
+                  { value: 'AC', label: __('AC Dining') },
+                  { value: 'Non-AC', label: __('Non-AC Dining') },
+                  { value: 'Rooftop', label: __('Rooftop / Open Air') },
+                  { value: 'Bar', label: __('Bar & Lounge') },
                 ]}
               />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
-                Save Zone
+                {__('Save Zone')}
               </Button>
             </DialogFooter>
           </form>
@@ -374,40 +375,40 @@ export const QuickActions: React.FC = () => {
       <Dialog open={activeModal === 'branch'} onOpenChange={handleClose}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Restaurant Branch</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Restaurant Branch')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitBranch} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Branch Name</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Branch Name')}</label>
               <Input
-                placeholder="Waterfront Bistro"
+                placeholder={__('Waterfront Bistro')}
                 value={branchForm.name}
                 onChange={(e: any) => setBranchForm({ ...branchForm, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Branch Code</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Branch Code')}</label>
               <Input
-                placeholder="WF-05"
+                placeholder={__('WF-05')}
                 value={branchForm.code}
                 onChange={(e: any) => setBranchForm({ ...branchForm, code: e.target.value })}
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Invoice Prefix</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Invoice Prefix')}</label>
               <Input
-                placeholder="INV-WF-"
+                placeholder={__('INV-WF-')}
                 value={branchForm.invoicePrefix}
                 onChange={(e: any) => setBranchForm({ ...branchForm, invoicePrefix: e.target.value })}
               />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
-                Create Branch
+                {__('Create Branch')}
               </Button>
             </DialogFooter>
           </form>
@@ -418,48 +419,48 @@ export const QuickActions: React.FC = () => {
       <Dialog open={activeModal === 'user'} onOpenChange={handleClose}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Staff User</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Staff User')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitUser} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Full Name</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Full Name')}</label>
               <Input
-                placeholder="Karan Verma"
+                placeholder={__('Karan Verma')}
                 value={userForm.name}
                 onChange={(e: any) => setUserForm({ ...userForm, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Email Address</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Email Address')}</label>
               <Input
                 type="email"
-                placeholder="karan@uryrestaurant.com"
+                placeholder={__('karan@uryrestaurant.com')}
                 value={userForm.email}
                 onChange={(e: any) => setUserForm({ ...userForm, email: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-muted-foreground mb-1">Role / Permissions</label>
+              <label className="block font-semibold text-muted-foreground mb-1">{__('Role / Permissions')}</label>
               <SearchableSelect
                 id="role"
                 value={userForm.role}
                 onChange={(_, value) => setUserForm({ ...userForm, role: value })}
                 options={[
-                  { value: 'URY Cashier', label: 'URY Cashier' },
-                  { value: 'URY Captain', label: 'URY Captain / Waiter' },
-                  { value: 'URY Manager', label: 'URY Restaurant Manager' },
-                  { value: 'URY Kitchen User', label: 'Kitchen Display User' },
+                  { value: 'URY Cashier', label: __('URY Cashier') },
+                  { value: 'URY Captain', label: __('URY Captain / Waiter') },
+                  { value: 'URY Manager', label: __('URY Restaurant Manager') },
+                  { value: 'URY Kitchen User', label: __('Kitchen Display User') },
                 ]}
               />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
-                Create User
+                {__('Create User')}
               </Button>
             </DialogFooter>
           </form>

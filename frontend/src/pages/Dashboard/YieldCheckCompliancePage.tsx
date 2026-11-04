@@ -13,6 +13,7 @@ import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
 import { menuAvailabilityService } from '../../services/menuAvailability';
+import { __ } from '../../i18n';
 
 interface ComplianceRow {
   item: string;
@@ -25,7 +26,7 @@ interface ComplianceRow {
   attached_count: number;
 }
 
-const ALL_BRANCHES_OPTION: AutocompleteOption = { value: '', label: 'All branches' };
+const ALL_BRANCHES_OPTION: AutocompleteOption = { value: '', label: __('All branches') };
 
 const getComplianceColor = (percent: number | null): string => {
   if (percent === null || percent === undefined) return 'text-muted-foreground';
@@ -35,7 +36,7 @@ const getComplianceColor = (percent: number | null): string => {
 };
 
 const formatCompliance = (percent: number | null): string =>
-  percent === null || percent === undefined ? 'N/A' : `${percent.toFixed(1)}%`;
+  percent === null || percent === undefined ? __('N/A') : `${percent.toFixed(1)}%`;
 
 async function companyForBranch(branch: string): Promise<string> {
   const res = await call<{ message?: { company?: string }; company?: string }>(
@@ -162,7 +163,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
       } catch {
         if (!cancelled) {
           setRows([]);
-          setError('Unable to load yield check compliance data.');
+          setError(__('Unable to load yield check compliance data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -177,36 +178,36 @@ export const YieldCheckCompliancePage: React.FC = () => {
   const columns: DataTableColumn<ComplianceRow>[] = [
     {
       key: 'item',
-      header: 'Item',
+      header: __('Item'),
       render: (row) => <span className="font-medium text-foreground">{row.item}</span>,
     },
     {
       key: 'cadence',
-      header: 'Cadence',
+      header: __('Cadence'),
       render: (row) => row.cadence,
     },
     {
       key: 'required_count',
-      header: 'Required',
+      header: __('Required'),
       align: 'right',
       render: (row) => <span className={numericCellClass}>{row.required_count}</span>,
     },
     {
       key: 'completed_count',
-      header: 'Completed',
+      header: __('Completed'),
       align: 'right',
       render: (row) => <span className={numericCellClass}>{row.completed_count}</span>,
     },
     {
       key: 'compliance_percent',
-      header: 'Compliance %',
+      header: __('Compliance %'),
       align: 'right',
       render: (row) => (
         <span
           className={`${numericCellClass} ${getComplianceColor(row.compliance_percent)}`}
           title={
             row.compliance_percent === null || row.compliance_percent === undefined
-              ? 'No checks were required for this item in the last 30 days, so compliance is not measurable.'
+              ? __('No checks were required for this item in the last 30 days, so compliance is not measurable.')
               : undefined
           }
         >
@@ -216,7 +217,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
     },
     {
       key: 'attached_count',
-      header: 'Attached Checks',
+      header: __('Attached Checks'),
       align: 'right',
       render: (row) => (
         <span className="text-xs text-muted-foreground">
@@ -229,18 +230,18 @@ export const YieldCheckCompliancePage: React.FC = () => {
   return (
     <Page>
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
-        <h1 className="text-xl font-semibold text-foreground">Yield Check Compliance</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Yield Check Compliance')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Monitor compliance with yield check cadence requirements. Last 30 days of data.
+          {__('Monitor compliance with yield check cadence requirements. Last 30 days of data.')}
         </p>
         <p className="mt-1 text-xs text-text-tertiary">
-          Items with no checks required in this window show <span className="font-medium">N/A</span>{' '}
-          rather than 100% — nothing was due, so compliance is not measurable.
+          {__('Items with no checks required in this window show')} <span className="font-medium">{__('N/A')}</span>{' '}
+          {__('rather than 100% — nothing was due, so compliance is not measurable.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex w-full max-w-sm flex-col text-xs font-medium text-muted-foreground">
-            Branch (Optional)
+            {__('Branch (Optional)')}
             <Autocomplete
               id="yield-compliance-branch"
               value={branchFilter}
@@ -248,7 +249,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
               onSearch={searchBranches}
               options={branchOptions}
               searching={branchSearching}
-              placeholder="All branches"
+              placeholder={__('All branches')}
               className="mt-1"
             />
           </label>
@@ -263,7 +264,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
             columns={columns}
             rows={rows}
             isLoading={loading}
-            emptyMessage="No yield tracking data found."
+            emptyMessage={__('No yield tracking data found.')}
           />
         )}
       </Section>

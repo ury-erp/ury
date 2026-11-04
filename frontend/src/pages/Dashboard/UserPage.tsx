@@ -7,6 +7,7 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import MultiSelect from '../../components/common/MultiSelect';
+import { __ } from '../../i18n';
 
 interface UserRecord {
   name: string;
@@ -147,7 +148,7 @@ export const UserPage: React.FC = () => {
     if (!newUser.email) return;
 
     if (newUser.roles.length === 0) {
-      showToast.warning('Please select at least one role for the user');
+      showToast.warning(__('Please select at least one role for the user'));
       return;
     }
 
@@ -165,7 +166,7 @@ export const UserPage: React.FC = () => {
         enabled: newUser.enabled ? 1 : 0,
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
-        showToast.warning('No changes in document');
+        showToast.warning(__('No changes in document'));
         return;
       }
     }
@@ -206,10 +207,10 @@ export const UserPage: React.FC = () => {
       }
       fetchUsers();
       setIsDrawerOpen(false);
-      showToast.success(`User ${editingUser ? 'updated' : 'added'} successfully`);
+      showToast.success(__('User {0} successfully', [editingUser ? 'updated' : 'added']));
     } catch (err: any) {
       console.error('Failed to save User', err);
-      let errorMessage = 'Failed to save User';
+      let errorMessage = __('Failed to save User');
       if (err._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -237,10 +238,10 @@ export const UserPage: React.FC = () => {
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add User</span>
+          <span>{__('Add User')}</span>
         </Button>
       </div>
 
@@ -253,16 +254,16 @@ export const UserPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Users className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Users Configured</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">{__('No Users Configured')}</h3>
           <p className="text-gray-500 mb-6 max-w-sm">
-            Add staff users and assign them roles for this branch.
+            {__('Add staff users and assign them roles for this branch.')}
           </p>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add User</span>
+            <span>{__('Add User')}</span>
           </Button>
         </Card>
       ) : (
@@ -273,7 +274,7 @@ export const UserPage: React.FC = () => {
                 const columns: DataTableColumn<UserRecord>[] = [
                   {
                     key: 'name',
-                    header: 'User',
+                    header: __('User'),
                     render: (row) => (
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
@@ -285,15 +286,15 @@ export const UserPage: React.FC = () => {
                       </div>
                     )
                   },
-                  { key: 'email', header: 'User ID', render: (row) => <span className="text-gray-600 font-medium">{row.email}</span> },
+                  { key: 'email', header: __('User ID'), render: (row) => <span className="text-gray-600 font-medium">{row.email}</span> },
                   {
                     key: 'role',
-                    header: 'Roles',
+                    header: __('Roles'),
                     render: (row) => (
                       <div className="flex flex-wrap gap-1">
                         {getDisplayRoles(row).map((r) => (
                           <Badge key={r} variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                            <ShieldCheck className="w-3 h-3 mr-1" />
+                            <ShieldCheck className="w-3 h-3 me-1" />
                             {r}
                           </Badge>
                         ))}
@@ -302,7 +303,7 @@ export const UserPage: React.FC = () => {
                   },
                   {
                     key: 'actions',
-                    header: 'Actions',
+                    header: __('Actions'),
                     align: 'right',
                     render: (row) => (
                       <Button variant="ghost" onClick={() => openEditDrawer(row)} className="text-gray-500 hover:text-primary">
@@ -322,12 +323,12 @@ export const UserPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingUser ? 'Edit User' : 'Add User'}
+        title={editingUser ? __('Edit User') : __('Add User')}
       >
         <form onSubmit={handleSaveUser} className="space-y-5 text-sm">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">First Name</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{__('First Name')}</label>
               <Input
                 value={newUser.first_name}
                 onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
@@ -335,7 +336,7 @@ export const UserPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Last Name</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">{__('Last Name')}</label>
               <Input
                 value={newUser.last_name}
                 onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
@@ -344,7 +345,7 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">User ID</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{__('User ID')}</label>
             <Input
               type="email"
               value={newUser.email}
@@ -355,12 +356,12 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Roles / Access Level</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">{__('Roles / Access Level')}</label>
             <MultiSelect
               id="user-roles"
               values={newUser.roles}
               options={allRoles.map(r => ({ value: r.name, label: r.name }))}
-              placeholder="Select roles..."
+              placeholder={__('Select roles...')}
               onChange={(selectedRoles) => setNewUser({ ...newUser, roles: selectedRoles })}
             />
           </div>
@@ -372,16 +373,16 @@ export const UserPage: React.FC = () => {
               onCheckedChange={(checked) => setNewUser({ ...newUser, enabled: checked })}
             />
             <label htmlFor="user-enabled" className="font-semibold text-gray-700 cursor-pointer">
-              Enabled (Active User)
+              {__('Enabled (Active User)')}
             </label>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-4 border-gray-100">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6 flex items-center gap-2" disabled={saving}>
-              {editingUser ? 'Save Changes' : 'Create User'}
+              {editingUser ? __('Save Changes') : __('Create User')}
             </Button>
           </div>
         </form>

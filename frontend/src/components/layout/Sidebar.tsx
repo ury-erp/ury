@@ -40,6 +40,7 @@ import {
   Gauge,
   Layers
 } from 'lucide-react';
+import { __ } from '../../i18n';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ury.sidebar.collapsed';
 const SIDEBAR_GROUP_STATE_STORAGE_KEY = 'ury.sidebar.groupState';
@@ -101,34 +102,34 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Plan',
     items: [
-      { label: 'Sales Plan', path: '/sales-plan', icon: Target },
-      { label: 'Requirements', path: '/requirements', icon: ClipboardList }
+      { label: __('Sales Plan'), path: '/sales-plan', icon: Target },
+      { label: __('Requirements'), path: '/requirements', icon: ClipboardList }
     ]
   },
   {
     label: 'Operate',
     items: [
-      { label: 'Service Board', path: '/dashboard', icon: LayoutDashboard },
-      { label: 'Service', path: '/service', icon: ClipboardCheck }
+      { label: __('Service Board'), path: '/dashboard', icon: LayoutDashboard },
+      { label: __('Service'), path: '/service', icon: ClipboardCheck }
     ]
   },
   {
     label: 'Observe',
     items: [
-      { label: 'Profitability', path: '/department-profitability', icon: TrendingUp },
-      { label: 'Yield Variance', path: '/yield-variance', icon: Percent },
-      { label: 'Yield Compliance', path: '/yield-compliance', icon: Gauge },
-      { label: 'Close Day', path: '/close-day', icon: Lock }
+      { label: __('Profitability'), path: '/department-profitability', icon: TrendingUp },
+      { label: __('Yield Variance'), path: '/yield-variance', icon: Percent },
+      { label: __('Yield Compliance'), path: '/yield-compliance', icon: Gauge },
+      { label: __('Close Day'), path: '/close-day', icon: Lock }
     ]
   },
   {
     label: 'Control',
     items: [
-      { label: 'Wastage', path: '/wastage', icon: Trash2 },
-      { label: 'Yield Checks', path: '/overdue-yield-checks', icon: ClipboardCheck },
-      { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
-      { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle },
-      { label: 'Sellability', path: '/menu-routing', icon: Ban }
+      { label: __('Wastage'), path: '/wastage', icon: Trash2 },
+      { label: __('Yield Checks'), path: '/overdue-yield-checks', icon: ClipboardCheck },
+      { label: __('Reservations'), path: '/stock-reservations', icon: BookmarkCheck },
+      { label: __('KOT Errors'), path: '/kot-error-log', icon: AlertCircle },
+      { label: __('Sellability'), path: '/menu-routing', icon: Ban }
     ]
   }
 ];
@@ -142,25 +143,25 @@ export const NAV_GROUPS: NavGroup[] = [
  * Production Units, Departments, Item Config), which are all configuration.
  */
 export const SETUP_ITEMS: NavItem[] = [
-  { label: 'Item', path: '/item', icon: Package },
-  { label: 'Menu', path: '/menu', icon: Utensils },
+  { label: __('Item'), path: '/item', icon: Package },
+  { label: __('Menu'), path: '/menu', icon: Utensils },
   { label: 'BOM', path: '/bom', icon: Layers },
-  { label: 'Tables', path: '/table', icon: Table2 },
-  { label: 'Rooms', path: '/room', icon: DoorOpen },
-  { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
-  { label: 'Users', path: '/user', icon: Users },
-  { label: 'Branches', path: '/branch', icon: Building2 },
-  { label: 'Self Ordering', path: '/self-ordering-profile', icon: Smartphone },
-  { label: 'Aggregators', path: '/aggregator', icon: Globe },
-  { label: 'Payment Terminals', path: '/payment-terminals', icon: CreditCard },
-  { label: 'Printer Configuration', path: '/printer-config', icon: Printer },
-  { label: 'Report Settings', path: '/report-settings', icon: FileCog },
-  { label: 'AI Assistant', path: '/ai-settings', icon: Bot },
-  { label: 'Commission', path: '/commission-settings', icon: Percent },
-  { label: 'Production Units', path: '/production-unit', icon: Factory },
-  { label: 'Departments', path: '/production-department', icon: Network },
-  { label: 'Item Config', path: '/item-production-config', icon: Boxes },
-  { label: 'Yield Standards', path: '/yield-standards', icon: Target }
+  { label: __('Tables'), path: '/table', icon: Table2 },
+  { label: __('Rooms'), path: '/room', icon: DoorOpen },
+  { label: __('POS Profile'), path: '/pos-profile', icon: SlidersHorizontal },
+  { label: __('Users'), path: '/user', icon: Users },
+  { label: __('Branches'), path: '/branch', icon: Building2 },
+  { label: __('Self Ordering'), path: '/self-ordering-profile', icon: Smartphone },
+  { label: __('Aggregators'), path: '/aggregator', icon: Globe },
+  { label: __('Payment Terminals'), path: '/payment-terminals', icon: CreditCard },
+  { label: __('Printer Configuration'), path: '/printer-config', icon: Printer },
+  { label: __('Report Settings'), path: '/report-settings', icon: FileCog },
+  { label: __('AI Assistant'), path: '/ai-settings', icon: Bot },
+  { label: __('Commission'), path: '/commission-settings', icon: Percent },
+  { label: __('Production Units'), path: '/production-unit', icon: Factory },
+  { label: __('Departments'), path: '/production-department', icon: Network },
+  { label: __('Item Config'), path: '/item-production-config', icon: Boxes },
+  { label: __('Yield Standards'), path: '/yield-standards', icon: Target }
 ];
 
 /**
@@ -179,7 +180,7 @@ export const SETUP_ITEMS: NavItem[] = [
 const getNavLinkClass =
   (isCollapsed: boolean) =>
     ({ isActive }: { isActive: boolean }) =>
-      `flex items-center rounded-md text-[12.5px] transition-all ${isCollapsed ? 'justify-center px-2 py-[5.5px]' : 'space-x-2 px-2 py-[5.5px]'
+      `flex items-center rounded-md text-[12.5px] transition-all ${isCollapsed ? 'justify-center px-2 py-[5.5px]' : 'gap-2 px-2 py-[5.5px]'
       } ${isActive
         ? 'bg-card text-foreground font-[550] shadow-[0_0_0_1px_hsl(var(--hair)),0_1px_2px_rgba(0,0,0,0.03)] [&_svg]:text-primary [&_svg]:opacity-100'
         : 'text-muted-foreground font-medium hover:bg-hair/60 hover:text-foreground [&_svg]:opacity-60'
@@ -235,7 +236,7 @@ const GroupHeaderButton: React.FC<{
     className={`w-full flex items-center justify-between rounded-md text-[10.5px] font-medium uppercase tracking-[0.04em] transition-colors px-2 py-[5px] ${isActive ? 'text-foreground' : 'text-text-tertiary hover:text-foreground'
       }`}
   >
-    <span className="flex items-center space-x-1.5">
+    <span className="flex items-center gap-1.5">
       {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
       <span>{label}</span>
     </span>
@@ -297,7 +298,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             <div key={group.label} className="space-y-0.5 pt-3 first:pt-0">
               {!isCollapsed && (
                 <GroupHeaderButton
-                  label={group.label}
+                  label={__(group.label)}
                   isOpen={isOpen}
                   isActive={isActive}
                   onToggle={() => toggleGroup(key)}
@@ -317,7 +318,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                       <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                       {!isCollapsed && <span>{item.label}</span>}
                       {!isCollapsed && typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
-                        <Badge variant="warning" size="sm" className="ml-auto h-4 px-1.5 text-[10px]">
+                        <Badge variant="warning" size="sm" className="ms-auto h-4 px-1.5 text-[10px]">
                           {item.badgeCount}
                         </Badge>
                       )}
@@ -332,7 +333,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
           <div className="pt-3">
             {!isCollapsed ? (
               <GroupHeaderButton
-                label="Reports"
+                label={__('Reports')}
                 isOpen={isGroupOpen('Reports')}
                 isActive={isReportsPath}
                 onToggle={() => toggleGroup('Reports')}
@@ -343,8 +344,8 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                 type="button"
                 onClick={() => toggleGroup('Reports')}
                 aria-expanded={isGroupOpen('Reports')}
-                aria-label="Reports"
-                title="Reports"
+                aria-label={__('Reports')}
+                title={__('Reports')}
                 className={linkClass({ isActive: isReportsPath })}
               >
                 <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -352,12 +353,12 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             )}
 
             {isGroupOpen('Reports') && (
-              <div className={isCollapsed ? 'mt-1 space-y-2' : 'mt-1 pl-2 space-y-2'}>
+              <div className={isCollapsed ? 'mt-1 space-y-2' : 'mt-1 ps-2 space-y-2'}>
                 {reportGroupEntries.map(([reportGroup, reports]) => (
                   <div key={reportGroup}>
                     {!isCollapsed && (
                       <h4 className="text-[9.5px] font-medium uppercase tracking-[0.04em] text-text-tertiary px-2 pb-[3px]">
-                        {reportGroup}
+                        {__(reportGroup)}
                       </h4>
                     )}
                     <div className="space-y-0.5">
@@ -388,7 +389,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
       <div className={`shrink-0 pt-2 pb-4 border-t border-hair mt-auto ${isCollapsed ? 'px-2' : 'px-4'}`}>
         {!isCollapsed ? (
           <GroupHeaderButton
-            label="Setup"
+            label={__('Setup')}
             isOpen={isGroupOpen('Setup')}
             isActive={isSetupPath}
             onToggle={() => toggleGroup('Setup')}
@@ -399,8 +400,8 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             type="button"
             onClick={() => toggleGroup('Setup')}
             aria-expanded={isGroupOpen('Setup')}
-            aria-label="Setup"
-            title="Setup"
+            aria-label={__('Setup')}
+            title={__('Setup')}
             className={linkClass({ isActive: isSetupPath })}
           >
             <Settings className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -452,20 +453,20 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-rail border-r border-hair sticky top-12 h-[calc(100vh-3rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${isCollapsed ? 'w-16' : 'w-[232px]'
+      className={`bg-rail border-e border-hair sticky top-12 h-[calc(100vh-3rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${isCollapsed ? 'w-16' : 'w-[232px]'
         }`}
     >
       <div className={`flex items-center py-2 shrink-0 ${isCollapsed ? 'justify-center' : 'justify-end px-2'}`}>
         <button
           onClick={() => setIsCollapsed((prev) => !prev)}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isCollapsed ? __('Expand sidebar') : __('Collapse sidebar')}
+          aria-label={isCollapsed ? __('Expand sidebar') : __('Collapse sidebar')}
           className="p-1.5 rounded-md text-text-tertiary hover:bg-muted hover:text-muted-foreground transition-colors"
         >
           {isCollapsed ? (
-            <PanelLeftOpen className="w-4 h-4" />
+            <PanelLeftOpen className="w-4 h-4 rtl:-scale-x-100" />
           ) : (
-            <PanelLeftClose className="w-4 h-4" />
+            <PanelLeftClose className="w-4 h-4 rtl:-scale-x-100" />
           )}
         </button>
       </div>

@@ -31,6 +31,7 @@ import {
   WASTAGE_REASON_CATEGORIES,
   WastageReasonCategory,
 } from '../../services/departmentStock';
+import { __ } from '../../i18n';
 
 /** Roles permitted to view department stock/issue read screens. Mirrors the
  * role strings used in the V3-31/V3-32/V3-33 backend permission checks and
@@ -158,9 +159,9 @@ export const DepartmentStockRoleGate: React.FC<DepartmentStockRoleGateProps> = (
   if (status === 'denied') {
     return (
       <Card className="w-full max-w-md p-6 text-center" data-testid="department-stock-access-denied">
-        <h2 className="mb-2 text-lg font-semibold text-foreground">Access Denied</h2>
+        <h2 className="mb-2 text-lg font-semibold text-foreground">{__('Access Denied')}</h2>
         <p className="text-muted-foreground">
-          You need the Production Manager, Stock Manager, or System Manager role to view this section.
+          {__('You need the Production Manager, Stock Manager, or System Manager role to view this section.')}
         </p>
       </Card>
     );
@@ -198,7 +199,7 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
       });
       onSuccess();
     } catch (err) {
-      onError(getErrorMessage(err, 'Unable to capture wastage for this issue authorization.'));
+      onError(getErrorMessage(err, __('Unable to capture wastage for this issue authorization.')));
     } finally {
       setSubmitting(false);
     }
@@ -207,9 +208,9 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Wasted Qty
+        {__('Wasted Qty')}
         <Input
-          aria-label="Wasted quantity"
+          aria-label={__('Wasted quantity')}
           type="number"
           min="0"
           step="any"
@@ -220,9 +221,9 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         />
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Reason
+        {__('Reason')}
         <Select
-          aria-label="Reason category"
+          aria-label={__('Reason category')}
           value={reasonCategory}
           onChange={(event) => setReasonCategory(event.target.value as WastageReasonCategory)}
           className="mt-1"
@@ -235,9 +236,9 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         </Select>
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Notes (optional)
+        {__('Notes (optional)')}
         <Input
-          aria-label="Reason notes"
+          aria-label={__('Reason notes')}
           type="text"
           value={reasonNotes}
           onChange={(event) => setReasonNotes(event.target.value)}
@@ -246,10 +247,10 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
       </label>
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting}>
-          Submit Wastage
+          {__('Submit Wastage')}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {__('Cancel')}
         </Button>
       </div>
     </form>
@@ -290,7 +291,7 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
       });
       onSuccess();
     } catch (err) {
-      onError(getErrorMessage(err, 'Unable to log usable output for this issue authorization.'));
+      onError(getErrorMessage(err, __('Unable to log usable output for this issue authorization.')));
     } finally {
       setSubmitting(false);
     }
@@ -299,22 +300,21 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
       <p className="mb-1 text-xs text-muted-foreground">
-        <span className="font-medium">Note:</span> This records a measurement for reporting only. It does not create or move stock.
+        <span className="font-medium">{__('Note:')}</span> {__('This records a measurement for reporting only. It does not create or move stock.')}
       </p>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Input Qty (authorized amount)
+        {__('Input Qty (authorized amount)')}
         <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {formatQty(authorization.authorized_qty)} {authorization.stock_uom || ''}
         </span>
         <span className="mt-1 text-xs font-normal text-text-tertiary">
-          This is the authorized quantity and is not editable here. If the actual quantity physically
-          issued differs, record it on the URY Yield Check document in the Desk.
+          {__('This is the authorized quantity and is not editable here. If the actual quantity physically issued differs, record it on the URY Yield Check document in the Desk.')}
         </span>
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Output Qty
+        {__('Output Qty')}
         <Input
-          aria-label="Output quantity"
+          aria-label={__('Output quantity')}
           type="number"
           min="0"
           step="any"
@@ -325,9 +325,9 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
         />
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Check Type
+        {__('Check Type')}
         <Select
-          aria-label="Check type"
+          aria-label={__('Check type')}
           value={checkType}
           onChange={(event) => setCheckType(event.target.value)}
           className="mt-1"
@@ -341,10 +341,10 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
       </label>
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting}>
-          Log Output
+          {__('Log Output')}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {__('Cancel')}
         </Button>
       </div>
     </form>
@@ -401,7 +401,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         if (!plan) {
           setPlanName(null);
           setPlanStatus(null);
-          setPlanError('No approved sales plan was found for this branch today.');
+          setPlanError(__('No approved sales plan was found for this branch today.'));
           return;
         }
         setPlanName(plan.name);
@@ -410,14 +410,14 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         setComponentOptions(forDepartment);
         if (forDepartment.length === 0) {
           setPlanError(
-            'This plan has no required components recorded yet for this department, so there is nothing to request against.'
+            __('This plan has no required components recorded yet for this department, so there is nothing to request against.')
           );
         }
       } catch {
         if (!cancelled) {
           setPlanName(null);
           setPlanStatus(null);
-          setPlanError('Unable to load the active sales plan for this branch.');
+          setPlanError(__('Unable to load the active sales plan for this branch.'));
         }
       } finally {
         if (!cancelled) setLoadingPlan(false);
@@ -452,7 +452,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
       });
       onSuccess();
     } catch (err) {
-      onError(getErrorMessage(err, 'Unable to create issue authorization for this plan and component.'));
+      onError(getErrorMessage(err, __('Unable to create issue authorization for this plan and component.')));
     } finally {
       setSubmitting(false);
     }
@@ -472,29 +472,29 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
       className="mt-3 flex flex-col gap-2 rounded-md border border-border bg-muted p-3 sm:flex-row sm:items-end sm:flex-wrap"
     >
       <div className="flex flex-col text-xs font-medium text-muted-foreground">
-        Plan
+        {__('Plan')}
         <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
-          {planName || 'No active plan'}
+          {planName || __('No active plan')}
           {planStatus ? ` (${planStatus})` : ''}
         </span>
       </div>
       <div className="flex flex-col text-xs font-medium text-muted-foreground">
-        Department
+        {__('Department')}
         <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {departmentName}
         </span>
       </div>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Required Component
+        {__('Required Component')}
         <Select
-          aria-label="Required component"
+          aria-label={__('Required component')}
           value={componentItem}
           onChange={(event) => handleComponentChange(event.target.value)}
           className="mt-1"
           disabled={componentOptions.length === 0}
           required
         >
-          <option value="">Select component</option>
+          <option value="">{__('Select component')}</option>
           {componentOptions.map((option) => (
             <option key={option.component_item} value={option.component_item}>
               {option.component_item_name || option.component_item}
@@ -503,9 +503,9 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         </Select>
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Requested Qty
+        {__('Requested Qty')}
         <Input
-          aria-label="Requested quantity"
+          aria-label={__('Requested quantity')}
           type="number"
           min="0"
           step="any"
@@ -517,16 +517,16 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         />
         {selectedComponent && (
           <span className="mt-1 text-xs font-normal text-text-tertiary">
-            Suggested: {formatQty(selectedComponent.required_qty)} {selectedComponent.stock_uom || ''}
+            {__('Suggested:')} {formatQty(selectedComponent.required_qty)} {selectedComponent.stock_uom || ''}
           </span>
         )}
       </label>
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting || !planName || !componentItem}>
-          Request Authorization
+          {__('Request Authorization')}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {__('Cancel')}
         </Button>
       </div>
       {planError && <p className="w-full text-xs font-normal text-destructive">{planError}</p>}
@@ -640,7 +640,7 @@ const DepartmentStockContent: React.FC = () => {
           setAuthorizations([]);
           setMovements([]);
           setWastageRows([]);
-          setError('Unable to load department stock and issue authorization data.');
+          setError(__('Unable to load department stock and issue authorization data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -684,8 +684,8 @@ const DepartmentStockContent: React.FC = () => {
     } catch {
       setActionError(
         wastageDrawerAction === 'approve'
-          ? 'Unable to approve this wastage record.'
-          : 'Unable to reject this wastage record.'
+          ? __('Unable to approve this wastage record.')
+          : __('Unable to reject this wastage record.')
       );
       setWastageDrawerBusy(false);
     }
@@ -707,11 +707,11 @@ const DepartmentStockContent: React.FC = () => {
     const totalWastageValue = wastageRows.reduce((sum, row) => sum + (row.valuation_amount ?? 0), 0);
 
     const items: KpiItemProps[] = [
-      { label: 'Issue Lines', value: authorizations.length },
-      { label: 'Fully Issued', value: fullyIssuedCount, tone: 'default' },
-      { label: 'Wastage Entries', value: wastageRows.length, tone: wastageRows.length > 0 ? 'danger' : 'default' },
-      { label: 'Wastage Value', value: formatCurrency(totalWastageValue), tone: 'danger' },
-      { label: 'Stock Movements', value: movements.length },
+      { label: __('Issue Lines'), value: authorizations.length },
+      { label: __('Fully Issued'), value: fullyIssuedCount, tone: 'default' },
+      { label: __('Wastage Entries'), value: wastageRows.length, tone: wastageRows.length > 0 ? 'danger' : 'default' },
+      { label: __('Wastage Value'), value: formatCurrency(totalWastageValue), tone: 'danger' },
+      { label: __('Stock Movements'), value: movements.length },
     ];
     return items;
   }, [authorizations, wastageRows, movements]);
@@ -719,17 +719,17 @@ const DepartmentStockContent: React.FC = () => {
   const authorizationColumns: DataTableColumn<IssueAuthorizationRow>[] = [
     {
       key: 'plan',
-      header: 'Plan',
+      header: __('Plan'),
       render: (row) => <span className="font-medium text-foreground">{row.plan}</span>,
     },
     {
       key: 'component_item',
-      header: 'Component',
+      header: __('Component'),
       render: (row) => row.component_item_name || row.component_item,
     },
     {
       key: 'authorized_qty',
-      header: 'Authorized Qty',
+      header: __('Authorized Qty'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -739,7 +739,7 @@ const DepartmentStockContent: React.FC = () => {
     },
     {
       key: 'remaining_after_qty',
-      header: 'Remaining Entitlement',
+      header: __('Remaining Entitlement'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -749,7 +749,7 @@ const DepartmentStockContent: React.FC = () => {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: __('Status'),
       render: (row) => <Badge variant={authorizationBadgeVariant(row.status)}>{row.status}</Badge>,
     },
   ];
@@ -757,23 +757,23 @@ const DepartmentStockContent: React.FC = () => {
   const wastageColumns: DataTableColumn<WastageRow>[] = [
     {
       key: 'component_item',
-      header: 'Component',
+      header: __('Component'),
       render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
     },
     {
       key: 'wasted_qty',
-      header: 'Wasted Qty',
+      header: __('Wasted Qty'),
       align: 'right',
       render: (row) => <span className={numericCellClass}>{formatQty(row.wasted_qty)}</span>,
     },
     {
       key: 'status',
-      header: 'Status',
+      header: __('Status'),
       render: (row) => <Badge variant={wastageBadgeVariant(row.status)}>{row.status}</Badge>,
     },
     {
       key: 'valuation_amount',
-      header: 'Value',
+      header: __('Value'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -786,17 +786,17 @@ const DepartmentStockContent: React.FC = () => {
   const movementColumns: DataTableColumn<StockMovementRow>[] = [
     {
       key: 'movement_type',
-      header: 'Type',
+      header: __('Type'),
       render: (row) => <Badge variant={movementBadgeVariant(row.movement_type)}>{row.movement_type}</Badge>,
     },
     {
       key: 'component_item',
-      header: 'Component',
+      header: __('Component'),
       render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
     },
     {
       key: 'qty',
-      header: 'Qty',
+      header: __('Qty'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -806,17 +806,17 @@ const DepartmentStockContent: React.FC = () => {
     },
     {
       key: 'from_location',
-      header: 'From',
+      header: __('From'),
       render: (row) => row.from_location || '-',
     },
     {
       key: 'to_location',
-      header: 'To',
+      header: __('To'),
       render: (row) => row.to_location || '-',
     },
     {
       key: 'posting_datetime',
-      header: 'Posted',
+      header: __('Posted'),
       render: (row) => row.posting_datetime || '-',
     },
   ];
@@ -824,22 +824,21 @@ const DepartmentStockContent: React.FC = () => {
   return (
     <Page>
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
-        <h1 className="text-xl font-semibold text-foreground">Department Stock &amp; Issue Authorizations</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Department Stock & Issue Authorizations')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Read-only view of authorized issue quantities, remaining entitlement, and related stock movements
-          for a department.
+          {__('Read-only view of authorized issue quantities, remaining entitlement, and related stock movements for a department.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            Department
+            {__('Department')}
             <Select
-              aria-label="Department"
+              aria-label={__('Department')}
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
               className="mt-1"
             >
-              <option value="">Select department</option>
+              <option value="">{__('Select department')}</option>
               {departmentOptions.map((dept) => (
                 <option key={dept.name} value={dept.name}>
                   {dept.department_name}
@@ -848,20 +847,20 @@ const DepartmentStockContent: React.FC = () => {
             </Select>
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            From
+            {__('From')}
             <DatePicker
               id="from-date"
-              aria-label="From date"
+              aria-label={__('From date')}
               value={fromDate}
               onChange={(_id, next) => setFromDate(next)}
               className="mt-1 w-[150px]"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            To
+            {__('To')}
             <DatePicker
               id="to-date"
-              aria-label="To date"
+              aria-label={__('To date')}
               value={toDate}
               onChange={(_id, next) => setToDate(next)}
               className="mt-1 w-[150px]"
@@ -872,7 +871,7 @@ const DepartmentStockContent: React.FC = () => {
 
       {!department ? (
         <Section>
-          <Card className="p-10 text-center text-sm text-text-tertiary">Select a department to view its data.</Card>
+          <Card className="p-10 text-center text-sm text-text-tertiary">{__('Select a department to view its data.')}</Card>
         </Section>
       ) : error ? (
         <Section>
@@ -888,10 +887,10 @@ const DepartmentStockContent: React.FC = () => {
 
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">Issue Authorizations</h2>
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">{__('Issue Authorizations')}</h2>
               {canCapture && !showRequestForm && (
                 <Button type="button" variant="outline" onClick={() => setShowRequestForm(true)}>
-                  Request Authorization
+                  {__('Request Authorization')}
                 </Button>
               )}
             </div>
@@ -914,7 +913,7 @@ const DepartmentStockContent: React.FC = () => {
                 columns={authorizationColumns}
                 rows={authorizations}
                 isLoading={loading}
-                emptyMessage="No issue authorizations found for this department and date range."
+                emptyMessage={__('No issue authorizations found for this department and date range.')}
                 onRowClick={(row) => {
                   setSelectedAuthorization(row);
                   setShowCaptureForm(false);
@@ -924,12 +923,12 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">Wastage</h2>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">{__('Wastage')}</h2>
             <DataTable
               columns={wastageColumns}
               rows={wastageRows}
               isLoading={loading}
-              emptyMessage="No wastage records found for this department and date range."
+              emptyMessage={__('No wastage records found for this department and date range.')}
               onRowClick={(row) => {
                 setSelectedWastage(row);
                 setWastageDrawerAction(null);
@@ -938,12 +937,12 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">Related Stock Movements</h2>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">{__('Related Stock Movements')}</h2>
             <DataTable
               columns={movementColumns}
               rows={movements}
               isLoading={loading}
-              emptyMessage="No transfers, receipts, or returns found for this department and date range."
+              emptyMessage={__('No transfers, receipts, or returns found for this department and date range.')}
               onRowClick={setSelectedMovement}
             />
           </section>
@@ -957,7 +956,7 @@ const DepartmentStockContent: React.FC = () => {
           setShowCaptureForm(false);
           setShowLogYieldForm(false);
         }}
-        title={selectedAuthorization ? selectedAuthorization.component_item_name || selectedAuthorization.component_item : 'Issue authorization'}
+        title={selectedAuthorization ? selectedAuthorization.component_item_name || selectedAuthorization.component_item : __('Issue authorization')}
         footer={
           selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm && !showLogYieldForm ? (
             <div className="flex gap-2">
@@ -969,12 +968,12 @@ const DepartmentStockContent: React.FC = () => {
                * mirror in `ury.ury.api.ury_wastage.capture_wastage`. */}
               {!selectedAuthorization.has_yield_check && (
                 <Button type="button" onClick={() => setShowCaptureForm(true)}>
-                  Capture Wastage
+                  {__('Capture Wastage')}
                 </Button>
               )}
               {!selectedAuthorization.has_wastage && (
                 <Button type="button" variant="outline" onClick={() => setShowLogYieldForm(true)}>
-                  Log Usable Output
+                  {__('Log Usable Output')}
                 </Button>
               )}
             </div>
@@ -983,39 +982,39 @@ const DepartmentStockContent: React.FC = () => {
       >
         {selectedAuthorization && (
           <>
-            <DrawerSectionLabel>Details</DrawerSectionLabel>
-            <KeyValueRow label="Plan" value={selectedAuthorization.plan} />
-            <KeyValueRow label="Department" value={departmentName(selectedAuthorization.department)} />
+            <DrawerSectionLabel>{__('Details')}</DrawerSectionLabel>
+            <KeyValueRow label={__('Plan')} value={selectedAuthorization.plan} />
+            <KeyValueRow label={__('Department')} value={departmentName(selectedAuthorization.department)} />
             <KeyValueRow
-              label="Component"
+              label={__('Component')}
               value={selectedAuthorization.component_item_name || selectedAuthorization.component_item}
             />
             <KeyValueRow
-              label="Status"
+              label={__('Status')}
               value={<Badge variant={authorizationBadgeVariant(selectedAuthorization.status)}>{selectedAuthorization.status}</Badge>}
             />
             <KeyValueRow
-              label="Required qty"
+              label={__('Required qty')}
               value={`${formatQty(selectedAuthorization.required_qty)} ${selectedAuthorization.stock_uom || ''}`}
             />
             <KeyValueRow
-              label="Authorized qty"
+              label={__('Authorized qty')}
               value={`${formatQty(selectedAuthorization.authorized_qty)} ${selectedAuthorization.stock_uom || ''}`}
             />
             <KeyValueRow
-              label="Remaining entitlement"
+              label={__('Remaining entitlement')}
               value={`${formatQty(selectedAuthorization.remaining_after_qty)} ${selectedAuthorization.stock_uom || ''}`}
             />
             {selectedAuthorization.production_unit && (
-              <KeyValueRow label="Production unit" value={selectedAuthorization.production_unit} />
+              <KeyValueRow label={__('Production unit')} value={selectedAuthorization.production_unit} />
             )}
-            {selectedAuthorization.branch && <KeyValueRow label="Branch" value={selectedAuthorization.branch} />}
-            {selectedAuthorization.company && <KeyValueRow label="Company" value={selectedAuthorization.company} />}
-            {selectedAuthorization.creation && <KeyValueRow label="Created" value={selectedAuthorization.creation} />}
+            {selectedAuthorization.branch && <KeyValueRow label={__('Branch')} value={selectedAuthorization.branch} />}
+            {selectedAuthorization.company && <KeyValueRow label={__('Company')} value={selectedAuthorization.company} />}
+            {selectedAuthorization.creation && <KeyValueRow label={__('Created')} value={selectedAuthorization.creation} />}
 
             {showCaptureForm && (
               <>
-                <DrawerSectionLabel>Capture Wastage</DrawerSectionLabel>
+                <DrawerSectionLabel>{__('Capture Wastage')}</DrawerSectionLabel>
                 <CaptureWastageForm
                   authorization={selectedAuthorization}
                   onCancel={() => setShowCaptureForm(false)}
@@ -1027,7 +1026,7 @@ const DepartmentStockContent: React.FC = () => {
 
             {showLogYieldForm && (
               <>
-                <DrawerSectionLabel>Log Usable Output</DrawerSectionLabel>
+                <DrawerSectionLabel>{__('Log Usable Output')}</DrawerSectionLabel>
                 <LogYieldCheckForm
                   authorization={selectedAuthorization}
                   onCancel={() => setShowLogYieldForm(false)}
@@ -1043,13 +1042,13 @@ const DepartmentStockContent: React.FC = () => {
       <Drawer
         open={selectedWastage !== null}
         onClose={closeWastageDrawer}
-        title={selectedWastage ? selectedWastage.component_item : 'Wastage entry'}
+        title={selectedWastage ? selectedWastage.component_item : __('Wastage entry')}
         footer={
           selectedWastage && canApprove && selectedWastage.status === 'Draft' ? (
             wastageDrawerAction ? (
               <>
-                <span className="mr-auto self-center text-xs text-muted-foreground">
-                  {wastageDrawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
+                <span className="me-auto self-center text-xs text-muted-foreground">
+                  {wastageDrawerAction === 'approve' ? __('Approve this entry?') : __('Reject this entry?')}
                 </span>
                 <Button
                   type="button"
@@ -1057,19 +1056,19 @@ const DepartmentStockContent: React.FC = () => {
                   onClick={() => setWastageDrawerAction(null)}
                   disabled={wastageDrawerBusy}
                 >
-                  Cancel
+                  {__('Cancel')}
                 </Button>
                 <Button type="button" onClick={handleWastageDrawerConfirm} disabled={wastageDrawerBusy}>
-                  Confirm
+                  {__('Confirm')}
                 </Button>
               </>
             ) : (
               <>
                 <Button type="button" variant="outline" onClick={() => setWastageDrawerAction('reject')}>
-                  Reject
+                  {__('Reject')}
                 </Button>
                 <Button type="button" onClick={() => setWastageDrawerAction('approve')}>
-                  Approve
+                  {__('Approve')}
                 </Button>
               </>
             )
@@ -1078,21 +1077,21 @@ const DepartmentStockContent: React.FC = () => {
       >
         {selectedWastage && (
           <>
-            <DrawerSectionLabel>Details</DrawerSectionLabel>
-            <KeyValueRow label="Component" value={selectedWastage.component_item} />
-            <KeyValueRow label="Department" value={departmentName(selectedWastage.department)} />
-            <KeyValueRow label="Wasted qty" value={formatQty(selectedWastage.wasted_qty)} />
+            <DrawerSectionLabel>{__('Details')}</DrawerSectionLabel>
+            <KeyValueRow label={__('Component')} value={selectedWastage.component_item} />
+            <KeyValueRow label={__('Department')} value={departmentName(selectedWastage.department)} />
+            <KeyValueRow label={__('Wasted qty')} value={formatQty(selectedWastage.wasted_qty)} />
             <KeyValueRow
-              label="Status"
+              label={__('Status')}
               value={<Badge variant={wastageBadgeVariant(selectedWastage.status)}>{selectedWastage.status}</Badge>}
             />
-            {selectedWastage.branch !== undefined && <KeyValueRow label="Branch" value={selectedWastage.branch} />}
-            {selectedWastage.company !== undefined && <KeyValueRow label="Company" value={selectedWastage.company} />}
+            {selectedWastage.branch !== undefined && <KeyValueRow label={__('Branch')} value={selectedWastage.branch} />}
+            {selectedWastage.company !== undefined && <KeyValueRow label={__('Company')} value={selectedWastage.company} />}
             {selectedWastage.valuation_rate !== undefined && (
-              <KeyValueRow label="Valuation rate" value={formatCurrency(selectedWastage.valuation_rate)} />
+              <KeyValueRow label={__('Valuation rate')} value={formatCurrency(selectedWastage.valuation_rate)} />
             )}
             {selectedWastage.valuation_amount !== undefined && (
-              <KeyValueRow label="Valuation amount" value={formatCurrency(selectedWastage.valuation_amount)} />
+              <KeyValueRow label={__('Valuation amount')} value={formatCurrency(selectedWastage.valuation_amount)} />
             )}
           </>
         )}
@@ -1101,31 +1100,31 @@ const DepartmentStockContent: React.FC = () => {
       <Drawer
         open={selectedMovement !== null}
         onClose={() => setSelectedMovement(null)}
-        title={selectedMovement ? selectedMovement.component_item : 'Stock movement'}
+        title={selectedMovement ? selectedMovement.component_item : __('Stock movement')}
       >
         {selectedMovement && (
           <>
-            <DrawerSectionLabel>Details</DrawerSectionLabel>
+            <DrawerSectionLabel>{__('Details')}</DrawerSectionLabel>
             <KeyValueRow
-              label="Type"
+              label={__('Type')}
               value={<Badge variant={movementBadgeVariant(selectedMovement.movement_type)}>{selectedMovement.movement_type}</Badge>}
             />
-            <KeyValueRow label="Component" value={selectedMovement.component_item} />
-            <KeyValueRow label="Department" value={departmentName(selectedMovement.department)} />
+            <KeyValueRow label={__('Component')} value={selectedMovement.component_item} />
+            <KeyValueRow label={__('Department')} value={departmentName(selectedMovement.department)} />
             <KeyValueRow
-              label="Qty"
+              label={__('Qty')}
               value={`${formatQty(selectedMovement.qty)} ${selectedMovement.stock_uom || ''}`}
             />
-            <KeyValueRow label="From" value={selectedMovement.from_location || '-'} />
-            <KeyValueRow label="To" value={selectedMovement.to_location || '-'} />
-            <KeyValueRow label="Posted" value={selectedMovement.posting_datetime || '-'} />
-            <KeyValueRow label="Issue authorization" value={selectedMovement.issue_authorization} />
-            {selectedMovement.branch && <KeyValueRow label="Branch" value={selectedMovement.branch} />}
-            {selectedMovement.company && <KeyValueRow label="Company" value={selectedMovement.company} />}
+            <KeyValueRow label={__('From')} value={selectedMovement.from_location || '-'} />
+            <KeyValueRow label={__('To')} value={selectedMovement.to_location || '-'} />
+            <KeyValueRow label={__('Posted')} value={selectedMovement.posting_datetime || '-'} />
+            <KeyValueRow label={__('Issue authorization')} value={selectedMovement.issue_authorization} />
+            {selectedMovement.branch && <KeyValueRow label={__('Branch')} value={selectedMovement.branch} />}
+            {selectedMovement.company && <KeyValueRow label={__('Company')} value={selectedMovement.company} />}
 
             {/* Link to the editable URY Stock Movement document in the desk. This screen is read-only. */}
             <div className="pt-3">
-              <DeskLink doctype="URY Stock Movement" name={selectedMovement.name} label="Open in Desk" />
+              <DeskLink doctype="URY Stock Movement" name={selectedMovement.name} label={__('Open in Desk')} />
             </div>
           </>
         )}

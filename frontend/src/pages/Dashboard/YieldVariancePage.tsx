@@ -14,6 +14,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { searchLinkOptions, withSelectedOption } from '../../services/linkSearch';
 import { menuAvailabilityService } from '../../services/menuAvailability';
 import { format as formatDate } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface YieldVarianceRow {
   name: string;
@@ -25,7 +26,7 @@ interface YieldVarianceRow {
   checked_on: string;
 }
 
-const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: 'All items' };
+const ALL_ITEMS_OPTION: AutocompleteOption = { value: '', label: __('All items') };
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -151,7 +152,7 @@ export const YieldVariancePage: React.FC = () => {
       } catch {
         if (!cancelled) {
           setRows([]);
-          setError('Unable to load yield variance data.');
+          setError(__('Unable to load yield variance data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -166,17 +167,17 @@ export const YieldVariancePage: React.FC = () => {
   const columns: DataTableColumn<YieldVarianceRow>[] = [
     {
       key: 'item',
-      header: 'Item',
+      header: __('Item'),
       render: (row) => <span className="font-medium text-foreground">{row.item}</span>,
     },
     {
       key: 'branch',
-      header: 'Branch',
+      header: __('Branch'),
       render: (row) => row.branch,
     },
     {
       key: 'standard_yield_percent_snapshot',
-      header: 'Standard Yield %',
+      header: __('Standard Yield %'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>{formatPercent(row.standard_yield_percent_snapshot)}</span>
@@ -184,7 +185,7 @@ export const YieldVariancePage: React.FC = () => {
     },
     {
       key: 'actual_yield_percent',
-      header: 'Latest Actual Yield %',
+      header: __('Latest Actual Yield %'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>{formatPercent(row.actual_yield_percent)}</span>
@@ -192,7 +193,7 @@ export const YieldVariancePage: React.FC = () => {
     },
     {
       key: 'variance_percent',
-      header: 'Variance %',
+      header: __('Variance %'),
       align: 'right',
       render: (row) => (
         <span
@@ -206,7 +207,7 @@ export const YieldVariancePage: React.FC = () => {
     },
     {
       key: 'checked_on',
-      header: 'Last Checked',
+      header: __('Last Checked'),
       render: (row) => formatDateTime(row.checked_on),
     },
   ];
@@ -214,14 +215,14 @@ export const YieldVariancePage: React.FC = () => {
   return (
     <Page>
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
-        <h1 className="text-xl font-semibold text-foreground">Yield Variance</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Yield Variance')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Track actual yield performance against standards and measure production efficiency.
+          {__('Track actual yield performance against standards and measure production efficiency.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex w-full max-w-sm flex-col text-xs font-medium text-muted-foreground">
-            Item
+            {__('Item')}
             <Autocomplete
               id="yield-variance-item"
               value={selectedItem}
@@ -229,7 +230,7 @@ export const YieldVariancePage: React.FC = () => {
               onSearch={searchItems}
               options={itemOptions}
               searching={itemSearching}
-              placeholder="All items"
+              placeholder={__('All items')}
               className="mt-1"
             />
           </label>
@@ -238,7 +239,7 @@ export const YieldVariancePage: React.FC = () => {
 
       {!activeBranchId || activeBranchId === 'all' ? (
         <Section>
-          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view yield variance data.</Card>
+          <Card className="p-10 text-center text-sm text-text-tertiary">{__('Select a branch to view yield variance data.')}</Card>
         </Section>
       ) : (
         <Section>
@@ -249,7 +250,7 @@ export const YieldVariancePage: React.FC = () => {
               columns={columns}
               rows={rows}
               isLoading={loading}
-              emptyMessage="No yield checks found for this branch and filters."
+              emptyMessage={__('No yield checks found for this branch and filters.')}
             />
           )}
         </Section>

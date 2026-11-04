@@ -14,6 +14,7 @@ import {
   messageToPlainText,
 } from '@ury/ui';
 import { call } from '@ury/core';
+import { __ } from '../../i18n';
 
 interface AgentConfig {
   available: boolean;
@@ -136,7 +137,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to load AI assistant settings:', err);
-      showToast.error('Failed to load AI assistant settings');
+      showToast.error(__('Failed to load AI assistant settings'));
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
       setAiEnabled(!!data?.enabled);
     } catch (err: any) {
       setAiEnabled(previous);
-      showToast.error(err?.message || 'Failed to update assistant enabled state');
+      showToast.error(err?.message || __('Failed to update assistant enabled state'));
     } finally {
       setTogglingEnabled(false);
     }
@@ -174,7 +175,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
   const handleSaveConfig = async () => {
     if (!agentConfig?.available) return;
     if (!selectedModel) {
-      showToast.error('Choose a model before saving.');
+      showToast.error(__('Choose a model before saving.'));
       return;
     }
     setSaving(true);
@@ -192,9 +193,9 @@ export const AiAssistantSettingsPage: React.FC = () => {
       setSelectedModel(data.model || '');
       setTemperature(data.temperature ?? 0.7);
       setEnableCaching(!!data.enable_prompt_caching);
-      showToast.success('Assistant configuration saved');
+      showToast.success(__('Assistant configuration saved'));
     } catch (err: any) {
-      showToast.error(getErrorMessage(err, 'Failed to save assistant configuration'));
+      showToast.error(getErrorMessage(err, __('Failed to save assistant configuration')));
     } finally {
       setSaving(false);
     }
@@ -220,10 +221,10 @@ export const AiAssistantSettingsPage: React.FC = () => {
         provider: keyProvider,
         api_key: apiKeyInput,
       });
-      showToast.success(`API key saved for ${keyProvider}`);
+      showToast.success(__('API key saved for {0}', [keyProvider]));
       closeAddKey();
     } catch (err: any) {
-      showToast.error(getErrorMessage(err, 'Failed to save API key'));
+      showToast.error(getErrorMessage(err, __('Failed to save API key')));
     } finally {
       setSavingKey(false);
       setApiKeyInput('');
@@ -248,9 +249,9 @@ export const AiAssistantSettingsPage: React.FC = () => {
               <Bot className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">AI Assistant Settings</h1>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">{__('AI Assistant Settings')}</h1>
               <p className="text-sm text-muted-foreground">
-                Control the floating chat assistant and ask bar available across the app.
+                {__('Control the floating chat assistant and ask bar available across the app.')}
               </p>
             </div>
           </div>
@@ -263,10 +264,9 @@ export const AiAssistantSettingsPage: React.FC = () => {
           <div className="p-6">
             <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
               <div>
-                <span className="text-sm font-semibold text-foreground block">Enable AI Assistant</span>
+                <span className="text-sm font-semibold text-foreground block">{__('Enable AI Assistant')}</span>
                 <span className="text-xs text-muted-foreground">
-                  Controls the floating chat button and the ⌘K ask bar across the app. Turning this off hides
-                  them for everyone.
+                  {__('Controls the floating chat button and the ⌘K ask bar across the app. Turning this off hides them for everyone.')}
                 </span>
               </div>
               <Switch
@@ -283,14 +283,14 @@ export const AiAssistantSettingsPage: React.FC = () => {
       <Section>
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-bold text-foreground">Assistant Configuration</h2>
-            <p className="text-xs text-muted-foreground">Provider, model, and response behavior for the assistant.</p>
+            <h2 className="text-lg font-bold text-foreground">{__('Assistant Configuration')}</h2>
+            <p className="text-xs text-muted-foreground">{__('Provider, model, and response behavior for the assistant.')}</p>
           </div>
 
           {!agentConfig?.available ? (
             <div className="flex flex-col items-center justify-center gap-2 text-center py-12 px-6">
               <Sparkles className="h-5 w-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">The assistant isn't available to configure right now.</p>
+              <p className="text-sm text-muted-foreground">{__("The assistant isn't available to configure right now.")}</p>
               {agentConfig?.reason && (
                 <p className="text-xs text-muted-foreground/70">{agentConfig.reason}</p>
               )}
@@ -299,7 +299,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Provider</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{__('Provider')}</label>
                   <Select value={selectedProvider} onValueChange={handleProviderChange}>
                     {providers.map((p) => (
                       <SelectItem key={p.name} value={p.name}>
@@ -310,7 +310,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Model</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">{__('Model')}</label>
                   <Select
                     value={selectedModel}
                     onValueChange={(val: string) => setSelectedModel(val)}
@@ -326,7 +326,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Temperature ({temperature.toFixed(1)})
+                    {__('Temperature (')}{temperature.toFixed(1)})
                   </label>
                   <input
                     type="range"
@@ -338,14 +338,14 @@ export const AiAssistantSettingsPage: React.FC = () => {
                     className="w-full accent-primary"
                   />
                   <span className="text-xs text-muted-foreground mt-1 block">
-                    Lower is more focused and deterministic; higher is more creative.
+                    {__('Lower is more focused and deterministic; higher is more creative.')}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
                   <div>
-                    <span className="text-sm font-semibold text-foreground block">Cache Responses</span>
-                    <span className="text-xs text-muted-foreground">Enable prompt caching to reduce cost and latency.</span>
+                    <span className="text-sm font-semibold text-foreground block">{__('Cache Responses')}</span>
+                    <span className="text-xs text-muted-foreground">{__('Enable prompt caching to reduce cost and latency.')}</span>
                   </div>
                   <Switch checked={enableCaching} onCheckedChange={setEnableCaching} />
                 </div>
@@ -358,7 +358,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                   className="gap-2"
                 >
                   {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  Save Configuration
+                  {__('Save Configuration')}
                 </Button>
               </div>
 
@@ -369,15 +369,15 @@ export const AiAssistantSettingsPage: React.FC = () => {
               <div className="pt-4 border-t border-border space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">API Key</h3>
+                    <h3 className="text-sm font-bold text-foreground">{__('API Key')}</h3>
                     <p className="text-xs text-muted-foreground">
-                      Add or update a provider's key. Existing keys aren't shown here.
+                      {__("Add or update a provider's key. Existing keys aren't shown here.")}
                     </p>
                   </div>
                   {!addingKey && (
                     <Button variant="outline" onClick={openAddKey} className="inline-flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5" />
-                      Add API Key
+                      {__('Add API Key')}
                     </Button>
                   )}
                 </div>
@@ -385,7 +385,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                 {addingKey && (
                   <Card className="flex flex-col md:flex-row gap-3 md:items-end rounded-xl shadow-none">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Provider</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">{__('Provider')}</label>
                       <Select value={keyProvider} onValueChange={setKeyProvider}>
                         {providers.map((p) => (
                           <SelectItem key={p.name} value={p.name}>
@@ -395,18 +395,18 @@ export const AiAssistantSettingsPage: React.FC = () => {
                       </Select>
                     </div>
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-foreground mb-1.5">API Key</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">{__('API Key')}</label>
                       <Input
                         type="password"
                         value={apiKeyInput}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKeyInput(e.target.value)}
-                        placeholder="Paste API key"
+                        placeholder={__('Paste API key')}
                         autoComplete="off"
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" onClick={closeAddKey}>
-                        Cancel
+                        {__('Cancel')}
                       </Button>
                       <Button
                         type="button"
@@ -415,7 +415,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                         className="inline-flex items-center gap-1.5"
                       >
                         {savingKey ? <Spinner className="w-4 h-4" /> : <KeyRound className="w-3.5 h-3.5" />}
-                        Save
+                        {__('Save')}
                       </Button>
                     </div>
                   </Card>

@@ -1,5 +1,6 @@
 import { useConfigure, SectionId } from '../../context/ConfigureContext';
 import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check } from 'lucide-react';
+import { __ } from '../../i18n';
 
 interface SidebarItem {
   id: SectionId;
@@ -8,12 +9,12 @@ interface SidebarItem {
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'branch', label: 'Branch', icon: Building2 },
-  { id: 'rooms', label: 'Rooms', icon: Map },
-  { id: 'tables', label: 'Tables', icon: Grid3X3 },
-  { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
-  { id: 'payment', label: 'Payments', icon: CreditCard },
-  { id: 'users', label: 'User', icon: Users },
+  { id: 'branch', label: __('Branch'), icon: Building2 },
+  { id: 'rooms', label: __('Rooms'), icon: Map },
+  { id: 'tables', label: __('Tables'), icon: Grid3X3 },
+  { id: 'menu', label: __('Menu'), icon: UtensilsCrossed },
+  { id: 'payment', label: __('Payments'), icon: CreditCard },
+  { id: 'users', label: __('User'), icon: Users },
 ];
 
 export function ConfigureSidebar() {
@@ -24,7 +25,7 @@ export function ConfigureSidebar() {
       <div className="bg-muted border border-border rounded-lg p-4">
         {/* Section Title */}
         <h2 className="text-xs font-medium text-text-tertiary uppercase tracking-wide mb-3 px-1">
-          Configuration
+          {__('Configuration')}
         </h2>
 
         <div className="space-y-1">

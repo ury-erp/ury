@@ -13,6 +13,7 @@ import {
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { yieldCheckService } from '../../services/yieldCheck';
+import { __ } from '../../i18n';
 
 interface DueYieldCheckRow {
   item: string;
@@ -58,11 +59,11 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
     const outQty = parseFloat(outputQty);
 
     if (!inputQty || isNaN(inQty) || inQty <= 0) {
-      setError('Input quantity must be a positive number.');
+      setError(__('Input quantity must be a positive number.'));
       return;
     }
     if (!outputQty || isNaN(outQty) || outQty <= 0) {
-      setError('Output quantity must be a positive number.');
+      setError(__('Output quantity must be a positive number.'));
       return;
     }
 
@@ -71,7 +72,7 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
     try {
       await onConfirm(inQty, outQty);
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      setError(err.message || __('An error occurred. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -80,15 +81,15 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <Card className="w-full max-w-md p-6">
-        <h2 className="mb-1 text-lg font-semibold text-foreground">Log Yield Check</h2>
+        <h2 className="mb-1 text-lg font-semibold text-foreground">{__('Log Yield Check')}</h2>
         <p className="mb-4 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{row.item_name}</span>
-          {' '} - enter the quantities weighed before and after preparation.
+          {' '} {__('- enter the quantities weighed before and after preparation.')}
         </p>
 
         <div className="mb-4 space-y-3">
           <label className="flex flex-col text-sm font-medium text-muted-foreground">
-            Input Qty
+            {__('Input Qty')}
             <input
               type="number"
               min="0.001"
@@ -101,7 +102,7 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
           </label>
 
           <label className="flex flex-col text-sm font-medium text-muted-foreground">
-            Output Qty
+            {__('Output Qty')}
             <input
               type="number"
               min="0.001"
@@ -115,7 +116,7 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
 
           {inputQty && outputQty && !isNaN(parseFloat(inputQty)) && !isNaN(parseFloat(outputQty)) && parseFloat(inputQty) > 0 && (
             <p className="text-xs text-muted-foreground">
-              Actual yield:{' '}
+              {__('Actual yield:')}{' '}
               <span className="font-medium text-foreground">
                 {((parseFloat(outputQty) / parseFloat(inputQty)) * 100).toFixed(1)}%
               </span>
@@ -127,10 +128,10 @@ const LogCheckModal: React.FC<LogCheckModalProps> = ({
 
         <div className="flex justify-end gap-3">
           <Button onClick={onCancel} disabled={loading} variant="outline">
-            Cancel
+            {__('Cancel')}
           </Button>
           <Button onClick={handleConfirm} disabled={loading} variant="default">
-            {loading ? 'Saving...' : 'Log Check'}
+            {loading ? __('Saving...') : __('Log Check')}
           </Button>
         </div>
       </Card>
@@ -199,7 +200,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
       setRows(Array.isArray(data) ? data : []);
     } catch {
       setRows([]);
-      setError('Unable to load overdue yield checks.');
+      setError(__('Unable to load overdue yield checks.'));
     } finally {
       setLoading(false);
     }
@@ -228,7 +229,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
       } catch {
         if (!cancelled) {
           setRows([]);
-          setError('Unable to load overdue yield checks.');
+          setError(__('Unable to load overdue yield checks.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -257,7 +258,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
 
     const actualYield = ((outputQty / inputQty) * 100).toFixed(1);
     setSuccessMessage(
-      `Yield check logged for ${logModal.row.item_name}: ${actualYield}% actual yield.`
+      __('Yield check logged for {0}: {1}% actual yield.', [logModal.row.item_name, actualYield])
     );
     setLogModal({ isOpen: false, row: null });
 
@@ -268,7 +269,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
   const columns: DataTableColumn<DueYieldCheckRow>[] = [
     {
       key: 'item_name',
-      header: 'Item',
+      header: __('Item'),
       render: (row) => (
         <div>
           <div className="font-medium text-foreground">{row.item_name}</div>
@@ -278,17 +279,17 @@ export const OverdueYieldChecksPage: React.FC = () => {
     },
     {
       key: 'cadence',
-      header: 'Cadence',
+      header: __('Cadence'),
       render: (row) => row.cadence,
     },
     {
       key: 'reason',
-      header: 'Reason',
+      header: __('Reason'),
       render: (row) => row.reason,
     },
     {
       key: 'days_overdue',
-      header: 'Days Overdue',
+      header: __('Days Overdue'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -298,14 +299,14 @@ export const OverdueYieldChecksPage: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Actions',
+      header: __('Actions'),
       render: (row) => (
         <Button
           onClick={() => handleLogCheck(row)}
           variant="secondary"
           size="xs"
         >
-          Log Check
+          {__('Log Check')}
         </Button>
       ),
     },
@@ -314,23 +315,22 @@ export const OverdueYieldChecksPage: React.FC = () => {
   return (
     <Page>
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
-        <h1 className="text-xl font-semibold text-foreground">Overdue Yield Checks</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Overdue Yield Checks')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Items that are due for yield checks based on their configured cadence. Click{' '}
-          <span className="font-medium">Log Check</span> on any row to record a standalone
-          spot-check directly from here.
+          {__('Items that are due for yield checks based on their configured cadence. Click')}{' '}
+          <span className="font-medium">{__('Log Check')}</span> {__('on any row to record a standalone spot-check directly from here.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            Branch
+            {__('Branch')}
             <Select
-              aria-label="Branch"
+              aria-label={__('Branch')}
               value={currentBranch || ''}
               onChange={(event) => setSelectedBranch(event.target.value)}
               className="mt-1"
             >
-              <option value="">Select a branch</option>
+              <option value="">{__('Select a branch')}</option>
               {branches.map((branch) => (
                 <option key={branch.name} value={branch.name}>
                   {branch.name}
@@ -343,7 +343,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
 
       {!currentBranch || currentBranch === 'all' ? (
         <Section>
-          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view overdue yield checks.</Card>
+          <Card className="p-10 text-center text-sm text-text-tertiary">{__('Select a branch to view overdue yield checks.')}</Card>
         </Section>
       ) : (
         <Section>
@@ -359,7 +359,7 @@ export const OverdueYieldChecksPage: React.FC = () => {
               columns={columns}
               rows={rows}
               isLoading={loading}
-              emptyMessage="No overdue yield checks for this branch."
+              emptyMessage={__('No overdue yield checks for this branch.')}
             />
           )}
         </Section>

@@ -4,6 +4,7 @@ import { buttonVariants, KpiStrip, Spinner } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
 import { buildDashboardStatsKpiItems, summaryToDashboardStats } from '../../lib/dashboardStatsKpis';
 import { useCurrency } from '../../context/CurrencyContext';
+import { __ } from '../../i18n';
 
 interface LinkCardProps {
   label: string;
@@ -40,8 +41,8 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   return (
     <section className="w-full space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:w-fit">
-        <LinkCard label="POS" subtitle="Billing & order taking" href="/pos" />
-        <LinkCard label="Mosaic" subtitle="Kitchen Display System" href="/mosaic" />
+        <LinkCard label={__('POS')} subtitle={__('Billing & order taking')} href="/pos" />
+        <LinkCard label={__('Mosaic')} subtitle={__('Kitchen Display System')} href="/mosaic" />
       </div>
 
       {loading ? (

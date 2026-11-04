@@ -9,6 +9,7 @@ import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { PageToolbar } from '../../components/layout/PageToolbar';
 import TableLayoutView from './TableLayoutView';
+import { __ } from '../../i18n';
 
 interface UryTableRecord {
   name: string;
@@ -125,7 +126,7 @@ export const TablePage: React.FC = () => {
     if (!newTable.table_name) return;
 
     if (!newTable.restaurant_room || !newTable.restaurant_room.trim()) {
-      showToast.warning('Please select a room for the table');
+      showToast.warning(__('Please select a room for the table'));
       return;
     }
 
@@ -151,7 +152,7 @@ export const TablePage: React.FC = () => {
           is_take_away: newTable.is_take_away ? 1 : 0,
         };
         if (JSON.stringify(original) === JSON.stringify(current)) {
-          showToast.warning('No changes in document');
+          showToast.warning(__('No changes in document'));
           setSaving(false);
           return;
         }
@@ -198,7 +199,7 @@ export const TablePage: React.FC = () => {
           }
         }
         if (!restaurantName) {
-          showToast.error('No URY Restaurant configured for this branch — set one up first');
+          showToast.error(__('No URY Restaurant configured for this branch — set one up first'));
           return;
         }
 
@@ -217,12 +218,12 @@ export const TablePage: React.FC = () => {
           },
         });
       }
-      showToast.success('Table saved');
+      showToast.success(__('Table saved'));
       fetchTables();
       setIsDrawerOpen(false);
     } catch (err) {
       console.error('Failed to save URY Table', err);
-      showToast.error(`Failed to save table: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showToast.error(__('Failed to save table: {0}', [err instanceof Error ? err.message : 'Unknown error']));
     } finally {
       setSaving(false);
     }
@@ -253,14 +254,14 @@ export const TablePage: React.FC = () => {
             className={`font-semibold flex items-center gap-1.5 ${viewMode === 'layout' ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
           >
             <LayoutTemplate className="w-4 h-4" />
-            <span>Edit Layout</span>
+            <span>{__('Edit Layout')}</span>
           </Button>
           <Button
             onClick={openAddDrawer}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Table</span>
+            <span>{__('Add Table')}</span>
           </Button>
         </div>
       </PageToolbar>
@@ -274,16 +275,16 @@ export const TablePage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Grid className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Dining Tables Configured</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-1">{__('No Dining Tables Configured')}</h3>
           <p className="text-muted-foreground mb-6 max-w-sm">
-            Add dining tables to configure your restaurant layout.
+            {__('Add dining tables to configure your restaurant layout.')}
           </p>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Table</span>
+            <span>{__('Add Table')}</span>
           </Button>
         </Card>
       ) : viewMode === 'layout' ? (
@@ -302,22 +303,22 @@ export const TablePage: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                    <Square className="w-3 h-3 mr-1" />
-                    {t.table_shape || 'Square'}
+                    <Square className="w-3 h-3 me-1" />
+                    {t.table_shape || __('Square')}
                   </Badge>
                   <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
-                    {t.status || 'Available'}
+                    {t.status || __('Available')}
                   </Badge>
                 </div>
                 <h3 className="mt-3 text-xl font-bold text-foreground tracking-tight">{t.table_name || t.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1 font-medium">{t.restaurant_room || 'Main Hall'}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-medium">{t.restaurant_room || __('Main Hall')}</p>
               </div>
               <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-semibold">
                 <span className="flex items-center">
-                  <Users className="w-3.5 h-3.5 mr-1 text-primary" />
-                  {t.no_of_seats || 4} Seats
+                  <Users className="w-3.5 h-3.5 me-1 text-primary" />
+                  {t.no_of_seats || 4} {__('Seats')}
                 </span>
-                <span className="text-muted-foreground">Branch: {t.branch || 'Main'}</span>
+                <span className="text-muted-foreground">{__('Branch:')} {t.branch || __('Main')}</span>
               </div>
               <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                 <Edit2 className="w-6 h-6 text-primary" />
@@ -329,30 +330,30 @@ export const TablePage: React.FC = () => {
         <>
           {(() => {
             const tableColumns: DataTableColumn<UryTableRecord>[] = [
-              { key: 'table_name', header: 'Table Name', render: (t) => t.table_name || t.name },
-              { key: 'restaurant_room', header: 'Room', render: (t) => t.restaurant_room || 'Main Hall' },
-              { key: 'no_of_seats', header: 'Seats', render: (t) => t.no_of_seats || 4 },
+              { key: 'table_name', header: __('Table Name'), render: (t) => t.table_name || t.name },
+              { key: 'restaurant_room', header: __('Room'), render: (t) => t.restaurant_room || 'Main Hall' },
+              { key: 'no_of_seats', header: __('Seats'), render: (t) => t.no_of_seats || 4 },
               {
                 key: 'table_shape',
-                header: 'Shape',
+                header: __('Shape'),
                 render: (t) => (
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                    {t.table_shape || 'Square'}
+                    {t.table_shape || __('Square')}
                   </Badge>
                 ),
               },
               {
                 key: 'status',
-                header: 'Status',
+                header: __('Status'),
                 render: (t) => (
                   <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
-                    {t.status || 'Available'}
+                    {t.status || __('Available')}
                   </Badge>
                 ),
               },
               {
                 key: 'name',
-                header: 'Actions',
+                header: __('Actions'),
                 align: 'right',
                 render: (t) => (
                   <Button variant="ghost" onClick={() => openEditDrawer(t)} className="text-gray-500 hover:text-primary">
@@ -362,7 +363,7 @@ export const TablePage: React.FC = () => {
               },
             ];
 
-            return <DataTable columns={tableColumns} rows={tables} isLoading={loading} emptyMessage="No tables configured." />;
+            return <DataTable columns={tableColumns} rows={tables} isLoading={loading} emptyMessage={__('No tables configured.')} />;
           })()}
         </>
       )}
@@ -371,12 +372,12 @@ export const TablePage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingTable ? 'Edit Dining Table' : 'Add Dining Table'}
+        title={editingTable ? __('Edit Dining Table') : __('Add Dining Table')}
       >
         <form onSubmit={handleSaveTable} className="space-y-5">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Table Name</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">{__('Table Name')}</label>
               <Input
                 value={newTable.table_name}
                 onChange={(e) => setNewTable({ ...newTable, table_name: e.target.value })}
@@ -387,7 +388,7 @@ export const TablePage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-1">Seats Capacity</label>
+                <label className="block text-sm font-semibold text-foreground mb-1">{__('Seats Capacity')}</label>
                 <Input
                   type="number"
                   value={newTable.no_of_seats}
@@ -396,7 +397,7 @@ export const TablePage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-foreground mb-1">Min. Seating</label>
+                <label className="block text-sm font-semibold text-foreground mb-1">{__('Min. Seating')}</label>
                 <Input
                   type="number"
                   value={newTable.minimum_seating}
@@ -408,13 +409,13 @@ export const TablePage: React.FC = () => {
 
             {/* Branch — Select from Branch doctype */}
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Branch</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">{__('Branch')}</label>
               <SearchableSelect
                 id="branch"
                 value={newTable.branch}
                 onChange={(_, value) => setNewTable({ ...newTable, branch: value })}
                 options={[
-                  { value: '', label: 'Select Branch' },
+                  { value: '', label: __('Select Branch') },
                   ...branches.map(b => ({ value: b.name, label: b.name }))
                 ]}
               />
@@ -422,50 +423,50 @@ export const TablePage: React.FC = () => {
 
             {/* Room — Select from URY Room docs */}
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Room</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">{__('Room')}</label>
               <SearchableSelect
                 id="restaurant_room"
                 value={newTable.restaurant_room}
                 onChange={(_, value) => setNewTable({ ...newTable, restaurant_room: value })}
                 options={[
-                  { value: '', label: 'Select Room' },
+                  { value: '', label: __('Select Room') },
                   ...rooms.map(r => ({ value: r.name, label: r.name }))
                 ]}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Table Shape</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">{__('Table Shape')}</label>
               <SearchableSelect
                 id="table_shape"
                 value={newTable.table_shape}
                 onChange={(_, value) => setNewTable({ ...newTable, table_shape: value })}
                 options={[
-                  { value: 'Square', label: 'Square' },
-                  { value: 'Rectangle', label: 'Rectangle' },
-                  { value: 'Circle', label: 'Circle' },
+                  { value: 'Square', label: __('Square') },
+                  { value: 'Rectangle', label: __('Rectangle') },
+                  { value: 'Circle', label: __('Circle') },
                 ]}
               />
             </div>
 
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex items-center gap-2 pt-2">
               <Switch
                 id="is_take_away"
                 checked={newTable.is_take_away}
                 onCheckedChange={(checked) => setNewTable({ ...newTable, is_take_away: checked })}
               />
               <label htmlFor="is_take_away" className="text-sm font-medium text-foreground cursor-pointer">
-                Is Take Away Table
+                {__('Is Take Away Table')}
               </label>
             </div>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm" disabled={saving}>
-              {editingTable ? 'Save Changes' : 'Save Table'}
+              {editingTable ? __('Save Changes') : __('Save Table')}
             </Button>
           </div>
         </form>

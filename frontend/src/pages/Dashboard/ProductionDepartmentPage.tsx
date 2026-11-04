@@ -6,6 +6,7 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { __ } from '../../i18n';
 
 interface ProductionDepartmentRecord {
   name: string;
@@ -128,7 +129,7 @@ export const ProductionDepartmentPage: React.FC = () => {
   const handleSaveDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDepartment.department_name || !newDepartment.company || !newDepartment.branch || !newDepartment.department_warehouse || !newDepartment.cost_center) {
-      showToast.error('Please fill in all required fields');
+      showToast.error(__('Please fill in all required fields'));
       return;
     }
     setSaving(true);
@@ -159,10 +160,10 @@ export const ProductionDepartmentPage: React.FC = () => {
       }
       fetchDepartments();
       setIsDrawerOpen(false);
-      showToast.success(`Production Department ${editingDepartment ? 'updated' : 'added'} successfully`);
+      showToast.success(__('Production Department {0} successfully', [editingDepartment ? 'updated' : 'added']));
     } catch (err: any) {
       console.error('Failed to save Production Department', err);
-      let errorMessage = 'Failed to save Production Department';
+      let errorMessage = __('Failed to save Production Department');
       if (err._server_messages) {
         try {
           const messages = JSON.parse(err._server_messages);
@@ -188,10 +189,10 @@ export const ProductionDepartmentPage: React.FC = () => {
       <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-border flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={openAddDrawer}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Production Department</span>
+          <span>{__('Add Production Department')}</span>
         </Button>
       </div>
 
@@ -201,15 +202,15 @@ export const ProductionDepartmentPage: React.FC = () => {
         </div>
       ) : departments.length === 0 ? (
         <div className="mt-section px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
-          <span>Add production departments to organize kitchen operations and control policies.</span>
+          <span>{__('Add production departments to organize kitchen operations and control policies.')}</span>
           <Button
             onClick={openAddDrawer}
             variant="chrome"
             size="compactSm"
-            className="ml-auto"
+            className="ms-auto"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Dept</span>
+            <span>{__('Add Dept')}</span>
           </Button>
         </div>
       ) : (
@@ -218,22 +219,22 @@ export const ProductionDepartmentPage: React.FC = () => {
             const departmentColumns: DataTableColumn<ProductionDepartmentRecord>[] = [
               {
                 key: 'department_name',
-                header: 'Department',
+                header: __('Department'),
                 render: (row) => <span className="font-semibold text-foreground">{row.department_name || row.name}</span>,
               },
               {
                 key: 'company',
-                header: 'Company',
+                header: __('Company'),
                 render: (row) => <span>{row.company || '-'}</span>,
               },
               {
                 key: 'branch',
-                header: 'Branch',
+                header: __('Branch'),
                 render: (row) => <span>{row.branch || '-'}</span>,
               },
               {
                 key: 'department_warehouse',
-                header: 'Warehouse',
+                header: __('Warehouse'),
                 render: (row) => <span>{row.department_warehouse || '-'}</span>,
               },
             ];
@@ -241,7 +242,7 @@ export const ProductionDepartmentPage: React.FC = () => {
               <DataTable
                 columns={departmentColumns}
                 rows={departments}
-                emptyMessage="No production departments found."
+                emptyMessage={__('No production departments found.')}
                 onRowClick={(row) => openEditDrawer(row)}
               />
             );
@@ -253,11 +254,11 @@ export const ProductionDepartmentPage: React.FC = () => {
       <SideDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        title={editingDepartment ? 'Edit Production Department' : 'Add Production Department'}
+        title={editingDepartment ? __('Edit Production Department') : __('Add Production Department')}
       >
         <form onSubmit={handleSaveDepartment} className="space-y-4 text-sm">
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Department Name *</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Department Name *')}</label>
             <Input
               value={newDepartment.department_name}
               onChange={(e) => setNewDepartment({ ...newDepartment, department_name: e.target.value })}
@@ -266,57 +267,57 @@ export const ProductionDepartmentPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Company *</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Company *')}</label>
             <SearchableSelect
               id="company"
               value={newDepartment.company}
               onChange={(id, val) => setNewDepartment({ ...newDepartment, company: val })}
               options={companies.map(c => ({ value: c.name, label: c.name }))}
-              placeholder="Select Company"
+              placeholder={__('Select Company')}
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Branch *</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Branch *')}</label>
             <SearchableSelect
               id="branch"
               value={newDepartment.branch}
               onChange={(id, val) => setNewDepartment({ ...newDepartment, branch: val })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
-              placeholder="Select Branch"
+              placeholder={__('Select Branch')}
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Department Manager</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Department Manager')}</label>
             <SearchableSelect
               id="department_manager"
               value={newDepartment.department_manager}
               onChange={(id, val) => setNewDepartment({ ...newDepartment, department_manager: val })}
               options={managers.map(m => ({ value: m.name, label: m.full_name || m.name }))}
-              placeholder="Select Manager (optional)"
+              placeholder={__('Select Manager (optional)')}
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Department Warehouse *</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Department Warehouse *')}</label>
             <SearchableSelect
               id="department_warehouse"
               value={newDepartment.department_warehouse}
               onChange={(id, val) => setNewDepartment({ ...newDepartment, department_warehouse: val })}
               options={warehouses.map(w => ({ value: w.name, label: w.name }))}
-              placeholder="Select Warehouse"
+              placeholder={__('Select Warehouse')}
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Cost Center *</label>
+            <label className="block font-semibold text-muted-foreground mb-1">{__('Cost Center *')}</label>
             <SearchableSelect
               id="cost_center"
               value={newDepartment.cost_center}
               onChange={(id, val) => setNewDepartment({ ...newDepartment, cost_center: val })}
               options={costCenters.map(cc => ({ value: cc.name, label: cc.name }))}
-              placeholder="Select Cost Center"
+              placeholder={__('Select Cost Center')}
             />
           </div>
 
@@ -327,17 +328,17 @@ export const ProductionDepartmentPage: React.FC = () => {
               checked={newDepartment.enabled}
               onChange={(e) => setNewDepartment({ ...newDepartment, enabled: e.target.checked })}
             />
-            <label htmlFor="enabled" className="font-semibold text-muted-foreground">Enabled</label>
+            <label htmlFor="enabled" className="font-semibold text-muted-foreground">{__('Enabled')}</label>
           </div>
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-border">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={saving}>
               <div className="flex items-center gap-2">
                 {saving && <Spinner className="w-4 h-4" />}
-                <span>{saving ? 'Saving...' : (editingDepartment ? 'Save Changes' : 'Save Department')}</span>
+                <span>{saving ? __('Saving...') : (editingDepartment ? 'Save Changes' : 'Save Department')}</span>
               </div>
             </Button>
           </div>

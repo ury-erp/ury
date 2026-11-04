@@ -6,6 +6,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface ABVRow {
   date: string;
@@ -20,9 +21,9 @@ interface AverageBillValueData {
 }
 
 const columns: DataTableColumn<ABVRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'bill_count', header: 'Bills', align: 'right' },
-  { key: 'total_sales', header: 'Total Sales', render: (r) => formatCurrency(r.total_sales), align: 'right' },
+  { key: 'date', header: __('Date') },
+  { key: 'bill_count', header: __('Bills'), align: 'right' },
+  { key: 'total_sales', header: __('Total Sales'), render: (r) => formatCurrency(r.total_sales), align: 'right' },
   { key: 'abv', header: 'ABV', render: (r) => formatCurrency(r.abv), align: 'right' },
 ];
 
@@ -48,7 +49,7 @@ export function AverageBillValue() {
       });
       setData(res.message ?? (res as unknown as AverageBillValueData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -61,8 +62,8 @@ export function AverageBillValue() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Average Bill Value"
-        description={`Daily average bill trend ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Average Bill Value')}
+        description={__('Daily average bill trend {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -73,18 +74,18 @@ export function AverageBillValue() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Bills', value: data.summary.total_bills },
-              { label: 'Total Sales', value: formatCurrency(data.summary.total_sales) },
-              { label: 'Average Bill Value', value: formatCurrency(data.summary.average_abv) },
+              { label: __('Total Bills'), value: data.summary.total_bills },
+              { label: __('Total Sales'), value: formatCurrency(data.summary.total_sales) },
+              { label: __('Average Bill Value'), value: formatCurrency(data.summary.average_abv) },
             ] satisfies KpiItemProps[]}
           />
 
-          <LineChartCard title="ABV Trend" data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: 'Avg Bill Value' }} />
+          <LineChartCard title={__('ABV Trend')} data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: 'Avg Bill Value' }} />
 
           <DataTable columns={columns} rows={data.data} isLoading={isLoading} />
         </>

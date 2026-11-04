@@ -5,6 +5,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface CustomerRow {
   customer_id: string;
@@ -21,11 +22,11 @@ interface DaywiseCustomerDetailsData {
 }
 
 const columns: DataTableColumn<CustomerRow>[] = [
-  { key: 'customer_name', header: 'Name' },
-  { key: 'mobile_number', header: 'Mobile', render: (r) => r.mobile_number || '—' },
-  { key: 'visit_count', header: 'Visits', align: 'right' },
-  { key: 'first_visit', header: 'First Visit' },
-  { key: 'last_visit', header: 'Last Visit' },
+  { key: 'customer_name', header: __('Name') },
+  { key: 'mobile_number', header: __('Mobile'), render: (r) => r.mobile_number || '—' },
+  { key: 'visit_count', header: __('Visits'), align: 'right' },
+  { key: 'first_visit', header: __('First Visit') },
+  { key: 'last_visit', header: __('Last Visit') },
 ];
 
 export function DaywiseCustomerDetails() {
@@ -49,7 +50,7 @@ export function DaywiseCustomerDetails() {
       );
       setData(res.message ?? (res as unknown as DaywiseCustomerDetailsData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -77,8 +78,8 @@ export function DaywiseCustomerDetails() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daywise Customer Details"
-        description={`Customer contact list ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Daywise Customer Details')}
+        description={__('Customer contact list {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={
           <>
             <button
@@ -86,7 +87,7 @@ export function DaywiseCustomerDetails() {
               disabled={!data || data.customers.length === 0}
               className="text-sm px-3 py-1.5 border border-input rounded-md hover:bg-accent disabled:opacity-50"
             >
-              Export CSV
+              {__('Export CSV')}
             </button>
             <DateRangeFilter value={range} onChange={setRange} />
           </>
@@ -101,7 +102,7 @@ export function DaywiseCustomerDetails() {
 
       {data && (
         <KpiStrip
-          items={[{ label: 'Unique Customers', value: data.total_count }] satisfies KpiItemProps[]}
+          items={[{ label: __('Unique Customers'), value: data.total_count }] satisfies KpiItemProps[]}
         />
       )}
 

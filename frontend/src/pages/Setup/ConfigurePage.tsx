@@ -20,40 +20,41 @@ import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
+import { __ } from '../../i18n';
 
 const SECTION_CONFIGS: Record<
   SectionId,
   { title: string; description: string }
 > = {
   branch: {
-    title: 'Branch Details',
+    title: __('Branch Details'),
     description:
-      'Set up your main branch name, invoice numbering, and tax details.',
+      __('Set up your main branch name, invoice numbering, and tax details.'),
   },
   rooms: {
-    title: 'Rooms',
+    title: __('Rooms'),
     description:
-      "Add the seating areas in your restaurant — you'll set how many tables each one has.",
+      __("Add the seating areas in your restaurant — you'll set how many tables each one has."),
   },
   tables: {
-    title: 'Tables',
+    title: __('Tables'),
     description:
-      'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
+      __('Review and adjust the tables we generated for each room — rename, adjust seats, or add more.'),
   },
   menu: {
-    title: 'Menu',
+    title: __('Menu'),
     description:
-      'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
+      __('Add a few items to get started — you can bulk-import or add hundreds more anytime later.'),
   },
   payment: {
-    title: 'Payments',
+    title: __('Payments'),
     description:
-      'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
+      __('How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.'),
   },
   users: {
-    title: 'Staff Accounts',
+    title: __('Staff Accounts'),
     description:
-      "Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below.",
+      __("Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below."),
   },
 };
 
@@ -64,7 +65,7 @@ function classifyError(err: unknown): {
   if (!err) {
     return {
       type: 'unknown',
-      msg: 'An unknown error occurred.',
+      msg: __('An unknown error occurred.'),
     };
   }
 
@@ -72,7 +73,7 @@ function classifyError(err: unknown): {
   if (err instanceof TypeError) {
     return {
       type: 'network',
-      msg: 'Network error, check your connection and retry.',
+      msg: __('Network error, check your connection and retry.'),
     };
   }
 
@@ -109,7 +110,7 @@ function classifyError(err: unknown): {
   ) {
     return {
       type: 'duplicate',
-      msg: 'Some records already exist and have been reused.',
+      msg: __('Some records already exist and have been reused.'),
     };
   }
 
@@ -129,7 +130,7 @@ function classifyError(err: unknown): {
     (typeof err === 'string' ? err : '') ||
     ((err as any)?.message ?? '') ||
     ((err as any)?.exception ?? '') ||
-    'Failed to configure setup. Check backend logs.';
+    __('Failed to configure setup. Check backend logs.');
 
   return {
     type: 'unknown',
@@ -227,7 +228,7 @@ function ConfigurePageContent() {
 
       if (classified.type === 'network') {
         setError(
-          'Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.'
+          __('Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.')
         );
       } else {
         setError(classified.msg);
@@ -298,7 +299,7 @@ function ConfigurePageContent() {
       secondaryAction={
         <div className="flex items-center gap-3">
           <span className="hidden sm:inline text-xs text-muted-foreground">
-            the data can be changed later
+            {__('the data can be changed later')}
           </span>
 
           <Button
@@ -307,7 +308,7 @@ function ConfigurePageContent() {
             onClick={handleFinish}
             disabled={finishing}
           >
-            Finish with defaults
+            {__('Finish with defaults')}
           </Button>
         </div>
       }
@@ -317,7 +318,7 @@ function ConfigurePageContent() {
           <div className="p-4 bg-destructive-tint border border-destructive-tint-border rounded-lg flex items-start gap-3 text-destructive">
             <div className="flex-1 text-sm font-medium">
               <span className="font-bold block mb-1">
-                Configuration Error:
+                {__('Configuration Error:')}
               </span>
               {error}
             </div>
@@ -326,7 +327,7 @@ function ConfigurePageContent() {
               onClick={() => setError(null)}
               className="text-xs text-destructive hover:text-destructive font-semibold underline shrink-0"
             >
-              Dismiss
+              {__('Dismiss')}
             </button>
           </div>
         )}

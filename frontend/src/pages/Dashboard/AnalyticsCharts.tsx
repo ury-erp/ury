@@ -5,6 +5,7 @@ import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
 import { DashboardChartsData } from '../../services/dashboard';
+import { __ } from '../../i18n';
 
 interface AnalyticsChartsProps {
   chartsData: DashboardChartsData | null;
@@ -46,13 +47,13 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
 
   // Payment method distribution
   const paymentMethods = chartsData?.payment_methods?.map(pm => ({
-    type: pm.method || 'Unknown',
+    type: pm.method || __('Unknown'),
     amount: pm.total || 0
   })) || [];
 
   // Order type distribution
   const orderTypes = chartsData?.order_types?.map(ot => ({
-    type: ot.order_type || 'Unknown',
+    type: ot.order_type || __('Unknown'),
     count: ot.count || 0
   })) || [];
 
@@ -77,7 +78,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           <ChartEmpty message="No sales trend data available" />
         ) : (
           <LineChartCard
-            title="Sales Trend"
+            title={__('Sales Trend')}
             data={trendData}
             xKey="time"
             yKeys={['sales']}
@@ -91,7 +92,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           <ChartEmpty message="No hourly data available" />
         ) : (
           <BarChartCard
-            title="Peak Sales Distribution"
+            title={__('Peak Sales Distribution')}
             data={hourlyData}
             xKey="hour"
             yKeys={['sales']}
@@ -108,7 +109,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           <ChartEmpty message="No branch data available" />
         ) : (
           <BarChartCard
-            title="Revenue by Branch"
+            title={__('Revenue by Branch')}
             data={branchData}
             xKey="name"
             yKeys={['revenue']}
@@ -121,7 +122,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         ) : paymentMethods.length === 0 ? (
           <ChartEmpty message="No payment data available" />
         ) : (
-          <PieChartCard title="Payment Breakdown" data={paymentMethods} dataKey="amount" nameKey="type" />
+          <PieChartCard title={__('Payment Breakdown')} data={paymentMethods} dataKey="amount" nameKey="type" />
         )}
 
         {loading ? (
@@ -129,7 +130,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         ) : orderTypes.length === 0 ? (
           <ChartEmpty message="No order type data available" />
         ) : (
-          <PieChartCard title="Order Type Split" data={orderTypes} dataKey="count" nameKey="type" />
+          <PieChartCard title={__('Order Type Split')} data={orderTypes} dataKey="count" nameKey="type" />
         )}
       </div>
 
@@ -142,11 +143,11 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         <CardHeader className="p-0 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-bold text-foreground">Top Selling Menu Items</CardTitle>
-              <p className="text-xs text-text-tertiary mt-1">Highest grossing items ranked by order count & volume</p>
+              <CardTitle className="text-lg font-bold text-foreground">{__('Top Selling Menu Items')}</CardTitle>
+              <p className="text-xs text-text-tertiary mt-1">{__('Highest grossing items ranked by order count & volume')}</p>
             </div>
             <Badge variant="outline" className="border-primary-tint-border bg-primary-tint text-primary">
-              Ranked Top {topItems.length}
+              {__('Ranked Top')} {topItems.length}
             </Badge>
           </div>
         </CardHeader>
@@ -157,7 +158,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
             </div>
           ) : topItems.length === 0 ? (
             <div className="py-12 flex items-center justify-center border border-dashed border-border rounded-lg text-text-tertiary text-xs">
-              No top items data available
+              {__('No top items data available')}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
@@ -188,8 +189,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                       />
                     </div>
                     <div className="flex justify-between text-[11px] text-text-tertiary">
-                      <span>Category: {item.category}</span>
-                      <span>{item.count} items ordered</span>
+                      <span>{__('Category:')} {item.category}</span>
+                      <span>{item.count} {__('items ordered')}</span>
                     </div>
                   </div>
                 </div>

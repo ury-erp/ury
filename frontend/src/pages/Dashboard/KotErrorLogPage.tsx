@@ -5,6 +5,7 @@ import { call } from "@ury/core";
 import { useBranchContext } from "../../context/BranchContext";
 import { kotErrorLogService, KotErrorLogRow } from "../../services/kotErrorLog";
 import { DeskLink } from "../../components/DeskLink";
+import { __ } from '../../i18n';
 
 interface PosProfileOption {
   name: string;
@@ -26,7 +27,7 @@ const columns: DataTableColumn<KotErrorLogRow>[] = [
   },
   {
     key: "invoice",
-    header: "Invoice",
+    header: __('Invoice'),
     render: (row) => (
       <span className="inline-flex items-center gap-1.5">
         <span>{row.invoice}</span>
@@ -40,7 +41,7 @@ const columns: DataTableColumn<KotErrorLogRow>[] = [
     header: "Date/Time",
     render: (row) => <span className="text-xs">{row.invoice_creation_time || "—"}</span>,
   },
-  { key: "production", header: "Department" },
+  { key: "production", header: __('Department') },
 ];
 
 export const KotErrorLogPage: React.FC = () => {
@@ -76,7 +77,7 @@ export const KotErrorLogPage: React.FC = () => {
           setState("select-profile");
         }
       } catch (err: any) {
-        setErrorMessage(err?.message || "Failed to load POS Profiles");
+        setErrorMessage(err?.message || __('Failed to load POS Profiles'));
         setState("error");
       }
     };
@@ -93,7 +94,7 @@ export const KotErrorLogPage: React.FC = () => {
         setLogs(result || []);
         setState(result && result.length > 0 ? "populated" : "empty");
       } catch (err: any) {
-        setErrorMessage(err?.message || "Failed to load KOT error logs");
+        setErrorMessage(err?.message || __('Failed to load KOT error logs'));
         setState("error");
       }
     };
@@ -105,8 +106,8 @@ export const KotErrorLogPage: React.FC = () => {
       <Card className="p-6">
         <EmptyState
           icon={AlertTriangle}
-          title="Select a branch"
-          description="Please select a specific branch to view KOT error logs."
+          title={__('Select a branch')}
+          description={__('Please select a specific branch to view KOT error logs.')}
         />
       </Card>
     );
@@ -125,8 +126,8 @@ export const KotErrorLogPage: React.FC = () => {
       <Card className="p-6">
         <EmptyState
           icon={AlertTriangle}
-          title="No POS Profiles found"
-          description="This branch has no POS Profile configured yet. Set one up to start tracking KOT errors."
+          title={__('No POS Profiles found')}
+          description={__('This branch has no POS Profile configured yet. Set one up to start tracking KOT errors.')}
         />
       </Card>
     );
@@ -144,11 +145,11 @@ export const KotErrorLogPage: React.FC = () => {
     <div className="space-y-4 p-4">
       {profiles.length > 1 && (
         <Card className="p-4">
-          <label className="text-xs text-muted-foreground block mb-2">POS Profile</label>
+          <label className="text-xs text-muted-foreground block mb-2">{__('POS Profile')}</label>
           <Select
             value={selectedProfile}
             onChange={(e) => setSelectedProfile(e.target.value)}
-            placeholder="Select a POS Profile"
+            placeholder={__('Select a POS Profile')}
           >
             {profiles.map((p) => (
               <option key={p.name} value={p.name}>
@@ -160,7 +161,7 @@ export const KotErrorLogPage: React.FC = () => {
       )}
 
       <div>
-        <h3 className="mb-4 text-sm font-semibold">KOT Error Logs</h3>
+        <h3 className="mb-4 text-sm font-semibold">{__('KOT Error Logs')}</h3>
         {state === "loading" ? (
           <div className="flex items-center justify-center p-8">
             <Spinner />
@@ -170,8 +171,8 @@ export const KotErrorLogPage: React.FC = () => {
         ) : (
           <EmptyState
             icon={AlertTriangle}
-            title="No KOT errors"
-            description="No duplicate or failed Kitchen Order Ticket events have been recorded for this POS Profile yet."
+            title={__('No KOT errors')}
+            description={__('No duplicate or failed Kitchen Order Ticket events have been recorded for this POS Profile yet.')}
           />
         )}
       </div>

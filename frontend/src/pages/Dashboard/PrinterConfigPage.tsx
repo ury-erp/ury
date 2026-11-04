@@ -17,6 +17,7 @@ import { Switch } from '../../components/ui/switch';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
 import { call } from '@ury/core';
+import { __ } from '../../i18n';
 
 type SectionKey = 'pos_profile' | 'production_unit' | 'room';
 
@@ -118,7 +119,7 @@ const rowForSave = (row: PrinterRow): Record<string, unknown> => ({
 });
 
 const parseFrappeError = (err: any): string => {
-  let msg = err?.message || 'An error occurred';
+  let msg = err?.message || __('An error occurred');
   if (err?._server_messages) {
     try {
       const messages = JSON.parse(err._server_messages).map((m: any) => {
@@ -196,7 +197,7 @@ export const PrinterConfigPage: React.FC = () => {
   const [deletingPrinter, setDeletingPrinter] = useState<boolean>(false);
 
   const activeBranchName = useMemo(() => {
-    if (activeBranchId === 'all') return 'All Branches';
+    if (activeBranchId === 'all') return __('All Branches');
     return branches.find((b) => b.id === activeBranchId)?.name || activeBranchId;
   }, [activeBranchId, branches]);
 
@@ -294,7 +295,7 @@ export const PrinterConfigPage: React.FC = () => {
         });
       } catch (err) {
         console.error('Failed to load printer config data', err);
-        setError(parseFrappeError(err) || 'Failed to load printer configuration');
+        setError(parseFrappeError(err) || __('Failed to load printer configuration'));
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -311,7 +312,7 @@ export const PrinterConfigPage: React.FC = () => {
     try {
       await loadNetworkPrinters();
     } catch (err) {
-      showToast.error(parseFrappeError(err) || 'Failed to refresh network printers');
+      showToast.error(parseFrappeError(err) || __('Failed to refresh network printers'));
     }
   }, [loadNetworkPrinters]);
 
@@ -395,7 +396,7 @@ export const PrinterConfigPage: React.FC = () => {
         setPosForm(form);
         setOriginals((prev) => ({ ...prev, pos_profile: snapshotOf('pos_profile', form) }));
       } catch (err) {
-        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
+        if (!cancelled) showToast.error(parseFrappeError(err) || __('Failed to load record'));
       } finally {
         if (!cancelled) setDocLoading((prev) => ({ ...prev, pos_profile: false }));
       }
@@ -423,7 +424,7 @@ export const PrinterConfigPage: React.FC = () => {
         setUnitForm(form);
         setOriginals((prev) => ({ ...prev, production_unit: snapshotOf('production_unit', form) }));
       } catch (err) {
-        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
+        if (!cancelled) showToast.error(parseFrappeError(err) || __('Failed to load record'));
       } finally {
         if (!cancelled) setDocLoading((prev) => ({ ...prev, production_unit: false }));
       }
@@ -451,7 +452,7 @@ export const PrinterConfigPage: React.FC = () => {
         setRoomForm(form);
         setOriginals((prev) => ({ ...prev, room: snapshotOf('room', form) }));
       } catch (err) {
-        if (!cancelled) showToast.error(parseFrappeError(err) || 'Failed to load record');
+        if (!cancelled) showToast.error(parseFrappeError(err) || __('Failed to load record'));
       } finally {
         if (!cancelled) setDocLoading((prev) => ({ ...prev, room: false }));
       }
@@ -472,7 +473,7 @@ export const PrinterConfigPage: React.FC = () => {
       originals.production_unit !== currentSnapshot('production_unit');
     const isRoomDirty = !!selectedNames.room && originals.room !== currentSnapshot('room');
     if (!isPosDirty && !isUnitDirty && !isRoomDirty) {
-      showToast.warning('No changes in document');
+      showToast.warning(__('No changes in document'));
       return;
     }
     setSavingAll(true);
@@ -522,9 +523,9 @@ export const PrinterConfigPage: React.FC = () => {
         ...(isUnitDirty ? { production_unit: currentSnapshot('production_unit') } : {}),
         ...(isRoomDirty ? { room: currentSnapshot('room') } : {}),
       }));
-      showToast.success('Printer configuration saved');
+      showToast.success(__('Printer configuration saved'));
     } catch (err) {
-      showToast.error(parseFrappeError(err) || 'Failed to save printer settings');
+      showToast.error(parseFrappeError(err) || __('Failed to save printer settings'));
       console.error('Failed to save printer settings', err);
     } finally {
       setSavingAll(false);
@@ -544,7 +545,7 @@ export const PrinterConfigPage: React.FC = () => {
     e.preventDefault();
     if (addingPrinter) return;
     if (!printerForm.name.trim()) {
-      showToast.error('Printer name is required');
+      showToast.error(__('Printer name is required'));
       return;
     }
     setAddingPrinter(true);
@@ -558,12 +559,12 @@ export const PrinterConfigPage: React.FC = () => {
           printer_name: printerForm.printer_name.trim(),
         },
       });
-      showToast.success('Network printer created');
+      showToast.success(__('Network printer created'));
       setPrinterModalOpen(false);
       setPrinterForm({ name: '', server_ip: 'localhost', port: '631', printer_name: '' });
       await refreshPrinters();
     } catch (err) {
-      showToast.error(parseFrappeError(err) || 'Failed to create network printer');
+      showToast.error(parseFrappeError(err) || __('Failed to create network printer'));
     } finally {
       setAddingPrinter(false);
     }
@@ -577,11 +578,11 @@ export const PrinterConfigPage: React.FC = () => {
         doctype: 'Network Printer Settings',
         name: deleteTarget,
       });
-      showToast.success('Network printer deleted');
+      showToast.success(__('Network printer deleted'));
       setDeleteTarget(null);
       await refreshPrinters();
     } catch (err) {
-      showToast.error(parseFrappeError(err) || 'Failed to delete network printer');
+      showToast.error(parseFrappeError(err) || __('Failed to delete network printer'));
     } finally {
       setDeletingPrinter(false);
     }
@@ -604,7 +605,7 @@ export const PrinterConfigPage: React.FC = () => {
   ) => (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-foreground">Printers</h3>
+        <h3 className="text-sm font-semibold text-foreground">{__('Printers')}</h3>
         <Button
           type="button"
           variant="outline"
@@ -613,21 +614,21 @@ export const PrinterConfigPage: React.FC = () => {
           className="text-primary border-primary"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add Row
+          {__('Add Row')}
         </Button>
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3">No printers configured. Add a row to assign printers.</p>
+        <p className="text-sm text-muted-foreground py-3">{__('No printers configured. Add a row to assign printers.')}</p>
       ) : (
         <div className="overflow-x-auto border border-border rounded-lg">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">Bill</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">KOT Print</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">Waiter Print</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5 min-w-[180px]">Printer</th>
-                <th className="w-10 px-2 py-2" aria-label="actions" />
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">{__('Bill')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">{__('KOT Print')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5 whitespace-nowrap">{__('Waiter Print')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5 min-w-[180px]">{__('Printer')}</th>
+                <th className="w-10 px-2 py-2" aria-label={__('actions')} />
               </tr>
             </thead>
             <tbody>
@@ -635,7 +636,7 @@ export const PrinterConfigPage: React.FC = () => {
                 <tr key={row.name || idx} className="border-b border-border last:border-b-0">
                   <td className="px-2.5 py-1.5">
                     <Switch
-                      aria-label={`${labelPrefix} row ${idx + 1} bill`}
+                      aria-label={__('{0} row {1} bill', [labelPrefix, idx + 1])}
                       checked={row.bill === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, bill: checked ? 1 : 0 } : r)))
@@ -644,7 +645,7 @@ export const PrinterConfigPage: React.FC = () => {
                   </td>
                   <td className="px-2.5 py-1.5">
                     <Switch
-                      aria-label={`${labelPrefix} row ${idx + 1} KOT print`}
+                      aria-label={__('{0} row {1} KOT print', [labelPrefix, idx + 1])}
                       checked={row.custom_kot_print === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, custom_kot_print: checked ? 1 : 0 } : r)))
@@ -653,7 +654,7 @@ export const PrinterConfigPage: React.FC = () => {
                   </td>
                   <td className="px-2.5 py-1.5">
                     <Switch
-                      aria-label={`${labelPrefix} row ${idx + 1} waiter print`}
+                      aria-label={__('{0} row {1} waiter print', [labelPrefix, idx + 1])}
                       checked={row.custom_waiter_print === 1}
                       onCheckedChange={(checked) =>
                         onChange(rows.map((r, i) => (i === idx ? { ...r, custom_waiter_print: checked ? 1 : 0 } : r)))
@@ -675,7 +676,7 @@ export const PrinterConfigPage: React.FC = () => {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`${labelPrefix} delete row ${idx + 1}`}
+                      aria-label={__('{0} delete row {1}', [labelPrefix, idx + 1])}
                       onClick={() => onChange(rows.filter((_, i) => i !== idx))}
                       className="text-destructive hover:text-destructive/80 h-8 w-8"
                     >
@@ -704,7 +705,7 @@ export const PrinterConfigPage: React.FC = () => {
           className="text-primary border-primary"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add Network Printer
+          {__('Add Network Printer')}
         </Button>
       )}
       {loading ? (
@@ -712,17 +713,17 @@ export const PrinterConfigPage: React.FC = () => {
           <Spinner className="w-6 h-6 text-primary" hideMessage />
         </div>
       ) : networkPrinters.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3">No network printers configured.</p>
+        <p className="text-sm text-muted-foreground py-3">{__('No network printers configured.')}</p>
       ) : (
         <div className="overflow-x-auto border border-border rounded-lg">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Printer Name / ID</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Server IP</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Port</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Printer Device Name</th>
-                <th className="text-left font-medium text-muted-foreground px-2.5 py-1.5">Actions</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5">{__('Printer Name / ID')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5">{__('Server IP')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5">{__('Port')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5">{__('Printer Device Name')}</th>
+                <th className="text-start font-medium text-muted-foreground px-2.5 py-1.5">{__('Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -737,7 +738,7 @@ export const PrinterConfigPage: React.FC = () => {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`Delete printer ${printer.name}`}
+                      aria-label={__('Delete printer {0}', [printer.name])}
                       onClick={() => setDeleteTarget(printer.name)}
                       className="text-destructive hover:text-destructive/80 h-8 w-8"
                     >
@@ -762,13 +763,13 @@ export const PrinterConfigPage: React.FC = () => {
       {records.pos_profile.length === 0 ? (
         <EmptyState
           icon={Printer}
-          title="No POS Profiles for this branch"
-          description={`There are no pos profiles assigned to ${activeBranchName}.`}
+          title={__('No POS Profiles for this branch')}
+          description={__('There are no pos profiles assigned to {0}.', [activeBranchName])}
         />
       ) : (
         <>
           <div className="max-w-md">
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">POS Profile</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('POS Profile')}</label>
             <SearchableSelect
               id="pos-profile-selector"
               value={selectedNames.pos_profile}
@@ -788,10 +789,10 @@ export const PrinterConfigPage: React.FC = () => {
           ) : (
             <>
               <div className="space-y-3 pt-2 border-t border-border">
-                <h3 className="text-sm font-semibold text-foreground">Standard Print Settings</h3>
+                <h3 className="text-sm font-semibold text-foreground">{__('Standard Print Settings')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Format</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Print Format')}</label>
                     <SearchableSelect
                       id="print_format"
                       value={posForm.print_format}
@@ -800,7 +801,7 @@ export const PrinterConfigPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Letter Head</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Letter Head')}</label>
                     <SearchableSelect
                       id="letter_head"
                       value={posForm.letter_head}
@@ -809,7 +810,7 @@ export const PrinterConfigPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Terms and Conditions</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Terms and Conditions')}</label>
                     <SearchableSelect
                       id="tc_name"
                       value={posForm.tc_name}
@@ -818,7 +819,7 @@ export const PrinterConfigPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">Print Heading</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Print Heading')}</label>
                     <SearchableSelect
                       id="select_print_heading"
                       value={posForm.select_print_heading}
@@ -830,37 +831,37 @@ export const PrinterConfigPage: React.FC = () => {
               </div>
 
               <div className="space-y-3 pt-3 border-t border-border">
-                <h3 className="text-sm font-semibold text-foreground">Hardware / QZ Settings</h3>
+                <h3 className="text-sm font-semibold text-foreground">{__('Hardware / QZ Settings')}</h3>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm text-foreground">QZ Print</p>
-                    <p className="text-xs text-muted-foreground">Print through a local QZ Tray client instead of network printers.</p>
+                    <p className="text-sm text-foreground">{__('QZ Print')}</p>
+                    <p className="text-xs text-muted-foreground">{__('Print through a local QZ Tray client instead of network printers.')}</p>
                   </div>
                   <Switch
                     id="qz_print"
-                    aria-label="QZ Print"
+                    aria-label={__('QZ Print')}
                     checked={posForm.qz_print}
                     onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, qz_print: checked }))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">QZ Host</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('QZ Host')}</label>
                   <Input
                     id="qz_host"
                     value={posForm.qz_host}
                     onChange={(e) => setPosForm((prev) => ({ ...prev, qz_host: e.target.value }))}
-                    placeholder="localhost"
+                    placeholder={__('localhost')}
                     disabled={!posForm.qz_print}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm text-foreground">Enable KOT Reprint</p>
-                    <p className="text-xs text-muted-foreground">Allow reprinting KOTs for table and parcel orders.</p>
+                    <p className="text-sm text-foreground">{__('Enable KOT Reprint')}</p>
+                    <p className="text-xs text-muted-foreground">{__('Allow reprinting KOTs for table and parcel orders.')}</p>
                   </div>
                   <Switch
                     id="custom_enable_kot_reprint"
-                    aria-label="Enable KOT Reprint"
+                    aria-label={__('Enable KOT Reprint')}
                     checked={posForm.custom_enable_kot_reprint}
                     onCheckedChange={(checked) => setPosForm((prev) => ({ ...prev, custom_enable_kot_reprint: checked }))}
                   />
@@ -868,7 +869,7 @@ export const PrinterConfigPage: React.FC = () => {
                 {posForm.custom_enable_kot_reprint && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Reprint KOT Format</label>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Reprint KOT Format')}</label>
                       <SearchableSelect
                         id="custom_reprint_kot_format"
                         value={posForm.custom_reprint_kot_format}
@@ -877,7 +878,7 @@ export const PrinterConfigPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Table Order Printer</label>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Table Order Printer')}</label>
                       <SearchableSelect
                         id="custom_table_order_printer"
                         value={posForm.custom_table_order_printer}
@@ -886,7 +887,7 @@ export const PrinterConfigPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Parcel Order Printer</label>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Parcel Order Printer')}</label>
                       <SearchableSelect
                         id="custom_parcel_order_printer"
                         value={posForm.custom_parcel_order_printer}
@@ -920,13 +921,13 @@ export const PrinterConfigPage: React.FC = () => {
       {records.production_unit.length === 0 ? (
         <EmptyState
           icon={Printer}
-          title="No Production Units for this branch"
-          description={`There are no production units assigned to ${activeBranchName}.`}
+          title={__('No Production Units for this branch')}
+          description={__('There are no production units assigned to {0}.', [activeBranchName])}
         />
       ) : (
         <>
           <div className="max-w-md">
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Production Unit</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Production Unit')}</label>
             <SearchableSelect
               id="unit-selector"
               value={selectedNames.production_unit}
@@ -969,13 +970,13 @@ export const PrinterConfigPage: React.FC = () => {
       {records.room.length === 0 ? (
         <EmptyState
           icon={Printer}
-          title="No Rooms for this branch"
-          description={`There are no rooms assigned to ${activeBranchName}.`}
+          title={__('No Rooms for this branch')}
+          description={__('There are no rooms assigned to {0}.', [activeBranchName])}
         />
       ) : (
         <>
           <div className="max-w-md">
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Room</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">{__('Room')}</label>
             <SearchableSelect
               id="room-selector"
               value={selectedNames.room}
@@ -1010,9 +1011,9 @@ export const PrinterConfigPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Printer Configuration</h1>
+          <h1 className="text-xl font-semibold text-foreground">{__('Printer Configuration')}</h1>
           <p className="text-sm text-muted-foreground">
-            Manage network printers and printer assignments across POS Profiles, Production Units, and Rooms.
+            {__('Manage network printers and printer assignments across POS Profiles, Production Units, and Rooms.')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1022,7 +1023,7 @@ export const PrinterConfigPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs min-w-[140px]"
           >
             {savingAll ? <Spinner className="w-4 h-4" hideMessage /> : <Save className="w-4 h-4" />}
-            Save Changes
+            {__('Save Changes')}
           </Button>
         </div>
       </div>
@@ -1036,11 +1037,11 @@ export const PrinterConfigPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <AlertCircle className="w-6 h-6 text-destructive" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">Failed to load printer configuration</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-1">{__('Failed to load printer configuration')}</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm">{error}</p>
           <Button variant="outline" onClick={() => loadAll(true)}>
             <RefreshCw className="w-4 h-4" />
-            Retry
+            {__('Retry')}
           </Button>
         </Card>
       ) : (
@@ -1060,32 +1061,32 @@ export const PrinterConfigPage: React.FC = () => {
       <Dialog open={printerModalOpen} onOpenChange={(open) => !open && setPrinterModalOpen(false)}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setPrinterModalOpen(false)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Add Network Printer</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Add Network Printer')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddPrinter} className="space-y-4 text-sm mt-4">
             <div>
               <label className="block font-semibold text-foreground mb-1.5">
-                Printer Name / ID <span className="text-red-500">*</span>
+                {__('Printer Name / ID')} <span className="text-red-500">*</span>
               </label>
               <Input
                 id="np-name"
                 value={printerForm.name}
                 onChange={(e) => setPrinterForm((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g. Kitchen Printer"
+                placeholder={__('e.g. Kitchen Printer')}
                 required
               />
             </div>
             <div>
-              <label className="block font-semibold text-foreground mb-1.5">Server IP</label>
+              <label className="block font-semibold text-foreground mb-1.5">{__('Server IP')}</label>
               <Input
                 id="np-server-ip"
                 value={printerForm.server_ip}
                 onChange={(e) => setPrinterForm((prev) => ({ ...prev, server_ip: e.target.value }))}
-                placeholder="localhost"
+                placeholder={__('localhost')}
               />
             </div>
             <div>
-              <label className="block font-semibold text-foreground mb-1.5">Port</label>
+              <label className="block font-semibold text-foreground mb-1.5">{__('Port')}</label>
               <Input
                 id="np-port"
                 type="number"
@@ -1096,23 +1097,23 @@ export const PrinterConfigPage: React.FC = () => {
             </div>
             <div>
               <label className="block font-semibold text-foreground mb-1.5">
-                Printer Device Name <span className="text-red-500">*</span>
+                {__('Printer Device Name')} <span className="text-red-500">*</span>
               </label>
               <Input
                 id="np-printer-name"
                 value={printerForm.printer_name}
                 onChange={(e) => setPrinterForm((prev) => ({ ...prev, printer_name: e.target.value }))}
-                placeholder="e.g. EPSON_TM-T88VI"
+                placeholder={__('e.g. EPSON_TM-T88VI')}
                 required
               />
             </div>
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
               <Button type="button" variant="outline" onClick={() => setPrinterModalOpen(false)} disabled={addingPrinter} className="font-semibold">
-                Cancel
+                {__('Cancel')}
               </Button>
               <Button type="submit" disabled={addingPrinter} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
                 {addingPrinter ? <Spinner className="w-4 h-4" hideMessage /> : <Plus className="w-4 h-4" />}
-                <span>Add Printer</span>
+                <span>{__('Add Printer')}</span>
               </Button>
             </div>
           </form>
@@ -1123,15 +1124,14 @@ export const PrinterConfigPage: React.FC = () => {
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setDeleteTarget(null)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Delete Network Printer</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{__('Delete Network Printer')}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground mt-4">
-            Are you sure you want to delete <span className="font-semibold text-foreground">{deleteTarget}</span>? Printer
-            assignments referencing it will need to be reconfigured.
+            {__('Are you sure you want to delete')} <span className="font-semibold text-foreground">{deleteTarget}</span>{__('? Printer assignments referencing it will need to be reconfigured.')}
           </p>
           <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
             <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)} disabled={deletingPrinter} className="font-semibold">
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button
               type="button"
@@ -1140,7 +1140,7 @@ export const PrinterConfigPage: React.FC = () => {
               className="bg-destructive hover:bg-destructive/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {deletingPrinter ? <Spinner className="w-4 h-4" hideMessage /> : <Trash2 className="w-4 h-4" />}
-              <span>Delete</span>
+              <span>{__('Delete')}</span>
             </Button>
           </div>
         </DialogContent>

@@ -9,6 +9,7 @@ import {
   DepartmentOption,
   IssueAuthorizationRow,
 } from '../../services/departmentStock';
+import { __ } from '../../i18n';
 
 const getDefaultFromDate = () => {
   const d = new Date();
@@ -99,7 +100,7 @@ const StoreIssueContent: React.FC = () => {
       } catch {
         if (!cancelled) {
           setRows([]);
-          setError('Unable to load store issue data.');
+          setError(__('Unable to load store issue data.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -115,9 +116,9 @@ const StoreIssueContent: React.FC = () => {
     const fullyIssuedCount = rows.filter(isFullyIssued).length;
     const departmentsWithRows = new Set(rows.map((row) => row.department));
     return [
-      { label: 'Lines Authorised', value: rows.length },
-      { label: 'Fully Issued', value: fullyIssuedCount },
-      { label: 'Departments Covered', value: departmentsWithRows.size },
+      { label: __('Lines Authorised'), value: rows.length },
+      { label: __('Fully Issued'), value: fullyIssuedCount },
+      { label: __('Departments Covered'), value: departmentsWithRows.size },
     ];
   }, [rows]);
 
@@ -138,7 +139,7 @@ const StoreIssueContent: React.FC = () => {
   const columns: DataTableColumn<IssueAuthorizationRow>[] = [
     {
       key: 'component_item',
-      header: 'Material',
+      header: __('Material'),
       render: (row) => (
         <span className="inline-flex items-center gap-1.5">
           <span className="font-medium text-foreground">{row.component_item_name || row.component_item}</span>
@@ -149,13 +150,13 @@ const StoreIssueContent: React.FC = () => {
     },
     {
       key: 'department',
-      header: 'Department',
+      header: __('Department'),
       render: (row) =>
         departmentOptions.find((option) => option.name === row.department)?.department_name || row.department,
     },
     {
       key: 'authorized_qty',
-      header: 'Authorised Qty',
+      header: __('Authorised Qty'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -165,7 +166,7 @@ const StoreIssueContent: React.FC = () => {
     },
     {
       key: 'issued_qty',
-      header: 'Issued Qty',
+      header: __('Issued Qty'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -175,7 +176,7 @@ const StoreIssueContent: React.FC = () => {
     },
     {
       key: 'balance',
-      header: 'Balance',
+      header: __('Balance'),
       align: 'right',
       render: (row) => (
         <span className={numericCellClass}>
@@ -185,7 +186,7 @@ const StoreIssueContent: React.FC = () => {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: __('Status'),
       render: (row) => <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>,
     },
     {
@@ -195,9 +196,9 @@ const StoreIssueContent: React.FC = () => {
         <Link
           to="/department-stock"
           className="text-xs font-semibold text-primary hover:underline"
-          title={`Open ${row.department} in Department Stock`}
+          title={__('Open {0} in Department Stock', [row.department])}
         >
-          View
+          {__('View')}
         </Link>
       ),
     },
@@ -206,27 +207,27 @@ const StoreIssueContent: React.FC = () => {
   return (
     <Page>
       <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
-        <h1 className="text-xl font-semibold text-foreground">Store Issue</h1>
+        <h1 className="text-xl font-semibold text-foreground">{__('Store Issue')}</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Read-only view of issue authorizations across every department for this branch and date range.
+          {__('Read-only view of issue authorizations across every department for this branch and date range.')}
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            From
+            {__('From')}
             <DatePicker
               id="from-date"
-              aria-label="From date"
+              aria-label={__('From date')}
               value={fromDate}
               onChange={(_id, next) => setFromDate(next)}
               className="mt-1 w-[150px]"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-muted-foreground">
-            To
+            {__('To')}
             <DatePicker
               id="to-date"
-              aria-label="To date"
+              aria-label={__('To date')}
               value={toDate}
               onChange={(_id, next) => setToDate(next)}
               className="mt-1 w-[150px]"
@@ -237,7 +238,7 @@ const StoreIssueContent: React.FC = () => {
 
       {!activeBranchId || activeBranchId === 'all' ? (
         <Section>
-          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
+          <Card className="p-10 text-center text-sm text-text-tertiary">{__('Select a branch to view store issue data.')}</Card>
         </Section>
       ) : error ? (
         <Section>
@@ -250,7 +251,7 @@ const StoreIssueContent: React.FC = () => {
           {departmentChips.length > 0 && (
             <div data-testid="store-issue-department-chips">
               <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
-                Issued by department
+                {__('Issued by department')}
               </div>
               {/*
                 One pill per department carrying the whole sentence
@@ -280,7 +281,7 @@ const StoreIssueContent: React.FC = () => {
                         size="tag"
                         variant={complete ? 'tagSuccess' : 'tagWarning'}
                         className="tabular-nums"
-                        aria-label={`${chip.name}: ${chip.issued} of ${chip.total} issued`}
+                        aria-label={__('{0}: {1} of {2} issued', [chip.name, chip.issued, chip.total])}
                       >
                         {chip.issued}/{chip.total}
                       </Badge>
@@ -299,7 +300,7 @@ const StoreIssueContent: React.FC = () => {
             <DataTable
               columns={columns}
               rows={rows}
-              emptyMessage="No issue authorizations found for this branch and date range."
+              emptyMessage={__('No issue authorizations found for this branch and date range.')}
             />
           )}
         </Section>

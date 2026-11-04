@@ -6,6 +6,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface EmployeeRow {
   employee_id: string;
@@ -24,11 +25,11 @@ interface EmployeeSalesData {
 
 const columns: DataTableColumn<EmployeeRow>[] = [
   { key: 'rank', header: '#' },
-  { key: 'employee_name', header: 'Employee' },
-  { key: 'total_invoices', header: 'Invoices', align: 'right' },
-  { key: 'sales_amount', header: 'Gross Sales (incl. tax)', render: (r) => formatCurrency(r.sales_amount), align: 'right' },
-  { key: 'net_sales_amount', header: 'Net Sales', render: (r) => formatCurrency(r.net_sales_amount), align: 'right' },
-  { key: 'average_invoice_value', header: 'Avg / Invoice', render: (r) => formatCurrency(r.average_invoice_value), align: 'right' },
+  { key: 'employee_name', header: __('Employee') },
+  { key: 'total_invoices', header: __('Invoices'), align: 'right' },
+  { key: 'sales_amount', header: __('Gross Sales (incl. tax)'), render: (r) => formatCurrency(r.sales_amount), align: 'right' },
+  { key: 'net_sales_amount', header: __('Net Sales'), render: (r) => formatCurrency(r.net_sales_amount), align: 'right' },
+  { key: 'average_invoice_value', header: __('Avg / Invoice'), render: (r) => formatCurrency(r.average_invoice_value), align: 'right' },
 ];
 
 export function EmployeeSales() {
@@ -53,7 +54,7 @@ export function EmployeeSales() {
       });
       setData(res.message ?? (res as unknown as EmployeeSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -68,12 +69,12 @@ export function EmployeeSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employee Sales"
-        description={`Staff leaderboard ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Employee Sales')}
+        description={__('Staff leaderboard {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={
           <>
             <a href="/reports/employee-commission" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-              View Commission →
+              {__('View Commission')} <span className="inline-block rtl:-scale-x-100">→</span>
             </a>
             <DateRangeFilter value={range} onChange={setRange} />
           </>
@@ -88,7 +89,7 @@ export function EmployeeSales() {
 
       {data && data.summary.unattributed_invoices && data.summary.unattributed_invoices > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {data.summary.unattributed_invoices} invoices ({formatCurrency(data.summary.unattributed_sales || 0)}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.
+          {__("{0} invoices ({1}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.", [data.summary.unattributed_invoices, formatCurrency(data.summary.unattributed_sales || 0)])}
         </div>
       )}
 
@@ -97,16 +98,16 @@ export function EmployeeSales() {
           <KpiStrip
             items={
               [
-                { label: 'Staff', value: data.summary.total_employees },
-                { label: 'Total Invoices', value: data.summary.period_total_invoices },
-                { label: 'Total Sales', value: formatCurrency(data.summary.period_total_sales) },
+                { label: __('Staff'), value: data.summary.total_employees },
+                { label: __('Total Invoices'), value: data.summary.period_total_invoices },
+                { label: __('Total Sales'), value: formatCurrency(data.summary.period_total_sales) },
               ] satisfies KpiItemProps[]
             }
           />
 
           {top10.length >= 2 && (
             <BarChartCard
-              title={`Top ${Math.min(10, top10.length)} by Sales`}
+              title={__('Top {0} by Sales', [Math.min(10, top10.length)])}
               data={top10}
               xKey="employee_name"
               yKeys={['sales_amount']}

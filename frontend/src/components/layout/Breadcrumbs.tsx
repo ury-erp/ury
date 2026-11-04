@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { NAV_GROUPS, SETUP_ITEMS } from './Sidebar';
 import { reportsRegistry } from '../../pages/Reports/reportsRegistry';
+import { __ } from '../../i18n';
 
 /**
  * Route -> {group, label} lookup built directly from the Sidebar's own nav
@@ -28,7 +29,7 @@ function resolveBreadcrumb(pathname: string): { group: string; label: string } |
   if (pathname.startsWith('/reports')) {
     const reportPath = pathname.replace(/^\/reports\/?/, '');
     if (!reportPath) {
-      return { group: REPORTS_GROUP_LABEL, label: 'Home' };
+      return { group: REPORTS_GROUP_LABEL, label: __('Home') };
     }
     const entry = reportsRegistry.find((r) => r.path === reportPath);
     return { group: REPORTS_GROUP_LABEL, label: entry?.label ?? reportPath };
@@ -48,7 +49,7 @@ export const Breadcrumbs: React.FC = () => {
 
   return (
     <div className="flex items-center gap-1 text-[12.5px] leading-none min-w-0">
-      <span className="text-muted-foreground truncate">{crumb.group}</span>
+      <span className="text-muted-foreground truncate">{__(crumb.group)}</span>
       <span className="text-muted-foreground">/</span>
       <span className="font-semibold text-foreground truncate">{crumb.label}</span>
     </div>

@@ -6,6 +6,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { startOfMonth, endOfDay } from 'date-fns';
 import { toApiDate } from '../../lib/reportDate';
+import { __ } from '../../i18n';
 
 interface DayRow {
   date: string;
@@ -32,13 +33,13 @@ interface DaywiseSalesData {
 }
 
 const columns: DataTableColumn<DayRow>[] = [
-  { key: 'date', header: 'Date' },
-  { key: 'total_invoices', header: 'Invoices', align: 'right' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
-  { key: 'round_off', header: 'Round Off', render: (r) => formatCurrency(r.round_off), align: 'right' },
-  { key: 'cash_discount', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discount), align: 'right' },
+  { key: 'date', header: __('Date') },
+  { key: 'total_invoices', header: __('Invoices'), align: 'right' },
+  { key: 'item_total', header: __('Item Total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'total_taxes', header: __('Taxes'), render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'grand_total', header: __('Grand Total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
+  { key: 'round_off', header: __('Round Off'), render: (r) => formatCurrency(r.round_off), align: 'right' },
+  { key: 'cash_discount', header: __('Cash Discounts'), render: (r) => formatCurrency(r.cash_discount), align: 'right' },
 ];
 
 export function DaywiseSales() {
@@ -63,7 +64,7 @@ export function DaywiseSales() {
       });
       setData(res.message ?? (res as unknown as DaywiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -76,8 +77,8 @@ export function DaywiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daywise Sales"
-        description={`Daily sales trend ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Daywise Sales')}
+        description={__('Daily sales trend {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -88,26 +89,26 @@ export function DaywiseSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={
               [
                 {
-                  label: 'Period Total',
+                  label: __('Period Total'),
                   value: formatCurrency(data.summary.period_total),
                 },
                 {
-                  label: 'Avg Daily Sales',
+                  label: __('Avg Daily Sales'),
                   value: formatCurrency(data.summary.period_avg_daily),
                 },
                 {
-                  label: 'Total Invoices',
+                  label: __('Total Invoices'),
                   value: data.summary.total_invoices,
                 },
                 {
-                  label: 'Peak Day',
+                  label: __('Peak Day'),
                   value: data.summary.peak_day ? `${data.summary.peak_day}` : '—',
                   hint: data.summary.peak_day ? formatCurrency(data.summary.peak_day_total) : undefined,
                 },
@@ -116,7 +117,7 @@ export function DaywiseSales() {
           />
 
           <LineChartCard
-            title="Grand Total Trend"
+            title={__('Grand Total Trend')}
             data={data.rows}
             xKey="date"
             yKeys={['grand_total']}

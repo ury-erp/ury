@@ -7,6 +7,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { DeskLink } from '../../components/DeskLink';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface CancelledInvoiceRow {
   date: string;
@@ -53,7 +54,7 @@ export function CancelledInvoices() {
       });
       setData(res.message ?? (res as unknown as CancelledInvoicesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -70,11 +71,11 @@ export function CancelledInvoices() {
   const threshold = data ? data.summary.avg_amount * HIGH_VALUE_MULTIPLIER : Infinity;
 
   const columns: DataTableColumn<CancelledInvoiceRow>[] = [
-    { key: 'date', header: 'Date' },
-    { key: 'time', header: 'Time' },
+    { key: 'date', header: __('Date') },
+    { key: 'time', header: __('Time') },
     {
       key: 'invoice',
-      header: 'Invoice',
+      header: __('Invoice'),
       render: (r) => (
         <span className="inline-flex items-center gap-1.5">
           {r.invoice}
@@ -85,7 +86,7 @@ export function CancelledInvoices() {
     },
     {
       key: 'amount',
-      header: 'Amount',
+      header: __('Amount'),
       align: 'right',
       render: (r) => (
         <span className={r.amount > threshold ? 'flex items-center gap-1 text-red-600 font-semibold' : ''}>
@@ -94,8 +95,8 @@ export function CancelledInvoices() {
         </span>
       ),
     },
-    { key: 'cancelled_by', header: 'Cancelled By' },
-    { key: 'cancellation_reason', header: 'Reason', render: (r) => r.cancellation_reason || '—' },
+    { key: 'cancelled_by', header: __('Cancelled By') },
+    { key: 'cancellation_reason', header: __('Reason'), render: (r) => r.cancellation_reason || '—' },
   ];
 
   const pagination = data?.pagination;
@@ -103,8 +104,8 @@ export function CancelledInvoices() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cancelled Invoices"
-        description={`Cancellation audit ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Cancelled Invoices')}
+        description={__('Cancellation audit {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -117,9 +118,9 @@ export function CancelledInvoices() {
       {data && (
         <KpiStrip
           items={[
-            { label: 'Total Cancelled', value: data.summary.total_count },
-            { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
-            { label: 'Unique Cancellers', value: data.summary.unique_cancellers },
+            { label: __('Total Cancelled'), value: data.summary.total_count },
+            { label: __('Total Amount'), value: formatCurrency(data.summary.total_amount) },
+            { label: __('Unique Cancellers'), value: data.summary.unique_cancellers },
           ] satisfies KpiItemProps[]}
         />
       )}
@@ -129,18 +130,18 @@ export function CancelledInvoices() {
       {pagination && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Page {pagination.page} of {pagination.total_pages}
+            {__('Page {0} of {1}', [pagination.page, pagination.total_pages])}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="w-4 h-4" /> Prev
+              <ChevronLeft className="w-4 h-4 rtl:-scale-x-100" /> {__('Prev')}
             </Button>
             <Button
               variant="outline"
               disabled={page >= pagination.total_pages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next <ChevronRight className="w-4 h-4" />
+              {__('Next')} <ChevronRight className="w-4 h-4 rtl:-scale-x-100" />
             </Button>
           </div>
         </div>

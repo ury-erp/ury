@@ -5,6 +5,7 @@ import { SearchableSelect, Option } from '../../common/SearchableSelect';
 import { Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { nextId } from '../../../utils/id';
+import { __ } from '../../../i18n';
 
 const DEFAULTS = ['Cash', 'Card', 'UPI'];
 
@@ -35,7 +36,7 @@ export function PaymentSection() {
         });
       })
       .catch(() =>
-        setFetchError('Could not load payment methods, check your connection.')
+        setFetchError(__('Could not load payment methods, check your connection.'))
       )
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +57,7 @@ export function PaymentSection() {
                 value={method.name}
                 options={allModes}
                 onChange={(_id, value) => updatePaymentMethod(method.id, { name: value })}
-                placeholder="Select Mode of Payment"
+                placeholder={__('Select Mode of Payment')}
                 disabled={loading}
               />
             </div>
@@ -66,7 +67,7 @@ export function PaymentSection() {
                 variant="ghost"
                 onClick={() => deletePaymentMethod(method.id)}
                 className="text-destructive hover:text-destructive hover:bg-destructive-tint shrink-0 p-2 h-auto"
-                title="Delete Method"
+                title={__('Delete Method')}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -86,7 +87,7 @@ export function PaymentSection() {
         className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/10 flex items-center justify-center gap-2 text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
-        Add Payment Method
+        {__('Add Payment Method')}
       </Button>
     </div>
   );

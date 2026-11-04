@@ -11,6 +11,7 @@ import {
   DashboardChartsData,
   TransactionRecord,
 } from '../../services/dashboard';
+import { __ } from '../../i18n';
 
 export const DashboardPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
@@ -48,7 +49,7 @@ export const DashboardPage: React.FC = () => {
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
       console.error('Failed to load dashboard data:', err);
-      setError('Unable to load Service Board data. Please retry.');
+      setError(__('Unable to load Service Board data. Please retry.'));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }

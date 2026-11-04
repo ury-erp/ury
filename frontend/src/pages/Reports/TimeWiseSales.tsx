@@ -4,6 +4,7 @@ import { KpiStrip, DataTable, type DataTableColumn, DatePicker, Select, PageHead
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
+import { __ } from '../../i18n';
 
 interface IntervalRow {
   interval_label: string;
@@ -30,11 +31,11 @@ interface TimeWiseSalesData {
 }
 
 const columns: DataTableColumn<IntervalRow>[] = [
-  { key: 'interval_label', header: 'Time Interval' },
-  { key: 'sales', header: 'Sales', render: (r) => formatCurrency(r.sales), align: 'right' },
-  { key: 'bills', header: 'Bills', align: 'right' },
+  { key: 'interval_label', header: __('Time Interval') },
+  { key: 'sales', header: __('Sales'), render: (r) => formatCurrency(r.sales), align: 'right' },
+  { key: 'bills', header: __('Bills'), align: 'right' },
   { key: 'pct_of_daily_total', header: '% of Day', render: (r) => `${r.pct_of_daily_total}%`, align: 'right' },
-  { key: 'avg_transaction_value', header: 'Avg / Bill', render: (r) => formatCurrency(r.avg_transaction_value), align: 'right' },
+  { key: 'avg_transaction_value', header: __('Avg / Bill'), render: (r) => formatCurrency(r.avg_transaction_value), align: 'right' },
 ];
 
 const BUCKET_OPTIONS = [1, 2, 4];
@@ -59,7 +60,7 @@ export function TimeWiseSales() {
       });
       setData(res.message ?? (res as unknown as TimeWiseSalesData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -72,8 +73,8 @@ export function TimeWiseSales() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Time Wise Sales"
-        description={`Sales by time of day ${activeBranchId === 'all' ? '· All Branches' : ''}`}
+        title={__('Time Wise Sales')}
+        description={__('Sales by time of day {0}', [activeBranchId === 'all' ? '· All Branches' : ''])}
         actions={
           <>
             <Select
@@ -82,13 +83,13 @@ export function TimeWiseSales() {
             >
               {BUCKET_OPTIONS.map((b) => (
                 <option key={b} value={b}>
-                  {b}-hour buckets
+                  {b}{__('-hour buckets')}
                 </option>
               ))}
             </Select>
             <DatePicker
               id="report-date"
-              aria-label="Report date"
+              aria-label={__('Report date')}
               value={date}
               maxDate={toApiDate(new Date())}
               onChange={(_id, next) => setDate(next)}
@@ -105,16 +106,16 @@ export function TimeWiseSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : data ? (
         <>
           <KpiStrip
             items={[
-              { label: 'Total Sales', value: formatCurrency(data.summary.total_sales) },
-              { label: 'Total Bills', value: data.summary.total_bills },
-              { label: 'Avg / Bill', value: formatCurrency(data.summary.avg_sale_per_bill) },
+              { label: __('Total Sales'), value: formatCurrency(data.summary.total_sales) },
+              { label: __('Total Bills'), value: data.summary.total_bills },
+              { label: __('Avg / Bill'), value: formatCurrency(data.summary.avg_sale_per_bill) },
               {
-                label: 'Peak Interval',
+                label: __('Peak Interval'),
                 value: data.summary.peak_interval ?? '—',
                 hint: data.summary.peak_interval ? formatCurrency(data.summary.peak_interval_sales) : undefined,
               },
@@ -122,7 +123,7 @@ export function TimeWiseSales() {
           />
 
           <BarChartCard
-            title="Sales by Time of Day"
+            title={__('Sales by Time of Day')}
             data={data.intervals}
             xKey="interval_label"
             yKeys={['sales']}

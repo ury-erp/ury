@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button, DataTable, Spinner, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
+import { __ } from '../../i18n';
 
 interface BomItemRow {
   item_code: string;
@@ -82,7 +83,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onCl
           description: itemDoc?.description,
         });
       } catch {
-        if (!cancelled) setError('Unable to load item details.');
+        if (!cancelled) setError(__('Unable to load item details.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -148,11 +149,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onCl
   if (!itemCode) return null;
 
   const bomColumns: DataTableColumn<BomItemRow>[] = [
-    { key: 'item_code', header: 'Item Code', render: (row) => row.item_code },
-    { key: 'item_name', header: 'Item Name', render: (row) => row.item_name || '-' },
+    { key: 'item_code', header: __('Item Code'), render: (row) => row.item_code },
+    { key: 'item_name', header: __('Item Name'), render: (row) => row.item_name || '-' },
     {
       key: 'qty',
-      header: 'Qty',
+      header: __('Qty'),
       align: 'right',
       render: (row) => (row.qty !== undefined ? formatQty(row.qty) : '-'),
     },
@@ -166,16 +167,16 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onCl
       aria-modal="true"
       aria-labelledby="item-detail-modal-title"
     >
-      <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close item detail" onClick={onClose} />
+      <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label={__('Close item detail')} onClick={onClose} />
       <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-lg bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted px-6 py-4">
           <div>
             <h2 id="item-detail-modal-title" className="text-lg font-semibold text-foreground">
               {item?.item_name || itemCode}
             </h2>
-            <p className="mt-1 text-sm text-text-tertiary">Item detail and recipe (BOM)</p>
+            <p className="mt-1 text-sm text-text-tertiary">{__('Item detail and recipe (BOM)')}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close item details">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label={__('Close item details')}>
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -192,21 +193,21 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onCl
             <>
               <div className="mb-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Item Code</p>
+                  <p className="text-xs font-medium text-text-tertiary">{__('Item Code')}</p>
                   <p className="mt-1 text-sm font-semibold text-foreground">{item?.item_code || itemCode}</p>
                 </div>
                 <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Item Group</p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">{item?.item_group || 'Unassigned'}</p>
+                  <p className="text-xs font-medium text-text-tertiary">{__('Item Group')}</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">{item?.item_group || __('Unassigned')}</p>
                 </div>
                 <div className="rounded-md border border-border p-3">
-                  <p className="text-xs font-medium text-text-tertiary">Stock UOM</p>
+                  <p className="text-xs font-medium text-text-tertiary">{__('Stock UOM')}</p>
                   <p className="mt-1 text-sm font-semibold text-foreground">{item?.stock_uom || '-'}</p>
                 </div>
               </div>
 
               <h3 className="mb-2 text-sm font-semibold text-foreground">
-                Recipe (BOM){bomName ? ` — ${bomName}` : ''}
+                {__('Recipe (BOM)')}{bomName ? ` — ${bomName}` : ''}
               </h3>
               {!bomChecked ? (
                 <div className="flex items-center justify-center py-6">
@@ -214,18 +215,18 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onCl
                 </div>
               ) : !bomName ? (
                 <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
-                  No BOM configured for this item.
+                  {__('No BOM configured for this item.')}
                 </div>
               ) : bomError ? (
                 <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
-                  Unable to load the recipe for this item.
+                  {__('Unable to load the recipe for this item.')}
                 </div>
               ) : bomItems.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
-                  This BOM has no ingredient lines.
+                  {__('This BOM has no ingredient lines.')}
                 </div>
               ) : (
-                <DataTable columns={bomColumns} rows={bomItems} emptyMessage="No BOM ingredients found." />
+                <DataTable columns={bomColumns} rows={bomItems} emptyMessage={__('No BOM ingredients found.')} />
               )}
             </>
           )}

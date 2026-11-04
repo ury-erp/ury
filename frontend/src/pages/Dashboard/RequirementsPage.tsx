@@ -16,6 +16,7 @@ import {
 import { useBranchContext } from '../../context/BranchContext';
 import { departmentStockService, PlanComponentDemand } from '../../services/departmentStock';
 import { salesPlanService } from '../../services/salesPlan';
+import { __ } from '../../i18n';
 
 /**
  * Real data used here:
@@ -113,7 +114,7 @@ export const RequirementsPage: React.FC = () => {
       // Requirements are derived from a single branch's approved Sales
       // Plan -- there is no meaningful "all branches" view. Fail closed
       // with an actionable message instead of calling the API.
-      setError('Select a specific branch above to view its Requirements.');
+      setError(__('Select a specific branch above to view its Requirements.'));
       setLoading(false);
       return () => {
         cancelled = true;
@@ -126,7 +127,7 @@ export const RequirementsPage: React.FC = () => {
         if (cancelled) return;
 
         if (!activePlan) {
-          setError('No approved Sales Plan found for this branch and date. Requirements are only available once a plan is approved.');
+          setError(__('No approved Sales Plan found for this branch and date. Requirements are only available once a plan is approved.'));
           setLoading(false);
           return;
         }
@@ -150,7 +151,7 @@ export const RequirementsPage: React.FC = () => {
         );
       } catch {
         if (!cancelled) {
-          setError('Unable to load Requirements for this branch and date.');
+          setError(__('Unable to load Requirements for this branch and date.'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -258,22 +259,22 @@ export const RequirementsPage: React.FC = () => {
   }, [demandVector, stockData]);
 
   const materialsColumns: DataTableColumn<PlanComponentDemand>[] = [
-    { key: 'component_item', header: 'Material', render: (row) => (
+    { key: 'component_item', header: __('Material'), render: (row) => (
       <div>
         <p className="font-semibold text-foreground">{row.component_item_name || row.component_item}</p>
         <p className="mt-0.5 text-xs text-text-tertiary">{row.component_item}</p>
       </div>
     ) },
-    { key: 'department', header: 'Department', render: (row) => row.department || '—' },
+    { key: 'department', header: __('Department'), render: (row) => row.department || '—' },
     {
       key: 'required_qty',
-      header: 'Required',
+      header: __('Required'),
       align: 'right',
       render: (row) => <span className={numericCellClass}>{formatQty(row.required_qty, row.stock_uom)}</span>,
     },
     {
       key: 'in_store',
-      header: 'In store',
+      header: __('In store'),
       align: 'right',
       render: (row) => {
         const stock = stockData.get(stockKey(row.component_item, row.department));
@@ -281,8 +282,8 @@ export const RequirementsPage: React.FC = () => {
         // If no stock data found or resolved_from is null, warehouse couldn't be resolved
         if (!stock || stock.resolved_from === null) {
           return (
-            <Badge variant="secondary" size="sm" title="No warehouse configured for this branch/department">
-              Not available
+            <Badge variant="secondary" size="sm" title={__('No warehouse configured for this branch/department')}>
+              {__('Not available')}
             </Badge>
           );
         }
@@ -292,7 +293,7 @@ export const RequirementsPage: React.FC = () => {
           return (
             <div className="flex items-center gap-2">
               <span className={numericCellClass}>{formatQty(stock.allocatable_qty, row.stock_uom)}</span>
-              <span title="Negative stock indicates data quality issue">⚠️</span>
+              <span title={__('Negative stock indicates data quality issue')}>⚠️</span>
             </div>
           );
         }
@@ -304,8 +305,8 @@ export const RequirementsPage: React.FC = () => {
 
         // Fallback to "Not available" if we somehow have stock data but no allocatable_qty
         return (
-          <Badge variant="secondary" size="sm" title="Stock quantity unavailable">
-            Not available
+          <Badge variant="secondary" size="sm" title={__('Stock quantity unavailable')}>
+            {__('Not available')}
           </Badge>
         );
       },
@@ -313,15 +314,15 @@ export const RequirementsPage: React.FC = () => {
   ];
 
   const productionColumns: DataTableColumn<ProductionTargetRow>[] = [
-    { key: 'item_code', header: 'Item', render: (row) => <span className="font-semibold text-foreground">{row.item_code}</span> },
+    { key: 'item_code', header: __('Item'), render: (row) => <span className="font-semibold text-foreground">{row.item_code}</span> },
     {
       key: 'department',
-      header: 'Department',
+      header: __('Department'),
       render: (row) => [row.department, row.production_unit].filter(Boolean).join(' · ') || '—',
     },
     {
       key: 'qty',
-      header: 'Quantity',
+      header: __('Quantity'),
       align: 'right',
       // Read-only: this is a submitted Sales Plan's frozen quantity, not a
       // draft -- see the module docstring above for why an editor was
@@ -334,13 +335,13 @@ export const RequirementsPage: React.FC = () => {
     <Page>
       <PageHeader
         bleed
-        title="Requirements"
+        title={__('Requirements')}
         description={
           <p className="mt-1 text-sm text-text-tertiary">
-            Materials and production targets derived from the approved Sales Plan.
+            {__('Materials and production targets derived from the approved Sales Plan.')}
             {planName && (
-              <span className="ml-1 text-text-tertiary">
-                Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
+              <span className="ms-1 text-text-tertiary">
+                {__('Plan')} {planName}{planStatus ? ` · ${planStatus}` : ''}
               </span>
             )}
           </p>
@@ -348,7 +349,7 @@ export const RequirementsPage: React.FC = () => {
         actions={
           <DatePicker
             id="requirements-date"
-            aria-label="Requirements date"
+            aria-label={__('Requirements date')}
             value={requirementsDate}
             onChange={(_id, next) => setRequirementsDate(next)}
             className="w-[180px]"
@@ -372,24 +373,24 @@ export const RequirementsPage: React.FC = () => {
             <KpiStrip
             items={[
               {
-                label: 'Material value',
+                label: __('Material value'),
                 value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.materialValue}`,
-                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Sum of required qty × valuation rate',
+                hint: kpiMetrics.hasUnresolvedWarehouse ? __('Some items have no warehouse configured') : __('Sum of required qty × valuation rate'),
               },
               {
-                label: 'Covered by stock',
+                label: __('Covered by stock'),
                 value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.coveredByStock}%`,
-                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Percentage of demand covered by allocatable stock',
+                hint: kpiMetrics.hasUnresolvedWarehouse ? __('Some items have no warehouse configured') : __('Percentage of demand covered by allocatable stock'),
               },
               {
-                label: 'Short',
+                label: __('Short'),
                 value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : kpiMetrics.short,
-                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Total quantity short after allocating available stock',
+                hint: kpiMetrics.hasUnresolvedWarehouse ? __('Some items have no warehouse configured') : __('Total quantity short after allocating available stock'),
               },
               {
-                label: 'To purchase',
+                label: __('To purchase'),
                 value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.toPurchase}`,
-                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Cost of items short (short qty × valuation rate)',
+                hint: kpiMetrics.hasUnresolvedWarehouse ? __('Some items have no warehouse configured') : __('Cost of items short (short qty × valuation rate)'),
               },
             ]}
             />
@@ -397,17 +398,17 @@ export const RequirementsPage: React.FC = () => {
 
           <Section>
             <AttentionFeed
-            title="Shortfalls"
+            title={__('Shortfalls')}
             items={kpiMetrics.hasUnresolvedWarehouse ? [
               {
                 severity: 'warning',
-                title: 'Some items have no warehouse configured',
+                title: __('Some items have no warehouse configured'),
                 detail: `This branch or some departments are missing warehouse configuration, so stock-on-hand data cannot be resolved for those items. Configure a POS Profile warehouse for this branch and/or department warehouses for your production departments to enable full stock tracking.`,
               },
             ] : [
               {
                 severity: 'info',
-                title: 'Stock-on-hand tracking enabled',
+                title: __('Stock-on-hand tracking enabled'),
                 detail: `Real-time stock data is available for all items. Review the materials below to identify any shortages and create purchase orders as needed.`,
               },
             ]}
@@ -417,12 +418,12 @@ export const RequirementsPage: React.FC = () => {
           <Section>
             <div>
             <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
-              Materials to issue <span className="ml-1 text-xs font-normal text-text-tertiary">{demandVector.length} lines</span>
+              {__('Materials to issue')} <span className="ms-1 text-xs font-normal text-text-tertiary">{demandVector.length} {__('lines')}</span>
             </h2>
             <DataTable
               columns={materialsColumns}
               rows={demandVector}
-              emptyMessage="No component demand recorded on this plan yet."
+              emptyMessage={__('No component demand recorded on this plan yet.')}
             />
             </div>
           </Section>
@@ -430,12 +431,12 @@ export const RequirementsPage: React.FC = () => {
           <Section>
             <div>
             <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
-              Production targets <span className="ml-1 text-xs font-normal text-text-tertiary">{productionItems.length} items</span>
+              {__('Production targets')} <span className="ms-1 text-xs font-normal text-text-tertiary">{productionItems.length} {__('items')}</span>
             </h2>
             <DataTable
               columns={productionColumns}
               rows={productionItems}
-              emptyMessage="No items recorded on this plan yet."
+              emptyMessage={__('No items recorded on this plan yet.')}
             />
             </div>
           </Section>

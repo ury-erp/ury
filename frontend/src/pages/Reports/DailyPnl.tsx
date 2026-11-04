@@ -19,6 +19,7 @@ import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { __ } from '../../i18n';
 
 interface MissingPriceSection {
   label: string;
@@ -62,11 +63,11 @@ interface DailyPnlData {
 }
 
 const costOfGoodsColumns: DataTableColumn<CostOfGoodsRow>[] = [
-  { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.item_code },
-  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty' },
-  { key: 'buying_price', header: 'Buying Price', render: (r) => formatCurrency(r.buying_price), align: 'right' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'item_name', header: __('Item'), render: (r) => r.item_name || r.item_code },
+  { key: 'item_group', header: __('Group'), render: (r) => r.item_group || '—' },
+  { key: 'qty', header: __('Qty') },
+  { key: 'buying_price', header: __('Buying Price'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.buying_price)}</bdi>, align: 'right' },
+  { key: 'amount', header: __('Amount'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.amount)}</bdi>, align: 'right' },
 ];
 
 function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] }) {
@@ -79,12 +80,11 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
         type="button"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-start"
       >
         <span className="flex items-center gap-2 font-medium">
           <AlertTriangle className="w-4 h-4 shrink-0" />
-          Buying price not set for {totalItems} item{totalItems === 1 ? '' : 's'} — Cost of Goods may be
-          understated
+          {totalItems === 1 ? __('Buying price not set for 1 item — Cost of Goods may be understated') : __('Buying price not set for {0} items — Cost of Goods may be understated', [totalItems])}
         </span>
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
@@ -105,7 +105,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
             </div>
           ))}
           <p className="text-xs text-warning-700">
-            Update these item prices, then submit the document again for accurate Cost of Goods.
+            {__('Update these item prices, then submit the document again for accurate Cost of Goods.')}
           </p>
         </div>
       )}
@@ -152,7 +152,7 @@ function WaterfallRow({
     <div
       className={
         'flex items-center justify-between gap-3 text-sm px-2 py-1.5 ' +
-        (variant === 'nested' ? 'pl-8 text-muted-foreground' : '') +
+        (variant === 'nested' ? 'ps-8 text-muted-foreground' : '') +
         (isHighlight
           ? ' mt-1 rounded-sm bg-muted/60 border-t border-b border-border font-semibold'
           : ' border-b last:border-0 border-border/60')
@@ -160,9 +160,9 @@ function WaterfallRow({
     >
       <span className={isSubtotal ? 'font-semibold text-foreground' : undefined}>{label}</span>
       <span className={cn('inline-flex items-center gap-1.5', isSubtotal ? 'font-semibold' : 'font-medium', signColor ?? (isSubtotal ? 'text-foreground' : undefined))}>
-        <bdi>{formatCurrency(amount)}</bdi>
+        <bdi dir="ltr" className="num">{formatCurrency(amount)}</bdi>
         {percent !== undefined && (
-          <span dir="ltr" className={cn('text-xs font-normal', signColor ?? 'text-muted-foreground')}>
+          <span dir="ltr" className={cn('num text-xs font-normal', signColor ?? 'text-muted-foreground')}>
             ({Number(percent).toFixed(1)}%)
           </span>
         )}
@@ -211,7 +211,7 @@ export function DailyPnl() {
       });
       setData(res.message ?? (res as unknown as DailyPnlData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -226,8 +226,8 @@ export function DailyPnl() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daily P&L"
-        description="Full daily profit & loss breakdown"
+        title={__('Daily P&L')}
+        description={__('Full daily profit & loss breakdown')}
         actions={
           <>
             <div className="w-48">
@@ -274,11 +274,11 @@ export function DailyPnl() {
       )}
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{__('Loading…')}</div>
       ) : !data?.exists ? (
         <Alert variant="warning" icon={<AlertTriangle />}>
           <AlertDescription>
-            No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
+            {__('No submitted Daily P&L exists for this branch/date. It must be created and submitted in Desk first.')}
           </AlertDescription>
         </Alert>
       ) : (
@@ -318,22 +318,22 @@ export function DailyPnl() {
             items={
               [
                 {
-                  label: 'Gross Sales',
+                  label: __('Gross Sales'),
                   value: formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0),
                 },
                 {
-                  label: 'Net Sales',
+                  label: __('Net Sales'),
                   value: formatCurrency(summaryMap.get('net_sales')?.amount ?? 0),
                 },
                 {
-                  label: 'Gross Profit',
+                  label: __('Gross Profit'),
                   value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} \u200E(${Number(
                     summaryMap.get('gross_profit')?.percent ?? 0
                   ).toFixed(1)}%)`,
                   tone: (summaryMap.get('gross_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
                 },
                 {
-                  label: 'Net Profit',
+                  label: __('Net Profit'),
                   value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} \u200E(${Number(
                     summaryMap.get('net_profit')?.percent ?? 0
                   ).toFixed(1)}%)`,
@@ -345,30 +345,30 @@ export function DailyPnl() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">P&amp;L Statement</CardTitle>
+              <CardTitle className="text-base">{__('P&L Statement')}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Read top to bottom — each subtotal is a running reduction of the one above it.
+                {__('Read top to bottom — each subtotal is a running reduction of the one above it.')}
               </p>
             </CardHeader>
             <CardContent className="space-y-0">
               {/* Revenue → Net Sales */}
               <WaterfallRow
-                label="Gross Sales"
+                label={__('Gross Sales')}
                 amount={summaryMap.get('gross_sales')?.amount ?? 0}
                 percent={summaryMap.get('gross_sales')?.percent}
               />
               <WaterfallRow
-                label="Discounts & Round Offs"
+                label={__('Discounts & Round Offs')}
                 amount={summaryMap.get('cash_discount_round_off')?.amount ?? 0}
                 percent={summaryMap.get('cash_discount_round_off')?.percent}
               />
               <WaterfallRow
-                label="Tax"
+                label={__('Tax')}
                 amount={summaryMap.get('tax')?.amount ?? 0}
                 percent={summaryMap.get('tax')?.percent}
               />
               <WaterfallRow
-                label="Net Sales"
+                label={__('Net Sales')}
                 amount={summaryMap.get('net_sales')?.amount ?? 0}
                 percent={summaryMap.get('net_sales')?.percent}
                 variant="highlight"
@@ -376,17 +376,17 @@ export function DailyPnl() {
 
               {/* Net Sales → Gross Profit/Loss */}
               <WaterfallRow
-                label="Cost of Goods Sold"
+                label={__('Cost of Goods Sold')}
                 amount={summaryMap.get('cogs')?.amount ?? 0}
                 percent={summaryMap.get('cogs')?.percent}
               />
               <WaterfallRow
-                label="Disposables"
+                label={__('Disposables')}
                 amount={summaryMap.get('disposables_cost')?.amount ?? 0}
                 percent={summaryMap.get('disposables_cost')?.percent}
               />
               <WaterfallRow
-                label="Direct Expenses"
+                label={__('Direct Expenses')}
                 amount={summaryMap.get('total_direct_expenses')?.amount ?? 0}
                 percent={summaryMap.get('total_direct_expenses')?.percent}
                 variant="subtotal"
@@ -395,7 +395,7 @@ export function DailyPnl() {
                 <WaterfallRow key={`de-${i}`} label={r.label} amount={r.amount} percent={r.percent} variant="nested" />
               ))}
               <WaterfallRow
-                label="Gross Profit/Loss"
+                label={__('Gross Profit/Loss')}
                 amount={summaryMap.get('gross_profit')?.amount ?? 0}
                 percent={summaryMap.get('gross_profit')?.percent}
                 variant="highlight"
@@ -404,7 +404,7 @@ export function DailyPnl() {
 
               {/* Gross Profit/Loss → Net Profit/Loss */}
               <WaterfallRow
-                label="Employee Cost"
+                label={__('Employee Cost')}
                 amount={summaryMap.get('total_employee_costs')?.amount ?? 0}
                 percent={summaryMap.get('total_employee_costs')?.percent}
                 variant="subtotal"
@@ -416,23 +416,23 @@ export function DailyPnl() {
                 <WaterfallRow key={`ie-${i}`} label={r.label} amount={r.amount} percent={r.percent} />
               ))}
               <WaterfallRow
-                label="Depreciation"
+                label={__('Depreciation')}
                 amount={summaryMap.get('depreciation')?.amount ?? 0}
                 percent={summaryMap.get('depreciation')?.percent}
               />
               <WaterfallRow
-                label="Other Expenses"
+                label={__('Other Expenses')}
                 amount={summaryMap.get('total_other_expenses')?.amount ?? 0}
                 percent={summaryMap.get('total_other_expenses')?.percent}
               />
               <WaterfallRow
-                label="Total Indirect Expenses"
+                label={__('Total Indirect Expenses')}
                 amount={summaryMap.get('total_indirect_expenses')?.amount ?? 0}
                 percent={summaryMap.get('total_indirect_expenses')?.percent}
                 variant="highlight"
               />
               <WaterfallRow
-                label="Net Profit/Loss"
+                label={__('Net Profit/Loss')}
                 amount={summaryMap.get('net_profit')?.amount ?? 0}
                 percent={summaryMap.get('net_profit')?.percent}
                 variant="highlight"
@@ -444,7 +444,7 @@ export function DailyPnl() {
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
+                <CardTitle className="text-base">{__('Cost of Goods Sold')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <DataTable className="rounded-none border-0" columns={costOfGoodsColumns} rows={data.cost_of_goods} />

@@ -4,6 +4,7 @@ import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn, PageHeade
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface PurchaseItemRow {
   item_code: string;
@@ -21,12 +22,12 @@ interface ItemWisePurchaseHistoryData {
 }
 
 const columns: DataTableColumn<PurchaseItemRow>[] = [
-  { key: 'item_name', header: 'Item' },
-  { key: 'qty', header: 'Qty Purchased', align: 'right' },
-  { key: 'avg_rate', header: 'Avg Rate', render: (r) => formatCurrency(r.avg_rate), align: 'right' },
-  { key: 'amount', header: 'Total Spend', render: (r) => formatCurrency(r.amount), align: 'right' },
-  { key: 'purchase_count', header: 'Purchases', align: 'right' },
-  { key: 'supplier_count', header: 'Suppliers', align: 'right' },
+  { key: 'item_name', header: __('Item') },
+  { key: 'qty', header: __('Qty Purchased'), align: 'right' },
+  { key: 'avg_rate', header: __('Avg Rate'), render: (r) => formatCurrency(r.avg_rate), align: 'right' },
+  { key: 'amount', header: __('Total Spend'), render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'purchase_count', header: __('Purchases'), align: 'right' },
+  { key: 'supplier_count', header: __('Suppliers'), align: 'right' },
 ];
 
 /**
@@ -54,7 +55,7 @@ export function ItemWisePurchaseHistory() {
       );
       setData(res.message ?? (res as unknown as ItemWisePurchaseHistoryData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -67,8 +68,8 @@ export function ItemWisePurchaseHistory() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Item-wise Purchase History"
-        description="Procurement by item · Company-wide (Purchase Invoice has no branch field)"
+        title={__('Item-wise Purchase History')}
+        description={__('Procurement by item · Company-wide (Purchase Invoice has no branch field)')}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -81,8 +82,8 @@ export function ItemWisePurchaseHistory() {
       {data && (
         <KpiStrip
           items={[
-            { label: 'Total Qty Purchased', value: data.summary.total_qty },
-            { label: 'Total Spend', value: formatCurrency(data.summary.total_amount) },
+            { label: __('Total Qty Purchased'), value: data.summary.total_qty },
+            { label: __('Total Spend'), value: formatCurrency(data.summary.total_amount) },
           ] satisfies KpiItemProps[]}
         />
       )}
@@ -91,7 +92,7 @@ export function ItemWisePurchaseHistory() {
         columns={columns}
         rows={data?.items ?? []}
         isLoading={isLoading}
-        emptyMessage="No purchase records in this range — Purchase Invoices are created via standard ERPNext Desk, not a URY-specific workflow, so this may legitimately be sparse."
+        emptyMessage={__('No purchase records in this range — Purchase Invoices are created via standard ERPNext Desk, not a URY-specific workflow, so this may legitimately be sparse.')}
       />
     </div>
   );

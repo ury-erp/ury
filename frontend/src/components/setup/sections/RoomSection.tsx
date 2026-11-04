@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useConfigure, TableData } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
+import { __ } from '../../../i18n';
 
 interface PendingShrink {
   newCount: number;
@@ -75,7 +76,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
       <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 md:items-end">
         <div className="space-y-1.5">
           <label htmlFor={`room-name-${room.id}`} className="text-xs font-medium text-muted-foreground">
-            Room Name
+            {__('Room Name')}
           </label>
           <Input
             id={`room-name-${room.id}`}
@@ -83,14 +84,14 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             value={nameDraft}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNameDraft(e.target.value)}
             onBlur={commitName}
-            placeholder="e.g. Main Dining, Rooftop"
+            placeholder={__('e.g. Main Dining, Rooftop')}
             className="w-full text-sm bg-background"
           />
         </div>
 
         <div className="space-y-1.5">
           <label htmlFor={`room-count-${room.id}`} className="text-xs font-medium text-muted-foreground">
-            Number of Tables
+            {__('Number of Tables')}
           </label>
           <Input
             id={`room-count-${room.id}`}
@@ -111,7 +112,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             type="button"
             variant="ghost"
             onClick={() => deleteRoom(room.id)}
-            aria-label="Delete room"
+            aria-label={__('Delete room')}
             className="text-destructive hover:text-destructive hover:bg-destructive-tint shrink-0 p-2 h-auto justify-self-end"
           >
             <Trash2 className="w-4 h-4" />
@@ -120,20 +121,20 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
       </div>
 
       <p className="text-xs text-muted-foreground">
-        We'll name your tables automatically , you can rename or adjust any of them after.
+        {__("We'll name your tables automatically , you can rename or adjust any of them after.")}
       </p>
 
       {pendingShrink && (
         <div className="rounded-md border border-amber-300 bg-warning-tint p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
           <p className="text-sm text-warning">
-            Remove {pendingShrink.tables.map((t) => t.name).join(' and ')}? This can't be undone.
+            {__("Remove {0}? This can't be undone.", [pendingShrink.tables.map((t) => t.name).join(__(' and '))])}
           </p>
           <div className="flex gap-2 shrink-0">
             <Button type="button" variant="ghost" onClick={cancelRemove}>
-              Cancel
+              {__('Cancel')}
             </Button>
             <Button type="button" variant="danger" onClick={confirmRemove}>
-              Remove
+              {__('Remove')}
             </Button>
           </div>
         </div>
@@ -173,7 +174,7 @@ export function RoomSection() {
         className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
-        Add Room
+        {__('Add Room')}
       </Button>
     </div>
   );

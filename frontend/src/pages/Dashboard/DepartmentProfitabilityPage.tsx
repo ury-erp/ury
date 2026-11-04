@@ -11,6 +11,7 @@ import {
 } from '../../services/departmentProfitability';
 import { departmentStockService, DepartmentOption } from '../../services/departmentStock';
 import { describeProfitabilityReason } from '../../lib/profitabilityReasons';
+import { __ } from '../../i18n';
 
 /**
  * Additive, unwired reporting page (V3-80): department profitability and
@@ -158,7 +159,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
       const hasRows = (profitabilityResult.rows?.length || 0) > 0 || (planResult.rows?.length || 0) > 0;
       setState(hasRows ? 'populated' : 'empty');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to load department profitability');
+      setErrorMessage(err?.message || __('Failed to load department profitability'));
       setState('error');
     }
   };
@@ -188,7 +189,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
       <Page>
         <Panel pad data-testid="profitability-denied">
           <p className="text-sm text-muted-foreground">
-            You do not have access to department profitability reporting.
+            {__('You do not have access to department profitability reporting.')}
           </p>
         </Panel>
       </Page>
@@ -201,7 +202,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
         <Section>
           <Panel pad data-testid="profitability-select-branch">
             <p className="text-sm text-muted-foreground">
-              Select a specific branch above to view its department profitability.
+              {__('Select a specific branch above to view its department profitability.')}
             </p>
           </Panel>
         </Section>
@@ -212,34 +213,34 @@ export const DepartmentProfitabilityPage: React.FC = () => {
   return (
     <Page data-testid="department-profitability-page">
       <PageHeader
-        title="Department Profitability"
-        description="Cost and plan-vs-actual for the selected branch and service date."
+        title={__('Department Profitability')}
+        description={__('Cost and plan-vs-actual for the selected branch and service date.')}
         actions={
           <>
             <Input
               value={company}
               disabled
-              placeholder="Derived from branch"
-              aria-label="Company"
+              placeholder={__('Derived from branch')}
+              aria-label={__('Company')}
               data-testid="profitability-company"
               className="w-[180px]"
             />
             <DatePicker
               id="profitability-service-date"
-              aria-label="Service date"
+              aria-label={__('Service date')}
               value={serviceDate}
               onChange={(_id, next) => setServiceDate(next)}
               className="w-[180px]"
             />
             <Select
               id="profitability-department"
-              aria-label="Department"
+              aria-label={__('Department')}
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               data-testid="profitability-department-select"
               className="w-[180px]"
             >
-              <option value="">All departments</option>
+              <option value="">{__('All departments')}</option>
               {departmentOptions.map((dept) => (
                 <option key={dept.name} value={dept.name}>
                   {dept.department_name}
@@ -247,7 +248,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
               ))}
             </Select>
             <Button onClick={load} variant="chrome">
-              Refresh
+              {__('Refresh')}
             </Button>
           </>
         }
@@ -265,7 +266,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
         <Section>
           <Panel pad data-testid="profitability-empty">
             <p className="text-sm text-muted-foreground">
-              No data for this company/branch/service date. Check that an approved Sales Plan exists for this scope.
+              {__('No data for this company/branch/service date. Check that an approved Sales Plan exists for this scope.')}
             </p>
           </Panel>
         </Section>
@@ -273,7 +274,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
       {state === 'populated' && profitability && (
         <Section data-testid="profitability-table">
-          <h3 className="mb-2 text-sm font-semibold">Department Profitability</h3>
+          <h3 className="mb-2 text-sm font-semibold">{__('Department Profitability')}</h3>
           {profitability.reason && (
             <p className="mb-2 text-xs text-warning" data-testid="profitability-reason">
               {describeProfitabilityReason(profitability.reason)}
@@ -281,9 +282,9 @@ export const DepartmentProfitabilityPage: React.FC = () => {
           )}
           {(() => {
             const baseProfitColumns: DataTableColumn<ProfitabilityRow>[] = [
-              { key: 'department', header: 'Department' },
-              { key: 'item_or_component', header: 'Item' },
-              { key: 'net_revenue', header: 'Net Revenue', render: (row) => formatCurrency(row.net_revenue) },
+              { key: 'department', header: __('Department') },
+              { key: 'item_or_component', header: __('Item') },
+              { key: 'net_revenue', header: __('Net Revenue'), render: (row) => formatCurrency(row.net_revenue) },
             ];
             // A row's own reason (e.g. UNATTRIBUTED_COST) can differ from
             // the report-level banner above -- shown per row too so a mix
@@ -291,32 +292,32 @@ export const DepartmentProfitabilityPage: React.FC = () => {
             if (profitability.rows.some((row) => row.reason)) {
               baseProfitColumns.push({
                 key: 'reason',
-                header: 'Reason',
+                header: __('Reason'),
                 render: (row) => (row.reason ? describeProfitabilityReason(row.reason) : '—'),
               });
             }
             const costColumns: DataTableColumn<ProfitabilityRow>[] = canSeeCost
               ? [
-                  { key: 'posted_cost', header: 'Posted Cost', render: (row) => formatCurrency(row.posted_cost) },
-                  { key: 'theoretical_cost', header: 'Theoretical Cost', render: (row) => formatCurrency(row.theoretical_cost) },
+                  { key: 'posted_cost', header: __('Posted Cost'), render: (row) => formatCurrency(row.posted_cost) },
+                  { key: 'theoretical_cost', header: __('Theoretical Cost'), render: (row) => formatCurrency(row.theoretical_cost) },
                   {
                     key: 'posted_gross_profit',
-                    header: 'Posted GP',
+                    header: __('Posted GP'),
                     render: (row) => formatCurrency(row.posted_gross_profit),
                   },
                   {
                     key: 'theoretical_gross_profit',
-                    header: 'Theoretical GP',
+                    header: __('Theoretical GP'),
                     render: (row) => formatCurrency(row.theoretical_gross_profit),
                   },
-                  { key: 'variance', header: 'Variance', render: (row) => formatCurrency(row.variance) },
+                  { key: 'variance', header: __('Variance'), render: (row) => formatCurrency(row.variance) },
                 ]
               : [];
             return (
               <DataTable
                 columns={[...baseProfitColumns, ...costColumns]}
                 rows={profitability.rows}
-                emptyMessage="No profitability data found."
+                emptyMessage={__('No profitability data found.')}
               />
             );
           })()}
@@ -325,20 +326,20 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
       {state === 'populated' && planVsActual && (
         <Section data-testid="plan-vs-actual-table">
-          <h3 className="mb-2 text-sm font-semibold">Plan vs Actual</h3>
+          <h3 className="mb-2 text-sm font-semibold">{__('Plan vs Actual')}</h3>
           {(() => {
             const planVsActualColumns: DataTableColumn<(typeof planVsActual.rows)[0]>[] = [
-              { key: 'department', header: 'Department' },
-              { key: 'item_or_component', header: 'Item' },
-              { key: 'planned_qty', header: 'Planned Qty' },
-              { key: 'actual_qty', header: 'Actual Qty' },
-              { key: 'qty_variance', header: 'Variance' },
+              { key: 'department', header: __('Department') },
+              { key: 'item_or_component', header: __('Item') },
+              { key: 'planned_qty', header: __('Planned Qty') },
+              { key: 'actual_qty', header: __('Actual Qty') },
+              { key: 'qty_variance', header: __('Variance') },
             ];
             return (
               <DataTable
                 columns={planVsActualColumns}
                 rows={planVsActual.rows}
-                emptyMessage="No plan vs actual data found."
+                emptyMessage={__('No plan vs actual data found.')}
               />
             );
           })()}

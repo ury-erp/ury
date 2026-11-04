@@ -5,6 +5,7 @@ import { DateRangeFilter, type DateRangeValue } from '../../components/reports/D
 import { DeskLink } from '../../components/DeskLink';
 import { toApiDate } from '../../lib/reportDate';
 import { subMonths, endOfDay } from 'date-fns';
+import { __ } from '../../i18n';
 
 interface WorkOrderRow {
   name: string;
@@ -24,7 +25,7 @@ interface CompletedWorkOrdersData {
 const columns: DataTableColumn<WorkOrderRow>[] = [
   {
     key: 'name',
-    header: 'Work Order',
+    header: __('Work Order'),
     render: (r) => (
       <span className="inline-flex items-center gap-1.5">
         {r.name}
@@ -33,10 +34,10 @@ const columns: DataTableColumn<WorkOrderRow>[] = [
       </span>
     ),
   },
-  { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.production_item },
-  { key: 'qty', header: 'Planned Qty', align: 'right' },
-  { key: 'produced_qty', header: 'Produced Qty', align: 'right' },
-  { key: 'actual_end_date', header: 'Completed', render: (r) => r.actual_end_date || r.planned_end_date || '—' },
+  { key: 'item_name', header: __('Item'), render: (r) => r.item_name || r.production_item },
+  { key: 'qty', header: __('Planned Qty'), align: 'right' },
+  { key: 'produced_qty', header: __('Produced Qty'), align: 'right' },
+  { key: 'actual_end_date', header: __('Completed'), render: (r) => r.actual_end_date || r.planned_end_date || '—' },
 ];
 
 export function CompletedWorkOrders() {
@@ -61,7 +62,7 @@ export function CompletedWorkOrders() {
       );
       setData(res.message ?? (res as unknown as CompletedWorkOrdersData));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load report data.');
+      setError(err instanceof Error ? err.message : __('Failed to load report data.'));
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +75,8 @@ export function CompletedWorkOrders() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Completed Work Orders"
-        description="Manufacturing production history"
+        title={__('Completed Work Orders')}
+        description={__('Manufacturing production history')}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 
@@ -88,8 +89,8 @@ export function CompletedWorkOrders() {
       {data && (
         <KpiStrip
           items={[
-            { label: 'Completed', value: data.summary.total_completed },
-            { label: 'Qty Produced', value: data.summary.total_qty_produced },
+            { label: __('Completed'), value: data.summary.total_completed },
+            { label: __('Qty Produced'), value: data.summary.total_qty_produced },
           ] satisfies KpiItemProps[]}
         />
       )}
@@ -98,7 +99,7 @@ export function CompletedWorkOrders() {
         columns={columns}
         rows={data?.work_orders ?? []}
         isLoading={isLoading}
-        emptyMessage="No completed work orders in this range."
+        emptyMessage={__('No completed work orders in this range.')}
       />
     </div>
   );

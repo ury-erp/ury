@@ -17,6 +17,7 @@ import {
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import { SearchableSelect, Option } from '../../components/common/SearchableSelect';
+import { __ } from '../../i18n';
 
 interface Tier {
   from_amount: number;
@@ -128,7 +129,7 @@ export const CommissionSettingsPage: React.FC = () => {
       })));
     } catch (err) {
       console.error('Failed to load commission settings:', err);
-      showToast.error('Failed to load commission settings');
+      showToast.error(__('Failed to load commission settings'));
     } finally {
       setLoading(false);
     }
@@ -276,9 +277,9 @@ export const CommissionSettingsPage: React.FC = () => {
       );
       const updated = res.message ?? res;
       setRules(updated.rules || []);
-      showToast.success('Commission settings saved');
+      showToast.success(__('Commission settings saved'));
     } catch (err: any) {
-      showToast.error(getErrorMessage(err, 'Failed to save commission settings'));
+      showToast.error(getErrorMessage(err, __('Failed to save commission settings')));
     } finally {
       setSaving(false);
     }
@@ -298,9 +299,9 @@ export const CommissionSettingsPage: React.FC = () => {
       <Section className="!mt-0">
         <Card padding="lg" className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl shadow-xs">
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Commission Settings</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">{__('Commission Settings')}</h1>
             <p className="text-sm text-muted-foreground">
-              Configure commission rules, attribution modes, and calculation bases.
+              {__('Configure commission rules, attribution modes, and calculation bases.')}
             </p>
           </div>
         </Card>
@@ -310,17 +311,17 @@ export const CommissionSettingsPage: React.FC = () => {
         {/* Policy Card */}
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-bold text-foreground">Commission Policy</h2>
-            <p className="text-xs text-muted-foreground">Global settings for commission calculation.</p>
+            <h2 className="text-lg font-bold text-foreground">{__('Commission Policy')}</h2>
+            <p className="text-xs text-muted-foreground">{__('Global settings for commission calculation.')}</p>
           </div>
 
           <div className="p-6 space-y-6">
             {/* Enable toggle */}
             <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
               <div>
-                <span className="text-sm font-semibold text-foreground block">Enable Commission</span>
+                <span className="text-sm font-semibold text-foreground block">{__('Enable Commission')}</span>
                 <span className="text-xs text-muted-foreground">
-                  Turn on to activate commission calculations for all employees.
+                  {__('Turn on to activate commission calculations for all employees.')}
                 </span>
               </div>
               <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -329,44 +330,44 @@ export const CommissionSettingsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Commission Base */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Commission Base</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{__('Commission Base')}</label>
                 <Select value={commissionBase} onValueChange={setCommissionBase}>
-                  <SelectItem value="Net Sales">Net Sales</SelectItem>
-                  <SelectItem value="Net Total">Net Total</SelectItem>
-                  <SelectItem value="Item Total">Item Total</SelectItem>
-                  <SelectItem value="Grand Total">Grand Total</SelectItem>
+                  <SelectItem value="Net Sales">{__('Net Sales')}</SelectItem>
+                  <SelectItem value="Net Total">{__('Net Total')}</SelectItem>
+                  <SelectItem value="Item Total">{__('Item Total')}</SelectItem>
+                  <SelectItem value="Grand Total">{__('Grand Total')}</SelectItem>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Net Sales: pre-tax revenue, discount-adjusted (recommended). Net Total: pre-tax as recorded. Item Total: sum of item prices before document discount. Grand Total: includes tax (not recommended).
+                  {__('Net Sales: pre-tax revenue, discount-adjusted (recommended). Net Total: pre-tax as recorded. Item Total: sum of item prices before document discount. Grand Total: includes tax (not recommended).')}
                 </p>
               </div>
 
               {/* Attribution Mode */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Attribution Mode</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{__('Attribution Mode')}</label>
                 <Select value={attributionMode} onValueChange={setAttributionMode}>
-                  <SelectItem value="Opener">Opener</SelectItem>
-                  <SelectItem value="Closer">Closer</SelectItem>
-                  <SelectItem value="Split Evenly">Split Evenly</SelectItem>
-                  <SelectItem value="Split By Contribution">Split By Contribution</SelectItem>
+                  <SelectItem value="Opener">{__('Opener')}</SelectItem>
+                  <SelectItem value="Closer">{__('Closer')}</SelectItem>
+                  <SelectItem value="Split Evenly">{__('Split Evenly')}</SelectItem>
+                  <SelectItem value="Split By Contribution">{__('Split By Contribution')}</SelectItem>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Opener: whoever started the order (default). Closer: whoever closed/billed. Split Evenly: 50/50 when they differ. Split By Contribution: split by line items entered.
+                  {__('Opener: whoever started the order (default). Closer: whoever closed/billed. Split Evenly: 50/50 when they differ. Split By Contribution: split by line items entered.')}
                 </p>
               </div>
 
               {/* Include Returns */}
               <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
                 <div>
-                  <span className="text-sm font-semibold text-foreground block">Include Returns</span>
-                  <span className="text-xs text-muted-foreground">Refunded sales reduce commission base (recommended).</span>
+                  <span className="text-sm font-semibold text-foreground block">{__('Include Returns')}</span>
+                  <span className="text-xs text-muted-foreground">{__('Refunded sales reduce commission base (recommended).')}</span>
                 </div>
                 <Switch checked={includeReturns} onCheckedChange={setIncludeReturns} />
               </div>
 
               {/* Default Rate */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Default Rate (%)</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{__('Default Rate (%)')}</label>
                 <Input
                   type="number"
                   min="0"
@@ -379,19 +380,19 @@ export const CommissionSettingsPage: React.FC = () => {
                   placeholder="0.00"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Applied when no rule matches an employee.
+                  {__('Applied when no rule matches an employee.')}
                 </p>
               </div>
 
               {/* Tier Period */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Tier Period</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">{__('Tier Period')}</label>
                 <Select value={tierPeriod} onValueChange={setTierPeriod}>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
-                  <SelectItem value="Weekly">Weekly</SelectItem>
+                  <SelectItem value="Monthly">{__('Monthly')}</SelectItem>
+                  <SelectItem value="Weekly">{__('Weekly')}</SelectItem>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Window over which tiered commission rates are evaluated.
+                  {__('Window over which tiered commission rates are evaluated.')}
                 </p>
               </div>
             </div>
@@ -402,9 +403,9 @@ export const CommissionSettingsPage: React.FC = () => {
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-foreground">Commission Rules</h2>
+              <h2 className="text-lg font-bold text-foreground">{__('Commission Rules')}</h2>
               <p className="text-xs text-muted-foreground">
-                Set branch, designation, or employee-specific commission rates and tiers.
+                {__('Set branch, designation, or employee-specific commission rates and tiers.')}
               </p>
             </div>
             <Button
@@ -413,14 +414,14 @@ export const CommissionSettingsPage: React.FC = () => {
               className="inline-flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              Add Rule
+              {__('Add Rule')}
             </Button>
           </div>
 
           <div className="p-6 space-y-4">
             {rules.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">
-                No rules yet. Add one to define commission rates for specific branches, designations, or employees.
+                {__('No rules yet. Add one to define commission rates for specific branches, designations, or employees.')}
               </p>
             ) : (
               rules.map((rule, ruleIdx) => (
@@ -432,7 +433,7 @@ export const CommissionSettingsPage: React.FC = () => {
                         checked={rule.disabled}
                         onChange={(e) => updateRule(ruleIdx, { disabled: e.target.checked })}
                       />
-                      <label className="text-xs text-muted-foreground">Disabled</label>
+                      <label className="text-xs text-muted-foreground">{__('Disabled')}</label>
                     </div>
                     <Button
                       variant="outline"
@@ -446,33 +447,33 @@ export const CommissionSettingsPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Branch */}
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">Branch</label>
+                      <label className="block text-xs font-medium text-foreground mb-1">{__('Branch')}</label>
                       <SearchableSelect
                         id={`rule-${ruleIdx}-branch`}
                         value={rule.branch || ''}
                         options={branchOptions}
                         onChange={(_, val) => updateRule(ruleIdx, { branch: val })}
-                        placeholder="Any branch"
+                        placeholder={__('Any branch')}
                         strict
                       />
                     </div>
 
                     {/* Designation */}
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">Designation</label>
+                      <label className="block text-xs font-medium text-foreground mb-1">{__('Designation')}</label>
                       <SearchableSelect
                         id={`rule-${ruleIdx}-designation`}
                         value={rule.designation || ''}
                         options={designations}
                         onChange={(_, val) => updateRule(ruleIdx, { designation: val })}
-                        placeholder="Any designation"
+                        placeholder={__('Any designation')}
                         strict
                       />
                     </div>
 
                     {/* Employee */}
                     <div>
-                      <label className="block text-xs font-medium text-foreground mb-1">Employee</label>
+                      <label className="block text-xs font-medium text-foreground mb-1">{__('Employee')}</label>
                       <SearchableSelect
                         id={`rule-${ruleIdx}-employee`}
                         value={rule.employee || ''}
@@ -491,7 +492,7 @@ export const CommissionSettingsPage: React.FC = () => {
                             return next;
                           });
                         }}
-                        placeholder="Search employee..."
+                        placeholder={__('Search employee...')}
                         strict
                       />
                     </div>
@@ -500,7 +501,7 @@ export const CommissionSettingsPage: React.FC = () => {
                   {/* Rate Type Toggle */}
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs font-medium text-foreground">Rate Type:</label>
+                      <label className="text-xs font-medium text-foreground">{__('Rate Type:')}</label>
                       <Switch
                         checked={rule.rate_type === 'Tiered'}
                         onCheckedChange={(checked) =>
@@ -510,7 +511,7 @@ export const CommissionSettingsPage: React.FC = () => {
                         }
                       />
                       <span className="text-xs text-muted-foreground">
-                        {rule.rate_type === 'Flat' ? 'Flat' : 'Tiered'}
+                        {rule.rate_type === 'Flat' ? __('Flat') : __('Tiered')}
                       </span>
                     </div>
                   </div>
@@ -519,7 +520,7 @@ export const CommissionSettingsPage: React.FC = () => {
                   {rule.rate_type === 'Flat' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-foreground mb-1">Rate (%)</label>
+                        <label className="block text-xs font-medium text-foreground mb-1">{__('Rate (%)')}</label>
                         <Input
                           type="number"
                           min="0"
@@ -541,15 +542,15 @@ export const CommissionSettingsPage: React.FC = () => {
                   {rule.rate_type === 'Tiered' && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-medium text-foreground">Tier Mode</label>
+                        <label className="text-xs font-medium text-foreground">{__('Tier Mode')}</label>
                         <Select
                           value={rule.tier_mode || 'Marginal'}
                           onValueChange={(val) =>
                             updateRule(ruleIdx, { tier_mode: val as 'Marginal' | 'Slab' })
                           }
                         >
-                          <SelectItem value="Marginal">Marginal</SelectItem>
-                          <SelectItem value="Slab">Slab</SelectItem>
+                          <SelectItem value="Marginal">{__('Marginal')}</SelectItem>
+                          <SelectItem value="Slab">{__('Slab')}</SelectItem>
                         </Select>
                       </div>
 
@@ -558,7 +559,7 @@ export const CommissionSettingsPage: React.FC = () => {
                           <div key={tierIdx} className="flex items-end gap-2">
                             <div className="flex-1">
                               <label className="block text-xs font-medium text-foreground mb-1">
-                                From Amount
+                                {__('From Amount')}
                               </label>
                               <Input
                                 type="number"
@@ -575,7 +576,7 @@ export const CommissionSettingsPage: React.FC = () => {
                             </div>
                             <div className="flex-1">
                               <label className="block text-xs font-medium text-foreground mb-1">
-                                Rate (%)
+                                {__('Rate (%)')}
                               </label>
                               <Input
                                 type="number"
@@ -607,8 +608,8 @@ export const CommissionSettingsPage: React.FC = () => {
                         onClick={() => addTier(ruleIdx)}
                         className="w-full"
                       >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Add Tier
+                        <Plus className="w-3.5 h-3.5 me-1" />
+                        {__('Add Tier')}
                       </Button>
                     </div>
                   )}
@@ -623,7 +624,7 @@ export const CommissionSettingsPage: React.FC = () => {
       <Section className="flex justify-end">
         <Button onClick={handleSave} disabled={saving} className="gap-2">
           {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          Save Commission Settings
+          {__('Save Commission Settings')}
         </Button>
       </Section>
     </Page>
