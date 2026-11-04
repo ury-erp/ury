@@ -66,8 +66,8 @@ const costOfGoodsColumns: DataTableColumn<CostOfGoodsRow>[] = [
   { key: 'item_name', header: __('Item'), render: (r) => r.item_name || r.item_code },
   { key: 'item_group', header: __('Group'), render: (r) => r.item_group || '—' },
   { key: 'qty', header: __('Qty') },
-  { key: 'buying_price', header: __('Buying Price'), render: (r) => formatCurrency(r.buying_price), align: 'right' },
-  { key: 'amount', header: __('Amount'), render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'buying_price', header: __('Buying Price'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.buying_price)}</bdi>, align: 'right' },
+  { key: 'amount', header: __('Amount'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.amount)}</bdi>, align: 'right' },
 ];
 
 function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] }) {

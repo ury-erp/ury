@@ -37,17 +37,17 @@ const columns: DataTableColumn<InvoiceRow>[] = [
     header: __('Invoice'),
     render: (r) => (
       <span className="inline-flex items-center gap-1.5">
-        {r.invoice}
+        <bdi dir="ltr" className="num">{r.invoice}</bdi>
         {/* Link to editable desk document; this report is read-only */}
         <DeskLink doctype="POS Invoice" name={r.invoice} iconOnly />
       </span>
     ),
   },
-  { key: 'item_total', header: __('Item Total'), render: (r) => formatCurrency(r.item_total), align: 'right' },
-  { key: 'total_taxes', header: __('Taxes'), render: (r) => formatCurrency(r.total_taxes), align: 'right' },
-  { key: 'grand_total', header: __('Grand Total'), render: (r) => formatCurrency(r.grand_total), align: 'right' },
-  { key: 'received_amount', header: __('Received'), render: (r) => formatCurrency(r.received_amount), align: 'right' },
-  { key: 'cash_discounts', header: __('Cash Discounts'), render: (r) => formatCurrency(r.cash_discounts), align: 'right' },
+  { key: 'item_total', header: __('Item Total'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.item_total)}</bdi>, align: 'right' },
+  { key: 'total_taxes', header: __('Taxes'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.total_taxes)}</bdi>, align: 'right' },
+  { key: 'grand_total', header: __('Grand Total'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.grand_total)}</bdi>, align: 'right' },
+  { key: 'received_amount', header: __('Received'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.received_amount)}</bdi>, align: 'right' },
+  { key: 'cash_discounts', header: __('Cash Discounts'), render: (r) => <bdi dir="ltr" className="num">{formatCurrency(r.cash_discounts)}</bdi>, align: 'right' },
   { key: 'payment_mode', header: __('Payment Mode'), render: (r) => r.payment_mode || '—' },
 ];
 
@@ -98,7 +98,11 @@ export function DaywiseInvoices() {
     <div className="space-y-6">
       <PageHeader
         title={__('Daywise Invoices')}
-        description={__('Invoice-level detail {0}{1}', [activeBranchId === 'all' ? '· All Branches' : '', pagination ? ` · ${pagination.total} invoices` : ''])}
+        description={[
+          __('Invoice-level detail'),
+          activeBranchId === 'all' ? `· ${__('All Branches')}` : '',
+          pagination ? `· ${__('{0} invoices', [pagination.total])}` : '',
+        ].filter(Boolean).join(' ')}
         actions={<DateRangeFilter value={range} onChange={setRange} />}
       />
 

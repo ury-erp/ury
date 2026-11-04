@@ -51,7 +51,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
       header: __('Date & Time'),
       render: (row) => {
         try {
-          return <span>{formatDate(new Date(`${row.posting_date} ${normalizeFrappeTime(row.posting_time)}`), 'yyyy-MM-dd hh:mm:ss a')}</span>;
+          return <bdi dir="ltr" className="num">{formatDate(new Date(`${row.posting_date} ${normalizeFrappeTime(row.posting_time)}`), 'yyyy-MM-dd hh:mm:ss a')}</bdi>;
         } catch {
           return <span>{row.posting_date} {normalizeFrappeTime(row.posting_time)}</span>;
         }
@@ -70,7 +70,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
       key: 'grand_total',
       header: __('Grand Total'),
       align: 'right',
-      render: (row) => <span className={numericCellClass}>{format(row.grand_total, row.currency)}</span>,
+      render: (row) => <span dir="ltr" className={`num ${numericCellClass}`}>{format(row.grand_total, row.currency)}</span>,
     },
   ], [format]);
 

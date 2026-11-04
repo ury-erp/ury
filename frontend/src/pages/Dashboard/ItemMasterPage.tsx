@@ -584,7 +584,9 @@ export const ItemMasterPage: React.FC = () => {
         value: newStatus,
       });
       showToast.success(
-        __('Item "{0}" {1}', [item.item_name, newStatus ? 'disabled' : 'enabled'])
+        newStatus
+          ? __('Item "{0}" disabled', [item.item_name])
+          : __('Item "{0}" enabled', [item.item_name])
       );
     } catch (err: any) {
       console.error('Failed to update status', err);
