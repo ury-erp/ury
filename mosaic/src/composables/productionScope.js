@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { reactive, watch } from "vue";
 import { FrappeApp } from "frappe-js-sdk";
 
@@ -37,7 +38,7 @@ export function createProductionScope() {
       writeTabScoped(branchKey, scope.branch);
       scope.ready = true;
     } catch {
-      if (request === branchRequest) scope.error = "Unable to load branches. Please reload to retry.";
+      if (request === branchRequest) scope.error = t("Unable to load branches. Please reload to retry.");
     } finally {
       if (request === branchRequest) scope.loading = false;
     }
@@ -55,7 +56,7 @@ export function createProductionScope() {
       writeTabScoped(companyKey, scope.company);
       await loadBranches();
     } catch {
-      scope.error = "Unable to load companies. Please reload to retry.";
+      scope.error = t("Unable to load companies. Please reload to retry.");
       scope.loading = false;
     }
     watch(() => scope.company, () => {

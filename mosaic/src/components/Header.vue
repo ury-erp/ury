@@ -1,12 +1,12 @@
 <template>
   <header class="sticky top-0 z-40 bg-[var(--panel)] min-h-12 py-2 px-4 md:px-6 flex flex-wrap gap-2 justify-between items-center border-b border-[var(--hair)]">
     <router-link to="/" class="flex items-center cursor-pointer">
-      <img :src="imagePath" alt="Logo" class="h-8 w-auto mr-2">
+      <img :src="imagePath" :alt="__('Logo')" class="h-8 w-auto me-2">
     </router-link>
     <div class="flex items-center gap-3">
       <template v-if="$route.name === 'Home'">
-        <ScopeSelector v-model="scope.company" label="Company" all-label="All Companies" :options="companyOptions" :disabled="scope.loading" />
-        <ScopeSelector v-model="scope.branch" label="Branch" all-label="All Branches" :options="branchOptions" :disabled="scope.loading" />
+        <ScopeSelector v-model="scope.company" :label="__('Company')" :all-label="__('All Companies')" :options="companyOptions" :disabled="scope.loading" />
+        <ScopeSelector v-model="scope.branch" :label="__('Branch')" :all-label="__('All Branches')" :options="branchOptions" :disabled="scope.loading" />
       </template>
       <button
         class="flex justify-center items-center h-7 w-7 rounded-[7px] hover:bg-[var(--hover)] transition-colors text-[var(--ac)]"
@@ -35,7 +35,7 @@
           </svg>
         </button>
 
-        <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-[var(--panel)] rounded-lg shadow-lg border border-[var(--hair)] z-50">
+        <div v-if="showUserMenu" class="absolute end-0 mt-2 w-56 bg-[var(--panel)] rounded-lg shadow-lg border border-[var(--hair)] z-50">
           <div class="p-4 border-b border-[var(--hair)]">
             <p class="text-sm font-semibold text-[var(--t1)]">{{ userName }}</p>
             <p class="text-sm font-semibold text-[var(--t3)]">{{ userId }}</p>
@@ -45,24 +45,24 @@
               @click="switchToDashboard"
               class="flex justify-start items-center w-full px-4 py-2 text-sm font-semibold text-[var(--t2)] hover:bg-[var(--hover)] transition-colors"
             >
-              <svg class="w-4 h-4 mr-3 text-[var(--t3)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-4 h-4 me-3 text-[var(--t3)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect width="20" height="14" x="2" y="3" rx="2"/>
                 <line x1="8" x2="16" y1="21" y2="21"/>
                 <line x1="12" x2="12" y1="17" y2="21"/>
               </svg>
-              Switch to Dashboard
+              {{ __("Switch to Dashboard") }}
             </button>
             
             <button
               @click="logout"
               class="flex justify-start items-center w-full px-4 py-2 text-sm font-semibold text-[var(--rd)] hover:bg-[var(--rd-t)] hover:text-[var(--rd)] transition-colors"
             >
-              <svg class="w-4 h-4 mr-3 text-[var(--rd)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="w-4 h-4 me-3 text-[var(--rd)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" x2="9" y1="12" y2="12"/>
               </svg>
-              Logout
+              {{ __("Logout") }}
             </button>
           </div>
         </div>
@@ -73,6 +73,7 @@
 
 <script>
 import urimosaicImage from "@/assets/logos/mosaic.jpg";
+import { t } from "../i18n";
 import ScopeSelector from "./ScopeSelector.vue";
 import { productionScopeKey } from "../composables/productionScope";
 
@@ -92,7 +93,7 @@ export default {
     return {
       imagePath: urimosaicImage,
       showUserMenu: false,
-      userName: "User",
+      userName: t("User"),
       userId: "user@example.com"
     };
   },

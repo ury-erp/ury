@@ -2,17 +2,17 @@
   <div class="min-h-screen bg-[var(--bg)] flex">
 	<div class="mx-auto w-full max-w-sm lg:w-96">
 	  <form @submit.prevent="login" class="space-y-6">
-		<label for="email"> Username: </label>
+		<label for="email">{{ __("Username:") }}</label>
 		<input type="text" v-model="email" />
 		<br />
-		<label for="password"> Password: </label>
+		<label for="password">{{ __("Password:") }}</label>
 		<input type="password" v-model="password" />
 
 		<button
 		  class="bg-[var(--ac)] block text-white p-2 hover:opacity-90 rounded-[7px]"
 		  type="submit"
 		>
-		  Sign in
+		  {{ __("Sign in") }}
 		</button>
 	  </form>
 	</div>

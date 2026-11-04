@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ frappe.lang or 'en' }}" dir="{{ 'rtl' if (frappe.lang or 'en').split('-')[0] in ['ar','he','fa','ur','ku'] else 'ltr' }}">
 
 <head>
   <meta charset="UTF-8" />

@@ -13,18 +13,18 @@
 
       <div>
         <h3 class="text-lg font-bold text-[var(--t1)]">
-          Chef Time Logging
+          {{ __("Chef Time Logging") }}
         </h3>
 
         <p class="text-xs text-[var(--t3)]">
-          {{ itemCode }} — selective Job Card usage (batch-eligible, opted in)
+          {{ itemCode }} — {{ __("selective Job Card usage (batch-eligible, opted in)") }}
         </p>
       </div>
     </div>
 
     <div class="grid grid-cols-2 gap-3 mt-4">
       <div>
-        <label class="block text-xs text-[var(--t3)] mb-1">From</label>
+        <label class="block text-xs text-[var(--t3)] mb-1">{{ __("From") }}</label>
         <input
           v-model="fromTime"
           type="datetime-local"
@@ -34,7 +34,7 @@
       </div>
 
       <div>
-        <label class="block text-xs text-[var(--t3)] mb-1">To</label>
+        <label class="block text-xs text-[var(--t3)] mb-1">{{ __("To") }}</label>
         <input
           v-model="toTime"
           type="datetime-local"
@@ -50,7 +50,7 @@
       class="mt-4 w-full h-[28px] bg-[var(--am)] text-white text-xs font-semibold rounded-[7px] hover:opacity-90 transition-opacity"
       @click="onLogTime"
     >
-      Log Chef Time
+      {{ __("Log Chef Time") }}
     </button>
   </div>
 </template>
