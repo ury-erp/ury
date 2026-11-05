@@ -69,7 +69,7 @@ describe('CustomerSelect', () => {
     expect(input).toBeDisabled();
   });
 
-  it('disables CustomerPicker when isUpdatingOrder is true', async () => {
+  it('keeps CustomerPicker enabled when isUpdatingOrder is true (customer can change on an open order)', async () => {
     usePOSStoreMock = vi.fn(() => ({
       selectedCustomer: null,
       setSelectedCustomer: vi.fn(),
@@ -79,7 +79,7 @@ describe('CustomerSelect', () => {
 
     render(<CustomerSelect />);
     const input = screen.getByPlaceholderText('Select customer') as HTMLInputElement;
-    expect(input).toBeDisabled();
+    expect(input).not.toBeDisabled();
   });
 
   it('does not pass an orderType filter to the picker (picker always searches all customers)', () => {
