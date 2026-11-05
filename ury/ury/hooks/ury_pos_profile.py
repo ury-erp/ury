@@ -1,10 +1,13 @@
 import frappe
 from frappe import _, msgprint
 
+from ury.ury_pos.default_customer import validate_order_type_customers
+
 
 def validate(doc, method):
     validate_bill_check(doc, method)
     validate_cost_center(doc, method)
+    validate_order_type_customers(doc, method)
 
 
 def validate_bill_check(doc, method):

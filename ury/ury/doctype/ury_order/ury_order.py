@@ -10,6 +10,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt, get_datetime
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
+from ury.ury_pos.default_customer import get_default_customer_config, resolve_default_customer
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 from ury.ury.api.ury_order_reservation_service import (
@@ -1720,6 +1721,7 @@ def get_captain_context():
             "show_image": bool(pos_profile.show_image),
             "custom_enable_kot_reprint": bool(pos_profile.custom_enable_kot_reprint),
             "custom_enable_multiple_cashier": multi_cashier,
+            **get_default_customer_config(pos_profile),
         }
 
     opening_state = None
@@ -2019,6 +2021,15 @@ def sync_order(
                 ),
             )
             return {"status": "Failure"}
+
+    # New order with no customer from the client (older cached client, offline
+    # replay, legacy POS, kiosk): fall back to the POS Profile's configured
+    # default for this order type. Never overrides a customer the client sent,
+    # and never applies to an existing order.
+    if not customer and not invoice.name:
+        customer = resolve_default_customer(
+            posprofile, order_type or getattr(invoice, "order_type", None)
+        )
 
     if not customer:
         frappe.throw("Please enter valid customer details")
