@@ -657,6 +657,7 @@ fixtures = [
                     "POS Closing Entry Detail-custom_closing_amount",
                     "POS Closing Entry-branch",
                     "POS Profile-custom_edit_order_type",
+                    "POS Profile-custom_order_type_customers",
                     "Printer Settings-kot_print_format_",
                     "Printer Settings-kot",
                     "POS Profile-kot_naming_series",
