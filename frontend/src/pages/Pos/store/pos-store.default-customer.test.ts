@@ -159,4 +159,14 @@ describe('pos-store default customer', () => {
     expect(usePOSStore.getState().selectedCustomer).toEqual(WALK_IN);
     expect(usePOSStore.getState().customerSource).toBe('auto');
   });
+
+  it('lets the customer be replaced on an order being updated and keeps it updating', () => {
+    usePOSStore.setState({ selectedCustomer: WALK_IN, customerSource: 'order', isUpdatingOrder: true, orderId: 'INV-1' });
+    usePOSStore.getState().setSelectedCustomer(PICKED);
+    const state = usePOSStore.getState();
+    expect(state.selectedCustomer).toEqual(PICKED);
+    expect(state.customerSource).toBe('manual');
+    expect(state.isUpdatingOrder).toBe(true);
+    expect(state.orderId).toBe('INV-1');
+  });
 });
