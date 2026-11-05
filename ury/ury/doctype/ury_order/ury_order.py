@@ -1752,6 +1752,21 @@ def get_captain_context():
     }
 
 
+def _validate_customer_change(invoice, customer):
+    """Allow replacing the customer on an open order, except for Aggregators.
+
+    A walk-in or provisional customer is routinely replaced with the real one
+    before payment, and the server accepts that. An Aggregators order's customer
+    is the aggregator itself and drives its price list, so it must not change.
+    """
+    if not getattr(invoice, "name", None):
+        return
+
+    current = getattr(invoice, "customer", None)
+    if current and current != customer and getattr(invoice, "order_type", None) == "Aggregators":
+        frappe.throw(_("The customer of an Aggregators order cannot be changed."))
+
+
 def _previous_line_snapshot(invoice_items):
     """Snapshot the already-saved invoice lines for the previous-vs-current diff.
 
@@ -2034,6 +2049,7 @@ def sync_order(
     if not customer:
         frappe.throw("Please enter valid customer details")
     else:
+        _validate_customer_change(invoice, customer)
         invoice.customer = customer
 
     if order_type:
@@ -2050,6 +2066,7 @@ def sync_order(
         )
 
     customerdoc = frappe.get_doc("Customer", customer)
+    invoice.customer_name = customerdoc.customer_name
     invoice.mobile_number = customerdoc.mobile_number
     if comments is not None:
         invoice.custom_comments = comments
