@@ -3,7 +3,7 @@ import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 import { validatePhoneNumber, getCountryCallingCode } from '@ury/core';
 
-import { addCustomer, type CreateCustomerData, searchCustomers, getCustomersByOrderType } from '../lib/customer-api';
+import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { t } from '../i18n';
 
@@ -11,7 +11,6 @@ export interface CustomerPickerProps {
   value: Customer | null;
   onChange: (customer: Customer | null) => void;
   disabled?: boolean;
-  orderType?: string;
 }
 
 function NewCustomerForm({
@@ -204,7 +203,7 @@ function NewCustomerForm({
   );
 }
 
-export function CustomerPicker({ value, onChange, disabled, orderType }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProps) {
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -221,25 +220,6 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
       setSearchError(null);
       return;
     }
-
-    if (orderType && typeof getCustomersByOrderType === 'function') {
-      setIsSearching(true);
-      setSearchError(null);
-      const delay = searchTerm.trim() ? 300 : 0;
-      const handler = setTimeout(() => {
-        getCustomersByOrderType(orderType, searchTerm)
-          .then((results) => {
-            setSearchResults(results);
-            setIsSearching(false);
-          })
-          .catch(() => {
-            setSearchError(t('customer.failed_search'));
-            setIsSearching(false);
-          });
-      }, delay);
-      return () => clearTimeout(handler);
-    }
-
 
     if (!searchTerm.trim()) {
       setSearchResults([]);
@@ -261,7 +241,7 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
         });
     }, 300);
     return () => clearTimeout(handler);
-  }, [searchTerm, isOpen, orderType]);
+  }, [searchTerm, isOpen]);
 
   const parseCustomer = (customer: { name: string; content?: string }): Customer => ({
     id: customer.name,
@@ -340,11 +320,6 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
                 </div>
               )}
               {searchError && <div className="p-4 text-center text-[12px] text-destructive">{searchError}</div>}
-              {!isSearching && orderType && !searchTerm.trim() && searchResults.length > 0 && (
-                <div className="px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-tertiary bg-muted/40 border-b border-hair">
-                  {orderType} Customers
-                </div>
-              )}
               {searchResults.map((customer, idx) => {
                 const parsed = parseCustomer(customer);
                 return (

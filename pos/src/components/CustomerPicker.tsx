@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { CustomerPicker as CustomerPickerView, type CustomerOption } from '@ury/ui';
-import { addCustomer, searchCustomers, getCustomersByOrderType } from '../lib/customer-api';
+import { addCustomer, searchCustomers } from '../lib/customer-api';
 import { type Customer, usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { t } from '../i18n';
@@ -9,7 +9,6 @@ export interface CustomerPickerProps {
   value: Customer | null;
   onChange: (customer: Customer | null) => void;
   disabled?: boolean;
-  orderType?: string;
 }
 
 function parseCustomer(row: { name: string; content?: string }): CustomerOption {
@@ -20,7 +19,7 @@ function parseCustomer(row: { name: string; content?: string }): CustomerOption 
   };
 }
 
-export function CustomerPicker({ value, onChange, disabled, orderType }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProps) {
   const posStoreProfile = usePOSStore((state) => state.posProfile);
   const rootStoreProfile = useRootStore((state) => state.posProfile);
   const posProfile = posStoreProfile || rootStoreProfile;
@@ -41,23 +40,7 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const fetchCustomers = useCallback((query: string, currentOrderType?: string) => {
-    if (currentOrderType && typeof getCustomersByOrderType === 'function') {
-      setSearching(true);
-      setSearchError(null);
-      getCustomersByOrderType(currentOrderType, query)
-        .then((rows) => {
-          setResults(rows.map(parseCustomer));
-          setSearchError(null);
-        })
-        .catch(() => {
-          setResults([]);
-          setSearchError(t('customer.failed_search'));
-        })
-        .finally(() => setSearching(false));
-      return;
-    }
-
+  const handleSearch = useCallback((query: string) => {
     if (!query.trim()) {
       setResults([]);
       setSearching(false);
@@ -79,19 +62,6 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
       .finally(() => setSearching(false));
   }, []);
 
-  const handleSearch = useCallback(
-    (query: string) => {
-      fetchCustomers(query, orderType);
-    },
-    [fetchCustomers, orderType]
-  );
-
-  useEffect(() => {
-    if (orderType && typeof getCustomersByOrderType === 'function') {
-      fetchCustomers('', orderType);
-    }
-  }, [orderType, fetchCustomers]);
-
   return (
     <CustomerPickerView
       value={value}
@@ -101,7 +71,6 @@ export function CustomerPicker({ value, onChange, disabled, orderType }: Custome
       searchError={searchError}
       onSearch={handleSearch}
       disabled={disabled}
-      resultsHeader={orderType ? `${orderType} Customers` : undefined}
       country={country}
       onCreate={async ({ name, phone }) => {
         const response = await addCustomer({

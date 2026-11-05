@@ -8,7 +8,6 @@ const addCustomerMock = vi.fn();
 vi.mock("../lib/customer-api", () => ({
   searchCustomers: (...a: any) => searchCustomersMock(...a),
   addCustomer: (...a: any) => addCustomerMock(...a),
-  getCustomersByOrderType: vi.fn().mockResolvedValue([]),
 }));
 let mockPosProfile: { name: string; country: string } | null = null;
 vi.mock("../store/pos-store", () => ({
@@ -28,7 +27,6 @@ describe("CustomerPicker", () => {
     vi.clearAllMocks();
     mockPosProfile = null;
   });
-  
   it("renders search input when no customer selected", () => {
     render(<CustomerPicker value={null} onChange={vi.fn()} />);
     expect(screen.getByPlaceholderText("customer.search_placeholder")).toBeInTheDocument();

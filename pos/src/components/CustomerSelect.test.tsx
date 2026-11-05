@@ -15,8 +15,12 @@ vi.mock("./AggregatorSelect", () => ({
   AggregatorSelect: () => <div data-testid="aggregator">Aggregator</div>,
 }));
 
+const pickerProps = vi.fn();
 vi.mock("./CustomerPicker", () => ({
-  CustomerPicker: () => <div data-testid="picker">Picker</div>,
+  CustomerPicker: (props: Record<string, unknown>) => {
+    pickerProps(props);
+    return <div data-testid="picker">Picker</div>;
+  },
 }));
 
 describe("CustomerSelect", () => {
@@ -28,6 +32,13 @@ describe("CustomerSelect", () => {
   it("renders picker component by default", () => {
     const { getByTestId } = render(<CustomerSelect />);
     expect(getByTestId("picker")).toBeInTheDocument();
+  });
+
+  it("does not pass an orderType filter to the picker (picker always searches all customers)", () => {
+    pickerProps.mockClear();
+    render(<CustomerSelect />);
+    expect(pickerProps).toHaveBeenCalled();
+    expect(pickerProps.mock.calls[0][0]).not.toHaveProperty("orderType");
   });
 
   it("accepts disabled prop", () => {

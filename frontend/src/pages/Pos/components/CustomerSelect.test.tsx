@@ -17,8 +17,12 @@ vi.mock('./AggregatorSelect', () => ({
   AggregatorSelect: () => <div>Aggregator Select</div>,
 }));
 
+const pickerProps = vi.fn();
 vi.mock('./CustomerPicker', () => ({
-  CustomerPicker: ({ value, onChange, disabled }: any) => (
+  CustomerPicker: (props: any) => {
+    pickerProps(props);
+    const { value, onChange, disabled } = props;
+    return (
     <div data-testid="customer-picker">
       <input
         type="text"
@@ -28,7 +32,8 @@ vi.mock('./CustomerPicker', () => ({
         placeholder="Select customer"
       />
     </div>
-  ),
+    );
+  },
 }));
 
 describe('CustomerSelect', () => {
@@ -75,5 +80,12 @@ describe('CustomerSelect', () => {
     render(<CustomerSelect />);
     const input = screen.getByPlaceholderText('Select customer') as HTMLInputElement;
     expect(input).toBeDisabled();
+  });
+
+  it('does not pass an orderType filter to the picker (picker always searches all customers)', () => {
+    pickerProps.mockClear();
+    render(<CustomerSelect />);
+    expect(pickerProps).toHaveBeenCalled();
+    expect(pickerProps.mock.calls[0][0]).not.toHaveProperty('orderType');
   });
 });

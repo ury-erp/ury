@@ -18,7 +18,6 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
       value={selectedCustomer}
       onChange={setSelectedCustomer}
       disabled={disabled || isUpdatingOrder}
-      orderType={selectedOrderType}
     />
   );
 }
