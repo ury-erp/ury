@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage, siteCurrencyCode, currencyDisplaySymbol } from '@ury/core';
+// Subpath import: keeps this pure helper independent of tests that mock the '@ury/core' barrel.
+import { resolveDefaultCustomer, profileLacksDefaultCustomerConfig } from '@ury/core/default-customer';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -44,6 +46,14 @@ export interface Customer {
   name: string;
   phone: string;
 }
+
+/**
+ * Where the current customer came from:
+ *  - 'auto'   preselected from the POS Profile default for the order type; follows order-type changes
+ *  - 'manual' picked or cleared by the user; never overwritten by order-type changes
+ *  - 'order'  loaded from an existing order; never overwritten
+ */
+export type CustomerSource = 'auto' | 'manual' | 'order';
 
 export interface OrderItem extends MenuItem {
   quantity: number;
@@ -124,6 +134,7 @@ interface POSState {
   selectedRoom: string | null;
   searchQuery: string;
   selectedCustomer: Customer | null;
+  customerSource: CustomerSource;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
   selectedItem: MenuItem | null;
@@ -171,6 +182,8 @@ interface POSStore extends POSState {
   setSelectedCustomer: (customer: Customer | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
+  /** Preselect the profile's default customer for the current order type (new, non-manual orders only). */
+  applyAutoCustomer: () => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
   setSelectedItem: (item: MenuItem | null) => void;
   initializeCart: () => Promise<void>;
@@ -229,6 +242,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   selectedRoom: null,
   searchQuery: '',
   selectedCustomer: null,
+  customerSource: 'auto' as CustomerSource,
   selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
   quickFilter: "all",
   selectedItem: null,
@@ -291,12 +305,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        if (profile && profile.country && 'custom_invoice_warning_time' in profile) {
+        if (profile && profile.country && 'custom_invoice_warning_time' in profile && !profileLacksDefaultCustomerConfig(profile)) {
           set({ 
             posProfile: profile, 
             profileLoading: false,
             currency: profile.currency || siteCurrencyCode() || 'INR'
           });
+          get().applyAutoCustomer();
           if (!storage.getItem('currencySymbol')) {
             await get().fetchCurrencySymbol();
           }
@@ -313,6 +328,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         profileLoading: false,
         currency: combinedProfile.currency || siteCurrencyCode() || 'INR'
       });
+      get().applyAutoCustomer();
       
       if (!storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
@@ -516,7 +532,12 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
-  setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+  setSelectedCustomer: (customer) => set({ selectedCustomer: customer, customerSource: 'manual' }),
+  applyAutoCustomer: () => {
+    const { isUpdatingOrder, customerSource, selectedOrderType, posProfile } = get();
+    if (isUpdatingOrder || customerSource !== 'auto') return;
+    set({ selectedCustomer: resolveDefaultCustomer(selectedOrderType, posProfile) });
+  },
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
     if (table ) {
@@ -530,13 +551,20 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
   setSelectedOrderType: (type) => {
-    const { fetchMenuItems } = get();
-    
+    const { fetchMenuItems, isUpdatingOrder, customerSource, posProfile } = get();
+
+    // Re-resolve the default customer only while it is auto-set on a new order.
+    // A manual pick, a customer loaded from an existing order, and any customer
+    // on an order being updated are never touched. Aggregators resolve to null
+    // (the aggregator flow owns its customer).
+    const followDefault = !isUpdatingOrder && customerSource === 'auto';
+
     set({ 
       activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
-      orderId: null
+      orderId: null,
+      ...(followDefault ? { selectedCustomer: resolveDefaultCustomer(type, posProfile) } : {}),
     });
     
     if (type !== 'Aggregators') {
@@ -700,6 +728,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             name: order.customer_name,
             phone: order.mobile_number,
           } : null,
+          customerSource: 'order',
           isUpdatingOrder: true,
           orderId: order.name,
           noOfPax: order.no_of_pax || 1,
@@ -707,14 +736,24 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           orderComment: order.custom_comments || '',
         });
       } else {
+        const state = get();
+        const orderCustomer = order && order.customer ? {
+          id: order.customer,
+          name: order.customer_name || order.customer,
+          phone: order.mobile_number || '',
+        } : null;
+        // Entering an empty table: a saved (empty) order keeps its own customer, otherwise
+        // preselect the default for the current order type (entering a table always reset
+        // the customer before, so a previous table's pick never carries over).
         set({
           tableOrder: order ? response : null,
           activeOrders: [],
-          selectedCustomer: order && order.customer ? {
-            id: order.customer,
-            name: order.customer_name || order.customer,
-            phone: order.mobile_number || '',
-          } : null,
+          ...(orderCustomer
+            ? { selectedCustomer: orderCustomer, customerSource: 'order' as CustomerSource }
+            : {
+                selectedCustomer: resolveDefaultCustomer(state.selectedOrderType, state.posProfile),
+                customerSource: 'auto' as CustomerSource,
+              }),
           isUpdatingOrder: false,
           orderId: order?.name || null,
           noOfPax: order?.no_of_pax || 1,
@@ -728,6 +767,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         tableOrder: null,
         activeOrders: [],
         selectedCustomer: null,
+        customerSource: 'auto',
         isUpdatingOrder: false,
         orderId: null,
         noOfPax: 1,
@@ -740,10 +780,12 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
+    const { selectedOrderType, posProfile } = get();
     set({
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: resolveDefaultCustomer(selectedOrderType, posProfile),
+      customerSource: 'auto',
       isUpdatingOrder: false,
       orderId: null,
       noOfPax: 1,
@@ -760,10 +802,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
+    const { fetchMenuItems, posProfile } = get();
     
     set({
-      selectedCustomer: null,
+      selectedCustomer: resolveDefaultCustomer(DEFAULT_ORDER_TYPE, posProfile),
+      customerSource: 'auto',
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
