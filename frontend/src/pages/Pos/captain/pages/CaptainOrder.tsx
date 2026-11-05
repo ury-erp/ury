@@ -257,7 +257,7 @@ export default function CaptainOrder() {
         order_type: tableOrderType,
         table,
         room: selectedRoom || undefined,
-        customer: selectedCustomer.name,
+        customer: selectedCustomer.id,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
