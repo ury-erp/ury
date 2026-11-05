@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { call, db } from '@ury/core';
+import type { DefaultCustomerEntry } from '@ury/core/default-customer';
 
 // Limited fields response
 export interface PosProfileLimited {
@@ -65,6 +66,10 @@ export interface PosProfileFull {
   role_restricted_for_table_order?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
+  /** Per-order-type default customer (POS Profile "Order Type Default Customers"), keyed by order type. */
+  order_type_customer_map?: Record<string, DefaultCustomerEntry>;
+  /** Profile-level default customer, or null. */
+  default_customer?: DefaultCustomerEntry | null;
 }
 
 // Combined POS Profile with both limited and full fields

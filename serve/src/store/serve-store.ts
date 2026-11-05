@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { storage, siteCurrencyCode } from '@ury/core'
+// Subpath import: keeps this pure helper independent of tests that mock the '@ury/core' barrel.
+import { resolveDefaultCustomer } from '@ury/core/default-customer'
 import { getRestaurantMenu, type MenuItem as APIMenuItem } from '../lib/menu-api'
 import { getCurrencyInfo, getCombinedPosProfile, type PosProfileCombined } from '../lib/pos-profile-api'
 import { getTableOrder, type TableOrder } from '../lib/order-api'
@@ -66,6 +68,14 @@ export interface Customer {
   phone: string
 }
 
+/**
+ * Where the current customer came from:
+ *  - 'auto'   preselected from the POS Profile default for the order type; follows order-type changes
+ *  - 'manual' picked or cleared by the user; never overwritten by order-type changes
+ *  - 'order'  loaded from an existing order; never overwritten
+ */
+export type CustomerSource = 'auto' | 'manual' | 'order'
+
 export interface OrderItem extends MenuItem {
   quantity: number
   comment?: string
@@ -123,6 +133,7 @@ interface ServeState {
   draftTable: string | null
   searchQuery: string
   selectedCustomer: Customer | null
+  customerSource: CustomerSource
   selectedOrderType: OrderType
   quickFilter: 'all' | 'special'
   selectedItem: MenuItem | null
@@ -161,6 +172,8 @@ interface ServeState {
   setSelectedCustomer: (customer: Customer | null) => void
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void
   setSelectedOrderType: (type: OrderType) => void
+  /** Preselect the profile's default customer for the current order type (new, non-manual orders only). */
+  applyAutoCustomer: () => void
   /** Enter takeaway mode: TAKEAWAY type, clear stale table/room; keep takeaway draft if present. */
   startTakeaway: () => void
   setQuickFilter: (filter: 'all' | 'special') => void
@@ -231,6 +244,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
   draftTable: null,
   searchQuery: '',
   selectedCustomer: null,
+  customerSource: 'auto' as CustomerSource,
   selectedOrderType: DEFAULT_ORDER_TYPE,
   quickFilter: 'all',
   selectedItem: null,
@@ -275,6 +289,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
     try {
       const profile = await getCombinedPosProfile()
       set({ posProfile: profile })
+      get().applyAutoCustomer()
       if (profile.currency) {
         const info = await getCurrencyInfo(profile.currency)
         storage.setItem('currencySymbol', info.symbol || profile.currency)
@@ -359,9 +374,21 @@ export const useServeStore = create<ServeState>((set, get) => ({
   clearOrder: async () => set({ activeOrders: [] }),
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
-  setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+  setSelectedCustomer: (customer) => set({ selectedCustomer: customer, customerSource: 'manual' }),
+  applyAutoCustomer: () => {
+    const { isUpdatingOrder, customerSource, selectedOrderType, posProfile } = get()
+    if (isUpdatingOrder || customerSource !== 'auto') return
+    set({ selectedCustomer: resolveDefaultCustomer(selectedOrderType, posProfile) })
+  },
   setSelectedOrderType: (type) => {
-    set({ selectedOrderType: type })
+    const { isUpdatingOrder, customerSource, posProfile } = get()
+    // Re-resolve only while the customer is auto-set on a new order; a manual pick,
+    // a customer loaded from an order and any order being updated are never touched.
+    const followDefault = !isUpdatingOrder && customerSource === 'auto'
+    set({
+      selectedOrderType: type,
+      ...(followDefault ? { selectedCustomer: resolveDefaultCustomer(type, posProfile) } : {}),
+    })
     void get().fetchMenuItems()
   },
   setQuickFilter: (filter) => set({ quickFilter: filter }),
@@ -371,7 +398,14 @@ export const useServeStore = create<ServeState>((set, get) => ({
   setSubmitting: (value) => set({ submitting: value }),
 
   setSelectedTable: (table, room, doNotLoadOrder = false) => {
-    set({ selectedTable: table, selectedRoom: room, ...(table ? { selectedOrderType: DINE_IN } : {}) })
+    const { isUpdatingOrder, customerSource, posProfile } = get()
+    const followDefault = !!table && !isUpdatingOrder && customerSource === 'auto'
+    set({
+      selectedTable: table,
+      selectedRoom: room,
+      ...(table ? { selectedOrderType: DINE_IN } : {}),
+      ...(followDefault ? { selectedCustomer: resolveDefaultCustomer(DINE_IN, posProfile) } : {}),
+    })
     if (table) {
       if (!doNotLoadOrder) void get().loadTableOrder(table)
     }
@@ -385,10 +419,20 @@ export const useServeStore = create<ServeState>((set, get) => ({
       (state.draftTable === TAKEAWAY_DRAFT_KEY ||
         (!state.draftTable && !state.selectedTable))
 
+    // A fresh takeaway entry gets the Take Away default customer; an existing unsent
+    // draft keeps whatever customer it already has.
+    const freshEntry = !state.hasUnsentDraft()
+
     set({
       selectedOrderType: TAKEAWAY,
       selectedTable: null,
       selectedRoom: null,
+      ...(freshEntry
+        ? {
+            selectedCustomer: resolveDefaultCustomer(TAKEAWAY, state.posProfile),
+            customerSource: 'auto' as CustomerSource,
+          }
+        : {}),
       draftTable: preserveTakeawayDraft
         ? TAKEAWAY_DRAFT_KEY
         : state.hasUnsentDraft()
@@ -453,6 +497,7 @@ export const useServeStore = create<ServeState>((set, get) => ({
           tableOrder: response,
           activeOrders: orderItems,
           selectedCustomer,
+          customerSource: 'order',
           isUpdatingOrder: true,
           orderId: order.name,
           noOfPax,
@@ -469,10 +514,12 @@ export const useServeStore = create<ServeState>((set, get) => ({
           get().draftTable === table &&
           (get().hasUnsentDraft() || get().activeOrders.some((i) => !i.invoiceItemName))
         if (!keepDraft) {
+          const state = get()
           set({
             tableOrder: null,
             activeOrders: [],
-            selectedCustomer: null,
+            selectedCustomer: resolveDefaultCustomer(state.selectedOrderType, state.posProfile),
+            customerSource: 'auto',
             isUpdatingOrder: false,
             orderId: null,
             noOfPax: 1,
@@ -507,7 +554,8 @@ export const useServeStore = create<ServeState>((set, get) => ({
       needsReconcile: false,
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: resolveDefaultCustomer(get().selectedOrderType, get().posProfile),
+      customerSource: 'auto',
       isUpdatingOrder: false,
       orderId: null,
       noOfPax: 1,
@@ -522,7 +570,8 @@ export const useServeStore = create<ServeState>((set, get) => ({
     set({
       needsReconcile: false,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: resolveDefaultCustomer(get().selectedOrderType, get().posProfile),
+      customerSource: 'auto',
       isUpdatingOrder: false,
       orderId: null,
       noOfPax: 1,
@@ -556,7 +605,8 @@ export const useServeStore = create<ServeState>((set, get) => ({
   resetOrderState: () => {
     set({
       needsReconcile: false,
-      selectedCustomer: null,
+      selectedCustomer: resolveDefaultCustomer(DEFAULT_ORDER_TYPE, get().posProfile),
+      customerSource: 'auto',
       selectedTable: null,
       selectedRoom: null,
       isUpdatingOrder: false,
