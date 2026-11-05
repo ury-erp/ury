@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./default-customer": {
+      "types": "./src/utils/defaultCustomer.ts",
+      "import": "./src/utils/defaultCustomer.ts"
     }
   },
   "scripts": {

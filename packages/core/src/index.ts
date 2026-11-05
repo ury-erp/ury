@@ -32,6 +32,12 @@ export {
 } from './format';
 export type { CurrencyInfo } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
+export { resolveDefaultCustomer, profileLacksDefaultCustomerConfig } from './utils/defaultCustomer';
+export type {
+  DefaultCustomerEntry,
+  DefaultCustomerConfig,
+  ResolvedDefaultCustomer,
+} from './utils/defaultCustomer';
 export { validateFieldValue } from './utils/validateField';
 export type { ValidationMessages } from './utils/validateField';
 export { validatePhoneNumber, sanitizePhoneNumber, getCountryCallingCode, COUNTRY_CALLING_CODES } from './utils/phoneValidation';

@@ -58,4 +58,6 @@ export interface PosProfileCombined {
   remove_items?: number;
   show_image?: number;
   custom_enable_kot_reprint?: number;
+  order_type_customer_map?: Record<string, import('./utils/defaultCustomer').DefaultCustomerEntry>;
+  default_customer?: import('./utils/defaultCustomer').DefaultCustomerEntry | null;
 }
