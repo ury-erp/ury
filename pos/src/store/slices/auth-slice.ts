@@ -21,8 +21,31 @@ export interface AuthActions {
 
 export type AuthSlice = AuthState & AuthActions;
 
+const USER_STORAGE_KEY = 'ury_auth_user';
+
+function getStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY) || sessionStorage.getItem(USER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistUser(user: User | null) {
+  try {
+    if (user) {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(USER_STORAGE_KEY);
+      sessionStorage.removeItem(USER_STORAGE_KEY);
+    }
+  } catch {}
+}
+
 const initialState: AuthState = {
-  user: null,
+  user: getStoredUser(),
   isLoading: false,
   error: null,
 };
@@ -36,7 +59,12 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
       const response = await getLoggedUser();
       
       if (!response) {
-        // If no user is logged in, redirect to login
+        // If offline and we have a stored user, use it rather than kicking to login
+        const stored = getStoredUser();
+        if (stored) {
+          set({ user: stored, isLoading: false });
+          return;
+        }
         window.location.href = '/login?redirect-to=%2Fpos';
         return;
       }
@@ -44,30 +72,48 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
       // Get user roles
       const roles = await getUserRoles(response);
 
+      const authenticatedUser: User = {
+        name: response,
+        full_name: roles.full_name,
+        roles: roles.roles || [],
+      };
+
+      persistUser(authenticatedUser);
+
       set({
-        user: {
-          name: response, // Store the user ID in name field
-          full_name: roles.full_name,
-          roles: roles.roles,
-        },
+        user: authenticatedUser,
         isLoading: false,
       });
     } catch (error) {
+      // Offline fallback: if network fails, use the locally persisted user
+      const stored = getStoredUser();
+      if (stored) {
+        set({
+          user: stored,
+          isLoading: false,
+          error: null,
+        });
+        return;
+      }
+
       set({ 
         error: (error as Error).message,
         isLoading: false,
         user: null,
       });
-      // Redirect to login on error
-      window.location.href = '/login?redirect-to=%2Fapp';
+      // Redirect to login only if there is no offline session
+      window.location.href = '/login?redirect-to=%2Fpos';
     }
   },
 
   setUser: (user) => {
+    persistUser(user);
     set({ user });
   },
 
   clearAuth: () => {
+    persistUser(null);
     set(initialState);
   },
-}); 
+});
+ 

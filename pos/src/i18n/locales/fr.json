@@ -238,6 +238,10 @@
     "no_orders_found": "Aucune commande trouvée",
     "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
     "status_title": "Statut de la commande",
+    "pending_sync": "Sync en attente",
+    "pending_sync_tooltip": "Synchronisation en attente — créée ou modifiée hors ligne",
+    "sync_failed": "Échec sync",
+    "sync_failed_tooltip": "Échec de synchronisation — nouvelle tentative ou résolution manuelle requise",
     "pagination": {
       "previous": "Précédent",
       "next": "Suivant",
@@ -274,6 +278,7 @@
     "last_updated": "Dernière mise à jour",
     "order_items": "Articles de la commande",
     "started_at": "Démarré à :",
+    "sync_status": "État de sync",
     "no_active_order": "Aucune commande active trouvée",
     "loading_table_order": "Chargement de la commande de la table...",
     "table_name_title": "Les noms des tables sont gérés dans le backend",

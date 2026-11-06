@@ -6,6 +6,7 @@ import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { getCombinedOrderTotals } from '../lib/invoice-api';
 import { Button, Input, Select, SelectItem } from '@ury/ui';
+import { SyncStatusBadge } from './SyncStatusBadge';
 import { t } from '../i18n';
 import { TABLE_STATE_STYLES } from './TableCard';
 
@@ -507,6 +508,15 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
+
+            {selectedTableData.occupied && (
+              <div>
+                <label className="block text-sm font-medium mb-1">{t('tables.sync_status')}</label>
+                <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm">
+                  <SyncStatusBadge tableName={selectedTableData.name} />
+                </div>
+              </div>
+            )}
 
             {/* Position Information */}
             <div className="pt-3 border-t border-gray-200">

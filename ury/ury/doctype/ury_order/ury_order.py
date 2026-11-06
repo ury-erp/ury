@@ -577,7 +577,22 @@ def split_bill(source_invoice, items_to_move, customer=None):
     total_moving_qty = 0.0
     total_remaining_qty = 0.0
     for item in source.items:
-        move_qty = move_map.get(item.name, 0)
+        item_name_str = getattr(item, "name", None)
+        move_qty = move_map.get(item_name_str) if isinstance(item_name_str, str) else None
+
+        if move_qty is None:
+            item_code_str = getattr(item, "item_code", None)
+            if isinstance(item_code_str, str):
+                move_qty = move_map.get(item_code_str)
+
+        if move_qty is None:
+            item_label_str = getattr(item, "item_name", None)
+            if isinstance(item_label_str, str):
+                move_qty = move_map.get(item_label_str)
+
+        if move_qty is None:
+            move_qty = 0.0
+
         if move_qty > item.qty:
             frappe.throw(
                 _("Cannot move more than available quantity for {0}.").format(item.item_name)
@@ -1542,10 +1557,23 @@ def sync_order(
 
     # dummy payment
     if invoice.invoice_created == 0:
-        invoice.append(
-            "payments",
-            dict(mode_of_payment=mode_of_payment, amount=invoice.grand_total),
-        )
+        if not mode_of_payment:
+            # POS Invoice requires at least one payment row.
+            # Fetch the default mode of payment from the cashier's POS Profile.
+            for p in posprofile.payments:
+                if p.default:
+                    mode_of_payment = p.mode_of_payment
+                    break
+            
+            # Fallback to the first available if no explicit default is checked
+            if not mode_of_payment and posprofile.payments:
+                mode_of_payment = posprofile.payments[0].mode_of_payment
+
+        if mode_of_payment:
+            invoice.append(
+                "payments",
+                dict(mode_of_payment=mode_of_payment, amount=invoice.grand_total),
+            )
         invoice.invoice_created = 1
 
     past_item = []
@@ -1600,6 +1628,10 @@ def sync_order(
     priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
     for item_dict in priced_items:
         invoice.append("items", item_dict)
+
+    # for payment in invoice.get("payments", []):
+    #     if not payment.mode_of_payment:
+    #         frappe.throw("Mode of payment is required for all payment entries in the POS Invoice.")
 
     try:
         invoice.save()
@@ -2147,8 +2179,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             release_invoice.restaurant_table,
             release_invoice.custom_merged_tables,
         )
-        
-        
+
+    return {"status": "success", "name": invoice.name}
 
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):

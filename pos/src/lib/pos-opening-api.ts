@@ -1,4 +1,4 @@
-import { call } from '@ury/core';
+import { call, apiRegistry } from '@ury/core';
 
 export interface POSOpeningEntryRef {
   name: string;
@@ -136,9 +136,10 @@ export const checkPOSOpening = async (user?: string): Promise<POSOpeningResponse
 };
 
 export const validatePOSClose = async (posProfile: string): Promise<POSCloseValidationResponse> => {
+  const endpoint = apiRegistry.getUrl('VALIDATE_POS_CLOSE');
   try {
     const response = await call.get<POSCloseValidationResponse>(
-      'ury.ury_pos.api.validate_pos_close',
+      endpoint,
       {
         pos_profile: posProfile
       }

@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { t } from '../i18n';
-import { Star, TrendingUp } from 'lucide-react';
+import { Star, TrendingUp, AlertTriangle } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
 import { cn } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import InitialLoader from '../components/InitialLoader';
@@ -16,11 +17,10 @@ export default function POS() {
     setQuickFilter,
     setSelectedItem,
     addToOrder,
-    loading,
-    error,
     isMenuInteractionDisabled,
     isInitializing,
   } = usePOSStore();
+  const { isLoading: menuLoading, error: menuError, data: menuData } = useMenu();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -77,16 +77,19 @@ export default function POS() {
     </button>
   );
 
-  if (isInitializing) {
+  const hasMenuData = menuData && menuData.length > 0;
+
+  if (isInitializing || (menuLoading && !hasMenuData)) {
     return <InitialLoader />;
   }
 
-  if (error) {
+  if (menuError && !hasMenuData) {
+
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600">{menuError.message}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
@@ -98,50 +101,39 @@ export default function POS() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Spinner message={t('common.loading_menu_items')} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <Sidebar disabled={isMenuInteractionDisabled()} />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
-        <div className="p-4 bg-white border-b border-gray-200">
-          <div className="max-w-screen-xl mx-auto space-y-3">
-            <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
-              {/* <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onVisibilityChange={setShowSearch}
-                isVisible={showSearch}
-                disabled={isMenuInteractionDisabled()}
-              /> */}
-              
-              <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
-              <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
+    <>
+      {menuError && hasMenuData && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Working offline. Showing previously cached menu.</span>
+        </div>
+      )}
+      <div className={`flex flex-1 overflow-hidden${menuError && hasMenuData ? ' pt-9' : ''}`}>
+        <Sidebar disabled={isMenuInteractionDisabled()} />
+        <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
+          <div className="p-4 bg-white border-b border-gray-200">
+            <div className="max-w-screen-xl mx-auto space-y-3">
+              <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
+                {/* <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onVisibilityChange={setShowSearch}
+                  isVisible={showSearch}
+                  disabled={isMenuInteractionDisabled()}
+                /> */}
+                
+                <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
+                <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <MenuList onItemClick={handleItemClick} />
+          <MenuList onItemClick={handleItemClick} />
+        </div>
+        <OrderPanel />
+        {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
       </div>
-      <OrderPanel />
-      {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
-    </div>
+    </>
   );
 }

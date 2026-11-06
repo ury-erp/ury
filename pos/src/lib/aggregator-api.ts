@@ -1,4 +1,4 @@
-import { call } from '@ury/core';
+import { call, apiRegistry } from '@ury/core';
 
 export interface Aggregator {
   customer: string;
@@ -8,19 +8,8 @@ export interface GetAggregatorsResponse {
   message: Aggregator[];
 }
 
-export async function getAggregators(): Promise<Aggregator[]> {
-  try {
-    const response = await call.get<GetAggregatorsResponse>(
-      'ury.ury_pos.api.getAggregator'
-    );
-    return response.message;
-  } catch (error: any) {
-    if (error._server_messages) {
-      const messages = JSON.parse(error._server_messages);
-      const message = JSON.parse(messages[0]);
-      throw new Error(message.message);
-    }
-    console.error('Failed to fetch aggregators:', error);
-    throw error;
-  }
-} 
+export async function getAggregators(posProfile?: string): Promise<Aggregator[]> {
+  const endpoint = apiRegistry.getUrl('GET_AGGREGATOR');
+  const response = await call.get<GetAggregatorsResponse>(endpoint, posProfile ? { pos_profile: posProfile } : undefined);
+  return response.message;
+}

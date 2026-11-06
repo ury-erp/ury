@@ -265,6 +265,10 @@
     "no_orders_found": "No orders found",
     "click_to_view": "Click on any order card to view its details",
     "status_title": "Order Status",
+    "pending_sync": "Pending Sync",
+    "pending_sync_tooltip": "Pending sync — created or modified while offline",
+    "sync_failed": "Sync Failed",
+    "sync_failed_tooltip": "Sync failed — manual retry or resolution needed",
     "pagination": {
       "previous": "Previous",
       "next": "Next",
@@ -301,6 +305,7 @@
     "last_updated": "Last Updated",
     "order_items": "Order Items",
     "started_at": "Started at:",
+    "sync_status": "Sync Status",
     "no_active_order": "No active order found",
     "loading_table_order": "Loading table order...",
     "table_name_title": "Table names are managed in backend",

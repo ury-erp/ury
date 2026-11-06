@@ -51,8 +51,12 @@ const TableMergeDialog = ({
     [availableTables, selectedTargets]
   );
   const mergeCandidates = useMemo(() => {
-    const filtered = availableTables.filter((table) => {
-      return table.name !== sourceTable?.name;
+    return availableTables.filter((table) => {
+      return (
+        table.occupied !== 1 &&
+        !table.merged_with &&
+        table.name !== sourceTable?.name
+      );
     });
     const q = search.trim().toLowerCase();
     if (!q) return filtered;

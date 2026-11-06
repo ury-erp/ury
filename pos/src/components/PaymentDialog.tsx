@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency, call, parseFrappeError } from '@ury/core';
+import { usePaymentModes } from '../hooks/useMasterData';
+import { formatCurrency, call, parseFrappeError, repositories, projectionBus } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
+import { releaseTableAfterPayment, queueOfflinePayment } from '../lib/order-api';
+import { isNetworkError } from '../lib/network-utils';
 import { t } from '../i18n';
 
 
@@ -40,7 +43,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   discountPercentage,
   discountAmount
 }) => {
-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
+  const { posProfile: storePosProfile } = usePOSStore();
+  const { data: paymentModesRaw = [] } = usePaymentModes();
+  const paymentModes = paymentModesRaw.filter(Boolean);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
@@ -56,9 +61,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
 
-  useEffect(() => {
-    fetchPaymentModes();
-  }, [fetchPaymentModes]);
+
 
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
@@ -140,25 +143,91 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const handlePayment = async () => {
     setIsProcessing(true);
     setError(null);
+    const paymentPayload = {
+      additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+      cashier,
+      customer,
+      invoice,
+      owner,
+      payments,
+      pos_profile: posProfile,
+      table,
+    };
+
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: appliedDiscount > 0 ? appliedDiscount : null,
-        cashier,
-        customer,
-        invoice,
-        owner,
-        payments,
-        pos_profile: posProfile,
-        table,
-      });
-      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
+      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', paymentPayload);
+
+      // Release the table locally so the Table UI shows Available immediately,
+      // even if the next projection fetch is delayed or fails.
+      await releaseTableAfterPayment(table);
+
+      if (invoice && invoice.startsWith('TEMP-')) {
+        try {
+          await repositories.orders.delete(invoice);
+        } catch (delErr) {
+          console.warn('[handlePayment] Failed to delete temporary offline order after payment:', delErr);
+        }
+      }
+
+      // Minimal storage approach: once paid and submitted to backend, remove the
+      // completed invoice from local IndexedDB orders store to avoid storage bloat.
+      if (invoice) {
+        try {
+          await repositories.orders.delete(invoice);
+          await repositories.orders.purgeSyncedPaidOrders();
+          projectionBus.emit('ORDERS_UPDATED');
+        } catch (paidErr) {
+          console.warn('[handlePayment] Failed to purge paid invoice from local storage:', paidErr);
+        }
+      }
+
+      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }) || 'Payment successful');
       onClose();
       clearSelectedOrder();
+      
+      const posStore = usePOSStore.getState();
+      if (posStore.orderId === invoice || posStore.orderId === invoice.replace('TEMP-', '')) {
+        posStore.resetOrderState();
+      }
+
       await fetchOrders();
-    } catch (err) {
-      console.error('Payment failed:', err);
-      // parseFrappeError extracts human-readable message from _server_messages (e.g. stock validation error)
-      setError(parseFrappeError(err, t('errors.payment_failed')));
+    } catch (err: any) {
+      if (!isNetworkError(err)) {
+        console.error('[handlePayment] Backend/validation error during make_invoice:', err);
+        // parseFrappeError extracts human-readable message from _server_messages
+        // (e.g. stock validation error).
+        setError(parseFrappeError(err, err?.message || t('errors.payment_failed')));
+        throw err;
+      }
+
+      console.warn('[handlePayment] Network request failed, queueing payment command offline:', err);
+      try {
+        // Queue the offline payment with the API payload separated from sync envelope
+        // metadata. The helper keeps the payload byte-equivalent to the online request.
+        await queueOfflinePayment({
+          invoice,
+          customer,
+          cashier,
+          owner,
+          pos_profile: posProfile,
+          table,
+          payments,
+          additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+        });
+
+        showToast.success(t('payment.payment_queued_offline') || 'Payment processed offline');
+        onClose();
+        clearSelectedOrder();
+
+        const posStore = usePOSStore.getState();
+        if (posStore.orderId === invoice || posStore.orderId === invoice.replace('TEMP-', '')) {
+          posStore.resetOrderState();
+        }
+
+        await fetchOrders();
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message || (err as Error).message || 'Failed to process payment');
+      }
     } finally {
       setIsProcessing(false);
     }

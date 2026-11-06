@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import { OrderItem, usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
@@ -43,9 +44,9 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     removeFromOrder, 
     setSelectedItem, 
     getItemQuantityFromCart,
-    activeOrders,
-    menuItems
+    activeOrders
   } = usePOSStore();
+  const { data: menuItems = [] } = useMenu();
   
 
   // State for the full item doc (used for all dialog content)

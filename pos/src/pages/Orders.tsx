@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, RefreshCw } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
@@ -9,7 +9,7 @@ import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import BillSplitDialog from '../components/BillSplitDialog';
 import BillMergeDialog from '../components/BillMergeDialog';
@@ -17,8 +17,9 @@ import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
-import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { SyncStatusBadge } from '../components/SyncStatusBadge';
+import { call, projectionBus } from '@ury/core';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -26,6 +27,7 @@ import {
   isMergedBill,
   resolvePrintFormat,
   mapSplitGroupInvoiceToPOSInvoice,
+  getOrderForEdit,
   type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
@@ -38,7 +40,7 @@ function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom
 }
 
 function isOrderEditable(status: string) {
-  return status === 'Draft' || status === 'Unbilled' || status === 'Recently Paid';
+  return status === 'Draft' || status === 'Unbilled';
 }
 
 function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
@@ -72,6 +74,7 @@ export default function Orders() {
 
   const posStore = usePOSStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState('');
@@ -149,6 +152,34 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderSearchQuery]);
 
+  // Refresh the orders list automatically when the sync engine emits projection
+  // updates (e.g. after offline orders are synced or temp records are cleared).
+  useEffect(() => {
+    const unsubscribe = projectionBus.subscribe((event) => {
+      if (event === 'ORDERS_UPDATED' || event === 'ALL_UPDATED') {
+        fetchOrders();
+      }
+    });
+    return () => unsubscribe();
+  }, [fetchOrders]);
+
+  // Auto-select the order passed via navigation state (e.g. after printing a
+  // table order). This keeps Online and Offline POS indistinguishable: the
+  // cashier lands on the Orders page with the Order Details panel already open.
+  useEffect(() => {
+    const pendingId = (location.state as { selectedOrderId?: string } | null)?.selectedOrderId;
+    if (!pendingId || orderLoading) return;
+
+    const order = orders.find((o) => o.name === pendingId);
+    if (order && selectedOrder?.name !== order.name) {
+      selectOrder(order);
+    }
+
+    // Clear the navigation state so a refresh or later visit does not re-select.
+    navigate(location.pathname + location.search, { replace: true, state: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, orderLoading, orders]);
+
 
   // Function to format the date and time
   const formatDateTime = (date: string, time: string) => {
@@ -191,15 +222,28 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
-      showToast.success(t('success.order_cancelled'));
+      const result = await cancelOrder(
+        {
+          name: selectedOrder.name,
+          restaurant_table: selectedOrder.restaurant_table,
+        },
+        cancelReason
+      );
+
+      if (!result.success) {
+        showToast.error(result.error || t('errors.failed_cancel_order'));
+        return;
+      }
+
+      showToast.success(
+        result.queued
+          ? (t('success.order_cancelled_offline') || 'Order cancelled offline')
+          : t('success.order_cancelled')
+      );
       setCancelDialogOpen(false);
       setCancelReason('');
       clearSelectedOrder();
-      fetchOrders();
+      await fetchOrders();
     } catch (err) {
       showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
     } finally {
@@ -211,12 +255,20 @@ export default function Orders() {
     if (!selectedOrder) return;
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
-      if (!res.ok) throw new Error('Failed to fetch order details');
-      const data = await res.json();
-      const order = data.message;
-
-      // Build the cart items from the draft order
+      const order = await getOrderForEdit(selectedOrder.name);
+      // Fill POS store
+      posStore.resetOrderState();
+      posStore.setSelectedOrderType(order.order_type);
+      if (order.order_type === 'Aggregators' && order.custom_aggregator_id) {
+        posStore.setSelectedAggregator({ customer: order.custom_aggregator_id });
+        posStore.fetchAggregatorMenu(order.custom_aggregator_id);
+      }
+      posStore.setOrderForUpdate(order.name);
+      if (order.restaurant_table) {
+        posStore.setSelectedTable(order.restaurant_table, order.custom_restaurant_room || null,true);
+      }
+      posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
+      // Fill cart
       const items = (order.items || []).map((item: any) => ({
         id: item.item_code,
         name: item.item_name,
@@ -359,7 +411,7 @@ export default function Orders() {
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
-  if (error) {
+  if (error && (!orders || orders.length === 0)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -380,6 +432,12 @@ export default function Orders() {
 
       {/* Middle Section - Order Cards */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
+        {error && orders.length > 0 && (
+          <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4" />
+            <span>Working offline. Showing previously cached orders.</span>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -413,6 +471,7 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
+                        <SyncStatusBadge orderId={order.name} syncStatus={order.sync_status} />
                         {mergedBill && (
                           <Badge
                             variant="outline"
@@ -578,6 +637,7 @@ export default function Orders() {
                       )}
                     </>
                   )}
+                  <SyncStatusBadge orderId={selectedOrder.name} syncStatus={selectedOrder.sync_status} />
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>
                     {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
                   </Badge>

@@ -7,13 +7,14 @@ import { getTableOrder } from '../lib/order-api';
 import { TableShapeIcon } from './TableShapeIcon';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { t } from '../i18n';
+import { DINE_IN } from '../data/order-types';
 
 interface Props {
   onClose: () => void;
 }
 
 const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
-  const { selectedTable, setSelectedTable, posProfile } = usePOSStore();
+  const { selectedTable, setSelectedTable, posProfile, selectedOrderType } = usePOSStore();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [activeReservationsList, setActiveReservationsList] = useState<TableReservation[]>([]);
@@ -28,6 +29,10 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     return [...tables].sort((a, b) => a.name.localeCompare(b.name));
   };
 
+  const isDineIn = selectedOrderType === DINE_IN;
+  const displayTables = isDineIn
+    ? tables.filter(table => table.is_take_away !== 1)
+    : tables;
   // Fetch active reservations for the branch
   useEffect(() => {
     if (!posProfile?.branch) return;
@@ -55,6 +60,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     return formatted ? `Reserved for ${formatted}` : 'Reserved';
   };
 
+
   // Fetch rooms on mount with session storage
   useEffect(() => {
     async function fetchRooms() {
@@ -66,19 +72,28 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
         const sessionKey = `ury_rooms_${posProfile.branch}`;
         const cachedRooms = sessionStorage.getItem(sessionKey);
         
+        let parsedRooms: Room[] = [];
         if (cachedRooms) {
-          const parsedRooms = JSON.parse(cachedRooms) as Room[];
+          try {
+            parsedRooms = JSON.parse(cachedRooms) as Room[];
+          } catch (e) {}
+        }
+
+        if (parsedRooms.length > 0) {
           setRooms(parsedRooms);
-          if (parsedRooms.length > 0) {
-            setSelectedRoom(parsedRooms[0].name);
-          }
+          setSelectedRoom(parsedRooms[0].name);
         } else {
+          // If not in session storage or empty, fetch from API
+
           const fetchedRooms = await getRooms(posProfile.branch);
           setRooms(fetchedRooms);
           if (fetchedRooms.length > 0) {
             setSelectedRoom(fetchedRooms[0].name);
           }
-          sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          // Store in session storage
+          if (fetchedRooms.length > 0) {
+            sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          }
         }
       } catch (e) {
         setError(t('errors.failed_load_rooms') || 'Failed to load rooms');
@@ -195,14 +210,14 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
               <AlertTriangle className="w-8 h-8 mb-1" />
               <span>{error}</span>
             </div>
-          ) : tables.length === 0 ? (
+          ) : displayTables.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 text-gray-400 mt-8">
               <Square className="w-8 h-8 mb-1" />
               <span>{t('common.no_tables_found')}</span>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-6">
-              {tables.map(table => {
+              {displayTables.map(table => {
                 const activeRes = lockActiveReservationsByTable.get(table.name);
                 const isReserved = !!activeRes;
 
@@ -253,6 +268,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                       onClose();
                     }}
                     variant="outline"
+
                     className={cn(
                       'h-fit p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors relative',
                       selectedTable === table.name

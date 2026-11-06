@@ -6,6 +6,7 @@ import {
   POSOpeningEntryRef,
 } from '../lib/pos-opening-api';
 import { getChecklist } from '../lib/checklist-api';
+import { isNetworkError } from '../lib/network-utils';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { User } from '../store/slices/auth-slice';
@@ -69,7 +70,9 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   // telling them to contact a manager.
   const [showClosingDialog, setShowClosingDialog] = useState(false);
 
-  const { posProfile, showVoluntaryClosing, setShowVoluntaryClosing } = usePOSStore();
+  const { posProfile: posProfileFromPOS, showVoluntaryClosing, setShowVoluntaryClosing } = usePOSStore();
+  const posProfileFromRoot = useRootStore((state) => state.posProfile);
+  const posProfile = posProfileFromPOS || posProfileFromRoot;
   const { user } = useRootStore();
 
   const canAccessDesk = useMemo(() => hasDeskAccess(user), [user]);
@@ -180,6 +183,16 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       setIsLoading(false);
     } catch (error) {
       console.error('Failed to check POS opening status:', error);
+
+      // Offline resilience: a transport failure must not white-lock the POS.
+      // Assume a previously validated session is still open and let the app
+      // through; the sync engine replays anything queued while offline.
+      if (isNetworkError(error)) {
+        console.warn('POS opening check failed due to network; assuming session still open:', error);
+        clearBlockingState();
+        setIsLoading(false);
+        return;
+      }
 
       const serverMessage = parseFrappeError(error);
       const status = getHttpStatus(error);

@@ -4,6 +4,7 @@ import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table, TableReservation } from '../lib/table-api';
 import { Badge } from '@ury/ui';
+import { SyncStatusBadge } from './SyncStatusBadge';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
@@ -124,6 +125,7 @@ const TableCard = ({
                     Reserved
                   </Badge>
                 )}
+                <SyncStatusBadge tableName={table.name} />
               </>
             ) : isLockedByReservation ? (
               <Badge

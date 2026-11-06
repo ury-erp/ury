@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@types/qz-tray':
+        specifier: ^2.2.2
+        version: 2.2.2
+
+packages:
+
+  '@types/qz-tray@2.2.2':
+    resolution: {integrity: sha512-/a0wZ5ZMd4kvD3KgafoXY07DVXd7JkEWOAoJQNf1Gvygb32y8cyxeHlfM93ic8NNGLC9bHMKxrafRyFFPsgASg==}
+
+snapshots:
+
+  '@types/qz-tray@2.2.2': {}

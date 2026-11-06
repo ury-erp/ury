@@ -60,9 +60,26 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
   }
 
   if (!user) {
-    // The checkAuth function will handle the redirect to login
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center p-6 bg-white rounded-lg shadow-sm border border-gray-200 max-w-sm">
+          <div className="text-blue-600 text-2xl mb-3">🔄</div>
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Connecting to Session...</h2>
+          <p className="text-sm text-gray-500 mb-4">Verifying user authentication. If offline, existing session data will be used.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              checkAuth();
+            }}
+          >
+            Retry Connection
+          </Button>
+        </div>
+      </div>
+    );
   }
+
 
   if (!posProfile) {
     return (

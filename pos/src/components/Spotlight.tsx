@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Command, X } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Input } from '@ury/ui';
@@ -12,11 +13,12 @@ const Spotlight = () => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { menuItems, setSelectedItem } = usePOSStore();
+  const { setSelectedItem } = usePOSStore();
+  const { data: menuItems = [] } = useMenu();
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(query.toLowerCase()) ||
-    item.category?.toLowerCase().includes(query.toLowerCase())
+    item.course?.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 10);
 
   useEffect(() => {
@@ -99,11 +101,13 @@ const Spotlight = () => {
                 <img
                   src={item.image ?? undefined}
                   alt={item.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-12 h-12 object-cover rounded me-4"
                 />
                 <div className="flex-1 text-start">
                   <div className="font-medium">{item.name}</div>
-                  <div className="text-sm text-gray-500">{item.category}</div>
+                  <div className="text-sm text-gray-500">{item.course}</div>
                 </div>
                 <div className="text-end">
                   <div className="font-medium">{formatCurrency(item.price)}</div>

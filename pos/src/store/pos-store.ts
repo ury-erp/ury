@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
+import { queryClient } from '../lib/query-client';
+import { getAggregators } from '../lib/aggregator-api';
+import { getMenuQueryKey } from '../hooks/useMenu';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
-import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
 import { getTableOrder, TableOrder } from '../lib/order-api';
-import { getPaymentModes } from '../lib/payment-api';
 
 // Constants
 const MAX_QUANTITY = 99;
@@ -153,8 +154,6 @@ interface POSState {
 interface POSStore extends POSState {
   fetchMenuItems: () => Promise<void>;
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
-  fetchCategories: () => Promise<void>;
-  fetchPaymentModes: () => Promise<void>;
   addToOrder: (item: OrderItem) => Promise<void>;
   removeFromOrder: (uniqueId: string) => Promise<void>;
   updateQuantity: (uniqueId: string, quantity: number) => Promise<void>;
@@ -327,26 +326,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ isInitializing: true, error: null });
       
-      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
-        get().fetchPosProfile(),
-        get().fetchMenuItems(),
-        get().fetchCategories(),
-        get().fetchPaymentModes()
-      ]);
-
-      if (profileResult.status === 'rejected' || 
-          menuResult.status === 'rejected' || 
-          categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected') {
-        set({ 
-          error: 'Failed to initialize app. Please refresh the page.',
-          isInitializing: false 
-        });
-        return;
-      }
+      await get().fetchPosProfile();
 
       set({ isInitializing: false });
-    } catch (error) {
+    } catch {
       set({ 
         error: 'Failed to initialize app. Please refresh the page.',
         isInitializing: false 
@@ -356,7 +339,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
-      const cached = sessionStorage.getItem('posProfile');
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
         set({ 
@@ -373,6 +356,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ profileLoading: true, error: null });
       const combinedProfile = await getCombinedPosProfile();
       
+      localStorage.setItem('posProfile', JSON.stringify(combinedProfile));
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
       set({ 
         posProfile: combinedProfile, 
@@ -384,13 +368,24 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         await get().fetchCurrencySymbol();
       }
     } catch (error) {
-      console.error('Error fetching POS profile:', error);
+      console.warn('Error fetching POS profile from network, checking storage fallback:', error);
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
+      if (cached) {
+        const profile = JSON.parse(cached);
+        set({ 
+          posProfile: profile, 
+          profileLoading: false,
+          currency: profile.currency || 'INR'
+        });
+        return;
+      }
       set({ 
         error: 'Failed to fetch POS profile',
         profileLoading: false 
       });
     }
   },
+
 
   fetchCurrencySymbol: async () => {
     try {
@@ -408,14 +403,22 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchMenuItems: async () => {
-    const { posProfile, selectedRoom, selectedOrderType } = get();
+    const { posProfile, selectedRoom, selectedOrderType, selectedAggregator } = get();
     if (!posProfile?.restaurant) return;
 
     try {
       set({ menuLoading: true, error: null });
-      const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
+      const items = await queryClient.fetchQuery({
+        queryKey: getMenuQueryKey(
+          posProfile.name,
+          selectedRoom,
+          selectedOrderType,
+          selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : null
+        ),
+        queryFn: () => getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType),
+      });
       
-      const menuItems: MenuItem[] = items.map((item: any) => ({
+      const menuItems: MenuItem[] = items.map((item: APIMenuItem) => ({
         id: item.item,
         name: item.item_name,
         image: item.item_image || null,
@@ -444,46 +447,27 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuLoading: true, error: null });
       const items = await getAggregatorMenu(aggregator);
       
-      const menuItems: MenuItem[] = items.map((item: any) => ({
-        ...item,
+      const menuItems: MenuItem[] = items.map((item: APIMenuItem) => ({
         id: item.item,
+        item: item.item,
+        item_name: item.item_name,
         name: item.item_name,
+        rate: item.rate,
+        item_image: item.item_image || null,
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
-        category: item.course
+        course: item.course || '',
+        course_label: item.course_label || item.course || '',
+        category: item.course || '',
+        description: item.description || '',
+        special_dish: item.special_dish || 0,
+        tax_rate: 0,
       }));
 
       set({ menuItems, menuLoading: false });
     } catch (error) {
       set({ error: 'Failed to load aggregator menu', menuLoading: false });
       console.error('Error loading aggregator menu:', error);
-    }
-  },
-
-  fetchCategories: async () => {
-    try {
-      const cached = sessionStorage.getItem('menuCategories');
-      if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
-      }
-
-      const courses = await getMenuCourses();
-      sessionStorage.setItem('menuCategories', JSON.stringify(courses));
-      set({ categories: courses });
-    } catch (error) {
-      set({ error: 'Failed to load menu categories' });
-      throw error;
-    }
-  },
-
-  fetchPaymentModes: async () => {
-    try {
-      const modes = await getPaymentModes();
-      set({ paymentModes: modes });
-    } catch (error) {
-      console.error('Failed to fetch payment modes:', error);
     }
   },
 
@@ -534,7 +518,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       const newOrders = get().activeOrders.filter(item => item.uniqueId !== uniqueId);
       set({ activeOrders: newOrders });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to remove item from cart' });
     }
   },
@@ -568,7 +552,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   clearOrder: async () => {
     try {
       set({ activeOrders: [] });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to clear cart' });
     }
   },
@@ -589,29 +573,51 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
   setSelectedOrderType: (type) => {
-    const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
-    
-    set({ 
-          selectedOrderType: type,
-          orderId: null
-    });
+    const { fetchMenuItems, selectedAggregator, fetchAggregatorMenu, isUpdatingOrder, posProfile, selectedOrderType } = get();
+
     const isCurrentTypeToggleable = selectedOrderType === 'Take Away' || selectedOrderType === 'Delivery';
     const isNewTypeToggleable = type === 'Take Away' || type === 'Delivery';
+    const preserveOrderState =
+      isUpdatingOrder && posProfile?.edit_order_type && isCurrentTypeToggleable && isNewTypeToggleable;
 
-    if (isUpdatingOrder && posProfile?.edit_order_type && isCurrentTypeToggleable && isNewTypeToggleable) {
-      set({ 
+    if (preserveOrderState) {
+      set({
         selectedOrderType: type,
+        selectedTable: type === 'Dine In' ? get().selectedTable : null,
+        selectedRoom: type === 'Dine In' ? get().selectedRoom : null,
+        selectedAggregator: type !== 'Aggregators' ? null : selectedAggregator,
+        tableOrder: type === 'Dine In' ? get().tableOrder : null,
       });
     } else {
-      set({ 
+      set({
         activeOrders: [],
         selectedOrderType: type,
         isUpdatingOrder: false,
-        orderId: null
+        orderId: null,
+        selectedTable: type === 'Dine In' ? get().selectedTable : null,
+        selectedRoom: type === 'Dine In' ? get().selectedRoom : null,
+        selectedAggregator: type !== 'Aggregators' ? null : selectedAggregator,
+        tableOrder: type === 'Dine In' ? get().tableOrder : null,
       });
     }
-    
-    if (type !== 'Aggregators') {
+
+    if (type === 'Aggregators') {
+      // Warm the aggregator list and, if one is already selected, its catalog
+      // so the menu is available even if the device goes offline before the
+      // cashier opens the aggregator selector.
+      const { posProfile } = get();
+      if (posProfile?.name) {
+        queryClient.prefetchQuery({
+          queryKey: ['aggregators', posProfile.name],
+          queryFn: () => getAggregators(posProfile.name),
+        }).catch((err) => console.warn('Failed to warm aggregator list:', err));
+      }
+      if (selectedAggregator?.customer) {
+        fetchAggregatorMenu(selectedAggregator.customer).catch((err) =>
+          console.warn('Failed to warm aggregator menu:', err)
+        );
+      }
+    } else {
       fetchMenuItems();
     }
   },
@@ -669,7 +675,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const groups = await getCustomerGroups();
-    const names = groups.map((g: any) => g.name);
+    const names = groups.map((g: { name: string }) => g.name);
     set({ customerGroups: names });
     sessionStorage.setItem('customerGroups', JSON.stringify(names));
   },
@@ -681,7 +687,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const terrs = await getCustomerTerritories();
-    const names = terrs.map((t: any) => t.name);
+    const names = terrs.map((t: { name: string }) => t.name);
     set({ territories: names });
     sessionStorage.setItem('territories', JSON.stringify(names));
   },

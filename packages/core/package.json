@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -22,11 +23,16 @@
   },
   "devDependencies": {
     "@types/jsrsasign": "^10.5.15",
-    "axios": "^1.7.0",
     "@types/qz-tray": "^2.2.2",
+    "axios": "^1.7.0",
+    "fake-indexeddb": "^6.2.5",
     "frappe-js-sdk": "^1.10.0",
     "jsrsasign": "^11.1.0",
     "qz-tray": "^2.2.5",
+    "tsx": "^4.23.9",
     "typescript": "~5.7.2"
+  },
+  "dependencies": {
+    "dexie": "^4.4.4"
   }
 }

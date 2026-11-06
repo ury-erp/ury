@@ -42,23 +42,32 @@ import MergeLinkConnector from '../components/MergeLinkConnector';
 import TableReservationDialog, { type ReservationFormData } from '../components/TableReservationDialog';
 import TableReservationEditDialog, { type EditReservationFormData } from '../components/TableReservationEditDialog';
 import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
+import { useRooms, useTables, useRoomCounts } from '../hooks/useTables';
+import { queryClient } from '../lib/query-client';
+import { printOrder } from '../lib/print';
+import { resolvePrintFormat } from '../lib/invoice-api';
 
 const TableView = () => {
   const navigate = useNavigate();
-  const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const { posProfile: posProfileFromPOS, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const posProfileFromRoot = useRootStore((state) => state.posProfile);
+  const posProfile = posProfileFromPOS || posProfileFromRoot;
   const user = useRootStore((state) => state.user);
+  const setSelectedStatus = useRootStore((state) => state.setSelectedStatus);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
   const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
-  const [rooms, setRooms] = useState<Room[]>([]);
+  // Offline-first data layer: TanStack Query hooks with IndexedDB fallback and
+  // service-worker master-data caching (network-resilient architecture).
+  const { data: rooms = [], isLoading: loadingRooms } = useRooms(branch);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-  const [tables, setTables] = useState<Table[]>([]);
+  const { data: tables = [], isLoading: loadingTables, error: tablesError } = useTables(selectedRoom);
+  const { data: roomCounts = {} } = useRoomCounts(
+    useMemo(() => rooms.map((r) => r.name), [rooms]),
+    branch
+  );
   const [allBranchTables, setAllBranchTables] = useState<Table[]>([]);
-  const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
-  const [loadingRooms, setLoadingRooms] = useState(false);
-  const [loadingTables, setLoadingTables] = useState(false);
-  const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
 
   const [branchSettings, setBranchSettings] = useState<BranchReservationSettings | null>(null);
   const [activeReservationsList, setActiveReservationsList] = useState<TableReservation[]>([]);
@@ -87,10 +96,7 @@ const TableView = () => {
 
   const [isLayoutView, setIsLayoutView] = useState(false);
 
-  const persistRoomCounts = useCallback((counts: Record<string, number>) => {
-    if (!branch) return;
-    sessionStorage.setItem(`ury_room_counts_${branch}`, JSON.stringify(counts));
-  }, [branch]);
+
 
   // Load branch reservation settings safely
   useEffect(() => {
@@ -111,122 +117,30 @@ const TableView = () => {
   }, [branch]);
 
   // Fetch rooms
+  // Auto-select the first room once rooms resolve (from cache or network).
   useEffect(() => {
-    async function fetchRooms() {
-      if (!branch) return;
-      setLoadingRooms(true);
+    if (!selectedRoom && rooms.length > 0) {
+      setSelectedRoom(rooms[0].name);
+    }
+  }, [rooms, selectedRoom]);
+
+  // Surface table-fetch errors (guarded in render so cached rows still show).
+  useEffect(() => {
+    if (tablesError) {
+      setError(t('tables.failed_load_tables'));
+    } else {
       setError(null);
-
-      try {
-        const sessionKey = `ury_rooms_${branch}`;
-        const cachedRooms = sessionStorage.getItem(sessionKey);
-
-        if (cachedRooms) {
-          const parsedRooms = JSON.parse(cachedRooms) as Room[];
-          setRooms(parsedRooms);
-          setSelectedRoom((prev) => prev ?? (parsedRooms[0]?.name ?? null));
-        } else {
-          const fetchedRooms = await getRooms(branch);
-          setRooms(fetchedRooms);
-          setSelectedRoom((prev) => prev ?? (fetchedRooms[0]?.name ?? null));
-          sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
-        }
-      } catch (e) {
-        console.error(e);
-        setError('Failed to load rooms');
-      } finally {
-        setLoadingRooms(false);
-      }
     }
+  }, [tablesError]);
 
-    fetchRooms();
-  }, [branch]);
 
-  // Fetch room table counts
-  useEffect(() => {
-    if (!branch || rooms.length === 0) return;
-    const cacheKey = `ury_room_counts_${branch}`;
-    const cachedCounts = sessionStorage.getItem(cacheKey);
-    let shouldFetch = true;
 
-    if (cachedCounts) {
-      try {
-        const parsedCounts = JSON.parse(cachedCounts) as Record<string, number>;
-        setRoomCounts(parsedCounts);
-        const hasAllRooms = rooms.every((room) => typeof parsedCounts[room.name] === 'number');
-        if (hasAllRooms) {
-          shouldFetch = false;
-        }
-      } catch {
-        sessionStorage.removeItem(cacheKey);
-      }
-    }
 
-    if (!shouldFetch) return;
-
-    async function fetchRoomCounts() {
-      try {
-        const counts = await Promise.all(
-          rooms.map((room) => getTableCount(room.name, room.branch))
-        );
-        const nextCounts = rooms.reduce((acc, room, index) => {
-          acc[room.name] = counts[index];
-          return acc;
-        }, {} as Record<string, number>);
-        setRoomCounts(nextCounts);
-        persistRoomCounts(nextCounts);
-      } catch (error) {
-        console.error('Failed to load room counts', error);
-      }
-    }
-
-    fetchRoomCounts();
-  }, [branch, rooms, persistRoomCounts]);
-
-  const loadTables = useCallback(
-    async (roomName: string, options?: { useCache?: boolean }) => {
-      if (!roomName) return;
-      setError(null);
-
-      const shouldUseCache = options?.useCache !== false;
-      if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTablesByMergeGroups(tablesCache[roomName]));
-        setLoadingTables(false);
-        if (branch) {
-          getActiveReservations(branch)
-            .then((res) => setActiveReservationsList(res || []))
-            .catch(() => setActiveReservationsList([]));
-        }
-        return;
-      }
-
-      setLoadingTables(true);
-      try {
-        const fetchedTables = await getTables(roomName);
-        const sortedTables = sortTablesByMergeGroups(fetchedTables);
-        setTables(sortedTables);
-        setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
-
-        if (branch) {
-          getActiveReservations(branch)
-            .then((res) => setActiveReservationsList(res || []))
-            .catch(() => setActiveReservationsList([]));
-        }
-      } catch (e) {
-        console.error('Failed to load tables:', e);
-        setError('Failed to load tables');
-        setTables([]);
-      } finally {
-        setLoadingTables(false);
-      }
-    },
-    [branch, tablesCache]
-  );
-
-  useEffect(() => {
+  const refreshTables = () => {
     if (!selectedRoom) return;
-    loadTables(selectedRoom);
-  }, [selectedRoom, loadTables]);
+    queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts', branch] });
+  };
 
   // Fetch all branch tables for edit dialog dropdown
   useEffect(() => {
@@ -390,7 +304,7 @@ const TableView = () => {
       });
       showToast.success('Table reserved successfully');
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       setReservationTable(null);
     } catch (error) {
@@ -427,7 +341,7 @@ const TableView = () => {
       });
       showToast.success('Reservation updated successfully');
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       setEditReservation(null);
     } catch (error) {
@@ -457,7 +371,7 @@ const TableView = () => {
       await updateTableReservationStatus(cancelReservationInfo.name, 'Cancelled');
       showToast.success('Reservation cancelled successfully');
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       setCancelReservationTable(null);
       setCancelReservationInfo(null);
@@ -500,10 +414,16 @@ const TableView = () => {
           posProfile.print_format
         ),
       });
-      showToast.success('Printed successfully');
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
+      showToast.success(
+        printResult.status === 'queued'
+          ? 'Print queued offline'
+          : 'Printed successfully'
+      );
+
+      // After print (online or queued offline), update the table projection
+      // so the cashier sees the released/occupied state without leaving the page.
+      await setSelectedStatus('Draft', invoiceId);
+      refreshTables();
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
@@ -578,7 +498,7 @@ const TableView = () => {
     try {
       await tableTransfer(transferSourceTable.name, newTable, transferInvoiceName);
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       showToast.success(t('tables.transfer_success'));
     } catch (error) {
@@ -595,7 +515,7 @@ const TableView = () => {
     try {
       await captainTransfer(currentCaptain, newCaptain, invoiceName);
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       showToast.success(t('tables.captain_transfer_success'));
     } catch (error) {
@@ -610,7 +530,7 @@ const TableView = () => {
       await mergeTablesBatch(mergeSourceTable.name, selectedTableNames);
       showToast.success('Tables merged successfully');
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       setMergeSourceTable(null);
     } catch (error) {
@@ -624,7 +544,7 @@ const TableView = () => {
       await unmergeTables(unmergeSourceTable.name);
       showToast.success('Tables unmerged successfully');
       if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
+        refreshTables();
       }
       setUnmergeSourceTable(null);
     } catch (error) {
@@ -694,25 +614,13 @@ const TableView = () => {
 
   const handleRoomChange = (roomName: string) => {
     if (roomName === selectedRoom) {
-      loadTables(roomName, { useCache: false });
+      refreshTables();
       return;
     }
-
     setSelectedRoom(roomName);
-
-    if (tablesCache[roomName]) {
-      setTables(sortTablesByMergeGroups(tablesCache[roomName]));
-      setLoadingTables(false);
-    } else {
-      setLoadingTables(true);
-      setTables([]);
-    }
   };
 
   const handleLayoutView = () => {
-    if (selectedRoom) {
-      loadTables(selectedRoom, { useCache: false });
-    }
     setIsLayoutView(true);
   };
 
@@ -722,7 +630,7 @@ const TableView = () => {
         selectedRoom={selectedRoom}
         tables={tablesToDisplay}
         onBackToGrid={() => setIsLayoutView(false)}
-        onRefresh={() => loadTables(selectedRoom, { useCache: false })}
+        onRefresh={() => refreshTables()}
       />
     );
   }
@@ -783,7 +691,7 @@ const TableView = () => {
       {/* Main Grid View */}
       <div className="flex-1 overflow-auto bg-gray-50 p-6">
         <div className="max-w-screen-xl mx-auto">
-          {error && !loadingTables ? (
+          {error && !loadingTables && tables.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
               <AlertTriangle className="w-10 h-10" />
               <p>{error}</p>

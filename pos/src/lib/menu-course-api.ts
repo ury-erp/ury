@@ -1,4 +1,4 @@
-import { call } from '@ury/core';
+import { call, apiRegistry } from '@ury/core';
 
 export interface MenuCourse {
   name: string;
@@ -10,10 +10,8 @@ export interface MenuCourseResponse {
   message: MenuCourse[];
 }
 
-
 export async function getMenuCourses(): Promise<MenuCourse[]> {
-  const response = await call.get<MenuCourseResponse>(
-    'ury.ury_pos.api.getMenuCourses'
-  );
+  const endpoint = apiRegistry.getUrl('GET_MENU_COURSES');
+  const response = await call.get<MenuCourseResponse>(endpoint);
   return response.message;
 }

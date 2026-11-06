@@ -268,7 +268,9 @@ on_session_creation = [
 website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
-# after_request = ["ury.utils.after_request"]
+# before_request = ["ury.utils.before_request"]
+# after_request adds Service-Worker-Allowed for the POS service worker (offline feature).
+after_request = ["ury.utils.after_request"]
 
 website_redirects = [
     {

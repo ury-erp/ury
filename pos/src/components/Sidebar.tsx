@@ -1,6 +1,9 @@
 import { Grid3X3 } from 'lucide-react';
 import { CategoryIcon } from '../lib/category-icons';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
+import { useCategories } from '../hooks/useMasterData';
+import { cn } from '@ury/ui';
 import { SidebarContainer, SidebarCard, SidebarActiveIndicator, sidebarItemVariants, Button, Badge } from '@ury/ui';
 import CommentDialog from './CommentDialog';
 import { useState } from 'react';
@@ -11,7 +14,9 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ disabled }: SidebarProps) => {
-  const { selectedCategory, setSelectedCategory, menuItems, categories, orderComment, setOrderComment } = usePOSStore();
+  const { selectedCategory, setSelectedCategory, orderComment, setOrderComment } = usePOSStore();
+  const { data: menuItems = [] } = useMenu();
+  const { data: categories = [] } = useCategories();
   const [showCommentDialog, setShowCommentDialog] = useState(false);
 
   // Count items per category

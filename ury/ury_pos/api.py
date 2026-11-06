@@ -135,6 +135,9 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
+        first_branch = frappe.db.get_value("Branch", {}, "name")
+        if first_branch:
+            return first_branch
         frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
     branch_name = branch_array[0].get("branch")
@@ -151,9 +154,14 @@ def getBranchRoom():
         WHERE a.user = %s
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    if not branch_array:
+        first_branch = frappe.db.get_value("Branch", {}, "name")
+        first_room = frappe.db.get_value("URY Room", {}, "name")
+        return {"branch": first_branch, "room": first_room}
     
     branch_name = branch_array[0].get("branch")
     room_name = branch_array[0].get("room")
+
 
     if not branch_name:
         frappe.throw("Branch information is missing for the user. Please contact your administrator.")
@@ -488,7 +496,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -511,7 +519,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -533,7 +541,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
@@ -553,7 +561,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
@@ -839,6 +847,7 @@ def getPosInvoiceItems(invoice):
         itemDetails.append(
             {
                 "name": items.name,
+                "item_code": items.item_code,
                 "item_name": items.item_name,
                 "qty": items.qty,
                 "rate": items.rate,

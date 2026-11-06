@@ -96,8 +96,8 @@ export const createConfigSlice: StateCreator<
     try {
       set({ isLoading: true, error: null });
 
-      // Check session storage first if not forcing refresh
-      const cached = sessionStorage.getItem('posProfile');
+      // Check local/session storage first if not forcing refresh
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);
         set({ posProfile: profile });
@@ -113,7 +113,9 @@ export const createConfigSlice: StateCreator<
       // If not in cache or forcing refresh, fetch from API
       const profile = await getCombinedPosProfile();
 
-      // Cache the profile
+      // Cache the profile locally (localStorage persists across restarts for
+      // offline boot; sessionStorage is the version-2 fast path).
+      localStorage.setItem('posProfile', JSON.stringify(profile));
       sessionStorage.setItem('posProfile', JSON.stringify(profile));
       set({ posProfile: profile });
 
@@ -122,12 +124,23 @@ export const createConfigSlice: StateCreator<
       get().setAllowedRoles(allowedRoles);
       set({ isLoading: false });
     } catch (error) {
+      // Offline fallback: if network fetch fails, check if we have a locally stored profile
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
+      if (cached) {
+        const profile = JSON.parse(cached);
+        set({ posProfile: profile, isLoading: false, error: null });
+        const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
+        get().setAllowedRoles(allowedRoles);
+        return;
+      }
+
       set({ 
         error: (error as Error).message,
         isLoading: false,
       });
     }
   },
+
 
   checkAccess: () => {
     const { user } = get();

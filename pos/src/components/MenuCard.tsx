@@ -35,6 +35,8 @@ const MenuCard: FC<MenuCardProps> = ({
           <img
             src={item_image}
             alt={name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover filter saturate-75 brightness-95"
             style={{ filter: 'saturate(0.7) brightness(0.95)' }}
             onError={(e) => {
