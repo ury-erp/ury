@@ -1,0 +1,194 @@
+# DB15 Leakage (cancellations, voids, discounts, zero bills). Built from dashboard_portfolio.md section DB15.
+# Base queries copied verbatim from semantic_layer.yaml (fact_invoices, fact_cancellations, fact_kot_headers,
+# fact_kot_lines, fact_kot_exec). Waiter on cancellations = order owner, not the canceller (R14).
+workbook: {id: ury_db15_leakage, title: "URY Leakage", module: "URY", required_apps: [ury]}
+queries:
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, weekday, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+  # only meaningful when order_status = 'Served' (charts must add that chart filter). Date column: date.
+  # department here = EXECUTED production unit (KOT.production); URY Production Department == unit 1:1 today.
+  - id: fact_kot_headers
+    title: "fact_kot_headers"
+    table: "URY KOT"
+    joins:
+      - {table: "POS Profile", type: left, on: [pos_profile, name], columns: [custom_kot_warning_time, table_attention_time]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: prod_minutes, type: Decimal, expr: "production_time.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+      - {as: is_served, type: Integer, expr: "if_else(order_status == 'Served', 1, 0)"}
+      - {as: sla_breach, type: Integer, expr: "if_else(production_time.cast(\"float64\") > custom_kot_warning_time, 1, 0)"}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+
+
+  # fact_kot_lines (builder, T1 counts). Grain: one URY KOT Items row (kitchen line). quantity/cancelled_qty are text:
+  # cast. Category = raw item_group (Item join); cleaned category is sales-side only. Date column: date.
+  - id: fact_kot_lines
+    title: "fact_kot_lines"
+    table: "URY KOT Items"
+    joins:
+      - {table: "URY KOT", type: inner, on: [parent, name], columns: [date, time, production, branch, type, order_status, invoice, pos_profile]}
+      - {table: "Item", type: left, on: [item, name], columns: [item_group]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: qty_num, type: Decimal, expr: "quantity.cast(\"float64\")"}
+      - {as: cancelled_qty_num, type: Decimal, expr: "cancelled_qty.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+    select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
+
+
+  # fact_kot_exec (sql, T3 on demo: structure ready, stamps milliseconds apart). Grain: one URY KOT Execution per
+  # (kot, production_unit), DEDUPED to the latest-modified row (6 KOTs have duplicate QUEUED rows).
+  # Why sql: durations need TIMESTAMPDIFF over Datetime (time_diff casts to TIME, drops dates/fractions, sign
+  # unverified); dedupe needs ROW_NUMBER(); KOT fire time is TIMESTAMP(KOT.date, KOT.time).
+  # TIMESTAMPDIFF(SECOND, a, b) = b - a (MariaDB). Date column: exec_date. department = executed unit's department.
+  - id: fact_kot_exec
+    title: "fact_kot_exec"
+    sql: "WITH ex AS (SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.kot, e.production_unit ORDER BY e.modified DESC) AS rn FROM `tabURY KOT Execution` e) SELECT ex.name, ex.kot, ex.state, ex.production_unit, COALESCE(NULLIF(pu.department, ''), ex.production_unit) AS department, ex.branch, ex.company, DATE(COALESCE(ex.started_at, ex.creation)) AS exec_date, HOUR(k.time) AS hour_of_day, k.type AS kot_type, ex.started_by, ex.ready_by, COALESCE(ur.full_name, ex.ready_by) AS ready_by_name, ex.served_by, ex.cancelled_by, pp.custom_kot_warning_time AS target_minutes, TIMESTAMPDIFF(SECOND, ex.creation, ex.started_at) AS queue_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.ready_at) AS prep_seconds, TIMESTAMPDIFF(SECOND, ex.ready_at, ex.served_at) AS pass_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.served_at) AS cycle_seconds, TIMESTAMPDIFF(SECOND, TIMESTAMP(k.date, k.time), ex.served_at) AS order_to_serve_seconds, CASE WHEN ex.state LIKE 'CANCELLED%' THEN 1 ELSE 0 END AS is_cancelled, CASE WHEN ex.state = 'CANCELLED_AFTER_START' THEN 'While cooking' WHEN ex.state = 'CANCELLED_AFTER_READY' THEN 'After ready' WHEN ex.state LIKE 'CANCELLED%' THEN 'Before start' END AS cancel_stage, CASE WHEN ex.state IN ('CANCELLED_AFTER_START','CANCELLED_AFTER_READY') THEN 1 ELSE 0 END AS wasted_prep, CASE WHEN ex.started_at IS NOT NULL THEN 1 ELSE 0 END AS was_started, CASE WHEN ex.ready_at IS NOT NULL THEN 1 ELSE 0 END AS was_ready, CASE WHEN ex.served_at IS NOT NULL THEN 1 ELSE 0 END AS was_served FROM ex JOIN `tabURY KOT` k ON k.name = ex.kot LEFT JOIN `tabURY Production Unit` pu ON pu.name = ex.production_unit LEFT JOIN `tabPOS Profile` pp ON pp.name = k.pos_profile LEFT JOIN `tabUser` ur ON ur.name = ex.ready_by WHERE ex.rn = 1 AND k.docstatus IN (1, 2)"
+
+  # fact_cancellations_named (builder, T1). fact_cancellations plus waiter_name (User.full_name of the order owner).
+  - id: fact_cancellations_named
+    title: "fact_cancellations_named"
+    source_query: fact_cancellations
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, branch, company, order_type, waiter, waiter_name, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # ---------------------------------------------------------------- ADDED FOR FULL METRIC COVERAGE
+  # fact_bills_all (builder, T1). Grain: one submitted OR cancelled non-return POS Invoice (docstatus 1 and 2). Only for ratios that need
+  # cancelled and submitted value on the same rows: cancellation rate = SUM(cancelled_value) / SUM(grand_total). Date column: posting_date.
+  - id: fact_bills_all
+    title: "fact_bills_all"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: in, value: [1, 2]}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: cancelled_value, type: Decimal, expr: "if_else(docstatus == 2, grand_total, 0)"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, grand_total, cancelled_value]
+
+  # fact_returns (builder, T1). Grain: one submitted return (credit note) POS Invoice; grand_total is negative. Date column: posting_date.
+  - id: fact_returns
+    title: "fact_returns"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 1}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, grand_total, return_against]
+
+charts:
+  # S1 KPIs (one tile per chart; currency rounded to whole rupees)
+  - {id: db15_cnt, title: "Cancelled bills", query: fact_cancellations, type: Number,
+     y: [{column: name, agg: count, as: Cancelled bills}]}
+  - {id: db15_val, title: "Cancelled value (₹)", query: fact_cancellations, type: Number,
+     y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}]}
+  - {id: db15_net, title: "Net sales (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)", format: currency}]}
+  - {id: db15_zero, title: "Zero-value bills", query: fact_invoices, type: Number,
+     y: [{column: is_zero_bill, agg: sum, as: Zero-value bills}]}
+  - {id: db15_disc, title: "Discounts given (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "(sum(discount_amount)).round(0)", as: "Discounts given (₹)", format: currency}]}
+  # S2 Why and where
+  - {id: db15_reason, title: "Cancelled value by reason (₹)", query: fact_cancellations, type: Row, limit: 15,
+     x: cancel_reason, y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}],
+     order: [{by: "Cancelled value (₹)", dir: desc}]}
+  - {id: db15_ot, title: "Cancelled bills by order type (count)", query: fact_cancellations, type: Row, limit: 10,
+     x: order_type, y: [{column: name, agg: count, as: Cancelled bills}], order: [{by: Cancelled bills, dir: desc}]}
+  - {id: db15_trend, title: "Cancelled bills per week (count)", query: fact_cancellations, type: Bar, limit: 366,
+     x: {column: posting_date, granularity: week}, y: [{column: name, agg: count, as: Cancelled bills}]}
+  # S3 Who
+  - {id: db15_waiter, title: "Cancelled value by order taker (₹)", query: fact_cancellations_named, type: Row, limit: 15,
+     x: waiter_name, y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}],
+     order: [{by: "Cancelled value (₹)", dir: desc}]}
+  # S4 Kitchen side
+  - {id: db15_stage, title: "Kitchen cancellations by stage (count)", query: fact_kot_exec, type: Row, limit: 10,
+     filters: [{column: is_cancelled, op: "=", value: 1}],
+     x: cancel_stage, y: [{column: name, agg: count, as: Cancelled tickets}]}
+  - {id: db15_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number,
+     filters: [{column: type, op: "=", value: "Order Modified"}],
+     y: [{column: name, agg: count, as: Modified KOTs}]}
+  - {id: db15_voids, title: "Voided kitchen quantity (count)", query: fact_kot_lines, type: Number,
+     y: [{column: cancelled_qty_num, agg: sum, as: Voided quantity}]}
+  # LKG-003 Cancellation rate (value): cancelled value over submitted plus cancelled value, on one union of both kinds of bill
+  - {id: db15_rate, title: "Cancelled share of sales (%)", query: fact_bills_all, type: Number,
+     y: [{expr: "sum(cancelled_value) / sum(grand_total)", as: "Cancelled share (%)", format: percent}]}
+  # LKG-007 Out-of-stock cancellations
+  - {id: db15_oos, title: "Out-of-stock cancels (count)", query: fact_cancellations, type: Number,
+     filters: [{column: cancel_reason, op: "=", value: "Kitchen out of stock"}],
+     y: [{column: name, agg: count, as: "Out-of-stock cancels"}]}
+  # SAL-018 Returns value
+  - {id: db15_returns, title: "Returned value (₹)", query: fact_returns, type: Number,
+     y: [{expr: "(-sum(grand_total)).round(0)", as: "Returned value (₹)", format: currency}]}
+
+dashboards:
+  - id: leakage
+    title: "Leakage"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"},
+         layout: {x: 0, y: 2, w: 5, h: 1},
+         applies_to: {fact_cancellations: posting_date, fact_cancellations_named: posting_date, fact_invoices: posting_date, fact_kot_exec: exec_date, fact_kot_headers: date, fact_kot_lines: date, fact_bills_all: posting_date, fact_returns: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: building-2,
+         layout: {x: 5, y: 2, w: 5, h: 1},
+         applies_to: {fact_cancellations: branch, fact_cancellations_named: branch, fact_invoices: branch, fact_kot_exec: branch, fact_kot_headers: branch, fact_kot_lines: branch, fact_bills_all: branch, fact_returns: branch}}
+      - {id: f_waiter, label: Waiter, type: string, icon: user,
+         layout: {x: 10, y: 2, w: 5, h: 1},
+         applies_to: {fact_cancellations: waiter, fact_cancellations_named: waiter, fact_invoices: waiter, fact_bills_all: waiter, fact_returns: waiter}}
+      - {id: f_order_type, label: Order type, type: string, icon: utensils,
+         layout: {x: 15, y: 2, w: 5, h: 1},
+         applies_to: {fact_cancellations: order_type, fact_cancellations_named: order_type, fact_invoices: order_type, fact_bills_all: order_type, fact_returns: order_type}}
+    items:
+      - {text: "<p><b>Leakage.</b> How much was cancelled, discounted or billed at zero, why and by whom. For owner and finance. Default: last 90 days; aim for cancellations under 2% of net sales.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db15_cnt, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db15_val, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db15_net, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db15_zero, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db15_disc, x: 0, y: 6, w: 5, h: 3}
+      - {chart: db15_modified, x: 5, y: 6, w: 5, h: 3}
+      - {chart: db15_voids, x: 10, y: 6, w: 5, h: 3}
+      - {chart: db15_rate, x: 15, y: 6, w: 5, h: 3}
+      - {chart: db15_oos, x: 0, y: 9, w: 10, h: 3}
+      - {chart: db15_returns, x: 10, y: 9, w: 10, h: 3}
+      - {chart: db15_trend, x: 0, y: 12, w: 20, h: 12}
+      - {chart: db15_reason, x: 0, y: 24, w: 10, h: 14}
+      - {chart: db15_ot, x: 10, y: 24, w: 10, h: 14}
+      - {chart: db15_waiter, x: 0, y: 38, w: 10, h: 14}
+      - {chart: db15_stage, x: 10, y: 38, w: 10, h: 14}
+      - {text: "<p>Discounts by cashier are on Staff performance.</p>", x: 0, y: 52, w: 20, h: 1}
+      - {text: "<p>The person shown took the order, not necessarily the one who cancelled. Cancelled value includes duplicates and re-billed orders, so it is not all lost revenue.</p>", x: 0, y: 53, w: 20, h: 2}
+      - {text: "<p>Cancelled share = cancelled value over submitted plus cancelled value. Returned value is credit notes; it is zero when no returns were billed.</p>", x: 0, y: 55, w: 20, h: 2}
+desk: {workspace: "URY", label: "Leakage"}

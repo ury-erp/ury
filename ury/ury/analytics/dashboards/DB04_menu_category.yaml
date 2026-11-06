@@ -1,0 +1,102 @@
+# DB04 Menu and category performance (portfolio section DB04). Audience: owner, branch manager, kitchen head.
+# Base queries copied VERBATIM from semantic_layer.yaml (fact_sales_lines_enriched, dim_item); probes dropped.
+# Population: Consolidated + Paid both included (item/category revenue). Category = CATEGORY_MAP v1 menu_category
+# everywhere (never raw item_group). Department filter = CONFIGURED department (item + branch).
+workbook: {id: ury_db04_menu_category, title: "URY Menu And Category", module: "URY", required_apps: [ury]}
+queries:
+  # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
+  # category_family (CATEGORY_MAP v1), branch-safe configured department, BOM-based estimated cost.
+  # Why sql: (1) the cleaned category is a 60-value CASE over Item Group; (2) the config join needs a composite key
+  # (item AND branch), finsights joins take one equality pair; (3) BOM unit cost needs a filtered sub-select
+  # (is_default=1, is_active=1, docstatus=1). Date column: posting_date. est_cost/est_margin are NULL when no recipe cost.
+  - id: fact_sales_lines_enriched
+    title: "fact_sales_lines_enriched"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, pi.cashier, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code"
+
+  # dim_item (sql). Grain: one Item x configured branch (one row per item while single-branch). Carries CATEGORY_MAP v1
+  # (identical CASE to fact_sales_lines_enriched), configured department/unit/policy, recipe-cost coverage and yield
+  # standard. Why sql: same CASE + composite/filtered joins as above. Use for coverage and data-quality charts.
+  - id: dim_item
+    title: "dim_item"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item), sold AS (SELECT DISTINCT pii.item_code FROM `tabPOS Invoice Item` pii WHERE pii.docstatus = 1) SELECT i.name AS item_code, i.item_name, i.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, ipc.branch, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, ipc.controlled_by_sales_plan, i.is_stock_item, i.is_sales_item, i.disabled, CASE WHEN sold.item_code IS NULL THEN 0 ELSE 1 END AS is_sold, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS has_recipe_cost, i.valuation_rate, i.custom_yield_tracked, i.custom_yield_percent FROM `tabItem` i LEFT JOIN cm ON cm.item_group = i.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = i.name AND ipc.active = 1 LEFT JOIN bc ON bc.item = i.name LEFT JOIN sold ON sold.item_code = i.name"
+
+
+  # db04_costed_lines: costed lines with a per-line margin ratio, so implausible recipes (margin under -100%, a data
+  # error not a business fact) can be filtered out of menu engineering. They belong in DB10 "recipes to check".
+  - id: db04_costed_lines
+    title: "db04_costed_lines"
+    source_query: fact_sales_lines_enriched
+    filters: [{column: cost_known, op: "=", value: 1}]
+    mutate: [{as: line_margin_pct, type: Decimal, expr: "est_margin / costed_net_amount"}]
+
+charts:
+  # S1 KPIs (SAL-001, MNU-002). No date on a Number chart: shows the TOTAL for the filtered rows.
+  # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
+  - {id: db04_net_sales_kpi, title: "Net sales (₹)", query: fact_sales_lines_enriched, type: Number,
+     y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)", format: currency}]}
+  - {id: db04_items_sold_kpi, title: "Items sold", query: fact_sales_lines_enriched, type: Number,
+     y: [{expr: "sum(qty).round(0)", as: "Items sold"}]}
+  - {id: db04_dishes_kpi, title: "Dishes sold (distinct)", query: fact_sales_lines_enriched, type: Number,
+     y: [{column: item_code, agg: count_distinct, as: "Dishes sold (distinct)"}]}
+  - {id: db04_avg_price_kpi, title: "Avg price per item (₹)", query: fact_sales_lines_enriched, type: Number,
+     y: [{expr: "(sum(net_amount) / sum(qty)).round(0)", as: "Avg price per item (₹)", format: currency}]}
+  # S2 Category (MNU-005, MNU-006, DQ-003, MNU-010). Unassigned and Non-menu are excluded from the ranking.
+  - {id: db04_cat_rev, title: "Net sales by menu category (₹)", query: fact_sales_lines_enriched, type: Row, limit: 15,
+     filters: [{column: menu_category, op: "!=", value: Unassigned}, {column: menu_category, op: "!=", value: Non-menu}],
+     x: menu_category, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  - {id: db04_unassigned, title: "Unassigned sales (₹)", query: fact_sales_lines_enriched, type: Number,
+     filters: [{column: menu_category, op: "=", value: Unassigned}],
+     y: [{expr: "sum(net_amount).round(0)", as: "Unassigned sales (₹)", format: currency}]}
+  # S3 Items (MNU-001 item revenue, MNU-003, MNU-004)
+  - {id: db04_top, title: "Top 10 dishes by net sales (₹)", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     filters: [{column: category_family, op: "!=", value: Non-menu}, {column: category_family, op: "!=", value: Unassigned}],
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  # Bottom: excludes Non-menu, Unassigned, Accompaniments (add-ons, not dishes) and zero-sale lines.
+  - {id: db04_bottom, title: "Bottom 10 dishes by net sales (₹)", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     filters: [{column: category_family, op: "!=", value: Non-menu}, {column: category_family, op: "!=", value: Unassigned},
+               {column: menu_category, op: "!=", value: Accompaniments}, {column: net_amount, op: ">", value: 0}],
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: asc}]}
+  # S4 Detail (MNU-009)
+  - {id: db04_item_table, title: "Dish sales table", query: fact_sales_lines_enriched, type: Table, limit: 15,
+     rows: [menu_category, item_name],
+     y: [{expr: "sum(qty).round(0)", as: Qty}, {expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  # S5 Margin view, estimate (MNU-012, MAR-007): ratios of sums over costed lines only; margin under -100% excluded.
+  - {id: db04_menu_eng, title: "Margin per dish, costed dishes only (estimate)", query: db04_costed_lines, type: Table, limit: 15,
+     filters: [{column: line_margin_pct, op: ">=", value: -1}],
+     rows: [item_name],
+     y: [{expr: "sum(qty).round(0)", as: Qty},
+         {expr: "(sum(est_margin) / sum(qty)).round(0)", as: "Margin per unit (₹)"},
+         {expr: "sum(est_margin) / sum(costed_net_amount)", as: "Margin (%)", format: percent}],
+     order: [{by: Qty, dir: desc}]}
+  # S6 Non-selling, T2 (MNU-011): sellable, enabled, never sold on a submitted bill
+  - {id: db04_nonselling, title: "Non-Selling Items", query: dim_item, type: Table, limit: 100,
+     filters: [{column: is_sales_item, op: "=", value: 1}, {column: is_sold, op: "=", value: 0},
+               {column: disabled, op: "=", value: 0}, {column: category_family, op: "!=", value: Non-menu}],
+     rows: [menu_category, item_name], y: [{column: item_code, agg: count, as: Items}]}
+dashboards:
+  - id: db04_menu_category
+    title: "Menu and category"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, applies_to: {fact_sales_lines_enriched: posting_date, db04_costed_lines: posting_date}, layout: {x: 0, y: 2, w: 5, h: 1}}
+      - {id: f_branch, label: Branch, type: string, icon: map-pin, applies_to: {fact_sales_lines_enriched: branch, db04_costed_lines: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
+      - {id: f_category, label: Category, type: string, icon: tag, applies_to: {fact_sales_lines_enriched: menu_category, db04_costed_lines: menu_category}, layout: {x: 10, y: 2, w: 5, h: 1}}
+      - {id: f_order_type, label: "Order type", type: string, icon: shopping-bag, applies_to: {fact_sales_lines_enriched: order_type, db04_costed_lines: order_type}, layout: {x: 15, y: 2, w: 5, h: 1}}
+      # Department filter dropped: UX standard allows 4 visible filters max (Date, Branch, then two).
+    items:
+      - {text: "<p><b>Menu and category.</b> Which dishes and categories earn, and which to promote, reprice or drop. For owner, branch manager and kitchen head. Default period: last 90 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db04_net_sales_kpi, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db04_items_sold_kpi, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db04_dishes_kpi, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db04_avg_price_kpi, x: 15, y: 3, w: 5, h: 3}
+      - {text: "<p><b>Categories</b> - which menu categories earn the most</p>", x: 0, y: 6, w: 20, h: 1}
+      - {chart: db04_unassigned, x: 0, y: 7, w: 20, h: 3}
+      - {chart: db04_cat_rev, x: 0, y: 10, w: 20, h: 14}
+      - {text: "<p><b>Fix in setup:</b> these items sit in All Item Groups; move them to a menu Item Group to rank them.</p>", x: 0, y: 24, w: 20, h: 1}
+      - {text: "<p><b>Dishes</b> - what sells best and worst</p>", x: 0, y: 25, w: 20, h: 1}
+      - {chart: db04_top, x: 0, y: 26, w: 10, h: 11}
+      - {chart: db04_bottom, x: 10, y: 26, w: 10, h: 11}
+      - {chart: db04_item_table, x: 0, y: 37, w: 20, h: 15}
+      - {text: "<p><b>Margin and non-sellers</b> - which dishes earn per plate, and which never sold</p>", x: 0, y: 52, w: 20, h: 1}
+      - {chart: db04_menu_eng, x: 0, y: 53, w: 10, h: 22}
+      - {chart: db04_nonselling, x: 10, y: 53, w: 10, h: 22}
+      - {text: "<p><b>Estimate:</b> margin uses recipe (BOM) cost and covers only costed dishes, about 6-8% of sales today. Dishes costing more than their price are left out.</p>", x: 0, y: 75, w: 20, h: 2}

@@ -1,0 +1,157 @@
+# DB02 Branch daily manager. Built from dashboard_portfolio.md section DB02. Base queries copied verbatim from semantic_layer.yaml.
+workbook: {id: ury_db02_branch_daily, title: "URY Branch Daily", module: "URY", required_apps: [ury]}
+queries:
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, weekday, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # ---------------------------------------------------------------- KITCHEN / KOT
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+  # only meaningful when order_status = 'Served' (charts must add that chart filter). Date column: date.
+  # department here = EXECUTED production unit (KOT.production); URY Production Department == unit 1:1 today.
+  - id: fact_kot_headers
+    title: "fact_kot_headers"
+    table: "URY KOT"
+    joins:
+      - {table: "POS Profile", type: left, on: [pos_profile, name], columns: [custom_kot_warning_time, table_attention_time]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: prod_minutes, type: Decimal, expr: "production_time.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+      - {as: is_served, type: Integer, expr: "if_else(order_status == 'Served', 1, 0)"}
+      - {as: sla_breach, type: Integer, expr: "if_else(production_time.cast(\"float64\") > custom_kot_warning_time, 1, 0)"}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+
+  # dim_table (builder, T1 snapshot). Grain: one URY Table. occupied is a LIVE flag (no history).
+  - id: dim_table
+    title: "dim_table"
+    table: "URY Table"
+    select: [name, branch, restaurant, restaurant_room, no_of_seats, minimum_seating, is_take_away, occupied, latest_invoice_time]
+
+  # fact_yield_checks (builder, T1 item level; department EMPTY). Grain: one URY Yield Check (not submittable).
+  # Weighted yield % = SUM(output_qty)/SUM(input_qty)*100 per UOM; never AVG(actual_yield_percent), never mix Kg/Litre.
+  # variance_percent is in percentage POINTS. Tolerance for out_of_tolerance = 5 points (architecture decision).
+  # Date column: checked_on (Datetime).
+  - id: fact_yield_checks
+    title: "fact_yield_checks"
+    table: "URY Yield Check"
+    joins:
+      - {table: "Item", type: left, on: [item, name], columns: [item_name, item_group]}
+    mutate:
+      - {as: expected_output, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100"}
+      - {as: yield_loss_qty, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100 - output_qty"}
+      - {as: below_standard, type: Integer, expr: "if_else(variance_percent < 0, 1, 0)"}
+      - {as: out_of_tolerance, type: Integer, expr: "if_else(variance_percent < -5, 1, 0)"}
+    select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
+
+charts:
+  # S1 Last trading day (Number + date granularity day = latest day inside the filter range). One measure per chart so tiles fill the row.
+  - {id: db02_day_kpi, title: "Last trading day: net sales (₹)", query: fact_invoices, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day},
+     y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)", format: currency}]}
+  - {id: db02_bills, title: "Last trading day: bills (count)", query: fact_invoices, type: Number,
+     date: {column: posting_date, granularity: day},
+     y: [{column: name, agg: count, as: Bills}]}
+  - {id: db02_covers, title: "Last trading day: covers (count)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: day},
+     y: [{column: pax, agg: sum, as: Covers}],
+     filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
+  - {id: db02_spend_per_cover, title: "Last trading day: spend per cover (₹)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: day},
+     y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: "Spend per cover (₹)", format: currency}],
+     filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
+  # S2 Shape of the day (bills by hour lives in DB03)
+  - {id: db02_by_hour, title: "Net sales by hour (₹)", query: fact_invoices, type: Bar, limit: 30,
+     x: hour_of_day, y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)"}]}
+  - {id: db02_daily, title: "Net sales by day, selected period (₹)", query: fact_invoices, type: Line, limit: 366,
+     x: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)"}]}
+  # S3 Kitchen, latest day in the range (was T2 estimate: legacy production_time)
+  - {id: db02_kot_kpi, title: "Last trading day: KOTs (count)", query: fact_kot_headers, type: Number,
+     date: {column: date, granularity: day},
+     y: [{column: name, agg: count, as: KOTs}]}
+  - {id: db02_kot_unserved, title: "Last trading day: KOTs not yet served (count)", query: fact_kot_headers, type: Number,
+     date: {column: date, granularity: day},
+     y: [{expr: "count(name) - sum(is_served)", as: "KOTs not yet served"}]}
+  - {id: db02_kot_prep, title: "Last trading day: avg prep time (min)", query: fact_kot_headers, type: Number,
+     date: {column: date, granularity: day},
+     y: [{column: prod_minutes, agg: avg, as: "Avg prep time (min)"}]}
+  - {id: db02_sla, title: "Last trading day: KOTs over target (%)", query: fact_kot_headers, type: Number,
+     date: {column: date, granularity: day},
+     y: [{expr: "sum(sla_breach) / sum(is_served)", as: "KOTs over target (%)", format: percent}]}
+  # S4 Floor and leakage
+  - {id: db02_occupied, title: "Tables occupied now (live, not for the period)", query: dim_table, type: Number,
+     y: [{column: occupied, agg: sum, as: Occupied}],
+     filters: [{column: is_take_away, op: "=", value: 0}]}
+  - {id: db02_tables, title: "Tables in total (count)", query: dim_table, type: Number,
+     y: [{column: name, agg: count, as: Tables}],
+     filters: [{column: is_take_away, op: "=", value: 0}]}
+  - {id: db02_cancel_count, title: "Cancelled bills (count)", query: fact_cancellations, type: Number,
+     y: [{column: name, agg: count, as: "Cancelled bills"}]}
+  - {id: db02_cancel, title: "Cancelled value (₹)", query: fact_cancellations, type: Number,
+     y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}]}
+  # LKG-007 Out-of-stock cancellations
+  - {id: db02_oos_cancel, title: "Out-of-stock cancels (count)", query: fact_cancellations, type: Number,
+     filters: [{column: cancel_reason, op: "=", value: "Kitchen out of stock"}],
+     y: [{column: name, agg: count, as: "Out-of-stock cancels"}]}
+  - {id: db02_yield_checks, title: "Yield checks done (count)", query: fact_yield_checks, type: Number,
+     y: [{column: name, agg: count, as: "Yield checks done"}]}
+  - {id: db02_yield_alert, title: "Yield checks failed (count)", query: fact_yield_checks, type: Number,
+     y: [{column: out_of_tolerance, agg: sum, as: "Yield checks failed"}]}
+dashboards:
+  - id: branch_daily
+    title: "Branch daily"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1},
+         applies_to: {fact_invoices: posting_date, fact_cancellations: posting_date, fact_kot_headers: date, fact_yield_checks: checked_on}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 7, y: 2, w: 7, h: 1},
+         applies_to: {fact_invoices: branch, fact_cancellations: branch, fact_kot_headers: branch, fact_yield_checks: branch, dim_table: branch}}
+      - {id: f_order_type, label: Order type, type: string, icon: utensils, layout: {x: 14, y: 2, w: 6, h: 1},
+         applies_to: {fact_invoices: order_type, fact_cancellations: order_type}}
+    items:
+      - {text: "<p><b>Branch daily.</b> How did the last trading day go: sales, guests, kitchen speed, cancellations and tables. For branch manager. Default: last 30 days, cards show the latest day in it.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db02_day_kpi, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db02_bills, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db02_covers, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db02_spend_per_cover, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db02_kot_kpi, x: 0, y: 6, w: 5, h: 3}
+      - {chart: db02_kot_unserved, x: 5, y: 6, w: 5, h: 3}
+      - {chart: db02_kot_prep, x: 10, y: 6, w: 5, h: 3}
+      - {chart: db02_sla, x: 15, y: 6, w: 5, h: 3}
+      - {chart: db02_daily, x: 0, y: 9, w: 20, h: 12}
+      - {chart: db02_by_hour, x: 0, y: 21, w: 20, h: 12}
+      - {text: "<p>Target is the KOT warning time on the POS profile (10 min, 15 for slow items).</p>", x: 0, y: 33, w: 20, h: 1}
+      - {chart: db02_occupied, x: 0, y: 34, w: 5, h: 3}
+      - {chart: db02_tables, x: 5, y: 34, w: 5, h: 3}
+      - {chart: db02_cancel_count, x: 10, y: 34, w: 5, h: 3}
+      - {chart: db02_cancel, x: 15, y: 34, w: 5, h: 3}
+      - {chart: db02_yield_checks, x: 0, y: 37, w: 7, h: 3}
+      - {chart: db02_yield_alert, x: 7, y: 37, w: 7, h: 3}
+      - {chart: db02_oos_cancel, x: 14, y: 37, w: 6, h: 3}
+      - {text: "<p>Yield checks failed = checks more than 5 points under the recipe standard.</p>", x: 0, y: 40, w: 20, h: 1}

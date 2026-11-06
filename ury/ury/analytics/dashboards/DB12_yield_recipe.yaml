@@ -1,0 +1,136 @@
+# DB12 Yield & recipe adherence (audience: kitchen/production head). Levels: item, category(raw), branch.
+# Population: yield checks are not invoice-based (no Consolidated/Paid split applies). Weighted yield only:
+# SUM(output_qty)/SUM(input_qty)*100 per UOM, never AVG(actual_yield_percent); f_uom defaults to Kg so Kg and Litre are not mixed.
+# Honesty: yield by station (YLD-008) and by checker are charted from the department and checked_by set on each check.
+# Base queries below are copied verbatim from semantic_layer.yaml (fact_yield_checks, fact_stock_correction).
+workbook: {id: ury_db12_yield_recipe, title: "URY Yield And Recipe", module: "URY", required_apps: [ury]}
+queries:
+  # fact_stock_correction (builder, T1 on child rows). Grain: one Stock Correction Item of a submitted correction.
+  # Use child amount_difference (header difference_amount is 0 on 20/20: never use it). Negative = shrink.
+  - id: fact_stock_correction
+    title: "fact_stock_correction"
+    table: "Stock Correction Item"
+    joins:
+      - {table: "Stock Correction", type: inner, on: [parent, name], columns: [posting_date, branch, company, reason, period_end_date]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: shrink_value, type: Decimal, expr: "if_else(amount_difference < 0, amount_difference, 0)"}
+      - {as: overage_value, type: Decimal, expr: "if_else(amount_difference > 0, amount_difference, 0)"}
+      - {as: qty_diff, type: Decimal, expr: "quantity_difference.cast(\"float64\")"}
+    select: [name, parent, posting_date, branch, company, reason, warehouse, item_code, item_name, item_group, uom, qty, current_qty, qty_diff, valuation_rate, amount, current_amount, amount_difference, shrink_value, overage_value]
+
+  # fact_yield_checks (builder, T1 item level; department EMPTY). Grain: one URY Yield Check (not submittable).
+  # Weighted yield % = SUM(output_qty)/SUM(input_qty)*100 per UOM; never AVG(actual_yield_percent), never mix Kg/Litre.
+  # variance_percent is in percentage POINTS. Tolerance for out_of_tolerance = 5 points (architecture decision).
+  # Date column: checked_on (Datetime).
+  - id: fact_yield_checks
+    title: "fact_yield_checks"
+    table: "URY Yield Check"
+    joins:
+      - {table: "Item", type: left, on: [item, name], columns: [item_name, item_group, valuation_rate]}
+    mutate:
+      - {as: expected_output, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100"}
+      - {as: yield_loss_qty, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100 - output_qty"}
+      - {as: yield_loss_value, type: Decimal, expr: "(input_qty * standard_yield_percent_snapshot / 100 - output_qty) * valuation_rate"}
+      - {as: below_standard, type: Integer, expr: "if_else(variance_percent < 0, 1, 0)"}
+      - {as: out_of_tolerance, type: Integer, expr: "if_else(variance_percent < -5, 1, 0)"}
+    select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, yield_loss_value, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
+charts:
+  # YLD-001 Weighted yield
+  - {id: db12_kpi, title: "Actual yield (%)", query: fact_yield_checks, type: Number,
+     y: [{expr: "(sum(output_qty) / sum(input_qty) * 100).round(2)", as: "Actual yield (%)"}]}
+  # YLD-002 Standard yield
+  - {id: db12_kpi_std, title: "Standard yield (%)", query: fact_yield_checks, type: Number,
+     y: [{expr: "(sum(expected_output) / sum(input_qty) * 100).round(2)", as: "Standard yield (%)"}]}
+  # YLD-005 Checks below standard
+  - {id: db12_kpi_below, title: "Checks below standard (%)", query: fact_yield_checks, type: Number,
+     y: [{expr: "sum(below_standard) / count(name)", as: "Checks below standard (%)", format: percent}]}
+  # Checks more than 5 points under standard
+  - {id: db12_kpi_tol, title: "Outside tolerance (%)", query: fact_yield_checks, type: Number,
+     y: [{expr: "sum(out_of_tolerance) / count(name)", as: "Outside tolerance (%)", format: percent}]}
+  # YLD-003 Yield gap vs standard (points)
+  - id: db12_gap
+    title: "Yield gap vs standard (points, negative = under-yield)"
+    query: fact_yield_checks
+    type: Row
+    limit: 30
+    x: item_name
+    y: [{expr: "sum(output_qty - expected_output) / sum(input_qty) * 100", as: Gap Pts}]
+    order: [{by: Gap Pts, dir: asc}]
+  # YLD-004 Yield loss quantity
+  - id: db12_loss
+    title: "Yield Loss Quantity by Item"
+    query: fact_yield_checks
+    type: Row
+    limit: 15
+    x: item_name
+    y: [{column: yield_loss_qty, agg: sum, as: Yield Loss Qty}]
+    order: [{by: Yield Loss Qty, dir: desc}]
+  # YLD-007 Yield trend (weekly gap to standard by item)
+  - id: db12_trend
+    title: "Weekly yield gap by item (points)"
+    query: fact_yield_checks
+    type: Line
+    limit: 366
+    x: {column: checked_on, granularity: week}
+    split_by: {column: item_name, max: 4}
+    y: [{expr: "sum(output_qty - expected_output) / sum(input_qty) * 100", as: Gap Pts}]
+  - id: db12_count_var
+    title: "Stock count difference by item (₹, negative = shortage)"
+    query: fact_stock_correction
+    type: Row
+    limit: 30
+    x: item_name
+    y: [{column: amount_difference, agg: sum, as: Count Variance, format: currency}]
+    order: [{by: Count Variance, dir: asc}]
+  # YLD-008 Yield by department (checks without a department are left out)
+  - {id: db12_dept, title: "Yield by station (%)", query: fact_yield_checks, type: Row, limit: 10,
+     filters: [{column: department, op: is_set}],
+     x: department, y: [{expr: "(100 * sum(output_qty) / sum(input_qty)).round(1)", as: "Yield (%)"}], order: [{by: "Yield (%)", dir: desc}]}
+  # Yield by the person who ran the check (checks without a checker are left out)
+  - {id: db12_checker, title: "Yield by checker (%)", query: fact_yield_checks, type: Row, limit: 10,
+     filters: [{column: checked_by, op: is_set}],
+     x: checked_by, y: [{expr: "(100 * sum(output_qty) / sum(input_qty)).round(1)", as: "Yield (%)"}], order: [{by: "Yield (%)", dir: desc}]}
+  # YLD-009 Yield loss cost
+  - {id: db12_loss_cost, title: "Yield loss value (₹)", query: fact_yield_checks, type: Number,
+     y: [{expr: "(sum(yield_loss_value)).round(0)", as: "Yield loss value (₹)", format: currency}]}
+  # YLD-010 Yield check compliance (checks done per item; the expected check schedule is not modelled)
+  - {id: db12_checks, title: "Yield checks done by item (count)", query: fact_yield_checks, type: Table, limit: 15,
+     rows: [{column: item_name, as: Item}],
+     y: [{column: name, agg: count, as: "Checks done"}, {column: checked_on, agg: max, as: "Last check"}],
+     order: [{by: "Checks done", dir: asc}]}
+
+dashboards:
+  - id: yield_recipe
+    title: "Yield and recipe"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 12 Months"},
+         layout: {x: 0, y: 2, w: 5, h: 1},
+         applies_to: {fact_yield_checks: checked_on, fact_stock_correction: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: building-2,
+         layout: {x: 5, y: 2, w: 5, h: 1},
+         applies_to: {fact_yield_checks: branch, fact_stock_correction: branch}}
+      - {id: f_uom, label: UOM, type: string, icon: scale, default: {op: in, value: ["Kg"]},
+         layout: {x: 10, y: 2, w: 5, h: 1},
+         applies_to: {fact_yield_checks: stock_uom}}
+      - {id: f_item, label: Item, type: string, icon: package,
+         layout: {x: 15, y: 2, w: 5, h: 1},
+         applies_to: {fact_yield_checks: item, fact_stock_correction: item_code}}
+    items:
+      - {text: "<p><b>Yield and recipe.</b> Which raw materials give less usable output than the recipe standard. For kitchen head. Default: last 12 months, kg items; good is within 5 points of standard.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db12_kpi, x: 0, y: 3, w: 4, h: 3}
+      - {chart: db12_kpi_std, x: 4, y: 3, w: 4, h: 3}
+      - {chart: db12_kpi_below, x: 8, y: 3, w: 4, h: 3}
+      - {chart: db12_kpi_tol, x: 12, y: 3, w: 4, h: 3}
+      - {chart: db12_loss_cost, x: 16, y: 3, w: 4, h: 3}
+      - {chart: db12_gap, x: 0, y: 6, w: 10, h: 12}
+      - {chart: db12_loss, x: 10, y: 6, w: 10, h: 12}
+      - {chart: db12_trend, x: 0, y: 18, w: 10, h: 12}
+      - {chart: db12_count_var, x: 10, y: 18, w: 10, h: 12}
+      - {chart: db12_dept, x: 0, y: 30, w: 10, h: 11}
+      - {chart: db12_checker, x: 10, y: 30, w: 10, h: 11}
+      - {chart: db12_checks, x: 0, y: 41, w: 20, h: 15}
+      - {text: "<p><b>Estimate:</b> yield loss value uses the item stock rate and the net shortfall against standard.</p>", x: 0, y: 56, w: 20, h: 1}
+      - {text: "<p>Checks without a station or a checker are left out of the two yield charts above.</p>", x: 0, y: 57, w: 20, h: 1}
+      - {text: "<p><b>Partial data:</b> checks done counts what was recorded; the expected check schedule per item is not modelled, so this cannot say who is overdue.</p>", x: 0, y: 58, w: 20, h: 1}

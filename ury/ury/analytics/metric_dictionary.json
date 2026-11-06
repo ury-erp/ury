@@ -1,0 +1,3402 @@
+[
+ {
+  "id": "SAL-001",
+  "name": "Net sales",
+  "domain": "sales",
+  "definition": "Revenue after discounts, excluding tax; canonical revenue.",
+  "formula": "SUM(fact_sales_lines.net_amount) == SUM(fact_invoices.net_total); POS Invoice docstatus=1, is_return=0",
+  "grain": "invoice line / invoice",
+  "levels": [
+   "department",
+   "item",
+   "category",
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines",
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Both populations (Consolidated + Paid) count for revenue.",
+   "Never use Sales Invoice (consolidated copies double count).",
+   "net_total == grand_total today only because taxes are 0."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB03",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-003",
+  "name": "Bills",
+  "domain": "sales",
+  "definition": "Number of submitted, non-return POS Invoices.",
+  "formula": "COUNT(fact_invoices.name)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "3177 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB03",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-004",
+  "name": "Average ticket (ATV)",
+  "domain": "sales",
+  "definition": "Net sales per bill.",
+  "formula": "SUM(net_total) / COUNT(name) on fact_invoices (chart expr measure)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Ratio of totals, never AVG of per-bill ratios.",
+   "Mixes order types: filter Order type for like-for-like."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB03"
+  ]
+ },
+ {
+  "id": "SAL-005",
+  "name": "Daily net sales trend",
+  "domain": "sales",
+  "definition": "Net sales per calendar day.",
+  "formula": "SUM(fact_invoices.net_total) by posting_date (granularity day)",
+  "grain": "day",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Demo gap Oct 2025-Mar 2026 shows as empty days."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB03"
+  ]
+ },
+ {
+  "id": "SAL-006",
+  "name": "Latest day vs previous day",
+  "domain": "sales",
+  "definition": "Latest period net sales with delta vs the previous period.",
+  "formula": "Number chart, y SUM(net_total), date posting_date granularity day, comparison true",
+  "grain": "day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Insights compares to the previous period, not the same weekday last week (owner brief slide 1 uses D-8; PWA computes that)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB02"
+  ]
+ },
+ {
+  "id": "SAL-007",
+  "name": "Month-to-date net sales",
+  "domain": "sales",
+  "definition": "Net sales of the latest month with delta vs previous month.",
+  "formula": "Number chart, y SUM(net_total), date posting_date granularity month, comparison true",
+  "grain": "month",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Previous month is a full month; MTD-vs-MTD needs the PWA."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-008",
+  "name": "Channel mix (order type)",
+  "domain": "sales",
+  "definition": "Net sales and bills by order_type.",
+  "formula": "SUM(net_total), COUNT(name) by fact_invoices.order_type",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Aggregators = 4 bills on demo; customer 'Swiggy' appears on all types (do not use customer as channel)."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB03",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-009",
+  "name": "Sales by hour of day",
+  "domain": "sales",
+  "definition": "Bills and net sales per hour of posting_time.",
+  "formula": "COUNT(name), SUM(net_total) by fact_invoices.hour_of_day",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "posting_time = order start (draft creation) for dine-in, not bill time.",
+   "Prefer population=Paid for realistic shape."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "count / INR",
+  "dashboards": [
+   "DB02",
+   "DB03"
+  ]
+ },
+ {
+  "id": "SAL-010",
+  "name": "Weekday x hour demand grid",
+  "domain": "sales",
+  "definition": "Bills per weekday and hour.",
+  "formula": "Table rows weekday, columns hour_of_day, COUNT(name) on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "No heatmap type: Table pivot."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "count",
+  "dashboards": [
+   "DB03"
+  ]
+ },
+ {
+  "id": "SAL-012",
+  "name": "Sales by branch",
+  "domain": "sales",
+  "definition": "Net sales per branch.",
+  "formula": "SUM(fact_invoices.net_total) by branch",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "Demo has 1 branch and 1 company: structurally ready, renders a single bar."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01"
+  ]
+ },
+ {
+  "id": "SAL-014",
+  "name": "Zero-value bills",
+  "domain": "sales",
+  "definition": "Submitted bills with grand_total = 0 (comps or test bills).",
+  "formula": "SUM(fact_invoices.is_zero_bill)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "18 on demo; no comp reason captured."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "SAL-015",
+  "name": "Covers (dine-in)",
+  "domain": "sales",
+  "definition": "Guests served on dine-in bills.",
+  "formula": "SUM(fact_invoices.pax) where order_type='Dine In' and population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "no_of_pax is text, cast; pax also filled on take-away (junk).",
+   "Paid population only: Consolidated rows carry a synthetic waiter (urycashier) and pax 0.",
+   "Demo pax 1-6 uniform-random."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "guests",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB07",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-016",
+  "name": "Spend per cover",
+  "domain": "sales",
+  "definition": "Dine-in net sales per guest.",
+  "formula": "SUM(net_total) / SUM(pax) on fact_invoices, order_type='Dine In', pax > 0, population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Null where covers = 0; do not coalesce to 0.",
+   "Paid population only: Consolidated rows carry a synthetic waiter (urycashier) and pax 0."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB02",
+   "DB07",
+   "DB16"
+  ]
+ },
+ {
+  "id": "SAL-018",
+  "name": "Returns value",
+  "domain": "sales",
+  "definition": "Value of return/credit-note invoices.",
+  "formula": "SUM(grand_total) where POS Invoice is_return=1 (not in facts: facts exclude returns)",
+  "grain": "invoice",
+  "levels": [
+   "item",
+   "branch",
+   "company"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "0 returns ever recorded; facts filter is_return=0 by design."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "SAL-019",
+  "name": "Service charge and tips",
+  "domain": "sales",
+  "definition": "Service charge or tip income.",
+  "formula": "SUM(Sales Taxes and Charges.tax_amount) for a service-charge account; no tip field",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "No tip field exists; taxes are 0 on all bills."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "SAL-020",
+  "name": "Self-order (QR/kiosk) share",
+  "domain": "sales",
+  "definition": "Share of bills originating from QR/kiosk sessions.",
+  "formula": "COUNT(URY Ordering Session with invoice) / COUNT(bills)",
+  "grain": "session",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "URY Ordering Session has 0 rows."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB03"
+  ]
+ },
+ {
+  "id": "SAL-021",
+  "name": "Sales vs monthly target",
+  "domain": "sales",
+  "definition": "Net sales of the month against the monthly target set for the branch; the current month is month to date against the full-month target.",
+  "formula": "SUM(POS Invoice.net_total) per branch between URY Sales Target.period_start and period_end / URY Sales Target.target_amount",
+  "grain": "month",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_target"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Only branches with a URY Sales Target row appear (demo: URY Branch, 7 months).",
+   "Current month is month to date, so it reads low until the month ends; closed months are shown separately."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB03",
+   "DB16"
+  ]
+ },
+ {
+  "id": "MNU-001",
+  "name": "Item revenue",
+  "domain": "menu",
+  "definition": "Net sales per item.",
+  "formula": "SUM(fact_sales_lines.net_amount) by item_name",
+  "grain": "invoice line",
+  "levels": [
+   "item",
+   "category",
+   "department",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB04"
+  ]
+ },
+ {
+  "id": "MNU-002",
+  "name": "Item quantity sold",
+  "domain": "menu",
+  "definition": "Units sold per item.",
+  "formula": "SUM(fact_sales_lines.qty) by item_name",
+  "grain": "invoice line",
+  "levels": [
+   "item",
+   "category",
+   "department",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Bar",
+  "unit": "qty",
+  "dashboards": [
+   "DB04"
+  ]
+ },
+ {
+  "id": "MNU-003",
+  "name": "Top 10 items by revenue",
+  "domain": "menu",
+  "definition": "Best sellers by net sales.",
+  "formula": "MNU-001 ordered desc, limit 10",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_lines"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB04",
+   "DB16"
+  ]
+ },
+ {
+  "id": "MNU-004",
+  "name": "Bottom 10 sold items by revenue",
+  "domain": "menu",
+  "definition": "Weakest sellers among items that sold at least once.",
+  "formula": "MNU-001 ordered asc, limit 10",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_lines"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Items with zero sales never appear here: see MNU-011."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB04",
+   "DB16"
+  ]
+ },
+ {
+  "id": "MNU-005",
+  "name": "Category revenue (cleaned)",
+  "domain": "menu",
+  "definition": "Net sales per cleaned menu category (CATEGORY_MAP v1).",
+  "formula": "SUM(fact_sales_lines_enriched.net_amount) by menu_category",
+  "grain": "invoice line",
+  "levels": [
+   "category",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Raw item_group is flat and polluted ('All Item Groups' holds 11.4%); always use menu_category."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB04"
+  ]
+ },
+ {
+  "id": "MNU-006",
+  "name": "Category family mix",
+  "domain": "menu",
+  "definition": "Food vs Beverage vs Non-menu vs Unassigned share of net sales.",
+  "formula": "SUM(net_amount) by fact_sales_lines_enriched.category_family",
+  "grain": "invoice line",
+  "levels": [
+   "category",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB04"
+  ]
+ },
+ {
+  "id": "MNU-009",
+  "name": "Item x category table",
+  "domain": "menu",
+  "definition": "Qty, revenue and share per item within category.",
+  "formula": "Table rows menu_category, item_name; SUM(qty), SUM(net_amount) on fact_sales_lines_enriched",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Table",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB04"
+  ]
+ },
+ {
+  "id": "MNU-010",
+  "name": "Beverage attach rate",
+  "domain": "menu",
+  "definition": "Share of bills that include at least one beverage line.",
+  "formula": "COUNT_DISTINCT(invoice) where category_family='Beverage' / COUNT_DISTINCT(invoice) on fact_sales_lines_enriched (two Number tiles; ratio stated in text)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Cannot express a conditional distinct ratio in one chart on 3.15.1 (distinct_count_if unverified): two tiles."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB04",
+   "DB08"
+  ]
+ },
+ {
+  "id": "MNU-011",
+  "name": "Non-selling items",
+  "domain": "menu",
+  "definition": "Sales items that never sold.",
+  "formula": "COUNT(dim_item) where is_sales_item=1 and is_sold=0 and disabled=0",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category",
+   "department"
+  ],
+  "source_queries": [
+   "dim_item"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Item master mixes raw materials and menu items; menu membership is on URY Menu, not Item."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "count",
+  "dashboards": [
+   "DB04",
+   "DB14"
+  ]
+ },
+ {
+  "id": "MNU-012",
+  "name": "Menu engineering (popularity x margin)",
+  "domain": "menu",
+  "definition": "Qty sold vs estimated unit margin per costed item.",
+  "formula": "Table: item_name, SUM(qty), SUM(est_margin)/SUM(qty) on fact_sales_lines_enriched where cost_known=1",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Only items with a default BOM cost (6-8% of revenue)."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB04",
+   "DB10"
+  ]
+ },
+ {
+  "id": "PRD-001",
+  "name": "Revenue by configured department",
+  "domain": "production",
+  "definition": "Net sales attributed to the department configured to make each item.",
+  "formula": "SUM(fact_sales_lines_enriched.net_amount) by department",
+  "grain": "invoice line",
+  "levels": [
+   "department",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "17.4% of revenue is 'Unmapped' (62 items without department).",
+   "Configured department, not the unit that cooked it (differs on 74/203 KOT lines)."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB05"
+  ]
+ },
+ {
+  "id": "PRD-002",
+  "name": "Revenue by kitchen warehouse",
+  "domain": "production",
+  "definition": "Made-to-order (Kitchen) vs pre-produced (Finished Goods) sales.",
+  "formula": "SUM(fact_sales_lines.net_amount) by warehouse",
+  "grain": "invoice line",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_lines"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Only 2 warehouse values."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB05"
+  ]
+ },
+ {
+  "id": "PRD-003",
+  "name": "Revenue by production policy",
+  "domain": "production",
+  "definition": "Sales by PRE_PRODUCED / MADE_TO_ORDER / DIRECT_RETAIL.",
+  "formula": "SUM(fact_sales_lines_enriched.net_amount) by production_policy",
+  "grain": "invoice line",
+  "levels": [
+   "department",
+   "item"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Null for unconfigured items."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB05"
+  ]
+ },
+ {
+  "id": "PRD-004",
+  "name": "KOTs by executed unit",
+  "domain": "production",
+  "definition": "Kitchen tickets per production unit that received them.",
+  "formula": "COUNT(fact_kot_headers.name) by production",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "132 KOTs on demo; dates sparse except 2026-10-21."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "count",
+  "dashboards": [
+   "DB05",
+   "DB06"
+  ]
+ },
+ {
+  "id": "PRD-005",
+  "name": "Kitchen quantity by unit",
+  "domain": "production",
+  "definition": "Dish quantity sent to each unit.",
+  "formula": "SUM(fact_kot_lines.qty_num) by production",
+  "grain": "KOT line",
+  "levels": [
+   "department",
+   "item",
+   "category"
+  ],
+  "source_queries": [
+   "fact_kot_lines"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "quantity is text, cast."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "qty",
+  "dashboards": [
+   "DB05"
+  ]
+ },
+ {
+  "id": "PRD-008",
+  "name": "Bulk production cost",
+  "domain": "production",
+  "definition": "Cost of batch production runs.",
+  "formula": "SUM(Bulk Production.total_cost)",
+  "grain": "run",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "Bulk Production has 0 rows."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-001",
+  "name": "Plan attainment %",
+  "domain": "planning",
+  "definition": "Share of planned quantity actually fulfilled.",
+  "formula": "SUM(fulfilled_qty) / SUM(qty) on fact_sales_plan_items",
+  "grain": "plan line",
+  "levels": [
+   "department",
+   "item",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "86.6% on demo (3639/4200).",
+   "fulfilled_qty is a running counter with no history."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB01",
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-002",
+  "name": "Planned quantity",
+  "domain": "planning",
+  "definition": "Units planned for production.",
+  "formula": "SUM(fact_sales_plan_items.qty)",
+  "grain": "plan line",
+  "levels": [
+   "department",
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Units are Nos/Unit; never sum across UOM."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "qty",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-004",
+  "name": "Under-production",
+  "domain": "planning",
+  "definition": "Planned units not fulfilled (per line, before aggregation).",
+  "formula": "SUM(fact_sales_plan_items.under_qty)",
+  "grain": "plan line",
+  "levels": [
+   "department",
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "114 of 131 lines under."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-005",
+  "name": "Over-production",
+  "domain": "planning",
+  "definition": "Units fulfilled beyond plan.",
+  "formula": "SUM(fact_sales_plan_items.over_qty)",
+  "grain": "plan line",
+  "levels": [
+   "department",
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Netting with PLN-004 hides overs: keep split."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-007",
+  "name": "Attainment by department",
+  "domain": "planning",
+  "definition": "Which kitchen misses plan.",
+  "formula": "SUM(fulfilled_qty)/SUM(qty) by department",
+  "grain": "department",
+  "levels": [
+   "department"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "department == production_unit on every plan line (5 values)."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "percent",
+  "dashboards": [
+   "DB05",
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-008",
+  "name": "Attainment by service period and enforcement",
+  "domain": "planning",
+  "definition": "Lunch vs dinner; Hard vs Soft vs Alert plans.",
+  "formula": "SUM(fulfilled_qty)/SUM(qty) by service_period split_by enforcement_mode",
+  "grain": "plan",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Bar",
+  "unit": "percent",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-009",
+  "name": "Committed vs fulfilled",
+  "domain": "planning",
+  "definition": "Open reservations against plan.",
+  "formula": "SUM(committed_qty) vs SUM(fulfilled_qty)",
+  "grain": "plan line",
+  "levels": [
+   "item",
+   "department"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "committed_qty = 0 on all 131 lines."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "qty",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-010",
+  "name": "Plan vs POS units sold",
+  "domain": "planning",
+  "definition": "Planned qty vs units actually sold for the same item and date.",
+  "formula": "Side-by-side: SUM(fact_sales_plan_items.qty) by item_code and SUM(fact_sales_lines.qty) by item_code for the same date filter; never row-join",
+  "grain": "item x day",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_plan_items",
+   "fact_sales_lines"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Builder joins cannot pre-aggregate two facts; show two charts with the same filters."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB13"
+  ]
+ },
+ {
+  "id": "PLN-011",
+  "name": "Plan-controlled item coverage",
+  "domain": "planning",
+  "definition": "Items whose production obeys the sales plan.",
+  "formula": "COUNT(dim_item) where controlled_by_sales_plan=1",
+  "grain": "item",
+  "levels": [
+   "item",
+   "department"
+  ],
+  "source_queries": [
+   "dim_item"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "169 of 202 configured items."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB13",
+   "DB14"
+  ]
+ },
+ {
+  "id": "KIT-001",
+  "name": "KOTs fired",
+  "domain": "kitchen",
+  "definition": "Kitchen tickets submitted.",
+  "formula": "COUNT(fact_kot_headers.name)",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB02",
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-003",
+  "name": "Ticket time (legacy production minutes)",
+  "domain": "kitchen",
+  "definition": "Average KOT creation-to-serve minutes from KOT.production_time.",
+  "formula": "AVG(prod_minutes) on fact_kot_headers with chart filter is_served = 1",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Stored in MINUTES though shipped reports say seconds.",
+   "36 seeded rows = 12.0 and 4 = 20.0: demo shape is synthetic."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "minutes",
+  "dashboards": [
+   "DB02",
+   "DB06",
+   "DB16"
+  ]
+ },
+ {
+  "id": "KIT-004",
+  "name": "KOT SLA breach rate",
+  "domain": "kitchen",
+  "definition": "Share of served KOTs over the POS Profile target (custom_kot_warning_time: 15 min URY, 10 min URY Branch).",
+  "formula": "SUM(sla_breach) / SUM(is_served) on fact_kot_headers",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Target is per POS Profile, not per unit/course.",
+   "100% on demo (seeded 12/20 min)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB01",
+   "DB02",
+   "DB06",
+   "DB16"
+  ]
+ },
+ {
+  "id": "KIT-006",
+  "name": "Prep time (start to ready)",
+  "domain": "kitchen",
+  "definition": "Minutes from IN_PREPARATION to READY.",
+  "formula": "AVG(prep_seconds)/60 on fact_kot_exec where was_ready=1",
+  "grain": "KOT x unit",
+  "levels": [
+   "department",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "Demo stamps are milliseconds apart (median 0.004 s): show empty-state, not a chart."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "minutes",
+  "dashboards": [
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-009",
+  "name": "Queue wait (fired to started)",
+  "domain": "kitchen",
+  "definition": "Minutes a ticket waits before cooking starts.",
+  "formula": "AVG(queue_seconds)/60 on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "No queued_at field; Execution.creation is a proxy and seeded back-dated (median 87.6 min): do not publish."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "minutes",
+  "dashboards": [
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-010",
+  "name": "Order-to-serve (guest wait)",
+  "domain": "kitchen",
+  "definition": "Minutes from KOT fired (date+time) to served_at.",
+  "formula": "AVG(order_to_serve_seconds)/60 on fact_kot_exec where was_served=1",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "KOT time back-dated in seed: 34 min..5.7 h meaningless on demo."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "minutes",
+  "dashboards": [
+   "DB06",
+   "DB07"
+  ]
+ },
+ {
+  "id": "KIT-011",
+  "name": "Kitchen throughput funnel",
+  "domain": "kitchen",
+  "definition": "Executions started, ready, served.",
+  "formula": "SUM(was_started), SUM(was_ready), SUM(was_served) on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Counts are valid even though durations are not (deduped: 93 KOTs)."
+  ],
+  "chart_type_hint": "Funnel",
+  "unit": "count",
+  "dashboards": [
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-012",
+  "name": "Cancellations by kitchen stage",
+  "domain": "kitchen",
+  "definition": "Cancelled before start / after start / after ready.",
+  "formula": "COUNT(name) by state where is_cancelled=1 on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "6 rows on demo."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "count",
+  "dashboards": [
+   "DB06",
+   "DB15"
+  ]
+ },
+ {
+  "id": "KIT-013",
+  "name": "Open tickets",
+  "domain": "kitchen",
+  "definition": "KOTs not yet served within the selected dates.",
+  "formula": "COUNT(name) - SUM(is_served) on fact_kot_headers",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Must be date-bounded; old 2025 KOTs never closed."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB02",
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-014",
+  "name": "Order modification rate",
+  "domain": "kitchen",
+  "definition": "Share of KOTs that are 'Order Modified'.",
+  "formula": "COUNT where type='Order Modified' / COUNT(name) on fact_kot_headers (chart filter tile + total tile)",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "KOT.user is a display name, not a user id."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB06",
+   "DB15"
+  ]
+ },
+ {
+  "id": "KIT-015",
+  "name": "Kitchen line voids",
+  "domain": "kitchen",
+  "definition": "Quantity cancelled on KOT lines.",
+  "formula": "SUM(fact_kot_lines.cancelled_qty_num)",
+  "grain": "KOT line",
+  "levels": [
+   "item",
+   "department"
+  ],
+  "source_queries": [
+   "fact_kot_lines"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "8 of 203 lines."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB06",
+   "DB15"
+  ]
+ },
+ {
+  "id": "KIT-016",
+  "name": "Void disposition",
+  "domain": "kitchen",
+  "definition": "Cancelled qty by fate (Returned to Stock / Wasted).",
+  "formula": "SUM(cancelled_qty_num) by disposition on fact_kot_lines",
+  "grain": "KOT line",
+  "levels": [
+   "item",
+   "department"
+  ],
+  "source_queries": [
+   "fact_kot_lines"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "disposition = Pending on 203/203."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "qty",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "KIT-017",
+  "name": "KOT load by hour",
+  "domain": "kitchen",
+  "definition": "Tickets per hour of KOT.time.",
+  "formula": "COUNT(name) by hour_of_day on fact_kot_headers",
+  "grain": "KOT",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_headers"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "hour(KOT.time) verified working."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "count",
+  "dashboards": [
+   "DB06"
+  ]
+ },
+ {
+  "id": "KIT-018",
+  "name": "Item prep speed",
+  "domain": "kitchen",
+  "definition": "Slowest dishes, start to ready per KOT line.",
+  "formula": "AVG(ready_at - started_at) on URY KOT Item Execution by item (not in semantic layer)",
+  "grain": "KOT line",
+  "levels": [
+   "item",
+   "category",
+   "department"
+  ],
+  "source_queries": [],
+  "tier": "T3",
+  "caveats": [
+   "Milliseconds on demo; add fact_kot_item_exec (sql) when stamps are real."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "minutes",
+  "dashboards": [
+   "DB06"
+  ]
+ },
+ {
+  "id": "TBL-001",
+  "name": "Tables occupied now",
+  "domain": "tables",
+  "definition": "Dining tables currently flagged occupied.",
+  "formula": "SUM(occupied) and COUNT(name) on dim_table where is_take_away=0",
+  "grain": "table snapshot",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "dim_table"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Live flag, no history; snapshot only."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB02",
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-002",
+  "name": "Dine-in bills",
+  "domain": "tables",
+  "definition": "Submitted dine-in invoices.",
+  "formula": "COUNT(fact_table_sessions.name)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "995 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-003",
+  "name": "Table turns per day",
+  "domain": "tables",
+  "definition": "Dine-in bills per table per day.",
+  "formula": "count(name) / distinct_count(restaurant_table) per posting_date on fact_table_sessions (expr measure) where is_take_away=0",
+  "grain": "table x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "~1.2 on demo; not a meaningful demo number."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "turns",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-004",
+  "name": "Order-open-to-pay dwell",
+  "domain": "tables",
+  "definition": "Average minutes from invoice creation to payment, valid rows only.",
+  "formula": "AVG(dwell_minutes) on fact_table_sessions with chart filter dwell_valid=1",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Not seat-to-clear: excludes pre-order wait and clearing.",
+   "502/995 are 00:00:00; the rest cluster at 30 min (seeded)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "minutes",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-006",
+  "name": "Revenue by table",
+  "domain": "tables",
+  "definition": "Dine-in net sales per table.",
+  "formula": "SUM(net_total) by restaurant_table on fact_table_sessions",
+  "grain": "table",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Exclude is_take_away=1 tables (162 dine-in bills sit on Takeaway/Waiting tables)."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-007",
+  "name": "Revenue by room",
+  "domain": "tables",
+  "definition": "Dine-in net sales per room (URY Table.restaurant_room).",
+  "formula": "SUM(net_total) by room on fact_table_sessions",
+  "grain": "room",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Uses the table master room, not the half-empty invoice room field."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-008",
+  "name": "Over-capacity parties",
+  "domain": "tables",
+  "definition": "Dine-in bills whose pax exceeds table seats.",
+  "formula": "SUM(over_capacity) on fact_table_sessions",
+  "grain": "invoice",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "104 breaches are seed noise."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB07",
+   "DB14"
+  ]
+ },
+ {
+  "id": "TBL-009",
+  "name": "RevPASH / covers per seat-hour",
+  "domain": "tables",
+  "definition": "PROXY: dine-in net sales (and covers) per available seat-hour, where available seat-hours = seats of enabled non-takeaway tables x that weekday's opening hours.",
+  "formula": "SUM(dine-in net_total) / SUM(SUM(URY Table.no_of_seats) x open hours of the day), days with dine-in trade",
+  "grain": "hour x room",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_seat_hours"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Proxy: capacity is tables x scheduled opening hours, not live seat occupancy.",
+   "Needs a URY Branch Operating Schedule per branch; branches without one are absent.",
+   "Days with no dine-in bill are not counted as available seat-hours."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-010",
+  "name": "Seat-to-clear dwell and utilisation",
+  "domain": "tables",
+  "definition": "PROXY: time at table (bill created to bill paid, total_spend_time) per room, and table occupancy = time at table / (tables x opening hours).",
+  "formula": "AVG(total_spend_time) for 0 < time <= 8 h; SUM(time at table) / SUM(tables x open hours)",
+  "grain": "table x day",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_table_sessions",
+   "fact_seat_hours"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Proxy: not seated-to-cleared; bills without a recorded time are left out.",
+   "Occupancy is a floor estimate because time before the bill is created is not captured."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "percent",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "TBL-011",
+  "name": "Bill / assistance response time",
+  "domain": "tables",
+  "definition": "Minutes from guest request to resolution.",
+  "formula": "AVG(resolved_at - requested_at) on fact_service_requests where status='Resolved' (needs sql TIMESTAMPDIFF when used)",
+  "grain": "request",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_service_requests"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "4 rows; no acknowledged_at."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "minutes",
+  "dashboards": [
+   "DB07"
+  ]
+ },
+ {
+  "id": "EMP-001",
+  "name": "Sales per waiter",
+  "domain": "employee",
+  "definition": "Net sales per waiter user (Paid population).",
+  "formula": "SUM(fact_invoices.net_total) by waiter where population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Employee = Frappe User (waiter), not HR Employee.",
+   "Paid population only: Consolidated rows carry a synthetic waiter (urycashier) and pax 0."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-002",
+  "name": "Bills per waiter",
+  "domain": "employee",
+  "definition": "Bills owned per waiter.",
+  "formula": "COUNT(fact_invoices.name) by waiter where population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Paid population only: Consolidated rows carry a synthetic waiter (urycashier) and pax 0."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "count",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-003",
+  "name": "Average ticket per waiter",
+  "domain": "employee",
+  "definition": "Net sales per bill per waiter.",
+  "formula": "SUM(net_total)/COUNT(name) by waiter where population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Compare within the same order type."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-004",
+  "name": "Covers per waiter",
+  "domain": "employee",
+  "definition": "Dine-in guests served per waiter.",
+  "formula": "SUM(pax) by waiter where order_type='Dine In' and population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "pax uniform-random on demo."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "guests",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-005",
+  "name": "Spend per cover per waiter",
+  "domain": "employee",
+  "definition": "Upsell indicator.",
+  "formula": "SUM(net_total)/SUM(pax) by waiter, Dine In, pax>0, population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Null where pax 0."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-007",
+  "name": "Category mix per waiter",
+  "domain": "employee",
+  "definition": "Revenue per waiter split by category family.",
+  "formula": "SUM(net_amount) by waiter split_by category_family on fact_sales_lines_enriched where population='Paid'",
+  "grain": "invoice line",
+  "levels": [
+   "employee",
+   "category"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-008",
+  "name": "Cancellations per waiter",
+  "domain": "employee",
+  "definition": "Cancelled bills and value per order owner.",
+  "formula": "COUNT(name), SUM(grand_total) by waiter on fact_cancellations",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Waiter is the order owner, not necessarily the canceller."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "count",
+  "dashboards": [
+   "DB08",
+   "DB15"
+  ]
+ },
+ {
+  "id": "EMP-009",
+  "name": "Sales per cashier",
+  "domain": "employee",
+  "definition": "Net sales settled per cashier user.",
+  "formula": "SUM(fact_invoices.net_total) by cashier",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Cashier is populated on 100% of bills, incl. Consolidated."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08",
+   "DB09"
+  ]
+ },
+ {
+  "id": "EMP-010",
+  "name": "Cash-up variance per cashier",
+  "domain": "employee",
+  "definition": "Till difference per closing user.",
+  "formula": "SUM(difference) by user on fact_closing_details",
+  "grain": "shift x mode",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_closing_details"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "difference = 0 on all 308 rows; all closings by urycashier."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08",
+   "DB09"
+  ]
+ },
+ {
+  "id": "EMP-011",
+  "name": "Discount given per cashier",
+  "domain": "employee",
+  "definition": "Discount value per cashier.",
+  "formula": "SUM(discount_amount) by cashier on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "4 discounted bills on demo."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08",
+   "DB15"
+  ]
+ },
+ {
+  "id": "EMP-012",
+  "name": "Labour cost % of sales",
+  "domain": "employee",
+  "definition": "Employee costs over net sales (Daily P and L).",
+  "formula": "SUM(total_employee_costs)/SUM(net_sales) on fact_daily_pnl",
+  "grain": "branch x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_daily_pnl"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Attendance-prorated wages, seeded; no per-person split."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB08",
+   "DB10"
+  ]
+ },
+ {
+  "id": "EMP-013",
+  "name": "Cook speed per user",
+  "domain": "employee",
+  "definition": "Prep minutes per cook (started_by/ready_by).",
+  "formula": "AVG(prep_seconds)/60 by ready_by on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "employee",
+   "department"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "All kitchen actors are Administrator; durations ms."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "minutes",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-014",
+  "name": "Sales per labour hour",
+  "domain": "employee",
+  "definition": "Branch net sales per hour of staff attendance (Attendance.working_hours of Present staff), for days that have both sales and attendance.",
+  "formula": "SUM(POS Invoice.net_total) / SUM(Attendance.working_hours), joined by branch (Employee.branch) and date",
+  "grain": "branch x day",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_labour_hours"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Branch-level only: sales of all staff against attendance of staff who have attendance rows.",
+   "Days with sales but no attendance (or the reverse) are excluded."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "EMP-015",
+  "name": "Tips and commission per waiter",
+  "domain": "employee",
+  "definition": "Tips entered at billing per waiter (POS Invoice.custom_tip_amount by custom_waiter_employee). Commission is not charted.",
+  "formula": "SUM(POS Invoice.custom_tip_amount) by waiter Employee",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_tips"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Partial: tips only. Commission is calculated by the Commission report in the app and is not stored on any table.",
+   "Tips depend on staff entering the tip at billing."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB08"
+  ]
+ },
+ {
+  "id": "PAY-001",
+  "name": "Tendered amount",
+  "domain": "payments",
+  "definition": "Money received across tenders on POS bills.",
+  "formula": "SUM(fact_payments.amount)",
+  "grain": "tender line",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_payments"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "parenttype='POS Invoice' mandatory (SIP also holds Sales Invoice rows).",
+   "Includes change given back: see PAY-004."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB09"
+  ]
+ },
+ {
+  "id": "PAY-002",
+  "name": "Payment mode mix",
+  "domain": "payments",
+  "definition": "Share of tender by mode of payment.",
+  "formula": "SUM(amount) by mode_of_payment on fact_payments",
+  "grain": "tender line",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_payments"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB09",
+   "DB16"
+  ]
+ },
+ {
+  "id": "PAY-003",
+  "name": "Payment mode by order type",
+  "domain": "payments",
+  "definition": "Tender mix per channel.",
+  "formula": "SUM(amount) by order_type split_by mode_of_payment",
+  "grain": "tender line",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_payments"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB09"
+  ]
+ },
+ {
+  "id": "PAY-004",
+  "name": "Collected vs billed",
+  "domain": "payments",
+  "definition": "Paid minus change vs rounded total; should match.",
+  "formula": "SUM(paid_amount) - SUM(change_amount) vs SUM(rounded_total) on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Matches to the rupee on demo (3,754,042)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB09"
+  ]
+ },
+ {
+  "id": "PAY-006",
+  "name": "Expected vs counted at close",
+  "domain": "payments",
+  "definition": "System expected vs counted per day.",
+  "formula": "SUM(expected_amount), SUM(closing_amount) by posting_date on fact_closing_details",
+  "grain": "shift x mode",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_closing_details"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Closings cover only Consolidated invoices."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB09"
+  ]
+ },
+ {
+  "id": "PAY-007",
+  "name": "Cash-up variance",
+  "domain": "payments",
+  "definition": "Sum and count of non-zero till differences.",
+  "formula": "SUM(difference), SUM(has_variance) on fact_closing_details",
+  "grain": "shift x mode",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_closing_details"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "0 on all 308 rows: 'All tills balanced' is the honest message."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB09",
+   "DB16"
+  ]
+ },
+ {
+  "id": "PAY-008",
+  "name": "Unclosed sales",
+  "domain": "payments",
+  "definition": "Net sales on Paid bills not yet in any POS Closing Entry.",
+  "formula": "SUM(net_total) on fact_invoices where population='Paid'",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "1,498,040 in 1075 bills on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB09",
+   "DB14"
+  ]
+ },
+ {
+  "id": "MAR-001",
+  "name": "Gross profit (Daily P and L)",
+  "domain": "margin",
+  "definition": "Gross profit as submitted on URY Daily P and L.",
+  "formula": "SUM(fact_daily_pnl.gross_profit)",
+  "grain": "branch x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_daily_pnl"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Seeded; COGS from BOM x buying price covers few items, so optimistic."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB10",
+   "DB16"
+  ]
+ },
+ {
+  "id": "MAR-002",
+  "name": "Gross margin % (Daily P and L)",
+  "domain": "margin",
+  "definition": "Gross profit over net sales.",
+  "formula": "SUM(gross_profit)/SUM(net_sales) on fact_daily_pnl",
+  "grain": "branch x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_daily_pnl"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Never AVG(gross_profit_percent)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB01",
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-003",
+  "name": "Food cost % (Daily P and L)",
+  "domain": "margin",
+  "definition": "COGS over net sales.",
+  "formula": "SUM(cogs)/SUM(net_sales) on fact_daily_pnl",
+  "grain": "branch x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_daily_pnl"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "cogs > 0 on 52 of 116 submitted docs."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "percent",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-004",
+  "name": "Net profit (Daily P and L)",
+  "domain": "margin",
+  "definition": "Profit after employee and other costs.",
+  "formula": "SUM(fact_daily_pnl.net_profit)",
+  "grain": "branch x day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_daily_pnl"
+  ],
+  "tier": "T2",
+  "caveats": [],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-005",
+  "name": "Recipe cost coverage %",
+  "domain": "margin",
+  "definition": "Share of revenue whose items have a default BOM cost.",
+  "formula": "SUM(costed_net_amount)/SUM(net_amount) on fact_sales_lines_enriched",
+  "grain": "invoice line",
+  "levels": [
+   "item",
+   "category",
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Must be shown next to every T2 margin number (~6-8% on demo)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB10",
+   "DB14"
+  ]
+ },
+ {
+  "id": "MAR-006",
+  "name": "Estimated margin (costed items)",
+  "domain": "margin",
+  "definition": "Net sales minus qty x BOM unit cost, costed lines only.",
+  "formula": "SUM(est_margin) on fact_sales_lines_enriched where cost_known=1",
+  "grain": "invoice line",
+  "levels": [
+   "item",
+   "category",
+   "department",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "BOM raw_material_cost at BOM rates; ignores yield (BOM yield fields 0)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-007",
+  "name": "Estimated margin % (costed items)",
+  "domain": "margin",
+  "definition": "Estimated margin over costed revenue.",
+  "formula": "SUM(est_margin)/SUM(costed_net_amount) on fact_sales_lines_enriched",
+  "grain": "invoice line",
+  "levels": [
+   "item",
+   "category",
+   "department"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Not representative of the whole menu."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "percent",
+  "dashboards": [
+   "DB04",
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-008",
+  "name": "Estimated food cost by category",
+  "domain": "margin",
+  "definition": "Estimated cost and margin per menu_category.",
+  "formula": "SUM(est_cost), SUM(est_margin) by menu_category where cost_known=1",
+  "grain": "invoice line",
+  "levels": [
+   "category",
+   "department"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T2",
+  "caveats": [],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-010",
+  "name": "Accounting food cost % (GL)",
+  "domain": "margin",
+  "definition": "COGS GL debit over sales GL credit.",
+  "formula": "SUM(GL debit 'Cost of Goods Sold') / SUM(GL credit 'Sales')",
+  "grain": "day",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "91% of sales stock movements valued at 0; POS Invoice posts no GL; single cost center."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "percent",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-011",
+  "name": "Actual consumption cost (stock ledger)",
+  "domain": "margin",
+  "definition": "Value of stock consumed by sales and issues.",
+  "formula": "SUM(-stock_value_difference) on SLE for Sales Invoice/Material Issue",
+  "grain": "item x day",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "Raw materials are not depleted by POS sales; warehouses carry no branch."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "MAR-012",
+  "name": "Theoretical vs counted cost variance",
+  "domain": "margin",
+  "definition": "BOM theoretical cost vs counted cost per item.",
+  "formula": "SUM(variance_vs_theoretical), SUM(variance_vs_counted) on URY Cost Variance Snapshot",
+  "grain": "item",
+  "levels": [
+   "item",
+   "company"
+  ],
+  "source_queries": [],
+  "tier": "T3",
+  "caveats": [
+   "8 seeded rows, company only; not in semantic layer."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB10"
+  ]
+ },
+ {
+  "id": "WST-001",
+  "name": "Wastage value",
+  "domain": "wastage",
+  "definition": "Value of authorised wastage.",
+  "formula": "SUM(fact_wastage_lines.amount) where status='Authorized'",
+  "grain": "wastage line",
+  "levels": [
+   "department",
+   "item",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_wastage_lines"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "URY Wastage has 0 rows: empty-state."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB11"
+  ]
+ },
+ {
+  "id": "WST-002",
+  "name": "Wastage quantity by item",
+  "domain": "wastage",
+  "definition": "Wasted units per item.",
+  "formula": "SUM(qty) by item_name on fact_wastage_lines",
+  "grain": "wastage line",
+  "levels": [
+   "item",
+   "department"
+  ],
+  "source_queries": [
+   "fact_wastage_lines"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "0 rows; never sum across UOM."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "WST-003",
+  "name": "Wastage by reason",
+  "domain": "wastage",
+  "definition": "Wastage value by reason_category.",
+  "formula": "SUM(amount) by reason_category",
+  "grain": "wastage",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_wastage_lines"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "0 rows."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "WST-004",
+  "name": "Wastage by department",
+  "domain": "wastage",
+  "definition": "Wastage value per production department.",
+  "formula": "SUM(amount) by department",
+  "grain": "wastage",
+  "levels": [
+   "department"
+  ],
+  "source_queries": [
+   "fact_wastage_lines"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "0 rows."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB05",
+   "DB11"
+  ]
+ },
+ {
+  "id": "WST-005",
+  "name": "Wastage % of sales",
+  "domain": "wastage",
+  "definition": "Wastage value over net sales, same branch and period.",
+  "formula": "WST-001 / SAL-001 (two tiles, same filters; never row-join)",
+  "grain": "branch x period",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_wastage_lines",
+   "fact_invoices"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "0 rows."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "WST-007",
+  "name": "Wasted-prep cancellations (proxy)",
+  "domain": "wastage",
+  "definition": "Kitchen executions cancelled after cooking started or finished.",
+  "formula": "SUM(wasted_prep) on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T2",
+  "caveats": [
+   "Count only, no cost (6 rows)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB11",
+   "DB15"
+  ]
+ },
+ {
+  "id": "STK-001",
+  "name": "Shrinkage value",
+  "domain": "stock",
+  "definition": "Counted below book (negative count variance).",
+  "formula": "SUM(shrink_value) on fact_stock_correction",
+  "grain": "correction line",
+  "levels": [
+   "item",
+   "category",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_stock_correction"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Use child amount_difference; header difference_amount is 0 on 20/20.",
+   "-14,883.2 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB01",
+   "DB11"
+  ]
+ },
+ {
+  "id": "STK-002",
+  "name": "Overage value",
+  "domain": "stock",
+  "definition": "Counted above book.",
+  "formula": "SUM(overage_value) on fact_stock_correction",
+  "grain": "correction line",
+  "levels": [
+   "item",
+   "category",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_stock_correction"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "+15,087.2 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "STK-003",
+  "name": "Net count variance",
+  "domain": "stock",
+  "definition": "Net value of all count corrections.",
+  "formula": "SUM(amount_difference) on fact_stock_correction",
+  "grain": "correction line",
+  "levels": [
+   "item",
+   "category",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_stock_correction"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "+204.0 on demo: netting hides 29,970 gross."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "STK-004",
+  "name": "Count variance % of stock value",
+  "domain": "stock",
+  "definition": "Gross absolute variance over book value counted.",
+  "formula": "(SUM(overage_value) - SUM(shrink_value)) / SUM(current_amount)",
+  "grain": "correction line",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_stock_correction"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "About 2.5% on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "STK-005",
+  "name": "Variance by item",
+  "domain": "stock",
+  "definition": "Shrink and overage per item.",
+  "formula": "SUM(shrink_value), SUM(overage_value) by item_name",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category"
+  ],
+  "source_queries": [
+   "fact_stock_correction"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Only 6 raw-material items counted."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB11",
+   "DB12"
+  ]
+ },
+ {
+  "id": "STK-007",
+  "name": "Days of cover",
+  "domain": "stock",
+  "definition": "Stock on hand over average daily outflow.",
+  "formula": "Bin.actual_qty / AVG daily SLE outflow",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category"
+  ],
+  "source_queries": [],
+  "tier": "T4",
+  "caveats": [
+   "POS sales do not deplete raw materials; no recipe backflush."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "days",
+  "dashboards": [
+   "DB11"
+  ]
+ },
+ {
+  "id": "YLD-001",
+  "name": "Weighted actual yield %",
+  "domain": "yield",
+  "definition": "Usable output over input across checks.",
+  "formula": "SUM(output_qty)/SUM(input_qty)*100 on fact_yield_checks, per stock_uom",
+  "grain": "check",
+  "levels": [
+   "item",
+   "category",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Never AVG(actual_yield_percent); never mix Kg and Litre.",
+   "Rows over 100% exist (allowed by design)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB01",
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-002",
+  "name": "Standard yield %",
+  "domain": "yield",
+  "definition": "Weighted standard yield of the same checks.",
+  "formula": "SUM(expected_output)/SUM(input_qty)*100",
+  "grain": "check",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Snapshot fixed at first save of each check."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-003",
+  "name": "Yield gap vs standard (points)",
+  "domain": "yield",
+  "definition": "Actual minus standard yield, percentage points.",
+  "formula": "YLD-001 - YLD-002, or SUM(output_qty - expected_output)/SUM(input_qty)*100",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Points, not relative %."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "points",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-004",
+  "name": "Yield loss quantity",
+  "domain": "yield",
+  "definition": "Output short of standard.",
+  "formula": "SUM(yield_loss_qty) by item_name (per UOM)",
+  "grain": "check",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Negative = gain."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "qty",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-005",
+  "name": "Checks below standard",
+  "domain": "yield",
+  "definition": "Share of checks under standard.",
+  "formula": "SUM(below_standard)/COUNT(name)",
+  "grain": "check",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-006",
+  "name": "Out-of-tolerance rate",
+  "domain": "yield",
+  "definition": "Share of checks more than 5 points under standard.",
+  "formula": "SUM(out_of_tolerance)/COUNT(name)",
+  "grain": "check",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Tolerance (5 points) is an architecture constant, not a stored field."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB02",
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-007",
+  "name": "Yield trend",
+  "domain": "yield",
+  "definition": "Weekly weighted yield per item.",
+  "formula": "SUM(output_qty)/SUM(input_qty)*100 by checked_on (week) split_by item_name",
+  "grain": "week",
+  "levels": [
+   "item"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "22 days of checks on demo."
+  ],
+  "chart_type_hint": "Line",
+  "unit": "percent",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-008",
+  "name": "Yield by department",
+  "domain": "yield",
+  "definition": "Weighted yield per production department.",
+  "formula": "YLD-001 by department",
+  "grain": "check",
+  "levels": [
+   "department"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T4",
+  "caveats": [
+   "department and production_unit empty on 66/66."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "percent",
+  "dashboards": [
+   "DB05",
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-009",
+  "name": "Yield loss cost",
+  "domain": "yield",
+  "definition": "Value of output short of standard.",
+  "formula": "SUM(yield_loss_qty x valuation_rate)",
+  "grain": "check",
+  "levels": [
+   "item",
+   "branch"
+  ],
+  "source_queries": [],
+  "tier": "T3",
+  "caveats": [
+   "Needs a rate join (Bin/Stock Correction Item) not in the layer."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "YLD-010",
+  "name": "Yield check compliance",
+  "domain": "yield",
+  "definition": "Checks done vs expected by cadence.",
+  "formula": "COUNT(checks) / expected from custom_yield_check_cadence + interval_days",
+  "grain": "item x week",
+  "levels": [
+   "item"
+  ],
+  "source_queries": [
+   "fact_yield_checks",
+   "dim_item"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "Expected-count rule lives in code (yield_check_reminders.py)."
+  ],
+  "chart_type_hint": "Table",
+  "unit": "percent",
+  "dashboards": [
+   "DB12"
+  ]
+ },
+ {
+  "id": "LKG-001",
+  "name": "Cancelled bills",
+  "domain": "leakage",
+  "definition": "Count of cancelled POS Invoices.",
+  "formula": "COUNT(fact_cancellations.name)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "60 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB01",
+   "DB15",
+   "DB16"
+  ]
+ },
+ {
+  "id": "LKG-002",
+  "name": "Cancelled value",
+  "domain": "leakage",
+  "definition": "Value of cancelled bills.",
+  "formula": "SUM(fact_cancellations.grand_total)",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "87,680 on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB02",
+   "DB15"
+  ]
+ },
+ {
+  "id": "LKG-003",
+  "name": "Cancellation rate (value)",
+  "domain": "leakage",
+  "definition": "Cancelled value over submitted plus cancelled value.",
+  "formula": "LKG-002 / (SAL-001 + LKG-002) (two tiles, same filters)",
+  "grain": "period",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_cancellations",
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "LKG-004",
+  "name": "Cancellations by reason",
+  "domain": "leakage",
+  "definition": "Cancelled bills by reason.",
+  "formula": "COUNT(name), SUM(grand_total) by cancel_reason",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Free text; 5 values on demo, messy in production."
+  ],
+  "chart_type_hint": "Row",
+  "unit": "count",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "LKG-005",
+  "name": "Cancellations by order type",
+  "domain": "leakage",
+  "definition": "Where cancellations happen.",
+  "formula": "COUNT(name) by order_type",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [],
+  "chart_type_hint": "Donut",
+  "unit": "count",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "LKG-006",
+  "name": "Discount value and bills",
+  "domain": "leakage",
+  "definition": "Bill discounts given.",
+  "formula": "SUM(discount_amount), SUM(has_discount) on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T3",
+  "caveats": [
+   "4 bills, 31.89 total on demo; line discounts 0; staff discount policy unused."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "currency INR",
+  "dashboards": [
+   "DB15"
+  ]
+ },
+ {
+  "id": "LKG-007",
+  "name": "Out-of-stock cancellations",
+  "domain": "leakage",
+  "definition": "Bills cancelled because the kitchen ran out.",
+  "formula": "COUNT(name) where cancel_reason='Kitchen out of stock'",
+  "grain": "invoice",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_cancellations"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Links planning misses to lost sales (13 on demo)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB13",
+   "DB15"
+  ]
+ },
+ {
+  "id": "DQ-001",
+  "name": "Invoice population split",
+  "domain": "data_quality",
+  "definition": "Bills and net sales by population (Consolidated vs Paid).",
+  "formula": "COUNT(name), SUM(net_total) by population on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "2102 Consolidated / 1075 Paid on demo."
+  ],
+  "chart_type_hint": "Donut",
+  "unit": "count",
+  "dashboards": [
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-002",
+  "name": "Revenue with no department",
+  "domain": "data_quality",
+  "definition": "Share of net sales whose item has no configured department.",
+  "formula": "SUM(net_amount) where department='Unmapped' / SUM(net_amount) on fact_sales_lines_enriched",
+  "grain": "invoice line",
+  "levels": [
+   "department",
+   "item"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "17.4% on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB05",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-003",
+  "name": "Revenue in unassigned category",
+  "domain": "data_quality",
+  "definition": "Share of net sales in the root 'All Item Groups'.",
+  "formula": "SUM(net_amount) where menu_category='Unassigned' / SUM(net_amount)",
+  "grain": "invoice line",
+  "levels": [
+   "category",
+   "item"
+  ],
+  "source_queries": [
+   "fact_sales_lines_enriched"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "11.4% on demo (9 items)."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB04",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-004",
+  "name": "Dine-in bills with covers",
+  "domain": "data_quality",
+  "definition": "Share of dine-in bills with pax > 0.",
+  "formula": "COUNT where pax>0 / COUNT, order_type='Dine In', by population on fact_invoices",
+  "grain": "invoice",
+  "levels": [
+   "employee",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "512 of 995 on demo."
+  ],
+  "chart_type_hint": "Bar",
+  "unit": "percent",
+  "dashboards": [
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-005",
+  "name": "Dine-in bills with valid dwell",
+  "domain": "data_quality",
+  "definition": "Share of dine-in bills with 0 < dwell <= 8 h.",
+  "formula": "SUM(dwell_valid)/COUNT(name) on fact_table_sessions",
+  "grain": "invoice",
+  "levels": [
+   "branch"
+  ],
+  "source_queries": [
+   "fact_table_sessions"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "493 of 995 non-zero, seeded."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB07",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-006",
+  "name": "Bills with waiter Employee link",
+  "domain": "data_quality",
+  "definition": "Share of bills whose waiter maps to an HR Employee.",
+  "formula": "COUNT where custom_waiter_employee set / COUNT on fact_invoices (chart filter is_set)",
+  "grain": "invoice",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "Employee.user_id set on 2 of 8 employees."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-007",
+  "name": "Items with recipe cost",
+  "domain": "data_quality",
+  "definition": "Sold items with a default BOM cost.",
+  "formula": "COUNT(dim_item) where is_sold=1 and has_recipe_cost=1 vs is_sold=1",
+  "grain": "item",
+  "levels": [
+   "item",
+   "category"
+  ],
+  "source_queries": [
+   "dim_item"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "39 BOM dishes vs 181 sold items."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB10",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-008",
+  "name": "Kitchen actor capture",
+  "domain": "data_quality",
+  "definition": "Share of kitchen executions whose actor is a real user (not Administrator).",
+  "formula": "COUNT where started_by not in ('Administrator', null) / COUNT on fact_kot_exec",
+  "grain": "KOT x unit",
+  "levels": [
+   "employee"
+  ],
+  "source_queries": [
+   "fact_kot_exec"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "0% on demo."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-009",
+  "name": "Yield checks with department",
+  "domain": "data_quality",
+  "definition": "Share of yield checks with department set.",
+  "formula": "COUNT where department is set / COUNT on fact_yield_checks",
+  "grain": "check",
+  "levels": [
+   "department"
+  ],
+  "source_queries": [
+   "fact_yield_checks"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "0 of 66."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "percent",
+  "dashboards": [
+   "DB12",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-010",
+  "name": "Wastage documents recorded",
+  "domain": "data_quality",
+  "definition": "Count of submitted wastage lines in period.",
+  "formula": "COUNT(fact_wastage_lines.name)",
+  "grain": "wastage line",
+  "levels": [
+   "department",
+   "branch"
+  ],
+  "source_queries": [
+   "fact_wastage_lines"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "0: the main T4 blocker for DB11."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB11",
+   "DB14"
+  ]
+ },
+ {
+  "id": "DQ-011",
+  "name": "Branches and companies with data",
+  "domain": "data_quality",
+  "definition": "Distinct branches and companies on bills.",
+  "formula": "COUNT_DISTINCT(branch), COUNT_DISTINCT(company) on fact_invoices",
+  "grain": "period",
+  "levels": [
+   "branch",
+   "company"
+  ],
+  "source_queries": [
+   "fact_invoices"
+  ],
+  "tier": "T1",
+  "caveats": [
+   "1 and 1: multi-branch comparisons are T3."
+  ],
+  "chart_type_hint": "Number",
+  "unit": "count",
+  "dashboards": [
+   "DB14"
+  ]
+ }
+]
