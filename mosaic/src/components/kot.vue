@@ -635,8 +635,8 @@ export default {
       });
     },
     calculateQty(kotitem, qty, type, cancelled_qty) {
-      // quantity / cancelled_qty are Data (string) fields on URY KOT Items and
-      // cancelled_qty is null/absent on rows that never recorded it, so coerce
+      // quantity / cancelled_qty are Float fields on URY KOT Items (older
+      // payloads may still carry strings) and cancelled_qty is null/absent on rows that never recorded it, so coerce
       // explicitly instead of relying on implicit JS arithmetic (-> NaN).
       const toNum = (v) => {
         const n = parseFloat(v);
@@ -645,7 +645,9 @@ export default {
       const total = toNum(qty);
       kotitem.qty = total;
       if (type == "Partially cancelled" || type == "Cancelled") {
-        kotitem.qty = total - toNum(cancelled_qty);
+        // Round to the 9 decimal places the Float column stores, which
+        // removes binary subtraction residue (0.3 - 0.1) without cutting data.
+        kotitem.qty = Math.round((total - toNum(cancelled_qty)) * 1e9) / 1e9;
       }
     },
     removeAllItemsFromLocalStorage(kot) {

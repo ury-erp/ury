@@ -331,16 +331,12 @@ export const useMenuStore = defineStore("menu", {
     addToCartAndUpdateQty() {
       const item = this.item;
 
-      if (
-        this.quantity !== null &&
-        this.quantity !== undefined &&
-        this.quantity !== "" &&
-        this.quantity > 0
-      ) {
+      const quantity = parseFloat(this.quantity);
+      if (Number.isFinite(quantity) && quantity > 0) {
         if (!item.qty) {
-          this.$set(item, "qty", this.quantity);
+          this.$set(item, "qty", quantity);
         } else {
-          item.qty = this.quantity;
+          item.qty = quantity;
           item.comment = this.itemComments;
         }
       }
@@ -374,14 +370,16 @@ export const useMenuStore = defineStore("menu", {
         (previous_item) => previous_item.item_code === item.item
       );
 
-      let item_qty = itemIndexExists ? this.cart[itemIndex].qty + 1 : 1;
+      let item_qty = itemIndexExists
+        ? (parseFloat(this.cart[itemIndex].qty) || 0) + 1
+        : 1;
       // If item exists in previous orders, adjust quantity
       if (previousItem) {
         item_qty -= previousItem.qty;
       }
       if (itemIndexExists) {
         item.comment = "";
-        this.cart[itemIndex].qty++;
+        this.cart[itemIndex].qty = (parseFloat(this.cart[itemIndex].qty) || 0) + 1;
         let message = `${item.item}'s Qty updated to ${item.qty} in Cart`;
         this.notification.createNotification(message);
       } else {
@@ -393,7 +391,7 @@ export const useMenuStore = defineStore("menu", {
       const itemIndex = this.cart.findIndex((obj) => obj.item === item.item);
       const itemIndexExists = itemIndex !== -1;
       if (itemIndexExists) {
-        this.cart[itemIndex].qty--;
+        this.cart[itemIndex].qty = (parseFloat(this.cart[itemIndex].qty) || 0) - 1;
         this.cart = this.cart.filter((obj) => obj.qty > 0);
         let message =
           item.qty > 0
