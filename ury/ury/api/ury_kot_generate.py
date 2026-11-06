@@ -477,7 +477,7 @@ def create_cancel_kot_doc(
             {
                 "item": cancelItem["item_code"],
                 "item_name": cancelItem["item_name"],
-                "cancelled_qty": abs(int(cancelItem["qty"])),
+                "cancelled_qty": abs(flt(cancelItem["qty"])),
                 "quantity": matched_item["qty"],
                 "comments": cancelItem["comments"],
                 "course":course,
@@ -595,14 +595,14 @@ def compare_two_array(array_1, array_2):
     for index, x in enumerate(array_1):
         a = list(
             filter(
-                lambda y: y["item_code"] == x["item_code"] and y["qty"] == x["qty"],
+                lambda y: y["item_code"] == x["item_code"] and flt(y["qty"]) == flt(x["qty"]),
                 array_2,
             )
         )
         if len(a) == 0:
             b = list(filter(lambda z: z["item_code"] == x["item_code"], array_2))
             for qtb in b:
-                x["qty"] = int(x["qty"]) - int(qtb["qty"])
+                x["qty"] = flt(x["qty"]) - flt(qtb["qty"])
             finalarray.append(x)
     return finalarray
 
