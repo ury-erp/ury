@@ -621,6 +621,13 @@ export class SyncEngine {
       const paidInvoiceId = (remappedPayload.invoice as string) || serverId;
       if (paidInvoiceId) {
         await this.repos.orders.markPaid(paidInvoiceId);
+        // The payment was acknowledged by the server, so the local record is
+        // synced. Without this, a promoted temp record keeps sync_status
+        // 'pending' and post-sync housekeeping can never purge it.
+        const paidRecord = await this.repos.orders.getById(paidInvoiceId);
+        if (paidRecord && paidRecord.sync_status !== 'synced') {
+          await this.repos.orders.put({ ...paidRecord, sync_status: 'synced' });
+        }
         // Defensive cleanup: if the payment referenced a temp ID that has now been mapped,
         // delete any stale local temp record so it does not resurface in the UI.
         const rawInvoice = (env.payload as any)?.invoice;
@@ -647,6 +654,12 @@ export class SyncEngine {
       if (cancelledInvoiceId) {
         try {
           await this.repos.orders.markCancelled(cancelledInvoiceId);
+          // The cancellation was acknowledged by the server; mark the local
+          // record synced so post-sync housekeeping can purge it.
+          const cancelledRecord = await this.repos.orders.getById(cancelledInvoiceId);
+          if (cancelledRecord && cancelledRecord.sync_status !== 'synced') {
+            await this.repos.orders.put({ ...cancelledRecord, sync_status: 'synced' });
+          }
         } catch (cancelErr) {
           console.warn('[SyncEngine] Error marking order as Cancelled after cancel sync:', cancelErr);
         }
