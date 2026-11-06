@@ -58,11 +58,13 @@ export default function ChatTab({ id: routeId, title, onBack, onCall, onStarted 
   useEffect(() => {
     const el = ta.current; if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 6 * 20)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 6 * 22)}px`;
   }, [text, recording]);
 
   useEffect(() => { alive.current = true; return () => { alive.current = false; clearInterval(timer.current); clearTimeout(poll.current); rec.current?.cancel(); }; }, []);
-  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [msgs, waiting]);
+  const toEnd = () => { const m = end.current?.parentElement; if (m) m.scrollTop = m.scrollHeight; };
+  useEffect(() => { toEnd(); }, [msgs, waiting]);
+  useEffect(() => { const vv = window.visualViewport; vv?.addEventListener("resize", toEnd); return () => vv?.removeEventListener("resize", toEnd); }, []);
 
   /** Server messages are the truth; keep only local items still in flight or failed. */
   const merge = (server: ChatMessage[]) =>
