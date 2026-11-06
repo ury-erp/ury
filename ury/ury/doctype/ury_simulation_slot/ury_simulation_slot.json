@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-19 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "slot_number",
+  "slot_time",
+  "scenario",
+  "status",
+  "invoice",
+  "amount",
+  "attempts",
+  "max_attempts",
+  "leased_until",
+  "lease_owner",
+  "error_message"
+ ],
+ "fields": [
+  {
+   "fieldname": "slot_number",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Slot Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "slot_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Slot Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "scenario",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Scenario",
+   "options": "Takeaway\nDine-in\nDelivery\nAggregator"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nProcessing\nCompleted\nSkipped\nFailed"
+  },
+  {
+   "fieldname": "invoice",
+   "fieldtype": "Link",
+   "label": "Invoice",
+   "options": "POS Invoice"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount"
+  },
+  {
+   "default": "0",
+   "fieldname": "attempts",
+   "fieldtype": "Int",
+   "label": "Attempts"
+  },
+  {
+   "default": "3",
+   "fieldname": "max_attempts",
+   "fieldtype": "Int",
+   "label": "Max Attempts"
+  },
+  {
+   "fieldname": "leased_until",
+   "fieldtype": "Datetime",
+   "label": "Leased Until"
+  },
+  {
+   "fieldname": "lease_owner",
+   "fieldtype": "Data",
+   "label": "Lease Owner"
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Small Text",
+   "label": "Error Message"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Simulation Slot",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
