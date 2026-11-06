@@ -523,7 +523,12 @@ def kot_execute(
     for key, cur in current_lines.items():
         prev = previous_lines.get(key)
         prev_qty = flt(prev["qty"]) if prev else 0
-        delta = flt(cur["qty"]) - prev_qty
+        # Round to the site precision so float subtraction residue (for
+        # example 0.30000000000000004 - 0.3) is not read as a quantity change.
+        delta = flt(
+            flt(cur["qty"]) - prev_qty,
+            frappe.get_precision("URY KOT Items", "quantity"),
+        )
         if delta == 0:
             continue
         item = dict(cur)
