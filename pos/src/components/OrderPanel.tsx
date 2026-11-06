@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError, flt } from '@ury/core';
 import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
+import OrderTabs from './OrderTabs';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
@@ -35,7 +36,10 @@ const OrderPanel = () => {
     resetOrderState,
     orderId,
     orderComment,
-    setOrderComment
+    setOrderComment,
+    noOfPax,
+    setNoOfPax,
+    lastModifiedTime
   } = usePOSStore();
   const user = useRootStore((state: RootState) => state.user);
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
@@ -45,12 +49,15 @@ const OrderPanel = () => {
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
     const addonsTotal = item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
-    return (basePrice + addonsTotal) * item.quantity;
+    return flt((basePrice + addonsTotal) * item.quantity, 2);
   };
 
-  const total = activeOrders.reduce(
-    (sum, item) => sum + calculateItemTotal(item),
-    0
+  const total = flt(
+    activeOrders.reduce(
+      (sum, item) => sum + calculateItemTotal(item),
+      0
+    ),
+    2
   );
 
   const handleEdit = (item: typeof activeOrders[0]) => {
@@ -104,7 +111,7 @@ const OrderPanel = () => {
           qty: item.quantity,
           comment: item.comment || undefined
         })),
-        no_of_pax: 1,
+        no_of_pax: noOfPax,
         pos_profile: posProfile.name,
         order_type: selectedOrderType,
         table: selectedOrderType === DINE_IN ? (selectedTable || undefined) : undefined,
@@ -115,35 +122,42 @@ const OrderPanel = () => {
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         last_invoice: isUpdatingOrder ? orderId : null,
+        last_modified_time: isUpdatingOrder ? (lastModifiedTime || undefined) : undefined,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
         comments: orderComment || undefined
       };
 
-      await syncOrder(orderData);
-      
+      const result = await syncOrder(orderData);
+
+      // sync_order returns { status: 'Failure' } instead of throwing when the
+      // write is rejected (stale last_modified_time, table already occupied,
+      // or the invoice was already billed by another user).
+      if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
+        showToast.error(isUpdatingOrder ? t('errors.order_modified') : t('errors.order_sync_failed'));
+        return;
+      }
+
       // Reset all states after successful order submission
       resetOrderState();
       showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
     } catch (error) {
       console.error('Failed to sync order:', error);
-      // Frappe API error handling
-      if (error && typeof error === 'object' && '_server_messages' in error && typeof (error as any)._server_messages === 'string') {
-        try {
-          const messages = JSON.parse((error as any)._server_messages);
-          const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
-        } catch {
-          showToast.error('API error');
-        }
-      } else if (error instanceof Error) {
-        showToast.error(error.message);
-      } else {
-        showToast.error(t('errors.failed_process_order'));
-      }
+      showToast.error(parseFrappeError(error, t('errors.failed_process_order')));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const MIN_PAX = 1;
+  const MAX_PAX = 50;
+
+  const handlePaxDecrement = () => {
+    setNoOfPax(Math.max(MIN_PAX, noOfPax - 1));
+  };
+
+  const handlePaxIncrement = () => {
+    setNoOfPax(Math.min(MAX_PAX, noOfPax + 1));
   };
 
   const EmptyCartUI = () => (
@@ -182,8 +196,33 @@ const OrderPanel = () => {
   return (
     <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <OrderTabs disabled={isInteractionDisabled} />
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handlePaxDecrement}
+              variant="outline"
+              size="icon"
+              className="w-8 h-8 rounded-full"
+              disabled={isInteractionDisabled || noOfPax <= MIN_PAX}
+            >
+              -
+            </Button>
+            <span className="w-6 text-center">{noOfPax}</span>
+            <Button
+              onClick={handlePaxIncrement}
+              variant="outline"
+              size="icon"
+              className="w-8 h-8 rounded-full"
+              disabled={isInteractionDisabled || noOfPax >= MAX_PAX}
+            >
+              +
+            </Button>
+          </div>
+        </div>
       </div>
       
       {orderLoading ? (
@@ -202,7 +241,7 @@ const OrderPanel = () => {
                 )}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
                     </div>
@@ -212,6 +251,11 @@ const OrderPanel = () => {
                     {item.selectedAddons && item.selectedAddons.length > 0 && (
                       <p className="text-sm text-gray-500">
                         {item.selectedAddons.map(addon => addon.name).join(', ')}
+                      </p>
+                    )}
+                    {item.comment && item.comment.trim() && (
+                      <p className="text-xs text-gray-500 italic mt-0.5 truncate">
+                        "{item.comment.trim()}"
                       </p>
                     )}
                     <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>

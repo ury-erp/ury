@@ -1,0 +1,110 @@
+[
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor",
+        "__newname": "T1",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor",
+        "__newname": "T2",
+        "branch": "Demo Branch",
+        "no_of_seats": "6",
+        "table_shape": "Rectangle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor",
+        "__newname": "T3",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Circle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor",
+        "__newname": "T4",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor AC",
+        "__newname": "T5",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor AC",
+        "__newname": "T6",
+        "branch": "Demo Branch",
+        "no_of_seats": "6",
+        "table_shape": "Rectangle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "Ground Floor AC",
+        "__newname": "T7",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Circle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "First Floor",
+        "__newname": "T8",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "First Floor AC",
+        "__newname": "T9",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "First Floor AC",
+        "__newname": "T10",
+        "branch": "Demo Branch",
+        "no_of_seats": "6",
+        "table_shape": "Rectangle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "First Floor",
+        "__newname": "T11",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Circle"
+    },
+    {
+        "doctype": "URY Table",
+        "restaurant": "Demo Restaurant",
+        "restaurant_room": "First Floor",
+        "__newname": "T12",
+        "branch": "Demo Branch",
+        "no_of_seats": "4",
+        "table_shape": "Square"
+    }
+]

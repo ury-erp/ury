@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -85,6 +85,21 @@ export default function Orders() {
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+
+  React.useEffect(() => {
+    if (selectedOrder?.name) {
+      call.get('frappe.client.has_permission', { doctype: 'POS Invoice', docname: selectedOrder.name, perm_type: 'cancel' })
+        .then((res: any) => {
+          setCanCancelInvoice(res?.message?.has_permission === true);
+        })
+        .catch(() => {
+          setCanCancelInvoice(false);
+        });
+    } else {
+      setCanCancelInvoice(false);
+    }
+  }, [selectedOrder?.name]);
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -230,7 +245,7 @@ export default function Orders() {
       clearSelectedOrder();
       await fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
     } finally {
       setCancelLoading(false);
     }
@@ -270,17 +285,27 @@ export default function Orders() {
         special_dish: 0,
         tax_rate: 0,
       }));
-      for (const cartItem of items) {
-        await posStore.addToOrder(cartItem);
-      }
+
+      // Open the draft order as a new tab without disturbing existing tabs.
+      // If the same draft is already open, it will just switch to that tab.
+      posStore.openDraftOrderInNewTab({
+        orderId: order.name,
+        orderType: order.order_type,
+        customer: { id: order.customer, name: order.customer_name, phone: order.mobile_number },
+        table: order.restaurant_table || null,
+        room: order.custom_restaurant_room || null,
+        items,
+      });
+
       // Redirect to POS page
-      navigate('/');
+      navigate('/pos');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_edit_order')));
     } finally {
       setEditLoading(false);
     }
   }
+
 
   async function handlePrintOrder() {
     if (!selectedOrder || !posStore.posProfile) return;
@@ -297,9 +322,10 @@ export default function Orders() {
         selectOrder({ ...selectedOrder, invoice_printed: 1 });
       }
       // If order was Unbilled, set to Draft and reload draft orders
-      if (selectedStatus === 'Unbilled') {
-        showToast.info(t('success.order_moved_to_draft'));
-        setSelectedStatus('Draft');
+      if (selectedStatus === 'Draft') {
+        setSelectedStatus('Unbilled');
+        fetchOrders();
+      } else {
         fetchOrders();
       }
     } catch (err: any) {
@@ -599,14 +625,16 @@ export default function Orders() {
                         <Pencil className="w-4 h-4" />
                         {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                       </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        aria-label="Cancel order"
-                        onClick={() => setCancelDialogOpen(true)}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {canCancelInvoice && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          aria-label="Cancel order"
+                          onClick={() => setCancelDialogOpen(true)}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </>
                   )}
                   <SyncStatusBadge orderId={selectedOrder.name} syncStatus={selectedOrder.sync_status} />

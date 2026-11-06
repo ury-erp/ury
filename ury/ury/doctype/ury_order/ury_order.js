@@ -657,7 +657,13 @@ frappe.ui.form.on('URY Order', {
 	restaurant_table: function (frm) {
 		// to show selected table in the view
 		const activeTable = document.createElement("div");
-		activeTable.innerHTML = `<span style="margin-left:1.2rem;margin-top:3rem;font-size:16px;font-weight:600">${frm.doc.restaurant_table}</span>`;
+		const span = document.createElement("span");
+		span.style.marginLeft = "1.2rem";
+		span.style.marginTop = "3rem";
+		span.style.fontSize = "16px";
+		span.style.fontWeight = "600";
+		span.textContent = frm.doc.restaurant_table;
+		activeTable.appendChild(span);
 		activeTable.style.color = "#1034A6"; // Set color to blue
 
 		const existingSpans = document.querySelectorAll(".page-head-content span");

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Branch Schema",
+  "type": "object",
+  "properties": {
+    "branch_name": {
+      "type": "string",
+      "title": "Branch Name"
+    },
+    "invoice_series_prefix": {
+      "type": "string",
+      "title": "Invoice Series Prefix",
+      "default": "INV-MAIN-"
+    },
+    "aggregator_series_prefix": {
+      "type": "string",
+      "title": "Aggregator Series Prefix",
+      "default": "AGG-MAIN-"
+    },
+    "tax_id": {
+      "type": "string",
+      "title": "Tax ID"
+    },
+    "address": {
+      "type": "string",
+      "title": "Address"
+    }
+  },
+  "required": ["branch_name", "invoice_series_prefix"]
+}

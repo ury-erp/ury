@@ -1,11 +1,50 @@
 import frappe
+from frappe import _
 from frappe.utils import cint
 from frappe.utils.print_format import print_by_server
 
+from ury.ury_pos.api import getBranch
+from ury.ury.doctype.ury_order.ury_order import _order_ownership_flags
 
 
 @frappe.whitelist()
 def reprint_kot(invoice_number):
+
+    # Authorization checks run outside the existing try/except below so a
+    # frappe.PermissionError isn't swallowed and rewritten into the generic
+    # "unexpected error" message by that block's broad except clause.
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_number)
+
+    if not frappe.has_permission("POS Invoice", "read", doc=pos_invoice):
+        frappe.throw(_("Not permitted to view this order"), frappe.PermissionError)
+
+    try:
+        user_branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            user_branch = None
+        else:
+            raise
+
+    if user_branch and pos_invoice.branch and pos_invoice.branch != user_branch:
+        frappe.throw(
+            _("Not permitted to reprint KOT for orders outside your active branch"),
+            frappe.PermissionError,
+        )
+
+    if not pos_invoice.pos_profile:
+        frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
+
+    # Captain ownership/elevated-access check, reusing Phase 2's ownership
+    # formula. Matches get_table_order_context()'s can_reprint_kot gate
+    # exactly: is_mine OR has_elevated_access (billing access alone does not
+    # imply reprint rights there, so it isn't included here either).
+    flags = _order_ownership_flags(pos_invoice, pos_invoice.pos_profile)
+    if not (flags["is_mine"] or flags["has_elevated_access"]):
+        frappe.throw(
+            _("Not permitted to reprint KOT for another Captain's order."),
+            frappe.PermissionError,
+        )
 
     try:
         pos_profile, restaurant_table, order_type = frappe.db.get_value(

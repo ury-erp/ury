@@ -1,0 +1,62 @@
+[
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "CG",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 10,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 1,
+                "parentfield": "items"
+            }
+        ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "MOM",
+        "qty": 10,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 10,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 1,
+                "parentfield": "items"
+            }
+        ]
+    },
+    {
+        "doctype": "BOM",
+        "company": "__COMPANY__",
+        "item": "WNG",
+        "qty": 20,
+        "items": [
+            {
+                "doctype": "BOM Item",
+                "item_code": "ONN",
+                "qty": 10,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "BOM Item",
+                "item_code": "CKN",
+                "qty": 2,
+                "parentfield": "items"
+            }
+        ]
+    }
+]

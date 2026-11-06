@@ -1,0 +1,10 @@
+[
+    {
+        "doctype": "URY Restaurant",
+        "__newname": "Demo Restaurant",
+        "default_room": "Ground Floor",
+        "branch": "Demo Branch",
+        "invoice_series_prefix": "UDT-SA-",
+        "active_menu": "Demo Menu"
+    }
+]

@@ -1,11 +1,27 @@
-import { Fragment, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-
-import { getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import {
+  getRooms,
+  getTables,
+  getTableCount,
+  getVacantTablesForBranch,
+  mergeTablesBatch,
+  unmergeTables,
+  checkTableReservation,
+  createTableReservation,
+  updateTableReservation,
+  updateTableReservationStatus,
+  getActiveReservations,
+  getBranchReservationSettings,
+  type Room,
+  type Table,
+  type TableReservation,
+  type BranchReservationSettings,
+} from '../lib/table-api';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups, formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
@@ -13,7 +29,7 @@ import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
-import { canCaptainTransfer } from '@ury/core';
+import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -21,10 +37,15 @@ import TableMergeDialog from '../components/TableMergeDialog';
 import TableUnmergeDialog from '../components/TableUnmergeDialog';
 import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
-import TableCard from '../components/TableCard';
+import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import TableReservationDialog, { type ReservationFormData } from '../components/TableReservationDialog';
+import TableReservationEditDialog, { type EditReservationFormData } from '../components/TableReservationEditDialog';
+import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
 import { useRooms, useTables, useRoomCounts } from '../hooks/useTables';
 import { queryClient } from '../lib/query-client';
+import { printOrder } from '../lib/print';
+import { resolvePrintFormat } from '../lib/invoice-api';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -34,8 +55,11 @@ const TableView = () => {
   const user = useRootStore((state) => state.user);
   const setSelectedStatus = useRootStore((state) => state.setSelectedStatus);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
+  const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
 
-  const branch = posProfile?.branch ?? 'Main Branch';
+  const branch = posProfile?.branch ?? null;
+  // Offline-first data layer: TanStack Query hooks with IndexedDB fallback and
+  // service-worker master-data caching (network-resilient architecture).
   const { data: rooms = [], isLoading: loadingRooms } = useRooms(branch);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const { data: tables = [], isLoading: loadingTables, error: tablesError } = useTables(selectedRoom);
@@ -43,7 +67,10 @@ const TableView = () => {
     useMemo(() => rooms.map((r) => r.name), [rooms]),
     branch
   );
+  const [allBranchTables, setAllBranchTables] = useState<Table[]>([]);
 
+  const [branchSettings, setBranchSettings] = useState<BranchReservationSettings | null>(null);
+  const [activeReservationsList, setActiveReservationsList] = useState<TableReservation[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
@@ -60,12 +87,44 @@ const TableView = () => {
     currentCaptain: string;
   } | null>(null);
 
+  // Reservation dialogs state
+  const [reservationTable, setReservationTable] = useState<Table | null>(null);
+  const [editReservation, setEditReservation] = useState<TableReservation | null>(null);
+  const [cancelReservationTable, setCancelReservationTable] = useState<string | null>(null);
+  const [cancelReservationInfo, setCancelReservationInfo] = useState<TableReservation | null>(null);
+  const [cancelReservationLoading, setCancelReservationLoading] = useState(false);
+
+  const [isLayoutView, setIsLayoutView] = useState(false);
+
+
+
+  // Load branch reservation settings safely
+  useEffect(() => {
+    setBranchSettings(null);
+    if (!branch) return;
+    let isMounted = true;
+    getBranchReservationSettings(branch)
+      .then((settings) => {
+        if (isMounted) setBranchSettings(settings);
+      })
+      .catch((err) => {
+        console.error('Failed to load branch reservation settings', err);
+        if (isMounted) setBranchSettings(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [branch]);
+
+  // Fetch rooms
+  // Auto-select the first room once rooms resolve (from cache or network).
   useEffect(() => {
     if (!selectedRoom && rooms.length > 0) {
       setSelectedRoom(rooms[0].name);
     }
   }, [rooms, selectedRoom]);
 
+  // Surface table-fetch errors (guarded in render so cached rows still show).
   useEffect(() => {
     if (tablesError) {
       setError(t('tables.failed_load_tables'));
@@ -74,20 +133,263 @@ const TableView = () => {
     }
   }, [tablesError]);
 
-  const handleNavigateToPOS = (tableName: string) => {
+
+
+
+  const refreshTables = () => {
     if (!selectedRoom) return;
-    setSelectedOrderType(DINE_IN);
-    setSelectedTable(tableName, selectedRoom);
-    navigate('/');
+    queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts', branch] });
   };
+
+  // Fetch all branch tables for edit dialog dropdown
+  useEffect(() => {
+    if (!branch) return;
+    getVacantTablesForBranch(branch)
+      .then((tList) => setAllBranchTables(tList))
+      .catch(console.error);
+  }, [branch]);
+  // Derived reservation maps
+  const { lockActiveReservationsByTable, upcomingReservationsByTable, allReservationsByTable } = useMemo(() => {
+    const lockMap = new Map<string, TableReservation>();
+    const upcomingMap = new Map<string, TableReservation>();
+    const allMap = new Map<string, TableReservation>();
+
+    for (const res of activeReservationsList) {
+      if (!allMap.has(res.reserved_table)) {
+        allMap.set(res.reserved_table, res);
+      }
+      const isLockActive =
+        isReservationLockWindowActive(res, branchSettings?.buffer_time) ||
+        (res.is_lock_window_active && res.status === 'Confirmed');
+      if (isLockActive && res.status === 'Confirmed') {
+        lockMap.set(res.reserved_table, res);
+      } else {
+        if (!upcomingMap.has(res.reserved_table)) {
+          upcomingMap.set(res.reserved_table, res);
+        }
+      }
+    }
+
+    return {
+      lockActiveReservationsByTable: lockMap,
+      upcomingReservationsByTable: upcomingMap,
+      allReservationsByTable: allMap,
+    };
+  }, [activeReservationsList, branchSettings?.buffer_time]);
+
+  // Periodic polling for active reservations so buffer time and status transitions reflect in real-time
+  useEffect(() => {
+    if (!branch) return;
+    let isMounted = true;
+
+    const intervalId = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const res = await getActiveReservations(branch);
+        if (isMounted && res) {
+          setActiveReservationsList(res);
+        }
+      } catch (_e) {
+        // Polling failure ignored
+      }
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [branch]);
+
+  // Informational notification when a table enters its reservation buffer window
+  const notifiedLockReservationsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeReservationsList || activeReservationsList.length === 0) return;
+
+    for (const res of activeReservationsList) {
+      if (res.is_lock_window_active && res.status === 'Confirmed' && res.reserved_table) {
+        const key = `${res.name || res.reserved_table}_${res.reserved_at}`;
+        if (!notifiedLockReservationsRef.current.has(key)) {
+          notifiedLockReservationsRef.current.add(key);
+          const timeStr = formatReservationTime(res.reserved_at);
+          showToast.warning(
+            `Table ${res.reserved_table} is reserved for ${timeStr}. Please choose another table.`
+          );
+        }
+      }
+    }
+  }, [activeReservationsList]);
+
+  const isReservationEnabled = Boolean(branchSettings && Number(branchSettings.enable_reservation) === 1);
+
+  const handleNavigateToPOS = async (tableName: string) => {
+    if (!selectedRoom) return;
+
+    // Check if user is restricted from taking table orders
+    if (isUserRestrictedFromTableOrders(user, posProfile)) {
+      showToast.error(t('errors.dine_in_restricted') || 'Dine In is not available for your role');
+      return;
+    }
+
+    // Check if table has an ongoing active order first
+    try {
+      const orderResponse = await getTableOrder(tableName);
+      const existingInvoice = orderResponse?.message;
+      if (
+        existingInvoice &&
+        existingInvoice.name &&
+        existingInvoice.docstatus === 0 &&
+        existingInvoice.invoice_printed !== 1
+      ) {
+        // Ongoing order exists - allow opening/continuing without reservation lock check
+        setSelectedOrderType(DINE_IN);
+        setSelectedTable(tableName, selectedRoom);
+        navigate('/pos');
+        return;
+      }
+    } catch {
+      // Continue to check reservation if order fetch failed
+    }
+
+    // Check if table is under active reservation lock window
+    const activeLockRes = lockActiveReservationsByTable.get(tableName);
+    const isActiveLockRes =
+      activeLockRes &&
+      (activeLockRes.is_lock_window_active ||
+        isReservationLockWindowActive(activeLockRes, branchSettings?.buffer_time)) &&
+      activeLockRes.status === 'Confirmed';
+
+    if (isActiveLockRes) {
+      const timeStr = formatReservationTime(activeLockRes.reserved_at);
+      showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
+      return;
+    }
+
+    try {
+      const reservation = await checkTableReservation(tableName);
+      const isResLocked =
+        reservation &&
+        (reservation.is_lock_window_active ||
+          isReservationLockWindowActive(reservation, branchSettings?.buffer_time)) &&
+        reservation.status === 'Confirmed';
+
+      if (isResLocked) {
+        const timeStr = formatReservationTime(reservation.reserved_at);
+        showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
+        return;
+      }
+
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate('/pos');
+    } catch {
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate('/pos');
+    }
+  };
+
+  const handleReserveConfirm = async (data: ReservationFormData) => {
+    if (!reservationTable) return;
+    try {
+      await createTableReservation({
+        table: reservationTable.name,
+        customer: data.customer,
+        customer_name: data.customer_name,
+        customer_phone: data.customer_phone,
+        no_of_pax: data.no_of_pax,
+        reserved_at: data.reservedAt,
+        notes: data.notes,
+        branch: branch || undefined,
+      });
+      showToast.success('Table reserved successfully');
+      if (selectedRoom) {
+        refreshTables();
+      }
+      setReservationTable(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to reserve table');
+      throw error;
+    }
+  };
+
+  const handleEditReservationOpen = async (tableName: string) => {
+    try {
+      const existing = allReservationsByTable.get(tableName) || (await checkTableReservation(tableName));
+      if (!existing) {
+        showToast.error('No reservation found for this table');
+        return;
+      }
+      setEditReservation(existing);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to fetch reservation details');
+    }
+  };
+
+  const handleEditReservationConfirm = async (data: EditReservationFormData) => {
+    try {
+      await updateTableReservation({
+        reservation_name: data.reservation_name,
+        table: data.table,
+        customer: data.customer,
+        customer_name: data.customer_name,
+        customer_phone: data.customer_phone,
+        no_of_pax: data.no_of_pax,
+        reserved_at: data.reservedAt,
+        notes: data.notes,
+        branch: branch || undefined,
+      });
+      showToast.success('Reservation updated successfully');
+      if (selectedRoom) {
+        refreshTables();
+      }
+      setEditReservation(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to update reservation');
+      throw error;
+    }
+  };
+
+  const handleCancelReservation = async (tableName: string) => {
+    try {
+      const reservation = allReservationsByTable.get(tableName) || (await checkTableReservation(tableName));
+      if (!reservation) {
+        showToast.error('This table has no active reservation');
+        return;
+      }
+      setCancelReservationTable(tableName);
+      setCancelReservationInfo(reservation);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to fetch reservation details');
+    }
+  };
+
+  const handleCancelReservationConfirm = async () => {
+    if (!cancelReservationTable || !cancelReservationInfo) return;
+    setCancelReservationLoading(true);
+    try {
+      await updateTableReservationStatus(cancelReservationInfo.name, 'Cancelled');
+      showToast.success('Reservation cancelled successfully');
+      if (selectedRoom) {
+        refreshTables();
+      }
+      setCancelReservationTable(null);
+      setCancelReservationInfo(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to cancel reservation');
+    } finally {
+      setCancelReservationLoading(false);
+    }
+  };
+
 
   const handlePreviewTable = (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation();
     handleNavigateToPOS(table.name);
   };
 
-  const handlePrintTable = async (table: Table, event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
+  const handlePrintTable = async (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation();
 
     if (!posProfile) {
       showToast.error('POS profile not loaded yet');
@@ -104,7 +406,7 @@ const TableView = () => {
         return;
       }
 
-      const printResult = await printOrder({
+      await printOrder({
         orderId: invoiceId,
         posProfile,
         printFormat: resolvePrintFormat(
@@ -112,7 +414,6 @@ const TableView = () => {
           posProfile.print_format
         ),
       });
-
       showToast.success(
         printResult.status === 'queued'
           ? 'Print queued offline'
@@ -127,40 +428,6 @@ const TableView = () => {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
       setPrintingTable(null);
-    }
-  };
-
-  const refreshTables = () => {
-    if (!selectedRoom) return;
-    queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
-    queryClient.invalidateQueries({ queryKey: ['roomCounts', branch] });
-  };
-
-  const handleMergeConfirm = async (targetNames: string[]) => {
-    if (!mergeSourceTable || targetNames.length === 0) return;
-
-    const sourceName = mergeSourceTable.name;
-
-    try {
-      await mergeTablesBatch(sourceName, targetNames);
-      refreshTables();
-      showToast.success(t('tables.merge_success'));
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.merge_failed'));
-      throw error;
-    }
-  };
-
-  const handleUnmergeConfirm = async () => {
-    if (!unmergeSourceTable) return;
-
-    try {
-      await unmergeTables(unmergeSourceTable.name);
-      refreshTables();
-      showToast.success(t('tables.unmerge_success'));
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
-      throw error;
     }
   };
 
@@ -230,7 +497,9 @@ const TableView = () => {
 
     try {
       await tableTransfer(transferSourceTable.name, newTable, transferInvoiceName);
-      refreshTables();
+      if (selectedRoom) {
+        refreshTables();
+      }
       showToast.success(t('tables.transfer_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
@@ -245,11 +514,41 @@ const TableView = () => {
 
     try {
       await captainTransfer(currentCaptain, newCaptain, invoiceName);
-      refreshTables();
+      if (selectedRoom) {
+        refreshTables();
+      }
       showToast.success(t('tables.captain_transfer_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
       throw error;
+    }
+  };
+
+  const handleMergeConfirm = async (selectedTableNames: string[]) => {
+    if (!mergeSourceTable) return;
+    try {
+      await mergeTablesBatch(mergeSourceTable.name, selectedTableNames);
+      showToast.success('Tables merged successfully');
+      if (selectedRoom) {
+        refreshTables();
+      }
+      setMergeSourceTable(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to merge tables');
+    }
+  };
+
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      showToast.success('Tables unmerged successfully');
+      if (selectedRoom) {
+        refreshTables();
+      }
+      setUnmergeSourceTable(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to unmerge tables');
     }
   };
 
@@ -259,8 +558,7 @@ const TableView = () => {
     return tables.filter((table) => {
       if (table.name === mergeSourceTable.name) return false;
       if (sourceCluster.has(table.name)) return false;
-      if (table.merged_with) return false;
-      if (table.occupied === 1) return false;
+      if (table.occupied === 1 && mergeSourceTable.occupied === 1) return false;
       return true;
     });
   }, [mergeSourceTable, tables]);
@@ -280,46 +578,49 @@ const TableView = () => {
       mergeMembers.length > 1 ? formatMergedTableLabelFromGroup(mergeMembers) : undefined;
     const canTransferTable = table.occupied === 1 && mergeMembers.length <= 1;
 
+    const isReservedLock = lockActiveReservationsByTable.has(table.name);
+    const upcomingRes = upcomingReservationsByTable.get(table.name) || null;
+    const activeRes = lockActiveReservationsByTable.get(table.name) || null;
+
     return (
-    <TableCard
-      key={table.name}
-      table={table}
-      mergeGroupLabel={mergeGroupLabel}
-      className={className}
-      menuOpen={menuOpenForTable === table.name}
-      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
-      onMerge={() => setMergeSourceTable(table)}
-      onUnmerge={() => setUnmergeSourceTable(table)}
-      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
-      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
-      showCaptainTransfer={showCaptainTransfer}
-      onNavigate={() => handleNavigateToPOS(table.name)}
-      onPreview={(event) => handlePreviewTable(table, event)}
-      onPrint={(event) => handlePrintTable(table, event)}
-      isPrinting={printingTable === table.name}
-    />
+      <TableCard
+        key={table.name}
+        table={table}
+        isReserved={isReservedLock}
+        upcomingReservation={upcomingRes}
+        activeReservation={activeRes}
+        reservationEnabled={isReservationEnabled}
+        mergeGroupLabel={mergeGroupLabel}
+        className={className}
+        menuOpen={menuOpenForTable === table.name}
+        onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+        onMerge={() => setMergeSourceTable(table)}
+        onUnmerge={() => setUnmergeSourceTable(table)}
+        onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+        onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+        showCaptainTransfer={showCaptainTransfer}
+        onReserve={isReservationEnabled ? () => setReservationTable(table) : undefined}
+        onNavigate={() => handleNavigateToPOS(table.name)}
+        onPreview={(event) => handlePreviewTable(table, event)}
+        onPrint={(event) => handlePrintTable(table, event)}
+        isPrinting={printingTable === table.name}
+        isRestricted={isRestricted}
+      />
     );
   };
 
   const hasRooms = rooms.length > 0;
-  const showGridSkeleton = loadingRooms || (hasRooms && !selectedRoom) || (hasRooms && loadingTables);
-
+  const showGridSkeleton = loadingTables || !selectedRoom;
 
   const handleRoomChange = (roomName: string) => {
     if (roomName === selectedRoom) {
-      queryClient.invalidateQueries({ queryKey: ['tables', roomName] });
+      refreshTables();
       return;
     }
-
     setSelectedRoom(roomName);
   };
 
-  const [isLayoutView, setIsLayoutView] = useState(false);
-
   const handleLayoutView = () => {
-    if (selectedRoom) {
-      queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
-    }
     setIsLayoutView(true);
   };
 
@@ -329,13 +630,14 @@ const TableView = () => {
         selectedRoom={selectedRoom}
         tables={tablesToDisplay}
         onBackToGrid={() => setIsLayoutView(false)}
-        onRefresh={refreshTables}
+        onRefresh={() => refreshTables()}
       />
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header with Rooms and Layout View */}
       <div className="p-4 bg-white border-b border-gray-200">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">
@@ -360,11 +662,10 @@ const TableView = () => {
                     variant="tab"
                     data-selected={selectedRoom === room.name}
                     onClick={() => handleRoomChange(room.name)}
-                    className="h-fit"
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ml-2 bg-white/60">
+                      <Badge variant="outline" className="ml-2 bg-white/80 border-gray-200 text-gray-700 font-semibold">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}
@@ -387,8 +688,9 @@ const TableView = () => {
         </div>
       </div>
 
+      {/* Main Grid View */}
       <div className="flex-1 overflow-auto bg-gray-50 p-6">
-        <div className="max-w-screen-xl mx-auto h-full">
+        <div className="max-w-screen-xl mx-auto">
           {error && !loadingTables && tables.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
               <AlertTriangle className="w-10 h-10" />
@@ -433,6 +735,7 @@ const TableView = () => {
         </div>
       </div>
 
+      {/* Dialogs */}
       <TableMergeDialog
         open={mergeSourceTable !== null}
         onOpenChange={(open) => {
@@ -477,18 +780,33 @@ const TableView = () => {
         onConfirm={handleCaptainTransferConfirm}
       />
 
+      <TableReservationDialog
+        open={reservationTable !== null}
+        table={reservationTable}
+        onOpenChange={(open) => {
+          if (!open) setReservationTable(null);
+        }}
+        onConfirm={handleReserveConfirm}
+      />
+
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+              <div className="w-4 h-4 bg-emerald-50 border border-emerald-300 rounded"></div>
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
+            {isReservationEnabled && (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-primary-50 border border-primary-400 rounded"></div>
+                <span>Reserved</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

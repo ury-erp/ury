@@ -1,0 +1,132 @@
+[
+    {
+        "conversion_rate": 1.0,
+        "customer": "Grant Foodie Ltd.",
+        "doctype": "Sales Order",
+        "order_type": "Sales",
+        "update_stock": 1,
+        "disable_rounded_total": 1,
+        "items": [
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "MOM",
+                "parentfield": "items",
+                "qty": 10.0,
+                "rate": 500.0,
+                "conversion_factor": 1
+            }
+        ]
+    },
+    {
+        "conversion_rate": 1.0,
+        "customer": "West View Foodie Ltd.",
+        "doctype": "Sales Order",
+        "order_type": "Sales",
+        "update_stock": 1,
+        "disable_rounded_total": 1,
+        "items": [
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "WNG",
+                "parentfield": "items",
+                "qty": 20.0,
+                "rate": 800.0,
+                "conversion_factor": 1
+            },
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "GR",
+                "parentfield": "items",
+                "qty": 3.0,
+                "rate": 800.0,
+                "conversion_factor": 1
+            }
+        ]
+    },
+    {
+        "conversion_rate": 1.0,
+        "customer": "West View Foodie Ltd.",
+        "doctype": "Sales Order",
+        "order_type": "Sales",
+        "update_stock": 1,
+        "disable_rounded_total": 1,
+        "items": [
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "BR",
+                "parentfield": "items",
+                "qty": 10,
+                "rate": 18000.0,
+                "conversion_factor": 1
+            },
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "MR",
+                "parentfield": "items",
+                "qty": 6,
+                "rate": 1800.0,
+                "conversion_factor": 1
+            },
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "MOM",
+                "parentfield": "items",
+                "qty": 10,
+                "rate": 900.0,
+                "conversion_factor": 1
+            }
+        ]
+    },
+    {
+        "conversion_rate": 1.0,
+        "customer": "Palmer Foodie Ltd.",
+        "doctype": "Sales Order",
+        "order_type": "Sales",
+        "update_stock": 1,
+        "disable_rounded_total": 1,
+        "items": [
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "BG",
+                "parentfield": "items",
+                "qty": 2.0,
+                "rate": 600.0,
+                "conversion_factor": 1
+            }
+        ]
+    },
+    {
+        "conversion_rate": 1.0,
+        "customer": "Grant Foodie Ltd.",
+        "doctype": "Sales Order",
+        "order_type": "Sales",
+        "update_stock": 1,
+        "disable_rounded_total": 1,
+        "items": [
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "CG",
+                "parentfield": "items",
+                "qty": 1.0,
+                "rate": 350.0,
+                "conversion_factor": 1
+            },
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "BR",
+                "parentfield": "items",
+                "qty": 4.0,
+                "rate": 400.0,
+                "conversion_factor": 1
+            },
+            {
+                "doctype": "Sales Order Item",
+                "item_code": "MR",
+                "parentfield": "items",
+                "qty": 2.0,
+                "rate": 900.0,
+                "conversion_factor": 1
+            }
+        ]
+    }
+]

@@ -347,12 +347,26 @@ class URYDailyPandL(Document):
 
 		# Append materials consumed
 		for expense in self.materials_consumed:
-			self.append("direct_expenses_breakup", {"breakup": expense.material, "amount": expense.amount})
+			if self.net_sales != 0.0:
+				expense_percent = round(((expense.amount / self.net_sales) * 100), 3)
+			else:
+				expense_percent = 0.0
+			self.append(
+				"direct_expenses_breakup",
+				{"breakup": expense.material, "amount": expense.amount, "percent": expense_percent},
+			)
 			self.total_direct_expenses += expense.amount
 
 		# Append other fixed expenses
 		for expense in report_settings.direct_fixed_expenses:
-			self.append("direct_expenses_breakup", {"breakup": expense.expense, "amount": expense.amount})
+			if self.net_sales != 0.0:
+				expense_percent = round(((expense.amount / self.net_sales) * 100), 3)
+			else:
+				expense_percent = 0.0
+			self.append(
+				"direct_expenses_breakup",
+				{"breakup": expense.expense, "amount": expense.amount, "percent": expense_percent},
+			)
 			self.total_direct_expenses += expense.amount
 
 

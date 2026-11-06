@@ -1,9 +1,48 @@
 import { storage } from './storage';
 
 export function formatCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol');
-  return `${symbol} ${amount}`;
-} 
+  const symbol = storage.getItem('currencySymbol') || '₹';
+  const roundedAmount = flt(amount, 2);
+  const formattedVal = typeof roundedAmount === 'number' && !isNaN(roundedAmount) ? roundedAmount.toLocaleString('en-IN') : roundedAmount;
+  return `${symbol} ${formattedVal}`;
+}
+
+export function flt(v: number | string | null | undefined, decimals: number = 2): number {
+  if (v == null || v === '') return 0;
+  const num = typeof v === 'number' ? v : parseFloat(v as string);
+  if (isNaN(num)) return 0;
+  if (decimals != null) {
+    const mult = Math.pow(10, decimals);
+    const isNegative = num < 0;
+    const absNum = Math.abs(num);
+    const n = +(absNum * mult).toFixed(8);
+    const rounded = Math.round(n) / mult;
+    return isNegative ? -rounded : rounded;
+  }
+  return num;
+}
+
+/**
+ * Formats a number as compact Indian-style currency for chart axes/labels,
+ * e.g. 600000 -> "₹6L", 12500000 -> "₹1.25Cr", 8200 -> "₹8.2k".
+ */
+export function formatCompactCurrency(amount: number): string {
+  const symbol = storage.getItem('currencySymbol') || '₹';
+  if (typeof amount !== 'number' || isNaN(amount)) return `${symbol} ${amount}`;
+
+  const sign = amount < 0 ? '-' : '';
+  const abs = Math.abs(amount);
+
+  const trim = (value: number) => {
+    const rounded = Math.round(value * 100) / 100;
+    return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  };
+
+  if (abs >= 1_00_00_000) return `${sign}${symbol}${trim(abs / 1_00_00_000)}Cr`;
+  if (abs >= 1_00_000) return `${sign}${symbol}${trim(abs / 1_00_000)}L`;
+  if (abs >= 1_000) return `${sign}${symbol}${trim(abs / 1_000)}k`;
+  return `${sign}${symbol}${trim(abs)}`;
+}
 
 export const formatInvoiceTime = (timestamp: string | null) => {
     if (!timestamp) return 'No bill activity yet';

@@ -1,0 +1,42 @@
+import React from 'react';
+import { cn } from '@ury/ui';
+
+interface HufLogoProps extends React.SVGAttributes<SVGSVGElement> {
+  className?: string;
+}
+
+export const HufLogo: React.FC<HufLogoProps> = ({ className, ...props }) => {
+  return (
+    <svg
+      viewBox="726.888 420 466.222 240"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn('h-3.5 w-auto', className)}
+      aria-label="HUF"
+      role="img"
+      {...props}
+    >
+      <path
+        d="M1064.37 590.387C1064.37 607.132 1050.8 620.707 1034.05 620.707H1025.1V660H948.299C924.856 660 905.85 640.995 905.85 617.552V494.866H945.267V620.584H1024.95V494.865H1064.37V590.387ZM1193.11 459.567H1149.69V494.798H1181.05V525.119H1149.69V629.278C1149.69 646.023 1136.12 659.598 1119.38 659.598H1110.28V525.119H1090.39V494.798H1110.28V462.6C1110.28 439.156 1129.28 420.151 1152.73 420.151H1193.11V459.567ZM766.305 494.462H842.961C866.404 494.462 885.409 513.467 885.409 536.911V659.597H845.993V533.879H766.305V659.597H726.888V564.075C726.888 547.33 740.464 533.755 757.21 533.755H766.161V494.866H726.888V420H766.305V494.462Z"
+        fill="url(#huf-logo-gradient)"
+      />
+      <defs>
+        <linearGradient
+          id="huf-logo-gradient"
+          x1="1193.11"
+          y1="660"
+          x2="1007.24"
+          y2="282.106"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0.132462" stopColor="#F58B63" />
+          <stop offset="0.296726" stopColor="#9AAFC7" />
+          <stop offset="0.576923" stopColor="#6F8ED7" />
+          <stop offset="0.853094" stopColor="#2457F5" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
+
+export default HufLogo;

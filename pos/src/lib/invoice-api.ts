@@ -639,7 +639,6 @@ export async function getPOSInvoiceItems(invoiceId: string) {
       console.warn('[getPOSInvoiceItems] Failed to cache items locally:', cacheErr);
     }
 
-
     return { items, taxes };
   } catch (error) {
     console.warn('[getPOSInvoiceItems] Network call failed. Falling back to local order repository cache:', error);
@@ -873,7 +872,6 @@ export async function getSplitGroup(invoiceId: string): Promise<SplitGroupRespon
     return buildLocalSplitGroup(invoiceId);
   }
 }
-
 
 function getBranchFromSession(): string {
   const raw = sessionStorage.getItem('posProfile');
@@ -1127,7 +1125,7 @@ export function getOrdersTabForInvoice(
     if (options?.viewAllStatus === 1) return 'Paid';
     return 'Recently Paid';
   }
-  if (inv.invoice_printed === 0 && inv.restaurant_table) return 'Unbilled';
+  if (inv.invoice_printed === 1) return 'Unbilled';
   return 'Draft';
 }
 

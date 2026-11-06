@@ -1,0 +1,58 @@
+[
+    {
+        "doctype": "Item Price",
+        "item_code": "ONN",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "130"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "CKN",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "BG",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "300"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "MOM",
+        "uom": "Nos",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "WNG",
+        "uom": "Nos",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "BR",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "MR",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    },
+    {
+        "doctype": "Item Price",
+        "item_code": "CG",
+        "uom": "Kg",
+        "price_list": "Standard Buying",
+        "price_list_rate": "250"
+    }
+]

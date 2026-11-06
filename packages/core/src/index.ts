@@ -1,6 +1,8 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
-export { isUserRestrictedFromTableOrders, canCaptainTransfer } from './frappe/roles';
+export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+export type { POSCapabilities } from './frappe/roles';
+export { parseFrappeError } from './frappe/errors';
 export type { User, PosProfileCombined } from './types';
 export { storage } from './storage';
 export * from './storage/index';
@@ -8,10 +10,7 @@ export * from './projections/index';
 export * from './commands/index';
 export * from './sync/index';
 export * from './api/index';
-export { formatCurrency, formatInvoiceTime } from './format';
+export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
-
-
-
-
-
+export { validateFieldValue } from './utils/validateField';
+export type { ValidationMessages } from './utils/validateField';

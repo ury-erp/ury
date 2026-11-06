@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Report Settings Schema",
+  "type": "object",
+  "properties": {
+    "business_hours": {
+      "type": "object",
+      "title": "Business Hours",
+      "properties": {
+        "extended_hours": {
+          "type": "boolean",
+          "title": "Extended Hours",
+          "default": false
+        },
+        "hours_offset": {
+          "type": "number",
+          "title": "Hours Offset (hours)",
+          "default": 4
+        }
+      }
+    },
+    "cost_configuration": {
+      "type": "object",
+      "title": "Cost Configuration",
+      "properties": {
+        "buying_price_list": {
+          "type": "string",
+          "title": "Buying Price List",
+          "default": "Standard Buying"
+        },
+        "depreciation": {
+          "type": "number",
+          "title": "Depreciation Rate (%)",
+          "default": 5.0
+        },
+        "electricity_charges": {
+          "type": "number",
+          "title": "Electricity Charges ($/mo)",
+          "default": 1200.0
+        }
+      }
+    },
+    "expenses": {
+      "type": "object",
+      "title": "Expenses",
+      "properties": {
+        "direct_fixed_expenses": {
+          "type": "array",
+          "title": "Direct Fixed Expenses",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "title": "Expense Name" },
+              "amount": { "type": "number", "title": "Amount" },
+              "frequency": { "type": "string", "title": "Frequency" }
+            }
+          }
+        },
+        "indirect_fixed_expenses": {
+          "type": "array",
+          "title": "Indirect Fixed Expenses",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "title": "Expense Name" },
+              "amount": { "type": "number", "title": "Amount" },
+              "frequency": { "type": "string", "title": "Frequency" }
+            }
+          }
+        },
+        "percentage_expenses": {
+          "type": "array",
+          "title": "Percentage Expenses",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "title": "Expense Name" },
+              "percentage": { "type": "number", "title": "Percentage (%)" },
+              "basis": { "type": "string", "title": "Basis" }
+            }
+          }
+        },
+        "employee_costs": {
+          "type": "array",
+          "title": "Employee Costs",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "type": "string", "title": "Role / Title" },
+              "salary": { "type": "number", "title": "Monthly Salary" },
+              "count": { "type": "number", "title": "Headcount" }
+            }
+          }
+        },
+        "monthly_fixed_expenses": {
+          "type": "array",
+          "title": "Monthly Fixed Expenses",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "title": "Expense Name" },
+              "amount": { "type": "number", "title": "Monthly Amount" }
+            }
+          }
+        },
+        "consumables": {
+          "type": "array",
+          "title": "Consumables",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item_name": { "type": "string", "title": "Item Name" },
+              "monthly_budget": { "type": "number", "title": "Monthly Budget" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
