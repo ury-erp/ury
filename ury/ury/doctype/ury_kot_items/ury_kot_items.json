@@ -36,13 +36,13 @@
   },
   {
    "fieldname": "quantity",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Quantity"
   },
   {
    "fieldname": "cancelled_qty",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_preview": 1,
    "label": "Cancelled Qty",
    "read_only": 1
@@ -96,7 +96,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-16 12:00:00.000000",
+ "modified": "2026-11-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT Items",
