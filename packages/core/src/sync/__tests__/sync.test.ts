@@ -191,8 +191,10 @@ test('7. SyncEngine — Post-sync cleanup removes mapped TEMP-* orders and compl
   const tempOrder = await repos.orders.getById(TEMP_ID);
   assert.equal(tempOrder, undefined, 'Mapped TEMP-* order should be deleted after sync');
 
+  // Paid+synced records are purged post-sync by design (minimal storage
+  // footprint); the server copy is the source of truth after sync.
   const serverOrder = await repos.orders.getById(SERVER_ID);
-  assert.ok(serverOrder, 'Server order should remain in IndexedDB');
+  assert.equal(serverOrder, undefined, 'Paid synced server order should be purged after sync');
 
   const queue = await repos.syncQueue.getAll();
   assert.equal(queue.length, 0, 'Completed queue entries should be purged');
@@ -394,7 +396,7 @@ test('9. SyncEngine — Offline update of a pending temp order reuses temp ID an
   }
 });
 
-test('10. SyncEngine — Promoted temp order adopts backend status from sync_order response', async () => {
+test('10. SyncEngine — Backend Paid status from sync_order is promoted and purged post-sync', async () => {
   const TEMP_ID = 'TEMP-ORD-BACKEND-STATUS-001';
   const SERVER_ID = 'POS-INV-2026-BE-001';
 
@@ -435,16 +437,18 @@ test('10. SyncEngine — Promoted temp order adopts backend status from sync_ord
     assert.equal(result.processed, 1, 'Temp order sync should process');
     assert.equal(result.succeeded, 1, 'Temp order sync should succeed');
 
+    // Backend reported Paid, so the promoted record is terminal and is purged
+    // post-sync by design. The observable guarantees are the temp->server
+    // mapping and a fully drained queue.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.ok(serverOrder, 'Server order record should exist after promotion');
-    assert.equal(serverOrder.status, 'Paid', 'Promoted order should use backend Paid status');
-    assert.equal(serverOrder.sync_status, 'synced', 'Promoted order should be marked synced');
+    assert.equal(serverOrder, undefined, 'Paid promoted order should be purged after sync');
+    assert.equal(await idMapper.getServerId(TEMP_ID), SERVER_ID, 'Temp->server mapping must be registered');
   } finally {
     (call as any).post = originalPost;
   }
 });
 
-test('11. SyncEngine — Local Paid status is preserved when backend returns Draft', async () => {
+test('11. SyncEngine — Local Paid status wins over backend Draft and is purged post-sync', async () => {
   const TEMP_ID = 'TEMP-ORD-LOCAL-PAID-001';
   const SERVER_ID = 'POS-INV-2026-LOCAL-PAID-001';
 
@@ -484,9 +488,11 @@ test('11. SyncEngine — Local Paid status is preserved when backend returns Dra
     assert.equal(result.processed, 1, 'Temp order sync should process');
     assert.equal(result.succeeded, 1, 'Temp order sync should succeed');
 
+    // Local Paid wins over backend Draft, making the promoted record terminal;
+    // terminal records are purged post-sync by design.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.ok(serverOrder, 'Server order record should exist after promotion');
-    assert.equal(serverOrder.status, 'Paid', 'Offline Paid status must not be overwritten by backend Draft');
+    assert.equal(serverOrder, undefined, 'Paid-promoted order should be purged after sync');
+    assert.equal(await idMapper.getServerId(TEMP_ID), SERVER_ID, 'Temp->server mapping must be registered');
   } finally {
     (call as any).post = originalPost;
   }
@@ -601,10 +607,10 @@ test('Scenario 2: Offline Draft -> Offline Payment -> Sync -> Backend Paid -> of
     assert.equal(result.processed, 2, 'Both sync_order and make_invoice should process');
     assert.equal(result.succeeded, 2, 'Both commands should succeed');
 
+    // Final synced status is Paid (terminal) -> purged post-sync by design.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.ok(serverOrder, 'Server order record should exist after sync');
-    assert.equal(serverOrder.status, 'Paid', 'Final local status must be Paid after payment sync');
-    assert.equal(serverOrder.sync_status, 'synced');
+    assert.equal(serverOrder, undefined, 'Paid order should be purged after sync');
+    assert.equal(await idMapper.getServerId(TEMP_ID), SERVER_ID, 'Temp->server mapping must be registered');
 
     const drafts = await repos.orders.findByStatus('Draft');
     assert.ok(!drafts.some(o => o.id === SERVER_ID), 'Paid order must not appear in Draft lookup');
@@ -826,11 +832,18 @@ test('Scenario 7: Multiple Orders statuses and order types match backend', async
     const result = await engine.triggerSync();
     assert.equal(result.succeeded, orders.length, 'All order syncs should succeed');
 
+    const terminalStatuses = ['Paid', 'Cancelled', 'Consolidated', 'Return'];
     for (const o of orders) {
       const serverOrder = await repos.orders.getById(o.serverId);
-      assert.ok(serverOrder, `Server order ${o.serverId} should exist`);
-      assert.equal(serverOrder.status, o.status, `Status should match backend for ${o.serverId}`);
-      assert.equal(serverOrder.order_type, o.order_type, `Order type should match for ${o.serverId}`);
+      if (terminalStatuses.includes(o.status)) {
+        // Terminal records are purged post-sync by design.
+        assert.equal(serverOrder, undefined, `Server order ${o.serverId} should be purged`);
+      } else {
+        assert.ok(serverOrder, `Server order ${o.serverId} should exist`);
+        assert.equal(serverOrder.status, o.status, `Status should match backend for ${o.serverId}`);
+        assert.equal(serverOrder.order_type, o.order_type, `Order type should match for ${o.serverId}`);
+      }
+      assert.equal(await idMapper.getServerId(o.tempId), o.serverId, `Mapping must be registered for ${o.tempId}`);
     }
   } finally {
     (call as any).post = originalPost;
@@ -931,12 +944,10 @@ test('Scenario 8: Offline Aggregator create -> offline payment -> sync -> Paid w
     assert.equal(result.processed, 2, 'Both sync_order and make_invoice should process');
     assert.equal(result.succeeded, 2, 'Both commands should succeed');
 
+    // Offline-paid Aggregator order syncs as Paid (terminal) -> purged post-sync by design.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.ok(serverOrder, 'Server order should exist after sync');
-    assert.equal(serverOrder.status, 'Paid', 'Offline-paid Aggregator order must sync as Paid');
-    assert.equal(serverOrder.order_type, 'Aggregators', 'Order type must be preserved');
-    assert.equal(serverOrder.custom_aggregator_id, 'Swiggy', 'custom_aggregator_id must be preserved after promotion');
-    assert.equal(serverOrder.sync_status, 'synced');
+    assert.equal(serverOrder, undefined, 'Paid Aggregator order should be purged after sync');
+    assert.equal(await idMapper.getServerId(TEMP_ID), SERVER_ID, 'Temp->server mapping must be registered');
 
     const drafts = await repos.orders.findByStatus('Draft');
     assert.ok(!drafts.some(o => o.id === SERVER_ID), 'Paid Aggregator order must not appear in Draft lookup');
@@ -1388,10 +1399,10 @@ test('Scenario 13: Offline cancel of temp order -> sync_order -> cancel_order dr
     assert.equal(cancelPosted.payload.reason, 'No show');
     assert.equal(cancelPosted.payload.table, undefined, 'cancel_order payload must not include table');
 
+    // Cancelled is terminal -> purged post-sync by design.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.ok(serverOrder, 'Server order should exist after promotion');
-    assert.equal(serverOrder.status, 'Cancelled', 'Server order must be Cancelled');
-    assert.equal(serverOrder.sync_status, 'synced');
+    assert.equal(serverOrder, undefined, 'Cancelled order should be purged after sync');
+    assert.equal(await idMapper.getServerId(TEMP_ID), SERVER_ID, 'Temp->server mapping must be registered');
 
     const tempOrder = await repos.orders.getById(TEMP_ID);
     assert.equal(tempOrder, undefined, 'Temp order should be cleaned up after sync');
@@ -1467,8 +1478,9 @@ test('Scenario 14: Offline cancel of server invoice -> cancel_order releases mer
     assert.equal(result.processed, 1, 'cancel_order should process');
     assert.equal(result.succeeded, 1, 'cancel_order should succeed');
 
+    // Cancelled is terminal -> purged post-sync by design.
     const serverOrder = await repos.orders.getById(SERVER_ID);
-    assert.equal(serverOrder?.status, 'Cancelled');
+    assert.equal(serverOrder, undefined, 'Cancelled server invoice should be purged after sync');
 
     for (const tableName of ['T-CANCEL-SERVER-001', 'T-CANCEL-SERVER-002']) {
       const t = await repos.tables.getById(tableName);
@@ -1808,13 +1820,10 @@ test('Scenario 11: Offline split of a server invoice -> child promoted and depen
     const movedRow = source.items.find((i: any) => i.item === 'ITEM-A');
     assert.equal(movedRow?.qty, 1, 'Source row quantity should be reduced');
 
+    // The child was paid in this scenario, so its promoted record is terminal
+    // and purged post-sync by design.
     const child = await repos.orders.getById(CHILD_SERVER_ID);
-    assert.ok(child, 'Child should be promoted to server ID');
-    assert.equal(child.custom_split_from, SOURCE_ID);
-    assert.equal(child.custom_split_group, 'SG-001');
-    assert.equal(child.split_index, 2);
-    assert.equal(child.split_total, 2);
-    assert.equal(child.sync_status, 'synced');
+    assert.equal(child, undefined, 'Paid child should be purged after sync');
 
     const tempChild = await repos.orders.getById(CHILD_TEMP_ID);
     assert.equal(tempChild, undefined, 'TEMP-SPLIT child should be removed after promotion');
@@ -2005,13 +2014,9 @@ test('Scenario 15: SyncEngine clears merged linkages and releases cluster after 
     const primary = await repos.orders.getById(PRIMARY_ID);
     const secondary = await repos.orders.getById(SECONDARY_ID);
 
-    assert.equal(primary?.status, 'Paid');
-    assert.equal(primary?.custom_merged_pos_invoice, null);
-    assert.equal(primary?.custom_merged_total, null);
-
-    assert.equal(secondary?.status, 'Paid');
-    assert.equal(secondary?.custom_merged_pos_invoice, null);
-    assert.equal(secondary?.custom_merged_total, null);
+    // Both invoices are Paid (terminal) after merged payment sync -> purged by design.
+    assert.equal(primary, undefined, 'Paid primary invoice should be purged after sync');
+    assert.equal(secondary, undefined, 'Paid secondary invoice should be purged after sync');
 
     for (const tableName of ['T-MERGE-PAY-SYNC-001', 'T-MERGE-PAY-SYNC-002']) {
       const t = await repos.tables.getById(tableName);
@@ -2234,13 +2239,10 @@ test('Scenario 17: Offline split sync promotes child temp ID, rewrites split met
     assert.ok(source.split_siblings?.includes(CHILD_SERVER_ID), 'Source siblings must reference server child ID');
     assert.ok(!source.split_siblings?.includes(CHILD_TEMP_ID), 'Source siblings must not reference temp child ID');
 
+    // The child was paid in this scenario, so its promoted record is terminal
+    // and purged post-sync by design.
     const child = await repos.orders.getById(CHILD_SERVER_ID);
-    assert.ok(child, 'Child should be promoted to server ID');
-    assert.equal(child.custom_split_from, SOURCE_ID);
-    assert.equal(child.custom_split_group, 'SG-RECON-001');
-    assert.equal(child.split_index, 2);
-    assert.equal(child.split_total, 2);
-    assert.equal(child.sync_status, 'synced');
+    assert.equal(child, undefined, 'Paid child should be purged after sync');
 
     const tempChild = await repos.orders.getById(CHILD_TEMP_ID);
     assert.equal(tempChild, undefined, 'TEMP-SPLIT child should be removed after promotion');
@@ -2459,16 +2461,10 @@ test('Scenario 18: Offline temp order split -> pay both -> sync resolves in stri
     const source = await repos.orders.getById(SERVER_SOURCE);
     const child = await repos.orders.getById(SERVER_CHILD);
 
-    assert.ok(source, 'Source invoice must be promoted locally');
-    assert.ok(child, 'Child invoice must be promoted locally');
-    assert.equal(source.status, 'Paid');
-    assert.equal(child.status, 'Paid');
-    assert.equal(source.grand_total, 100);
-    assert.equal(child.grand_total, 100);
-    assert.equal(source.items.length, 1);
-    assert.equal(child.items.length, 1);
-    assert.equal(source.items[0].qty, 1);
-    assert.equal(child.items[0].qty, 1);
+    // Both invoices are Paid (terminal) after sync -> purged by design; the
+    // observable local guarantees are the drained queue and removed temp records.
+    assert.equal(source, undefined, 'Paid source invoice should be purged after sync');
+    assert.equal(child, undefined, 'Paid child invoice should be purged after sync');
 
     assert.equal(await repos.orders.getById(TEMP_SOURCE), undefined);
     assert.equal(await repos.orders.getById(TEMP_CHILD), undefined);
