@@ -50,6 +50,7 @@ export const useTableStore = defineStore("table", {
     call: frappe.call(),
     customers: useCustomerStore(),
     db: frappe.db(),
+    serverTimeOffset: 0,
     totalMinutes: null,
     invoiceNumber: null,
     modifiedTime: null,
@@ -142,7 +143,7 @@ export const useTableStore = defineStore("table", {
     },
     async handleRoomChange() {
       localStorage.setItem("selectedRoom", this.selectedRoom);
-      await this.fetchTable();
+      this.fetchTable();
       await this.getMenu();
       if (this.invoiceData.multipleCashier) {
         this.getCashier()
@@ -157,6 +158,13 @@ export const useTableStore = defineStore("table", {
       });
     },
     fetchTable() {
+      this.call
+        .get("ury.ury.api.ury_server_time.get_server_time")
+        .then((result) => {
+          // Match Mosaic's site-local wall-clock offset.
+          this.serverTimeOffset = new Date(result.message.replace(" ", "T")).getTime() - Date.now();
+        })
+        .catch((error) => console.error(error));
       this.db
         .getDocList("URY Table", {
           fields: [
@@ -175,14 +183,47 @@ export const useTableStore = defineStore("table", {
           filters: [["restaurant_room", "=", this.selectedRoom]],
           limit: 0,
         })
-        .then((tables) => {
+        .then(async (tables) => {
           this.tables = tables.sort((a, b) => {
             return a.name.localeCompare(b.name, undefined, {
               numeric: true,
               sensitivity: "base",
             });
           });
-        });
+          // Publish the floor first; a pending/denied bill read must not block it.
+          const occupiedTables = this.tables.filter((table) => table.occupied === 1);
+          if (!occupiedTables.length) return;
+          const invoices = await this.db.getDocList("POS Invoice", {
+            fields: ["restaurant_table", "creation", "custom_merged_tables"],
+            filters: [
+              ["docstatus", "=", 0],
+            ],
+            orFilters: [
+              ["restaurant_table", "in", occupiedTables.map((table) => table.name)],
+              ...occupiedTables.map((table) => ["custom_merged_tables", "like", `%${table.name}%`]),
+            ],
+            orderBy: { field: "creation", order: "desc" },
+            limit: 0,
+          });
+          // Seating starts at the oldest still-open check, including split siblings.
+          // Keep these captured rows so a late response cannot affect another room.
+          for (const table of occupiedTables) {
+            let oldestTime = Infinity;
+            table.open_bill_creation = null;
+            for (const bill of invoices) {
+              if (
+                bill.restaurant_table !== table.name &&
+                !(bill.custom_merged_tables || "").split(",").some((name) => name.trim() === table.name)
+              ) continue;
+              const creationTime = new Date((bill.creation || "").replace(" ", "T")).getTime();
+              if (creationTime < oldestTime) {
+                oldestTime = creationTime;
+                table.open_bill_creation = bill.creation;
+              }
+            }
+          }
+        })
+        .catch((error) => console.error(error));
     },
     async getMenu() {
       const getMenuIem = {
@@ -286,36 +327,43 @@ export const useTableStore = defineStore("table", {
       this.newCaptain = captain.name;
       this.showCaptain = false;
     },
-    getTimeDifference(table) {
-      const now = new Date();
-      let tableTime = "00:00:00";
-      if (table && table.occupied === 1 && table.latest_invoice_time) {
-        tableTime = table.latest_invoice_time;
+    getTimeDifference(table, browserNow = Date.now()) {
+      const now = new Date(browserNow + this.serverTimeOffset);
+      const creation = table && table.occupied === 1 && table.open_bill_creation;
+      // Frappe creation and the server clock use the same site-local wall time.
+      let tableDate = new Date(creation ? creation.replace(" ", "T") : NaN);
+      if (!Number.isFinite(tableDate.getTime())) {
+        // Preserve the legacy fallback only when no readable, valid bill exists.
+        const hasInvoiceTime = table && table.occupied === 1 && table.latest_invoice_time;
+        const tableTime = hasInvoiceTime ? table.latest_invoice_time : "00:00:00";
+        const [tableHours, tableMinutes, tableSeconds] = tableTime.split(":");
+        tableDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          tableHours,
+          tableMinutes,
+          tableSeconds
+        );
+        if (hasInvoiceTime && tableDate - now > 12 * 60 * 60 * 1000) {
+          tableDate.setDate(tableDate.getDate() - 1);
+        }
       }
-      const [tableHours, tableMinutes, tableSeconds] = tableTime.split(":");
-      const tableDate = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        tableHours,
-        tableMinutes,
-        tableSeconds
-      );
-      const timeDifferenceInMs = now - tableDate;
+      const timeDifferenceInMs = Math.max(0, now - tableDate);
       const secondsDifference = Math.floor(timeDifferenceInMs / 1000);
       const minutesDifference = Math.floor(secondsDifference / 60);
       const hoursDifference = Math.floor(minutesDifference / 60);
-      const formattedTimeDifference = `${hoursDifference}:${minutesDifference % 60
-        }`;
+      const minutes = minutesDifference % 60;
+      const formattedTimeDifference = `${hoursDifference}:${String(minutes).padStart(2, "0")}`;
       return formattedTimeDifference;
     },
-    getBadgeType(table) {
+    getBadgeType(table, browserNow) {
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "green";
       } else if (table.name === this.selectedTable) {
         return "default";
       } else if (table.occupied === 1 && table.name !== this.selectedTable) {
-        const timeDifference = this.getTimeDifference(table);
+        const timeDifference = this.getTimeDifference(table, browserNow);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
         if (totalMinutes > this.invoiceData.tableAttention) {
@@ -325,13 +373,13 @@ export const useTableStore = defineStore("table", {
         }
       }
     },
-    getBadgeText(table) {
+    getBadgeText(table, browserNow) {
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "Free";
       } else if (table.name === this.selectedTable) {
         return "Active";
       } else if (table.occupied === 1 && table.name !== this.selectedTable) {
-        const timeDifference = this.getTimeDifference(table);
+        const timeDifference = this.getTimeDifference(table, browserNow);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
         if (totalMinutes > this.invoiceData.tableAttention) {
