@@ -1,0 +1,117 @@
+# DB03 Sales & revenue deep-dive. Audience: owner, finance, branch manager. Levels: branch, company, employee (waiter filter).
+# One base query (fact_invoices, copied verbatim from semantic_layer.yaml); charts aggregate over its rows.
+# Populations: revenue/bills/ATV/channel use BOTH populations (f_population is the split filter). The waiter filter is
+# meaningful for the Paid population only (Consolidated waiter = urycashier on every bill).
+workbook: {id: ury_db03_sales_deep_dive, title: "Sales deep-dive", module: "URY", required_apps: [ury]}
+queries:
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: hour_label, type: String, expr: "pad_number(hour(posting_time), 2)"}  # string label: pivot_wider on an Integer column mixes int and string names (IbisTypeError)
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      # weekday_label sorts Mon..Sun as a column header (leading digit = ISO weekday). Same column as the shared semantic layer fact_invoices.
+      - {as: weekday_label, type: String, expr: "if_else(day_name(posting_date) == 'Monday', '1 Mon', if_else(day_name(posting_date) == 'Tuesday', '2 Tue', if_else(day_name(posting_date) == 'Wednesday', '3 Wed', if_else(day_name(posting_date) == 'Thursday', '4 Thu', if_else(day_name(posting_date) == 'Friday', '5 Fri', if_else(day_name(posting_date) == 'Saturday', '6 Sat', '7 Sun'))))))"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+  # fact_ordering_sessions (builder, T4 on demo: 0 rows). Grain: one QR/kiosk ordering session. invoice is set when the session became a bill.
+  # No branch column exists (sessions hang off a table), so only the Date filter can apply. Date column: opened_at.
+  - id: fact_ordering_sessions
+    title: "fact_ordering_sessions"
+    table: "URY Ordering Session"
+    select: [name, source, status, opened_at, invoice, table]
+
+  # fact_sales_target (sql, T1). Grain: one URY Sales Target row (branch x month). actual_net_sales = SUM(POS Invoice.net_total) of the same
+  # branch between period_start and period_end (submitted, non-return; same rule as net sales everywhere). is_current_month = 1 for the month
+  # that contains today (month to date against the full-month target); is_closed = 1 once the month has ended. Why sql: actual comes from a correlated range sum over the target dates,
+  # which the join grammar (one equality pair) cannot express. Date column: period_start. Branches without a target row do not appear.
+  - id: fact_sales_target
+    title: "fact_sales_target"
+    sql: "SELECT t.name, t.branch, t.company, t.period_start, t.period_end, t.target_amount, COALESCE((SELECT SUM(pi.net_total) FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.branch = t.branch AND pi.posting_date BETWEEN t.period_start AND t.period_end), 0) AS actual_net_sales, CASE WHEN CURDATE() BETWEEN t.period_start AND t.period_end THEN 1 ELSE 0 END AS is_current_month, CASE WHEN t.period_end < CURDATE() THEN 1 ELSE 0 END AS is_closed, DATE_FORMAT(t.period_start, '%Y-%m') AS month_label FROM `tabURY Sales Target` t WHERE t.docstatus < 2"
+
+charts:
+  # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
+  - {id: db03_net_sales_kpi, title: "Net sales (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)", format: currency}]}
+  - {id: db03_bills_kpi, title: "Bills", query: fact_invoices, type: Number,
+     y: [{column: name, agg: count, as: Bills}]}
+  # SAL-004 Average ticket (average bill)
+  - {id: db03_avg_bill_kpi, title: "Average bill (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill (₹)", format: currency}]}
+  - {id: db03_items_per_bill_kpi, title: "Items per bill", query: fact_invoices, type: Number,
+     y: [{expr: "sum(total_qty) / count(name)", as: "Items per bill"}]}
+  - {id: db03_discounts_kpi, title: "Discounts given (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "sum(discount_amount).round(0)", as: "Discounts given (₹)", format: currency}]}
+  # Trend: weekly stacked net sales by channel (limit above the bucket count: Line/Bar + asc + limit keeps the oldest).
+  - {id: db03_daily, title: "Weekly net sales by channel (₹)", query: fact_invoices, type: Bar, limit: 1000, stack: true,
+     x: {column: posting_date, granularity: week}, y: [{column: net_total, agg: sum, as: "Net sales"}],
+     split_by: {column: order_type, max: 4}}
+  # Detail: bills by hour (rows) and weekday (columns, Mon..Sun). No heatmap on 3.15.1.
+  - {id: db03_grid, title: "Bills by hour and weekday", query: fact_invoices, type: Table,
+     rows: [hour_label], columns: [weekday_label], y: [{column: name, agg: count, as: Bills}]}
+  # Channel ranking, one measure.
+  - {id: db03_channel, title: "Net sales by channel (₹)", query: fact_invoices, type: Row,
+     x: order_type, y: [{column: net_total, agg: sum, as: "Net sales"}],
+     order: [{by: "Net sales", dir: desc}]}
+  # SAL-020 Self-order (QR/kiosk) share: count of bills that came from a QR or kiosk session (share needs sessions to exist)
+  - {id: db03_self_order, title: "Self-order bills (count)", query: fact_ordering_sessions, type: Number,
+     filters: [{column: invoice, op: is_set}],
+     y: [{column: name, agg: count, as: "Self-order bills"}]}
+
+  # SAL-021 Net sales against the monthly target, months that have ended (a full month of sales against a full-month target)
+  - {id: db03_target_attain, title: "Closed months against target (%)", query: fact_sales_target, type: Number,
+     filters: [{column: is_closed, op: "=", value: 1}],
+     y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Closed months against target (%)", format: percent}]}
+  # SAL-021 Month to date against the full-month target
+  - {id: db03_target_mtd, title: "Month to date vs target (%)", query: fact_sales_target, type: Number,
+     filters: [{column: is_current_month, op: "=", value: 1}],
+     y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Month to date vs target (%)", format: percent}]}
+  # SAL-021 Target for the selected months
+  - {id: db03_target_amount, title: "Sales target, selected months (₹)", query: fact_sales_target, type: Number,
+     y: [{expr: "sum(target_amount).round(0)", as: "Sales target (₹)", format: currency}]}
+  # SAL-021 Net sales in the same months
+  - {id: db03_target_actual, title: "Net sales, target months (₹)", query: fact_sales_target, type: Number,
+     y: [{expr: "sum(actual_net_sales).round(0)", as: "Net sales in target months (₹)", format: currency}]}
+  # SAL-021 Actual against target by month
+  - {id: db03_target_month, title: "Net sales against target by month (₹)", query: fact_sales_target, type: Bar, limit: 24, stack: false,
+     x: month_label,
+     y: [{expr: "sum(actual_net_sales).round(0)", as: "Net sales"}, {expr: "sum(target_amount).round(0)", as: "Target"}]}
+dashboards:
+  - id: sales_deep_dive
+    title: "Sales deep-dive"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, applies_to: {fact_invoices: posting_date, fact_ordering_sessions: opened_at, fact_sales_target: period_start}, layout: {x: 0, y: 2, w: 5, h: 1}}
+      - {id: f_branch, label: Branch, type: string, icon: store, applies_to: {fact_invoices: branch, fact_sales_target: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
+      - {id: f_order_type, label: "Order type", type: string, icon: utensils, applies_to: {fact_invoices: order_type}, layout: {x: 10, y: 2, w: 5, h: 1}}
+      - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_invoices: waiter}, layout: {x: 15, y: 2, w: 5, h: 1}}
+    items:
+      - {text: "<p><b>Sales deep-dive.</b> How much we sell, when, and through which channel. For owner, finance and branch manager. Default period: last 90 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db03_net_sales_kpi, x: 0, y: 3, w: 4, h: 3}
+      - {chart: db03_bills_kpi, x: 4, y: 3, w: 4, h: 3}
+      - {chart: db03_avg_bill_kpi, x: 8, y: 3, w: 4, h: 3}
+      - {chart: db03_items_per_bill_kpi, x: 12, y: 3, w: 4, h: 3}
+      - {chart: db03_discounts_kpi, x: 16, y: 3, w: 4, h: 3}
+      - {chart: db03_daily, x: 0, y: 6, w: 20, h: 12}
+      - {chart: db03_channel, x: 0, y: 18, w: 20, h: 13}
+      - {chart: db03_grid, x: 0, y: 31, w: 20, h: 15}
+      - {text: "<p>Net sales exclude tax and cancelled bills. Average bill = net sales per bill.</p>", x: 0, y: 46, w: 20, h: 1}
+      - {text: "<p><b>Sales against target</b> - monthly net sales against the branch target</p>", x: 0, y: 47, w: 20, h: 1}
+      - {chart: db03_target_attain, x: 0, y: 48, w: 5, h: 3}
+      - {chart: db03_target_mtd, x: 5, y: 48, w: 5, h: 3}
+      - {chart: db03_target_amount, x: 10, y: 48, w: 5, h: 3}
+      - {chart: db03_target_actual, x: 15, y: 48, w: 5, h: 3}
+      - {chart: db03_target_month, x: 0, y: 51, w: 20, h: 12}
+      - {text: "<p>Closed months compare a full month to its target; the current month is month to date. Only branches with a target appear.</p>", x: 0, y: 63, w: 20, h: 1}
+      - {chart: db03_self_order, x: 0, y: 64, w: 20, h: 3}
+      - {text: "<p>Bills that came from a guest QR or kiosk ordering session. This tile follows the Date filter only; there is no branch on a session.</p>", x: 0, y: 67, w: 20, h: 2}

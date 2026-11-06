@@ -1,0 +1,247 @@
+# DB08 Employee performance (waiter / cashier). Indicators, not verdicts. Waiter and covers metrics are Paid-population only.
+# L1 queries below are copied verbatim from semantic_layer.yaml (ids, titles, operations, comments).
+workbook: {id: ury_db08_employee_performance, title: "URY Employee Performance", module: "URY", required_apps: [ury]}
+queries:
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: hour_label, type: String, expr: "pad_number(hour(posting_time), 2)"}  # string label: pivot_wider on an Integer column mixes int and string names (IbisTypeError)
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      # weekday_label sorts Mon..Sun as a Table column header (leading digit = ISO weekday); weekday itself sorts alphabetically.
+      - {as: weekday_label, type: String, expr: "if_else(day_name(posting_date) == 'Monday', '1 Mon', if_else(day_name(posting_date) == 'Tuesday', '2 Tue', if_else(day_name(posting_date) == 'Wednesday', '3 Wed', if_else(day_name(posting_date) == 'Thursday', '4 Thu', if_else(day_name(posting_date) == 'Friday', '5 Fri', if_else(day_name(posting_date) == 'Saturday', '6 Sat', '7 Sun'))))))"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+  # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
+  # category_family (CATEGORY_MAP v1), branch-safe configured department, BOM-based estimated cost.
+  # Why sql: (1) the cleaned category is a 60-value CASE over Item Group; (2) the config join needs a composite key
+  # (item AND branch), finsights joins take one equality pair; (3) BOM unit cost needs a filtered sub-select
+  # (is_default=1, is_active=1, docstatus=1). Date column: posting_date. est_cost/est_margin are NULL when no recipe cost.
+  - id: fact_sales_lines_enriched
+    title: "fact_sales_lines_enriched"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, COALESCE(uw.full_name, pi.waiter) AS waiter_name, pi.cashier, COALESCE(uc.full_name, pi.cashier) AS cashier_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 WHEN pii.net_amount - pii.qty * bc.bom_unit_cost < -pii.net_amount THEN 0 ELSE 1 END AS cost_plausible FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code LEFT JOIN `tabUser` uw ON uw.name = pi.waiter LEFT JOIN `tabUser` uc ON uc.name = pi.cashier"
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # fact_invoices_named (builder chain, T1). Same rows and columns as fact_invoices plus waiter_name and cashier_name (User.full_name,
+  # falling back to the login id). Two User joins clash on `full_name` (the second join is prefixed), so each join sits in its own
+  # query, takes the name into a mutate column and drops full_name in select. Use for per-person labels; filters bind to waiter/cashier.
+  - id: fact_invoices_w
+    title: "fact_invoices_w"
+    source_query: fact_invoices
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name]
+  - id: fact_invoices_named
+    title: "fact_invoices_named"
+    source_query: fact_invoices_w
+    joins:
+      - {table: "User", type: left, on: [cashier, name], columns: [full_name]}
+    mutate:
+      - {as: cashier_name, type: String, expr: "coalesce(full_name, cashier)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name, cashier_name]
+
+  # fact_cancellations_named (builder, T1). fact_cancellations plus waiter_name (User.full_name of the order owner).
+  - id: fact_cancellations_named
+    title: "fact_cancellations_named"
+    source_query: fact_cancellations
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, branch, company, order_type, waiter, waiter_name, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # fact_kot_exec (sql, T3 on demo: structure ready, stamps milliseconds apart). Grain: one URY KOT Execution per
+  # (kot, production_unit), DEDUPED to the latest-modified row (6 KOTs have duplicate QUEUED rows).
+  # cancel_stage = where in the KOT life the cancel happened (short labels: they sit on a narrow Row axis); ready_by_name = cook full name (User.full_name).
+  # Why sql: durations need TIMESTAMPDIFF over Datetime (time_diff casts to TIME, drops dates/fractions, sign
+  # unverified); dedupe needs ROW_NUMBER(); KOT fire time is TIMESTAMP(KOT.date, KOT.time).
+  # TIMESTAMPDIFF(SECOND, a, b) = b - a (MariaDB). Date column: exec_date. department = executed unit's department.
+  - id: fact_kot_exec
+    title: "fact_kot_exec"
+    sql: "WITH ex AS (SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.kot, e.production_unit ORDER BY e.modified DESC) AS rn FROM `tabURY KOT Execution` e) SELECT ex.name, ex.kot, ex.state, ex.production_unit, COALESCE(NULLIF(pu.department, ''), ex.production_unit) AS department, ex.branch, ex.company, DATE(COALESCE(ex.started_at, ex.creation)) AS exec_date, HOUR(k.time) AS hour_of_day, k.type AS kot_type, ex.started_by, ex.ready_by, COALESCE(ur.full_name, ex.ready_by) AS ready_by_name, ex.served_by, ex.cancelled_by, pp.custom_kot_warning_time AS target_minutes, TIMESTAMPDIFF(SECOND, ex.creation, ex.started_at) AS queue_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.ready_at) AS prep_seconds, TIMESTAMPDIFF(SECOND, ex.ready_at, ex.served_at) AS pass_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.served_at) AS cycle_seconds, TIMESTAMPDIFF(SECOND, TIMESTAMP(k.date, k.time), ex.served_at) AS order_to_serve_seconds, CASE WHEN ex.state LIKE 'CANCELLED%' THEN 1 ELSE 0 END AS is_cancelled, CASE WHEN ex.state = 'CANCELLED_AFTER_START' THEN 'While cooking' WHEN ex.state = 'CANCELLED_AFTER_READY' THEN 'After ready' WHEN ex.state LIKE 'CANCELLED%' THEN 'Before start' END AS cancel_stage, CASE WHEN ex.state IN ('CANCELLED_AFTER_START','CANCELLED_AFTER_READY') THEN 1 ELSE 0 END AS wasted_prep, CASE WHEN ex.started_at IS NOT NULL THEN 1 ELSE 0 END AS was_started, CASE WHEN ex.ready_at IS NOT NULL THEN 1 ELSE 0 END AS was_ready, CASE WHEN ex.served_at IS NOT NULL THEN 1 ELSE 0 END AS was_served FROM ex JOIN `tabURY KOT` k ON k.name = ex.kot LEFT JOIN `tabURY Production Unit` pu ON pu.name = ex.production_unit LEFT JOIN `tabPOS Profile` pp ON pp.name = k.pos_profile LEFT JOIN `tabUser` ur ON ur.name = ex.ready_by WHERE ex.rn = 1 AND k.docstatus IN (1, 2)"
+
+  # fact_service_charges (builder, T4 on demo: no service-charge tax rows). Grain: one tax/charge row of a submitted POS Invoice whose
+  # account head contains 'Service'. tax_amount = service charge income. There is no tip field anywhere. Date column: posting_date.
+  - id: fact_service_charges
+    title: "fact_service_charges"
+    table: "Sales Taxes and Charges"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, branch, company]}
+    filters:
+      - {column: parenttype, op: "=", value: "POS Invoice"}
+      - {column: docstatus, op: "=", value: 1}
+      - {column: account_head, op: contains, value: "Service"}
+    select: [name, parent, posting_date, branch, company, account_head, tax_amount]
+
+  # fact_labour_hours (sql, T2). Grain: one branch x day that has BOTH POS sales and attendance. net_sales = SUM(POS Invoice.net_total) of the branch
+  # that day; labour_hours = SUM(Attendance.working_hours) of submitted Present attendance whose Employee.branch is that branch. Days with sales but
+  # no attendance (or the reverse) are left out so the ratio never mixes a full day of sales with no hours. Why sql: two aggregates joined on
+  # (branch, date), with Attendance branch coming from Employee. Date column: posting_date.
+  - id: fact_labour_hours
+    title: "fact_labour_hours"
+    sql: "SELECT s.branch, s.company, s.posting_date, s.net_sales, a.labour_hours, a.staff_present FROM (SELECT pi.branch, pi.company, pi.posting_date, SUM(pi.net_total) AS net_sales FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 GROUP BY pi.branch, pi.company, pi.posting_date) s JOIN (SELECT e.branch, att.attendance_date, SUM(att.working_hours) AS labour_hours, COUNT(DISTINCT att.employee) AS staff_present FROM `tabAttendance` att JOIN `tabEmployee` e ON e.name = att.employee WHERE att.docstatus = 1 AND att.status = 'Present' AND att.working_hours > 0 GROUP BY e.branch, att.attendance_date) a ON a.branch = s.branch AND a.attendance_date = s.posting_date"
+
+  # fact_tips (builder, T2). Grain: one submitted, non-return POS Invoice with the tip entered at billing (custom_tip_amount, custom field on POS Invoice)
+  # and the waiter's Employee name (custom_waiter_employee -> Employee.employee_name). Tips only: commission is calculated by the Commission report in
+  # the app and is not stored on any table, so it cannot be charted here. Date column: posting_date.
+  - id: fact_tips
+    title: "fact_tips"
+    table: "POS Invoice"
+    joins:
+      - {table: "Employee", type: left, on: [custom_waiter_employee, name], columns: [employee_name]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: waiter_label, type: String, expr: "coalesce(employee_name, custom_waiter_employee)"}
+    select: [name, posting_date, branch, company, order_type, waiter, custom_waiter_employee, waiter_label, net_total, custom_tip_amount]
+
+charts:
+  # Staff performance (UX change list DB08). Person labels are full names (waiter_name / cashier_name from the shared
+  # semantic layer joins); filters still bind to the login id. Administrator is excluded per chart.
+  # KPI row (Paid only)
+  - {id: db08_kpi_atv, title: "Average bill (₹)", query: fact_invoices_named, type: Number,
+     y: [{expr: "(sum(net_total) / count(name)).round(0)", as: Average bill, format: currency}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  - {id: db08_kpi_items, title: "Items per bill", query: fact_invoices_named, type: Number,
+     y: [{expr: "(sum(total_qty) / count(name)).round(1)", as: Items per bill}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  - {id: db08_kpi_cover, title: "Spend per cover (₹)", query: fact_invoices_named, type: Number,
+     y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: Spend per cover, format: currency}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: order_type, op: "=", value: "Dine In"}, {column: pax, op: ">", value: 0}, {column: waiter, op: "!=", value: "Administrator"}]}
+  - {id: db08_kpi_waiters, title: "Waiters active", query: fact_invoices_named, type: Number,
+     y: [{column: waiter_name, agg: count_distinct, as: Waiters active}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  # S1 Waiters (Paid only)
+  - {id: db08_sales, title: "Net sales by waiter (₹)", query: fact_invoices_named, type: Row, limit: 15,
+     x: waiter_name, y: [{expr: "(sum(net_total)).round(0)", as: Net sales, format: currency}],
+     order: [{by: Net sales, dir: desc}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  - {id: db08_bills_atv, title: "Bills and average bill by waiter", query: fact_invoices_named, type: Table, limit: 15,
+     rows: [{column: waiter_name, as: Waiter}],
+     y: [{column: name, agg: count, as: Bills},
+         {expr: "(sum(net_total) / count(name)).round(0)", as: Average bill (₹), format: currency},
+         {expr: "(sum(total_qty) / count(name)).round(1)", as: Items per bill}],
+     order: [{by: Bills, dir: desc}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  # S2 Upsell
+  - {id: db08_mix, title: "Beverage share of sales by waiter (%)", query: fact_sales_lines_enriched, type: Row, limit: 15,
+     x: waiter_name,
+     y: [{expr: "(100 * sum(if_else(category_family == 'Beverage', net_amount, 0)) / sum(net_amount)).round(1)", as: Beverage share}],
+     order: [{by: Beverage share, dir: desc}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: waiter, op: "!=", value: "Administrator"}]}
+  - {id: db08_covers, title: "Covers and spend per cover by waiter", query: fact_invoices_named, type: Table, limit: 15,
+     rows: [{column: waiter_name, as: Waiter}],
+     y: [{column: pax, agg: sum, as: Covers},
+         {expr: "(sum(net_total) / sum(pax)).round(0)", as: Spend per cover (₹), format: currency}],
+     order: [{by: Covers, dir: desc}],
+     filters: [{column: population, op: "=", value: "Paid"}, {column: order_type, op: "=", value: "Dine In"}, {column: pax, op: ">", value: 0}, {column: waiter, op: "!=", value: "Administrator"}]}
+  # S3 Leakage owners (waiter = order owner, not necessarily who cancelled)
+  - {id: db08_cancels, title: "Cancelled value by order taker (₹)", query: fact_cancellations_named, type: Row, limit: 15,
+     x: waiter_name, y: [{expr: "(sum(grand_total)).round(0)", as: Cancelled value, format: currency}],
+     order: [{by: Cancelled value, dir: desc}],
+     filters: [{column: waiter, op: "!=", value: "Administrator"}]}
+  # S4 Cashiers
+  - {id: db08_cashier, title: "Net sales by cashier (₹)", query: fact_invoices_named, type: Row, limit: 15,
+     x: cashier_name, y: [{expr: "(sum(net_total)).round(0)", as: Net sales, format: currency}],
+     order: [{by: Net sales, dir: desc}],
+     filters: [{column: cashier, op: "!=", value: "Administrator"}]}
+  # S5 Discounts, kitchen speed and service charge
+  # EMP-011 Discount given per cashier
+  - {id: db08_discount, title: "Discounts given by cashier (₹)", query: fact_invoices_named, type: Row, limit: 15,
+     x: cashier_name, y: [{expr: "(sum(discount_amount)).round(0)", as: Discounts, format: currency}],
+     order: [{by: Discounts, dir: desc}],
+     filters: [{column: discount_amount, op: ">", value: 0}, {column: cashier, op: "!=", value: "Administrator"}]}
+  # EMP-013 Cook speed per user
+  - {id: db08_cook, title: "Avg prep time by cook (min)", query: fact_kot_exec, type: Row, limit: 15,
+     x: ready_by_name, y: [{expr: "(avg(prep_seconds) / 60).round(1)", as: "Prep time (min)"}],
+     order: [{by: "Prep time (min)", dir: desc}],
+     filters: [{column: was_ready, op: "=", value: 1}, {column: ready_by, op: "!=", value: "Administrator"}]}
+  # SAL-019 Service charge and tips
+  - {id: db08_service, title: "Service charge collected (₹)", query: fact_service_charges, type: Number,
+     y: [{expr: "(sum(tax_amount)).round(0)", as: "Service charge (₹)", format: currency}]}
+
+  # EMP-014 Sales per labour hour: branch net sales / attendance hours, days with both recorded
+  - {id: db08_labour_kpi, title: "Sales per labour hour (₹)", query: fact_labour_hours, type: Number,
+     y: [{expr: "(sum(net_sales) / sum(labour_hours)).round(0)", as: "Sales per labour hour (₹)", format: currency}]}
+  # EMP-014 Labour hours behind the ratio
+  - {id: db08_labour_hours, title: "Labour hours (hours)", query: fact_labour_hours, type: Number,
+     y: [{expr: "sum(labour_hours).round(0)", as: "Labour hours"}]}
+  # EMP-014 Sales per labour hour by day
+  - {id: db08_labour_trend, title: "Sales per labour hour by day (₹)", query: fact_labour_hours, type: Line, limit: 366,
+     x: {column: posting_date, granularity: day},
+     y: [{expr: "(sum(net_sales) / sum(labour_hours)).round(0)", as: "Sales per labour hour"}]}
+  # EMP-015 Tips collected (tips only: commission is not stored)
+  - {id: db08_tips_kpi, title: "Tips collected (₹)", query: fact_tips, type: Number,
+     y: [{expr: "sum(custom_tip_amount).round(0)", as: "Tips collected (₹)", format: currency}]}
+  # EMP-015 Tips as share of net sales
+  - {id: db08_tips_pct, title: "Tips as share of net sales (%)", query: fact_tips, type: Number,
+     y: [{expr: "sum(custom_tip_amount) / sum(net_total)", as: "Tips as share of net sales (%)", format: percent}]}
+  # EMP-015 Tips per waiter
+  - {id: db08_tips_waiter, title: "Tips by waiter (₹)", query: fact_tips, type: Row, limit: 15,
+     filters: [{column: custom_tip_amount, op: ">", value: 0}, {column: custom_waiter_employee, op: is_set}],
+     x: waiter_label, y: [{expr: "sum(custom_tip_amount).round(0)", as: "Tips", format: currency}], order: [{by: Tips, dir: desc}]}
+dashboards:
+  - id: employee_performance
+    title: "Staff performance"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, layout: {x: 0, y: 2, w: 5, h: 1},
+         applies_to: {fact_invoices_named: posting_date, fact_sales_lines_enriched: posting_date, fact_cancellations_named: posting_date, fact_kot_exec: exec_date, fact_service_charges: posting_date, fact_labour_hours: posting_date, fact_tips: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: building-2, layout: {x: 5, y: 2, w: 5, h: 1},
+         applies_to: {fact_invoices_named: branch, fact_sales_lines_enriched: branch, fact_cancellations_named: branch, fact_kot_exec: branch, fact_service_charges: branch, fact_labour_hours: branch, fact_tips: branch}}
+      - {id: f_waiter, label: Waiter, type: string, icon: user, layout: {x: 10, y: 2, w: 5, h: 1},
+         applies_to: {fact_invoices_named: waiter, fact_sales_lines_enriched: waiter, fact_cancellations_named: waiter, fact_tips: waiter}}
+      - {id: f_order_type, label: Order type, type: string, icon: utensils, layout: {x: 15, y: 2, w: 5, h: 1},
+         applies_to: {fact_invoices_named: order_type, fact_sales_lines_enriched: order_type, fact_tips: order_type}}
+    items:
+      - {text: "<p><b>Staff performance, for managers only.</b> Use it to coach, not to judge: sales count for the person on the bill, cancellations for whoever opened the order. Paid bills only; default last 90 days.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db08_kpi_atv, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db08_kpi_items, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db08_kpi_cover, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db08_kpi_waiters, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db08_labour_kpi, x: 0, y: 6, w: 5, h: 3}
+      - {chart: db08_labour_hours, x: 5, y: 6, w: 5, h: 3}
+      - {chart: db08_tips_kpi, x: 10, y: 6, w: 5, h: 3}
+      - {chart: db08_tips_pct, x: 15, y: 6, w: 5, h: 3}
+      - {text: "<p><b>Sales and bills</b> - who sells and how big each bill is</p>", x: 0, y: 9, w: 20, h: 1}
+      - {chart: db08_sales, x: 0, y: 10, w: 20, h: 14}
+      - {chart: db08_bills_atv, x: 0, y: 24, w: 20, h: 16}
+      - {text: "<p><b>Upsell and covers</b> - who sells more drinks and earns more per guest</p>", x: 0, y: 40, w: 20, h: 1}
+      - {chart: db08_mix, x: 0, y: 41, w: 20, h: 14}
+      - {chart: db08_covers, x: 0, y: 55, w: 20, h: 16}
+      - {text: "<p><b>Cancellations and cashiers</b> - cancelled value by the person who opened the order, and sales by cashier</p>", x: 0, y: 71, w: 20, h: 1}
+      - {chart: db08_cancels, x: 0, y: 72, w: 10, h: 14}
+      - {chart: db08_cashier, x: 10, y: 72, w: 10, h: 14}
+      - {text: "<p>Cancelled value is credited to the person who opened the order, not necessarily who cancelled it. Covers count dine-in bills only.</p>", x: 0, y: 86, w: 20, h: 1}
+      - {text: "<p><b>Labour and tips</b> - sales for each hour of staff attendance, and tips entered at billing</p>", x: 0, y: 87, w: 20, h: 1}
+      - {chart: db08_labour_trend, x: 0, y: 88, w: 20, h: 12}
+      - {chart: db08_tips_waiter, x: 0, y: 100, w: 20, h: 14}
+      - {text: "<p><b>Partial data:</b> sales per labour hour = branch net sales divided by attendance hours, for days with both; staff without attendance are not counted. <b>Not recorded yet:</b> commission; it is worked out in the Commission report, not saved on the bill, so only tips show.</p>", x: 0, y: 114, w: 20, h: 3}
+      - {text: "<p><b>Discounts, kitchen speed and service charge</b> - who discounts, how fast cooks are, what service charge is billed</p>", x: 0, y: 117, w: 20, h: 1}
+      - {chart: db08_service, x: 0, y: 118, w: 20, h: 3}
+      - {chart: db08_discount, x: 0, y: 121, w: 10, h: 14}
+      - {chart: db08_cook, x: 10, y: 121, w: 10, h: 14}
+      - {text: "<p>Cook speed needs a named cook on each ready tap; on this site every tap was made by the Administrator login, which is left out, so the chart is empty until cooks sign in. Service charge is the tax lines named service charge on paid bills.</p>", x: 0, y: 135, w: 20, h: 3}
