@@ -27,6 +27,16 @@ class URYPrintJob(Document):
         else:
             super(Document, self).__init__(serialized)
 
+    def autoname(self):
+        """Generate a print_job_id for desk/API-created jobs.
+
+        The print engine sets its own structured IDs; without one the
+        document name (field:print_job_id) would stay empty and the file
+        store write would be skipped silently.
+        """
+        if not self.print_job_id:
+            self.print_job_id = f"PJ-{frappe.generate_hash(length=12).upper()}"
+
     def db_insert(self, *args, **kwargs):
         """Persist new job to file store."""
         data = self.as_dict()
