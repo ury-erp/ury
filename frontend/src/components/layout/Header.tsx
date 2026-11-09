@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import {
+  logout,
+  call,
+  getLoggedUser,
+  getUserRoles,
+  withReturnContext,
+  appLabelForPath,
+  DESK_RETURN_STORAGE_KEY,
+} from '@ury/core';
 import { useCompanyContext } from '../../context/CompanyContext';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useDeskPermission } from '../DeskLink';
@@ -17,7 +25,6 @@ import {
   AlertTriangle,
   Info,
   LogOut,
-  Settings,
   Store,
   Building2,
   Building,
@@ -64,8 +71,7 @@ function stripHtml(html: string): string {
 
 
 export const Header: React.FC = () => {
-  const navigate = useNavigate();
-  const { activeBranchId, setActiveBranchId, branches, activeBranch, filterContext } = useBranchContext();
+  const { activeBranchId, setActiveBranchId, branches, activeBranch } = useBranchContext();
   const { activeCompanyId, setActiveCompanyId, companies, activeCompany } = useCompanyContext();
   const deskPermission = useDeskPermission('User');
 
@@ -184,7 +190,12 @@ export const Header: React.FC = () => {
     } catch {
       // Ignore logout errors
     } finally {
-      window.location.href = '/login?redirect-to=%2Fpos';
+      const path = window.location.pathname || '';
+      const matched = ['/pos', '/ury', '/mosaic', '/urypos', '/order'].find(
+        (prefix) => path === prefix || path.startsWith(prefix + '/')
+      );
+      const redirectTarget = matched || (path.startsWith('/') ? path : '/ury');
+      window.location.href = `/login?redirect-to=${encodeURIComponent(redirectTarget)}`;
     }
   };
 
@@ -391,7 +402,18 @@ export const Header: React.FC = () => {
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        window.location.href = '/app';
+                        try {
+                          sessionStorage.setItem(
+                            DESK_RETURN_STORAGE_KEY,
+                            JSON.stringify({
+                              path: window.location.pathname + window.location.search,
+                              label: appLabelForPath(window.location.pathname),
+                            })
+                          );
+                        } catch (e) {
+                          /* ignore */
+                        }
+                        window.location.href = withReturnContext('/desk/ury');
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                     >
