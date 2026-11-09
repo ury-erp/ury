@@ -10,6 +10,7 @@ export {
   appLabelForPath,
   DESK_RETURN_PARAM,
   DESK_RETURN_LABEL_PARAM,
+  DESK_RETURN_STORAGE_KEY,
   RETURN_TO_ALLOWED_PREFIXES,
 } from './frappe/deskLink';
 export type { ReturnContext, BuildDeskUrlOptions } from './frappe/deskLink';
