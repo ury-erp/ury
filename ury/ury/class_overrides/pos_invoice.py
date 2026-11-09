@@ -1,13 +1,51 @@
 import frappe
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 	POSInvoice,
-	ProductBundleStockValidationError,
-	get_product_bundle_stock_availability,
 	get_stock_availability,
 )
 
 from frappe import _
 from frappe.utils import flt
+
+try:
+	from erpnext.accounts.doctype.pos_invoice.pos_invoice import ProductBundleStockValidationError
+except ImportError:
+	class ProductBundleStockValidationError(frappe.ValidationError):
+		pass
+
+try:
+	from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+		get_product_bundle_stock_availability,
+	)
+except ImportError:
+	def get_product_bundle_stock_availability(item_code, warehouse, item_qty):
+		try:
+			from erpnext.stock.stock_ledger import is_negative_stock_allowed
+			from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+				get_bin_qty,
+				get_pos_reserved_qty,
+			)
+
+			is_stock_item = True
+			bundle = frappe.get_doc("Product Bundle", item_code)
+			availabilities = []
+			for bundle_item in bundle.items:
+				if frappe.get_value("Item", bundle_item.item_code, "is_stock_item"):
+					bin_qty = get_bin_qty(bundle_item.item_code, warehouse)
+					reserved_qty = get_pos_reserved_qty(bundle_item.item_code, warehouse)
+					available = bin_qty - reserved_qty
+					availabilities.append(
+						{
+							"item_code": bundle_item.item_code,
+							"required": bundle_item.qty * item_qty,
+							"available": available,
+						}
+					)
+
+			return availabilities, is_stock_item, is_negative_stock_allowed(item_code=item_code)
+		except Exception:
+			return get_stock_availability(item_code, warehouse)
+
 
 
 class CustomPOSInvoice(POSInvoice):
