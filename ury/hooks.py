@@ -730,7 +730,8 @@ fixtures = [
                     "POS Profile-custom_disposables",
                     "POS Profile-custom_column_break_bgzjv",
                     "POS Profile-custom_section_break_bmczy",
-                    "POS Profile-custom_ury_pos_configurations"
+                    "POS Profile-custom_ury_pos_configurations",
+                    "POS Profile-custom_disable_print_status_tracking"
                 },
             ]
         ],

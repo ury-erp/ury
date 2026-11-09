@@ -62,4 +62,11 @@ export interface PosProfileCombined {
   default_customer?: import('./utils/defaultCustomer').DefaultCustomerEntry | null;
   enable_payment_without_printing?: number;
   custom_enable_payment_without_printing?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
+
+export const isPrintStatusDisabled = (
+  posProfile?: Partial<PosProfileCombined> | null
+): boolean => {
+  return Boolean(posProfile?.custom_disable_print_status_tracking);
+};
