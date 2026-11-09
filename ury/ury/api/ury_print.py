@@ -287,3 +287,33 @@ def signature_promise(toSign=None):
     )
 
     return base64.b64encode(signature).decode("ascii")
+
+
+@frappe.whitelist()
+def get_print_job_status(print_job_id):
+    """Return the current metadata for a URY Print Job.
+
+    The job is a Virtual DocType backed by JSON files. If the job is not
+    found, a structured failure response is returned instead of raising.
+    """
+    if not print_job_id:
+        return {"status": "Failure", "message": "print_job_id is required"}
+
+    try:
+        doc = frappe.get_doc("URY Print Job", print_job_id)
+        return {
+            "status": "Success",
+            "print_job": doc.as_dict(),
+        }
+    except frappe.DoesNotExistError:
+        return {
+            "status": "Failure",
+            "message": f"Print job {print_job_id} not found",
+        }
+    except Exception as e:
+        frappe.logger("printing").warning(
+            {"event": "get_print_job_status_failed", "print_job_id": print_job_id},
+            exc_info=True,
+        )
+        return {"status": "Failure", "message": str(e)}
+

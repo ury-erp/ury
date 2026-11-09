@@ -106,6 +106,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Print Jobs",
+   "link_count": 0,
+   "link_to": "URY Print Job",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Ordering Device",
    "link_count": 0,
    "link_to": "URY Ordering Device",

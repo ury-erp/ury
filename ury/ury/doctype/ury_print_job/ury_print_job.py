@@ -21,7 +21,11 @@ class URYPrintJob(Document):
         if not data:
             raise frappe.DoesNotExistError
 
-        super(Document, self).__init__(_serialize_for_document(data))
+        serialized = _serialize_for_document(data)
+        if hasattr(self, "init_from_dict"):
+            self.init_from_dict(serialized)
+        else:
+            super(Document, self).__init__(serialized)
 
     def db_insert(self, *args, **kwargs):
         """Persist new job to file store."""
