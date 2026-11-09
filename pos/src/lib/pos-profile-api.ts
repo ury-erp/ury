@@ -26,6 +26,7 @@ export interface PosProfileLimited {
   custom_invoice_warning_time?: number;
   enable_payment_without_printing?: number;
   custom_enable_payment_without_printing?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
 
 export interface PosProfileLimitedResponse {
@@ -99,6 +100,7 @@ export interface PosProfileCombined extends PosProfileFull {
   custom_invoice_warning_time?: number;
   enable_payment_without_printing?: number;
   custom_enable_payment_without_printing?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
 
 export interface Currency {
@@ -165,6 +167,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     custom_invoice_warning_time: limitedProfile.custom_invoice_warning_time ?? 0,
     enable_payment_without_printing: enablePaymentWithoutPrinting,
     custom_enable_payment_without_printing: enablePaymentWithoutPrinting,
+    custom_disable_print_status_tracking: limitedProfile.custom_disable_print_status_tracking ?? 0,
   };
 
   return combinedProfile;

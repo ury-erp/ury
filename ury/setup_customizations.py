@@ -437,6 +437,13 @@ def get_custom_fields():
 				"description": "Allow payment without requiring prior invoice printing in POS",
 				"insert_after": "show_image",
 				"default": 0,
+			},
+			{
+				"fieldname": "custom_disable_print_status_tracking",
+				"fieldtype": "Check",
+				"insert_after": "qz_host",
+				"label": "Disable Print & Printer Status Tracking",
+				"description": "When enabled, hides the printer status indicator in POS.",
 			}
 		],
   
