@@ -109,6 +109,29 @@ describe("Header", () => {
 
     expect(screen.getByText("header.logout")).toBeInTheDocument();
     expect(screen.getByText("header.clear_cache")).toBeInTheDocument();
+    expect(screen.getByText("header.switch_to_desk")).toBeInTheDocument();
+  });
+
+  it("navigates to /desk/ury when switch to desk is clicked", async () => {
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const userButton = screen.getByRole("button", { name: /Test User/i });
+    await userEvent.click(userButton);
+
+    const switchBtn = screen.getByText("header.switch_to_desk");
+    await userEvent.click(switchBtn);
+
+    expect(window.location.href).toContain("/desk/ury");
+
+    window.location = originalLocation as any;
   });
 
   it("renders logo link to dashboard", () => {

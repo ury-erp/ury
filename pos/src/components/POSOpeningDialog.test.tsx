@@ -126,6 +126,30 @@ describe("POSOpeningDialog", () => {
     expect(screen.getByText("pos.switch_to_desk")).toBeInTheDocument();
   });
 
+  it("opens /desk/ury in a new tab when switch to desk is clicked", async () => {
+    const user = userEvent.setup();
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(
+      <POSOpeningDialog
+        state="permissionDenied"
+        canAccessDesk={true}
+        onRetry={vi.fn()}
+        onContinue={vi.fn()}
+      />
+    );
+
+    const switchBtn = screen.getByText("pos.switch_to_desk");
+    await user.click(switchBtn);
+
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/desk/ury"),
+      "_blank"
+    );
+
+    windowOpenSpy.mockRestore();
+  });
+
   it("hides switch to desk button when canAccessDesk is false", () => {
     render(
       <POSOpeningDialog

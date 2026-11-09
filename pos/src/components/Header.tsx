@@ -14,7 +14,7 @@ import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout, withReturnContext } from '@ury/core';
+import { logout, withReturnContext, DESK_RETURN_STORAGE_KEY } from '@ury/core';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
@@ -193,7 +193,17 @@ const Header = () => {
                        a floating "Back to POS" chip (return_to_app.js) --
                        otherwise a cashier who steps into the desk for a
                        not-yet-migrated feature has no obvious way back. */
-                    onClick={() => window.location.href = withReturnContext('/app')}
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem(DESK_RETURN_STORAGE_KEY, JSON.stringify({
+                          path: window.location.pathname + window.location.search,
+                          label: 'POS',
+                        }));
+                      } catch (e) {
+                        /* ignore */
+                      }
+                      window.location.href = withReturnContext('/desk/ury');
+                    }}
                   >
                     <Monitor className="w-4 h-4 me-3" />
                     {t('header.switch_to_desk')}
