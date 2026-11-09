@@ -60,4 +60,6 @@ export interface PosProfileCombined {
   custom_enable_kot_reprint?: number;
   order_type_customer_map?: Record<string, import('./utils/defaultCustomer').DefaultCustomerEntry>;
   default_customer?: import('./utils/defaultCustomer').DefaultCustomerEntry | null;
+  enable_payment_without_printing?: number;
+  custom_enable_payment_without_printing?: number;
 }

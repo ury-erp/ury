@@ -772,6 +772,7 @@ def getPosProfile():
         edit_order_type = pos_profiles.custom_edit_order_type
         enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
         invoice_warning_time = pos_profiles.custom_invoice_warning_time or 0
+        enable_payment_without_printing = pos_profiles.get("custom_enable_payment_without_printing") or 0
         if multiple_cashier:
             details = getBranchRoom()
             room = details[0].get('name') 
@@ -852,6 +853,7 @@ def getPosProfile():
         "edit_order_type":edit_order_type,
         "enable_kot_reprint":enable_kot_reprint,
         "custom_invoice_warning_time":invoice_warning_time,
+        "enable_payment_without_printing":enable_payment_without_printing,
         **get_default_customer_config(pos_profiles),
     }
 
@@ -896,6 +898,9 @@ def getPosProfileFull(pos_profile):
         "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
+        "print_format": profile.print_format,
+        "enable_payment_without_printing": profile.get("custom_enable_payment_without_printing") or 0,
+        "custom_enable_payment_without_printing": profile.get("custom_enable_payment_without_printing") or 0,
         **get_default_customer_config(profile),
     }
 

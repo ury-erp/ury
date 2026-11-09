@@ -100,7 +100,7 @@ export const createConfigSlice: StateCreator<
       const cached = sessionStorage.getItem('posProfile');
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);
-        if (profile && profile.country) {
+        if (profile && profile.country && profile.enable_payment_without_printing !== undefined) {
           set({ posProfile: profile });
           // Allowed to enter the app: any role this POS Profile references
           // anywhere (billing, transfer, table-order-restricted) — see

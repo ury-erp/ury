@@ -276,7 +276,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       if (
         cachedProfile &&
         'custom_invoice_warning_time' in cachedProfile &&
-        !profileLacksDefaultCustomerConfig(cachedProfile)
+        !profileLacksDefaultCustomerConfig(cachedProfile) &&
+        cachedProfile.enable_payment_without_printing !== undefined
       ) {
         const profile = cachedProfile;
         set({ 

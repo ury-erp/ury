@@ -305,7 +305,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        if (profile && profile.country && 'custom_invoice_warning_time' in profile && !profileLacksDefaultCustomerConfig(profile)) {
+        if (profile && profile.country && 'custom_invoice_warning_time' in profile && !profileLacksDefaultCustomerConfig(profile) && profile.enable_payment_without_printing !== undefined) {
           set({ 
             posProfile: profile, 
             profileLoading: false,

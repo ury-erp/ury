@@ -407,7 +407,7 @@ def calculate_and_set_times(doc, method=None):
 
 def validate_invoice_print(doc, method):
     # Check if the invoice has been printed
-    invoice_printed = frappe.db.get_value("POS Invoice", doc.name, "invoice_printed")
+    invoice_printed = frappe.db.get_value("POS Invoice", doc.name, "invoice_printed") or 0
 
     # If the invoice is associated with a restaurant table and hasn't been printed
     if doc.restaurant_table and invoice_printed == 0:

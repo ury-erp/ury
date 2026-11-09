@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, Percent, Coins } from 'lucide-react';
+import { X, Percent, Coins, Printer } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency } from '@ury/core';
-import { Button, Input, Dialog, DialogContent } from '@ury/ui';
+import { formatCurrency, parseFrappeError } from '@ury/core';
+import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { printOrder } from '../lib/print';
+import { resolvePrintFormat, type POSInvoice } from '../lib/invoice-api';
 
 
 interface PaymentDialogProps {
+  order?: Pick<POSInvoice, 'custom_merged_pos_invoice'> | null;
   onClose: () => void;
   grandTotal: number;
   roundedTotal: number;
@@ -26,6 +29,7 @@ interface PaymentDialogProps {
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
+  order,
   onClose,
   grandTotal,
   roundedTotal,
@@ -43,6 +47,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [printInvoice, setPrintInvoice] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
   
@@ -139,25 +144,70 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setIsProcessing(true);
     setError(null);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
-        cashier,
-        customer,
-        invoice,
-        owner,
-        payments,
-        pos_profile: posProfile,
-        table,
-      });
-      // Show toast and reload orders (assume showToast and reload available globally)
-      if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast.success('Payment successful');
+      const wasAlreadyPrinted = order ? String(order.invoice_printed) !== '0' : false;
+      if (!printInvoice && !wasAlreadyPrinted) {
+        setError(t('errors.please_print_first'));
+        showToast.error(t('errors.please_print_first'));
+        setIsProcessing(false);
+        return;
       }
+
+      if (printInvoice) {
+        // Step 1: Save draft invoice with discount and payment modes without submitting
+        await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+          additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+          cashier,
+          customer,
+          invoice,
+          owner,
+          payments,
+          pos_profile: posProfile,
+          table,
+          submit_invoice: 0,
+        });
+
+        // Step 2: Print invoice with discount and payment modes included
+        if (storePosProfile) {
+          try {
+            await printOrder({
+              orderId: invoice,
+              posProfile: storePosProfile,
+              printFormat: resolvePrintFormat(order || {}, storePosProfile.print_format),
+            });
+          } catch (printErr: any) {
+            console.error('Print failed:', printErr);
+            const reason = printErr?.message || parseFrappeError(printErr) || 'Unknown error';
+            setError(`${t('errors.print_failed', { reason })} ${t('payment.payment_not_processed')}`);
+            showToast.error(`${t('errors.print_failed', { reason })} ${t('payment.payment_not_processed')}`);
+            setIsProcessing(false);
+            return;
+          }
+        }
+
+        // Step 3: Print succeeded! Submit the invoice to finalize payment
+        await call.post('ury.ury.doctype.ury_order.ury_order.submit_order_invoice', {
+          invoice,
+        });
+      } else {
+        await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+          additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+          cashier,
+          customer,
+          invoice,
+          owner,
+          payments,
+          pos_profile: posProfile,
+          table,
+          submit_invoice: 1,
+        });
+      }
+      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
     } catch (err) {
-      setError((err as Error).message);
+      console.error('Payment failed:', err);
+      setError(parseFrappeError(err, t('errors.payment_failed')));
     } finally {
       setIsProcessing(false);
     }
@@ -294,6 +344,26 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Print Invoice Checkbox */}
+          {(Number(storePosProfile?.enable_payment_without_printing) === 1 || Number((storePosProfile as any)?.custom_enable_payment_without_printing) === 1) && (
+            <div className="mb-4 flex items-center gap-2">
+              <input
+                id="frontend-print-invoice-checkbox"
+                type="checkbox"
+                checked={printInvoice}
+                onChange={(e) => setPrintInvoice(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label
+                htmlFor="frontend-print-invoice-checkbox"
+                className="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1.5"
+              >
+                <Printer className="w-4 h-4 text-gray-500" />
+                {t('payment.print_invoice')}
+              </label>
+            </div>
+          )}
 
           {/* Payment Button */}
           <Button

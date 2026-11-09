@@ -38,6 +38,7 @@ interface PosProfileRecord {
   custom_enable_kot_reprint?: number;
   custom_daily_pos_close?: number;
   custom_edit_order_type?: number;
+  custom_enable_payment_without_printing?: number;
   paid_limit?: number;
   table_attention_time?: number;
   custom_reset_order_number_daily?: number;
@@ -255,6 +256,7 @@ export const PosProfilePage: React.FC = () => {
         fields: ['name', 'branch', 'company', 'warehouse', 'selling_price_list', 'print_format',
           'custom_enable_discount', 'custom_enable_multiple_cashier',
           'custom_enable_kot_reprint', 'custom_daily_pos_close', 'custom_edit_order_type',
+          'custom_enable_payment_without_printing',
           'paid_limit', 'table_attention_time', 'custom_reset_order_number_daily', 'disabled'],
         limit: 50,
       });
@@ -285,6 +287,7 @@ export const PosProfilePage: React.FC = () => {
         custom_enable_multiple_cashier: profile.custom_enable_multiple_cashier || 0,
         custom_daily_pos_close: profile.custom_daily_pos_close || 0,
         custom_edit_order_type: profile.custom_edit_order_type || 0,
+        custom_enable_payment_without_printing: profile.custom_enable_payment_without_printing || 0,
         paid_limit: profile.paid_limit || '',
         table_attention_time: profile.table_attention_time || '',
         custom_reset_order_number_daily: profile.custom_reset_order_number_daily || 0,
@@ -362,6 +365,7 @@ export const PosProfilePage: React.FC = () => {
         custom_enable_multiple_cashier: form.custom_enable_multiple_cashier ? 1 : 0,
         custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
         custom_edit_order_type: form.custom_edit_order_type ? 1 : 0,
+        custom_enable_payment_without_printing: form.custom_enable_payment_without_printing ? 1 : 0,
         paid_limit: form.paid_limit || '',
         table_attention_time: form.table_attention_time || '',
         custom_reset_order_number_daily: form.custom_reset_order_number_daily ? 1 : 0,
@@ -453,6 +457,7 @@ export const PosProfilePage: React.FC = () => {
           custom_enable_multiple_cashier: profileForm.custom_enable_multiple_cashier,
           custom_daily_pos_close: profileForm.custom_daily_pos_close,
           custom_edit_order_type: profileForm.custom_edit_order_type,
+          custom_enable_payment_without_printing: profileForm.custom_enable_payment_without_printing,
           paid_limit: profileForm.paid_limit,
           table_attention_time: profileForm.table_attention_time,
           custom_reset_order_number_daily: profileForm.custom_reset_order_number_daily,
@@ -634,6 +639,7 @@ export const PosProfilePage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { key: 'custom_enable_discount', label: __('Enable Item Discounts') },
+                      { key: 'custom_enable_payment_without_printing', label: __('Enable Payment Without Printing') },
                       { key: 'custom_enable_kot_reprint', label: __('Enable KOT Reprint') },
                       { key: 'custom_enable_multiple_cashier', label: __('Enable Multiple Cashier Configuration') },
                       { key: 'custom_daily_pos_close', label: __('Require Daily POS Closing') },

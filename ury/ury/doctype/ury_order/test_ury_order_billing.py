@@ -34,6 +34,7 @@ from ury.ury.doctype.ury_order.test_ury_order import _FakeInvoice, _FakeRow
 from ury.ury.doctype.ury_order.ury_order import (
     _validate_additional_discount,
     make_invoice,
+    submit_order_invoice,
     merge_free_tables,
     merge_tables_batch,
     pos_opening_check,
@@ -698,7 +699,7 @@ class TestMakeInvoice(FrappeTestCase):
         invoice.flags = frappe._dict()
         return invoice
 
-    def _run(self, invoice, payments, stack, discount=None, table="T1", roles=None):
+    def _run(self, invoice, payments, stack, discount=None, table="T1", roles=None, submit_invoice=1):
         stack.enter_context(patch(f"{MODULE}.get_order_invoice", return_value=invoice))
         stack.enter_context(
             patch(f"{MODULE}.frappe.get_value", return_value="Dine In")
@@ -712,6 +713,17 @@ class TestMakeInvoice(FrappeTestCase):
         stack.enter_context(
             patch(f"{MODULE}.frappe.session", MagicMock(user="cashier@example.com"))
         )
+        stack.enter_context(
+            patch(
+                f"{MODULE}.frappe.get_cached_doc",
+                return_value=frappe._dict(
+                    company="Test Company",
+                    currency="USD",
+                    allow_discount_change=1,
+                    custom_enable_discount=1,
+                ),
+            )
+        )
         return make_invoice(
             customer="Walk In",
             payments=payments,
@@ -720,7 +732,29 @@ class TestMakeInvoice(FrappeTestCase):
             owner="cashier@example.com",
             additionalDiscount=discount,
             table=table,
+            submit_invoice=submit_invoice,
         )
+
+    def test_make_invoice_without_submit(self):
+        invoice = self._invoice()
+        with ExitStack() as stack:
+            mock_free = stack.enter_context(patch(f"{MODULE}._free_tables_if_no_open_invoices"))
+            res = self._run(invoice, [{"mode_of_payment": "Cash", "amount": 250}], stack, submit_invoice=0)
+        self.assertEqual(res, {"name": invoice.name, "status": "Draft"})
+        self.assertEqual(len(invoice.payments), 1)
+        invoice.save.assert_called_once()
+        invoice.submit.assert_not_called()
+        mock_free.assert_not_called()
+
+    def test_submit_order_invoice(self):
+        invoice = self._invoice()
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{MODULE}.frappe.get_doc", return_value=invoice))
+            mock_free = stack.enter_context(patch(f"{MODULE}._free_tables_if_no_open_invoices"))
+            res = submit_order_invoice(invoice.name)
+        self.assertEqual(res, {"name": invoice.name, "status": "Submitted"})
+        invoice.submit.assert_called_once()
+        mock_free.assert_called_once_with("T1", None)
 
     def test_applies_the_payment_rows_and_submits_the_invoice(self):
         invoice = self._invoice()

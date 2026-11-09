@@ -113,7 +113,9 @@
     "processing": "جاري المعالجة...",
     "short_by": "ناقص {{amount}}",
     "change_due": "الباقي: {{amount}}",
-    "success": "تم الدفع بنجاح: تم استلام {{amount}}"
+    "success": "تم الدفع بنجاح: تم استلام {{amount}}",
+    "print_invoice": "طباعة الفاتورة",
+    "payment_not_processed": "لم تتم معالجة الدفع."
   },
   "pos": {
     "not_opened_title": "نقطة البيع غير مفتوحة",

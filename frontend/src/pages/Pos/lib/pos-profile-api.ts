@@ -5,6 +5,7 @@ import type { DefaultCustomerEntry } from '@ury/core/default-customer';
 // Limited fields response
 export interface PosProfileLimited {
   pos_profile: string;
+  country?: string;
   branch: string;
   company: string;
   waiter: string;
@@ -23,6 +24,8 @@ export interface PosProfileLimited {
   owner: string;
   edit_order_type?: number;
   custom_invoice_warning_time?: number;
+  enable_payment_without_printing?: number;
+  custom_enable_payment_without_printing?: number;
 }
 
 export interface PosProfileLimitedResponse {
@@ -71,6 +74,8 @@ export interface PosProfileFull {
   order_type_customer_map?: Record<string, DefaultCustomerEntry>;
   /** Profile-level default customer, or null. */
   default_customer?: DefaultCustomerEntry | null;
+  enable_payment_without_printing?: number;
+  custom_enable_payment_without_printing?: number;
 }
 
 // Combined POS Profile with both limited and full fields
@@ -92,6 +97,8 @@ export interface PosProfileCombined extends PosProfileFull {
   view_all_status?: number;
   custom_daily_pos_close?: number;
   custom_invoice_warning_time?: number;
+  enable_payment_without_printing?: number;
+  custom_enable_payment_without_printing?: number;
 }
 
 export interface Currency {
@@ -124,10 +131,19 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   
   // Get full profile using the pos_profile name from limited profile
   const fullProfile = await getPosProfileFull(limitedProfile.pos_profile);
+
+  const enablePaymentWithoutPrinting = Number(
+    limitedProfile.enable_payment_without_printing ??
+    (limitedProfile as any).custom_enable_payment_without_printing ??
+    fullProfile.enable_payment_without_printing ??
+    fullProfile.custom_enable_payment_without_printing ??
+    0
+  );
   
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,
+    country: fullProfile.country || limitedProfile.country || '',
     owner: limitedProfile.owner,
     waiter: limitedProfile.waiter,
     cashier: limitedProfile.cashier,
@@ -143,6 +159,8 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
     custom_invoice_warning_time: limitedProfile.custom_invoice_warning_time ?? 0,
+    enable_payment_without_printing: enablePaymentWithoutPrinting,
+    custom_enable_payment_without_printing: enablePaymentWithoutPrinting,
   };
 
   return combinedProfile;

@@ -80,7 +80,9 @@
     "adjustment": "Ajustement",
     "total": "Total",
     "pay_button": "Payer {{amount}}",
-    "processing": "Traitement..."
+    "processing": "Traitement...",
+    "print_invoice": "Imprimer la facture",
+    "payment_not_processed": "Le paiement n'a pas été traité."
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",

@@ -106,7 +106,9 @@
     "processing": "Processing...",
     "short_by": "Short by {{amount}}",
     "change_due": "Change due: {{amount}}",
-    "success": "Payment successful: {{amount}} received"
+    "success": "Payment successful: {{amount}} received",
+    "print_invoice": "Print Invoice",
+    "payment_not_processed": "Payment was not processed."
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
