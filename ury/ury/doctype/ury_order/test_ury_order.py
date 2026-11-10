@@ -1919,6 +1919,9 @@ class _FakeInvoice:
         getattr(self, table).append(row)
         return row
 
+    def set_paid_amount(self):
+        pass
+
     def remove(self, row):
         self.items.remove(row)
 

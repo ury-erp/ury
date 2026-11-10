@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PaymentDialog from "./PaymentDialog";
 import { printOrder } from "../lib/print";
 import { call } from "@ury/core";
+import { showToast } from "@ury/ui";
 
 const mockUsePOSStore = vi.fn();
 
@@ -364,7 +365,7 @@ describe("PaymentDialog", () => {
     });
   });
 
-  it("does not complete payment if print invoice is unchecked and invoice was not already printed", async () => {
+  it("completes payment directly without printing when enable_payment_without_printing is 1 and print invoice is unchecked", async () => {
     mockUsePOSStore.mockReturnValue({
       paymentModes: ["Cash"],
       fetchPaymentModes: vi.fn(),
@@ -396,8 +397,58 @@ describe("PaymentDialog", () => {
     fireEvent.click(payButton);
 
     await waitFor(() => {
-      expect(call.post).not.toHaveBeenCalled();
+      // Payment completes directly without printing and without error
+      expect(call.post).toHaveBeenCalledWith(
+        "ury.ury.doctype.ury_order.ury_order.make_invoice",
+        expect.objectContaining({ submit_invoice: 1 })
+      );
     });
+    expect(printOrder).not.toHaveBeenCalled();
+    expect(showToast.error).not.toHaveBeenCalled();
+  });
+
+  it("does not call printOrder when enable_payment_without_printing is 0 and Pay is clicked", async () => {
+    mockUsePOSStore.mockReturnValue({
+      paymentModes: ["Cash"],
+      fetchPaymentModes: vi.fn(),
+      posProfile: { enable_discount: 1, enable_payment_without_printing: 0, print_format: "Standard" },
+    });
+
+    render(
+      <PaymentDialog
+        onClose={vi.fn()}
+        grandTotal={1000}
+        roundedTotal={1000}
+        invoice="INV001"
+        customer="CUST001"
+        posProfile="POS001"
+        table={null}
+        cashier="user1"
+        owner="user1"
+        fetchOrders={vi.fn()}
+        clearSelectedOrder={vi.fn()}
+        order={{ invoice_printed: 1 }}
+      />
+    );
+
+    // Checkbox is hidden when the flag is disabled
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+
+    const payButton = screen.getByText(/payment.pay_button/);
+    fireEvent.click(payButton);
+
+    await waitFor(() => {
+      // Submits directly with no duplicate reprint
+      expect(call.post).toHaveBeenCalledWith(
+        "ury.ury.doctype.ury_order.ury_order.make_invoice",
+        expect.objectContaining({ submit_invoice: 1 })
+      );
+    });
+    expect(printOrder).not.toHaveBeenCalled();
+    expect(call.post).not.toHaveBeenCalledWith(
+      "ury.ury.doctype.ury_order.ury_order.submit_order_invoice",
+      expect.anything()
+    );
   });
 
   it("completes payment directly if print invoice is unchecked but invoice was already printed", async () => {

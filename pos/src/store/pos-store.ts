@@ -302,42 +302,48 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
+      let currencySymbolHandled = false;
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
         if (profile && profile.country && 'custom_invoice_warning_time' in profile && !profileLacksDefaultCustomerConfig(profile) && profile.enable_payment_without_printing !== undefined) {
-          set({ 
-            posProfile: profile, 
+          // Stale-while-revalidate: populate state from the cache immediately so
+          // the UI stays responsive, then fall through and revalidate against
+          // the server so desk configuration changes take effect on reload.
+          set({
+            posProfile: profile,
             profileLoading: false,
             currency: profile.currency || siteCurrencyCode() || 'INR'
           });
           get().applyAutoCustomer();
           if (!storage.getItem('currencySymbol')) {
-            await get().fetchCurrencySymbol();
+            currencySymbolHandled = true;
+            get().fetchCurrencySymbol();
           }
-          return;
         }
       }
 
-      set({ profileLoading: true, error: null });
+      if (!get().posProfile) {
+        set({ profileLoading: true, error: null });
+      }
       const combinedProfile = await getCombinedPosProfile();
-      
+
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
-      set({ 
-        posProfile: combinedProfile, 
+      set({
+        posProfile: combinedProfile,
         profileLoading: false,
         currency: combinedProfile.currency || siteCurrencyCode() || 'INR'
       });
       get().applyAutoCustomer();
-      
-      if (!storage.getItem('currencySymbol')) {
+
+      if (!currencySymbolHandled && !storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
       }
     } catch (error) {
       console.error('Error fetching POS profile:', error);
-      set({ 
+      set({
         error: 'Failed to fetch POS profile',
-        profileLoading: false 
+        profileLoading: false
       });
     }
   },
