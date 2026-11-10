@@ -431,17 +431,12 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     onOpenChange(next);
   };
 
-  // Fix 2: submission-blocking validation. Every row must be explicitly
-  // touched (not just numerically non-zero, since a blank input silently
-  // becomes 0), and the total closing amount across all rows must be
-  // non-zero so an all-zero close can't slip through unnoticed.
+  // Closing may be submitted with blank or zero amount fields. Blank inputs
+  // count as 0; rows that had activity but a zero close only show a warning.
   const validation = useMemo(() => {
     if (rows.length === 0) {
       return { isValid: false, blockingMessage: null as string | null, warningMessage: null as string | null };
     }
-
-    const untouchedCount = rows.filter((row) => !touchedModes.has(row.mode_of_payment)).length;
-    const totalClosing = rows.reduce((sum, row) => sum + row.closing_amount, 0);
 
     const zeroRowsWithActivity = rows.filter(
       (row) =>
@@ -450,19 +445,10 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         (row.opening_amount !== 0 || row.expected_amount !== 0)
     );
 
-    let blockingMessage: string | null = null;
-    if (untouchedCount > 0) {
-      blockingMessage = t('pos_closing.validation_missing_rows');
-    } else if (totalClosing === 0) {
-      blockingMessage = t('pos_closing.validation_all_zero');
-    }
-
     const warningMessage =
-      !blockingMessage && zeroRowsWithActivity.length > 0
-        ? t('pos_closing.validation_zero_row_warning')
-        : null;
+      zeroRowsWithActivity.length > 0 ? t('pos_closing.validation_zero_row_warning') : null;
 
-    return { isValid: !blockingMessage, blockingMessage, warningMessage };
+    return { isValid: true, blockingMessage: null as string | null, warningMessage };
   }, [rows, touchedModes]);
 
   const handleRequestSubmit = () => {

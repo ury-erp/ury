@@ -157,8 +157,6 @@
     "help_expected": "The amount the system expects for this payment mode, based on today's invoices.",
     "help_closing": "Enter the actual amount you counted for this payment mode.",
     "help_difference": "Counted amount minus expected amount. Positive means an overage, negative means a shortage.",
-    "validation_missing_rows": "Enter a closing amount for every payment mode before submitting.",
-    "validation_all_zero": "Total closing amount can't be zero. Enter the amounts you counted.",
     "validation_zero_row_warning": "One or more payment modes were left at 0 despite having activity today. Double-check before submitting.",
     "confirm_title": "Confirm POS Close",
     "confirm_message": "This will submit the closing entry and cannot be undone. Are you sure you want to continue?",
