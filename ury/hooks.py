@@ -221,6 +221,7 @@ permission_query_conditions = {
 
 override_doctype_class = {
 	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog",
+	"Network Printer Settings": "ury.ury.printing.custom_network_printer_settings.CustomNetworkPrinterSettings",
 	"POS Invoice": "ury.ury.class_overrides.pos_invoice.CustomPOSInvoice",
 	"Report": "ury.ury.class_overrides.report.CustomReport",
 }
@@ -361,6 +362,8 @@ scheduler_events = {
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 			"ury.ury.api.reservation_scheduler.process_reservation_no_shows",
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs",
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
@@ -377,13 +380,13 @@ scheduler_events = {
 	"daily": [
 		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks",
 		"ury.chairman_jobs.purge_chairman_audio",
-	]
+	],
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs",
+	],
 # 	"weekly": [
 # 		"ury.tasks.weekly"
 # 	],

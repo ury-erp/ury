@@ -104,8 +104,27 @@ class URYPrintJob(Document):
         and field projection, and returns paginated results sorted newest-first.
         """
         args = args or {}
-        start = int(args.get("start") or 0)
-        page_length = int(args.get("page_length") or 20)
+        start = args.get("start") or args.get("limit_start") or 0
+        try:
+            start = int(start)
+        except (ValueError, TypeError):
+            start = 0
+
+        raw_limit = (
+            args.get("page_length")
+            if args.get("page_length") is not None
+            else (args.get("limit_page_length") or args.get("limit"))
+        )
+        if raw_limit in ("*", "all", "ALL", 0, "0"):
+            page_length = None
+        elif raw_limit in (None, "", "None"):
+            page_length = 20
+        else:
+            try:
+                val = int(raw_limit)
+                page_length = None if val <= 0 else val
+            except (ValueError, TypeError):
+                page_length = 20
 
         jobs = list_all_jobs(max_age_seconds=7200)
         requested_fields = _parse_requested_fields(args.get("fields"))
@@ -128,6 +147,8 @@ class URYPrintJob(Document):
             else:
                 valid_jobs.append(doc)
 
+        if page_length is None:
+            return valid_jobs[start:]
         return valid_jobs[start : start + page_length]
 
     @staticmethod
