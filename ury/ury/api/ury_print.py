@@ -4,7 +4,6 @@ from frappe import _
 import base64
 import os
 
-from pypdf import PdfWriter
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
@@ -15,6 +14,22 @@ base_template_path = "www/printview.html"
 standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
+
+
+class PrintResult(dict):
+    """Print job result that compares equal to its status string.
+
+    Lets callers keep checking ``result == "Success"`` (legacy behaviour)
+    while the engine returns a rich dict.
+    """
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.get("status") == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return self.get("status") or super().__str__()
 
 
 def _mark_invoice_printed(invoice_name, was_printed=None, update_modified=True):
@@ -45,69 +60,33 @@ def network_printing(
 ):
     validate_print_permission(frappe.get_doc(doctype, name))
 
-    if not print_format and doctype == "POS Invoice":
-        pos_profile = frappe.db.get_value(doctype, name, "pos_profile")
-        if pos_profile:
-            print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+    restaurant_table = None
+    if doctype == "POS Invoice":
+        restaurant_table = frappe.db.get_value("POS Invoice", name, "restaurant_table")
 
-    try:
-        print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
+    printer_doc = frappe.get_doc("Network Printer Settings", printer_setting)
+    result = printer_doc.print_doc(
+        doctype=doctype,
+        name=name,
+        print_format=print_format,
+        doc=doc,
+        no_letterhead=no_letterhead,
+        job_type="BILL",
+        extra_metadata={
+            "invoice": name,
+            "table": restaurant_table,
+            "restaurant_table": restaurant_table,
+            "job_owner": getattr(frappe.session, "user", "Administrator"),
+        },
+    )
 
-        try:
-            import cups
-        except ImportError:
-            return "Failed to import cups"
+    if isinstance(result, dict) and result.get("status") == "Success":
+        result["invoice"] = name
 
-        try:
-            cups.setServer(print_settings.server_ip)
-            cups.setPort(print_settings.port)
-            conn = cups.Connection()
-        except Exception as e:
-            return f"Failed to connect to the printer: {str(e)}"
+        from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
+        trigger_manufacture_on_bill_print(name)
 
-        try:
-            output = PdfWriter()
-            output = frappe.get_print(
-                doctype,
-                name,
-                print_format,
-                doc=doc,
-                no_letterhead=no_letterhead,
-                as_pdf=True,
-                output=output,
-            )
-            file_path = os.path.join(
-                "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
-            )
-            try:
-                with open(file_path, "wb") as f:
-                    output.write(f)
-                conn.printFile(print_settings.printer_name, file_path, name, {})
-
-                restaurant_table, invoice_printed, name = frappe.db.get_value(
-                    "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
-                )
-
-                if restaurant_table and invoice_printed == 0:
-                    _mark_invoice_printed(name, was_printed=0)
-                    release_merge_cluster_tables(restaurant_table)
-                else:
-                    _mark_invoice_printed(name, was_printed=invoice_printed)
-
-                from ury.ury.api.ury_fulfilment_posting_service import trigger_manufacture_on_bill_print
-                trigger_manufacture_on_bill_print(name)
-
-                return "Success"
-            finally:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-        except Exception as e:
-            return f"Failed to print: {str(e)}"
-    except Exception as e:
-        import traceback
-
-        traceback.print_exc()  # Print the full traceback for debugging
-        return f"An error occurred: {str(e)}"
+    return PrintResult(result) if isinstance(result, dict) else result
 
 
 @frappe.whitelist()
@@ -120,34 +99,45 @@ def select_network_printer(pos_profile, invoice_id, print_format=None):
     if not print_format:
         print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
 
+    print_jobs = []
+    bill_printers = []
+
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
-        room_bill_printers = frappe.get_all(
+        bill_printers = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": room, "parenttype": "URY Room", "bill": 1},
             pluck="printer",
             order_by="idx"
         )
-        if room_bill_printers:
-            for printer in room_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
-            return print
-
     else:
-        pos_bill_printers = frappe.get_all(
+        bill_printers = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},
             pluck="printer",
             order_by="idx"
         )
-        if pos_bill_printers:
-            for printer in pos_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
-            return print
+
+    if bill_printers:
+        for printer in bill_printers:
+            print_result = network_printing(
+                "POS Invoice", invoice_id, printer, print_format
+            )
+            print_jobs.append(print_result)
+
+    any_succeeded = any(
+        (isinstance(job, dict) and job.get("status") == "Success") or job == "Success"
+        for job in print_jobs
+    )
+
+    if not bill_printers:
+        return None
+
+    return PrintResult({
+        "status": "Success" if any_succeeded else "Failure",
+        "print_jobs": print_jobs,
+        "invoice": invoice_id,
+    })
 
 
 @frappe.whitelist()
