@@ -64,6 +64,13 @@ def network_printing(
     if doctype == "POS Invoice":
         restaurant_table = frappe.db.get_value("POS Invoice", name, "restaurant_table")
 
+    if not print_format and doctype == "POS Invoice":
+        pos_profile = getattr(doc, "pos_profile", None) or frappe.db.get_value("POS Invoice", name, "pos_profile")
+        if pos_profile:
+            print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+        if not print_format:
+            print_format = "POS Invoice"
+
     printer_doc = frappe.get_doc("Network Printer Settings", printer_setting)
     result = printer_doc.print_doc(
         doctype=doctype,
@@ -96,21 +103,32 @@ def select_network_printer(pos_profile, invoice_id, print_format=None):
         frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
 
     table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
-    if not print_format:
+    if not print_format and pos_profile:
         print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+    if not print_format:
+        print_format = "POS Invoice"
 
     print_jobs = []
     bill_printers = []
 
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
+        if room:
+            bill_printers = frappe.get_all(
+                "URY Printer Settings",
+                filters={"parent": room, "parenttype": "URY Room", "bill": 1},
+                pluck="printer",
+                order_by="idx"
+            )
+    else:
         bill_printers = frappe.get_all(
             "URY Printer Settings",
-            filters={"parent": room, "parenttype": "URY Room", "bill": 1},
+            filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},
             pluck="printer",
             order_by="idx"
         )
-    else:
+
+    if not bill_printers and pos_profile:
         bill_printers = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},

@@ -78,6 +78,8 @@ def submit_and_monitor_print_job(
         pos_profile = getattr(target_doc, "pos_profile", None) or frappe.db.get_value("POS Invoice", name, "pos_profile")
         if pos_profile:
             resolved_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+        if not resolved_format:
+            resolved_format = "POS Invoice"
 
     pdf_content = frappe.get_print(
         doctype,

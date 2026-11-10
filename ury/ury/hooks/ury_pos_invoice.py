@@ -406,11 +406,21 @@ def calculate_and_set_times(doc, method=None):
 
 
 def validate_invoice_print(doc, method):
+    if not doc.restaurant_table:
+        return
+
+    pos_profile = getattr(doc, "pos_profile", None)
+    if pos_profile:
+        enable_pwp = frappe.db.get_value(
+            "POS Profile", pos_profile, "custom_enable_payment_without_printing"
+        )
+        if enable_pwp:
+            return
+
     # Check if the invoice has been printed
     invoice_printed = frappe.db.get_value("POS Invoice", doc.name, "invoice_printed") or 0
 
-    # If the invoice is associated with a restaurant table and hasn't been printed
-    if doc.restaurant_table and invoice_printed == 0:
+    if invoice_printed == 0:
         frappe.throw(
             "Printing the invoice is mandatory before submitting. Please print the invoice."
         )

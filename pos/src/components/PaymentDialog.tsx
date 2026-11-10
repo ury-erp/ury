@@ -11,7 +11,7 @@ import { resolvePrintFormat, type POSInvoice } from '../lib/invoice-api';
 
 
 interface PaymentDialogProps {
-  order?: Pick<POSInvoice, 'custom_merged_pos_invoice'> | null;
+  order?: (Pick<POSInvoice, 'custom_merged_pos_invoice'> & { invoice_printed?: string | number }) | null;
   onClose: () => void;
   grandTotal: number;
   roundedTotal: number;
@@ -46,8 +46,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   discountAmount
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
+  const enablePaymentWithoutPrinting = Boolean(
+    Number(storePosProfile?.enable_payment_without_printing) === 1 ||
+    Number((storePosProfile as any)?.custom_enable_payment_without_printing) === 1
+  );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [printInvoice, setPrintInvoice] = useState(true);
+  const [printInvoice, setPrintInvoice] = useState(enablePaymentWithoutPrinting);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
   
@@ -148,7 +152,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       const wasAlreadyPrinted = order ? String(order.invoice_printed) !== '0' : false;
-      if (!printInvoice && !wasAlreadyPrinted) {
+      if (!enablePaymentWithoutPrinting && !wasAlreadyPrinted) {
         setError(t('errors.please_print_first'));
         showToast.error(t('errors.please_print_first'));
         setIsProcessing(false);
@@ -359,7 +363,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
 
           {/* Print Invoice Checkbox */}
-          {(Number(storePosProfile?.enable_payment_without_printing) === 1 || Number((storePosProfile as any)?.custom_enable_payment_without_printing) === 1) && (
+          {enablePaymentWithoutPrinting && (
             <div className="mb-4 flex items-center gap-2">
               <input
                 id="print-invoice-checkbox"
