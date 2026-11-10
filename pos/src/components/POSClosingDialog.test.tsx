@@ -214,7 +214,7 @@ describe("POSClosingDialog", () => {
     });
   });
 
-  it("prevents submission if closing amounts are not entered", async () => {
+  it("allows submission with blank closing amount fields", async () => {
     render(
       <POSClosingDialog
         open={true}
@@ -226,8 +226,11 @@ describe("POSClosingDialog", () => {
       expect(screen.getByText("pos_closing.submit")).toBeInTheDocument();
     });
 
+    // No closing amount is entered; blank inputs must not block submission.
+    expect(screen.queryByText("pos_closing.validation_missing_rows")).not.toBeInTheDocument();
+    expect(screen.queryByText("pos_closing.validation_all_zero")).not.toBeInTheDocument();
     const submitButton = screen.getByText("pos_closing.submit") as HTMLButtonElement;
-    expect(submitButton).toBeDisabled();
+    expect(submitButton).toBeEnabled();
   });
 
   it("calls onOpenChange with false when cancel is clicked", async () => {
