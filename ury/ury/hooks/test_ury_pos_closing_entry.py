@@ -17,6 +17,7 @@ Pinned here:
   4. An invoice outside the period window is excluded.
 """
 
+import unittest
 from unittest.mock import patch
 
 import frappe
@@ -146,3 +147,56 @@ class TestPopulatePosTransactions(FrappeTestCase):
 			populate_pos_transactions(doc, "validate")
 		self.assertEqual(get_all.call_count, 0)
 		self.assertEqual(doc.pos_transactions, [{"pos_invoice": "PRESET-1"}])
+
+
+class TestWastageClosingCheck(unittest.TestCase):
+	"""validate_ported_checks() requires a submitted URY Wastage whose datetime
+	falls inside the closing period, regardless of its posting date/time.
+
+	The module-level ``frappe`` reference is replaced with a mock so the check
+	runs without a bound site or database."""
+
+	def _profile(self):
+		return frappe._dict(
+			branch="Branch A",
+			warehouse="WH-1",
+			validate_stock_correction=0,
+			validate_daily_p_and_l=0,
+			validate_attendance=0,
+			validate_wastage=1,
+		)
+
+	def _doc(self):
+		return frappe._dict(
+			pos_profile="Profile-1",
+			period_start_date="2026-10-23 00:00:00",
+			period_end_date="2026-10-23 23:59:59",
+		)
+
+	def test_passes_when_wastage_datetime_in_period(self):
+		from unittest.mock import MagicMock
+		from ury.ury.hooks.ury_pos_closing_entry import validate_ported_checks
+
+		fake_frappe = MagicMock()
+		fake_frappe.get_doc.return_value = self._profile()
+		fake_frappe.db.sql.return_value = [{"name": "WSTG-00001"}]
+		with patch(f"{MODULE}.frappe", fake_frappe):
+			validate_ported_checks(self._doc(), "before_submit")
+
+		fake_frappe.throw.assert_not_called()
+		query = fake_frappe.db.sql.call_args[0][0]
+		self.assertIn("`datetime`", query)
+		self.assertNotIn("TIMESTAMP(posting_date", query)
+
+	def test_blocks_when_no_wastage_datetime_in_period(self):
+		from unittest.mock import MagicMock
+		from ury.ury.hooks.ury_pos_closing_entry import validate_ported_checks
+
+		fake_frappe = MagicMock()
+		fake_frappe.get_doc.return_value = self._profile()
+		fake_frappe.db.sql.return_value = []
+		with patch(f"{MODULE}.frappe", fake_frappe):
+			validate_ported_checks(self._doc(), "before_submit")
+
+		fake_frappe.throw.assert_called_once()
+		self.assertIn("Wastage: No recording for today", fake_frappe.throw.call_args[0][0])
