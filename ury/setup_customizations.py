@@ -538,6 +538,17 @@ def get_custom_fields():
 			}
 		],
 
+		"Network Printer Settings": [
+			{
+				"fieldname": "custom_printer_queue_name",
+				"fieldtype": "Data",
+				"insert_after": "printer_name",
+				"label": "Printer Queue Name",
+				"description": "CUPS queue name for this printer. Used by URY Print Job and printer health matching.",
+				"translatable": 0,
+			}
+		],
+
 		"URY KOT": [
 			{
 				"fieldname": "custom_merged_tables",
