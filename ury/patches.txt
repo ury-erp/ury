@@ -45,3 +45,4 @@ ury.patches.v3_43.set_pos_invoice_type
 ury.patches.v3_39.add_pos_profile_enable_payment_without_printing
 ury.patches.v3_39.set_pos_invoice_default_print_format
 ury.patches.v3_43.add_network_printer_settings_queue_name
+ury.patches.v3_44.backfill_wastage_datetime
