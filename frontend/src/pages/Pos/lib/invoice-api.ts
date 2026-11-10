@@ -243,11 +243,17 @@ export async function networkPrint(orderId: string, printer: string, printFormat
 }
 
 export async function selectNetworkPrinter(orderId: string, posProfile: string, printFormat?: string | null) {
-  await call.post('ury.ury.api.ury_print.select_network_printer', {
+  const res = await call.post('ury.ury.api.ury_print.select_network_printer', {
     invoice_id: orderId,
     pos_profile: posProfile,
     print_format: printFormat,
   });
+  if (res?.message === null || res?.message === undefined) {
+    throw new Error('No bill printer configured for this order. Please configure a bill printer in POS Profile or Room.');
+  }
+  if (res?.message?.status === 'Failure') {
+    throw new Error(res?.message?.message || 'Print job failed');
+  }
 }
 
 
