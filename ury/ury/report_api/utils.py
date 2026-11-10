@@ -18,6 +18,30 @@ def require_manager():
 		)
 
 
+def require_dashboard_user():
+	"""Raise frappe.PermissionError unless the current user has POS/dashboard
+	access (URY Cashier, URY Captain, URY Manager, URY Admin, URY Owner,
+	Manager, System Manager, or Administrator).
+	"""
+	allowed_roles = {
+		"URY Cashier",
+		"URY Captain",
+		"URY Manager",
+		"URY Admin",
+		"URY Owner",
+		"Manager",
+		"System Manager",
+	}
+	user_roles = set(frappe.get_roles())
+	if frappe.session.user == "Administrator":
+		return
+	if not allowed_roles & user_roles:
+		frappe.throw(
+			"You do not have permission to access this resource.",
+			frappe.PermissionError,
+		)
+
+
 def user_has_branch_access(user, branch):
 	"""True if `user` is assigned to `branch` via Branch's `user` child table
 	(rows of URY User, each linking a User in its own `user` field), or if

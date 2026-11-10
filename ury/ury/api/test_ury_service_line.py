@@ -12,7 +12,7 @@ from ury.ury.api.ury_service_line import (
 class TestGetServiceLine(FrappeTestCase):
 
     def setUp(self):
-        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        patcher = patch("ury.ury.api.ury_service_line.require_dashboard_user")
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -206,7 +206,7 @@ class TestGetServiceLine(FrappeTestCase):
 class TestGetRunningLow(FrappeTestCase):
 
     def setUp(self):
-        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        patcher = patch("ury.ury.api.ury_service_line.require_dashboard_user")
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -387,14 +387,14 @@ class TestBinActualQty(FrappeTestCase):
 
 
 class TestServiceLineRealPermissionBoundary(FrappeTestCase):
-	"""Real (non-mocked) coverage of `require_manager()` for this module.
+	"""Real (non-mocked) coverage of `require_dashboard_user()` for this module.
 
-	Every test class above in this file patches `require_manager` out
+	Every test class above in this file patches `require_dashboard_user` out
 	entirely, so the actual permission gate guarding `get_service_line()`
 	and `get_running_low()` has never been exercised against a real
 	session/role table -- only the business logic behind it has. This uses
-	`frappe.set_user()` with a real, role-less user and asserts the actual
-	`frappe.PermissionError`.
+	`frappe.set_user()` with a real, role-less user and a real URY Cashier
+	user, asserting the actual `frappe.PermissionError` (or its absence).
 	"""
 
 	@classmethod
@@ -404,6 +404,9 @@ class TestServiceLineRealPermissionBoundary(FrappeTestCase):
 
 		cls.no_role_user = make_user(
 			email="p4r3-serviceline-norole@ury.test", roles=[]
+		).name
+		cls.cashier_user = make_user(
+			email="p4r3-serviceline-cashier@ury.test", roles=["URY Cashier"]
 		).name
 
 	def tearDown(self):
@@ -418,3 +421,13 @@ class TestServiceLineRealPermissionBoundary(FrappeTestCase):
 		frappe.set_user(self.no_role_user)
 		with self.assertRaises(frappe.PermissionError):
 			get_running_low()
+
+	def test_get_service_line_allows_cashier_user(self):
+		frappe.set_user(self.cashier_user)
+		result = get_service_line()
+		self.assertIsInstance(result, list)
+
+	def test_get_running_low_allows_cashier_user(self):
+		frappe.set_user(self.cashier_user)
+		result = get_running_low()
+		self.assertIsInstance(result, list)

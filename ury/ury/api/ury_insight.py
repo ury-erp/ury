@@ -1,6 +1,6 @@
 import frappe
 
-from ury.ury.report_api.utils import require_manager
+from ury.ury.report_api.utils import require_dashboard_user, require_manager
 
 
 @frappe.whitelist(methods=["GET"])
@@ -16,7 +16,7 @@ def get_active_insights(branch=None, max_age_hours=24):
 	open" card from days ago would sit on the dashboard until a human
 	dismissed it by hand.
 	"""
-	require_manager()
+	require_dashboard_user()
 
 	filters = {
 		"dismissed": 0,
