@@ -1,0 +1,179 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"opsYesHdr\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Yesterday</b></span>\", \"col\": 12}}, {\"id\": \"opsYesSales\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Yesterday Sales\", \"col\": 4}}, {\"id\": \"opsYesBills\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Yesterday Bills\", \"col\": 4}}, {\"id\": \"opsYesAvg\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Yesterday Average Bill\", \"col\": 4}}, {\"id\": \"opsTodHdr\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Today</b></span>\", \"col\": 12}}, {\"id\": \"opsTodSales\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Today Sales\", \"col\": 4}}, {\"id\": \"opsTodBills\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Today Bills\", \"col\": 4}}, {\"id\": \"opsTodAvg\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Today Average Bill\", \"col\": 4}}, {\"id\": \"opsCancel\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Cancelled Bills\", \"col\": 4}}, {\"id\": \"opsUnsettled\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Unsettled Bills\", \"col\": 4}}, {\"id\": \"opsKots\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"URY Ops Open KOTs\", \"col\": 4}}, {\"id\": \"opsWaiterHdr\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Sales by Waiter - Last 7 Days</b></span>\", \"col\": 12}}, {\"id\": \"opsWaiter\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"URY Waiter Sales 7 Days\", \"col\": 12}}, {\"id\": \"opsLinksHdr\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Shortcuts</b></span>\", \"col\": 12}}, {\"id\": \"opsSc00\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Open POS\", \"col\": 3}}, {\"id\": \"opsSc01\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"URY Console\", \"col\": 3}}, {\"id\": \"opsSc02\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Kitchen Orders\", \"col\": 3}}, {\"id\": \"opsSc03\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tables\", \"col\": 3}}, {\"id\": \"opsSc04\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Invoices\", \"col\": 3}}, {\"id\": \"opsSc05\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sub POS Closing\", \"col\": 3}}, {\"id\": \"opsSc06\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Opening Entry\", \"col\": 3}}, {\"id\": \"opsSc07\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Closing Entry\", \"col\": 3}}, {\"id\": \"opsSc08\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ordering Sessions\", \"col\": 3}}, {\"id\": \"opsSc09\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Service Requests\", \"col\": 3}}, {\"id\": \"opsSc10\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Rooms\", \"col\": 3}}, {\"id\": \"opsSc11\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Payment Terminals\", \"col\": 3}}, {\"id\": \"opsSc12\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Terminal Transactions\", \"col\": 3}}, {\"id\": \"opsSc13\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Checklist Log\", \"col\": 3}}, {\"id\": \"opsSc14\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"KOT Error Log\", \"col\": 3}}]",
+ "creation": "2026-11-10 12:00:00.000000",
+ "custom_blocks": [
+  {
+   "custom_block_name": "URY Waiter Sales 7 Days",
+   "label": "Sales by Waiter"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "dashboard",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Daily Operations",
+ "links": [],
+ "modified": "2026-11-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Daily Operations",
+ "number_cards": [
+  {
+   "label": "Yesterday's Sales",
+   "number_card_name": "URY Ops Yesterday Sales"
+  },
+  {
+   "label": "Yesterday's Bills",
+   "number_card_name": "URY Ops Yesterday Bills"
+  },
+  {
+   "label": "Yesterday's Average Bill Value",
+   "number_card_name": "URY Ops Yesterday Average Bill"
+  },
+  {
+   "label": "Today's Sales",
+   "number_card_name": "URY Ops Today Sales"
+  },
+  {
+   "label": "Today's Bills",
+   "number_card_name": "URY Ops Today Bills"
+  },
+  {
+   "label": "Today's Average Bill Value",
+   "number_card_name": "URY Ops Today Average Bill"
+  },
+  {
+   "label": "Cancelled Bills",
+   "number_card_name": "URY Ops Cancelled Bills"
+  },
+  {
+   "label": "Unsettled Bills",
+   "number_card_name": "URY Ops Unsettled Bills"
+  },
+  {
+   "label": "Open KOTs",
+   "number_card_name": "URY Ops Open KOTs"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Cashier"
+  },
+  {
+   "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
+  },
+  {
+   "role": "URY Owner"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 34.0,
+ "shortcuts": [
+  {
+   "label": "Open POS",
+   "type": "URL",
+   "url": "/pos"
+  },
+  {
+   "label": "URY Console",
+   "type": "URL",
+   "url": "/ury"
+  },
+  {
+   "label": "Kitchen Orders",
+   "type": "DocType",
+   "link_to": "URY KOT",
+   "doc_view": "List"
+  },
+  {
+   "label": "Tables",
+   "type": "DocType",
+   "link_to": "URY Table",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Invoices",
+   "type": "DocType",
+   "link_to": "POS Invoice",
+   "doc_view": "List"
+  },
+  {
+   "label": "Sub POS Closing",
+   "type": "DocType",
+   "link_to": "Sub POS Closing",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Opening Entry",
+   "type": "DocType",
+   "link_to": "POS Opening Entry",
+   "doc_view": "List"
+  },
+  {
+   "label": "POS Closing Entry",
+   "type": "DocType",
+   "link_to": "POS Closing Entry",
+   "doc_view": "List"
+  },
+  {
+   "label": "Ordering Sessions",
+   "type": "DocType",
+   "link_to": "URY Ordering Session",
+   "doc_view": "List"
+  },
+  {
+   "label": "Service Requests",
+   "type": "DocType",
+   "link_to": "URY Service Request",
+   "doc_view": "List"
+  },
+  {
+   "label": "Rooms",
+   "type": "DocType",
+   "link_to": "URY Room",
+   "doc_view": "List"
+  },
+  {
+   "label": "Payment Terminals",
+   "type": "DocType",
+   "link_to": "URY Payment Terminal",
+   "doc_view": "List"
+  },
+  {
+   "label": "Terminal Transactions",
+   "type": "DocType",
+   "link_to": "URY Payment Terminal Transaction",
+   "doc_view": "List"
+  },
+  {
+   "label": "Checklist Log",
+   "type": "DocType",
+   "link_to": "URY POS Checklist Log",
+   "doc_view": "List"
+  },
+  {
+   "label": "KOT Error Log",
+   "type": "DocType",
+   "link_to": "URY KOT Error Log",
+   "doc_view": "List"
+  }
+ ],
+ "title": "Daily Operations",
+ "standard": 1,
+ "type": "Workspace",
+ "link_type": "DocType"
+}

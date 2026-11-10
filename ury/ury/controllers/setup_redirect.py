@@ -228,8 +228,22 @@ def extend_bootinfo(bootinfo):
     if (repaired or bootinfo.get("home_page") == _WIZARD_HOME_PAGE) and _is_setup_complete_safe():
         bootinfo["home_page"] = _DESK_HOME_PAGE
 
+    # Cashier-only users get the Daily Operations workspace in Desk instead of a
+    # bounce to /pos; everyone else keeps the role-restricted landing below.
+    cashier_only = False
+    try:
+        from ury.ury.controllers.cashier_desk_guard import shape_bootinfo
+        from ury.ury.utils.cashier_desk import is_cashier_only
+
+        cashier_only = bool(complete and is_cashier_only())
+        if cashier_only:
+            shape_bootinfo(bootinfo)
+    except Exception:
+        frappe.log_error(title="URY cashier desk boot failed")
+        cashier_only = False
+
     # Role-restricted landing for cashier / captain-only users.
-    if complete:
+    if complete and not cashier_only:
         restricted = _role_based_home_page()
         if restricted:
             bootinfo["ury_role_home_page"] = restricted

@@ -21,5 +21,16 @@
      "roles": [],
      "script": "",
      "style": ".container {\n    min-height:40px;\n    display:flex;\n    align-items:center;\n    justify-content:center;\n}\n\n.uryposlogo {\n  font-size:20px;\n}"
+    },
+    {
+     "docstatus": 0,
+     "doctype": "Custom HTML Block",
+     "html": "<div class=\"ury-waiter-sales\">\n  <div class=\"ury-waiter-empty text-muted\" style=\"display:none\"></div>\n  <div class=\"ury-waiter-chart\"></div>\n</div>",
+     "modified": "2026-11-10 12:00:00.000000",
+     "name": "URY Waiter Sales 7 Days",
+     "private": 0,
+     "roles": [],
+     "script": "const mount = root_element.querySelector('.ury-waiter-chart');\nconst empty = root_element.querySelector('.ury-waiter-empty');\nlet chart = null;\nlet timer = null;\n\nfunction show_empty(message) {\n\tempty.textContent = message;\n\tempty.style.display = '';\n\tmount.style.display = 'none';\n}\n\nfunction render(data) {\n\tconst datasets = (data.datasets || []).filter(function (d) {\n\t\treturn d.values.some(function (v) { return v; });\n\t});\n\tif (!datasets.length) {\n\t\tshow_empty(__('No sales in the last 7 days'));\n\t\treturn;\n\t}\n\tempty.style.display = 'none';\n\tmount.style.display = '';\n\tconst args = {\n\t\ttype: 'bar',\n\t\theight: 300,\n\t\tcolors: frappe.utils.get_chart_palette(),\n\t\tdata: {\n\t\t\tlabels: data.labels,\n\t\t\tdatasets: datasets.map(function (d) { return { name: d.name, values: d.values }; })\n\t\t},\n\t\taxisOptions: { xIsSeries: 1 },\n\t\tbarOptions: { spaceRatio: 0.4 },\n\t\ttooltipOptions: { formatTooltipY: function (v) { return format_currency(v); } }\n\t};\n\tif (chart) {\n\t\tchart.update(args.data);\n\t} else {\n\t\tchart = new frappe.Chart(mount, args);\n\t}\n}\n\nfunction load() {\n\tif (!root_element.host || !root_element.host.isConnected) {\n\t\tclearInterval(timer);\n\t\treturn;\n\t}\n\tfrappe.xcall('ury.ury.api.cashier_dashboard.get_waiter_sales_chart').then(render).catch(function () {\n\t\tshow_empty(__('Sales by waiter is not available'));\n\t});\n}\n\nload();\ntimer = setInterval(load, 60000);",
+     "style": ".ury-waiter-sales { padding: var(--padding-md, 12px); }\n.ury-waiter-empty { padding: 24px 0; text-align: center; }"
     }
 ]

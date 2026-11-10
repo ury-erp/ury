@@ -40,6 +40,8 @@ app_include_js = [
     "/assets/ury/js/ury_order_checklist.js",
     "/assets/ury/js/autofetch_fields.js",
     "/assets/ury/js/insights_guard.js",
+    # Keeps cashier-only users inside the Daily Operations workspace (UX layer).
+    "/assets/ury/js/cashier_desk_guard.js",
 ]
 
 # include js, css files in header of web template
@@ -213,6 +215,13 @@ before_uninstall = "ury.uninstall.uninstall"
 
 permission_query_conditions = {
     "Quality Review": "ury.ury.hooks.checklist.permission_checklists",
+    # Cashier-only users can only list the Daily Operations workspace.
+    "Workspace": "ury.ury.controllers.cashier_desk_guard.workspace_permission_query_conditions",
+}
+
+# Controller hooks can only deny. Cashier-only users may only read Daily Operations.
+has_permission = {
+    "Workspace": "ury.ury.controllers.cashier_desk_guard.workspace_has_permission",
 }
 
 # DocType Class
@@ -407,7 +416,9 @@ before_tests = "ury.install.before_tests"
 # ------------------------------
 #
 override_whitelisted_methods = {
-	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data"
+	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data",
+	# Serves only the Daily Operations workspace to cashier-only users.
+	"frappe.desk.desktop.get_desktop_page": "ury.ury.controllers.cashier_desk_guard.get_desktop_page",
 }
 #
 # each overriding function accepts a `data` argument;
@@ -441,6 +452,8 @@ website_path_resolver = [
 before_request = [
     "ury.ury.api.wa_signature.guard_whatsapp_webhook",
     "ury.ury.api.chairman_link.guard_brief_only_session",
+    # Cashier-only users: Desk page loads outside Daily Operations are redirected.
+    "ury.ury.controllers.cashier_desk_guard.guard_desk_page_load",
 ]
 after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
