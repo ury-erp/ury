@@ -29,6 +29,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import os
+from datetime import datetime
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = []
@@ -401,6 +402,12 @@ class TestEndOfDayFlow(unittest.TestCase):
 						return_value="2026-10-23 22:30:00")
 		patcher.start()
 		self.addCleanup(patcher.stop)
+		# before_submit stamps datetime with now_datetime(), which reads the system
+		# timezone through frappe.db; stub it so the db mocks in these tests stay isolated.
+		patcher = patch(f"{CONTROLLER_MODULE}.now_datetime",
+						return_value=datetime(2026, 10, 23, 22, 30, 0))
+		patcher.start()
+		self.addCleanup(patcher.stop)
 
 	# -- validate() --------------------------------------------------------
 
@@ -742,3 +749,82 @@ class IntegrationTestURYWastage(unittest.TestCase):
 	EXTRA_TEST_RECORD_DEPENDENCIES = []
 	IGNORE_TEST_RECORD_DEPENDENCIES = []
 	pass
+
+
+# ---------------------------------------------------------------------------
+# Datetime field and posting date/time rules
+# ---------------------------------------------------------------------------
+
+class TestWastageDatetimeAndPostingRules(unittest.TestCase):
+	"""datetime is set on every draft save: the save time, or the user's posting
+	date/time when Edit Posting Date is ticked manually. Submit does not recompute
+	it, and the POS Profile posting override never changes it."""
+
+	SAVE_NOW = datetime(2026, 10, 23, 22, 30, 0)
+
+	def setUp(self):
+		patcher = patch(f"{CONTROLLER_MODULE}.now_datetime", return_value=self.SAVE_NOW)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def _validate(self, doc):
+		from ury.ury.doctype.ury_wastage.ury_wastage import URYWastage
+
+		with patch.object(URYWastage, "validate_item_stock", return_value=None):
+			doc.validate()
+
+	def _before_submit(self, doc, pos_override_configured):
+		from ury.ury.doctype.ury_wastage.ury_wastage import URYWastage
+
+		get_value_side_effect = [1, "2026-10-23"] if pos_override_configured else [0]
+		with patch(f"{CONTROLLER_MODULE}.frappe.db.has_column", return_value=True), \
+			 patch(f"{CONTROLLER_MODULE}.frappe.get_value", side_effect=get_value_side_effect), \
+			 patch(f"{CONTROLLER_MODULE}.frappe.db.exists", return_value="POE-1"), \
+			 patch(f"{CONTROLLER_MODULE}.frappe.db.get_value", return_value="23:00:00"), \
+			 patch.object(URYWastage, "validate_item_stock", return_value=None):
+			doc.before_submit()
+
+	def test_draft_save_without_manual_edit_sets_save_time(self):
+		doc = _make_controller(wastage_source="Physical Audit", edit_posting_date=0,
+							   posting_date="2026-10-23", posting_time="10:00:00", docstatus=0)
+		self._validate(doc)
+		self.assertEqual(doc.datetime, self.SAVE_NOW)
+
+	def test_draft_save_with_manual_edit_uses_user_posting_date_time(self):
+		doc = _make_controller(wastage_source="Physical Audit", edit_posting_date=1,
+							   posting_date="2026-10-20", posting_time="09:15:00", docstatus=0)
+		self._validate(doc)
+		self.assertEqual(doc.datetime, datetime(2026, 10, 20, 9, 15, 0))
+
+	def test_submit_keeps_datetime_and_user_posting_values_when_manual(self):
+		doc = _make_controller(wastage_source="Physical Audit", edit_posting_date=1,
+							   posting_date="2026-10-20", posting_time="09:15:00", docstatus=0)
+		self._validate(doc)
+		doc.docstatus = 1
+		self._validate(doc)  # submit-time validate must not recompute datetime
+		self._before_submit(doc, pos_override_configured=True)
+		self.assertEqual(doc.datetime, datetime(2026, 10, 20, 9, 15, 0))
+		self.assertEqual(doc.posting_date, "2026-10-20")
+		self.assertEqual(doc.posting_time, "09:15:00",
+						  "manually entered posting_time must not be replaced by wastage time")
+
+	def test_pos_profile_override_applies_when_not_manual_and_datetime_untouched(self):
+		doc = _make_controller(wastage_source="Physical Audit", edit_posting_date=0,
+							   posting_date="2026-10-23", posting_time="10:00:00", docstatus=0)
+		self._validate(doc)
+		doc.docstatus = 1
+		self._before_submit(doc, pos_override_configured=True)
+		self.assertEqual(doc.posting_time, "23:00:00",
+						  "automatic POS Profile wastage time must still apply to posting_time")
+		self.assertEqual(doc.edit_posting_date, 1)
+		self.assertEqual(doc.datetime, self.SAVE_NOW,
+						  "datetime must stay the save time, not the POS Profile wastage time")
+
+	def test_kot_cancellation_draft_save_sets_save_time_and_skips_posting_override(self):
+		doc = _make_controller(wastage_source="KOT Cancellation", edit_posting_date=0,
+							   posting_date="2026-10-23", posting_time="10:00:00", docstatus=0)
+		self._validate(doc)
+		doc.docstatus = 1
+		self._before_submit(doc, pos_override_configured=True)
+		self.assertEqual(doc.posting_time, "10:00:00")
+		self.assertEqual(doc.datetime, self.SAVE_NOW)
