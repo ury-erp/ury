@@ -147,11 +147,10 @@ dashboards:
   - id: data_quality
     title: "Data readiness"
     filters:
-      # No date default on purpose: readiness counts are all-history (banner says so).
-      - {id: f_date, label: Date, type: date, icon: calendar, layout: {x: 0, y: 2, w: 10, h: 1}, applies_to: {fact_invoices: posting_date, fact_sales_lines_enriched: posting_date, fact_table_sessions: posting_date, fact_kot_exec: exec_date, fact_yield_checks: checked_on, fact_wastage_lines: posting_date}}
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 10, h: 1}, applies_to: {fact_invoices: posting_date, fact_sales_lines_enriched: posting_date, fact_table_sessions: posting_date, fact_kot_exec: exec_date, fact_yield_checks: checked_on, fact_wastage_lines: posting_date}}
       - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 10, y: 2, w: 10, h: 1}, applies_to: {fact_invoices: branch, fact_sales_lines_enriched: branch, fact_table_sessions: branch, fact_kot_exec: branch, fact_yield_checks: branch, fact_wastage_lines: branch}}
     items:
-      - text: "<p><b>Data readiness.</b> Which numbers you can trust today and what to start recording next; the order below is a suggestion. For the owner, monthly. Period: all history unless you pick dates.</p>"
+      - text: "<p><b>Data readiness.</b> Which numbers you can trust today and what to start recording next; the order below is a suggestion. For the owner, monthly. Default: last 30 days.</p>"
         x: 0
         y: 0
         w: 20

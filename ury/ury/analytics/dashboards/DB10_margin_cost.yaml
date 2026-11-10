@@ -118,12 +118,12 @@ dashboards:
   - id: margin_cost
     title: "Margin and cost"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, applies_to: {fact_daily_pnl: date, fact_sales_lines_enriched: posting_date, fact_gl_pnl: posting_date, fact_stock_outflow: posting_date, fact_cost_variance: computed_at}, layout: {x: 0, y: 2, w: 5, h: 1}}
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, applies_to: {fact_daily_pnl: date, fact_sales_lines_enriched: posting_date, fact_gl_pnl: posting_date, fact_stock_outflow: posting_date, fact_cost_variance: computed_at}, layout: {x: 0, y: 2, w: 5, h: 1}}
       - {id: f_branch, label: Branch, type: string, icon: map-pin, applies_to: {fact_daily_pnl: branch, fact_sales_lines_enriched: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
       - {id: f_category, label: Category, type: string, icon: tag, applies_to: {fact_sales_lines_enriched: menu_category}, layout: {x: 10, y: 2, w: 5, h: 1}}
       - {id: f_department, label: Department, type: string, icon: layers, applies_to: {fact_sales_lines_enriched: department}, layout: {x: 15, y: 2, w: 5, h: 1}}
     items:
-      - {text: "<p><b>Margin and cost.</b> What we keep after food and staff cost: the daily P and L, then a recipe estimate with its coverage first. For owner and finance. Default period: last 90 days. Demo figures.</p>", x: 0, y: 0, w: 20, h: 2}  # demo: remove last sentence on live sites
+      - {text: "<p><b>Margin and cost.</b> What we keep after food and staff cost: the daily P and L, then a recipe estimate with its coverage first. For owner and finance. Default period: last 30 days. Demo figures.</p>", x: 0, y: 0, w: 20, h: 2}  # demo: remove last sentence on live sites
       - {chart: db10_pnl_kpi, x: 0, y: 3, w: 5, h: 3}
       - {chart: db10_gross_margin, x: 5, y: 3, w: 5, h: 3}
       - {chart: db10_food_cost, x: 10, y: 3, w: 5, h: 3}

@@ -170,14 +170,14 @@ dashboards:
   - id: owner_overview
     title: "Owner overview"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, layout: {x: 0, y: 2, w: 7, h: 1},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1},
          applies_to: {fact_invoices: posting_date, fact_sales_lines_enriched: posting_date, fact_cancellations: posting_date, fact_kot_headers: date, fact_sales_plan_items: plan_date, fact_stock_correction: posting_date, fact_yield_checks: checked_on, fact_daily_pnl: date}}
       - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 7, y: 2, w: 7, h: 1},
          applies_to: {fact_invoices: branch, fact_sales_lines_enriched: branch, fact_cancellations: branch, fact_kot_headers: branch, fact_sales_plan_items: branch, fact_stock_correction: branch, fact_yield_checks: branch, fact_daily_pnl: branch}}
       - {id: f_population, label: Population, type: string, icon: users, layout: {x: 14, y: 2, w: 6, h: 1},
          applies_to: {fact_invoices: population, fact_sales_lines_enriched: population}}
     items:
-      - {text: "<p><b>Owner overview.</b> Is revenue growing, where does it come from, and is anything leaking? For the owner. Default period: last 90 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Owner overview.</b> Is revenue growing, where does it come from, and is anything leaking? For the owner. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db01_net_sales_kpi, x: 0, y: 3, w: 5, h: 3}
       - {chart: db01_bills_kpi, x: 5, y: 3, w: 5, h: 3}
       - {chart: db01_avg_bill_kpi, x: 10, y: 3, w: 5, h: 3}

@@ -159,7 +159,7 @@ dashboards:
   - id: leakage
     title: "Leakage"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"},
          layout: {x: 0, y: 2, w: 5, h: 1},
          applies_to: {fact_cancellations: posting_date, fact_cancellations_named: posting_date, fact_invoices: posting_date, fact_kot_exec: exec_date, fact_kot_headers: date, fact_kot_lines: date, fact_bills_all: posting_date, fact_returns: posting_date}}
       - {id: f_branch, label: Branch, type: string, icon: building-2,
@@ -172,7 +172,7 @@ dashboards:
          layout: {x: 15, y: 2, w: 5, h: 1},
          applies_to: {fact_cancellations: order_type, fact_cancellations_named: order_type, fact_invoices: order_type, fact_bills_all: order_type, fact_returns: order_type}}
     items:
-      - {text: "<p><b>Leakage.</b> How much was cancelled, discounted or billed at zero, why and by whom. For owner and finance. Default: last 90 days; aim for cancellations under 2% of net sales.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Leakage.</b> How much was cancelled, discounted or billed at zero, why and by whom. For owner and finance. Default: last 30 days; aim for cancellations under 2% of net sales.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db15_cnt, x: 0, y: 3, w: 5, h: 3}
       - {chart: db15_val, x: 5, y: 3, w: 5, h: 3}
       - {chart: db15_net, x: 10, y: 3, w: 5, h: 3}

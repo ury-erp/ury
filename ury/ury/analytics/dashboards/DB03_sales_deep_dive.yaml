@@ -91,12 +91,12 @@ dashboards:
   - id: sales_deep_dive
     title: "Sales deep-dive"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, applies_to: {fact_invoices: posting_date, fact_ordering_sessions: opened_at, fact_sales_target: period_start}, layout: {x: 0, y: 2, w: 5, h: 1}}
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, applies_to: {fact_invoices: posting_date, fact_ordering_sessions: opened_at, fact_sales_target: period_start}, layout: {x: 0, y: 2, w: 5, h: 1}}
       - {id: f_branch, label: Branch, type: string, icon: store, applies_to: {fact_invoices: branch, fact_sales_target: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
       - {id: f_order_type, label: "Order type", type: string, icon: utensils, applies_to: {fact_invoices: order_type}, layout: {x: 10, y: 2, w: 5, h: 1}}
       - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_invoices: waiter}, layout: {x: 15, y: 2, w: 5, h: 1}}
     items:
-      - {text: "<p><b>Sales deep-dive.</b> How much we sell, when, and through which channel. For owner, finance and branch manager. Default period: last 90 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Sales deep-dive.</b> How much we sell, when, and through which channel. For owner, finance and branch manager. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db03_net_sales_kpi, x: 0, y: 3, w: 4, h: 3}
       - {chart: db03_bills_kpi, x: 4, y: 3, w: 4, h: 3}
       - {chart: db03_avg_bill_kpi, x: 8, y: 3, w: 4, h: 3}

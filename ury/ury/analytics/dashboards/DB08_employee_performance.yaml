@@ -208,7 +208,7 @@ dashboards:
   - id: employee_performance
     title: "Staff performance"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, layout: {x: 0, y: 2, w: 5, h: 1},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 5, h: 1},
          applies_to: {fact_invoices_named: posting_date, fact_sales_lines_enriched: posting_date, fact_cancellations_named: posting_date, fact_kot_exec: exec_date, fact_service_charges: posting_date, fact_labour_hours: posting_date, fact_tips: posting_date}}
       - {id: f_branch, label: Branch, type: string, icon: building-2, layout: {x: 5, y: 2, w: 5, h: 1},
          applies_to: {fact_invoices_named: branch, fact_sales_lines_enriched: branch, fact_cancellations_named: branch, fact_kot_exec: branch, fact_service_charges: branch, fact_labour_hours: branch, fact_tips: branch}}
@@ -217,7 +217,7 @@ dashboards:
       - {id: f_order_type, label: Order type, type: string, icon: utensils, layout: {x: 15, y: 2, w: 5, h: 1},
          applies_to: {fact_invoices_named: order_type, fact_sales_lines_enriched: order_type, fact_tips: order_type}}
     items:
-      - {text: "<p><b>Staff performance, for managers only.</b> Use it to coach, not to judge: sales count for the person on the bill, cancellations for whoever opened the order. Paid bills only; default last 90 days.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Staff performance, for managers only.</b> Use it to coach, not to judge: sales count for the person on the bill, cancellations for whoever opened the order. Paid bills only; default last 30 days.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db08_kpi_atv, x: 0, y: 3, w: 5, h: 3}
       - {chart: db08_kpi_items, x: 5, y: 3, w: 5, h: 3}
       - {chart: db08_kpi_cover, x: 10, y: 3, w: 5, h: 3}

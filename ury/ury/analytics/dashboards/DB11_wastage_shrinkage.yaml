@@ -127,11 +127,11 @@ dashboards:
   - id: wastage_shrinkage
     title: "Stock count and wastage"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, layout: {x: 0, y: 2, w: 7, h: 1}, applies_to: {fact_stock_correction: posting_date, fact_kot_exec: exec_date, fact_wastage_lines: posting_date, fact_waste_vs_sales: posting_date, fact_kot_lines: date}}
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1}, applies_to: {fact_stock_correction: posting_date, fact_kot_exec: exec_date, fact_wastage_lines: posting_date, fact_waste_vs_sales: posting_date, fact_kot_lines: date}}
       - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 7, y: 2, w: 7, h: 1}, applies_to: {fact_stock_correction: branch, fact_kot_exec: branch, fact_wastage_lines: branch, fact_waste_vs_sales: branch, fact_kot_lines: branch}}
       - {id: f_item, label: Item, type: string, icon: package, layout: {x: 14, y: 2, w: 6, h: 1}, applies_to: {fact_stock_correction: item_code, fact_wastage_lines: item_code, fact_kot_lines: item}}
     items:
-      - {text: "<p><b>Stock count and wastage.</b> Where is stock going missing, and why? For the kitchen head and finance. Default period: last 90 days; every filter applies to every chart except Item on the cancelled KOT items tile.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Stock count and wastage.</b> Where is stock going missing, and why? For the kitchen head and finance. Default period: last 30 days; every filter applies to every chart except Item on the cancelled KOT items tile.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db11_shortage, x: 0, y: 3, w: 4, h: 3}
       - {chart: db11_excess, x: 4, y: 3, w: 4, h: 3}
       - {chart: db11_net, x: 8, y: 3, w: 4, h: 3}

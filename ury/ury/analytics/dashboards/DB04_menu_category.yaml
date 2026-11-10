@@ -77,13 +77,13 @@ dashboards:
   - id: db04_menu_category
     title: "Menu and category"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 90 days"}, applies_to: {fact_sales_lines_enriched: posting_date, db04_costed_lines: posting_date}, layout: {x: 0, y: 2, w: 5, h: 1}}
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, applies_to: {fact_sales_lines_enriched: posting_date, db04_costed_lines: posting_date}, layout: {x: 0, y: 2, w: 5, h: 1}}
       - {id: f_branch, label: Branch, type: string, icon: map-pin, applies_to: {fact_sales_lines_enriched: branch, db04_costed_lines: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
       - {id: f_category, label: Category, type: string, icon: tag, applies_to: {fact_sales_lines_enriched: menu_category, db04_costed_lines: menu_category}, layout: {x: 10, y: 2, w: 5, h: 1}}
       - {id: f_order_type, label: "Order type", type: string, icon: shopping-bag, applies_to: {fact_sales_lines_enriched: order_type, db04_costed_lines: order_type}, layout: {x: 15, y: 2, w: 5, h: 1}}
       # Department filter dropped: UX standard allows 4 visible filters max (Date, Branch, then two).
     items:
-      - {text: "<p><b>Menu and category.</b> Which dishes and categories earn, and which to promote, reprice or drop. For owner, branch manager and kitchen head. Default period: last 90 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Menu and category.</b> Which dishes and categories earn, and which to promote, reprice or drop. For owner, branch manager and kitchen head. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db04_net_sales_kpi, x: 0, y: 3, w: 5, h: 3}
       - {chart: db04_items_sold_kpi, x: 5, y: 3, w: 5, h: 3}
       - {chart: db04_dishes_kpi, x: 10, y: 3, w: 5, h: 3}

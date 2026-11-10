@@ -105,7 +105,7 @@ dashboards:
   - id: yield_recipe
     title: "Yield and recipe"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 12 Months"},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"},
          layout: {x: 0, y: 2, w: 5, h: 1},
          applies_to: {fact_yield_checks: checked_on, fact_stock_correction: posting_date}}
       - {id: f_branch, label: Branch, type: string, icon: building-2,
@@ -118,7 +118,7 @@ dashboards:
          layout: {x: 15, y: 2, w: 5, h: 1},
          applies_to: {fact_yield_checks: item, fact_stock_correction: item_code}}
     items:
-      - {text: "<p><b>Yield and recipe.</b> Which raw materials give less usable output than the recipe standard. For kitchen head. Default: last 12 months, kg items; good is within 5 points of standard.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<p><b>Yield and recipe.</b> Which raw materials give less usable output than the recipe standard. For kitchen head. Default: last 30 days, kg items; good is within 5 points of standard.</p>", x: 0, y: 0, w: 20, h: 2}
       - {chart: db12_kpi, x: 0, y: 3, w: 4, h: 3}
       - {chart: db12_kpi_std, x: 4, y: 3, w: 4, h: 3}
       - {chart: db12_kpi_below, x: 8, y: 3, w: 4, h: 3}
