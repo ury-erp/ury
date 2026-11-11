@@ -41,6 +41,8 @@ import { PrinterConfigPage } from './pages/Dashboard/PrinterConfigPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { Landing } from './components/Landing';
+import { NoAccess } from './components/NoAccess';
+import { URY_POS_ROUTES_ENABLED } from './lib/posRouteBlock';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ActiveReportProvider } from './components/chat/ActiveReportContext';
 import ChatWidget, {
@@ -366,42 +368,55 @@ function AppRoutes() {
         'URY Manager'-driven. Every other route above keeps the original
         SetupGuard -> RoleGuard -> AuthGuard chain unchanged.
       */}
-      <Route
-        path="pos"
-        element={
-          <Suspense fallback={<PosRouteFallback />}>
-            <PosLayout />
-          </Suspense>
-        }
-      >
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<PosDashboard />} />
-        <Route path="pos" element={<PosPOS />} />
-        <Route path="tables" element={<PosTable />} />
-        <Route path="orders" element={<PosOrders />} />
-        <Route path="settings" element={<PosSettings />} />
-        <Route path="open-entries" element={<PosOpenEntries />} />
-      </Route>
-      <Route
-        path="pos/order"
-        element={
-          <Suspense fallback={<PosRouteFallback />}>
-            <CaptainRouteGuard>
-              <CaptainTables />
-            </CaptainRouteGuard>
-          </Suspense>
-        }
-      />
-      <Route
-        path="pos/order/table/:table"
-        element={
-          <Suspense fallback={<PosRouteFallback />}>
-            <CaptainRouteGuard>
-              <CaptainOrder />
-            </CaptainRouteGuard>
-          </Suspense>
-        }
-      />
+      {/*
+        ####################################################################################
+        ##  /ury/pos/*  IS BLOCKED FOR ALL USERS FOR NOW  (see lib/posRouteBlock.ts)       ##
+        ####################################################################################
+        While `URY_POS_ROUTES_ENABLED` is false every `/pos` path renders "no access" and the
+        POS route tree below is not mounted. The server also returns 403 for these URLs
+        (`ury/www/ury.py`). Flip both switches to bring the routes back.
+      */}
+      {!URY_POS_ROUTES_ENABLED && <Route path="pos/*" element={<NoAccess />} />}
+      {URY_POS_ROUTES_ENABLED && (
+        <>
+        <Route
+          path="pos"
+          element={
+            <Suspense fallback={<PosRouteFallback />}>
+              <PosLayout />
+            </Suspense>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<PosDashboard />} />
+          <Route path="pos" element={<PosPOS />} />
+          <Route path="tables" element={<PosTable />} />
+          <Route path="orders" element={<PosOrders />} />
+          <Route path="settings" element={<PosSettings />} />
+          <Route path="open-entries" element={<PosOpenEntries />} />
+        </Route>
+        <Route
+          path="pos/order"
+          element={
+            <Suspense fallback={<PosRouteFallback />}>
+              <CaptainRouteGuard>
+                <CaptainTables />
+              </CaptainRouteGuard>
+            </Suspense>
+          }
+        />
+        <Route
+          path="pos/order/table/:table"
+          element={
+            <Suspense fallback={<PosRouteFallback />}>
+              <CaptainRouteGuard>
+                <CaptainOrder />
+              </CaptainRouteGuard>
+            </Suspense>
+          }
+        />
+        </>
+      )}
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

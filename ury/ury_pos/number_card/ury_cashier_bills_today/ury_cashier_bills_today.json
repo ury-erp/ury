@@ -1,0 +1,21 @@
+{
+ "creation": "2026-11-10 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "POS Invoice",
+ "dynamic_filters_json": "[[\"POS Invoice\", \"posting_date\", \"=\", \"frappe.datetime.get_today()\"]]",
+ "filters_json": "[[\"POS Invoice\", \"docstatus\", \"=\", \"1\"], [\"POS Invoice\", \"status\", \"in\", [\"Paid\", \"Consolidated\"]], [\"POS Invoice\", \"is_return\", \"=\", \"0\"]]",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Today's Bills",
+ "modified": "2026-11-11 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY POS",
+ "name": "URY Cashier Bills Today",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Document Type"
+}

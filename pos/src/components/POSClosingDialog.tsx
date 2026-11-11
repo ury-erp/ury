@@ -10,7 +10,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
-import { call, db, formatCurrency } from '@ury/core';
+import { call, db, formatCurrency, shouldMaskAmounts } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -51,6 +51,8 @@ interface OpeningEntryDoc {
   name: string;
   balance_details?: OpeningBalanceDetail[];
 }
+
+const MASKED = '—';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -288,6 +290,8 @@ function buildRows(
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
   const { posProfile } = usePOSStore();
   const { user } = useRootStore();
+  // Roles configured on the POS Profile do not see totals/expected amounts (display only).
+  const maskAmounts = shouldMaskAmounts(user, posProfile);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -674,13 +678,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.grandTotal)}
+                    {maskAmounts ? MASKED : formatCurrency(totals.grandTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.netTotal)}
+                    {maskAmounts ? MASKED : formatCurrency(totals.netTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
@@ -698,6 +702,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                   rows={rows}
                   touchedModes={touchedModes}
                   onChange={handleRowChange}
+                  hideExpected={maskAmounts}
                 />
               ) : (
                 <p className="py-8 text-center text-sm text-gray-500">

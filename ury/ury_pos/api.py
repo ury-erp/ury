@@ -898,6 +898,7 @@ def getPosProfileFull(pos_profile):
         "role_allowed_for_billing": [row.as_dict() for row in profile.role_allowed_for_billing],
         "role_restricted_for_table_order": [row.as_dict() for row in profile.role_restricted_for_table_order],
         "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
+        "role_masked_for_amounts": [row.as_dict() for row in (profile.get("role_masked_for_amounts") or [])],
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
         "print_format": profile.print_format,

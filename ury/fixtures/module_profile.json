@@ -1,0 +1,231 @@
+[
+ {
+  "doctype": "Module Profile",
+  "name": "URY Cashier",
+  "module_profile_name": "URY Cashier",
+  "block_modules": [
+   {
+    "doctype": "Block Module",
+    "module": "URY",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "EDI",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Subcontracting",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Bulk Transaction",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Telephony",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Communication",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Quality Management",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "ERPNext Integrations",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Regional",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Maintenance",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Portal",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Assets",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Utilities",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Support",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Stock",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Manufacturing",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Setup",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Selling",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Projects",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Buying",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "CRM",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Accounts",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Users",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Data",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Build",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "System",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Automation",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Contacts",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Printing",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Integrations",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Desk",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Geo",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Custom",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Email",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Workflow",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Website",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   },
+   {
+    "doctype": "Block Module",
+    "module": "Core",
+    "parentfield": "block_modules",
+    "parenttype": "Module Profile"
+   }
+  ]
+ }
+]

@@ -18,6 +18,22 @@ export const isUserRestrictedFromTableOrders = (
   return hasRestrictedRole;
 };
 
+/**
+ * True when POS amounts (grand/net total, expected amounts) must be hidden for the user.
+ * Driven only by the POS Profile's `role_masked_for_amounts`: any configured role masks, no role is exempt.
+ * Display-only: no calculation or submitted value depends on it.
+ */
+export const shouldMaskAmounts = (
+  user: User | null,
+  posProfile: PosProfileCombined | null
+): boolean => {
+  const maskedRoles = posProfile?.role_masked_for_amounts?.map((row) => row.role) ?? [];
+  if (!user?.roles || !maskedRoles.length) {
+    return false;
+  }
+  return user.roles.some((role) => maskedRoles.includes(role));
+};
+
 export const canCaptainTransfer = (
   user: User | null,
   posProfile: PosProfileCombined | null

@@ -11,6 +11,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
+import { isCashierOnly } from '../lib/roles';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
@@ -206,7 +207,10 @@ const Header = () => {
                       } catch (e) {
                         /* ignore */
                       }
-                      window.location.href = withReturnContext('/desk/ury');
+                      // Cashier-only users cannot open the URY workspace; send them to their dashboard.
+                      window.location.href = withReturnContext(
+                        isCashierOnly(user?.roles) ? '/desk/pos-operations' : '/desk/ury'
+                      );
                     }}
                   >
                     <Monitor className="w-4 h-4 me-3" />
