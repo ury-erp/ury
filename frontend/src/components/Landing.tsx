@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../store/useAuth';
 import { __ } from '../i18n';
+import { URY_POS_ROUTES_ENABLED } from '../lib/posRouteBlock';
+import { NoAccess } from './NoAccess';
 
 /**
  * Client-side-only role-aware landing redirect for the bare root URL ("/").
@@ -30,5 +32,15 @@ export function Landing() {
     );
   }
 
-  return <Navigate to={isManager ? '/dashboard' : '/pos/dashboard'} replace />;
+  if (isManager) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // BLOCKED FOR NOW: non-managers (e.g. a cashier opening the URY app from /desk) used to be
+  // sent to /pos/dashboard. That area is blocked for everyone, so show "no access" instead of
+  // redirecting. See lib/posRouteBlock.ts.
+  if (!URY_POS_ROUTES_ENABLED) {
+    return <NoAccess />;
+  }
+  return <Navigate to="/pos/dashboard" replace />;
 }

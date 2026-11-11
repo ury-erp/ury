@@ -10,7 +10,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
-import { db, formatCurrency } from '@ury/core';
+import { db, formatCurrency, shouldMaskAmounts } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -256,6 +256,8 @@ function buildRows(
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
   const { posProfile } = usePOSStore();
   const { user } = useRootStore();
+  // Roles configured on the POS Profile do not see totals/expected amounts (display only).
+  const maskAmounts = shouldMaskAmounts(user, posProfile);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -484,13 +486,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-text-tertiary">{t('pos_closing.grand_total')}</p>
                   <p className="text-lg font-semibold text-foreground">
-                    {formatCurrency(totals.grandTotal)}
+                    {maskAmounts ? '—' : formatCurrency(totals.grandTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-text-tertiary">{t('pos_closing.net_total')}</p>
                   <p className="text-lg font-semibold text-foreground">
-                    {formatCurrency(totals.netTotal)}
+                    {maskAmounts ? '—' : formatCurrency(totals.netTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
@@ -504,7 +506,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
               </div>
 
               {hasRows ? (
-                <ClosingPaymentTable rows={rows} onChange={handleRowChange} />
+                <ClosingPaymentTable rows={rows} onChange={handleRowChange} hideExpected={maskAmounts} />
               ) : (
                 <p className="py-8 text-center text-sm text-text-tertiary">
                   {t('pos_closing.no_invoices')}

@@ -1,0 +1,57 @@
+{
+ "app": "ury",
+ "charts": [],
+ "content": "[{\"id\": \"cashierCard0\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Today's Sales\", \"col\": 4}}, {\"id\": \"cashierCard1\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Today's Bills\", \"col\": 4}}, {\"id\": \"cashierCard2\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Average Bill Value\", \"col\": 4}}, {\"id\": \"cashierCard3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"cashierCard4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills\", \"col\": 4}}]",
+ "creation": "2026-11-10 12:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "dashboard",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "POS Operations",
+ "link_type": "DocType",
+ "links": [],
+ "modified": "2026-11-11 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY POS",
+ "name": "POS Operations",
+ "number_cards": [
+  {
+   "label": "Today's Sales",
+   "number_card_name": "URY Cashier Sales Today"
+  },
+  {
+   "label": "Today's Bills",
+   "number_card_name": "URY Cashier Bills Today"
+  },
+  {
+   "label": "Average Bill Value",
+   "number_card_name": "URY Cashier Average Bill"
+  },
+  {
+   "label": "Open KOTs",
+   "number_card_name": "URY Cashier Open Kots"
+  },
+  {
+   "label": "Unsettled Bills",
+   "number_card_name": "URY Cashier Unsettled Bills"
+  }
+ ],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Cashier"
+  }
+ ],
+ "sequence_id": 34.0,
+ "shortcuts": [],
+ "standard": 1,
+ "title": "POS Operations",
+ "type": "Workspace"
+}

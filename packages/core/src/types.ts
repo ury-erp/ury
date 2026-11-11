@@ -39,6 +39,8 @@ export interface PosProfileCombined {
   currency: string;
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
+  /** Roles that must not see grand/net total and expected amounts (POS Profile config). */
+  role_masked_for_amounts?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
   waiter: string;

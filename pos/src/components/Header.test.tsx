@@ -32,12 +32,15 @@ vi.mock("./PrinterWatch", () => ({
   ),
 }));
 
+const mockUser = vi.hoisted(() => ({ roles: [] as string[] }));
+
 vi.mock("../store/root-store", () => ({
   useRootStore: (selector: any) => {
     const state = {
       user: {
         name: "test_user",
         full_name: "Test User",
+        roles: mockUser.roles,
       },
       orderSearchQuery: "",
       setOrderSearchQuery: vi.fn(),
@@ -146,6 +149,32 @@ describe("Header", () => {
     expect(window.location.href).toContain("/desk/ury");
 
     window.location = originalLocation as any;
+  });
+
+  it.each([
+    [["URY Cashier"], "/desk/pos-operations"],
+    [["URY Cashier", "URY Manager"], "/desk/ury"],
+    [["URY Cashier", "URY Admin"], "/desk/ury"],
+    [["URY Cashier", "System Manager"], "/desk/ury"],
+  ])("switch to desk for roles %j goes to %s", async (roles, expected) => {
+    mockUser.roles = roles;
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Test User/i }));
+    await userEvent.click(screen.getByText("header.switch_to_desk"));
+
+    expect(window.location.href).toContain(expected);
+    expect(window.location.href).not.toContain("/pos/dashboard");
+
+    window.location = originalLocation as any;
+    mockUser.roles = [];
   });
 
   it("renders logo link to dashboard", () => {

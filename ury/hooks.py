@@ -619,6 +619,7 @@ fixtures = [
                     "POS Profile-role_allowed_for_billing",
                     "POS Profile-column_break_bvzw2",
                     "POS Profile-role_restricted_for_table_order",
+                    "POS Profile-role_masked_for_amounts",
                     "POS Profile-view_all_status",
                     "POS Profile-remove_items",
                     "POS Profile-custom_qty_reduction_allowed_order_types",
@@ -783,4 +784,9 @@ fixtures = [
     # row's `action` Link field fails validation with a LinkValidationError
     # on any later re-save/re-validate unless this row already exists.
     {"doctype": "Workflow Action Master", "filters": [["name", "in", ["Return to Draft"]]]},
+    # POS Operations: its own module (so the cashier Module Profile can block "URY"
+    # without hiding it) plus the Module Profile / Role Profile assigned to cashiers.
+    {"doctype": "Module Def", "filters": [["name", "in", ["URY POS"]]]},
+    {"doctype": "Role Profile", "filters": [["name", "in", ["URY Cashier"]]]},
+    {"doctype": "Module Profile", "filters": [["name", "in", ["URY Cashier"]]]},
 ]

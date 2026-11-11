@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import POSClosingDialog from "./POSClosingDialog";
+import { shouldMaskAmounts } from "@ury/core";
 
 const getOpenPosOpeningEntriesMock = vi.fn();
 const getSubCashierPosInvoicesMock = vi.fn();
@@ -40,6 +41,7 @@ vi.mock("../lib/checklist-api", () => ({
 }));
 
 vi.mock("@ury/core", () => ({
+  shouldMaskAmounts: vi.fn(() => false),
   call: {
     get: vi.fn().mockResolvedValue({
       message: { owner: "test_user", multiple_cashier: 0 },
@@ -199,6 +201,27 @@ describe("POSClosingDialog", () => {
       expect(screen.getByText("pos_closing.total_qty")).toBeInTheDocument();
       expect(screen.getByText("pos_closing.total_invoices")).toBeInTheDocument();
     });
+  });
+
+  it("masks grand and net total when the POS Profile masks amounts for the user", async () => {
+    vi.mocked(shouldMaskAmounts).mockReturnValue(true);
+    try {
+      render(<POSClosingDialog open={true} onOpenChange={vi.fn()} />);
+
+      const grand = (await screen.findByText("pos_closing.grand_total")).nextElementSibling;
+      const net = (await screen.findByText("pos_closing.net_total")).nextElementSibling;
+      expect(grand?.textContent).toBe("—");
+      expect(net?.textContent).toBe("—");
+    } finally {
+      vi.mocked(shouldMaskAmounts).mockReturnValue(false);
+    }
+  });
+
+  it("shows grand and net total normally when amounts are not masked", async () => {
+    render(<POSClosingDialog open={true} onOpenChange={vi.fn()} />);
+
+    const grand = (await screen.findByText("pos_closing.grand_total")).nextElementSibling;
+    expect(grand?.textContent).not.toBe("—");
   });
 
   it("renders closing payment table", async () => {
