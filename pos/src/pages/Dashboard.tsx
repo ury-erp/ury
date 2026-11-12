@@ -4,7 +4,6 @@ import {
   LogOut,
   Activity,
   Gauge,
-  Sparkles,
   PackageSearch,
   ArrowRight,
 } from 'lucide-react';
@@ -675,20 +674,6 @@ export default function Dashboard() {
                   </a>
                 </div>
               )}
-            </Panel>
-
-            <Panel
-              icon={Sparkles}
-              title={t('dashboard.shift_brief_title')}
-              meta={
-                <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary ring-1 ring-primary-200">
-                  HUF
-                </span>
-              }
-            >
-              <p className="text-sm text-gray-500">
-                {t('dashboard.shift_brief_placeholder')}
-              </p>
             </Panel>
 
             <Panel icon={Bell} title={t('dashboard.notifications_title')}>
