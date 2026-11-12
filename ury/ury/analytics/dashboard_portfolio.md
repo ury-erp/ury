@@ -264,5 +264,18 @@ Sections (one row per slide, all h=6 unless noted):
 - Banner (10,25,10,3): "Slide 1 compares the same weekday last week in the PWA; Insights compares the previous day. Slide 2 target: no target table yet (SAL-021, R13)."
 Acceptance: the PWA P0 truth file (proof/brief_sql_truth.txt) must equal db16_yesterday for a pinned date (2026-10-21) and SAL-001 SQL with `posting_date='2026-10-21'`.
 
+## DB17 Customer analysis
+Workbook `ury_db17_customer_analysis`, title "Customer analysis". Audience: branch manager, owner, marketing. Levels: branch, customer.
+Purpose: Guest retention, new vs repeat customer acquisition, guest phone collection rates, and guest lifetime value.
+Queries: fact_customer_visits, fact_customer_daily.
+Filters: f_date (default: Last 30 days), f_branch.
+Sections:
+- S1 KPIs: Total active customers, New customers acquired, Repeat customer visits, Repeat visit rate %, Customer contacts collected, Data collection rate %, Customer net sales, Average customer dwell time.
+- S2 Daily trends: Daily new customers acquired (Line), Daily repeat customers returning (Line).
+- S3 Mix & Share: Visits by customer type (Donut), Guest phone collection status (Donut), Customer visits by order type (Donut).
+- S4 Branch: Customer contacts collected by branch (Bar), Repeat customer visits by branch (Bar).
+- S5 Top Guests: Top 10 customers by net spend (Row), Top 10 most frequent guests (Row).
+- S6 Roster: Customer directory & spend summary (Table).
+
 ## Builder checklist (every DB)
 1. Copy only the L1 queries listed; ids/titles unchanged; no new joins. 2. Charts per the lines above; non-T1 chart titles end with the tier tag. 3. Filters per the standard map; every `applies_to` query must have a chart on the dashboard (L13). 4. `lint --strict` clean with a fresh catalog; compile; plan; apply --write; verify (min-rows 1; 0 only for fact_wastage_lines); reproduce each acceptance SQL; open the page and screenshot. 5. Report any `sql:` query whose dashboard filter does not bind (architecture section 12) instead of working around it.

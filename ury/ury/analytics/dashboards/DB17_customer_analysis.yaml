@@ -1,0 +1,96 @@
+# DB17 Customer analysis (audience: branch manager, owner, marketing).
+# Focus: Guest retention, repeat vs new customer acquisition, phone data collection rates, and customer lifetime value.
+workbook: {id: ury_db17_customer_analysis, title: "Customer analysis", module: "URY", required_apps: [ury]}
+queries:
+  # fact_customer_visits (sql, T1). Grain: one submitted, non-return POS Invoice.
+  # Tracks customer identity, phone collection status, visit sequence number, dwell time, and order channel.
+  - id: fact_customer_visits
+    title: "fact_customer_visits"
+    sql: "SELECT pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, DAYNAME(pi.posting_date) AS weekday, pi.branch, pi.company, pi.order_type, pi.customer, COALESCE(NULLIF(pi.customer_name, ''), pi.customer, 'Walk-in Guest') AS customer_name, COALESCE(NULLIF(pi.mobile_number, ''), 'Not Collected') AS mobile_number, CASE WHEN pi.mobile_number IS NOT NULL AND pi.mobile_number != '' AND LENGTH(pi.mobile_number) >= 8 THEN 1 ELSE 0 END AS has_mobile, ROW_NUMBER() OVER (PARTITION BY pi.customer ORDER BY pi.posting_date, pi.posting_time, pi.name) AS visit_number, CASE WHEN ROW_NUMBER() OVER (PARTITION BY pi.customer ORDER BY pi.posting_date, pi.posting_time, pi.name) = 1 THEN 1 ELSE 0 END AS is_new_customer, CASE WHEN ROW_NUMBER() OVER (PARTITION BY pi.customer ORDER BY pi.posting_date, pi.posting_time, pi.name) > 1 THEN 1 ELSE 0 END AS is_repeat_customer, CASE WHEN ROW_NUMBER() OVER (PARTITION BY pi.customer ORDER BY pi.posting_date, pi.posting_time, pi.name) = 1 THEN 'New Customer' ELSE 'Repeat Customer' END AS customer_type, CASE WHEN pi.mobile_number IS NOT NULL AND pi.mobile_number != '' AND LENGTH(pi.mobile_number) >= 8 THEN 'Data Collected' ELSE 'No Contact' END AS data_collection_status, pi.net_total, pi.grand_total, CAST(COALESCE(NULLIF(pi.no_of_pax, ''), '0') AS UNSIGNED) AS pax, ROUND(TIME_TO_SEC(pi.total_spend_time) / 60, 1) AS dwell_minutes FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0"
+
+  # fact_customer_daily (sql, T2). Grain: one branch x date with customer metrics.
+  # Summarizes total unique guests, first-time guests, repeat guests, and phone collection rates by day.
+  - id: fact_customer_daily
+    title: "fact_customer_daily"
+    sql: "SELECT t.posting_date, t.branch, t.company, COUNT(DISTINCT t.customer) AS total_customers, COUNT(DISTINCT CASE WHEN t.visit_number = 1 THEN t.customer END) AS new_customers, COUNT(DISTINCT CASE WHEN t.visit_number > 1 THEN t.customer END) AS repeat_customers, ROUND(COUNT(DISTINCT CASE WHEN t.visit_number > 1 THEN t.customer END) / NULLIF(COUNT(DISTINCT t.customer), 0) * 100, 2) AS repeat_customer_pct, COUNT(*) AS total_invoices, SUM(t.has_mobile) AS contacts_collected, ROUND(SUM(t.has_mobile) / NULLIF(COUNT(*), 0) * 100, 2) AS data_collection_pct, SUM(t.net_total) AS net_sales FROM (SELECT name, posting_date, posting_time, branch, company, customer, net_total, CASE WHEN mobile_number IS NOT NULL AND mobile_number != '' AND LENGTH(mobile_number) >= 8 THEN 1 ELSE 0 END AS has_mobile, ROW_NUMBER() OVER (PARTITION BY customer ORDER BY posting_date, posting_time, name) AS visit_number FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) t GROUP BY t.posting_date, t.branch, t.company"
+
+charts:
+  # S1 KPI Summary
+  - {id: db17_kpi_total_cust, title: "Total active customers", query: fact_customer_visits, type: Number,
+     y: [{column: customer, agg: count_distinct, as: "Active customers"}]}
+  - {id: db17_kpi_new_cust, title: "New customers acquired", query: fact_customer_visits, type: Number,
+     y: [{column: is_new_customer, agg: sum, as: "New customers"}]}
+  - {id: db17_kpi_repeat_visits, title: "Repeat customer visits", query: fact_customer_visits, type: Number,
+     y: [{column: is_repeat_customer, agg: sum, as: "Repeat visits"}]}
+  - {id: db17_kpi_repeat_rate, title: "Repeat visit rate (%)", query: fact_customer_visits, type: Number,
+     y: [{expr: "sum(is_repeat_customer) / count(invoice)", as: "Repeat visit rate (%)", format: percent}]}
+  - {id: db17_kpi_contacts, title: "Customer contacts collected", query: fact_customer_visits, type: Number,
+     y: [{column: has_mobile, agg: sum, as: "Contacts collected"}]}
+  - {id: db17_kpi_collection_rate, title: "Data collection rate (%)", query: fact_customer_visits, type: Number,
+     y: [{expr: "sum(has_mobile) / count(invoice)", as: "Data collection rate (%)", format: percent}]}
+  - {id: db17_kpi_sales, title: "Customer net sales (₹)", query: fact_customer_visits, type: Number,
+     y: [{column: net_total, agg: sum, as: "Customer net sales (₹)", format: currency}]}
+  - {id: db17_kpi_avg_dwell, title: "Average customer dwell time (min)", query: fact_customer_visits, type: Number,
+     y: [{column: dwell_minutes, agg: avg, as: "Avg dwell (min)"}]}
+
+  # S2 Daily Trends
+  - {id: db17_daily_new, title: "Daily new customers acquired", query: fact_customer_daily, type: Line, limit: 366,
+     x: {column: posting_date, granularity: day}, y: [{column: new_customers, agg: sum, as: "New customers"}]}
+  - {id: db17_daily_repeat, title: "Daily repeat customers returning", query: fact_customer_daily, type: Line, limit: 366,
+     x: {column: posting_date, granularity: day}, y: [{column: repeat_customers, agg: sum, as: "Repeat customers"}]}
+
+  # S3 Mix & Share
+  - {id: db17_type_donut, title: "Visits by customer type (New vs Repeat)", query: fact_customer_visits, type: Donut, limit: 10,
+     x: customer_type, y: [{column: invoice, agg: count, as: "Visits"}]}
+  - {id: db17_collection_donut, title: "Guest phone collection status", query: fact_customer_visits, type: Donut, limit: 10,
+     x: data_collection_status, y: [{column: invoice, agg: count, as: "Invoices"}]}
+  - {id: db17_channel_donut, title: "Customer visits by order type", query: fact_customer_visits, type: Donut, limit: 10,
+     x: order_type, y: [{column: invoice, agg: count, as: "Visits"}]}
+
+  # S4 Branch Breakdown
+  - {id: db17_branch_collection, title: "Customer contacts collected by branch", query: fact_customer_visits, type: Bar, limit: 20,
+     x: branch, y: [{column: has_mobile, agg: sum, as: "Contacts collected"}]}
+  - {id: db17_branch_repeat, title: "Repeat customer visits by branch", query: fact_customer_visits, type: Bar, limit: 20,
+     x: branch, y: [{column: is_repeat_customer, agg: sum, as: "Repeat visits"}]}
+
+  # S5 Top Guests
+  - {id: db17_top_revenue, title: "Top 10 customers by net spend (₹)", query: fact_customer_visits, type: Row, limit: 10,
+     order: [{by: "Net sales (₹)", dir: desc}], x: customer_name, y: [{column: net_total, agg: sum, as: "Net sales (₹)"}]}
+  - {id: db17_top_visits, title: "Top 10 most frequent guests (visits)", query: fact_customer_visits, type: Row, limit: 10,
+     order: [{by: "Visits", dir: desc}], x: customer_name, y: [{column: invoice, agg: count, as: "Visits"}]}
+
+  # S6 Customer Directory Table
+  - {id: db17_customer_directory, title: "Customer directory & spend summary", query: fact_customer_visits, type: Table, limit: 100,
+     rows: [customer_name, mobile_number], values: [{column: invoice, agg: count, as: "Visits"}, {column: net_total, agg: sum, as: "Total Net (₹)"}, {column: dwell_minutes, agg: avg, as: "Avg Dwell (min)"}]}
+
+dashboards:
+  - id: customer_analysis
+    title: "Customer analysis"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 10, h: 1},
+         applies_to: {fact_customer_visits: posting_date, fact_customer_daily: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 10, y: 2, w: 10, h: 1},
+         applies_to: {fact_customer_visits: branch, fact_customer_daily: branch}}
+    items:
+      - {text: "<p><b>Customer Analysis.</b> Guest retention, new customer acquisition, data collection rates, and guest lifetime value. For branch manager and marketing. Default period: last 30 days.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db17_kpi_total_cust, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db17_kpi_new_cust, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db17_kpi_repeat_visits, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db17_kpi_repeat_rate, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db17_kpi_contacts, x: 0, y: 6, w: 5, h: 3}
+      - {chart: db17_kpi_collection_rate, x: 5, y: 6, w: 5, h: 3}
+      - {chart: db17_kpi_sales, x: 10, y: 6, w: 5, h: 3}
+      - {chart: db17_kpi_avg_dwell, x: 15, y: 6, w: 5, h: 3}
+      - {chart: db17_daily_new, x: 0, y: 9, w: 10, h: 12}
+      - {chart: db17_daily_repeat, x: 10, y: 9, w: 10, h: 12}
+      - {chart: db17_type_donut, x: 0, y: 21, w: 7, h: 12}
+      - {chart: db17_collection_donut, x: 7, y: 21, w: 7, h: 12}
+      - {chart: db17_channel_donut, x: 14, y: 21, w: 6, h: 12}
+      - {chart: db17_branch_collection, x: 0, y: 33, w: 10, h: 11}
+      - {chart: db17_branch_repeat, x: 10, y: 33, w: 10, h: 11}
+      - {chart: db17_top_revenue, x: 0, y: 44, w: 10, h: 12}
+      - {chart: db17_top_visits, x: 10, y: 44, w: 10, h: 12}
+      - {chart: db17_customer_directory, x: 0, y: 56, w: 20, h: 14}
+      - {text: "<p><b>Data Collection Rate:</b> Share of bills where a guest phone number is recorded. Repeat customers identified by historical invoice sequence.</p>", x: 0, y: 70, w: 20, h: 1}
+
+desk: {workspace: "URY", label: "Customer Analysis"}

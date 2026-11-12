@@ -63,6 +63,7 @@ DASHBOARD_ROLES = {
 	"Data readiness": ("System Manager", "URY Admin", "URY Owner", "URY Manager"),  # DB14
 	"Leakage": _FINANCE,  # DB15
 	"Owner brief check": _OWNER,  # DB16
+	"Customer analysis": _BRANCH + ("URY Owner",),  # DB17
 }
 
 # Minimal sources for the Chairman dashboards DB01, DB14, DB16 (semantic_layer.yaml / dashboards/*.yaml).
