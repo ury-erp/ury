@@ -22,6 +22,7 @@ vi.mock("@ury/core", () => ({
   withReturnContext: (path: string) => path,
   formatCurrency: (amount: number) => `Rs. ${amount}`,
   isPrintStatusDisabled: mockIsPrintStatusDisabled,
+  DESK_RETURN_STORAGE_KEY: "ury:desk_return_to",
 }));
 
 vi.mock("./PrinterWatch", () => ({
@@ -177,7 +178,7 @@ describe("Header", () => {
     mockUser.roles = [];
   });
 
-  it("renders logo link to dashboard", () => {
+  it("renders logo link to /desk", () => {
     render(
       <BrowserRouter>
         <Header />
@@ -185,7 +186,25 @@ describe("Header", () => {
     );
 
     const logoLink = screen.getByAltText("URY POS").closest("a");
-    expect(logoLink).toHaveAttribute("href", "/dashboard");
+    expect(logoLink).toHaveAttribute("href", "/desk");
+  });
+
+  it("stores return context in sessionStorage when logo link is clicked", async () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const logoLink = screen.getByAltText("URY POS").closest("a");
+    expect(logoLink).not.toBeNull();
+    logoLink?.addEventListener("click", (e) => e.preventDefault());
+    await userEvent.click(logoLink!);
+
+    const stored = sessionStorage.getItem("ury:desk_return_to");
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed.label).toBe("POS");
   });
 
   it("renders the printer status button next to the user menu when enabled", () => {
