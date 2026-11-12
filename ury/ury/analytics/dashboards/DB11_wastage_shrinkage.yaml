@@ -1,0 +1,154 @@
+# DB11 Wastage And Shrinkage. Audience: kitchen head, finance. Levels: item, raw category, branch, department (wastage, T4).
+# Shrinkage (stock correction child rows) is T1; URY Wastage has 0 rows on the demo (T4): banner + pre-wired empty query
+# (verify V02 on fact_wastage_lines is expected). Base queries copied verbatim from semantic_layer.yaml.
+workbook: {id: ury_db11_wastage_shrinkage, title: "URY Wastage And Shrinkage", module: "URY", required_apps: [ury]}
+queries:
+  # ---------------------------------------------------------------- STOCK / YIELD / WASTE / PLAN
+  # fact_stock_correction (builder, T1 on child rows). Grain: one Stock Correction Item of a submitted correction.
+  # Use child amount_difference (header difference_amount is 0 on 20/20: never use it). Negative = shrink.
+  - id: fact_stock_correction
+    title: "fact_stock_correction"
+    table: "Stock Correction Item"
+    joins:
+      - {table: "Stock Correction", type: inner, on: [parent, name], columns: [posting_date, branch, company, reason, period_end_date]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: shrink_value, type: Decimal, expr: "if_else(amount_difference < 0, amount_difference, 0)"}
+      - {as: overage_value, type: Decimal, expr: "if_else(amount_difference > 0, amount_difference, 0)"}
+      - {as: qty_diff, type: Decimal, expr: "quantity_difference.cast(\"float64\")"}
+    select: [name, parent, posting_date, branch, company, reason, warehouse, item_code, item_name, item_group, uom, qty, current_qty, qty_diff, valuation_rate, amount, current_amount, amount_difference, shrink_value, overage_value]
+
+  # fact_wastage_lines (builder, T4 on demo: 0 rows). Grain: one Wastage Item of a submitted URY Wastage.
+  # Dashboards show an empty-state text block until rows exist (verify --min-rows 0 for this query only).
+  - id: fact_wastage_lines
+    title: "fact_wastage_lines"
+    table: "Wastage Item"
+    joins:
+      - {table: "URY Wastage", type: inner, on: [parent, name], columns: [posting_date, branch, company, department, production_unit, reason_category, status, captured_by, approved_by]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, parent, posting_date, branch, company, department, production_unit, reason_category, status, captured_by, approved_by, item_code, item_name, uom, qty, rate, amount]
+
+  # fact_kot_exec (sql, T3 on demo: structure ready, stamps milliseconds apart). Grain: one URY KOT Execution per
+  # (kot, production_unit), DEDUPED to the latest-modified row (6 KOTs have duplicate QUEUED rows).
+  # Why sql: durations need TIMESTAMPDIFF over Datetime (time_diff casts to TIME, drops dates/fractions, sign
+  # unverified); dedupe needs ROW_NUMBER(); KOT fire time is TIMESTAMP(KOT.date, KOT.time).
+  # TIMESTAMPDIFF(SECOND, a, b) = b - a (MariaDB). Date column: exec_date. department = executed unit's department.
+  - id: fact_kot_exec
+    title: "fact_kot_exec"
+    sql: "WITH ex AS (SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.kot, e.production_unit ORDER BY e.modified DESC) AS rn FROM `tabURY KOT Execution` e) SELECT ex.name, ex.kot, ex.state, ex.production_unit, COALESCE(NULLIF(pu.department, ''), ex.production_unit) AS department, ex.branch, ex.company, DATE(COALESCE(ex.started_at, ex.creation)) AS exec_date, HOUR(k.time) AS hour_of_day, k.type AS kot_type, ex.started_by, ex.ready_by, ex.served_by, ex.cancelled_by, pp.custom_kot_warning_time AS target_minutes, TIMESTAMPDIFF(SECOND, ex.creation, ex.started_at) AS queue_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.ready_at) AS prep_seconds, TIMESTAMPDIFF(SECOND, ex.ready_at, ex.served_at) AS pass_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.served_at) AS cycle_seconds, TIMESTAMPDIFF(SECOND, TIMESTAMP(k.date, k.time), ex.served_at) AS order_to_serve_seconds, CASE WHEN ex.state LIKE 'CANCELLED%' THEN 1 ELSE 0 END AS is_cancelled, CASE WHEN ex.state IN ('CANCELLED_AFTER_START','CANCELLED_AFTER_READY') THEN 1 ELSE 0 END AS wasted_prep, CASE WHEN ex.started_at IS NOT NULL THEN 1 ELSE 0 END AS was_started, CASE WHEN ex.ready_at IS NOT NULL THEN 1 ELSE 0 END AS was_ready, CASE WHEN ex.served_at IS NOT NULL THEN 1 ELSE 0 END AS was_served FROM ex JOIN `tabURY KOT` k ON k.name = ex.kot LEFT JOIN `tabURY Production Unit` pu ON pu.name = ex.production_unit LEFT JOIN `tabPOS Profile` pp ON pp.name = k.pos_profile WHERE ex.rn = 1 AND k.docstatus IN (1, 2)"
+
+  # fact_kot_lines (builder, T1 counts). Grain: one URY KOT Items row (kitchen line). quantity/cancelled_qty are text:
+  # cast. Category = raw item_group (Item join); cleaned category is sales-side only. Date column: date.
+  - id: fact_kot_lines
+    title: "fact_kot_lines"
+    table: "URY KOT Items"
+    joins:
+      - {table: "URY KOT", type: inner, on: [parent, name], columns: [date, time, production, branch, type, order_status, invoice, pos_profile]}
+      - {table: "Item", type: left, on: [item, name], columns: [item_group]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: qty_num, type: Decimal, expr: "quantity.cast(\"float64\")"}
+      - {as: cancelled_qty_num, type: Decimal, expr: "cancelled_qty.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+    select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
+
+  # fact_waste_vs_sales (sql, T4 on demo). Grain: one authorised wastage line (waste_value) UNION ALL one bill (sales_value); the other
+  # measure is 0 on each row so SUM(waste_value) / SUM(sales_value) honours the same date and branch filters (two facts cannot be joined
+  # row-level). Date column: posting_date.
+  - id: fact_waste_vs_sales
+    title: "fact_waste_vs_sales"
+    sql: "SELECT w.posting_date, w.branch, w.company, wi.amount AS waste_value, 0 AS sales_value FROM `tabWastage Item` wi JOIN `tabURY Wastage` w ON w.name = wi.parent WHERE w.docstatus = 1 AND w.status = 'Authorized' UNION ALL SELECT pi.posting_date, pi.branch, pi.company, 0 AS waste_value, pi.net_total AS sales_value FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0"
+
+  # fact_stock_cover (sql, T2). Grain: one item. days_of_cover = Bin stock on hand / average daily outflow over the LAST 30 DAYS (fixed
+  # window, so the dashboard Date filter does not apply). NULL when nothing left the item in 30 days. No date or branch column.
+  - id: fact_stock_cover
+    title: "fact_stock_cover"
+    sql: "SELECT b.item_code, SUM(b.actual_qty) AS on_hand_qty, COALESCE(o.out_30d, 0) / 30 AS daily_outflow_qty, CASE WHEN COALESCE(o.out_30d, 0) > 0 THEN SUM(b.actual_qty) / (o.out_30d / 30) END AS days_of_cover FROM `tabBin` b LEFT JOIN (SELECT item_code, SUM(-actual_qty) AS out_30d FROM `tabStock Ledger Entry` WHERE is_cancelled = 0 AND actual_qty < 0 AND posting_date >= CURDATE() - INTERVAL 30 DAY GROUP BY item_code) o ON o.item_code = b.item_code GROUP BY b.item_code, o.out_30d HAVING SUM(b.actual_qty) > 0"
+
+charts:
+  # UX pass (DB11): shortage is shown as a POSITIVE loss number (shrink_value is stored negative), amounts rounded to whole rupees.
+  - {id: db11_shortage, title: "Stock shortage (₹)", query: fact_stock_correction, type: Number,
+     y: [{expr: "(-sum(shrink_value)).round(0)", as: "Stock Shortage", format: currency}]}
+  # STK-002 Overage value
+  - {id: db11_excess, title: "Stock excess (₹)", query: fact_stock_correction, type: Number,
+     y: [{expr: "(sum(overage_value)).round(0)", as: "Stock Excess", format: currency}]}
+  # STK-003 Net count variance
+  - {id: db11_net, title: "Net difference (₹)", query: fact_stock_correction, type: Number,
+     y: [{expr: "(sum(amount_difference)).round(0)", as: "Net Difference", format: currency}]}
+  # Net difference / counted value (0-1 fraction, format: percent). Was the gross variance % tile.
+  - {id: db11_pct, title: "Net difference (% of stock value)", query: fact_stock_correction, type: Number,
+     y: [{expr: "sum(amount_difference) / sum(current_amount)", as: "Net Difference Pct", format: percent}]}
+  - {id: db11_by_item, title: "Shortage and excess by item (₹, top 15)", query: fact_stock_correction, type: Row, limit: 15,
+     x: item_name, y: [{expr: "(-sum(shrink_value)).round(0)", as: Shortage}, {expr: "(sum(overage_value)).round(0)", as: Excess}],
+     order: [{by: Shortage, dir: desc}]}
+  - {id: db11_by_reason, title: "Count differences by reason (₹)", query: fact_stock_correction, type: Row, limit: 8,
+     x: reason, y: [{expr: "(-sum(shrink_value)).round(0)", as: Shortage}, {expr: "(sum(overage_value)).round(0)", as: Excess}],
+     order: [{by: Shortage, dir: desc}]}
+  - {id: db11_wasted_prep, title: "KOT items cooked then cancelled (count)", query: fact_kot_exec, type: Number,
+     y: [{column: wasted_prep, agg: sum, as: "Cooked Then Cancelled"}]}
+  # Pre-wired (not placed on the dashboard): wastage is T4 (0 rows); the empty state text replaces the zero tile (S 3.5).
+  - {id: db11_waste_rows, title: "Wastage Records Logged", query: fact_wastage_lines, type: Number,
+     y: [{column: name, agg: count, as: "Wastage Rows"}]}
+  # S3 Wastage (empty until wastage is submitted) and stock cover
+  # WST-001 Wastage value
+  - {id: db11_waste_value, title: "Wastage value (₹)", query: fact_wastage_lines, type: Number,
+     filters: [{column: status, op: "=", value: "Authorized"}],
+     y: [{expr: "(sum(amount)).round(0)", as: "Wastage value (₹)", format: currency}]}
+  # WST-005 Wastage % of sales (two facts in one union query: waste_value rows and sales_value rows)
+  - {id: db11_waste_pct, title: "Wastage of sales (%)", query: fact_waste_vs_sales, type: Number,
+     y: [{expr: "sum(waste_value) / sum(sales_value)", as: "Wastage of sales (%)", format: percent}]}
+  # WST-002 Wastage quantity by item
+  - {id: db11_waste_item, title: "Wastage by item (qty)", query: fact_wastage_lines, type: Row, limit: 10,
+     filters: [{column: status, op: "=", value: "Authorized"}],
+     x: item_name, y: [{column: qty, agg: sum, as: "Wasted qty"}], order: [{by: "Wasted qty", dir: desc}]}
+  # WST-004 Wastage by department
+  - {id: db11_waste_dept, title: "Wastage by department (₹)", query: fact_wastage_lines, type: Row, limit: 10,
+     filters: [{column: status, op: "=", value: "Authorized"}],
+     x: department, y: [{expr: "(sum(amount)).round(0)", as: "Wastage (₹)"}], order: [{by: "Wastage (₹)", dir: desc}]}
+  # WST-003 Wastage by reason
+  - {id: db11_waste_reason, title: "Wastage by reason (₹)", query: fact_wastage_lines, type: Donut, limit: 5, max_slices: 5,
+     filters: [{column: status, op: "=", value: "Authorized"}],
+     x: reason_category, y: [{expr: "(sum(amount)).round(0)", as: "Wastage (₹)"}], order: [{by: "Wastage (₹)", dir: desc}]}
+  # KIT-016 Void disposition
+  - {id: db11_void_disp, title: "Cancelled kitchen items by outcome (qty)", query: fact_kot_lines, type: Donut, limit: 5, max_slices: 5,
+     filters: [{column: cancelled_qty_num, op: ">", value: 0}],
+     x: disposition, y: [{column: cancelled_qty_num, agg: sum, as: "Cancelled qty"}]}
+  # STK-007 Days of cover
+  - {id: db11_cover, title: "Days of stock left, lowest 15 (use of last 30 days)", query: fact_stock_cover, type: Table, limit: 15,
+     filters: [{column: days_of_cover, op: is_set}],
+     rows: [{column: item_code, as: Item}],
+     y: [{expr: "(min(on_hand_qty)).round(1)", as: "On hand"}, {expr: "(min(daily_outflow_qty)).round(1)", as: "Used per day"}, {expr: "(min(days_of_cover)).round(1)", as: "Days left"}],
+     order: [{by: "Days left", dir: asc}]}
+
+dashboards:
+  - id: wastage_shrinkage
+    title: "Stock count and wastage"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1}, applies_to: {fact_stock_correction: posting_date, fact_kot_exec: exec_date, fact_wastage_lines: posting_date, fact_waste_vs_sales: posting_date, fact_kot_lines: date}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 7, y: 2, w: 7, h: 1}, applies_to: {fact_stock_correction: branch, fact_kot_exec: branch, fact_wastage_lines: branch, fact_waste_vs_sales: branch, fact_kot_lines: branch}}
+      - {id: f_item, label: Item, type: string, icon: package, layout: {x: 14, y: 2, w: 6, h: 1}, applies_to: {fact_stock_correction: item_code, fact_wastage_lines: item_code, fact_kot_lines: item}}
+    items:
+      - {text: "<p><b>Stock count and wastage.</b> Where is stock going missing, and why? For the kitchen head and finance. Default period: last 30 days; every filter applies to every chart except Item on the cancelled KOT items tile.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db11_shortage, x: 0, y: 3, w: 4, h: 3}
+      - {chart: db11_excess, x: 4, y: 3, w: 4, h: 3}
+      - {chart: db11_net, x: 8, y: 3, w: 4, h: 3}
+      - {chart: db11_pct, x: 12, y: 3, w: 4, h: 3}
+      - {chart: db11_wasted_prep, x: 16, y: 3, w: 4, h: 3}
+      - {chart: db11_by_item, x: 0, y: 6, w: 10, h: 14}
+      - {chart: db11_by_reason, x: 10, y: 6, w: 10, h: 14}
+      - {text: "<p><b>Kitchen wastage</b> comes from authorised URY Wastage entries; log spoiled or dropped food at each shift end. The cancelled-items outcome chart needs a disposition on partly cancelled KOT items, which this site has none of yet.</p>", x: 0, y: 20, w: 20, h: 3}
+      - {text: "<p>Cooked and then cancelled before serving: a proxy for waste until wastage is logged.</p>", x: 0, y: 23, w: 20, h: 1}
+      - {text: "<p><b>Kitchen wastage</b> - what was thrown away and why</p>", x: 0, y: 24, w: 20, h: 1}
+      - {chart: db11_waste_value, x: 0, y: 25, w: 10, h: 3}
+      - {chart: db11_waste_pct, x: 10, y: 25, w: 10, h: 3}
+      - {chart: db11_waste_item, x: 0, y: 28, w: 10, h: 11}
+      - {chart: db11_waste_dept, x: 10, y: 28, w: 10, h: 11}
+      - {chart: db11_waste_reason, x: 0, y: 39, w: 10, h: 11}
+      - {chart: db11_void_disp, x: 10, y: 39, w: 10, h: 11}
+      - {text: "<p>Wastage % = authorised wastage value over net sales for the same period and branch.</p>", x: 0, y: 50, w: 20, h: 1}
+      - {text: "<p><b>Stock cover</b> - how many days each item lasts at its recent use</p>", x: 0, y: 51, w: 20, h: 1}
+      - {chart: db11_cover, x: 0, y: 52, w: 20, h: 15}
+      - {text: "<p>Days left = stock on hand divided by average daily use over the last 30 days. It ignores the Date filter.</p>", x: 0, y: 67, w: 20, h: 1}

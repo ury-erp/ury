@@ -1,0 +1,144 @@
+# DB09 Payments & cash-up. Audience: finance, branch manager. Levels: branch, employee (cashier / closing user).
+# Base queries copied verbatim from semantic_layer.yaml (fact_payments, fact_invoices, fact_closing_details).
+# Closings exist only for Consolidated bills; Paid bills are "unclosed sales" (PAY-008). Sales Invoice Payment is
+# always filtered parenttype = 'POS Invoice'.
+workbook: {id: ury_db09_payments_cashup, title: "URY Payments And Cashup", module: "URY", required_apps: [ury]}
+queries:
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: hour_label, type: String, expr: "pad_number(hour(posting_time), 2)"}  # string label: pivot_wider on an Integer column mixes int and string names (IbisTypeError)
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      # weekday_label sorts Mon..Sun as a Table column header (leading digit = ISO weekday); weekday itself sorts alphabetically.
+      - {as: weekday_label, type: String, expr: "if_else(day_name(posting_date) == 'Monday', '1 Mon', if_else(day_name(posting_date) == 'Tuesday', '2 Tue', if_else(day_name(posting_date) == 'Wednesday', '3 Wed', if_else(day_name(posting_date) == 'Thursday', '4 Thu', if_else(day_name(posting_date) == 'Friday', '5 Fri', if_else(day_name(posting_date) == 'Saturday', '6 Sat', '7 Sun'))))))"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+
+  # fact_payments (builder, T1). Grain: one tender line of a submitted POS Invoice. parenttype filter is mandatory.
+  - id: fact_payments
+    title: "fact_payments"
+    table: "Sales Invoice Payment"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, branch, company, order_type, cashier, status]}
+    filters:
+      - {column: parenttype, op: "=", value: "POS Invoice"}
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, parent, posting_date, branch, company, order_type, cashier, population, mode_of_payment, amount]
+
+  # fact_closing_details (builder, T1 structure / demo flat). Grain: one mode-of-payment row of a submitted POS Closing
+  # Entry. branch comes from the POS Opening Entry (POS Closing Entry.branch is NULL on 101/101). Covers only
+  # CONSOLIDATED invoices: the 1075 Paid invoices are in no closing yet.
+  - id: fact_closing_details
+    title: "fact_closing_details"
+    table: "POS Closing Entry Detail"
+    joins:
+      - {table: "POS Closing Entry", type: inner, on: [parent, name], columns: [posting_date, user, pos_profile, pos_opening_entry, company, period_start_date, period_end_date]}
+      - {table: "POS Opening Entry", type: left, on: [pos_opening_entry, name], columns: [branch]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: has_variance, type: Integer, expr: "if_else(difference != 0, 1, 0)"}
+    select: [name, parent, posting_date, user, pos_profile, branch, company, period_start_date, period_end_date, mode_of_payment, opening_amount, expected_amount, closing_amount, difference, has_variance]
+
+  # ---------------------------------------------------------------- KITCHEN / KOT
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+
+  # fact_invoices_named (builder chain, T1). Same rows and columns as fact_invoices plus waiter_name and cashier_name (User.full_name,
+  # falling back to the login id). Two User joins clash on `full_name` (the second join is prefixed), so each join sits in its own
+  # query, takes the name into a mutate column and drops full_name in select. Use for per-person labels; filters bind to waiter/cashier.
+  - id: fact_invoices_w
+    title: "fact_invoices_w"
+    source_query: fact_invoices
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name]
+  - id: fact_invoices_named
+    title: "fact_invoices_named"
+    source_query: fact_invoices_w
+    joins:
+      - {table: "User", type: left, on: [cashier, name], columns: [full_name]}
+    mutate:
+      - {as: cashier_name, type: String, expr: "coalesce(full_name, cashier)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name, cashier_name]
+
+charts:
+  # Tiles: one chart per tile (w:4). Whole rupees via round(). Billed uses rounded_total (reconciles to tender).
+  - {id: db09_tender, title: "Tendered (₹)", query: fact_payments, type: Number,
+     y: [{expr: "sum(amount).round(0)", as: "Tendered (₹)", format: currency}]}
+  - {id: db09_collected, title: "Collected (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "sum(paid_amount).round(0)", as: "Collected (₹)", format: currency}]}
+  - {id: db09_billed, title: "Billed (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "sum(rounded_total).round(0)", as: "Billed (₹)", format: currency}]}
+  - {id: db09_unclosed, title: "Not yet closed (₹)", query: fact_invoices, type: Number,
+     filters: [{column: population, op: "=", value: "Paid"}],
+     y: [{expr: "sum(net_total).round(0)", as: "Not yet closed (₹)", format: currency}]}
+  - {id: db09_unclosed_n, title: "Bills not yet closed", query: fact_invoices, type: Number,
+     filters: [{column: population, op: "=", value: "Paid"}],
+     y: [{column: name, agg: count, as: "Bills not yet closed"}]}
+  - {id: db09_mode, title: "Tendered by payment mode (₹)", query: fact_payments, type: Donut, limit: 5, max_slices: 5,
+     x: mode_of_payment, y: [{expr: "sum(amount).round(0)", as: "Tendered (₹)"}], order: [{by: "Tendered (₹)", dir: desc}]}
+  - {id: db09_mode_ot, title: "Tendered by order type and mode (₹)", query: fact_payments, type: Bar, limit: 50, stack: true,
+     x: order_type, split_by: {column: mode_of_payment, max: 4}, y: [{expr: "sum(amount).round(0)", as: "Tendered (₹)"}]}
+  # Counted = closing_amount (counted cash at close); Expected = expected_amount.
+  - {id: db09_exp_counted, title: "Expected vs counted by day (₹)", query: fact_closing_details, type: Line, limit: 366,
+     x: {column: posting_date, granularity: day},
+     y: [{expr: "sum(expected_amount).round(0)", as: "Expected (₹)"}, {expr: "sum(closing_amount).round(0)", as: "Counted (₹)"}]}
+  - {id: db09_diff, title: "Cash difference (₹)", query: fact_closing_details, type: Number,
+     y: [{column: difference, agg: sum, as: "Cash difference (₹)", format: currency}]}
+  - {id: db09_variance, title: "Lines with a difference", query: fact_closing_details, type: Number,
+     y: [{column: has_variance, agg: sum, as: "Lines with a difference"}]}
+  # EMP-010 Cash-up variance per cashier (shift rows with a difference)
+  - {id: db09_diff_shifts, title: "Shifts with a cash difference (₹)", query: fact_closing_details, type: Table, limit: 15,
+     filters: [{column: difference, op: "!=", value: 0}],
+     rows: [{column: posting_date, as: Date}, {column: user, as: Cashier}, {column: mode_of_payment, as: Mode}],
+     y: [{expr: "sum(expected_amount).round(0)", as: "Expected (₹)"}, {expr: "sum(closing_amount).round(0)", as: "Counted (₹)"},
+          {column: difference, agg: sum, as: "Difference (₹)"}],
+     order: [{by: "Difference (₹)", dir: desc}]}
+  # Full names from the shared-layer User join (cashier_name). Administrator excluded.
+  - {id: db09_cashier, title: "Net sales by cashier (₹)", query: fact_invoices_named, type: Row, limit: 15,
+     filters: [{column: cashier, op: "!=", value: "Administrator"}],
+     x: cashier_name, y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+dashboards:
+  - id: payments_cashup
+    title: "Payments and cash-up"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, layout: {x: 0, y: 2, w: 5, h: 1}, default: {op: within, value: "Last 30 days"},
+         applies_to: {fact_payments: posting_date, fact_invoices: posting_date, fact_invoices_named: posting_date, fact_closing_details: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: building-2, layout: {x: 5, y: 2, w: 5, h: 1},
+         applies_to: {fact_payments: branch, fact_invoices: branch, fact_invoices_named: branch, fact_closing_details: branch}}
+      - {id: f_order_type, label: Order type, type: string, icon: utensils, layout: {x: 10, y: 2, w: 5, h: 1},
+         applies_to: {fact_payments: order_type, fact_invoices: order_type, fact_invoices_named: order_type}}
+      - {id: f_mode, label: Payment mode, type: string, icon: credit-card, layout: {x: 15, y: 2, w: 5, h: 1},
+         applies_to: {fact_payments: mode_of_payment, fact_closing_details: mode_of_payment}}
+    items:
+      - {text: "<p><b>Payments and cash-up.</b> Where the money came in and whether cash-up balances. For finance and branch managers. Default period: last 30 days; Order type skips cash-up, Payment mode skips billed totals.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db09_tender, x: 0, y: 3, w: 4, h: 3}
+      - {chart: db09_collected, x: 4, y: 3, w: 4, h: 3}
+      - {chart: db09_billed, x: 8, y: 3, w: 4, h: 3}
+      - {chart: db09_unclosed, x: 12, y: 3, w: 4, h: 3}
+      - {chart: db09_unclosed_n, x: 16, y: 3, w: 4, h: 3}
+      - {text: "<p>Not yet closed = paid bills not yet included in a POS closing. Close the shift to move them into cash-up.</p>", x: 0, y: 6, w: 20, h: 1}
+      - {chart: db09_diff, x: 0, y: 7, w: 10, h: 3}
+      - {chart: db09_variance, x: 10, y: 7, w: 10, h: 3}
+      - {chart: db09_exp_counted, x: 0, y: 10, w: 20, h: 12}
+      - {chart: db09_mode_ot, x: 0, y: 22, w: 10, h: 12}
+      - {chart: db09_mode, x: 10, y: 22, w: 10, h: 12}
+      - {chart: db09_cashier, x: 0, y: 34, w: 20, h: 14}
+      - {chart: db09_diff_shifts, x: 0, y: 48, w: 20, h: 16}
+      - {text: "<p><b>Not enough data yet:</b> every cash-up on this site balances exactly, so no differences show. Cash-up covers bills already closed into a shift; paid bills not yet closed show above as Not yet closed.</p>", x: 0, y: 64, w: 20, h: 2}
+      - {text: "<p>Expected = cash the system says should be in the drawer. Counted = what the cashier counted at close.</p>", x: 0, y: 66, w: 20, h: 1}
+      - {text: "<p>The table lists only shifts where counted cash differs from expected. If it is empty, every shift in the period closed with no difference.</p>", x: 0, y: 67, w: 20, h: 2}

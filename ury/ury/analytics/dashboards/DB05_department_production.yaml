@@ -1,0 +1,129 @@
+# DB05 Department & kitchen production. Audience: kitchen/production head, owner.
+# Two department variants are shown SEPARATELY on purpose (architecture section 2): CONFIGURED department (money:
+# fact_sales_lines_enriched / fact_sales_lines) and EXECUTED unit (kitchen work: fact_kot_headers / fact_kot_lines).
+# Base queries copied verbatim from semantic_layer.yaml (probe charts dropped).
+workbook: {id: ury_db05_department_production, title: "URY Department Production", module: "URY", required_apps: [ury]}
+queries:
+  # fact_sales_lines (warehouse donut) dropped per UX change list; query removed as no chart uses it.
+  # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
+  # category_family (CATEGORY_MAP v1), branch-safe configured department, BOM-based estimated cost.
+  # Why sql: (1) the cleaned category is a 60-value CASE over Item Group; (2) the config join needs a composite key
+  # (item AND branch), finsights joins take one equality pair; (3) BOM unit cost needs a filtered sub-select
+  # (is_default=1, is_active=1, docstatus=1). Date column: posting_date. est_cost/est_margin are NULL when no recipe cost.
+  - id: fact_sales_lines_enriched
+    title: "fact_sales_lines_enriched"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, pi.cashier, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code"
+
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+  # only meaningful when order_status = 'Served' (charts must add that chart filter). Date column: date.
+  # department here = EXECUTED production unit (KOT.production); URY Production Department == unit 1:1 today.
+  - id: fact_kot_headers
+    title: "fact_kot_headers"
+    table: "URY KOT"
+    joins:
+      - {table: "POS Profile", type: left, on: [pos_profile, name], columns: [custom_kot_warning_time, table_attention_time]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: prod_minutes, type: Decimal, expr: "production_time.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+      - {as: is_served, type: Integer, expr: "if_else(order_status == 'Served', 1, 0)"}
+      - {as: sla_breach, type: Integer, expr: "if_else(production_time.cast(\"float64\") > custom_kot_warning_time, 1, 0)"}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+
+  # fact_kot_lines (builder, T1 counts). Grain: one URY KOT Items row (kitchen line). quantity/cancelled_qty are text:
+  # cast. Category = raw item_group (Item join); cleaned category is sales-side only. Date column: date.
+  - id: fact_kot_lines
+    title: "fact_kot_lines"
+    table: "URY KOT Items"
+    joins:
+      - {table: "URY KOT", type: inner, on: [parent, name], columns: [date, time, production, branch, type, order_status, invoice, pos_profile]}
+      - {table: "Item", type: left, on: [item, name], columns: [item_group]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: qty_num, type: Decimal, expr: "quantity.cast(\"float64\")"}
+      - {as: cancelled_qty_num, type: Decimal, expr: "cancelled_qty.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+    select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
+
+  # fact_sales_plan_items (builder, T1). Grain: one URY Sales Plan Item of a submitted plan (Locked for Production).
+  # Attainment = SUM(fulfilled_qty)/SUM(qty). under/over split per line BEFORE aggregation. Date column: plan_date.
+  - id: fact_sales_plan_items
+    title: "fact_sales_plan_items"
+    table: "URY Sales Plan Item"
+    joins:
+      - {table: "URY Sales Plan", type: inner, on: [parent, name], columns: [plan_date, branch, company, status, service_period, enforcement_mode]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: under_qty, type: Decimal, expr: "if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)"}
+      - {as: over_qty, type: Decimal, expr: "if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)"}
+    select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
+
+  # fact_sales_lines_policy (builder chain, T2). fact_sales_lines_enriched plus policy_label (production policy in plain words).
+  - id: fact_sales_lines_policy
+    title: "fact_sales_lines_policy"
+    source_query: fact_sales_lines_enriched
+    mutate:
+      - {as: policy_label, type: String, expr: "if_else(production_policy == 'PRE_PRODUCED', 'Pre-produced', if_else(production_policy == 'MADE_TO_ORDER', 'Made to order', if_else(production_policy == 'DIRECT_RETAIL', 'Direct retail', 'Not set')))"}
+
+charts:
+  # S1 KPI row (UX change list DB05 P0-1)
+  - {id: db05_kpi_kots, title: "KOTs", query: fact_kot_headers, type: Number,
+     filters: [{column: type, op: "!=", value: "Duplicate"}],
+     y: [{column: name, agg: count, as: KOTs}]}
+  - {id: db05_kpi_dishes, title: "Dishes made", query: fact_kot_lines, type: Number,
+     y: [{column: qty_num, agg: sum, as: Dishes made}]}
+  - {id: db05_kpi_plan, title: "Plan fulfilled (%)", query: fact_sales_plan_items, type: Number,
+     y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: Plan fulfilled, format: percent}]}
+  # Unmapped department sales moved into the KPI row (fix-in-setup tile)
+  - {id: db05_unmapped, title: "Sales with no department (₹)", query: fact_sales_lines_enriched, type: Number,
+     filters: [{column: department, op: "=", value: "Unmapped"}],
+     y: [{expr: "sum(floor(net_amount + 0.5))", as: Sales with no department, format: currency}]}
+  # S2 Work by executed station
+  - {id: db05_kots_unit, title: "KOTs by cooking station (count)", query: fact_kot_headers, type: Row, limit: 15,
+     filters: [{column: type, op: "!=", value: "Duplicate"}],
+     x: production, y: [{column: name, agg: count, as: KOTs}], order: [{by: KOTs, dir: desc}]}
+  - {id: db05_top_dishes, title: "Top 15 dishes made (qty)", query: fact_kot_lines, type: Row, limit: 15,
+     x: item_name, y: [{column: qty_num, agg: sum, as: Quantity}], order: [{by: Quantity, dir: desc}]}
+  # S3 Plan vs sales
+  - {id: db05_plan_dept, title: "Plan fulfilled by department (%)", query: fact_sales_plan_items, type: Row, limit: 15,
+     x: department, y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: Plan fulfilled}], order: [{by: Plan fulfilled, dir: desc}]}
+  - {id: db05_dept_rev, title: "Sales by assigned department (₹)", query: fact_sales_lines_enriched, type: Row, limit: 15,
+     filters: [{column: department, op: "!=", value: "Unmapped"}],
+     x: department, y: [{expr: "sum(floor(net_amount + 0.5))", as: Net sales, format: currency}], order: [{by: Net sales, dir: desc}]}
+  # S4 How the sales were produced
+  # PRD-002 Revenue by kitchen warehouse
+  - {id: db05_warehouse, title: "Net sales by kitchen warehouse (₹)", query: fact_sales_lines_enriched, type: Donut, limit: 5, max_slices: 5,
+     x: warehouse, y: [{expr: "sum(floor(net_amount + 0.5))", as: Net sales, format: currency}], order: [{by: Net sales, dir: desc}]}
+  # PRD-003 Revenue by production policy
+  - {id: db05_policy, title: "Net sales by production policy (₹)", query: fact_sales_lines_policy, type: Donut, limit: 5, max_slices: 5,
+     x: policy_label, y: [{expr: "sum(floor(net_amount + 0.5))", as: Net sales, format: currency}], order: [{by: Net sales, dir: desc}]}
+  # dropped per change list: db05_qty_unit table
+
+dashboards:
+  - id: department_production
+    title: "Kitchen stations and production"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1},
+         applies_to: {fact_sales_lines_enriched: posting_date, fact_kot_headers: date, fact_kot_lines: date, fact_sales_plan_items: plan_date, fact_sales_lines_policy: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: building-2, layout: {x: 7, y: 2, w: 7, h: 1},
+         applies_to: {fact_sales_lines_enriched: branch, fact_kot_headers: branch, fact_kot_lines: branch, fact_sales_plan_items: branch, fact_sales_lines_policy: branch}}
+      - {id: f_department, label: Department, type: string, icon: chef-hat, layout: {x: 14, y: 2, w: 6, h: 1},
+         applies_to: {fact_sales_lines_enriched: department, fact_kot_headers: production, fact_kot_lines: production, fact_sales_plan_items: department, fact_sales_lines_policy: department}}
+    items:
+      - {text: "<p><b>Kitchen stations and production.</b> How much each station made, whether it met the sales plan, and which department the sales belong to. For kitchen head. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db05_kpi_kots, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db05_kpi_dishes, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db05_kpi_plan, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db05_unmapped, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db05_kots_unit, x: 0, y: 6, w: 10, h: 14}
+      - {chart: db05_top_dishes, x: 10, y: 6, w: 10, h: 14}
+      - {chart: db05_plan_dept, x: 0, y: 20, w: 10, h: 14}
+      - {chart: db05_dept_rev, x: 10, y: 20, w: 10, h: 14}
+      - {chart: db05_warehouse, x: 0, y: 34, w: 10, h: 11}
+      - {chart: db05_policy, x: 10, y: 34, w: 10, h: 11}
+      - {text: "<p><b>Two views of the kitchen.</b> Work counts KOTs by the station that cooked them; sales are credited to the department set on the item. They differ on about 1 in 3 KOT lines; that is expected.</p>", x: 0, y: 45, w: 20, h: 2}
+      - {text: "<p>Wastage by department is on Stock count and wastage, and yield by station is on Yield and recipe checks, so they are not repeated here.</p>", x: 0, y: 47, w: 20, h: 2}
