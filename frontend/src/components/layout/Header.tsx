@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   logout,
@@ -204,9 +203,25 @@ export const Header: React.FC = () => {
       <div className="flex items-center justify-between h-12 px-4 md:px-6">
         {/* Left Section: Logo, Brand & Breadcrumb */}
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/dashboard" className="flex items-center gap-3 group shrink-0">
+          <a
+            href="/desk"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(
+                  DESK_RETURN_STORAGE_KEY,
+                  JSON.stringify({
+                    path: window.location.pathname + window.location.search,
+                    label: appLabelForPath(window.location.pathname),
+                  })
+                );
+              } catch (e) {
+                /* ignore */
+              }
+            }}
+            className="flex items-center gap-3 group shrink-0"
+          >
             <img src={uryLogo} alt={__('URY Logo')} className="h-8 w-auto" />
-          </Link>
+          </a>
           <div className="hidden sm:block h-4 w-px bg-border shrink-0" />
           <Breadcrumbs />
         </div>

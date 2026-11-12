@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { t, tUser } from '../i18n';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Command,
   User,
@@ -121,13 +121,29 @@ const Header = () => {
       <div className="flex items-center justify-between h-12 px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/dashboard" className="flex items-center gap-3">
+          <a
+            href="/desk"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(
+                  DESK_RETURN_STORAGE_KEY,
+                  JSON.stringify({
+                    path: window.location.pathname + window.location.search,
+                    label: 'POS',
+                  })
+                );
+              } catch (e) {
+                /* ignore */
+              }
+            }}
+            className="flex items-center gap-3"
+          >
             <img
               src="/assets/ury/pos/ury_pos.png"
               alt="URY POS"
               className="h-8 w-auto"
             />
-          </Link>
+          </a>
         </div>
 
         {/* Search Bar */}
