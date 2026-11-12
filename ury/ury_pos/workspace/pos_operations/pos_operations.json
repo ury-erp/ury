@@ -1,8 +1,7 @@
 {
- "app": "ury",
  "charts": [],
- "content": "[{\"id\": \"cashierCard0\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Today's Sales\", \"col\": 4}}, {\"id\": \"cashierCard1\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Today's Bills\", \"col\": 4}}, {\"id\": \"cashierCard2\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Average Bill Value\", \"col\": 4}}, {\"id\": \"cashierCard3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"cashierCard4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills\", \"col\": 4}}]",
- "creation": "2026-11-10 12:00:00.000000",
+ "content": "[{\"id\": \"JrEmKR5Zd8\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan class=\\\"h4\\\"\\u003e\\u003cb\\u003eYesterday\\u003c/b\\u003e\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"cashierCard0\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Bills Yesterday\", \"col\": 4}}, {\"id\": \"tPSv_AtwmY\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Average Bill Yesterday\", \"col\": 4}}, {\"id\": \"78kWkVnjkm\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan class=\\\"h4\\\"\\u003e\\u003cb\\u003eToday\\u003c/b\\u003e\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"cashierCard1\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Today's Bills\", \"col\": 4}}, {\"id\": \"cashierCard2\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Average Bill Value\", \"col\": 4}}, {\"id\": \"cashierCard3\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open KOTs\", \"col\": 4}}, {\"id\": \"cashierCard4\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Unsettled Bills\", \"col\": 4}}, {\"id\": \"dBZMirld7g\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"ECL_G1DXLM\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Opening Entry\", \"col\": 4}}, {\"id\": \"pc41OnGE1t\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"POS Closing Entry\", \"col\": 4}}]",
+ "creation": "2026-11-10 12:00:00",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -14,30 +13,34 @@
  "label": "POS Operations",
  "link_type": "DocType",
  "links": [],
- "modified": "2026-11-11 19:00:00.000000",
+ "modified": "2026-11-12 15:25:04.689846",
  "modified_by": "Administrator",
  "module": "URY POS",
  "name": "POS Operations",
  "number_cards": [
   {
-   "label": "Today's Sales",
-   "number_card_name": "URY Cashier Sales Today"
+   "label": "Bills Yesterday",
+   "number_card_name": "URY Bills Yesterday"
   },
   {
    "label": "Today's Bills",
-   "number_card_name": "URY Cashier Bills Today"
+   "number_card_name": "URY Bills Today"
+  },
+  {
+   "label": "Average Bill Yesterday",
+   "number_card_name": "URY Average Bill Yesterday"
   },
   {
    "label": "Average Bill Value",
-   "number_card_name": "URY Cashier Average Bill"
+   "number_card_name": "URY Average Bill Today"
   },
   {
    "label": "Open KOTs",
-   "number_card_name": "URY Cashier Open Kots"
+   "number_card_name": "URY Open KOTs"
   },
   {
    "label": "Unsettled Bills",
-   "number_card_name": "URY Cashier Unsettled Bills"
+   "number_card_name": "URY Unsettled Bills"
   }
  ],
  "owner": "Administrator",
@@ -50,7 +53,24 @@
   }
  ],
  "sequence_id": 34.0,
- "shortcuts": [],
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "POS Opening Entry",
+   "link_to": "POS Opening Entry",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "POS Closing Entry",
+   "link_to": "POS Closing Entry",
+   "stats_filter": "[]",
+   "type": "DocType"
+  }
+ ],
  "standard": 1,
  "title": "POS Operations",
  "type": "Workspace"
