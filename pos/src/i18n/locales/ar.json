@@ -86,6 +86,9 @@
   "order": {
     "select_to_view": "حدد طلبًا لعرض التفاصيل",
     "items_title": "عناصر الطلب",
+    "change_type_title": "تغيير نوع الطلب؟",
+    "change_type_message": "التبديل إلى {{type}} يمسح هذا الطلب. عدد العناصر في السلة: {{count}}.",
+    "change_type_confirm": "مسح وتبديل",
     "taxes_charges": "الضرائب والرسوم",
     "cancel_order": "إلغاء الطلب",
     "enter_cancel_reason": "أدخل سبب الإلغاء",
