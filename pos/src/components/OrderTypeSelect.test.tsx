@@ -39,6 +39,7 @@ describe("OrderTypeSelect", () => {
       tableOrder: null,
       posProfile: {},
       isUpdatingOrder: false,
+      activeOrders: [],
     });
 
     mockUseRootStore.mockReturnValue({
@@ -64,6 +65,7 @@ describe("OrderTypeSelect", () => {
       tableOrder: null,
       posProfile: {},
       isUpdatingOrder: false,
+      activeOrders: [],
     });
 
     render(<OrderTypeSelect />);
@@ -92,6 +94,7 @@ describe("OrderTypeSelect", () => {
       tableOrder: null,
       posProfile: {},
       isUpdatingOrder: true,
+      activeOrders: [],
     });
 
     render(<OrderTypeSelect />);

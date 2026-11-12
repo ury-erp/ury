@@ -79,6 +79,9 @@
   "order": {
     "select_to_view": "Select an order to view details",
     "items_title": "Order Items",
+    "change_type_title": "Change order type?",
+    "change_type_message": "Switching to {{type}} clears this order. Items in the cart: {{count}}.",
+    "change_type_confirm": "Clear and switch",
     "taxes_charges": "Taxes & Charges",
     "cancel_order": "Cancel order",
     "enter_cancel_reason": "Enter cancel reason",

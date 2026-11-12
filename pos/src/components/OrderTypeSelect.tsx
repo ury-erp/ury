@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { cn } from '@ury/ui';
-import { Button } from '@ury/ui';
+import { Button, ConfirmDialog } from '@ury/ui';
 import TableSelectionDialog from './TableSelectionDialog';
 import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES, orderTypeLabel, type OrderType} from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
@@ -15,23 +15,37 @@ interface OrderTypeSelectProps {
 }
 
 const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
-  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder } = usePOSStore();
+  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder, activeOrders } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
+  const [pendingType, setPendingType] = useState<OrderType | null>(null);
 
   // Check if user is restricted from table orders
   const isRestrictedFromTableOrders = isUserRestrictedFromTableOrders(user, posProfile);
+
+  const applyOrderType = (type: OrderType) => {
+    setSelectedOrderType(type);
+    if (type === DINE_IN) {
+      setShowTableDialog(true);
+    }
+  };
 
   const handleOrderTypeSelect = (type: OrderType) => {
     // Prevent selecting "Dine In" if user is restricted
     if (type === DINE_IN && isRestrictedFromTableOrders) {
       return;
     }
-    
-    setSelectedOrderType(type);
-    if (type === DINE_IN) {
-      setShowTableDialog(true);
+    // Re-tapping the current type is not a change: never clear the cart for it.
+    if (type === selectedOrderType) {
+      if (type === DINE_IN) setShowTableDialog(true);
+      return;
     }
+    // A type change clears the cart: ask first.
+    if (activeOrders.length > 0) {
+      setPendingType(type);
+      return;
+    }
+    applyOrderType(type);
   };
 
   const handleTableDialogClose = () => {
@@ -96,6 +110,20 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
       {showTableDialog && (
         <TableSelectionDialog onClose={handleTableDialogClose} />
       )}
+
+      <ConfirmDialog
+        open={!!pendingType}
+        onOpenChange={(open) => !open && setPendingType(null)}
+        title={t('order.change_type_title')}
+        description={pendingType ? t('order.change_type_message', { type: orderTypeLabel(pendingType), count: activeOrders.length }) : ''}
+        cancelLabel={t('common.cancel')}
+        confirmLabel={t('order.change_type_confirm')}
+        confirmVariant="danger"
+        onConfirm={() => {
+          if (pendingType) applyOrderType(pendingType);
+          setPendingType(null);
+        }}
+      />
     </div>
   );
 };

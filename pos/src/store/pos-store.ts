@@ -570,6 +570,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       selectedOrderType: type,
       isUpdatingOrder: false,
       orderId: null,
+      // Only a Dine In check holds a table.
+      ...(type !== 'Dine In' ? { selectedTable: null, selectedRoom: null } : {}),
       ...(followDefault ? { selectedCustomer: resolveDefaultCustomer(type, posProfile) } : {}),
     });
     
