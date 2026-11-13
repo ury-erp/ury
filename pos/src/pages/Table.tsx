@@ -628,10 +628,10 @@ const TableView = () => {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 bg-white border-b border-border">
-        <div className="max-w-screen-xl mx-auto">
+        <div className="max-w-screen-2xl mx-auto">
           <div className="flex flex-col gap-3">
-            <div className="flex justify-between items-start gap-4">
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
                     <Spinner message={t('common.loading_rooms')} />
@@ -651,7 +651,7 @@ const TableView = () => {
                     variant="tab"
                     data-selected={selectedRoom === room.name}
                     onClick={() => handleRoomChange(room.name)}
-                    className="h-fit"
+                    className="h-fit whitespace-normal text-left"
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
@@ -663,7 +663,7 @@ const TableView = () => {
                 ))}
               </div>
 
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 self-end sm:self-auto">
                 <Button
                   variant="tab"
                   className="flex items-center gap-2 text-sm"
@@ -679,7 +679,7 @@ const TableView = () => {
       </div>
 
       <div className="flex-1 overflow-auto bg-gray-50 p-6">
-        <div className="max-w-screen-xl mx-auto h-full">
+        <div className="max-w-screen-2xl mx-auto h-full">
           {error && !loadingTables ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
               <AlertTriangle className="w-10 h-10" />
@@ -693,7 +693,7 @@ const TableView = () => {
               <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-40">
+            <div className="grid grid-cols-1 gap-4 pb-40 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {tableRenderGroups.map((group) =>
                 group.length === 1 ? (
                   renderTableCard(group[0])
@@ -779,18 +779,18 @@ const TableView = () => {
 
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-border">
-        <div className="max-w-screen-xl mx-auto">
-          <div className="flex items-center justify-center gap-6 text-sm">
+        <div className="max-w-screen-2xl mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-emerald-50 border border-emerald-300 rounded"></div>
+              <div className="w-4 h-4 bg-success-tint border border-success rounded"></div>
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
+              <div className="w-4 h-4 bg-warning-tint border border-warning rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-50/40 border border-blue-200/70 rounded"></div>
+              <div className="w-4 h-4 bg-primary-tint border border-primary rounded"></div>
               <span>{t('tables.merged')}</span>
             </div>
             {isReservationEnabled && (
