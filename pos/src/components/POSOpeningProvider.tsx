@@ -101,13 +101,14 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
 
       // No open entry for this user -> show the native opening screen.
       if (response.message === 1) {
-        if (posProfile.custom_daily_pos_close === 1) {
-          const closeResponse = await validatePOSClose(posProfile.name);
-          if (closeResponse.message === 'Failed') {
-            setBlockingState('dailyClosePending');
-            setIsLoading(false);
-            return;
-          }
+        // Always ask: besides the daily-close setting, the backend also
+        // fails a session opened before today, which ERPNext v16 refuses
+        // to bill against.
+        const closeResponse = await validatePOSClose(posProfile.name);
+        if (closeResponse.message === 'Failed') {
+          setBlockingState('dailyClosePending');
+          setIsLoading(false);
+          return;
         }
         setIsLoading(false);
         return;
@@ -168,13 +169,11 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         }
       }
 
-      if (posProfile.custom_daily_pos_close === 1) {
-        const closeResponse = await validatePOSClose(posProfile.name);
-        if (closeResponse.message === 'Failed') {
-          setBlockingState('dailyClosePending');
-          setIsLoading(false);
-          return;
-        }
+      const closeResponse = await validatePOSClose(posProfile.name);
+      if (closeResponse.message === 'Failed') {
+        setBlockingState('dailyClosePending');
+        setIsLoading(false);
+        return;
       }
 
       setIsLoading(false);

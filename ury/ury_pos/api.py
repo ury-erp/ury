@@ -997,8 +997,23 @@ def get_open_pos_opening_entries(pos_profile):
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile):
+    # ERPNext v16 rejects every invoice while the profile's open POS Opening
+    # Entry started before today, so such a session must be closed first
+    # whatever the daily-close setting says.
+    outdated_opening = frappe.db.exists(
+        "POS Opening Entry",
+        {
+            "pos_profile": pos_profile,
+            "status": "Open",
+            "docstatus": 1,
+            "period_start_date": ["<", frappe.utils.today()],
+        },
+    )
+    if outdated_opening:
+        return "Failed"
+
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
-    
+
     if enable_unclosed_pos_check:
         current_datetime = frappe.utils.now_datetime()
         start_of_day = current_datetime.replace(hour=5, minute=0, second=0, microsecond=0)
@@ -1021,10 +1036,37 @@ def validate_pos_close(pos_profile):
     
         if unclosed_pos_opening:
             return "Failed"
-        
+
         return "Success"
-    
+
     return "Success"
+
+
+@frappe.whitelist()
+def get_closing_invoices(start, end, pos_profile, user):
+    """Invoices for the main cashier's POS closing, with payments and taxes.
+
+    Replaces ERPNext's `get_pos_invoices`, which v16 removed.
+    """
+    from ury.ury.hooks.ury_pos_closing_entry import get_closing_invoice_rows
+
+    frappe.has_permission("POS Profile", "read", doc=pos_profile, throw=True)
+    frappe.has_permission("POS Invoice", "read", throw=True)
+
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & {"URY Manager", "System Manager"}
+    )
+    if not is_supervisor:
+        if user != session_user:
+            frappe.throw(_("You can only close your own POS session."), frappe.PermissionError)
+        if frappe.db.get_value("POS Profile", pos_profile, "branch") != getBranch():
+            frappe.throw(_("This POS Profile belongs to another branch."), frappe.PermissionError)
+
+    return [
+        frappe.get_doc(row.doctype, row.name).as_dict()
+        for row in get_closing_invoice_rows(start, end, pos_profile, user)
+    ]
 
 
 def _get_allowed_pos_profiles(company: str, user: str) -> list:

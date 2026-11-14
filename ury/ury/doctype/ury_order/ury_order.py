@@ -1285,6 +1285,18 @@ def get_captain_context():
     }
 
 
+def _assign_owner_to_cashier(invoice):
+    """Make the invoice's cashier its owner.
+
+    ERPNext's POS Closing Entry only takes invoices whose owner is the
+    closing cashier, so an order a captain took would otherwise be left out
+    of the cashier's closing and never consolidated. `invoice.cashier` is
+    resolved on the server in sync_order, never taken from the client.
+    """
+    if invoice.cashier and invoice.owner != invoice.cashier:
+        invoice.db_set("owner", invoice.cashier, update_modified=False)
+
+
 @frappe.whitelist()
 def sync_order(
     items,
@@ -1577,8 +1589,9 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")   
+        frappe.throw(f"Error while updating order: {e}")
 
+    _assign_owner_to_cashier(invoice)
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
@@ -1924,9 +1937,6 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
         # Submitted invoice: cancel through the standard document workflow so
         # on_cancel hooks run and GL/payment reversals and audit entries are
@@ -2068,7 +2078,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             target.save(ignore_permissions=True)
         finally:
             frappe.flags.in_bill_merge_sync = False
-            
+        _assign_owner_to_cashier(target)
+
         invoice.flags.ignore_payment_sync = True
     else:
         for d in payments:
@@ -2076,8 +2087,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
-    # invoice.owner = owner
     invoice.save()
+    _assign_owner_to_cashier(invoice)
     try:
         invoice.submit()
     except Exception as e:
