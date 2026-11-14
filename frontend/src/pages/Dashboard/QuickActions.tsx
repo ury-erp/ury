@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getCurrencyLabel } from '@ury/core';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
@@ -255,7 +256,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
+              <label className="block font-semibold text-gray-700 mb-1">Price ({getCurrencyLabel()})</label>
               <Input
                 type="number"
                 placeholder="280"

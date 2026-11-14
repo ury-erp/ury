@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage } from '@ury/core';
+import { storage, getDefaultCurrency } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -172,6 +172,7 @@ interface POSStore extends POSState {
   fetchPosProfile: () => Promise<void>;
   fetchCustomerGroups: () => Promise<void>;
   fetchTerritories: () => Promise<void>;
+  setCurrency: (profileCurrency?: string) => void;
   fetchCurrencySymbol: () => Promise<void>;
   getCartTotals: () => CartTotals;
   itemExistsInCart: (uniqueId: string) => boolean;
@@ -312,7 +313,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   posProfile: null,
   customerGroups: [],
   territories: [],
-  currency: storage.getItem('currency') || 'INR',
+  currency: storage.getItem('currency') || getDefaultCurrency(),
   currencySymbol: storage.getItem('currencySymbol') || null,
   tableOrder: null,
   isInitializing: true,
@@ -359,11 +360,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        set({ 
-          posProfile: profile, 
-          profileLoading: false,
-          currency: profile.currency || 'INR'
-        });
+        get().setCurrency(profile.currency);
+        set({ posProfile: profile, profileLoading: false });
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
         }
@@ -374,11 +372,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const combinedProfile = await getCombinedPosProfile();
       
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
-      set({ 
-        posProfile: combinedProfile, 
-        profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
-      });
+      get().setCurrency(combinedProfile.currency);
+      set({ posProfile: combinedProfile, profileLoading: false });
       
       if (!storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
@@ -390,6 +385,16 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         profileLoading: false 
       });
     }
+  },
+
+  setCurrency: (profileCurrency?: string) => {
+    const currency = profileCurrency || getDefaultCurrency();
+    if (currency && currency !== storage.getItem('currency')) {
+      // A different currency than last session: drop its cached symbol.
+      storage.setItem('currency', currency);
+      storage.removeItem('currencySymbol');
+    }
+    set({ currency });
   },
 
   fetchCurrencySymbol: async () => {
