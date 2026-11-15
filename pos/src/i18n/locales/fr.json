@@ -400,5 +400,11 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "station": {
+    "done": "Terminé",
+    "still_there": "Toujours là ?",
+    "signing_out_in": "Déconnexion dans {{seconds}} secondes. Les articles non envoyés seront perdus.",
+    "keep_working": "Continuer"
   }
 }

@@ -267,6 +267,7 @@ website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # after_request = ["ury.utils.after_request"]
+after_request = ["ury.ury.station.session.after_request"]
 
 website_redirects = [
     {

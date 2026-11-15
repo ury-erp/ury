@@ -242,5 +242,11 @@
         "paid": "مدفوع",
         "consolidated": "مجمع",
         "return": "مرتجع"
+    },
+    "station": {
+        "done": "تم",
+        "still_there": "هل ما زلت هنا؟",
+        "signing_out_in": "سيتم تسجيل الخروج خلال {{seconds}} ثانية. ستُفقد العناصر غير المرسلة.",
+        "keep_working": "متابعة العمل"
     }
 }

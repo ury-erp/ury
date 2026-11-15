@@ -1043,6 +1043,36 @@ def validate_pos_close(pos_profile):
 
 
 @frappe.whitelist()
+def check_opening_entry(user):
+    """Open POS Opening Entries the POS should treat as this user's session.
+
+    ERPNext only reports entries the user opened themselves. An order-taker
+    (captain) never opens one and is not allowed to, so the POS would show
+    them the cashier's "open POS" screen forever. They work inside the
+    session of their POS Profile, so report that one for them.
+    """
+    from erpnext.selling.page.point_of_sale.point_of_sale import check_opening_entry as erpnext_check
+
+    entries = erpnext_check(user)
+    if entries or user != frappe.session.user or frappe.has_permission("POS Opening Entry", "create"):
+        return entries
+
+    profiles = frappe.get_all(
+        "POS Profile User", filters={"user": user, "parenttype": "POS Profile"}, pluck="parent"
+    )
+    if not profiles:
+        return entries
+
+    return frappe.get_all(
+        "POS Opening Entry",
+        filters={"pos_profile": ["in", profiles], "status": "Open", "docstatus": 1},
+        fields=["name", "company", "pos_profile", "period_start_date"],
+        order_by="period_start_date desc",
+        limit=1,
+    )
+
+
+@frappe.whitelist()
 def get_closing_invoices(start, end, pos_profile, user):
     """Invoices for the main cashier's POS closing, with payments and taxes.
 

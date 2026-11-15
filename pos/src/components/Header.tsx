@@ -15,6 +15,7 @@ import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
+import { clearTabCache, signedOutUrl } from '../lib/station';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
@@ -89,7 +90,8 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      window.location.href = '/login?redirect-to=%2Fpos';
+      clearTabCache();
+      window.location.href = signedOutUrl();
     } catch (error) {
       showToast.error(t('errors.failed_logout'));
     }

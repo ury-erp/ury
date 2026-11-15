@@ -124,7 +124,8 @@ export const checkPOSOpening = async (user?: string): Promise<POSOpeningResponse
   try {
     const params = user ? { user } : undefined;
     const response = await call.get<POSOpeningResponse>(
-      'erpnext.selling.page.point_of_sale.point_of_sale.check_opening_entry',
+      // URY's wrapper also covers order-takers, who work in the cashier's session.
+      'ury.ury_pos.api.check_opening_entry',
       params
     );
 

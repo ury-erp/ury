@@ -6,6 +6,8 @@ import frappe.sessions
 from frappe import _
 from frappe.utils.telemetry import capture
 
+from ury.ury.station.session import boot_info
+
 no_cache = 1
 
 SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
@@ -31,6 +33,9 @@ def get_context(context):
 	else:
 		enabled = True
 	boot["server_script_enabled"] = enabled
+
+	# Set when this session was started with a PIN at a station (see ury.ury.station).
+	boot["ury_station"] = boot_info()
 
 	boot_json = frappe.as_json(boot, indent=None, separators=(",", ":"))
 	boot_json = SCRIPT_TAG_PATTERN.sub("", boot_json)

@@ -427,5 +427,11 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "station": {
+    "done": "Done",
+    "still_there": "Still there?",
+    "signing_out_in": "Signing out in {{seconds}} seconds. Unsent items will be lost.",
+    "keep_working": "Keep working"
   }
 }
