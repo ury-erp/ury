@@ -88,6 +88,9 @@ export interface SyncOrderRequest {
   last_modified_time?: string;
   comments?: string | null;
   room?: string;
+  /** A manager's approval PIN, when removing items already sent to the kitchen. */
+  approval_pin?: string;
+  approval_reason?: string;
 }
 
 /**

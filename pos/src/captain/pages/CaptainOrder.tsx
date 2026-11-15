@@ -25,6 +25,8 @@ import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
 import CaptainTransferDialog from '../../components/CaptainTransferDialog';
 import { CustomerSelect } from '../../components/CustomerSelect';
+import { useManagerApproval } from '../../components/ManagerApproval';
+import { t } from '../../i18n';
 
 type Mode = 'menu' | 'order';
 
@@ -41,6 +43,7 @@ type Mode = 'menu' | 'order';
  * guard was airtight.
  */
 export default function CaptainOrder() {
+  const { withApproval } = useManagerApproval();
   const { table } = useParams<{ table: string }>();
   const navigate = useNavigate();
   const user = useRootStore((state: RootState) => state.user);
@@ -214,7 +217,13 @@ export default function CaptainOrder() {
         comments: orderComment || undefined,
       };
 
-      const result = await syncOrder(orderData);
+      // Removing items already sent to the kitchen needs a manager's PIN.
+      const result = await withApproval(
+        (approval) =>
+          syncOrder({ ...orderData, approval_pin: approval?.pin, approval_reason: approval?.reason }),
+        { title: t('approval.remove_title'), askReason: true }
+      );
+      if (result === undefined) return;
 
       if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
         showToast.error(

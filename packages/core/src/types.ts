@@ -75,5 +75,7 @@ export interface ServerPOSCapabilities {
   canClosePOS: boolean;
   canCancelOrder: boolean;
   cancelNeedsApproval: boolean;
+  canRemoveSentItems: boolean;
+  removeNeedsApproval: boolean;
   isManager: boolean;
 }

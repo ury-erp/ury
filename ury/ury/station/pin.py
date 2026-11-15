@@ -48,13 +48,16 @@ def hash_pin(pin: str) -> str:
 	return passlibctx.hash(pin)
 
 
-def find_users(pin: str, exclude: str | None = None) -> list[str]:
-	"""Users whose enabled PIN matches. Every hash is checked, with no early
-	exit, so the time taken does not reveal which waiter matched."""
+WAITER_PINS = "URY Waiter PIN"
+MANAGER_PINS = "URY Manager PIN"
+PIN_DOCTYPES = (WAITER_PINS, MANAGER_PINS)
+
+
+def find_users(pin: str, exclude: str | None = None, doctype: str = WAITER_PINS) -> list[str]:
+	"""Users whose enabled PIN of this kind matches. Every hash is checked,
+	with no early exit, so the time taken does not reveal who matched."""
 	matches = []
-	rows = frappe.get_all(
-		"URY Waiter PIN", filters={"enabled": 1}, fields=["name", "user", "pin_hash"], order_by="creation"
-	)
+	rows = frappe.get_all(doctype, filters={"enabled": 1}, fields=["name", "user", "pin_hash"], order_by="creation")
 	for row in rows:
 		if row.name == exclude or not row.pin_hash:
 			continue
@@ -63,7 +66,14 @@ def find_users(pin: str, exclude: str | None = None) -> list[str]:
 	return matches
 
 
-def ensure_unique(pin: str, exclude: str | None = None):
-	if find_users(pin, exclude=exclude):
+def ensure_unique(pin: str, exclude: str | None = None, doctype: str = WAITER_PINS):
+	"""No enabled PIN of either kind may equal another: a waiter's sign-in PIN
+	must never double as a manager's approval PIN, or the other way round."""
+	clashes = [
+		user
+		for kind in PIN_DOCTYPES
+		for user in find_users(pin, exclude=exclude if kind == doctype else None, doctype=kind)
+	]
+	if clashes:
 		# Deliberately does not say whose PIN it clashes with.
 		frappe.throw(_("This PIN is already in use. Choose a different one."), title=_("PIN Not Available"))

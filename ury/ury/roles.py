@@ -133,5 +133,9 @@ def pos_capabilities(pos_profile=None, user=None) -> dict:
 		# Cashiers can request these; a manager approves (see order approvals).
 		"canCancelOrder": billing,
 		"cancelNeedsApproval": user_level < MANAGER,
+		# Removing items already sent to the kitchen: always possible, with a
+		# manager's approval PIN below manager (see ury.ury.approvals).
+		"canRemoveSentItems": True,
+		"removeNeedsApproval": user_level < MANAGER,
 		"isManager": user_level >= MANAGER,
 	}

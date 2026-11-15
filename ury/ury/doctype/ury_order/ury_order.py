@@ -7,7 +7,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 from erpnext.controllers.queries import item_query
-from ury.ury import roles
+from ury.ury import approvals, roles
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
@@ -1142,8 +1142,11 @@ def get_table_order_context(table):
     invoice_billed = bool(order) and order.get("invoice_printed") == 1
     can_modify = can_view and (not order or not invoice_billed or is_billing_user)
 
-    can_reduce_items = can_modify and bool(pos_profile.remove_items)
-    can_remove_items = can_modify and bool(pos_profile.remove_items)
+    # Sent items can always be reduced or removed by whoever may modify the
+    # order; below manager the server then asks for a manager's approval PIN
+    # (see ury.ury.approvals), so the POS shows the controls.
+    can_reduce_items = can_modify
+    can_remove_items = can_modify
 
     can_transfer_table = can_modify and has_elevated_access
 
@@ -1313,7 +1316,9 @@ def sync_order(
     order_type=None,
     aggregator_id=None,
     room=None,
-    merged_tables=None
+    merged_tables=None,
+    approval_pin=None,
+    approval_reason=None,
 ):
     
     user_role = frappe.get_roles()
@@ -1546,10 +1551,9 @@ def sync_order(
     if isinstance(items, str):
         items = json.loads(items)
 
-    # Reduction/removal permission: gate any decrease in a previously-sent
-    # item's quantity (including full removal) by POS Profile `remove_items`,
-    # matching Phase 2's can_reduce_items/can_remove_items derivation.
-    if past_item and not bool(posprofile.remove_items):
+    # Reducing or removing items that were already sent to the kitchen:
+    # managers may; anyone else with a manager's approval PIN.
+    if past_item:
         requested_qty_by_item = {}
         for d in items:
             requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(
@@ -1567,12 +1571,21 @@ def sync_order(
                 prev["item_code"], 0
             ) + flt(prev["qty"])
 
-        for item_code, prev_qty in previous_qty_by_item.items():
-            if requested_qty_by_item.get(item_code, 0) < prev_qty:
-                frappe.throw(
-                    _("You are not permitted to reduce or remove items from this order."),
-                    frappe.PermissionError,
-                )
+        reduced = {
+            item_code: (prev_qty, requested_qty_by_item.get(item_code, 0))
+            for item_code, prev_qty in previous_qty_by_item.items()
+            if requested_qty_by_item.get(item_code, 0) < prev_qty
+        }
+        if reduced:
+            approvals.approve(
+                approvals.REMOVE_SENT_ITEMS,
+                invoice.name,
+                reason=approval_reason,
+                approval_pin=approval_pin,
+                detail="; ".join(
+                    f"{code}: {flt(before):g} -> {flt(after):g}" for code, (before, after) in reduced.items()
+                ),
+            )
 
     invoice.items = []
 
@@ -1901,7 +1914,7 @@ def customer_favourite_item(customer_name):
 
 
 @frappe.whitelist()
-def cancel_order(invoice_id, reason):
+def cancel_order(invoice_id, reason, approval_pin=None):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     # Authorization gate: the session user must hold cancel rights on this
@@ -1921,6 +1934,9 @@ def cancel_order(invoice_id, reason):
                 _("You are not allowed to cancel an invoice from another branch."),
                 frappe.PermissionError,
             )
+
+    # Below manager, cancelling needs a manager's approval PIN.
+    approvals.approve(approvals.CANCEL_ORDER, invoice_id, reason=reason, approval_pin=approval_pin)
 
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:

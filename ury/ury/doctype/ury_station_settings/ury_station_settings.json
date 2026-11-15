@@ -148,6 +148,12 @@
    "read": 1,
    "write": 1,
    "create": 1
+  },
+  {
+   "role": "URY Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1
   }
  ],
  "sort_field": "creation",

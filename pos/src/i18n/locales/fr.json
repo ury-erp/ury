@@ -406,5 +406,14 @@
     "still_there": "Toujours là ?",
     "signing_out_in": "Déconnexion dans {{seconds}} secondes. Les articles non envoyés seront perdus.",
     "keep_working": "Continuer"
+  },
+  "approval": {
+    "needed": "Un responsable doit approuver.",
+    "enter_pin": "Demandez à un responsable de saisir son code d'approbation.",
+    "reason": "Motif (obligatoire)",
+    "approve": "Approuver",
+    "delete_digit": "Effacer le dernier chiffre",
+    "cancel_title": "Approbation : annuler la commande",
+    "remove_title": "Approbation : retirer des articles envoyés"
   }
 }

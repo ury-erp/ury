@@ -77,6 +77,11 @@
    "role": "URY Manager",
    "read": 1,
    "delete": 1
+  },
+  {
+   "role": "URY Admin",
+   "read": 1,
+   "delete": 1
   }
  ],
  "sort_field": "creation",

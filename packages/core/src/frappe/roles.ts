@@ -108,7 +108,7 @@ export const derivePOSCapabilities = (
     return {
       canTakeTableOrders: server.canTakeTableOrders,
       canAccessOtherCaptainsTables: server.canAccessOtherCaptainsTables,
-      canRemoveSentItems: Boolean(posProfile?.remove_items),
+      canRemoveSentItems: server.canRemoveSentItems,
       showItemImages: Boolean(posProfile?.show_image),
       canSettlePayment: server.canSettlePayment,
       canApplyDiscount: server.canApplyDiscount,

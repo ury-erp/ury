@@ -773,7 +773,7 @@ class TestSyncOrderHardening(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_denies_item_reduction_without_remove_items_permission(
+    def test_item_reduction_needs_manager_approval(
         self,
         mock_session,
         mock_get_roles,
@@ -810,8 +810,12 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_db_get_value.return_value = None
 
+        # Reducing a sent item without a manager's PIN asks for approval,
+        # whatever the profile's remove_items setting (ury.ury.approvals).
+        from ury.ury.approvals import ApprovalRequired
+
         with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]):
-            with self.assertRaises(frappe.PermissionError) as context:
+            with self.assertRaises(ApprovalRequired) as context:
                 sync_order(
                     items=json.dumps([{"item": "ITEM-1", "qty": 1}]),  # 2 -> 1: a reduction
                     cashier="fake_cashier",
@@ -832,9 +836,7 @@ class TestSyncOrderHardening(FrappeTestCase):
                     waiter="fake_waiter",
                     pos_profile="Test Profile",
                 )
-        self.assertIn(
-            "not permitted to reduce or remove items", str(context.exception)
-        )
+        self.assertIn("manager must approve", str(context.exception))
 
 
 class TestGetOrderInvoiceOwnership(FrappeTestCase):

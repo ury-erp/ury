@@ -433,5 +433,14 @@
     "still_there": "Still there?",
     "signing_out_in": "Signing out in {{seconds}} seconds. Unsent items will be lost.",
     "keep_working": "Keep working"
+  },
+  "approval": {
+    "needed": "A manager must approve this.",
+    "enter_pin": "Ask a manager to enter their approval PIN.",
+    "reason": "Reason (required)",
+    "approve": "Approve",
+    "delete_digit": "Delete last digit",
+    "cancel_title": "Manager approval: cancel order",
+    "remove_title": "Manager approval: remove sent items"
   }
 }
