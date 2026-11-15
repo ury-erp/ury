@@ -92,6 +92,7 @@ export interface OpenPosOpeningEntry {
   name: string;
   period_start_date: string;
   user: string;
+  user_full_name?: string;
   pos_profile: string;
 }
 

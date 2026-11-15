@@ -173,7 +173,12 @@
     "confirm_submit": "Yes, Close POS",
     "confirm_back": "Go Back",
     "checklist_skip": "Skip for now",
-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
+    "closed_title": "Shift closed",
+    "closed_message": "The till is closed. You can print the shift report now, or a manager can find it later in the system.",
+    "print_report": "Print shift report",
+    "done": "Done",
+    "closing_for": "You are closing the shift opened by {{user}}."
   },
   "checklist": {
     "title_opening": "Opening Checklist",

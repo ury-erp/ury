@@ -764,9 +764,12 @@ def getPosProfile():
                 else:
                     cashier = pos_opened_cashier    
                 
-        else:    
-            cashier = get_cashier.applicable_for_users[0].user
-            owner = get_cashier.applicable_for_users[0].user
+        else:
+            from ury.ury import pos_session
+
+            # Whoever has the till open now (shift handover); first user otherwise.
+            cashier = pos_session.current_cashier(get_cashier)
+            owner = cashier
         
         qz_print = pos_profiles.qz_print
         print_type = None
@@ -991,7 +994,7 @@ def get_open_pos_opening_entries(pos_profile):
     if not frappe.has_permission("POS Opening Entry", "read"):
         frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
 
-    return frappe.get_all(
+    entries = frappe.get_all(
         "POS Opening Entry",
         filters={
             "pos_profile": pos_profile,
@@ -1000,6 +1003,9 @@ def get_open_pos_opening_entries(pos_profile):
         },
         fields=["name", "period_start_date", "user", "pos_profile"],
     )
+    for entry in entries:
+        entry["user_full_name"] = frappe.utils.get_fullname(entry.user)
+    return entries
 
 
 @frappe.whitelist()
@@ -1236,6 +1242,11 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
         opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
         if opening_amount is not None and frappe.utils.flt(opening_amount) < 0:
             frappe.throw(_("Opening amount cannot be negative."))
+
+    from ury.ury import pos_session
+
+    # One open till per POS Profile: say clearly whose shift is still open.
+    pos_session.ensure_can_open(pos_profile)
 
     opening = frappe.get_doc(
         {

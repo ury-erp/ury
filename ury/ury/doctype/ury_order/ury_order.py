@@ -7,7 +7,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 from erpnext.controllers.queries import item_query
-from ury.ury import approvals, roles
+from ury.ury import approvals, pos_session, roles
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
@@ -1505,7 +1505,9 @@ def sync_order(
         else:
             invoice.cashier = pos_opened_cashier
     else:
-        invoice.cashier = posprofile.applicable_for_users[0].user if posprofile.applicable_for_users else frappe.session.user
+        # The cashier whose shift is open now, so a later cashier's closing
+        # includes orders taken during their shift (shift handover).
+        invoice.cashier = pos_session.current_cashier(posprofile)
 
     if not invoice.waiter:
         invoice.waiter = frappe.session.user
@@ -1598,7 +1600,7 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")
+        frappe.throw(pos_session.explain_error(e) or f"Error while updating order: {e}")
 
     _assign_owner_to_cashier(invoice)
 
@@ -2079,6 +2081,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 target_req -= give
                 
         target.flags.ignore_payment_sync = True
+        if not frappe.db.get_value("POS Profile", pos_profile, "custom_enable_multiple_cashier"):
+            target.cashier = pos_session.current_cashier(frappe.get_cached_doc("POS Profile", pos_profile))
         
         frappe.flags.in_bill_merge_sync = True
         try:
@@ -2094,12 +2098,19 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
-    invoice.save()
+    # Paid during the current shift: it belongs in that cashier's closing,
+    # even if the order was taken in an earlier shift.
+    if not frappe.db.get_value("POS Profile", pos_profile, "custom_enable_multiple_cashier"):
+        invoice.cashier = pos_session.current_cashier(frappe.get_cached_doc("POS Profile", pos_profile))
+    try:
+        invoice.save()
+    except Exception as e:
+        frappe.throw(pos_session.explain_error(e) or f"Error while settling order: {e}")
     _assign_owner_to_cashier(invoice)
     try:
         invoice.submit()
     except Exception as e:
-        frappe.throw(f"Error while settling order: {e}")
+        frappe.throw(pos_session.explain_error(e) or f"Error while settling order: {e}")
         
     # Free the table when no other open drafts remain on this table group
 

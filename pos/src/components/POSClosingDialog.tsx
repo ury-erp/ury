@@ -190,6 +190,9 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   // Entry doc name so a retry after a failed submit re-submits the same
   // doc instead of creating a duplicate draft (Fix 3). Cleared only on
   // final success or explicit cancel/dismiss of the dialog.
+  // Set once the closing is submitted: shows "Shift closed" with an optional
+  // printed shift report before moving on.
+  const [closedDoc, setClosedDoc] = useState<{ name: string; kind: 'sub' | 'main' } | null>(null);
   const [pendingCloseDoc, setPendingCloseDoc] = useState<{
     name: string;
     kind: 'sub' | 'main';
@@ -207,7 +210,12 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
 
     try {
       const openEntries = await getOpenPosOpeningEntries(posProfile.name);
-      const ownEntry = openEntries.find((entry) => entry.user === user.name) ?? null;
+      // A manager may close the open session for the cashier who opened it
+      // (e.g. the cashier has left); everyone else closes only their own.
+      const ownEntry =
+        openEntries.find((entry) => entry.user === user.name) ??
+        (posProfile.capabilities?.isManager ? openEntries[0] : undefined) ??
+        null;
 
       if (!ownEntry) {
         setOpeningEntry(null);
@@ -251,8 +259,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
 
       const [invoices, openingDoc] = await Promise.all([
         subCashier
-          ? getSubCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name)
-          : getMainCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, user.name),
+          ? getSubCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, ownEntry.user)
+          : getMainCashierPosInvoices(ownEntry.period_start_date, end, posProfile.name, ownEntry.user),
         db.getDoc<OpeningEntryDoc>('POS Opening Entry', ownEntry.name),
       ]);
 
@@ -320,10 +328,14 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         (row.opening_amount !== 0 || row.expected_amount !== 0)
     );
 
+    // An all-zero count is only suspicious when money was expected: a shift
+    // with no float and no takings (e.g. a short handover shift) closes at zero.
+    const totalExpected = rows.reduce((sum, row) => sum + row.opening_amount + row.expected_amount, 0);
+
     let blockingMessage: string | null = null;
     if (untouchedCount > 0) {
       blockingMessage = t('pos_closing.validation_missing_rows');
-    } else if (totalClosing === 0) {
+    } else if (totalClosing === 0 && totalExpected !== 0) {
       blockingMessage = t('pos_closing.validation_all_zero');
     }
 
@@ -370,7 +382,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
           const doc = await createSubPosClosing({
             pos_profile: posProfile.name,
             pos_opening_entry: openingEntry.name,
-            user: user.name,
+            user: openingEntry.user,
             period_start_date: openingEntry.period_start_date,
             period_end_date: formatDateTime(periodEndDate),
             payment_reconciliation: paymentReconciliation,
@@ -383,7 +395,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
           const doc = await createPosClosingEntry({
             pos_profile: posProfile.name,
             pos_opening_entry: openingEntry.name,
-            user: user.name,
+            user: openingEntry.user,
             company: posProfile.company,
             period_start_date: openingEntry.period_start_date,
             period_end_date: formatDateTime(periodEndDate),
@@ -408,11 +420,31 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         await submitPosClosingEntry(docName);
       }
 
-      // Final success -- stop tracking the draft.
+      // Final success -- stop tracking the draft, and offer the shift report.
       setPendingCloseDoc(null);
+      setClosedDoc({ name: docName, kind });
+    } catch (error) {
+      console.error('Failed to submit POS closing:', error);
+      setSubmitError(extractServerErrorMessage(error, t('pos_closing.submit_failed')));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      // Close submission succeeded -- gate on the Closing checklist before
-      // notifying the parent and dismissing the dialog.
+  /** Optional: the shift report is the closing document's print view. */
+  const printShiftReport = () => {
+    if (!closedDoc) return;
+    const doctype = closedDoc.kind === 'sub' ? 'Sub POS Closing' : 'POS Closing Entry';
+    window.open(
+      `/printview?doctype=${encodeURIComponent(doctype)}&name=${encodeURIComponent(closedDoc.name)}&trigger_print=1`,
+      '_blank'
+    );
+  };
+
+  const finishAfterClose = async () => {
+    try {
+      // Gate on the Closing checklist before notifying the parent and
+      // dismissing the dialog.
       if (posProfile?.name) {
         try {
           const { logStatus } = await getChecklist(posProfile.name, 'Closing');
@@ -430,11 +462,8 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         await onClosingSubmitted?.();
         onOpenChange(false);
       }
-    } catch (error) {
-      console.error('Failed to submit POS closing:', error);
-      setSubmitError(extractServerErrorMessage(error, t('pos_closing.submit_failed')));
     } finally {
-      setIsSubmitting(false);
+      setClosedDoc(null);
     }
   };
 
@@ -493,11 +522,20 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       >
         <DialogHeader>
           <DialogTitle>{t('pos_closing.title')}</DialogTitle>
-          <DialogDescription>{t('pos_closing.description')}</DialogDescription>
+          <DialogDescription>
+            {openingEntry && openingEntry.user !== user?.name
+              ? t('pos_closing.closing_for', { user: openingEntry.user_full_name || openingEntry.user })
+              : t('pos_closing.description')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-6 pb-4">
-          {isLoading ? (
+          {closedDoc ? (
+            <div className="py-8 text-center">
+              <p className="text-lg font-semibold text-gray-900">{t('pos_closing.closed_title')}</p>
+              <p className="mt-1 text-sm text-gray-600">{t('pos_closing.closed_message')}</p>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Spinner message={t('pos_closing.loading')} />
             </div>
@@ -558,6 +596,14 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
           <p className="px-6 pb-2 text-sm font-medium text-red-600">{submitError}</p>
         )}
 
+        {closedDoc ? (
+          <DialogFooter>
+            <Button variant="outline" onClick={printShiftReport}>
+              {t('pos_closing.print_report')}
+            </Button>
+            <Button onClick={finishAfterClose}>{t('pos_closing.done')}</Button>
+          </DialogFooter>
+        ) : (
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
             {t('common.cancel')}
@@ -569,6 +615,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
             {isSubmitting ? t('pos_closing.submitting') : t('pos_closing.submit')}
           </Button>
         </DialogFooter>
+        )}
       </DialogContent>
 
       {showConfirm && (

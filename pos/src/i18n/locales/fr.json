@@ -158,7 +158,12 @@
     "confirm_submit": "Oui, cloturer le PDV",
     "confirm_back": "Retour",
     "checklist_skip": "Ignorer pour l'instant",
-    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
+    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard.",
+    "closed_title": "Service clôturé",
+    "closed_message": "La caisse est clôturée. Vous pouvez imprimer le rapport maintenant, ou un responsable le retrouvera plus tard dans le système.",
+    "print_report": "Imprimer le rapport",
+    "done": "Terminé",
+    "closing_for": "Vous clôturez le service ouvert par {{user}}."
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
