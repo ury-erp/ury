@@ -25,6 +25,8 @@ import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
 import CaptainTransferDialog from '../../components/CaptainTransferDialog';
 import { CustomerSelect } from '../../components/CustomerSelect';
+import { useManagerApproval } from '../../components/ManagerApproval';
+import { t } from '../../i18n';
 
 type Mode = 'menu' | 'order';
 
@@ -41,6 +43,7 @@ type Mode = 'menu' | 'order';
  * guard was airtight.
  */
 export default function CaptainOrder() {
+  const { withApproval } = useManagerApproval();
   const { table } = useParams<{ table: string }>();
   const navigate = useNavigate();
   const user = useRootStore((state: RootState) => state.user);
@@ -187,15 +190,6 @@ export default function CaptainOrder() {
         showToast.error('Add at least one item before sending the order.');
         return;
       }
-      // sync_order requires `customer` as a hard backend parameter (found via
-      // live E2E test — a 500 "missing 1 required positional argument:
-      // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
-      // exact validate-before-submit gate rather than only omitting the field.
-      if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before sending the order.');
-        return;
-      }
-
       setIsSubmitting(true);
 
       const orderData: SyncOrderRequest = {
@@ -211,7 +205,8 @@ export default function CaptainOrder() {
         order_type: DINE_IN,
         table,
         room: selectedRoom || undefined,
-        customer: selectedCustomer.name,
+        // Optional: sync_order falls back to the POS Profile's default customer.
+        customer: selectedCustomer?.name,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
@@ -222,7 +217,13 @@ export default function CaptainOrder() {
         comments: orderComment || undefined,
       };
 
-      const result = await syncOrder(orderData);
+      // Removing items already sent to the kitchen needs a manager's PIN.
+      const result = await withApproval(
+        (approval) =>
+          syncOrder({ ...orderData, approval_pin: approval?.pin, approval_reason: approval?.reason }),
+        { title: t('approval.remove_title'), askReason: true }
+      );
+      if (result === undefined) return;
 
       if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
         showToast.error(
@@ -367,9 +368,8 @@ export default function CaptainOrder() {
   const OrderListContent = () => (
     <div className="flex-1 overflow-y-auto p-3 space-y-5 pb-32">
       {canModify && (
-        // sync_order requires customer server-side (§handleSend) — surfaced
-        // here so a Captain can satisfy it before hitting the send-time
-        // validation error. Reused as-is from the Cashier OrderPanel.
+        // Optional — sync_order falls back to the POS Profile's default
+        // customer. Reused as-is from the Cashier OrderPanel.
         <CustomerSelect disabled={isInteractionDisabled} />
       )}
 

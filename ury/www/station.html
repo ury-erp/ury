@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="robots" content="noindex" />
+    <title>Sign in</title>
+    <link rel="stylesheet" href="/assets/ury/css/ury_station.css?v={{ build_version }}" />
+  </head>
+  <body>
+    <main class="card">
+      <!-- First use on this screen: which station is it? -->
+      <section id="setup" hidden>
+        <h1>Set up this screen</h1>
+        <p class="hint">Enter this screen's station code. You only do this once.</p>
+        <label for="station-code">Station code</label>
+        <input id="station-code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="POS1" />
+        <div id="activation-row">
+          <label for="activation-code">Activation code</label>
+          <input id="activation-code" type="text" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="6 digits, from a manager" />
+        </div>
+        <p id="setup-error" class="error" role="alert"></p>
+        <button id="setup-save" class="primary" type="button">Save</button>
+      </section>
+
+      <!-- Every day: just the PIN -->
+      <section id="signin" hidden>
+        <h1>Enter your PIN</h1>
+        <div id="dots" class="dots" aria-hidden="true"></div>
+        <p id="signin-error" class="error" role="alert"></p>
+        <div class="keypad" id="keypad">
+          <button type="button" data-key="1">1</button>
+          <button type="button" data-key="2">2</button>
+          <button type="button" data-key="3">3</button>
+          <button type="button" data-key="4">4</button>
+          <button type="button" data-key="5">5</button>
+          <button type="button" data-key="6">6</button>
+          <button type="button" data-key="7">7</button>
+          <button type="button" data-key="8">8</button>
+          <button type="button" data-key="9">9</button>
+          <button type="button" data-key="back" class="secondary" aria-label="Delete last digit">&#9003;</button>
+          <button type="button" data-key="0">0</button>
+          <button type="button" data-key="enter" class="primary" id="enter">Sign in</button>
+        </div>
+      </section>
+
+      <footer>
+        <span id="station-label"></span>
+        <span>
+          <a href="#" id="change-station" hidden>Change station</a>
+          <a href="/login" id="staff-login">Staff login</a>
+        </span>
+      </footer>
+    </main>
+
+    <script>window.ury_station_config = {{ config_json }};</script>
+    <script src="/assets/ury/js/ury_station.js?v={{ build_version }}"></script>
+  </body>
+</html>

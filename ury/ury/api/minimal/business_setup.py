@@ -1,10 +1,11 @@
 import frappe
 from frappe import _
 
+from ury.ury import roles
+
 @frappe.whitelist()
 def get_business_setup():
-    if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+    roles.require_manager(_("Only a manager can view the business setup."))
 
     company = frappe.get_all("Company", limit=1)
     if not company:
@@ -27,8 +28,7 @@ def get_business_setup():
 
 @frappe.whitelist()
 def get_branches():
-    if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+    roles.require_manager(_("Only a manager can view the business setup."))
 
     comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
@@ -38,8 +38,7 @@ def get_branches():
 
 @frappe.whitelist()
 def update_business_setup(branch=None, restaurant=None):
-    if frappe.session.user == "Guest":
-        frappe.throw("Not permitted")
+    roles.require_manager(_("Only a manager can change the business setup."))
 
     if branch:
         if isinstance(branch, str):
@@ -93,6 +92,9 @@ def update_business_setup(branch=None, restaurant=None):
 
 @frappe.whitelist()
 def create_setup_user(email, name, password=None, role="URY Cashier"):
+    # Writes with permissions bypassed, so the caller and the role are checked
+    # here: without this anyone logged in could create a System Manager.
+    roles.check_can_assign(role)
     if frappe.db.exists("User", email):
         return {"status": "exists", "email": email}
     
@@ -113,6 +115,8 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
+    if not roles.is_admin():
+        frappe.throw(_("Only an admin can run the restaurant setup."), frappe.PermissionError)
     if isinstance(data, str):
         data = frappe.parse_json(data)
         
@@ -130,7 +134,7 @@ def submit_configure_data(data):
             comp_doc = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": default_company,
-                "default_currency": "INR"
+                "default_currency": frappe.defaults.get_global_default("currency") or "INR"
             })
             comp_doc.insert(ignore_permissions=True)
             

@@ -18,6 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
+import { useManagerApproval } from '../components/ManagerApproval';
 import { splitBill } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
@@ -71,6 +72,7 @@ export default function Orders() {
   } = useRootStore();
 
   const posStore = usePOSStore();
+  const { withApproval } = useManagerApproval();
   const navigate = useNavigate();
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
@@ -191,10 +193,17 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
+      // A cashier needs a manager's PIN; a manager cancels directly.
+      const done = await withApproval(
+        (approval) =>
+          call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+            invoice_id: selectedOrder.name,
+            reason: cancelReason,
+            approval_pin: approval?.pin,
+          }),
+        { title: t('approval.cancel_title') }
+      );
+      if (done === undefined) return;
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');

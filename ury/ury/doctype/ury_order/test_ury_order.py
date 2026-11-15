@@ -773,7 +773,7 @@ class TestSyncOrderHardening(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_denies_item_reduction_without_remove_items_permission(
+    def test_item_reduction_needs_manager_approval(
         self,
         mock_session,
         mock_get_roles,
@@ -810,8 +810,12 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_db_get_value.return_value = None
 
+        # Reducing a sent item without a manager's PIN asks for approval,
+        # whatever the profile's remove_items setting (ury.ury.approvals).
+        from ury.ury.approvals import ApprovalRequired
+
         with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]):
-            with self.assertRaises(frappe.PermissionError) as context:
+            with self.assertRaises(ApprovalRequired) as context:
                 sync_order(
                     items=json.dumps([{"item": "ITEM-1", "qty": 1}]),  # 2 -> 1: a reduction
                     cashier="fake_cashier",
@@ -832,9 +836,7 @@ class TestSyncOrderHardening(FrappeTestCase):
                     waiter="fake_waiter",
                     pos_profile="Test Profile",
                 )
-        self.assertIn(
-            "not permitted to reduce or remove items", str(context.exception)
-        )
+        self.assertIn("manager must approve", str(context.exception))
 
 
 class TestGetOrderInvoiceOwnership(FrappeTestCase):
@@ -936,6 +938,13 @@ class TestTableTransfer(FrappeTestCase):
     """Phase 3: table_transfer() previously had no server-side transfer-role
     check at all, relying entirely on the frontend's canCaptainTransfer()."""
 
+    def setUp(self):
+        # Role checks treat Administrator as an admin whatever get_roles
+        # returns, so run as an ordinary user for the mocked roles to count.
+        self._previous_user = frappe.session.user
+        frappe.local.session.user = "captain_a@example.com"
+        self.addCleanup(setattr, frappe.local.session, "user", self._previous_user)
+
     @patch("ury.ury.doctype.ury_order.ury_order._get_merge_cluster")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
@@ -1029,6 +1038,13 @@ class TestCaptainTransfer(FrappeTestCase):
     assignment under multiple_cashier mode. These cover the added
     transfer-role authorization, invoice-write authorization, branch
     validation, and target-user eligibility."""
+
+    def setUp(self):
+        # Role checks treat Administrator as an admin whatever get_roles
+        # returns, so run as an ordinary user for the mocked roles to count.
+        self._previous_user = frappe.session.user
+        frappe.local.session.user = "captain_a@example.com"
+        self.addCleanup(setattr, frappe.local.session, "user", self._previous_user)
 
     def _pos_invoice(self, pos_profile="Test POS Profile", branch="Test Branch", restaurant_table="T1"):
         inv = MagicMock()
@@ -1153,3 +1169,59 @@ class TestCaptainTransfer(FrappeTestCase):
 
         self.assertEqual(pos_invoice.waiter, "captain_b@example.com")
         pos_invoice.save.assert_called_once()
+
+
+class _StopAfterCustomer(Exception):
+    pass
+
+
+class TestSyncOrderOptionalCustomer(FrappeTestCase):
+    """Staff orders don't need a customer: sync_order falls back to the POS
+    Profile's default (walk-in) customer."""
+
+    def _run_new_take_away_order(self, profile_customer, customer=None):
+        mock_invoice = MagicMock()
+        mock_invoice.name = None  # brand-new order
+        mock_invoice.customer = None
+
+        mock_pos_profile = _make_pos_profile()
+        mock_pos_profile.customer = profile_customer
+
+        def get_doc(doctype, name=None):
+            if doctype == "Customer":
+                # Customer is resolved by now; stop before the rest of sync_order.
+                raise _StopAfterCustomer(name)
+            return mock_pos_profile
+
+        with patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice", return_value=mock_invoice), \
+                patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission", return_value=True), \
+                patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc", side_effect=get_doc), \
+                patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles", return_value=["URY Cashier"]):
+            sync_order(
+                items="[]",
+                cashier="fake_cashier",
+                owner="fake_owner",
+                mode_of_payment="Cash",
+                customer=customer,
+                no_of_pax=1,
+                last_invoice=None,
+                waiter="fake_waiter",
+                pos_profile="Test Profile",
+                order_type="Take Away",
+            )
+        return mock_invoice
+
+    def test_uses_pos_profile_default_customer_when_none_given(self):
+        with self.assertRaises(_StopAfterCustomer) as context:
+            self._run_new_take_away_order(profile_customer="Walk-In Customer")
+        self.assertEqual(str(context.exception), "Walk-In Customer")
+
+    def test_selected_customer_overrides_default(self):
+        with self.assertRaises(_StopAfterCustomer) as context:
+            self._run_new_take_away_order(profile_customer="Walk-In Customer", customer="Jane")
+        self.assertEqual(str(context.exception), "Jane")
+
+    def test_errors_clearly_when_no_customer_and_no_default(self):
+        with self.assertRaises(frappe.ValidationError) as context:
+            self._run_new_take_away_order(profile_customer=None)
+        self.assertIn("default Customer on POS Profile", str(context.exception))

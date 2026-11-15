@@ -7,6 +7,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 from erpnext.controllers.queries import item_query
+from ury.ury import approvals, pos_session, roles
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
@@ -365,7 +366,8 @@ TABLE_RELEASE_FIELDS = {
 }
 
 
-def release_merge_cluster_tables(table_or_tables):
+def release_merge_cluster_tables(table_or_tables, commit=True):
+    # Pass commit=False from document hooks: Frappe v16 forbids commits inside doc events.
 
     if isinstance(table_or_tables, (list, tuple, set)):
         cluster = list(table_or_tables)
@@ -380,7 +382,8 @@ def release_merge_cluster_tables(table_or_tables):
             update_modified=False,
         )
 
-    frappe.db.commit()
+    if commit:
+        frappe.db.commit()
 
 @frappe.whitelist()
 def release_tables_after_print(invoice):
@@ -925,8 +928,8 @@ def _order_ownership_flags(invoice, pos_profile_name=None):
     if pos_profile_name:
         pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
         user_roles = frappe.get_roles()
-        has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
-        is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+        has_elevated_access = roles.can_manage_tables(user_roles, pos_profile)
+        is_billing_user = roles.can_bill(user_roles, pos_profile)
 
     # Administrator/System Manager is exempt from the ownership formula
     # itself, matching this file's own established convention for every
@@ -1120,8 +1123,8 @@ def get_table_order_context(table):
     pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
     user_roles = frappe.get_roles()
 
-    has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
-    is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+    has_elevated_access = roles.can_manage_tables(user_roles, pos_profile)
+    is_billing_user = roles.can_bill(user_roles, pos_profile)
 
     # Ported V1 ownership check (Table.js:379-397): only applies once a table
     # is occupied. A free table has no owner to protect.
@@ -1153,8 +1156,11 @@ def get_table_order_context(table):
     invoice_billed = bool(order) and order.get("invoice_printed") == 1
     can_modify = can_view and (not order or not invoice_billed or is_billing_user)
 
-    can_reduce_items = can_modify and bool(pos_profile.remove_items)
-    can_remove_items = can_modify and bool(pos_profile.remove_items)
+    # Sent items can always be reduced or removed by whoever may modify the
+    # order; below manager the server then asks for a manager's approval PIN
+    # (see ury.ury.approvals), so the POS shows the controls.
+    can_reduce_items = can_modify
+    can_remove_items = can_modify
 
     can_transfer_table = can_modify and has_elevated_access
 
@@ -1264,12 +1270,8 @@ def get_captain_context():
 
         pos_profile_context = {
             "name": pos_profile.name,
-            "transfer_role_permissions": _has_role(
-                user_roles, pos_profile.transfer_role_permissions
-            ),
-            "role_allowed_for_billing": _has_role(
-                user_roles, pos_profile.role_allowed_for_billing
-            ),
+            "transfer_role_permissions": roles.can_manage_tables(user_roles, pos_profile),
+            "role_allowed_for_billing": roles.can_bill(user_roles, pos_profile),
             "role_restricted_for_table_order": role_restricted_for_table_order,
             "remove_items": bool(pos_profile.remove_items),
             "show_image": bool(pos_profile.show_image),
@@ -1294,7 +1296,20 @@ def get_captain_context():
         "pos_profile": pos_profile_context,
         "role_restricted_for_table_order": role_restricted_for_table_order,
         "opening_state": opening_state,
+        "capabilities": roles.pos_capabilities(pos_profile if pos_profile_name else None),
     }
+
+
+def _assign_owner_to_cashier(invoice):
+    """Make the invoice's cashier its owner.
+
+    ERPNext's POS Closing Entry only takes invoices whose owner is the
+    closing cashier, so an order a captain took would otherwise be left out
+    of the cashier's closing and never consolidated. `invoice.cashier` is
+    resolved on the server in sync_order, never taken from the client.
+    """
+    if invoice.cashier and invoice.owner != invoice.cashier:
+        invoice.db_set("owner", invoice.cashier, update_modified=False)
 
 
 @frappe.whitelist()
@@ -1303,11 +1318,11 @@ def sync_order(
     cashier,
     owner,
     mode_of_payment,
-    customer,
     no_of_pax,
     last_invoice,
     waiter,
     pos_profile,
+    customer=None,
     last_modified_time=None,
     table=None,
     invoice=None,
@@ -1315,15 +1330,15 @@ def sync_order(
     order_type=None,
     aggregator_id=None,
     room=None,
-    merged_tables=None
+    merged_tables=None,
+    approval_pin=None,
+    approval_reason=None,
 ):
     
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
     
-    billing_user = any(
-        role.role in user_role for role in posprofile.role_allowed_for_billing
-    )
+    billing_user = roles.can_bill(user_role, posprofile)
 
     # Check if the last invoice was already billed
     if (
@@ -1348,7 +1363,7 @@ def sync_order(
     # and block modification of an already-billed/printed invoice unless the
     # acting user holds billing access. Only applies once an order actually
     # exists — a brand-new invoice has no owner or billed state to protect.
-    elevated_user = _has_role(user_role, posprofile.transfer_role_permissions)
+    elevated_user = roles.can_manage_tables(user_role, posprofile)
     if invoice.name:
         is_mine = frappe.session.user == invoice.waiter
         can_view_order = is_mine or elevated_user or billing_user
@@ -1468,10 +1483,15 @@ def sync_order(
             )
             return {"status": "Failure"}
 
+    # Customer is optional for staff orders: a busy restaurant can't ask every
+    # guest for their name. Keep the order's existing customer on an update,
+    # otherwise fall back to the POS Profile's default (walk-in) customer.
+    customer = customer or invoice.customer or posprofile.customer
     if not customer:
-        frappe.throw("Please enter valid customer details")
-    else:
-        invoice.customer = customer
+        frappe.throw(
+            _("Set a default Customer on POS Profile {0} to take orders without a customer").format(pos_profile)
+        )
+    invoice.customer = customer
 
     if order_type:
         invoice.order_type = order_type
@@ -1519,7 +1539,9 @@ def sync_order(
         else:
             invoice.cashier = pos_opened_cashier
     else:
-        invoice.cashier = posprofile.applicable_for_users[0].user if posprofile.applicable_for_users else frappe.session.user
+        # The cashier whose shift is open now, so a later cashier's closing
+        # includes orders taken during their shift (shift handover).
+        invoice.cashier = pos_session.current_cashier(posprofile)
 
     if not invoice.waiter:
         invoice.waiter = frappe.session.user
@@ -1565,10 +1587,9 @@ def sync_order(
     if isinstance(items, str):
         items = json.loads(items)
 
-    # Reduction/removal permission: gate any decrease in a previously-sent
-    # item's quantity (including full removal) by POS Profile `remove_items`,
-    # matching Phase 2's can_reduce_items/can_remove_items derivation.
-    if past_item and not bool(posprofile.remove_items):
+    # Reducing or removing items that were already sent to the kitchen:
+    # managers may; anyone else with a manager's approval PIN.
+    if past_item:
         requested_qty_by_item = {}
         for d in items:
             requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(
@@ -1586,12 +1607,21 @@ def sync_order(
                 prev["item_code"], 0
             ) + flt(prev["qty"])
 
-        for item_code, prev_qty in previous_qty_by_item.items():
-            if requested_qty_by_item.get(item_code, 0) < prev_qty:
-                frappe.throw(
-                    _("You are not permitted to reduce or remove items from this order."),
-                    frappe.PermissionError,
-                )
+        reduced = {
+            item_code: (prev_qty, requested_qty_by_item.get(item_code, 0))
+            for item_code, prev_qty in previous_qty_by_item.items()
+            if requested_qty_by_item.get(item_code, 0) < prev_qty
+        }
+        if reduced:
+            approvals.approve(
+                approvals.REMOVE_SENT_ITEMS,
+                invoice.name,
+                reason=approval_reason,
+                approval_pin=approval_pin,
+                detail="; ".join(
+                    f"{code}: {flt(before):g} -> {flt(after):g}" for code, (before, after) in reduced.items()
+                ),
+            )
 
     invoice.items = []
 
@@ -1604,8 +1634,9 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")   
+        frappe.throw(pos_session.explain_error(e) or f"Error while updating order: {e}")
 
+    _assign_owner_to_cashier(invoice)
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
@@ -1769,7 +1800,7 @@ def table_transfer(table, newTable, invoice):
         )
 
     pos_profile_doc = frappe.get_doc("POS Profile", pos_invoice.pos_profile)
-    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+    if not roles.can_manage_tables(pos_profile=pos_profile_doc):
         frappe.throw(
             _("You are not permitted to transfer tables."),
             frappe.PermissionError,
@@ -1844,7 +1875,7 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
     # Transfer-role authorization (POS Profile transfer_role_permissions),
     # same field/helper as table_transfer().
-    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+    if not roles.can_manage_tables(pos_profile=pos_profile_doc):
         frappe.throw(
             _("You are not permitted to transfer captains."),
             frappe.PermissionError,
@@ -1936,7 +1967,7 @@ def customer_favourite_item(customer_name):
 
 
 @frappe.whitelist()
-def cancel_order(invoice_id, reason):
+def cancel_order(invoice_id, reason, approval_pin=None):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     # Authorization gate: the session user must hold cancel rights on this
@@ -1957,6 +1988,9 @@ def cancel_order(invoice_id, reason):
                 frappe.PermissionError,
             )
 
+    # Below manager, cancelling needs a manager's approval PIN.
+    approvals.approve(approvals.CANCEL_ORDER, invoice_id, reason=reason, approval_pin=approval_pin)
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
@@ -1968,9 +2002,6 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
         # Submitted invoice: cancel through the standard document workflow so
         # on_cancel hooks run and GL/payment reversals and audit entries are
@@ -1990,10 +2021,6 @@ def cancel_order(invoice_id, reason):
         frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
         frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
-# Roles permitted to authorize an additional discount when settling an order.
-DISCOUNT_ALLOWED_ROLES = frozenset(
-    {"URY Manager", "URY Cashier", "System Manager", "Administrator"}
-)
 MAX_DISCOUNT_PERCENTAGE = 100
 
 
@@ -2034,7 +2061,8 @@ def _validate_additional_discount(additional_discount, pos_profile):
             )
         )
 
-    if not DISCOUNT_ALLOWED_ROLES.intersection(frappe.get_roles()):
+    # Cashier and above (see ury.ury.roles).
+    if roles.level() < roles.CASHIER:
         frappe.throw(
             _("You do not have permission to apply a discount on this order."),
             frappe.PermissionError,
@@ -2067,9 +2095,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         if not pos_prof.get("allow_discount_change") and not pos_prof.get("custom_enable_discount"):
             frappe.throw(_("Discount is not allowed for this POS Profile"))
         
-        allowed_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager", "URY Cashier"}
-        user_roles = set(frappe.get_roles(frappe.session.user))
-        if not allowed_roles.intersection(user_roles):
+        if roles.level() < roles.CASHIER:
             frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
 
         invoice.additional_discount_percentage = discount_val
@@ -2106,13 +2132,16 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 target_req -= give
                 
         target.flags.ignore_payment_sync = True
+        if not frappe.db.get_value("POS Profile", pos_profile, "custom_enable_multiple_cashier"):
+            target.cashier = pos_session.current_cashier(frappe.get_cached_doc("POS Profile", pos_profile))
         
         frappe.flags.in_bill_merge_sync = True
         try:
             target.save(ignore_permissions=True)
         finally:
             frappe.flags.in_bill_merge_sync = False
-            
+        _assign_owner_to_cashier(target)
+
         invoice.flags.ignore_payment_sync = True
     else:
         for d in payments:
@@ -2120,12 +2149,19 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
-    # invoice.owner = owner
-    invoice.save()
+    # Paid during the current shift: it belongs in that cashier's closing,
+    # even if the order was taken in an earlier shift.
+    if not frappe.db.get_value("POS Profile", pos_profile, "custom_enable_multiple_cashier"):
+        invoice.cashier = pos_session.current_cashier(frappe.get_cached_doc("POS Profile", pos_profile))
+    try:
+        invoice.save()
+    except Exception as e:
+        frappe.throw(pos_session.explain_error(e) or f"Error while settling order: {e}")
+    _assign_owner_to_cashier(invoice)
     try:
         invoice.submit()
     except Exception as e:
-        frappe.throw(f"Error while settling order: {e}")
+        frappe.throw(pos_session.explain_error(e) or f"Error while settling order: {e}")
         
     # Free the table when no other open drafts remain on this table group
 

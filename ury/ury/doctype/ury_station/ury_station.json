@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "autoname": "field:code",
+ "creation": "2026-11-14 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "code",
+  "description",
+  "enabled",
+  "column_break_1",
+  "device_activated_on",
+  "locked_until",
+  "device_token_hash",
+  "activation_code_hash",
+  "activation_expires"
+ ],
+ "fields": [
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "label": "Station Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Typed once on the screen, e.g. POS1. Identifies the screen, not the person."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "label": "Description",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "device_activated_on",
+   "fieldtype": "Datetime",
+   "label": "Screen Activated On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "locked_until",
+   "fieldtype": "Datetime",
+   "label": "Locked Until",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Set after too many wrong PINs."
+  },
+  {
+   "fieldname": "device_token_hash",
+   "fieldtype": "Data",
+   "label": "Device Token Hash",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "activation_code_hash",
+   "fieldtype": "Data",
+   "label": "Activation Code Hash",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "activation_expires",
+   "fieldtype": "Datetime",
+   "label": "Activation Expires",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-14 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Station",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "URY Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

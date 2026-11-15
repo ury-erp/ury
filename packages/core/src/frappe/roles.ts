@@ -5,6 +5,7 @@ export const isUserRestrictedFromTableOrders = (
   user: User | null,
   posProfile: PosProfileCombined | null
 ): boolean => {
+  if (posProfile?.capabilities) return !posProfile.capabilities.canTakeTableOrders;
   if (!user || !posProfile || !user.roles || !posProfile.role_restricted_for_table_order) {
     return false;
   }
@@ -22,6 +23,7 @@ export const canCaptainTransfer = (
   user: User | null,
   posProfile: PosProfileCombined | null
 ): boolean => {
+  if (posProfile?.capabilities) return posProfile.capabilities.canTransferCaptain;
   if (!user || !posProfile || !user.roles || !posProfile.transfer_role_permissions?.length) {
     return false;
   }
@@ -99,6 +101,26 @@ export const derivePOSCapabilities = (
   user: User | null,
   posProfile: PosProfileCombined | null
 ): POSCapabilities => {
+  // The server decides (ury.ury.roles.pos_capabilities); the role-table
+  // matching below is only a fallback for a profile loaded without it.
+  const server = posProfile?.capabilities;
+  if (server) {
+    return {
+      canTakeTableOrders: server.canTakeTableOrders,
+      canAccessOtherCaptainsTables: server.canAccessOtherCaptainsTables,
+      canRemoveSentItems: server.canRemoveSentItems,
+      showItemImages: Boolean(posProfile?.show_image),
+      canSettlePayment: server.canSettlePayment,
+      canApplyDiscount: server.canApplyDiscount,
+      canCancelOrder: server.canCancelOrder,
+      canReprintKOT: Boolean(posProfile?.custom_enable_kot_reprint),
+      canTransferCaptain: server.canTransferCaptain,
+      canOpenPOS: server.canOpenPOS,
+      canClosePOS: server.canClosePOS,
+      canPrintBill: Boolean(user?.roles?.length),
+    };
+  }
+
   const canAccessOtherCaptainsTables =
     canCaptainTransfer(user, posProfile) || hasBillingRole(user, posProfile);
   const billingCapability = hasBillingRole(user, posProfile);

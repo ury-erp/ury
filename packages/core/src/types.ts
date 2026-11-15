@@ -53,9 +53,29 @@ export interface PosProfileCombined {
   enable_discount: number;
   multiple_cashier: number;
   edit_order_type?: number;
+  /** Computed by the server (ury.ury.roles.pos_capabilities). */
+  capabilities?: ServerPOSCapabilities;
   view_all_status?: number;
   custom_daily_pos_close?: number;
   remove_items?: number;
   show_image?: number;
   custom_enable_kot_reprint?: number;
+}
+
+/** What the server says this user may do in the POS (ury.ury.roles.pos_capabilities). */
+export interface ServerPOSCapabilities {
+  level: number;
+  role_label: string | null;
+  canTakeTableOrders: boolean;
+  canAccessOtherCaptainsTables: boolean;
+  canTransferCaptain: boolean;
+  canSettlePayment: boolean;
+  canApplyDiscount: boolean;
+  canOpenPOS: boolean;
+  canClosePOS: boolean;
+  canCancelOrder: boolean;
+  cancelNeedsApproval: boolean;
+  canRemoveSentItems: boolean;
+  removeNeedsApproval: boolean;
+  isManager: boolean;
 }

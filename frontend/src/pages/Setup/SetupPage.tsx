@@ -174,7 +174,7 @@ export default function SetupPage() {
       } else if (pending.installationType === 'minimal') {
         navigate('/setup-wizard/1');
       } else {
-        window.location.href = '/app';
+        window.location.href = '/desk';
       }
     }, 800);
   }, [navigate, progressSteps.length]);

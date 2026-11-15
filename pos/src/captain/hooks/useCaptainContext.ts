@@ -93,6 +93,7 @@ const buildCapabilityProfileShim = (
     remove_items: profile?.remove_items ? 1 : 0,
     show_image: profile?.show_image ? 1 : 0,
     custom_enable_kot_reprint: profile?.custom_enable_kot_reprint ? 1 : 0,
+    capabilities: ctx.capabilities,
   };
 };
 

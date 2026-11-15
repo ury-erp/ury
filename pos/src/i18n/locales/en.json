@@ -173,7 +173,12 @@
     "confirm_submit": "Yes, Close POS",
     "confirm_back": "Go Back",
     "checklist_skip": "Skip for now",
-    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later.",
+    "closed_title": "Shift closed",
+    "closed_message": "The till is closed. You can print the shift report now, or a manager can find it later in the system.",
+    "print_report": "Print shift report",
+    "done": "Done",
+    "closing_for": "You are closing the shift opened by {{user}}."
   },
   "checklist": {
     "title_opening": "Opening Checklist",
@@ -428,5 +433,20 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "station": {
+    "done": "Done",
+    "still_there": "Still there?",
+    "signing_out_in": "Signing out in {{seconds}} seconds. Unsent items will be lost.",
+    "keep_working": "Keep working"
+  },
+  "approval": {
+    "needed": "A manager must approve this.",
+    "enter_pin": "Ask a manager to enter their approval PIN.",
+    "reason": "Reason (required)",
+    "approve": "Approve",
+    "delete_digit": "Delete last digit",
+    "cancel_title": "Manager approval: cancel order",
+    "remove_title": "Manager approval: remove sent items"
   }
 }

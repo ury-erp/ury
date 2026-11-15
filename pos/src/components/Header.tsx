@@ -15,6 +15,7 @@ import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
+import { clearTabCache, signedOutUrl } from '../lib/station';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
@@ -23,7 +24,10 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+  const { searchQuery, setSearchQuery, setShowVoluntaryClosing, posProfile } = usePOSStore();
+  // Cashier and above (see ury.ury.roles); defaults to shown for an older profile.
+  const canClosePOS = posProfile?.capabilities?.canClosePOS ?? true;
+  const isManager = posProfile?.capabilities?.isManager ?? true;
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -94,7 +98,8 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      window.location.href = '/login?redirect-to=%2Fpos';
+      clearTabCache();
+      window.location.href = signedOutUrl();
     } catch (error) {
       showToast.error(t('errors.failed_logout'));
     }
@@ -171,6 +176,7 @@ const Header = () => {
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
+                  {canClosePOS && (
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -179,6 +185,10 @@ const Header = () => {
                     <Lock className="w-4 h-4 me-3" />
                     {t('header.close_shift')}
                   </Button>
+                  )}
+                  {/* /ury and the Desk are for managers and admins (see ury.ury.roles). */}
+                  {isManager && (
+                  <>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -190,11 +200,13 @@ const Header = () => {
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => window.location.href = '/app'}
+                    onClick={() => window.location.href = '/desk'}
                   >
                     <Monitor className="w-4 h-4 me-3" />
                     {t('header.switch_to_desk')}
                   </Button>
+                  </>
+                  )}
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

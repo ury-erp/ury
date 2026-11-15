@@ -8,16 +8,12 @@
  * Backend sources:
  * - ury/ury/ury/doctype/sub_pos_closing/sub_pos_closing.py
  *   (get_pos_profile, get_cashiers, get_pos_invoices)
- * - ury/ury/ury_pos/api.py (get_open_pos_opening_entries)
+ * - ury/ury/ury_pos/api.py (get_open_pos_opening_entries, get_closing_invoices)
  * - erpnext/accounts/doctype/pos_closing_entry/pos_closing_entry.py
- *   (get_cashiers, get_pos_invoices)
+ *   (get_cashiers)
  *
- * Note: the standard ERPNext POS Closing Entry module exposes a whitelisted
- * `get_pos_invoices(start, end, pos_profile, user)` -- there is no separate
- * `get_invoices` method, and it returns the same "list of full POS Invoice
- * dicts" shape as the Sub POS Closing method (POSClosingInvoice[]), not a
- * {invoices, payments, taxes} object. Both are wrapped below using the same
- * POSClosingInvoice[] return type.
+ * Both invoice fetches return a list of full POS Invoice dicts
+ * (POSClosingInvoice[]).
  */
 
 import { call, db } from '@ury/core';
@@ -96,6 +92,7 @@ export interface OpenPosOpeningEntry {
   name: string;
   period_start_date: string;
   user: string;
+  user_full_name?: string;
   pos_profile: string;
 }
 
@@ -234,13 +231,8 @@ export async function getSubCashierPosInvoices(
 /**
  * Main-cashier / single-cashier path: returns the full POS Invoice dicts
  * (with taxes and payments) for a cashier within a time window.
- * Wraps erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices(start, end, pos_profile, user).
- *
- * This is the standard ERPNext whitelisted method referenced as
- * `get_invoices` in the task brief; the actual method name is
- * `get_pos_invoices` and it returns the same POSClosingInvoice[] shape as
- * the Sub POS Closing variant above (not a separate
- * {invoices, payments, taxes} object).
+ * Wraps ury.ury_pos.api.get_closing_invoices(start, end, pos_profile, user),
+ * which works on ERPNext v15 and v16 (v16 removed `get_pos_invoices`).
  */
 export async function getMainCashierPosInvoices(
   start: string,
@@ -250,7 +242,7 @@ export async function getMainCashierPosInvoices(
 ): Promise<POSClosingInvoice[]> {
   try {
     const response = await call.get<{ message: POSClosingInvoice[] }>(
-      'erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry.get_pos_invoices',
+      'ury.ury_pos.api.get_closing_invoices',
       { start, end, pos_profile: posProfile, user }
     );
 

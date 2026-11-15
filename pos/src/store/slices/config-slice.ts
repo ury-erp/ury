@@ -37,7 +37,7 @@ export interface ConfigState {
  * `role_restricted_for_table_order` do NOT reference "URY Captain" at all,
  * which would leave Captain locked out if this set were config-only.
  */
-const URY_POS_ROLES = ['URY Captain', 'URY Cashier', 'URY Manager'];
+const URY_POS_ROLES = ['URY Captain', 'URY Cashier', 'URY Manager', 'URY Admin', 'System Manager'];
 
 /**
  * Allowed-to-enter-the-app role set: the fixed URY POS role vocabulary

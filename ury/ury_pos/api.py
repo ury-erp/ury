@@ -112,9 +112,9 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
     pos_profile = frappe.get_doc("POS Profile", pos_profile)
 
-    cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
-    )
+    from ury.ury import roles
+
+    cashier = roles.can_bill(user_role, pos_profile)
     branch_name = getBranch()
 
     return resolve_restaurant_menu(branch_name, room, order_type, cashier)
@@ -140,6 +140,26 @@ def getBranch():
     branch_name = branch_array[0].get("branch")
 
     return branch_name
+
+@frappe.whitelist()
+def get_production_units_for_branch():
+    """Production units (kitchen, bar...) of the user's branch.
+
+    The POS listens on a kot_error_<branch>_<production unit> channel for
+    each, so it can alert the cashier when a kitchen ticket fails.
+    """
+    try:
+        branch = getBranch()
+    except frappe.ValidationError:
+        # Not assigned to a branch (e.g. Administrator): nothing to listen to.
+        return {"production_units": []}
+
+    return {
+        "production_units": frappe.get_all(
+            "URY Production Unit", filters={"branch": branch}, pluck="name", order_by="name"
+        )
+    }
+
 
 @frappe.whitelist()
 def getBranchRoom():
@@ -768,9 +788,12 @@ def getPosProfile():
                 else:
                     cashier = pos_opened_cashier    
                 
-        else:    
-            cashier = get_cashier.applicable_for_users[0].user
-            owner = get_cashier.applicable_for_users[0].user
+        else:
+            from ury.ury import pos_session
+
+            # Whoever has the till open now (shift handover); first user otherwise.
+            cashier = pos_session.current_cashier(get_cashier)
+            owner = cashier
         
         qz_print = pos_profiles.qz_print
         print_type = None
@@ -814,11 +837,18 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
-
+        "enable_kot_reprint":enable_kot_reprint,
+        # What this user may do in the POS; server checks use the same rules.
+        "capabilities": _pos_capabilities(pos_profiles),
     }
 
     return invoice_details
+
+
+def _pos_capabilities(pos_profile):
+    from ury.ury import roles
+
+    return roles.pos_capabilities(pos_profile)
 
 
 @frappe.whitelist()
@@ -1002,7 +1032,7 @@ def get_open_pos_opening_entries(pos_profile):
     if not frappe.has_permission("POS Opening Entry", "read"):
         frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
 
-    return frappe.get_all(
+    entries = frappe.get_all(
         "POS Opening Entry",
         filters={
             "pos_profile": pos_profile,
@@ -1011,12 +1041,30 @@ def get_open_pos_opening_entries(pos_profile):
         },
         fields=["name", "period_start_date", "user", "pos_profile"],
     )
+    for entry in entries:
+        entry["user_full_name"] = frappe.utils.get_fullname(entry.user)
+    return entries
 
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile):
+    # ERPNext v16 rejects every invoice while the profile's open POS Opening
+    # Entry started before today, so such a session must be closed first
+    # whatever the daily-close setting says.
+    outdated_opening = frappe.db.exists(
+        "POS Opening Entry",
+        {
+            "pos_profile": pos_profile,
+            "status": "Open",
+            "docstatus": 1,
+            "period_start_date": ["<", frappe.utils.today()],
+        },
+    )
+    if outdated_opening:
+        return "Failed"
+
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
-    
+
     if enable_unclosed_pos_check:
         current_datetime = frappe.utils.now_datetime()
         start_of_day = current_datetime.replace(hour=5, minute=0, second=0, microsecond=0)
@@ -1039,10 +1087,72 @@ def validate_pos_close(pos_profile):
     
         if unclosed_pos_opening:
             return "Failed"
-        
+
         return "Success"
-    
+
     return "Success"
+
+
+@frappe.whitelist()
+def check_opening_entry(user):
+    """Open POS Opening Entries the POS should treat as this user's session.
+
+    ERPNext only reports entries the user opened themselves. Waiters never
+    open one, and a manager stepping in should not have to: both work
+    inside the open session of their POS Profile, so report that one.
+    A cashier still gets only their own, so a second cashier opens their
+    own shift after the first one closes (shift handover).
+    """
+    from erpnext.selling.page.point_of_sale.point_of_sale import check_opening_entry as erpnext_check
+
+    from ury.ury import roles
+
+    entries = erpnext_check(user)
+    if entries or user != frappe.session.user:
+        return entries
+    if roles.level() == roles.CASHIER:
+        return entries
+
+    profiles = frappe.get_all(
+        "POS Profile User", filters={"user": user, "parenttype": "POS Profile"}, pluck="parent"
+    )
+    if not profiles:
+        return entries
+
+    return frappe.get_all(
+        "POS Opening Entry",
+        filters={"pos_profile": ["in", profiles], "status": "Open", "docstatus": 1},
+        fields=["name", "company", "pos_profile", "period_start_date"],
+        order_by="period_start_date desc",
+        limit=1,
+    )
+
+
+@frappe.whitelist()
+def get_closing_invoices(start, end, pos_profile, user):
+    """Invoices for the main cashier's POS closing, with payments and taxes.
+
+    Replaces ERPNext's `get_pos_invoices`, which v16 removed.
+    """
+    from ury.ury.hooks.ury_pos_closing_entry import get_closing_invoice_rows
+
+    frappe.has_permission("POS Profile", "read", doc=pos_profile, throw=True)
+    frappe.has_permission("POS Invoice", "read", throw=True)
+
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & {"URY Manager", "System Manager"}
+    )
+    if not is_supervisor:
+        if user != session_user:
+            frappe.throw(_("You can only close your own POS session."), frappe.PermissionError)
+        if frappe.db.get_value("POS Profile", pos_profile, "branch") != getBranch():
+            frappe.throw(_("This POS Profile belongs to another branch."), frappe.PermissionError)
+
+    return [
+        frappe.get_doc(row.doctype, row.name).as_dict()
+        for row in get_closing_invoice_rows(start, end, pos_profile, user)
+    ]
 
 
 def _get_allowed_pos_profiles(company: str, user: str) -> list:
@@ -1170,6 +1280,11 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
         opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
         if opening_amount is not None and frappe.utils.flt(opening_amount) < 0:
             frappe.throw(_("Opening amount cannot be negative."))
+
+    from ury.ury import pos_session
+
+    # One open till per POS Profile: say clearly whose shift is still open.
+    pos_session.ensure_can_open(pos_profile)
 
     opening = frappe.get_doc(
         {

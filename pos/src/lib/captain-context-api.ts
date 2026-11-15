@@ -1,4 +1,5 @@
 import { call } from '@ury/core';
+import type { ServerPOSCapabilities } from '@ury/core';
 
 /**
  * Mirrors the `pos_profile` sub-object returned by the backend
@@ -32,6 +33,8 @@ export interface CaptainContextOpeningState {
 }
 
 export interface CaptainContext {
+  /** Computed by the server (ury.ury.roles.pos_capabilities). */
+  capabilities?: ServerPOSCapabilities;
   user: string;
   roles: string[];
   branch: string | null;

@@ -548,9 +548,16 @@ class URYDailyPandL(Document):
 			self.total_indirect_expenses_percent = round(((self.total_indirect_expenses / self.net_sales) * 100),2)
 			self.net_profit_percent = round(((self.net_profit / self.net_sales) * 100),2)
 	
+	def _get_currency(self):
+		company = self.branch and frappe.db.get_value("URY Restaurant", {"branch": self.branch}, "company")
+		return (
+			(company and frappe.get_cached_value("Company", company, "default_currency"))
+			or frappe.defaults.get_global_default("currency")
+		)
+
 	@frappe.whitelist()
 	def get_proft_loss_details(self):
 		return frappe.render_template(
 			"ury/doctype/ury_daily_p_and_l/profit_loss_details.html",
-			{"data": self, "currency": "INR"},
+			{"data": self, "currency": self._get_currency()},
 		)

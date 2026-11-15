@@ -2,16 +2,14 @@ import frappe
 
 
 def require_manager():
-	"""Raise frappe.PermissionError unless the current user is a URY Manager,
-	System Manager, or Administrator. Every report_api endpoint must call this
+	"""Raise frappe.PermissionError unless the current user is a manager or
+	above (URY Manager, URY Admin, System Manager, Administrator). Every report_api endpoint must call this
 	first — the frontend's AuthGuard hides the nav item but is not a security
 	boundary on its own.
 	"""
-	allowed_roles = {"URY Manager", "System Manager"}
-	user_roles = set(frappe.get_roles())
-	if frappe.session.user == "Administrator":
-		return
-	if not allowed_roles & user_roles:
+	from ury.ury import roles
+
+	if not roles.is_manager():
 		frappe.throw(
 			"You do not have permission to access this report.",
 			frappe.PermissionError,

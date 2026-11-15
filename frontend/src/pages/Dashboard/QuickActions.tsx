@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getCurrencyLabel } from '@ury/core';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
@@ -255,7 +256,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
+              <label className="block font-semibold text-gray-700 mb-1">Price ({getCurrencyLabel()})</label>
               <Input
                 type="number"
                 placeholder="280"
@@ -446,10 +447,9 @@ export const QuickActions: React.FC = () => {
                 value={userForm.role}
                 onChange={(_, value) => setUserForm({ ...userForm, role: value })}
                 options={[
-                  { value: 'URY Cashier', label: 'URY Cashier' },
-                  { value: 'URY Captain', label: 'URY Captain / Waiter' },
-                  { value: 'URY Manager', label: 'URY Restaurant Manager' },
-                  { value: 'URY Kitchen User', label: 'Kitchen Display User' },
+                  { value: 'URY Captain', label: 'Waiter' },
+                  { value: 'URY Cashier', label: 'Cashier' },
+                  { value: 'URY Manager', label: 'Manager' },
                 ]}
               />
             </div>

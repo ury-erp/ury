@@ -1,4 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
+import type { ServerPOSCapabilities } from '@ury/core';
 import { call, db } from '@ury/core';
 
 // Limited fields response
@@ -21,6 +22,7 @@ export interface PosProfileLimited {
   multiple_cashier: number;
   owner: string;
   edit_order_type?: number;
+  capabilities?: ServerPOSCapabilities;
 }
 
 export interface PosProfileLimitedResponse {
@@ -85,6 +87,7 @@ export interface PosProfileCombined extends PosProfileFull {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  capabilities?: ServerPOSCapabilities;
 }
 
 export interface Currency {
@@ -135,6 +138,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     enable_discount: limitedProfile.enable_discount,
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
+    capabilities: limitedProfile.capabilities,
   };
 
   return combinedProfile;

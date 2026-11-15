@@ -1,4 +1,5 @@
 import { StateCreator } from 'zustand';
+import { signedOutUrl } from '../../lib/station';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 
 export interface User {
@@ -37,7 +38,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
       
       if (!response) {
         // If no user is logged in, redirect to login
-        window.location.href = '/login?redirect-to=%2Fpos';
+        window.location.href = signedOutUrl();
         return;
       }
 
@@ -59,7 +60,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
         user: null,
       });
       // Redirect to login on error
-      window.location.href = '/login?redirect-to=%2Fapp';
+      window.location.href = '/login?redirect-to=%2Fdesk';
     }
   },
 

@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "field:user",
+ "creation": "2026-11-14 12:00:00.000000",
+ "description": "A manager's approval PIN",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "full_name",
+  "enabled",
+  "column_break_1",
+  "new_pin",
+  "last_used",
+  "pin_hash"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Manager",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "set_only_once": 1,
+   "description": "Must hold URY Manager or URY Admin."
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Name",
+   "fetch_from": "user.full_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "new_pin",
+   "fieldtype": "Password",
+   "label": "Set New Approval PIN",
+   "no_copy": 1,
+   "description": "Typed on a POS screen to approve a cashier's cancellation or item removal. Never opens a session. Only a salted hash is kept."
+  },
+  {
+   "fieldname": "last_used",
+   "fieldtype": "Datetime",
+   "label": "Last Used",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "pin_hash",
+   "fieldtype": "Data",
+   "label": "PIN Hash",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "length": 255
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-14 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Manager PIN",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "URY Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "full_name",
+ "track_changes": 0
+}

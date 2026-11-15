@@ -112,6 +112,13 @@ ury_demo_transaction_doctypes = [
 # 	"Role": "home_page"
 # }
 
+# Waiters and cashiers have no Desk access; after logging in they go
+# straight to the POS instead of the portal.
+role_home_page = {
+	"URY Cashier": "pos",
+	"URY Captain": "pos/order",
+}
+
 # Generators
 # ----------
 
@@ -192,6 +199,7 @@ doc_events = {
         "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
         },
     "POS Closing Entry": {
+        "before_validate": "ury.ury.hooks.ury_pos_closing_entry.before_validate",
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
         "validate": "ury.ury.hooks.ury_pos_closing_entry.validate",
         "on_submit": "ury.ury.hooks.ury_pos_closing_entry.on_submit",
@@ -269,6 +277,7 @@ website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # after_request = ["ury.utils.after_request"]
+after_request = ["ury.ury.station.session.after_request"]
 
 website_redirects = [
     {

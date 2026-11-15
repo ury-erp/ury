@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "pin_section",
+  "min_pin_length",
+  "max_pin_length",
+  "column_break_1",
+  "max_wrong_pins",
+  "lock_minutes",
+  "session_section",
+  "idle_seconds",
+  "warning_seconds",
+  "column_break_2",
+  "landing_page",
+  "block_desk",
+  "security_section",
+  "require_device_activation",
+  "allowed_roles",
+  "waiter_section",
+  "waiter_email_domain"
+ ],
+ "fields": [
+  {
+   "fieldname": "pin_section",
+   "fieldtype": "Section Break",
+   "label": "PIN"
+  },
+  {
+   "fieldname": "min_pin_length",
+   "fieldtype": "Int",
+   "label": "Minimum PIN Length",
+   "default": "4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_pin_length",
+   "fieldtype": "Int",
+   "label": "Maximum PIN Length",
+   "default": "6",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_wrong_pins",
+   "fieldtype": "Int",
+   "label": "Wrong PINs Before Lock",
+   "default": "5",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lock_minutes",
+   "fieldtype": "Int",
+   "label": "Lock Station For (Minutes)",
+   "default": "5",
+   "reqd": 1
+  },
+  {
+   "fieldname": "session_section",
+   "fieldtype": "Section Break",
+   "label": "Session"
+  },
+  {
+   "fieldname": "idle_seconds",
+   "fieldtype": "Int",
+   "label": "Sign Out After Idle (Seconds)",
+   "default": "90",
+   "reqd": 1
+  },
+  {
+   "fieldname": "warning_seconds",
+   "fieldtype": "Int",
+   "label": "Warn Before Sign Out (Seconds)",
+   "default": "15",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "landing_page",
+   "fieldtype": "Data",
+   "label": "Page After Sign-in",
+   "default": "/pos/order",
+   "reqd": 1
+  },
+  {
+   "fieldname": "block_desk",
+   "fieldtype": "Check",
+   "label": "Keep Station Sessions Out of the Desk",
+   "default": "1"
+  },
+  {
+   "fieldname": "security_section",
+   "fieldtype": "Section Break",
+   "label": "Security"
+  },
+  {
+   "fieldname": "require_device_activation",
+   "fieldtype": "Check",
+   "label": "Only Allow Activated Screens",
+   "default": "1",
+   "description": "A manager activates each screen once. Without this, anyone who knows a station code can try PINs from any device."
+  },
+  {
+   "fieldname": "allowed_roles",
+   "fieldtype": "Table",
+   "label": "Roles a PIN User May Hold",
+   "options": "URY Station Allowed Role",
+   "description": "A user holding any other role cannot sign in with a PIN. Manager and admin roles are always refused."
+  },
+  {
+   "fieldname": "waiter_section",
+   "fieldtype": "Section Break",
+   "label": "New Waiters"
+  },
+  {
+   "fieldname": "waiter_email_domain",
+   "fieldtype": "Data",
+   "label": "Email Domain for Waiter Users",
+   "default": "waiters.invalid",
+   "reqd": 1,
+   "description": "Waiter users need an email address as their ID. No mail is ever sent to it."
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-14 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Station Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "URY Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "URY Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -16,8 +16,10 @@ import type { RootState } from '../store/root-store';
 import { showToast } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
 import { t } from '../i18n';
+import { useManagerApproval } from './ManagerApproval';
 
 const OrderPanel = () => {
+  const { withApproval } = useManagerApproval();
   const { 
     activeOrders, 
     removeFromOrder, 
@@ -85,14 +87,11 @@ const OrderPanel = () => {
         throw new Error(t('errors.user_not_logged_in'));
       }
 
-      // Validate customer/aggregator details
-      if (selectedOrderType === 'Aggregators') {
-        if (!selectedAggregator?.customer) {
-          showToast.error(t('errors.select_aggregator'));
-          return;
-        }
-      } else if (!selectedCustomer?.name) {
-        showToast.error(t('errors.select_customer'));
+      // Aggregator orders need the aggregator's customer for pricing. Customer
+      // is optional otherwise; the backend falls back to the POS Profile's
+      // default customer.
+      if (selectedOrderType === 'Aggregators' && !selectedAggregator?.customer) {
+        showToast.error(t('errors.select_aggregator'));
         return;
       }
 
@@ -129,7 +128,13 @@ const OrderPanel = () => {
         comments: orderComment || undefined
       };
 
-      const result = await syncOrder(orderData);
+      // Removing items already sent to the kitchen needs a manager's PIN.
+      const result = await withApproval(
+        (approval) =>
+          syncOrder({ ...orderData, approval_pin: approval?.pin, approval_reason: approval?.reason }),
+        { title: t('approval.remove_title'), askReason: true }
+      );
+      if (result === undefined) return;
 
       // sync_order returns { status: 'Failure' } instead of throwing when the
       // write is rejected (stale last_modified_time, table already occupied,

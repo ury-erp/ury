@@ -14,15 +14,17 @@ While URY may work on existing ERPNext instance, it is recommended that you setu
 
 
 > :information_source: Note :
-> Minimum Node Version 18.20.*+ required
+> URY supports Frappe/ERPNext **version-15** and **version-16**.
+> - version-15: Python 3.10+, Node 18.20+
+> - version-16: Python 3.14+, Node 24+
 
 
 - Install ERPNext using the [official installation guide](https://github.com/frappe/bench#installation).
 
-**To Install ERPNext to your bench:**
+**To Install ERPNext to your bench** (use `version-15` or `version-16`, matching your Frappe branch):
 
 ```sh
-	bench get-app --branch version-15 erpnext https://github.com/frappe/erpnext.git
+	bench get-app --branch version-16 erpnext https://github.com/frappe/erpnext.git
 ```
 **To Install Frappe HR to your bench:**
 
