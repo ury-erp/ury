@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 const URY_E2E_USER = process.env.URY_E2E_USER ?? 'test@erpnext.com';
 const URY_E2E_PASSWORD = process.env.URY_E2E_PASSWORD ?? 'testpass123';
 const URY_E2E_ITEM = process.env.URY_E2E_ITEM ?? 'Appam';
+const URY_E2E_CUSTOMER = process.env.URY_E2E_CUSTOMER ?? 'jay';
 
 test.describe('POS app', () => {
   test('loads and renders a recognizable app shell', async ({ page }) => {
@@ -141,6 +142,58 @@ test.describe('POS app', () => {
     // and its literal order-line label format.
     await expect(page.getByRole('heading', { name: 'New / Changed' }).first()).toBeVisible({ timeout: 5000 });
     await expect(page.getByText(`+1 × ${URY_E2E_ITEM}`).first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('captain golden path: send order to kitchen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto('/login');
+    await page.fill('#login_email', URY_E2E_USER);
+    await page.fill('#login_password', URY_E2E_PASSWORD);
+    await page.click('.btn-login');
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+
+    await page.goto('/pos/order');
+    await expect(page.getByRole('heading', { name: 'Tables' })).toBeVisible({ timeout: 15000 });
+
+    const freeTable = page.locator('button[type="button"]').filter({ hasText: 'Free' }).first();
+    await expect(freeTable).toBeVisible({ timeout: 10000 });
+    await freeTable.click();
+    await expect(page).toHaveURL(/\/pos\/order\/table\//, { timeout: 10000 });
+
+    // Fresh table -> CaptainOrder.tsx defaults to "menu" mode (no existing
+    // lines yet), so the menu grid (CaptainMenu.tsx) is already showing.
+    const menuItem = page.getByText(URY_E2E_ITEM, { exact: true }).first();
+    await expect(menuItem).toBeVisible({ timeout: 10000 });
+    await menuItem.click();
+
+    // Order toggle's badge count (activeOrders.length) confirms the tap
+    // actually landed in the pos-store before we even switch views.
+    const orderTabButton = page.getByRole('button', { name: /^Order/ });
+    await expect(orderTabButton).toBeVisible({ timeout: 5000 });
+    await expect(orderTabButton).toContainText('1', { timeout: 5000 });
+    await orderTabButton.click();
+
+    // Real assertion against CaptainOrder.tsx's own "New / Changed" section
+    // and its literal order-line label format.
+    await expect(page.getByRole('heading', { name: 'New / Changed' }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(`+1 × ${URY_E2E_ITEM}`).first()).toBeVisible({ timeout: 5000 });
+
+    // Pick a customer (sending is blocked without one).
+    const customerSearch = page.getByPlaceholder('Search customer...').filter({ visible: true });
+    await customerSearch.fill(URY_E2E_CUSTOMER);
+
+    const customerOption = page.getByText(URY_E2E_CUSTOMER).first();
+    await expect(customerOption).toBeVisible({ timeout: 10000 });
+    await customerOption.click();
+    await expect(customerSearch).not.toBeVisible();
+
+    // Tap the Send button.
+    const sendButton = page.getByRole('button', { name: 'Send Order' }).filter({ visible: true });
+    await sendButton.click();
+
+    // Check that the order is sent to the kitchen.
+    await expect(page.getByText('Order sent to kitchen.')).toBeVisible({ timeout: 10000 });
   });
 
   // Still genuinely out of scope for this pass (see EXECUTION_LOG.md Phase 5
