@@ -32,8 +32,9 @@ def serve_kot(name, time=None):
 # role, so confirmation cannot be self-attributed or forged by the caller.
 @frappe.whitelist()
 def confirm_cancel_kot(name):
-    manager_roles = {"URY Manager", "URY Admin", "System Manager"}
-    if not manager_roles.intersection(frappe.get_roles()) and frappe.session.user != "Administrator":
+    from ury.ury import roles
+
+    if not roles.is_manager():
         frappe.throw(
             "Only a manager can confirm a cancelled KOT.",
             frappe.PermissionError,

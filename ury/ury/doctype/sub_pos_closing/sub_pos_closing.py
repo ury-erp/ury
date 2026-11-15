@@ -96,7 +96,7 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
     return [c for c in cashiers_list]
 
 
-SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+SUPERVISOR_ROLES = {"URY Manager", "URY Admin", "System Manager"}
 
 
 @frappe.whitelist()

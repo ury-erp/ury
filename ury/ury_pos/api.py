@@ -112,9 +112,9 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
     pos_profile = frappe.get_doc("POS Profile", pos_profile)
 
-    cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
-    )
+    from ury.ury import roles
+
+    cashier = roles.can_bill(user_role, pos_profile)
     branch_name = getBranch()
 
     return resolve_restaurant_menu(branch_name, room, order_type, cashier)
@@ -810,11 +810,18 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
-
+        "enable_kot_reprint":enable_kot_reprint,
+        # What this user may do in the POS; server checks use the same rules.
+        "capabilities": _pos_capabilities(pos_profiles),
     }
 
     return invoice_details
+
+
+def _pos_capabilities(pos_profile):
+    from ury.ury import roles
+
+    return roles.pos_capabilities(pos_profile)
 
 
 @frappe.whitelist()
@@ -1046,15 +1053,20 @@ def validate_pos_close(pos_profile):
 def check_opening_entry(user):
     """Open POS Opening Entries the POS should treat as this user's session.
 
-    ERPNext only reports entries the user opened themselves. An order-taker
-    (captain) never opens one and is not allowed to, so the POS would show
-    them the cashier's "open POS" screen forever. They work inside the
-    session of their POS Profile, so report that one for them.
+    ERPNext only reports entries the user opened themselves. Waiters never
+    open one, and a manager stepping in should not have to: both work
+    inside the open session of their POS Profile, so report that one.
+    A cashier still gets only their own, so a second cashier opens their
+    own shift after the first one closes (shift handover).
     """
     from erpnext.selling.page.point_of_sale.point_of_sale import check_opening_entry as erpnext_check
 
+    from ury.ury import roles
+
     entries = erpnext_check(user)
-    if entries or user != frappe.session.user or frappe.has_permission("POS Opening Entry", "create"):
+    if entries or user != frappe.session.user:
+        return entries
+    if roles.level() == roles.CASHIER:
         return entries
 
     profiles = frappe.get_all(

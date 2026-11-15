@@ -6,7 +6,7 @@ from frappe.utils import get_datetime, datetime
 from ury.ury_pos.api import getBranch
 
 
-SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+SUPERVISOR_ROLES = {"URY Manager", "URY Admin", "System Manager"}
 
 
 def kotValidationThread():

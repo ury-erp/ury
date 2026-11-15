@@ -112,6 +112,13 @@ ury_demo_transaction_doctypes = [
 # 	"Role": "home_page"
 # }
 
+# Waiters and cashiers have no Desk access; after logging in they go
+# straight to the POS instead of the portal.
+role_home_page = {
+	"URY Cashier": "pos",
+	"URY Captain": "pos/order",
+}
+
 # Generators
 # ----------
 

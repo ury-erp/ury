@@ -7,6 +7,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 from erpnext.controllers.queries import item_query
+from ury.ury import roles
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
@@ -913,8 +914,8 @@ def _order_ownership_flags(invoice, pos_profile_name=None):
     if pos_profile_name:
         pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
         user_roles = frappe.get_roles()
-        has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
-        is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+        has_elevated_access = roles.can_manage_tables(user_roles, pos_profile)
+        is_billing_user = roles.can_bill(user_roles, pos_profile)
 
     # Administrator/System Manager is exempt from the ownership formula
     # itself, matching this file's own established convention for every
@@ -1108,8 +1109,8 @@ def get_table_order_context(table):
     pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
     user_roles = frappe.get_roles()
 
-    has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
-    is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+    has_elevated_access = roles.can_manage_tables(user_roles, pos_profile)
+    is_billing_user = roles.can_bill(user_roles, pos_profile)
 
     # Ported V1 ownership check (Table.js:379-397): only applies once a table
     # is occupied. A free table has no owner to protect.
@@ -1252,12 +1253,8 @@ def get_captain_context():
 
         pos_profile_context = {
             "name": pos_profile.name,
-            "transfer_role_permissions": _has_role(
-                user_roles, pos_profile.transfer_role_permissions
-            ),
-            "role_allowed_for_billing": _has_role(
-                user_roles, pos_profile.role_allowed_for_billing
-            ),
+            "transfer_role_permissions": roles.can_manage_tables(user_roles, pos_profile),
+            "role_allowed_for_billing": roles.can_bill(user_roles, pos_profile),
             "role_restricted_for_table_order": role_restricted_for_table_order,
             "remove_items": bool(pos_profile.remove_items),
             "show_image": bool(pos_profile.show_image),
@@ -1282,6 +1279,7 @@ def get_captain_context():
         "pos_profile": pos_profile_context,
         "role_restricted_for_table_order": role_restricted_for_table_order,
         "opening_state": opening_state,
+        "capabilities": roles.pos_capabilities(pos_profile if pos_profile_name else None),
     }
 
 
@@ -1321,9 +1319,7 @@ def sync_order(
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
     
-    billing_user = any(
-        role.role in user_role for role in posprofile.role_allowed_for_billing
-    )
+    billing_user = roles.can_bill(user_role, posprofile)
 
     # Check if the last invoice was already billed
     if (
@@ -1348,7 +1344,7 @@ def sync_order(
     # and block modification of an already-billed/printed invoice unless the
     # acting user holds billing access. Only applies once an order actually
     # exists — a brand-new invoice has no owner or billed state to protect.
-    elevated_user = _has_role(user_role, posprofile.transfer_role_permissions)
+    elevated_user = roles.can_manage_tables(user_role, posprofile)
     if invoice.name:
         is_mine = frappe.session.user == invoice.waiter
         can_view_order = is_mine or elevated_user or billing_user
@@ -1755,7 +1751,7 @@ def table_transfer(table, newTable, invoice):
         )
 
     pos_profile_doc = frappe.get_doc("POS Profile", pos_invoice.pos_profile)
-    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+    if not roles.can_manage_tables(pos_profile=pos_profile_doc):
         frappe.throw(
             _("You are not permitted to transfer tables."),
             frappe.PermissionError,
@@ -1813,7 +1809,7 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
     # Transfer-role authorization (POS Profile transfer_role_permissions),
     # same field/helper as table_transfer().
-    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+    if not roles.can_manage_tables(pos_profile=pos_profile_doc):
         frappe.throw(
             _("You are not permitted to transfer captains."),
             frappe.PermissionError,
@@ -1956,10 +1952,6 @@ def cancel_order(invoice_id, reason):
         frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
         frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
-# Roles permitted to authorize an additional discount when settling an order.
-DISCOUNT_ALLOWED_ROLES = frozenset(
-    {"URY Manager", "URY Cashier", "System Manager", "Administrator"}
-)
 MAX_DISCOUNT_PERCENTAGE = 100
 
 
@@ -2000,7 +1992,8 @@ def _validate_additional_discount(additional_discount, pos_profile):
             )
         )
 
-    if not DISCOUNT_ALLOWED_ROLES.intersection(frappe.get_roles()):
+    # Cashier and above (see ury.ury.roles).
+    if roles.level() < roles.CASHIER:
         frappe.throw(
             _("You do not have permission to apply a discount on this order."),
             frappe.PermissionError,
@@ -2033,9 +2026,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         if not pos_prof.get("allow_discount_change") and not pos_prof.get("custom_enable_discount"):
             frappe.throw(_("Discount is not allowed for this POS Profile"))
         
-        allowed_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager", "URY Cashier"}
-        user_roles = set(frappe.get_roles(frappe.session.user))
-        if not allowed_roles.intersection(user_roles):
+        if roles.level() < roles.CASHIER:
             frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
 
         invoice.additional_discount_percentage = discount_val

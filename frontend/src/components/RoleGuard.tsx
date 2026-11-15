@@ -17,9 +17,11 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ children }) => {
         if (userId) {
           const roles = await getUserRoles(userId);
           const userRoles = roles.roles || [];
-          const hasURYManagerRole = userRoles.some(
-            (role: any) => role === 'URY Manager' || role.name === 'URY Manager'
-          );
+          // Manager and above (see ury.ury.roles).
+          const MANAGER_ROLES = ['URY Manager', 'URY Admin', 'System Manager'];
+          const hasURYManagerRole =
+            userId === 'Administrator' ||
+            userRoles.some((role: any) => MANAGER_ROLES.includes(typeof role === 'string' ? role : role.name));
           setHasRole(hasURYManagerRole);
         } else {
           setHasRole(false);

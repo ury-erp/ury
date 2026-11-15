@@ -936,6 +936,13 @@ class TestTableTransfer(FrappeTestCase):
     """Phase 3: table_transfer() previously had no server-side transfer-role
     check at all, relying entirely on the frontend's canCaptainTransfer()."""
 
+    def setUp(self):
+        # Role checks treat Administrator as an admin whatever get_roles
+        # returns, so run as an ordinary user for the mocked roles to count.
+        self._previous_user = frappe.session.user
+        frappe.local.session.user = "captain_a@example.com"
+        self.addCleanup(setattr, frappe.local.session, "user", self._previous_user)
+
     @patch("ury.ury.doctype.ury_order.ury_order._get_merge_cluster")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
@@ -1029,6 +1036,13 @@ class TestCaptainTransfer(FrappeTestCase):
     assignment under multiple_cashier mode. These cover the added
     transfer-role authorization, invoice-write authorization, branch
     validation, and target-user eligibility."""
+
+    def setUp(self):
+        # Role checks treat Administrator as an admin whatever get_roles
+        # returns, so run as an ordinary user for the mocked roles to count.
+        self._previous_user = frappe.session.user
+        frappe.local.session.user = "captain_a@example.com"
+        self.addCleanup(setattr, frappe.local.session, "user", self._previous_user)
 
     def _pos_invoice(self, pos_profile="Test POS Profile", branch="Test Branch", restaurant_table="T1"):
         inv = MagicMock()

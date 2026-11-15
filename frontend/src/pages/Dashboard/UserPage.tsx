@@ -8,6 +8,20 @@ import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
 
+// Highest first; labels match ury.ury.roles.ROLE_LABELS.
+const URY_ROLE_LABELS: Record<string, string> = {
+  'URY Admin': 'Admin',
+  'URY Manager': 'Manager',
+  'URY Cashier': 'Cashier',
+  'URY Captain': 'Waiter',
+};
+
+const uryRoleOf = (roles: unknown): string | null => {
+  if (!Array.isArray(roles)) return null;
+  const names = roles.map((r: any) => (typeof r === 'string' ? r : r?.role));
+  return Object.keys(URY_ROLE_LABELS).find((role) => names.includes(role)) ?? null;
+};
+
 interface UserRecord {
   name: string;
   email: string;
@@ -35,20 +49,19 @@ export const UserPage: React.FC = () => {
     enabled: true,
   });
   const [originalUser, setOriginalUser] = useState<any>(null);
-  const [allRoles, setAllRoles] = useState<{name: string}[]>([]);
+  const [allRoles, setAllRoles] = useState<{name: string; label?: string}[]>([]);
 
+  // Only the URY roles this manager may give (ury.ury.api.staff).
   const fetchRoles = async () => {
     try {
-      const res = await call<any>('frappe.client.get_list', { doctype: 'Role', fields: ['name'], limit: 1000 });
+      const res = await call<any>('ury.ury.api.staff.get_assignable_roles');
       const records = res.message || res;
-      setAllRoles(Array.isArray(records) ? records : []);
+      setAllRoles(Array.isArray(records) ? records.map((r: any) => ({ name: r.role, label: r.label })) : []);
     } catch (err) {
       console.error('Failed to fetch roles', err);
       setAllRoles([]);
     }
   };
-
-  const URY_ROLES = ['URY Manager', 'URY Waiter', 'URY Cashier'];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -68,10 +81,8 @@ export const UserPage: React.FC = () => {
   }, [activeBranchId]);
 
   const getDisplayRole = (user: UserRecord): string => {
-    if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
-      return user.roles[0].role;
-    }
-    return 'User';
+    const role = uryRoleOf(user.roles);
+    return role ? URY_ROLE_LABELS[role] : 'User';
   };
 
   const openAddDrawer = () => {
@@ -91,16 +102,11 @@ export const UserPage: React.FC = () => {
       });
       const fullUser = (fullUserRes as any).message || fullUserRes;
 
-      if (fullUser.roles && Array.isArray(fullUser.roles) && fullUser.roles.length > 0) {
-        userRole = fullUser.roles[0].role;
-      }
+      userRole = uryRoleOf(fullUser.roles) || userRole;
     } catch (err) {
       console.error('Failed to fetch user roles', err);
     }
     
-    if (userRole === 'URY Cashier' && user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
-      userRole = user.roles[0].role;
-    }
 
     const initialForm = {
       first_name: user.first_name || '',
@@ -139,47 +145,15 @@ export const UserPage: React.FC = () => {
 
     setSaving(true);
     try {
-      if (editingUser) {
-        await call('frappe.client.set_value', {
-          doctype: 'User',
-          name: editingUser.name,
-          fieldname: {
-            first_name: newUser.first_name,
-            last_name: newUser.last_name,
-            enabled: newUser.enabled ? 1 : 0,
-          },
-        });
-
-        if (newUser.role) {
-          const fullUserRes = await call('frappe.client.get', {
-            doctype: 'User',
-            name: editingUser.name,
-          });
-          const fullUser = (fullUserRes as any).message || fullUserRes;
-
-          let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
-          updatedRoles = [{ role: newUser.role }];
-
-          await call('frappe.client.set_value', {
-            doctype: 'User',
-            name: editingUser.name,
-            fieldname: 'roles',
-            value: updatedRoles,
-          });
-        }
-      } else {
-        await call('frappe.client.insert', {
-          doc: {
-            doctype: 'User',
-            email: newUser.email,
-            first_name: newUser.first_name,
-            last_name: newUser.last_name,
-            send_welcome_email: 1,
-            enabled: newUser.enabled ? 1 : 0,
-            roles: [{ role: newUser.role }],
-          },
-        });
-      }
+      // One endpoint for both: it only accepts URY roles this manager may give.
+      await call('ury.ury.api.staff.save_staff_user', {
+        name: editingUser ? editingUser.name : undefined,
+        email: newUser.email,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        role: newUser.role,
+        enabled: newUser.enabled ? 1 : 0,
+      });
       fetchUsers();
       setIsDrawerOpen(false);
       showToast.success(`User ${editingUser ? 'updated' : 'added'} successfully`);
@@ -329,13 +303,7 @@ export const UserPage: React.FC = () => {
               value={newUser.role}
               onChange={(_, value) => setNewUser({ ...newUser, role: value })}
               options={
-                allRoles.length > 0 
-                  ? allRoles.map(r => ({ value: r.name, label: r.name }))
-                  : [
-                      { value: 'URY Cashier', label: 'URY Cashier' },
-                      { value: 'URY Waiter', label: 'URY Waiter' },
-                      { value: 'URY Manager', label: 'URY Manager' },
-                    ]
+                allRoles.map(r => ({ value: r.name, label: r.label || r.name }))
               }
             />
           </div>

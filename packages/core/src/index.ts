@@ -3,7 +3,7 @@ export { getLoggedUser, getUserRoles, logout } from './frappe/auth';
 export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
 export type { POSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
-export type { User, PosProfileCombined } from './types';
+export type { User, PosProfileCombined, ServerPOSCapabilities } from './types';
 export { storage } from './storage';
 export { formatCurrency, formatCompactCurrency, formatInvoiceTime, flt, getDefaultCurrency, getCurrencyLabel } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
