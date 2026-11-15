@@ -142,6 +142,26 @@ def getBranch():
     return branch_name
 
 @frappe.whitelist()
+def get_production_units_for_branch():
+    """Production units (kitchen, bar...) of the user's branch.
+
+    The POS listens on a kot_error_<branch>_<production unit> channel for
+    each, so it can alert the cashier when a kitchen ticket fails.
+    """
+    try:
+        branch = getBranch()
+    except frappe.ValidationError:
+        # Not assigned to a branch (e.g. Administrator): nothing to listen to.
+        return {"production_units": []}
+
+    return {
+        "production_units": frappe.get_all(
+            "URY Production Unit", filters={"branch": branch}, pluck="name", order_by="name"
+        )
+    }
+
+
+@frappe.whitelist()
 def getBranchRoom():
     user = frappe.session.user
     sql_query = """

@@ -12,10 +12,11 @@ interface ProductionUnitsResponse {
  */
 export async function getProductionUnitsForBranch(): Promise<string[]> {
   try {
-    const response = await call.get<ProductionUnitsResponse>(
+    // Frappe wraps a method's return value in `message`.
+    const response = await call.get<{ message?: ProductionUnitsResponse }>(
       'ury.ury_pos.api.get_production_units_for_branch'
     );
-    return response.production_units || [];
+    return response.message?.production_units || [];
   } catch (error) {
     console.error('Failed to fetch production units for branch:', error);
     return [];
