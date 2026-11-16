@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { showToast } from "@ury/ui";
 import Orders from "./Orders";
 
 // Mock UI components first
@@ -10,7 +11,7 @@ vi.mock("@ury/ui", () => ({
       {children}
     </button>
   ),
-  Badge: ({ children, variant }: any) => (
+  Badge: ({ children }: any) => (
     <span data-testid="badge">{children}</span>
   ),
   Card: ({ children }: any) => <div data-testid="card">{children}</div>,
@@ -55,7 +56,9 @@ vi.mock("../store/root-store", () => ({
   useRootStore: vi.fn(() => mockRootStoreState),
 }));
 
-const mockPosStore = {
+const mockPosStore: {
+  posProfile: { name: string; enable_payment_without_printing?: number } | null;
+} = {
   posProfile: { name: "POS-001" },
 };
 
@@ -72,6 +75,7 @@ vi.mock("react-router-dom", () => ({
 // Mock core functions
 vi.mock("@ury/core", () => ({
   formatCurrency: (amount: number) => `Rs. ${amount}`,
+  normalizeFrappeTime: (time: any) => time || "2026-11-03 12:00:00",
   call: {
     get: vi.fn().mockResolvedValue({ message: { has_permission: true } }),
   },
@@ -203,5 +207,41 @@ describe("Orders Page", () => {
 
     expect(screen.getByText(/orders.pagination.previous/i)).toBeInTheDocument();
     expect(screen.getByText(/orders.pagination.next/i)).toBeInTheDocument();
+  });
+
+  it("shows please_print_first error when invoice is not printed and enable_payment_without_printing is not enabled", () => {
+    mockPosStore.posProfile = { name: "POS-001", enable_payment_without_printing: 0 };
+    mockRootStoreState.selectedOrder = {
+      name: "ACC-PSINV-0001",
+      status: "Unbilled",
+      invoice_printed: 0,
+      rounded_total: 100,
+    } as any;
+
+    render(<Orders />);
+
+    const paymentBtn = screen.getByRole("button", { name: "order.payment" });
+    fireEvent.click(paymentBtn);
+
+    expect(showToast.error).toHaveBeenCalledWith("errors.please_print_first");
+    expect(screen.queryByTestId("payment-dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens payment dialog when invoice is not printed but enable_payment_without_printing is enabled", () => {
+    mockPosStore.posProfile = { name: "POS-001", enable_payment_without_printing: 1 };
+    mockRootStoreState.selectedOrder = {
+      name: "ACC-PSINV-0001",
+      status: "Unbilled",
+      invoice_printed: 0,
+      rounded_total: 100,
+    } as any;
+
+    render(<Orders />);
+
+    const paymentBtn = screen.getByRole("button", { name: "order.payment" });
+    fireEvent.click(paymentBtn);
+
+    expect(showToast.error).not.toHaveBeenCalled();
+    expect(screen.getByTestId("payment-dialog")).toBeInTheDocument();
   });
 });

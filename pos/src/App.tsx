@@ -11,6 +11,7 @@ import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import KotAlertListener from './components/KotAlertListener';
+import { PrinterWatchProvider } from './components/PrinterWatch';
 import CaptainRouteGuard from './captain/components/CaptainRouteGuard';
 import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
@@ -74,7 +75,7 @@ function App() {
     document.documentElement.lang = lang || 'en';
   }, []);
   return (
-    <>
+    <PrinterWatchProvider>
       <ToastProvider />
       <KotAlertListener />
       <ScreenSizeProvider>
@@ -140,7 +141,7 @@ function App() {
           </Router>
         </AuthGuard>
       </ScreenSizeProvider>
-    </>
+    </PrinterWatchProvider>
   );
 }
 

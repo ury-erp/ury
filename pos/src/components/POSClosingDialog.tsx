@@ -10,7 +10,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
-import { call, db, formatCurrency } from '@ury/core';
+import { call, db, formatCurrency, shouldMaskAmounts } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -51,6 +51,8 @@ interface OpeningEntryDoc {
   name: string;
   balance_details?: OpeningBalanceDetail[];
 }
+
+const MASKED = '—';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -288,6 +290,8 @@ function buildRows(
 const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosingDialogProps) => {
   const { posProfile } = usePOSStore();
   const { user } = useRootStore();
+  // Roles configured on the POS Profile do not see totals/expected amounts (display only).
+  const maskAmounts = shouldMaskAmounts(user, posProfile);
 
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -431,17 +435,12 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     onOpenChange(next);
   };
 
-  // Fix 2: submission-blocking validation. Every row must be explicitly
-  // touched (not just numerically non-zero, since a blank input silently
-  // becomes 0), and the total closing amount across all rows must be
-  // non-zero so an all-zero close can't slip through unnoticed.
+  // Closing may be submitted with blank or zero amount fields. Blank inputs
+  // count as 0; rows that had activity but a zero close only show a warning.
   const validation = useMemo(() => {
     if (rows.length === 0) {
       return { isValid: false, blockingMessage: null as string | null, warningMessage: null as string | null };
     }
-
-    const untouchedCount = rows.filter((row) => !touchedModes.has(row.mode_of_payment)).length;
-    const totalClosing = rows.reduce((sum, row) => sum + row.closing_amount, 0);
 
     const zeroRowsWithActivity = rows.filter(
       (row) =>
@@ -450,19 +449,10 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         (row.opening_amount !== 0 || row.expected_amount !== 0)
     );
 
-    let blockingMessage: string | null = null;
-    if (untouchedCount > 0) {
-      blockingMessage = t('pos_closing.validation_missing_rows');
-    } else if (totalClosing === 0) {
-      blockingMessage = t('pos_closing.validation_all_zero');
-    }
-
     const warningMessage =
-      !blockingMessage && zeroRowsWithActivity.length > 0
-        ? t('pos_closing.validation_zero_row_warning')
-        : null;
+      zeroRowsWithActivity.length > 0 ? t('pos_closing.validation_zero_row_warning') : null;
 
-    return { isValid: !blockingMessage, blockingMessage, warningMessage };
+    return { isValid: true, blockingMessage: null as string | null, warningMessage };
   }, [rows, touchedModes]);
 
   const handleRequestSubmit = () => {
@@ -674,13 +664,13 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.grandTotal)}
+                    {maskAmounts ? MASKED : formatCurrency(totals.grandTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(totals.netTotal)}
+                    {maskAmounts ? MASKED : formatCurrency(totals.netTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border p-3">
@@ -698,6 +688,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
                   rows={rows}
                   touchedModes={touchedModes}
                   onChange={handleRowChange}
+                  hideExpected={maskAmounts}
                 />
               ) : (
                 <p className="py-8 text-center text-sm text-gray-500">

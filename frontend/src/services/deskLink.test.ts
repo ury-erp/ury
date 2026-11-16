@@ -20,7 +20,7 @@ describe('deskLink helpers', () => {
 
   it('buildDeskUrl slugifies the doctype', () => {
     const url = buildDeskUrl('URY Wastage', 'WST-0001', { returnTo: null });
-    expect(url).toBe('/app/ury-issue-wastage/WST-0001');
+    expect(url).toBe('/app/ury-wastage/WST-0001');
   });
 
   it('buildDeskUrl URL-encodes the docname (with spaces and slashes)', () => {
@@ -33,19 +33,19 @@ describe('deskLink helpers', () => {
 
   it('buildDeskUrl with null docname gives the list route without trailing slash', () => {
     const url = buildDeskUrl('URY Wastage', null, { returnTo: null });
-    expect(url).toBe('/app/ury-issue-wastage');
+    expect(url).toBe('/app/ury-wastage');
   });
 
   it('buildDeskUrl without docname gives the list route without trailing slash', () => {
     const url = buildDeskUrl('URY Wastage', undefined, { returnTo: null });
-    expect(url).toBe('/app/ury-issue-wastage');
+    expect(url).toBe('/app/ury-wastage');
   });
 
   it('buildDeskUrl with explicit returnTo includes encoded params', () => {
     const url = buildDeskUrl('URY Wastage', 'WST-0001', {
       returnTo: { path: '/ury/wastage', label: 'URY' },
     });
-    expect(url).toContain('/app/ury-issue-wastage/WST-0001?');
+    expect(url).toContain('/app/ury-wastage/WST-0001?');
     expect(url).toContain('ury_return_to=%2Fury%2Fwastage');
     expect(url).toContain('ury_return_label=URY');
   });

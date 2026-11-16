@@ -66,4 +66,14 @@ describe("Header", () => {
     );
     expect(container.textContent.length).toBeGreaterThan(0);
   });
+
+  it("renders logo link to /desk", () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+    const logoLink = screen.getByAltText("URY POS").closest("a");
+    expect(logoLink).toHaveAttribute("href", "/desk");
+  });
 });

@@ -21,6 +21,7 @@ from ury.ury.tests.factories import make_branch, make_user
 MODULE = "ury.ury.api.ury_insight"
 TEST_MANAGER = "_test_ury_insight_api_manager@example.com"
 TEST_NON_MANAGER = "_test_ury_insight_api_non_manager@example.com"
+TEST_CASHIER = "_test_ury_insight_api_cashier@example.com"
 
 
 def _ensure_test_branch(branch_name="Test Branch"):
@@ -199,10 +200,11 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 		frappe.set_user("Administrator")
 		self._create_test_user(TEST_MANAGER, roles=["URY Manager"])
 		self._create_test_user(TEST_NON_MANAGER, roles=[])
+		self._create_test_user(TEST_CASHIER, roles=["URY Cashier"])
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
-		for user in [TEST_MANAGER, TEST_NON_MANAGER]:
+		for user in [TEST_MANAGER, TEST_NON_MANAGER, TEST_CASHIER]:
 			if frappe.db.exists("User", user):
 				try:
 					frappe.delete_doc("User", user, force=True, ignore_permissions=True)
@@ -227,6 +229,16 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 	def test_manager_can_call_get_active_insights(self):
 		"""URY Manager users can call get_active_insights()."""
 		frappe.set_user(TEST_MANAGER)
+		try:
+			result = get_active_insights()
+			self.assertIsInstance(result, list)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_cashier_can_call_get_active_insights(self):
+		"""URY Cashier users can call get_active_insights() (dashboard feed is
+		open to POS floor roles, not just managers)."""
+		frappe.set_user(TEST_CASHIER)
 		try:
 			result = get_active_insights()
 			self.assertIsInstance(result, list)
@@ -353,7 +365,8 @@ class TestDismissInsightPermissions(FrappeTestCase):
 		frappe.set_user("Administrator")
 		self._create_test_user(TEST_MANAGER, roles=["URY Manager"])
 		self._create_test_user(TEST_NON_MANAGER, roles=[])
-		
+		self._create_test_user(TEST_CASHIER, roles=["URY Cashier"])
+
 		self.test_insight = frappe.get_doc({
 			"doctype": "URY Insight",
 			"title": "Test Insight",
@@ -371,7 +384,7 @@ class TestDismissInsightPermissions(FrappeTestCase):
 				frappe.delete_doc("URY Insight", insight, force=True, ignore_permissions=True)
 			except:
 				pass
-		for user in [TEST_MANAGER, TEST_NON_MANAGER]:
+		for user in [TEST_MANAGER, TEST_NON_MANAGER, TEST_CASHIER]:
 			if frappe.db.exists("User", user):
 				try:
 					frappe.delete_doc("User", user, force=True, ignore_permissions=True)
@@ -387,6 +400,16 @@ class TestDismissInsightPermissions(FrappeTestCase):
 	def test_non_manager_cannot_dismiss_insight(self):
 		"""Non-manager users get PermissionError when calling dismiss_insight()."""
 		frappe.set_user(TEST_NON_MANAGER)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				dismiss_insight(self.test_insight.name)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_cashier_cannot_dismiss_insight(self):
+		"""URY Cashier users get PermissionError when calling dismiss_insight()
+		(dismissal is a managerial write action and stays manager-only)."""
+		frappe.set_user(TEST_CASHIER)
 		try:
 			with self.assertRaises(frappe.PermissionError):
 				dismiss_insight(self.test_insight.name)

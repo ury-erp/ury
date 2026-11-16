@@ -4,7 +4,6 @@
 import frappe
 import requests
 import json
-from frappe.utils.print_format import print_by_server
 from frappe.model.document import Document
 
 
@@ -18,13 +17,27 @@ class URYKOT(Document):
 
     # Function for printing multiple KOTs.
     def multi_print_kot(self):
-        # Function for printing a KOT on a specified printer using a print format.
+        # Function for printing a KOT on a specified printer using the unified print dispatcher.
         def print_kot(printer, kot_print_format):
             try:
-                # Print KOT using a server function (print_by_server)
-                print_by_server("URY KOT", self.name, printer, kot_print_format)
-            except:
-                pass
+                printer_doc = frappe.get_doc("Network Printer Settings", printer)
+                printer_doc.print_doc(
+                    doctype="URY KOT",
+                    name=self.name,
+                    print_format=kot_print_format,
+                    job_type="KOT",
+                    extra_metadata={
+                        "invoice": self.invoice,
+                        "restaurant_table": self.restaurant_table,
+                        "production": self.production,
+                        "job_owner": self.owner or getattr(frappe.session, "user", "Administrator"),
+                    },
+                )
+            except Exception:
+                frappe.logger("printing").warning(
+                    {"event": "kot_print_submission_failed", "kot": self.name, "printer": printer},
+                    exc_info=True,
+                )
 
         
         pos_kot_printers = frappe.db.get_all(

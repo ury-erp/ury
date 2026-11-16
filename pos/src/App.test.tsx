@@ -104,9 +104,11 @@ vi.mock("./store/pos-store", () => ({
   }),
 }));
 
-const mockCall = {
-  get: vi.fn().mockResolvedValue({ message: { enabled: false } }),
-};
+const { mockCall } = vi.hoisted(() => ({
+  mockCall: {
+    get: vi.fn().mockResolvedValue({ message: { enabled: false } }),
+  },
+}));
 
 vi.mock("@ury/core", () => ({
   call: mockCall,

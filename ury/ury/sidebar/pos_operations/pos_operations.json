@@ -1,0 +1,33 @@
+{
+ "app": "ury",
+ "creation": "2026-11-11 15:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Sidebar",
+ "header_icon": "monitor",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "child": 0,
+   "collapsible": 1,
+   "hidden": 0,
+   "icon": "monitor",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "POS Operations",
+   "link_to": "POS Operations",
+   "link_type": "Workspace",
+   "open_in_new_tab": 0,
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-11-11 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "POS Operations",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "POS Operations"
+}

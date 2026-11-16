@@ -7,9 +7,11 @@ import { cn } from '@ury/ui';
 interface ClosingPaymentTableProps {
   rows: ClosingPaymentSummary[];
   onChange: (modeOfPayment: string, closingAmount: number) => void;
+  /** Mask Expected and Difference (display only; values are still computed and submitted). */
+  hideExpected?: boolean;
 }
 
-const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChange }) => {
+const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChange, hideExpected = false }) => {
   const handleClosingAmountChange = (modeOfPayment: string, value: string) => {
     const closingAmount = parseFloat(value) || 0;
     onChange(modeOfPayment, closingAmount);
@@ -27,7 +29,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
       key: 'expected_amount',
       header: 'Expected',
       align: 'right',
-      render: (row) => formatCurrency(row.expected_amount),
+      render: (row) => (hideExpected ? '—' : formatCurrency(row.expected_amount)),
     },
     {
       key: 'closing_amount',
@@ -58,10 +60,10 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
           <span
             className={cn(
               'font-medium',
-              hasDifference ? 'text-destructive' : 'text-success'
+              !hideExpected && (hasDifference ? 'text-destructive' : 'text-success')
             )}
           >
-            {formatCurrency(difference)}
+            {hideExpected ? '—' : formatCurrency(difference)}
           </span>
         );
       },

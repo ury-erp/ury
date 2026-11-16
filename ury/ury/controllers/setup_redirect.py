@@ -18,9 +18,9 @@ _DESK_HOME_PAGE = "Workspaces"
 # A user qualifies for a restricted landing only when they hold the
 # matching role but do NOT hold any of the elevated roles that grant
 # full Desk access.
-_ELEVATED_ROLES = {"URY Manager", "URY Admin", "System Manager"}
-_CASHIER_ROLE = "URY Cashier"
-_CAPTAIN_ROLE = "URY Captain"
+_ELEVATED_ROLES = {"URY Manager", "URY Admin", "System Manager", "Administrator"}
+_CASHIER_ROLES = {"URY Cashier"}
+_CAPTAIN_ROLES = {"URY Captain"}
 _CASHIER_HOME = "/pos"
 _CAPTAIN_HOME = "/ury/serve"
 
@@ -96,12 +96,17 @@ def website_path_resolver(path):
     (which ignores frappe.local.response type=redirect on page GETs).
     """
     from frappe.website.path_resolver import resolve_path
+    import werkzeug.routing.exceptions
 
     if _should_redirect_to_ury_setup(path):
         frappe.local.flags.redirect_location = _setup_wizard_target()
         raise frappe.Redirect(302)
 
-    return resolve_path(path)
+    try:
+        return resolve_path(path)
+    except werkzeug.routing.exceptions.RequestRedirect as e:
+        frappe.flags.redirect_location = e.new_url
+        raise frappe.Redirect(e.code)
 
 
 def _role_based_home_page():
@@ -111,14 +116,14 @@ def _role_based_home_page():
     URY Admin, System Manager) or when no restricted rule applies, so
     that callers can fall through to the standard Desk home page.
     """
-    if frappe.session.user == "Guest":
+    if frappe.session.user in ("Guest", "Administrator"):
         return None
     roles = set(frappe.get_roles())
     if roles & _ELEVATED_ROLES:
         return None
-    if _CASHIER_ROLE in roles:
+    if roles & _CASHIER_ROLES:
         return _CASHIER_HOME
-    if _CAPTAIN_ROLE in roles:
+    if roles & _CAPTAIN_ROLES:
         return _CAPTAIN_HOME
     return None
 

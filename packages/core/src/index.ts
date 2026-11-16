@@ -1,6 +1,6 @@
 export { createFrappeClient, call, db, auth } from './frappe/client';
 export { getLoggedUser, getUserRoles, logout, login } from './frappe/auth';
-export { isUserRestrictedFromTableOrders, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
+export { isUserRestrictedFromTableOrders, shouldMaskAmounts, canCaptainTransfer, derivePOSCapabilities } from './frappe/roles';
 export { parseFrappeError } from './frappe/errors';
 export {
   buildDeskUrl,
@@ -10,11 +10,13 @@ export {
   appLabelForPath,
   DESK_RETURN_PARAM,
   DESK_RETURN_LABEL_PARAM,
+  DESK_RETURN_STORAGE_KEY,
   RETURN_TO_ALLOWED_PREFIXES,
 } from './frappe/deskLink';
 export type { ReturnContext, BuildDeskUrlOptions } from './frappe/deskLink';
 export type { POSCapabilities } from './frappe/roles';
 export type { User, PosProfileCombined } from './types';
+export { isPrintStatusDisabled } from './types';
 export { storage } from './storage';
 export {
   formatCurrency,

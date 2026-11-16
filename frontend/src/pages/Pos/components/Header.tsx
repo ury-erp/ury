@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Command,
   ChevronDown,
@@ -12,7 +12,7 @@ import { Button, Input, buttonVariants } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout } from '@ury/core';
+import { logout, DESK_RETURN_STORAGE_KEY } from '@ury/core';
 import { showToast } from '@ury/ui';
 
 const Header = () => {
@@ -107,13 +107,29 @@ const Header = () => {
       <div className="flex items-center justify-between h-[52px] px-[18px] gap-3">
         {/* Logo */}
         <div className="flex items-center">
-          <Link to="/pos/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
+          <a
+            href="/desk"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(
+                  DESK_RETURN_STORAGE_KEY,
+                  JSON.stringify({
+                    path: window.location.pathname + window.location.search,
+                    label: 'POS',
+                  })
+                );
+              } catch (e) {
+                /* ignore */
+              }
+            }}
+            className="flex items-center gap-3"
+          >
             <img
               src="/assets/ury/pos/ury_pos.png"
               alt="URY POS"
               className="h-5 w-auto"
             />
-          </Link>
+          </a>
         </div>
 
         {/* Search Bar */}

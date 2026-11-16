@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 from erpnext.stock.utils import get_incoming_rate
-from frappe.utils import flt
+from frappe.utils import flt, get_datetime, now_datetime
 from ury.ury.api.ury_stock_check import get_available_stock
 
 class URYWastage(Document):
@@ -14,6 +14,16 @@ class URYWastage(Document):
         self.calculate_item_values()
         self.total_cost = self.get_total_cost()
         self.validate_item_stock()
+        if not getattr(self, "docstatus", 0):
+            self.set_datetime()
+
+    def set_datetime(self):
+        # Saved on every draft save. A manually ticked Edit Posting Date makes the
+        # user's posting date/time the datetime; otherwise it is the save time.
+        if getattr(self, "edit_posting_date", 0) and self.posting_date and self.posting_time:
+            self.datetime = get_datetime(f"{self.posting_date} {self.posting_time}")
+        else:
+            self.datetime = now_datetime()
 
     def calculate_item_values(self):
         for item in self.items:
@@ -47,7 +57,9 @@ class URYWastage(Document):
     
     def before_submit(self):
         self.validate_item_stock()
-        if getattr(self, "wastage_source", None) != "KOT Cancellation":
+        # Captured before the POS Profile override below can set edit_posting_date.
+        manual_edit = bool(getattr(self, "edit_posting_date", 0))
+        if not manual_edit and getattr(self, "wastage_source", None) != "KOT Cancellation":
             if frappe.db.has_column("POS Profile", "custom_enable_opening_date"):
                 enable_opening_date = frappe.get_value("POS Profile", {"branch": self.branch}, "custom_enable_opening_date")
                 if enable_opening_date:

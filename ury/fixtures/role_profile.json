@@ -1,0 +1,15 @@
+[
+ {
+  "doctype": "Role Profile",
+  "name": "URY Cashier",
+  "role_profile": "URY Cashier",
+  "roles": [
+   {
+    "doctype": "Has Role",
+    "role": "URY Cashier",
+    "parentfield": "roles",
+    "parenttype": "Role Profile"
+   }
+  ]
+ }
+]

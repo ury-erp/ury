@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import POSClosingDialog from "./POSClosingDialog";
+import { shouldMaskAmounts } from "@ury/core";
 
 const getOpenPosOpeningEntriesMock = vi.fn();
 const getSubCashierPosInvoicesMock = vi.fn();
@@ -40,6 +41,7 @@ vi.mock("../lib/checklist-api", () => ({
 }));
 
 vi.mock("@ury/core", () => ({
+  shouldMaskAmounts: vi.fn(() => false),
   call: {
     get: vi.fn().mockResolvedValue({
       message: { owner: "test_user", multiple_cashier: 0 },
@@ -201,6 +203,27 @@ describe("POSClosingDialog", () => {
     });
   });
 
+  it("masks grand and net total when the POS Profile masks amounts for the user", async () => {
+    vi.mocked(shouldMaskAmounts).mockReturnValue(true);
+    try {
+      render(<POSClosingDialog open={true} onOpenChange={vi.fn()} />);
+
+      const grand = (await screen.findByText("pos_closing.grand_total")).nextElementSibling;
+      const net = (await screen.findByText("pos_closing.net_total")).nextElementSibling;
+      expect(grand?.textContent).toBe("—");
+      expect(net?.textContent).toBe("—");
+    } finally {
+      vi.mocked(shouldMaskAmounts).mockReturnValue(false);
+    }
+  });
+
+  it("shows grand and net total normally when amounts are not masked", async () => {
+    render(<POSClosingDialog open={true} onOpenChange={vi.fn()} />);
+
+    const grand = (await screen.findByText("pos_closing.grand_total")).nextElementSibling;
+    expect(grand?.textContent).not.toBe("—");
+  });
+
   it("renders closing payment table", async () => {
     render(
       <POSClosingDialog
@@ -214,7 +237,7 @@ describe("POSClosingDialog", () => {
     });
   });
 
-  it("prevents submission if closing amounts are not entered", async () => {
+  it("allows submission with blank closing amount fields", async () => {
     render(
       <POSClosingDialog
         open={true}
@@ -226,8 +249,11 @@ describe("POSClosingDialog", () => {
       expect(screen.getByText("pos_closing.submit")).toBeInTheDocument();
     });
 
+    // No closing amount is entered; blank inputs must not block submission.
+    expect(screen.queryByText("pos_closing.validation_missing_rows")).not.toBeInTheDocument();
+    expect(screen.queryByText("pos_closing.validation_all_zero")).not.toBeInTheDocument();
     const submitButton = screen.getByText("pos_closing.submit") as HTMLButtonElement;
-    expect(submitButton).toBeDisabled();
+    expect(submitButton).toBeEnabled();
   });
 
   it("calls onOpenChange with false when cancel is clicked", async () => {

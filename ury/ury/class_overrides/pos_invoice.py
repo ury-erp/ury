@@ -1,18 +1,68 @@
 import frappe
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 	POSInvoice,
-	ProductBundleStockValidationError,
-	get_product_bundle_stock_availability,
 	get_stock_availability,
 )
 
 from frappe import _
 from frappe.utils import flt
 
+try:
+	from erpnext.accounts.doctype.pos_invoice.pos_invoice import ProductBundleStockValidationError
+except ImportError:
+	class ProductBundleStockValidationError(frappe.ValidationError):
+		pass
+
+# ERPNext v16+ refactored stock validation into batched queries
+try:
+	from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+		get_active_bundle_items,
+		get_available_stock_qty,
+		get_required_stock_qty,
+		get_stock_item_details,
+		is_stock_check_needed,
+	)
+	HAS_BATCHED_STOCK_CHECK = True
+except ImportError:
+	HAS_BATCHED_STOCK_CHECK = False
+
+try:
+	from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+		get_product_bundle_stock_availability,
+	)
+except ImportError:
+	def get_product_bundle_stock_availability(item_code, warehouse, item_qty):
+		try:
+			from erpnext.stock.stock_ledger import is_negative_stock_allowed
+			from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+				get_bin_qty,
+				get_pos_reserved_qty,
+			)
+
+			is_stock_item = True
+			bundle = frappe.get_doc("Product Bundle", item_code)
+			availabilities = []
+			for bundle_item in bundle.items:
+				if frappe.get_value("Item", bundle_item.item_code, "is_stock_item"):
+					bin_qty = get_bin_qty(bundle_item.item_code, warehouse)
+					reserved_qty = get_pos_reserved_qty(bundle_item.item_code, warehouse)
+					available = bin_qty - reserved_qty
+					availabilities.append(
+						{
+							"item_code": bundle_item.item_code,
+							"required": bundle_item.qty * item_qty,
+							"available": available,
+						}
+					)
+
+			return availabilities, is_stock_item, is_negative_stock_allowed(item_code=item_code)
+		except Exception:
+			return get_stock_availability(item_code, warehouse)
+
 
 class CustomPOSInvoice(POSInvoice):
 	def validate_stock_availablility(self):
-		if self.is_return:
+		if self.is_return or frappe.get_cached_doc("Stock Settings").allow_negative_stock:
 			return
 
 		if self.docstatus.is_draft() and not frappe.db.get_value(
@@ -22,6 +72,37 @@ class CustomPOSInvoice(POSInvoice):
 
 		branch = self.branch or frappe.db.get_value("POS Profile", self.pos_profile, "branch")
 
+		if HAS_BATCHED_STOCK_CHECK:
+			rows = [
+				d
+				for d in self.get("items")
+				if d.item_code
+				and not d.serial_and_batch_bundle
+				and not (branch and self._is_always_available(d.item_code, branch))
+			]
+			if not rows:
+				return
+
+			bundle_items = get_active_bundle_items({d.item_code for d in rows})
+			required_qty = get_required_stock_qty(rows, bundle_items)
+			available_qty, reserved_stock_keys = get_available_stock_qty(required_qty)
+			items = get_stock_item_details({item_code for item_code, warehouse in required_qty})
+			keys_to_check = {
+				key
+				for key in required_qty
+				if is_stock_check_needed(items.get(key[0]), key in reserved_stock_keys)
+			}
+
+			for d in rows:
+				if d.item_code in bundle_items:
+					self.validate_bundle_stock(
+						d, bundle_items[d.item_code], required_qty, available_qty, keys_to_check
+					)
+				elif (d.item_code, d.warehouse) in keys_to_check:
+					self.validate_item_stock(d, required_qty, available_qty)
+			return
+
+		# Fallback stock validation for older ERPNext versions
 		for d in self.get("items"):
 			if d.serial_and_batch_bundle:
 				continue
@@ -104,3 +185,4 @@ class CustomPOSInvoice(POSInvoice):
 				"active": 1,
 			},
 		)
+

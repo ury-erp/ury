@@ -11,6 +11,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Button } from '@ury/ui';
+import { withReturnContext } from '@ury/core';
 import { t } from '../i18n';
 import type { OpeningBlockingState } from './POSOpeningProvider';
 import type { POSOpeningEntryRef } from '../lib/pos-opening-api';
@@ -57,7 +58,7 @@ const POSOpeningDialog = ({
     // Opens in a new tab, so the POS tab itself is still there to come back
     // to -- but the desk tab still gets a "Back to POS" chip via the return
     // context, since users routinely lose track of which tab is which.
-    window.open(`${window.location.origin}${withReturnContext('/app')}`, '_blank');
+    window.open(`${window.location.origin}${withReturnContext('/desk/ury')}`, '_blank');
   };
 
   const stateConfig: Record<OpeningBlockingState, StateConfig> = {

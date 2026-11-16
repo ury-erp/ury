@@ -93,7 +93,7 @@ def validate_ported_checks(doc, method):
         wtg_query = """
             SELECT name
             FROM `tabURY Wastage`
-            WHERE docstatus = 1 AND branch = %s AND TIMESTAMP(posting_date, posting_time) >= %s AND TIMESTAMP(posting_date, posting_time) <= %s
+            WHERE docstatus = 1 AND branch = %s AND `datetime` >= %s AND `datetime` <= %s
         """
         wastage = frappe.db.sql(wtg_query, (branch, start_date, end_date), as_dict=True)
         if not wastage:

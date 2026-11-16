@@ -772,6 +772,8 @@ def getPosProfile():
         edit_order_type = pos_profiles.custom_edit_order_type
         enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
         invoice_warning_time = pos_profiles.custom_invoice_warning_time or 0
+        enable_payment_without_printing = pos_profiles.get("custom_enable_payment_without_printing") or 0
+        disable_print_status_tracking = getattr(pos_profiles, "custom_disable_print_status_tracking", 0)
         if multiple_cashier:
             details = getBranchRoom()
             room = details[0].get('name') 
@@ -852,6 +854,8 @@ def getPosProfile():
         "edit_order_type":edit_order_type,
         "enable_kot_reprint":enable_kot_reprint,
         "custom_invoice_warning_time":invoice_warning_time,
+        "enable_payment_without_printing":enable_payment_without_printing,
+        "custom_disable_print_status_tracking":disable_print_status_tracking,
         **get_default_customer_config(pos_profiles),
     }
 
@@ -894,8 +898,12 @@ def getPosProfileFull(pos_profile):
         "role_allowed_for_billing": [row.as_dict() for row in profile.role_allowed_for_billing],
         "role_restricted_for_table_order": [row.as_dict() for row in profile.role_restricted_for_table_order],
         "transfer_role_permissions": [row.as_dict() for row in profile.transfer_role_permissions],
+        "role_masked_for_amounts": [row.as_dict() for row in (profile.get("role_masked_for_amounts") or [])],
         "view_all_status": profile.get("view_all_status"),
         "custom_daily_pos_close": profile.get("custom_daily_pos_close"),
+        "print_format": profile.print_format,
+        "enable_payment_without_printing": profile.get("custom_enable_payment_without_printing") or 0,
+        "custom_enable_payment_without_printing": profile.get("custom_enable_payment_without_printing") or 0,
         **get_default_customer_config(profile),
     }
 
@@ -2319,3 +2327,12 @@ def ensure_payment_mode_accounts(modes, company):
         _ensure_mode_of_payment(mode, company)
         ensured.append(mode)
     return ensured
+
+
+@frappe.whitelist(allow_guest=False)
+def is_printer_watch_installed() -> dict:
+    try:
+        installed = "ury_printer_watch" in frappe.get_installed_apps()
+    except Exception:
+        installed = False
+    return {"installed": bool(installed)}

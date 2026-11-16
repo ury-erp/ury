@@ -221,6 +221,7 @@ permission_query_conditions = {
 
 override_doctype_class = {
 	"POS Invoice Merge Log": "ury.ury.class_overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog",
+	"Network Printer Settings": "ury.ury.printing.custom_network_printer_settings.CustomNetworkPrinterSettings",
 	"POS Invoice": "ury.ury.class_overrides.pos_invoice.CustomPOSInvoice",
 	"Report": "ury.ury.class_overrides.report.CustomReport",
 }
@@ -361,6 +362,8 @@ scheduler_events = {
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 			"ury.ury.api.reservation_scheduler.process_reservation_no_shows",
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs",
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
@@ -377,13 +380,13 @@ scheduler_events = {
 	"daily": [
 		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks",
 		"ury.chairman_jobs.purge_chairman_audio",
-	]
+	],
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs",
+	],
 # 	"weekly": [
 # 		"ury.tasks.weekly"
 # 	],
@@ -616,6 +619,7 @@ fixtures = [
                     "POS Profile-role_allowed_for_billing",
                     "POS Profile-column_break_bvzw2",
                     "POS Profile-role_restricted_for_table_order",
+                    "POS Profile-role_masked_for_amounts",
                     "POS Profile-view_all_status",
                     "POS Profile-remove_items",
                     "POS Profile-custom_qty_reduction_allowed_order_types",
@@ -730,7 +734,9 @@ fixtures = [
                     "POS Profile-custom_disposables",
                     "POS Profile-custom_column_break_bgzjv",
                     "POS Profile-custom_section_break_bmczy",
-                    "POS Profile-custom_ury_pos_configurations"
+                    "POS Profile-custom_ury_pos_configurations",
+                    "POS Profile-custom_disable_print_status_tracking",
+                    "Network Printer Settings-custom_printer_queue_name"
                 },
             ]
         ],
@@ -778,4 +784,9 @@ fixtures = [
     # row's `action` Link field fails validation with a LinkValidationError
     # on any later re-save/re-validate unless this row already exists.
     {"doctype": "Workflow Action Master", "filters": [["name", "in", ["Return to Draft"]]]},
+    # POS Operations: its own module (so the cashier Module Profile can block "URY"
+    # without hiding it) plus the Module Profile / Role Profile assigned to cashiers.
+    {"doctype": "Module Def", "filters": [["name", "in", ["URY POS"]]]},
+    {"doctype": "Role Profile", "filters": [["name", "in", ["URY Cashier"]]]},
+    {"doctype": "Module Profile", "filters": [["name", "in", ["URY Cashier"]]]},
 ]

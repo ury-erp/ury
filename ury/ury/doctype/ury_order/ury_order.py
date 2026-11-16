@@ -2688,7 +2688,8 @@ def _validate_additional_discount(additional_discount, pos_profile):
 
 # Method for URY POS
 @frappe.whitelist()
-def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+def make_invoice(customer, payments, cashier, pos_profile, owner, additionalDiscount=None, table=None, invoice=None, submit_invoice=1):
+    submit_invoice = frappe.utils.cint(submit_invoice) if submit_invoice is not None else 1
     additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
 
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
@@ -2766,15 +2767,24 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
+    invoice.set_paid_amount()
     # invoice.owner = owner
     invoice.save()
+
+    if not submit_invoice:
+        return {"name": invoice.name, "status": "Draft"}
+
+    _submit_and_release_tables(invoice)
+    return {"name": invoice.name, "status": "Submitted"}
+
+
+def _submit_and_release_tables(invoice):
     try:
         invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
-        
-    # Free the table when no other open drafts remain on this table group
 
+    # Free the table when no other open drafts remain on this table group
     release_invoice = invoice
 
     # If this invoice is a secondary merged bill,
@@ -2793,6 +2803,16 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             release_invoice.restaurant_table,
             release_invoice.custom_merged_tables,
         )
+
+
+@frappe.whitelist()
+def submit_order_invoice(invoice):
+    doc = frappe.get_doc("POS Invoice", invoice)
+    if doc.docstatus == 1:
+        return {"name": doc.name, "status": "Submitted"}
+
+    _submit_and_release_tables(doc)
+    return {"name": doc.name, "status": "Submitted"}
         
         
 

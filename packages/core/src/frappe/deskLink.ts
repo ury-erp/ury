@@ -31,6 +31,9 @@ export const DESK_RETURN_PARAM = 'ury_return_to';
 /** Query param carrying the display name of the originating app. */
 export const DESK_RETURN_LABEL_PARAM = 'ury_return_label';
 
+/** Session storage key used to persist the return context across desk page switches. */
+export const DESK_RETURN_STORAGE_KEY = 'ury:desk_return_to';
+
 /**
  * Path prefixes that a `ury_return_to` value is allowed to point at.
  *

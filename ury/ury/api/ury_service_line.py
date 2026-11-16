@@ -3,12 +3,12 @@ from datetime import datetime as _datetime, timedelta as _timedelta
 import frappe
 
 from frappe.utils import get_datetime, add_to_date, today
-from ury.ury.report_api.utils import require_manager
+from ury.ury.report_api.utils import require_dashboard_user
 
 
 @frappe.whitelist(methods=["GET"])
 def get_service_line(branch=None):
-	require_manager()
+	require_dashboard_user()
 	cache_key = f"ury_dashboard_service_line:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:
@@ -108,7 +108,7 @@ def _bin_actual_qty(item_code, warehouse=None):
 
 @frappe.whitelist(methods=["GET"])
 def get_running_low(branch=None):
-	require_manager()
+	require_dashboard_user()
 	cache_key = f"ury_dashboard_running_low:{branch}"
 	cached = frappe.cache().get_value(cache_key)
 	if cached:

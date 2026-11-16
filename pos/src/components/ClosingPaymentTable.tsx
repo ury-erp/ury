@@ -10,12 +10,15 @@ interface ClosingPaymentTableProps {
   /** Modes the cashier has explicitly entered a closing amount for (see Fix 2). */
   touchedModes: Set<string>;
   onChange: (modeOfPayment: string, closingAmount: number) => void;
+  /** Mask Expected and Difference (display only; values are still computed and submitted). */
+  hideExpected?: boolean;
 }
 
 const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
   rows,
   touchedModes,
   onChange,
+  hideExpected = false,
 }) => {
   const handleClosingAmountChange = (modeOfPayment: string, value: string) => {
     const parsed = parseFloat(value);
@@ -104,7 +107,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                   {formatCurrency(row.opening_amount)}
                 </td>
                 <td className="py-3 px-4 text-end text-gray-700">
-                  {formatCurrency(row.expected_amount)}
+                  {hideExpected ? '—' : formatCurrency(row.expected_amount)}
                 </td>
                 <td className="py-3 px-4">
                   <Input
@@ -123,10 +126,14 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
                 <td
                   className={cn(
                     'py-3 px-4 text-end font-medium',
-                    hasDifference ? 'text-red-600' : 'text-green-600'
+                    hideExpected
+                      ? 'text-gray-700'
+                      : hasDifference
+                        ? 'text-red-600'
+                        : 'text-green-600'
                   )}
                 >
-                  {formatCurrency(difference)}
+                  {hideExpected ? '—' : formatCurrency(difference)}
                 </td>
               </tr>
             );

@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import Header from "./Header";
 import { BrowserRouter } from "react-router-dom";
 
+const { mockIsPrintStatusDisabled } = vi.hoisted(() => ({
+  mockIsPrintStatusDisabled: vi.fn(),
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
   return {
@@ -17,7 +21,19 @@ vi.mock("@ury/core", () => ({
   logout: vi.fn().mockResolvedValue(undefined),
   withReturnContext: (path: string) => path,
   formatCurrency: (amount: number) => `Rs. ${amount}`,
+  isPrintStatusDisabled: mockIsPrintStatusDisabled,
+  DESK_RETURN_STORAGE_KEY: "ury:desk_return_to",
 }));
+
+vi.mock("./PrinterWatch", () => ({
+  PrinterStatusButton: () => (
+    <button type="button" data-testid="printer-status-button">
+      Printer Status
+    </button>
+  ),
+}));
+
+const mockUser = vi.hoisted(() => ({ roles: [] as string[] }));
 
 vi.mock("../store/root-store", () => ({
   useRootStore: (selector: any) => {
@@ -25,6 +41,7 @@ vi.mock("../store/root-store", () => ({
       user: {
         name: "test_user",
         full_name: "Test User",
+        roles: mockUser.roles,
       },
       orderSearchQuery: "",
       setOrderSearchQuery: vi.fn(),
@@ -61,6 +78,7 @@ describe("Header", () => {
     localStorage.clear();
     sessionStorage.clear();
     vi.clearAllMocks();
+    mockIsPrintStatusDisabled.mockReturnValue(false);
   });
 
   it("renders the header", () => {
@@ -109,9 +127,58 @@ describe("Header", () => {
 
     expect(screen.getByText("header.logout")).toBeInTheDocument();
     expect(screen.getByText("header.clear_cache")).toBeInTheDocument();
+    expect(screen.getByText("header.switch_to_desk")).toBeInTheDocument();
   });
 
-  it("renders logo link to dashboard", () => {
+  it("navigates to /desk/ury when switch to desk is clicked", async () => {
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const userButton = screen.getByRole("button", { name: /Test User/i });
+    await userEvent.click(userButton);
+
+    const switchBtn = screen.getByText("header.switch_to_desk");
+    await userEvent.click(switchBtn);
+
+    expect(window.location.href).toContain("/desk/ury");
+
+    window.location = originalLocation as any;
+  });
+
+  it.each([
+    [["URY Cashier"], "/desk/pos-operations"],
+    [["URY Cashier", "URY Manager"], "/desk/ury"],
+    [["URY Cashier", "URY Admin"], "/desk/ury"],
+    [["URY Cashier", "System Manager"], "/desk/ury"],
+  ])("switch to desk for roles %j goes to %s", async (roles, expected) => {
+    mockUser.roles = roles;
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = { ...originalLocation, href: "" } as any;
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Test User/i }));
+    await userEvent.click(screen.getByText("header.switch_to_desk"));
+
+    expect(window.location.href).toContain(expected);
+    expect(window.location.href).not.toContain("/pos/dashboard");
+
+    window.location = originalLocation as any;
+    mockUser.roles = [];
+  });
+
+  it("renders logo link to /desk", () => {
     render(
       <BrowserRouter>
         <Header />
@@ -119,6 +186,66 @@ describe("Header", () => {
     );
 
     const logoLink = screen.getByAltText("URY POS").closest("a");
-    expect(logoLink).toHaveAttribute("href", "/dashboard");
+    expect(logoLink).toHaveAttribute("href", "/desk");
+  });
+
+  it("stores return context in sessionStorage when logo link is clicked", async () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const logoLink = screen.getByAltText("URY POS").closest("a");
+    expect(logoLink).not.toBeNull();
+    logoLink?.addEventListener("click", (e) => e.preventDefault());
+    await userEvent.click(logoLink!);
+
+    const stored = sessionStorage.getItem("ury:desk_return_to");
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed.label).toBe("POS");
+  });
+
+  it("renders the printer status button next to the user menu when enabled", () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const printerButton = screen.getByTestId("printer-status-button");
+    expect(printerButton).toBeInTheDocument();
+
+    const userButton = screen.getByRole("button", { name: /Test User/i });
+    // The printer button must sit immediately before the user menu in the
+    // right-side actions group.
+    expect(
+      printerButton.compareDocumentPosition(userButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("hides the printer status button when print status is disabled", () => {
+    mockIsPrintStatusDisabled.mockReturnValue(true);
+
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    expect(screen.queryByTestId("printer-status-button")).not.toBeInTheDocument();
+  });
+
+  it("renders only one user menu and one printer button", () => {
+    render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>
+    );
+
+    expect(screen.getAllByRole("button", { name: /Test User/i })).toHaveLength(1);
+    expect(screen.getAllByTestId("printer-status-button")).toHaveLength(1);
   });
 });

@@ -135,8 +135,6 @@
     "help_expected": "El monto que el sistema espera para este modo de pago, según las facturas del día.",
     "help_closing": "Ingresa el monto real que contaste para este modo de pago.",
     "help_difference": "Monto contado menos monto esperado. Positivo es sobrante; negativo es faltante.",
-    "validation_missing_rows": "Ingresa un monto de cierre para cada modo de pago antes de enviar.",
-    "validation_all_zero": "El total de cierre no puede ser cero. Ingresa los montos contados.",
     "validation_zero_row_warning": "Uno o más modos de pago quedaron en 0 aunque hubo actividad hoy. Revisa antes de enviar.",
     "confirm_title": "Confirmar cierre de POS",
     "confirm_message": "Esto enviará el cierre y no se puede deshacer. ¿Seguro que quieres continuar?",

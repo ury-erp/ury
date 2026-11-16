@@ -9,6 +9,34 @@ def after_install():
     create_custom_fields(get_custom_fields())
     add_roles_to_administrator()
     hide_setup_sidebar_options()
+    setup_pos_invoice_print_fields()
+
+def setup_pos_invoice_print_fields():
+    """Ensure mode of payment and discount fields are visible in POS Invoice standard print format."""
+    fields_to_unhide = [
+        ("POS Invoice", "additional_discount_percentage", "print_hide", "0", "Check"),
+        ("POS Invoice", "additional_discount_percentage", "print_hide_if_no_value", "1", "Check"),
+        ("POS Invoice", "discount_amount", "print_hide", "0", "Check"),
+        ("POS Invoice", "discount_amount", "print_hide_if_no_value", "1", "Check"),
+        ("POS Invoice", "payments", "print_hide", "0", "Check"),
+        ("POS Invoice", "paid_amount", "print_hide", "0", "Check"),
+        ("POS Invoice", "change_amount", "print_hide", "0", "Check"),
+        ("POS Invoice", "change_amount", "print_hide_if_no_value", "1", "Check"),
+        ("Sales Invoice Payment", "type", "print_hide", "1", "Check"),
+    ]
+
+    for dt, fn, prop, val, ptype in fields_to_unhide:
+        frappe.make_property_setter(
+            {
+                "doctype": dt,
+                "doctype_or_field": "DocField",
+                "fieldname": fn,
+                "property": prop,
+                "value": val,
+                "property_type": ptype,
+            }
+        )
+
 
 def hide_setup_sidebar_options():
 	"""Hide Access, Email, Data, and Integrations options from the Setup sidebar."""
@@ -401,6 +429,21 @@ def get_custom_fields():
 				"insert_after": "qz_print",
 				"label": "QZ Host",
 				"translatable": 0,
+			},
+			{
+				"fieldname": "custom_enable_payment_without_printing",
+				"fieldtype": "Check",
+				"label": "Enable Payment Without Printing",
+				"description": "Allow payment without requiring prior invoice printing in POS",
+				"insert_after": "show_image",
+				"default": 0,
+			},
+			{
+				"fieldname": "custom_disable_print_status_tracking",
+				"fieldtype": "Check",
+				"insert_after": "qz_host",
+				"label": "Disable Print & Printer Status Tracking",
+				"description": "When enabled, hides the printer status indicator in POS.",
 			}
 		],
   
@@ -492,6 +535,17 @@ def get_custom_fields():
 				"label": "Comment",
 				"insert_after": "description",
 				"translatable": 0
+			}
+		],
+
+		"Network Printer Settings": [
+			{
+				"fieldname": "custom_printer_queue_name",
+				"fieldtype": "Data",
+				"insert_after": "printer_name",
+				"label": "Printer Queue Name",
+				"description": "CUPS queue name for this printer. Used by URY Print Job and printer health matching.",
+				"translatable": 0,
 			}
 		],
 

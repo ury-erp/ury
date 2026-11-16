@@ -1,6 +1,5 @@
 import frappe
 from frappe.utils import flt
-from frappe.utils.print_format import print_by_server
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
 ADD_KOT_TYPES = ("New Order", "Order Modified")
@@ -171,6 +170,24 @@ def _validate_waiter_print_format(waiter_print_format, room, printer):
 	return True
 
 
+def print_by_server(doctype, name, printer_setting, print_format=None, doc=None, no_letterhead=0, **kwargs):
+	printer_doc = frappe.get_doc("Network Printer Settings", printer_setting)
+	extra_metadata = dict(kwargs.get("extra_metadata") or {})
+	if doc and getattr(doc, "invoice", None):
+		extra_metadata.setdefault("invoice", getattr(doc, "invoice", None))
+	if doc and getattr(doc, "restaurant_table", None):
+		extra_metadata.setdefault("restaurant_table", getattr(doc, "restaurant_table", None))
+	return printer_doc.print_doc(
+		doctype=doctype,
+		name=name,
+		print_format=print_format,
+		doc=doc,
+		no_letterhead=no_letterhead,
+		job_type=kwargs.get("job_type", "WAITER_SLIP"),
+		extra_metadata=extra_metadata,
+	)
+
+
 def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
 	"""Print one combined waiter slip for all delta KOTs created in an order update."""
 	if not invoice_id or not kot_names:
@@ -190,6 +207,7 @@ def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
 	combined_doc = build_combined_kot_doc(kot_names)
 	if not combined_doc or not combined_doc.kot_items:
 		return
+	combined_doc.restaurant_table = restaurant_table
 
 	for printer_row in waiter_printers:
 		waiter_print_format = printer_row.custom_waiter_print_format

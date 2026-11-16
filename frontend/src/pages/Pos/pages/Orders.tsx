@@ -18,7 +18,6 @@ import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
-import { call } from '@ury/core';
 import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
@@ -835,7 +834,11 @@ export default function Orders() {
                   <Button
                     className="flex-1"
                     onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
+                      const enablePaymentWithoutPrinting = Boolean(
+                        Number(posStore.posProfile?.enable_payment_without_printing) === 1 ||
+                        Number((posStore.posProfile as any)?.custom_enable_payment_without_printing) === 1
+                      );
+                      if (String(selectedOrder.invoice_printed) === '0' && !enablePaymentWithoutPrinting) {
                         showToast.error(t('errors.please_print_first'));
                         return;
                       }
@@ -863,6 +866,7 @@ export default function Orders() {
       </div>
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
+          order={selectedOrder}
           onClose={() => setShowPaymentDialog(false)}
           grandTotal={selectedOrderTotals.grandTotal}
           roundedTotal={selectedOrderTotals.roundedTotal}

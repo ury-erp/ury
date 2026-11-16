@@ -79,6 +79,26 @@
 	};
 
 	/**
+	 * Remove return query params from the browser URL without a page reload,
+	 * keeping the address bar clean (e.g. /desk/ury instead of /desk/ury?ury_return_to=...).
+	 */
+	const cleanUrlParams = () => {
+		try {
+			if (!window.location.search || !window.location.search.includes(RETURN_PARAM)) {
+				return;
+			}
+			const url = new URL(window.location.href);
+			url.searchParams.delete(RETURN_PARAM);
+			url.searchParams.delete(LABEL_PARAM);
+			const newSearch = url.searchParams.toString();
+			const cleaned = url.pathname + (newSearch ? `?${newSearch}` : "") + url.hash;
+			window.history.replaceState(window.history.state, "", cleaned);
+		} catch (e) {
+			/* ignore */
+		}
+	};
+
+	/**
 	 * Capture the return context from the URL if present, otherwise fall back
 	 * to whatever an earlier desk page in this session already captured.
 	 */
@@ -94,21 +114,22 @@
 		if (isAllowedReturnPath(fromUrl)) {
 			const context = { path: fromUrl, label: sanitizeLabel(params.get(LABEL_PARAM)) };
 			writeSession(STORAGE_KEY, JSON.stringify(context));
+			cleanUrlParams();
 			return context;
 		}
 
 		const stored = readSession(STORAGE_KEY);
-		if (!stored) return { path: "/ury", label: "URY" };
+		if (!stored) return null;
 		try {
 			const context = JSON.parse(stored);
 			if (!isAllowedReturnPath(context && context.path)) {
 				writeSession(STORAGE_KEY, null);
-				return { path: "/ury", label: "URY" };
+				return null;
 			}
 			return { path: context.path, label: sanitizeLabel(context.label) };
 		} catch (e) {
 			writeSession(STORAGE_KEY, null);
-			return { path: "/ury", label: "URY" };
+			return null;
 		}
 	};
 
@@ -164,7 +185,7 @@
 			"color:var(--text-muted, #7a8592)",
 			"font-size:15px",
 			"line-height:1",
-			"padding:0 ",
+			"padding:0",
 			"border-radius:999px",
 		].join(";");
 		dismiss.addEventListener("click", () => {

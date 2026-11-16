@@ -39,6 +39,8 @@ export interface PosProfileCombined {
   currency: string;
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
+  /** Roles that must not see grand/net total and expected amounts (POS Profile config). */
+  role_masked_for_amounts?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
   waiter: string;
@@ -60,4 +62,13 @@ export interface PosProfileCombined {
   custom_enable_kot_reprint?: number;
   order_type_customer_map?: Record<string, import('./utils/defaultCustomer').DefaultCustomerEntry>;
   default_customer?: import('./utils/defaultCustomer').DefaultCustomerEntry | null;
+  enable_payment_without_printing?: number;
+  custom_enable_payment_without_printing?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
+
+export const isPrintStatusDisabled = (
+  posProfile?: Partial<PosProfileCombined> | null
+): boolean => {
+  return Boolean(posProfile?.custom_disable_print_status_tracking);
+};

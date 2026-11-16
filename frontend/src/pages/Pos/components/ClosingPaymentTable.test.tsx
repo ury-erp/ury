@@ -16,6 +16,11 @@ vi.mock("@ury/ui", async () => {
         {rows.map((row: any, idx: number) => (
           <div key={idx} data-testid={`row-${row.mode_of_payment}`}>
             {row.mode_of_payment}
+            {columns.map((col: any) => (
+              <span key={col.key} data-testid={`${col.key}-${row.mode_of_payment}`}>
+                {col.render ? col.render(row) : null}
+              </span>
+            ))}
           </div>
         ))}
       </div>
@@ -82,6 +87,20 @@ describe("ClosingPaymentTable", () => {
       await user.clear(inputs[0]);
       await user.type(inputs[0], "1500");
       expect(mockOnChange).toHaveBeenCalled();
+    }
+  });
+
+  it("shows expected and difference amounts by default", () => {
+    render(<ClosingPaymentTable rows={mockRows} onChange={mockOnChange} />);
+    expect(screen.getByTestId("expected_amount-Cash").textContent).toBe("Rs. 1500.00");
+    expect(screen.getByTestId("difference-Cash").textContent).toBe("Rs. 1500.00");
+  });
+
+  it("masks expected and difference on every row when hideExpected is set", () => {
+    render(<ClosingPaymentTable rows={mockRows} onChange={mockOnChange} hideExpected />);
+    for (const mode of ["Cash", "Card"]) {
+      expect(screen.getByTestId(`expected_amount-${mode}`).textContent).toBe("—");
+      expect(screen.getByTestId(`difference-${mode}`).textContent).toBe("—");
     }
   });
 

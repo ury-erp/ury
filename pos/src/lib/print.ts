@@ -15,7 +15,7 @@ interface PrintOrderParams {
 
 export async function printOrder({ orderId, posProfile, printFormat }: PrintOrderParams): Promise<'qz' | 'network' | 'socket'> {
   const { print_type, qz_host, print_format, printer, name, cashier, multiple_cashier } = posProfile;
-  const format = printFormat || print_format;
+  const format = printFormat || print_format || '';
 
   if (print_type === 'qz') {
     if (!qz_host) {
@@ -35,7 +35,8 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
     return 'network';
   } else {
     // Redirect to printview page
-    const url = `/printview?doctype=POS Invoice&name=${orderId}&format=${format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+    const formatParam = format ? `&format=${encodeURIComponent(format)}` : '';
+    const url = `/printview?doctype=POS Invoice&name=${orderId}${formatParam}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
     window.open(url, '_blank', 'noopener,noreferrer');
     await updatePrintStatus(orderId);
     return 'socket';
