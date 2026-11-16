@@ -41,15 +41,20 @@ or one `--project` at a time):
 - `URY_E2E_PASSWORD` (default: `testpass123`): password of the captain on your site
 - `URY_E2E_ITEM` (default: `Appam`): an item that you have on your site
 - `URY_E2E_CUSTOMER` (default: `jay`): a customer that exists on your site
+- `URY_E2E_CASHIER` (default: `cashier@example.com`): login email of a cashier who can open the pos page on your site
+- `URY_E2E_CASHIER_PASSWORD` (default: `cashierpass123`): a cashier's password on your site
 
 The user has to be able to open the `/pos/order` page and the item must be on the menu.
 Use `read -s` so the password is typed without being shown on screen or saved in shell history. The commands to use before running the e2e test:
 ```bash
 read -s URY_E2E_PASSWORD
 export URY_E2E_PASSWORD
-URY_BASE_URL=http://ury.localhost:8000 URY_E2E_USER=e2e.captain@example.com URY_E2E_ITEM='your item' URY_E2E_CUSTOMER='your customer' npx playwright test tests/pos.spec.ts --workers=1
+read -s URY_E2E_CASHIER_PASSWORD
+export URY_E2E_CASHIER_PASSWORD
+URY_BASE_URL=http://ury.localhost:8000 URY_E2E_USER=e2e.captain@example.com URY_E2E_ITEM='your item' URY_E2E_CUSTOMER='your customer' URY_E2E_CASHIER='your cashier' npx playwright test tests/pos.spec.ts --workers=1
 ```
-Each run of the 'send order' test occupies a table, so you need to free tables between runs.
+Tip: add -g "<test name>" to run one test, and --headed to watch the browser.
+A table may stay occupied when the test fails before the payment.
 
 ## Golden-path specs: round 2 update (2026-09-15) -- root cause found and fixed
 
