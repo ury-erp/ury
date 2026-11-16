@@ -26,6 +26,8 @@ const URY_E2E_USER = process.env.URY_E2E_USER ?? 'test@erpnext.com';
 const URY_E2E_PASSWORD = process.env.URY_E2E_PASSWORD ?? 'testpass123';
 const URY_E2E_ITEM = process.env.URY_E2E_ITEM ?? 'Appam';
 const URY_E2E_CUSTOMER = process.env.URY_E2E_CUSTOMER ?? 'jay';
+const URY_E2E_CASHIER = process.env.URY_E2E_CASHIER ?? 'cashier@example.com';
+const URY_E2E_CASHIER_PASSWORD = process.env.URY_E2E_CASHIER_PASSWORD ?? 'cashierpass123';
 
 test.describe('POS app', () => {
   test('loads and renders a recognizable app shell', async ({ page }) => {
@@ -144,7 +146,8 @@ test.describe('POS app', () => {
     await expect(page.getByText(`+1 × ${URY_E2E_ITEM}`).first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('captain golden path: send order to kitchen', async ({ page }) => {
+  test('full flow: captain sends order, cashier pays it', async ({ page, browser }) => {
+    test.setTimeout(90000);
     await page.setViewportSize({ width: 390, height: 844 });
 
     await page.goto('/login');
@@ -158,6 +161,9 @@ test.describe('POS app', () => {
 
     const freeTable = page.locator('button[type="button"]').filter({ hasText: 'Free' }).first();
     await expect(freeTable).toBeVisible({ timeout: 10000 });
+
+    // Remember the table so the cashier can find this order.
+    const tableName = await freeTable.locator('span[title]').first().getAttribute('title');
     await freeTable.click();
     await expect(page).toHaveURL(/\/pos\/order\/table\//, { timeout: 10000 });
 
@@ -194,6 +200,42 @@ test.describe('POS app', () => {
 
     // Check that the order is sent to the kitchen.
     await expect(page.getByText('Order sent to kitchen.')).toBeVisible({ timeout: 10000 });
+
+    // Cashier: log in in a separate browser context.
+    const cashierContext = await browser.newContext();
+    const cashierPage = await cashierContext.newPage();
+
+    await cashierPage.goto('/login');
+    await cashierPage.fill('#login_email', URY_E2E_CASHIER);
+    await cashierPage.fill('#login_password', URY_E2E_CASHIER_PASSWORD);
+    await cashierPage.click('.btn-login');
+    await cashierPage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 15000 });
+
+    // Open the Orders page and the Unbilled filter.
+    await cashierPage.goto('/pos/orders');
+    await cashierPage.getByRole('button', { name: 'Unbilled', exact: true }).click();
+
+    // Find the order for the table with the title `tableName` and click it to open the order details.
+    await cashierPage.getByText(`Table ${tableName} •`).click();
+
+    // Check that the order details show the item `URY_E2E_ITEM` and the customer `URY_E2E_CUSTOMER`.
+    await expect(cashierPage.getByText(URY_E2E_ITEM, { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(cashierPage.getByText(URY_E2E_CUSTOMER, { exact: true }).last()).toBeVisible({ timeout: 10000 });
+
+    // Tap `print` button, then close the print tab.
+    const printTabPromise = cashierContext.waitForEvent('page');
+    await cashierPage.getByRole('button', { name: 'Print', exact: true }).click();
+    const printTab = await printTabPromise;
+    await printTab.close();
+    await expect(cashierPage.getByText('Printed successfully')).toBeVisible({ timeout: 10000 });
+
+    // Tap `Payment` and `Pay` buttons.
+    await cashierPage.getByRole('button', { name: 'Payment', exact: true }).click();
+    await cashierPage.getByRole('button', { name: /^Pay / }).click();
+
+    // Check that the green pop up `Payment successful` is visible.
+    await expect(cashierPage.getByText('Payment successful')).toBeVisible({ timeout: 10000 });
+    await cashierContext.close();
   });
 
   // Still genuinely out of scope for this pass (see EXECUTION_LOG.md Phase 5
