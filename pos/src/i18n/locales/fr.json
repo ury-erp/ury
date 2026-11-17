@@ -63,6 +63,9 @@
     "cancel_order": "Annuler la commande",
     "enter_cancel_reason": "Saisir le motif d'annulation",
     "print": "Imprimer",
+    "print_bill": "Imprimer l’addition",
+    "print_receipt": "Imprimer le reçu",
+    "settle_bill": "Régler l’addition",
     "payment": "Paiement",
     "order_actions": "Actions sur la commande"
   },
