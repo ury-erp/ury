@@ -1,0 +1,179 @@
+# DB13 Production planning (plan vs actual). Workbook ury_db13_production_planning. Builder: BUILD-DB13.
+# Base queries copied verbatim from semantic_layer.yaml (fact_sales_plan_items, fact_cancellations).
+# Never row-join plan x sales (architecture rule 2): section S4 shows two charts side by side under the same filters.
+# Layout: portfolio coordinates shifted +1 on y because the 3 filters occupy row y=0.
+workbook: {id: ury_db13_production_planning, title: "URY Production Planning", module: "URY", required_apps: [ury]}
+queries:
+  # fact_sales_plan_items (builder, T1). Grain: one URY Sales Plan Item of a submitted plan (Locked for Production).
+  # Attainment = SUM(fulfilled_qty)/SUM(qty). under/over split per line BEFORE aggregation. Date column: plan_date.
+  - id: fact_sales_plan_items
+    title: "fact_sales_plan_items"
+    table: "URY Sales Plan Item"
+    joins:
+      - {table: "URY Sales Plan", type: inner, on: [parent, name], columns: [plan_date, branch, company, status, service_period, enforcement_mode]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: under_qty, type: Decimal, expr: "if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)"}
+      - {as: over_qty, type: Decimal, expr: "if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)"}
+    select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # fact_bulk_production (builder, T4 on demo: 0 rows). Grain: one submitted Bulk Production run. total_cost = cost of the batch.
+  - id: fact_bulk_production
+    title: "fact_bulk_production"
+    table: "Bulk Production"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, posting_date, branch, company, warehouse, total_cost, status]
+
+  # ---------------------------------------------------------------- SALES
+  # fact_sales_lines (builder, T1, the canonical revenue line). Grain: one submitted POS Invoice Item.
+  # Revenue = SUM(net_amount). Header measures (covers, grand_total) must NOT be summed here (line fan-out).
+  # department = CONFIGURED department (URY Item Production Configuration, joined on item only: safe while one config
+  # row per item; with a 2nd branch use fact_sales_lines_enriched, whose join is item AND branch).
+  # Date column: posting_date.
+  - id: fact_sales_lines
+    title: "fact_sales_lines"
+    table: "POS Invoice Item"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, posting_time, branch, company, order_type, waiter, cashier, status, is_return, pos_profile, restaurant_table]}
+      - {table: "URY Item Production Configuration", type: left, on: [item_code, item], columns: [department, production_unit, production_policy]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+    select: [name, parent, posting_date, hour_of_day, branch, company, order_type, waiter, cashier, population, pos_profile, restaurant_table, item_code, item_name, item_group, department, production_unit, production_policy, warehouse, qty, amount, net_amount, discount_amount, price_list_rate]
+
+charts:
+  # S1 KPIs (T1). No `date` on the Number charts -> TOTAL of the filtered rows.
+  # PLN-001 Plan fulfilled, PLN-002 Planned quantity
+  - id: db13_kpi
+    title: "Plan fulfilled (%)"
+    query: fact_sales_plan_items
+    type: Number
+    y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: "Plan fulfilled (%)", format: percent}]
+  - id: db13_planned_kpi
+    title: "Planned qty"
+    query: fact_sales_plan_items
+    type: Number
+    y: [{column: qty, agg: sum, as: "Planned qty"}]
+  - id: db13_made_kpi
+    title: "Made qty"
+    query: fact_sales_plan_items
+    type: Number
+    y: [{column: fulfilled_qty, agg: sum, as: "Made qty"}]
+  # LKG-007 Out-of-stock cancellations
+  - id: db13_oos
+    title: "Bills cancelled: kitchen out of stock"
+    query: fact_cancellations
+    type: Number
+    filters: [{column: cancel_reason, op: "=", value: "Kitchen out of stock"}]
+    y: [{column: name, agg: count, as: "Bills cancelled"}]
+
+  # S2 Misses (T1). under_qty / over_qty are split per line before aggregation.
+  # PLN-004 Under-production
+  - id: db13_under
+    title: "Made less than planned, by dish (qty)"
+    query: fact_sales_plan_items
+    type: Row
+    limit: 15
+    x: item_code
+    y: [{column: under_qty, agg: sum, as: "Short by (qty)"}]
+    order: [{by: "Short by (qty)", dir: desc}]
+  # PLN-005 Over-production
+  - id: db13_over
+    title: "Made more than planned, by dish (qty)"
+    query: fact_sales_plan_items
+    type: Row
+    limit: 15
+    filters: [{column: over_qty, op: ">", value: 0}]
+    x: item_code
+    y: [{column: over_qty, agg: sum, as: "Extra (qty)"}]
+    order: [{by: "Extra (qty)", dir: desc}]
+
+  # S3 Shape (T1). Ratio of sums, never average of ratios.
+  - id: db13_dept
+    title: "Plan fulfilled by department (%)"
+    query: fact_sales_plan_items
+    type: Row
+    x: department
+    y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: "Plan fulfilled (%)"}]
+    order: [{by: "Plan fulfilled (%)", dir: desc}]
+  # PLN-008 Attainment by service period and enforcement
+  - id: db13_period
+    title: "Plan fulfilled by service period and enforcement (%)"
+    query: fact_sales_plan_items
+    type: Bar
+    stack: false
+    x: service_period
+    split_by: {column: enforcement_mode}
+    y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: "Plan fulfilled (%)"}]
+  - id: db13_trend
+    title: "Plan fulfilled by day (%)"
+    query: fact_sales_plan_items
+    type: Line
+    limit: 366
+    x: {column: plan_date, granularity: day}
+    y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: "Plan fulfilled (%)"}]
+
+  # S4 lowest-fulfilled dishes (replaces planned/sold unit charts). Ratio of sums.
+  - id: db13_dish_low
+    title: "Plan fulfilled by dish, lowest 15 (%)"
+    query: fact_sales_plan_items
+    type: Row
+    limit: 15
+    filters: [{column: qty, op: ">", value: 0}]
+    x: item_code
+    y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: "Plan fulfilled (%)"}]
+    order: [{by: "Plan fulfilled (%)", dir: asc}]
+  # PLN-009 Committed vs fulfilled (committed quantity stays empty until reservations are used)
+  - {id: db13_committed, title: "Committed vs made by service period (qty)", query: fact_sales_plan_items, type: Bar, limit: 10,
+     x: service_period, y: [{column: committed_qty, agg: sum, as: "Committed (qty)"}, {column: fulfilled_qty, agg: sum, as: "Made (qty)"}]}
+  # PLN-010 Plan vs POS units sold (two charts side by side on the same date filter; never row-joined)
+  - {id: db13_planned_dish, title: "Planned by dish, top 10 (qty)", query: fact_sales_plan_items, type: Row, limit: 10,
+     x: item_code, y: [{column: qty, agg: sum, as: "Planned (qty)"}], order: [{by: "Planned (qty)", dir: desc}]}
+  - {id: db13_sold_dish, title: "Sold by dish, top 10 (qty)", query: fact_sales_lines, type: Row, limit: 10,
+     x: item_code, y: [{column: qty, agg: sum, as: "Sold (qty)"}], order: [{by: "Sold (qty)", dir: desc}]}
+  # PRD-008 Bulk production cost
+  - {id: db13_bulk_cost, title: "Bulk production cost (₹)", query: fact_bulk_production, type: Number,
+     y: [{expr: "(sum(total_cost)).round(0)", as: "Bulk cost (₹)", format: currency}]}
+
+dashboards:
+  - id: production_planning
+    title: "Production planning"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 7, h: 1}, applies_to: {fact_sales_plan_items: plan_date, fact_cancellations: posting_date, fact_sales_lines: posting_date, fact_bulk_production: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 7, y: 2, w: 7, h: 1}, applies_to: {fact_sales_plan_items: branch, fact_cancellations: branch, fact_sales_lines: branch, fact_bulk_production: branch}}
+      - {id: f_department, label: Department, type: string, icon: layers, layout: {x: 14, y: 2, w: 6, h: 1}, applies_to: {fact_sales_plan_items: department, fact_sales_lines: department}}
+    items:
+      - {text: "<p><b>Production planning.</b> Did each station make what the sales plan asked for, and which dishes fell short? For kitchen head. Default: last 30 days; good is near 100% with few out-of-stock cancellations.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db13_bulk_cost, x: 0, y: 3, w: 20, h: 3}
+      - {chart: db13_kpi, x: 0, y: 6, w: 10, h: 12}
+      - {chart: db13_planned_kpi, x: 10, y: 6, w: 10, h: 12}
+      - {chart: db13_made_kpi, x: 0, y: 18, w: 10, h: 12}
+      - {chart: db13_oos, x: 10, y: 18, w: 10, h: 12}
+      - {chart: db13_under, x: 0, y: 30, w: 10, h: 12}
+      - {chart: db13_over, x: 10, y: 30, w: 10, h: 12}
+      - {chart: db13_dish_low, x: 0, y: 42, w: 10, h: 12}
+      - {chart: db13_dept, x: 10, y: 42, w: 10, h: 12}
+      - {chart: db13_period, x: 0, y: 54, w: 10, h: 12}
+      - {chart: db13_trend, x: 10, y: 54, w: 10, h: 12}
+      - {chart: db13_committed, x: 0, y: 66, w: 10, h: 12}
+      - {chart: db13_planned_dish, x: 10, y: 66, w: 10, h: 12}
+      - {chart: db13_sold_dish, x: 0, y: 78, w: 20, h: 11}
+      - {text: "<p>Plan vs sales: the two dish charts use the same filters but are not joined. Bulk production cost is the total of submitted bulk runs in the period.</p>", x: 0, y: 89, w: 20, h: 2}
+      - {text: "<p>100% = made exactly what the plan asked for.</p>", x: 0, y: 91, w: 20, h: 1}
+      - {text: "<p><b>Not recorded yet:</b> committed quantity (reservations); only the made series shows. Plan fulfilled = quantity made divided by quantity planned.</p>", x: 0, y: 92, w: 20, h: 2}

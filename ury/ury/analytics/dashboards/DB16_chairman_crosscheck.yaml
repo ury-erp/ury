@@ -1,0 +1,201 @@
+# DB16 Owner brief cross-check. One chart per owner PWA slide (architecture section 10) so each slide number can be
+# reconciled with Insights. The PWA API (ury.ury.api.chairman.get_brief) is not built or called here.
+# Base queries are copied verbatim from semantic_layer.yaml (only the ones this dashboard reads).
+# Date filter default: Last 30 days (UX standard daily-ops default). Demo data ends 2026-10-21, so "yesterday"
+# here = latest day inside the Date filter (clear the filter or set it to 2026-10-21 to reproduce the pinned acceptance date).
+workbook: {id: ury_db16_chairman_crosscheck, title: "URY Owner Crosscheck", module: "URY", required_apps: [ury]}
+queries:
+  # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
+  # category_family (CATEGORY_MAP v1), branch-safe configured department, BOM-based estimated cost.
+  # Why sql: (1) the cleaned category is a 60-value CASE over Item Group; (2) the config join needs a composite key
+  # (item AND branch), finsights joins take one equality pair; (3) BOM unit cost needs a filtered sub-select
+  # (is_default=1, is_active=1, docstatus=1). Date column: posting_date. est_cost/est_margin are NULL when no recipe cost.
+  - id: fact_sales_lines_enriched
+    title: "fact_sales_lines_enriched"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, pi.cashier, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code"
+
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, weekday, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # fact_payments (builder, T1). Grain: one tender line of a submitted POS Invoice. parenttype filter is mandatory.
+  - id: fact_payments
+    title: "fact_payments"
+    table: "Sales Invoice Payment"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, branch, company, order_type, cashier, status]}
+    filters:
+      - {column: parenttype, op: "=", value: "POS Invoice"}
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, parent, posting_date, branch, company, order_type, cashier, population, mode_of_payment, amount]
+
+  # fact_closing_details (builder, T1 structure / demo flat). Grain: one mode-of-payment row of a submitted POS Closing
+  # Entry. branch comes from the POS Opening Entry (POS Closing Entry.branch is NULL on 101/101). Covers only
+  # CONSOLIDATED invoices: the 1075 Paid invoices are in no closing yet.
+  - id: fact_closing_details
+    title: "fact_closing_details"
+    table: "POS Closing Entry Detail"
+    joins:
+      - {table: "POS Closing Entry", type: inner, on: [parent, name], columns: [posting_date, user, pos_profile, pos_opening_entry, company, period_start_date, period_end_date]}
+      - {table: "POS Opening Entry", type: left, on: [pos_opening_entry, name], columns: [branch]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: has_variance, type: Integer, expr: "if_else(difference != 0, 1, 0)"}
+    select: [name, parent, posting_date, user, pos_profile, branch, company, period_start_date, period_end_date, mode_of_payment, opening_amount, expected_amount, closing_amount, difference, has_variance]
+
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+  # only meaningful when order_status = 'Served' (charts must add that chart filter). Date column: date.
+  # department here = EXECUTED production unit (KOT.production); URY Production Department == unit 1:1 today.
+  - id: fact_kot_headers
+    title: "fact_kot_headers"
+    table: "URY KOT"
+    joins:
+      - {table: "POS Profile", type: left, on: [pos_profile, name], columns: [custom_kot_warning_time, table_attention_time]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: prod_minutes, type: Decimal, expr: "production_time.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+      - {as: is_served, type: Integer, expr: "if_else(order_status == 'Served', 1, 0)"}
+      - {as: sla_breach, type: Integer, expr: "if_else(production_time.cast(\"float64\") > custom_kot_warning_time, 1, 0)"}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+
+  # fact_daily_pnl (builder, T2: seeded, recipe cost covers ~6-8% of revenue). Grain: one submitted URY Daily P and L
+  # (branch x date). Date column: date.
+  - id: fact_daily_pnl
+    title: "fact_daily_pnl"
+    table: "URY Daily P and L"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, date, branch, gross_sales, net_sales, cogs, cogs_percent, disposables_cost, gross_profit, gross_profit_percent, total_employee_costs, net_profit]
+
+  # fact_sales_target (sql, T1). Grain: one URY Sales Target row (branch x month). actual_net_sales = SUM(POS Invoice.net_total) of the same
+  # branch between period_start and period_end (submitted, non-return; same rule as net sales everywhere). is_current_month = 1 for the month
+  # that contains today (month to date against the full-month target); is_closed = 1 once the month has ended. Why sql: actual comes from a correlated range sum over the target dates,
+  # which the join grammar (one equality pair) cannot express. Date column: period_start. Branches without a target row do not appear.
+  - id: fact_sales_target
+    title: "fact_sales_target"
+    sql: "SELECT t.name, t.branch, t.company, t.period_start, t.period_end, t.target_amount, COALESCE((SELECT SUM(pi.net_total) FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.branch = t.branch AND pi.posting_date BETWEEN t.period_start AND t.period_end), 0) AS actual_net_sales, CASE WHEN CURDATE() BETWEEN t.period_start AND t.period_end THEN 1 ELSE 0 END AS is_current_month, CASE WHEN t.period_end < CURDATE() THEN 1 ELSE 0 END AS is_closed, DATE_FORMAT(t.period_start, '%Y-%m') AS month_label FROM `tabURY Sales Target` t WHERE t.docstatus < 2"
+
+charts:
+  # Numbering follows research/PWA_chairman_app_plan.md (10 slides). Number tiles carry the slide label in the measure
+  # alias because Number charts do not render their title. One Number chart per tile (multi-measure tiles render narrow).
+  # Slide 1 (T1): latest day in the Date filter vs previous day. PWA compares same weekday last week (SAL-006 caveat).
+  - {id: db16_s1_sales, title: "Slide 1: Last trading day net sales (₹)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: day},
+     y: [{expr: "sum(net_total).round(0)", as: "Slide 1: Last day net sales (₹)", format: currency}]}
+  - {id: db16_s1_bills, title: "Slide 1: Last trading day bills", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: day},
+     y: [{column: name, agg: count, as: "Slide 1: Last day bills"}]}
+  # Slide 2 (T1): month total in the filter. No comparison: previous month is empty on the demo (shows infinity).
+  - {id: db16_s2_mtd, title: "Slide 2: Month to date net sales (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "sum(net_total).round(0)", as: "Slide 2: Month to date net sales (₹)", format: currency}]}
+  # Slide 2 SAL-021: month to date against the monthly target (current calendar month; does not follow the Date filter)
+  - {id: db16_s2_target, title: "Slide 2: Month to date vs target (%)", query: fact_sales_target, type: Number,
+     filters: [{column: is_current_month, op: "=", value: 1}],
+     y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Slide 2: Month to date vs target (%)", format: percent}]}
+  # Slide 3 (T3): one branch on this site.
+  - {id: db16_branch_rank, title: "Slide 3: Net sales by branch (₹)", query: fact_invoices, type: Row, limit: 10,
+     x: branch, y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  # Slide 4 (T1)
+  - {id: db16_channel, title: "Slide 4: Net sales by order type (₹)", query: fact_invoices, type: Donut, limit: 10, max_slices: 5,
+     x: order_type, y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  # Slide 5 (T1): top 3 menu items (Non-menu excluded, CATEGORY_MAP v1).
+  - {id: db16_top_items, title: "Slide 5: Top 3 dishes (₹)", query: fact_sales_lines_enriched, type: Row, limit: 3,
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}],
+     filters: [{column: category_family, op: "!=", value: "Non-menu"}]}
+  # Slide 5 (T1): bottom 3 menu items. Excludes Non-menu, Unassigned, zero-qty and zero-sale lines.
+  - {id: db16_bottom_items, title: "Slide 5: Bottom 3 dishes (₹)", query: fact_sales_lines_enriched, type: Row, limit: 3,
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: asc}],
+     filters: [{column: category_family, op: "!=", value: "Non-menu"}, {column: category_family, op: "!=", value: "Unassigned"}, {column: qty, op: ">", value: 0}, {column: net_amount, op: ">", value: 0}]}
+  # Slide 6 (T1): Row not Donut, cash is ~99% of tender.
+  - {id: db16_pay_mix, title: "Slide 6: Payment mix (₹)", query: fact_payments, type: Row, limit: 6,
+     x: mode_of_payment, y: [{expr: "sum(amount).round(0)", as: "Tendered (₹)"}], order: [{by: "Tendered (₹)", dir: desc}]}
+  # Slide 7 (T1): cancelled bills and cancelled value (discounts half of the PWA slide is near-empty, not shown).
+  - {id: db16_s7_bills, title: "Slide 7: Cancelled bills", query: fact_cancellations, type: Number,
+     y: [{column: name, agg: count, as: "Slide 7: Cancelled bills"}]}
+  - {id: db16_s7_value, title: "Slide 7: Cancelled value (₹)", query: fact_cancellations, type: Number,
+     y: [{expr: "sum(grand_total).round(0)", as: "Slide 7: Cancelled value (₹)", format: currency}]}
+  # Slide 8 (T2): served KOTs only; legacy minutes, SLA seeded 10/15 min.
+  - {id: db16_s8_prep, title: "Slide 8: Avg prep time (min)", query: fact_kot_headers, type: Number,
+     y: [{expr: "avg(prod_minutes).round(1)", as: "Slide 8: Avg prep time (min)"}],
+     filters: [{column: is_served, op: "=", value: 1}]}
+  - {id: db16_s8_over, title: "Slide 8: KOTs over target (%)", query: fact_kot_headers, type: Number,
+     y: [{expr: "sum(sla_breach) / sum(is_served)", as: "Slide 8: KOTs over target (%)", format: percent}],
+     filters: [{column: is_served, op: "=", value: 1}]}
+  # Slide 9 (T3): consolidated closings only; demo differences are flat.
+  - {id: db16_s9_diff, title: "Slide 9: Cash-up difference (₹)", query: fact_closing_details, type: Number,
+     y: [{column: difference, agg: sum, as: "Slide 9: Cash-up difference (₹)", format: currency}]}
+  - {id: db16_s9_closings, title: "Slide 9: Closings with a difference", query: fact_closing_details, type: Number,
+     y: [{column: has_variance, agg: sum, as: "Slide 9: Closings with a difference"}]}
+  # Slide 10 (T2): Paid population, Dine In, bills with covers only (architecture section 4).
+  - {id: db16_s10_covers, title: "Slide 10: Covers (estimate)", query: fact_invoices, type: Number,
+     y: [{column: pax, agg: sum, as: "Slide 10: Covers (estimate)"}],
+     filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
+  - {id: db16_s10_spend, title: "Slide 10: Spend per cover (₹)", query: fact_invoices, type: Number,
+     y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: "Slide 10: Spend per cover (₹)", format: currency}],
+     filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
+  # Extra (not a slide in the PWA plan): seeded Daily P and L.
+  - {id: db16_x_profit, title: "Extra: Gross profit (estimate)", query: fact_daily_pnl, type: Number,
+     y: [{expr: "sum(gross_profit).round(0)", as: "Extra: Gross profit (₹, estimate)", format: currency}]}
+  - {id: db16_x_margin, title: "Extra: Gross margin (estimate)", query: fact_daily_pnl, type: Number,
+     y: [{expr: "sum(gross_profit) / sum(net_sales)", as: "Extra: Gross margin (%, estimate)", format: percent}]}
+dashboards:
+  - id: chairman_crosscheck
+    title: "Owner brief check"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 10, h: 1},
+         applies_to: {fact_invoices: posting_date, fact_sales_lines_enriched: posting_date, fact_payments: posting_date, fact_cancellations: posting_date, fact_closing_details: posting_date, fact_kot_headers: date, fact_daily_pnl: date}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 10, y: 2, w: 10, h: 1},
+         applies_to: {fact_invoices: branch, fact_sales_lines_enriched: branch, fact_payments: branch, fact_cancellations: branch, fact_closing_details: branch, fact_kot_headers: branch, fact_daily_pnl: branch, fact_sales_target: branch}}
+    items:
+      - {text: "<p><b>Owner brief check.</b> Each card is one slide of the daily owner brief, in slide order, so you can tick it against the brief. This page compares the last trading day with the day before; the brief uses the same weekday last week.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {chart: db16_s1_sales, x: 0, y: 3, w: 5, h: 3}
+      - {chart: db16_s1_bills, x: 5, y: 3, w: 5, h: 3}
+      - {chart: db16_s2_mtd, x: 10, y: 3, w: 5, h: 3}
+      - {chart: db16_s2_target, x: 15, y: 3, w: 5, h: 3}
+      - {chart: db16_s7_bills, x: 0, y: 6, w: 5, h: 3}
+      - {chart: db16_s7_value, x: 5, y: 6, w: 5, h: 3}
+      - {chart: db16_s8_prep, x: 10, y: 6, w: 5, h: 3}
+      - {chart: db16_s8_over, x: 15, y: 6, w: 5, h: 3}
+      - {chart: db16_s9_diff, x: 0, y: 9, w: 5, h: 3}
+      - {chart: db16_s9_closings, x: 5, y: 9, w: 5, h: 3}
+      - {chart: db16_s10_covers, x: 10, y: 9, w: 5, h: 3}
+      - {chart: db16_s10_spend, x: 15, y: 9, w: 5, h: 3}
+      - {chart: db16_x_profit, x: 0, y: 12, w: 10, h: 3}
+      - {chart: db16_x_margin, x: 10, y: 12, w: 10, h: 3}
+      - {chart: db16_branch_rank, x: 0, y: 15, w: 10, h: 11}
+      - {chart: db16_channel, x: 10, y: 15, w: 10, h: 11}
+      - {chart: db16_top_items, x: 0, y: 26, w: 10, h: 11}
+      - {chart: db16_bottom_items, x: 10, y: 26, w: 10, h: 11}
+      - {chart: db16_pay_mix, x: 0, y: 37, w: 20, h: 11}
+      - {text: "<p><b>Notes.</b> <b>Slide 2 target:</b> current month to date against the full-month target set for the branch; it does not follow the Date filter. <b>Estimates:</b> kitchen speed, covers and the Extra margin tiles (margin comes from the daily P and L). Cash-up counts closed shifts only.</p>", x: 0, y: 48, w: 20, h: 3}
