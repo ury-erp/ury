@@ -37,23 +37,29 @@ queries:
       - {as: out_of_tolerance, type: Integer, expr: "if_else(variance_percent < -5, 1, 0)"}
     select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, yield_loss_value, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
 charts:
+  # KPI date (month) + comparison, colours, stacking, table filter row and the layout were set in the Insights UI 2026-11-16.
   # YLD-001 Weighted yield
-  - {id: db12_kpi, title: "Actual yield (%)", query: fact_yield_checks, type: Number,
+  - {id: db12_kpi, title: "Actual yield (%)", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      y: [{expr: "(sum(output_qty) / sum(input_qty) * 100).round(2)", as: "Actual yield (%)"}]}
   # YLD-002 Standard yield
-  - {id: db12_kpi_std, title: "Standard yield (%)", query: fact_yield_checks, type: Number,
+  - {id: db12_kpi_std, title: "Standard yield (%)", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      y: [{expr: "(sum(expected_output) / sum(input_qty) * 100).round(2)", as: "Standard yield (%)"}]}
   # YLD-005 Checks below standard
-  - {id: db12_kpi_below, title: "Checks below standard (%)", query: fact_yield_checks, type: Number,
+  - {id: db12_kpi_below, title: "Checks below standard (%)", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      y: [{expr: "sum(below_standard) / count(name)", as: "Checks below standard (%)", format: percent}]}
   # Checks more than 5 points under standard
-  - {id: db12_kpi_tol, title: "Outside tolerance (%)", query: fact_yield_checks, type: Number,
+  - {id: db12_kpi_tol, title: "Outside tolerance (%)", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      y: [{expr: "sum(out_of_tolerance) / count(name)", as: "Outside tolerance (%)", format: percent}]}
   # YLD-003 Yield gap vs standard (points)
   - id: db12_gap
     title: "Yield gap vs standard (points, negative = under-yield)"
     query: fact_yield_checks
     type: Row
+    stack: true
     limit: 30
     x: item_name
     y: [{expr: "sum(output_qty - expected_output) / sum(input_qty) * 100", as: Gap Pts}]
@@ -63,6 +69,8 @@ charts:
     title: "Yield Loss Quantity by Item"
     query: fact_yield_checks
     type: Row
+    color: "#cc9f2d"
+    stack: true
     limit: 15
     x: item_name
     y: [{column: yield_loss_qty, agg: sum, as: Yield Loss Qty}]
@@ -80,23 +88,25 @@ charts:
     title: "Stock count difference by item (₹, negative = shortage)"
     query: fact_stock_correction
     type: Row
+    color: "#a8a825"
+    stack: true
     limit: 30
     x: item_name
     y: [{column: amount_difference, agg: sum, as: Count Variance, format: currency}]
     order: [{by: Count Variance, dir: asc}]
   # YLD-008 Yield by department (checks without a department are left out)
-  - {id: db12_dept, title: "Yield by station (%)", query: fact_yield_checks, type: Row, limit: 10,
+  - {id: db12_dept, title: "Yield by station (%)", query: fact_yield_checks, type: Row, stack: true, limit: 10,
      filters: [{column: department, op: is_set}],
      x: department, y: [{expr: "(100 * sum(output_qty) / sum(input_qty)).round(1)", as: "Yield (%)"}], order: [{by: "Yield (%)", dir: desc}]}
   # Yield by the person who ran the check (checks without a checker are left out)
-  - {id: db12_checker, title: "Yield by checker (%)", query: fact_yield_checks, type: Row, limit: 10,
+  - {id: db12_checker, title: "Yield by checker (%)", query: fact_yield_checks, type: Row, color: "#7d1991", stack: true, limit: 10,
      filters: [{column: checked_by, op: is_set}],
      x: checked_by, y: [{expr: "(100 * sum(output_qty) / sum(input_qty)).round(1)", as: "Yield (%)"}], order: [{by: "Yield (%)", dir: desc}]}
   # YLD-009 Yield loss cost
-  - {id: db12_loss_cost, title: "Yield loss value (₹)", query: fact_yield_checks, type: Number,
+  - {id: db12_loss_cost, title: "Yield loss value (₹)", query: fact_yield_checks, type: Number, sparkline: false, negative_is_better: false,
      y: [{expr: "(sum(yield_loss_value)).round(0)", as: "Yield loss value (₹)", format: currency}]}
   # YLD-010 Yield check compliance (checks done per item; the expected check schedule is not modelled)
-  - {id: db12_checks, title: "Yield checks done by item (count)", query: fact_yield_checks, type: Table, limit: 15,
+  - {id: db12_checks, title: "Yield checks done by item (count)", query: fact_yield_checks, type: Table, show_filter_row: true, limit: 15,
      rows: [{column: item_name, as: Item}],
      y: [{column: name, agg: count, as: "Checks done"}, {column: checked_on, agg: max, as: "Last check"}],
      order: [{by: "Checks done", dir: asc}]}
@@ -124,13 +134,13 @@ dashboards:
       - {chart: db12_kpi_below, x: 8, y: 3, w: 4, h: 3}
       - {chart: db12_kpi_tol, x: 12, y: 3, w: 4, h: 3}
       - {chart: db12_loss_cost, x: 16, y: 3, w: 4, h: 3}
-      - {chart: db12_gap, x: 0, y: 6, w: 10, h: 12}
-      - {chart: db12_loss, x: 10, y: 6, w: 10, h: 12}
-      - {chart: db12_trend, x: 0, y: 18, w: 10, h: 12}
-      - {chart: db12_count_var, x: 10, y: 18, w: 10, h: 12}
-      - {chart: db12_dept, x: 0, y: 30, w: 10, h: 11}
-      - {chart: db12_checker, x: 10, y: 30, w: 10, h: 11}
-      - {chart: db12_checks, x: 0, y: 41, w: 20, h: 15}
-      - {text: "<p><b>Estimate:</b> yield loss value uses the item stock rate and the net shortfall against standard.</p>", x: 0, y: 56, w: 20, h: 1}
-      - {text: "<p>Checks without a station or a checker are left out of the two yield charts above.</p>", x: 0, y: 57, w: 20, h: 1}
-      - {text: "<p><b>Partial data:</b> checks done counts what was recorded; the expected check schedule per item is not modelled, so this cannot say who is overdue.</p>", x: 0, y: 58, w: 20, h: 1}
+      - {chart: db12_gap, x: 0, y: 6, w: 10, h: 9}
+      - {chart: db12_loss, x: 10, y: 6, w: 10, h: 9}
+      - {chart: db12_trend, x: 0, y: 15, w: 10, h: 8}
+      - {chart: db12_count_var, x: 10, y: 15, w: 10, h: 8}
+      - {chart: db12_dept, x: 0, y: 23, w: 10, h: 8}
+      - {chart: db12_checker, x: 10, y: 23, w: 10, h: 8}
+      - {chart: db12_checks, x: 0, y: 31, w: 20, h: 9}
+      - {text: "<p><b>Estimate:</b> yield loss value uses the item stock rate and the net shortfall against standard.</p>", x: 0, y: 40, w: 20, h: 1}
+      - {text: "<p>Checks without a station or a checker are left out of the two yield charts above.</p>", x: 0, y: 41, w: 20, h: 1}
+      - {text: "<p><b>Partial data:</b> checks done counts what was recorded; the expected check schedule per item is not modelled, so this cannot say who is overdue.</p>", x: 0, y: 42, w: 20, h: 1}

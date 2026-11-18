@@ -46,31 +46,38 @@ queries:
 
 charts:
   # S1 KPI row. UX: no metric ids/tier codes in titles. (was T2)
+  # date (month) + comparison set in the Insights UI 2026-11-16: each card shows the LATEST month in the filtered
+  # range and % change vs the previous month.
   # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
-  - {id: db06_kots_kpi, title: "KOTs", query: fact_kot_headers, type: Number,
+  - {id: db06_kots_kpi, title: "KOTs", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{column: name, agg: count, as: KOTs}]}
-  - {id: db06_over_target_kpi, title: "KOTs over target (%)", query: fact_kot_headers, type: Number,
-     y: [{expr: "(sum(sla_breach) / sum(is_served)).round(1)", as: "KOTs over target (%)", format: percent}]}
-  - {id: db06_avg_prep, title: "Avg prep time (min)", query: fact_kot_headers, type: Number,
+  - {id: db06_over_target_kpi, title: "KOTs over target (%)", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
+     y: [{expr: "sum(sla_breach) / sum(is_served)", as: "KOTs over target (%)", format: percent}]}
+  - {id: db06_avg_prep, title: "Avg prep time (min)", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      filters: [{column: order_status, op: "=", value: "Served"}],
      y: [{expr: "avg(prod_minutes).round(1)", as: "Avg prep time (min)"}]}
-  - {id: db06_open, title: "KOTs not yet served", query: fact_kot_headers, type: Number,
+  - {id: db06_open, title: "KOTs not yet served", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{expr: "count(name) - sum(is_served)", as: "KOTs not yet served"}]}
-  - {id: db06_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number,
+  - {id: db06_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      filters: [{column: type, op: "=", value: "Order Modified"}],
      y: [{column: name, agg: count, as: "Modified KOTs"}]}
   # S2 Load (T1). db06_unit dropped: duplicate of DB05 KOTs by cooking station (same workspace).
-  - {id: db06_by_hour, title: "KOTs by hour and station (count)", query: fact_kot_headers, type: Bar, limit: 100, stack: true,
+  - {id: db06_by_hour, title: "KOTs by hour and station (count)", query: fact_kot_headers, type: Bar, limit: 100, stack: true, normalize: false,
      x: hour_of_day, split_by: {column: production, max: 4}, y: [{column: name, agg: count, as: KOTs}],
      order: [{by: hour_of_day, dir: asc}]}
   # S3 Targets and flow
-  - {id: db06_target, title: "Prep time vs target by branch (min)", query: fact_kot_headers, type: Table, limit: 20,
+  - {id: db06_target, title: "Prep time vs target by branch (min)", query: fact_kot_headers, type: Table, limit: 20, show_filter_row: true,
      filters: [{column: order_status, op: "=", value: "Served"}],
      rows: [branch],
      y: [{column: custom_kot_warning_time, agg: max, as: "Target"}, {expr: "avg(prod_minutes).round(1)", as: "Actual"}]}
   - {id: db06_funnel, title: "KOT stages reached (count)", query: fact_kot_stages, type: Funnel, limit: 10,
      x: stage, y: [{column: kot, agg: count, as: KOTs}]}
-  - {id: db06_cancel_stage, title: "Cancelled KOTs by stage (count)", query: fact_kot_exec, type: Row, limit: 10,
+  - {id: db06_cancel_stage, title: "Cancelled KOTs by stage (count)", query: fact_kot_exec, type: Row, limit: 10, stack: true,
      filters: [{column: is_cancelled, op: "=", value: 1}],
      x: cancel_stage, y: [{column: name, agg: count, as: Cancelled}]}
   # S4 Time per stage and slow dishes
@@ -81,7 +88,7 @@ charts:
          {expr: "(avg(queue_seconds) / 60).round(1)", as: "Queue wait (min)"},
          {expr: "(avg(order_to_serve_seconds) / 60).round(1)", as: "Order to serve (min)"}]}
   # KIT-018 Item prep speed
-  - {id: db06_item_speed, title: "Slowest dishes, avg prep time (min)", query: fact_kot_item_exec, type: Row, limit: 10,
+  - {id: db06_item_speed, title: "Slowest dishes, avg prep time (min)", query: fact_kot_item_exec, type: Row, limit: 10, stack: true,
      x: item_name, y: [{expr: "avg(prep_minutes).round(1)", as: "Prep time (min)"}], order: [{by: "Prep time (min)", dir: desc}]}
   # db06_voids (Voided Kitchen Qty, always 0) dropped per UX change list.
 dashboards:
@@ -105,10 +112,10 @@ dashboards:
       - {chart: db06_open, x: 12, y: 3, w: 4, h: 3}
       - {chart: db06_modified, x: 16, y: 3, w: 4, h: 3}
       - {text: "<p>Over target = KOT not served within its branch's warning time. Not yet served = no served time recorded.</p>", x: 0, y: 6, w: 20, h: 1}
-      - {chart: db06_by_hour, x: 0, y: 7, w: 20, h: 12}
-      - {chart: db06_stage_time, x: 0, y: 19, w: 10, h: 12}
-      - {chart: db06_funnel, x: 10, y: 19, w: 10, h: 12}
-      - {chart: db06_cancel_stage, x: 0, y: 31, w: 10, h: 11}
-      - {chart: db06_item_speed, x: 10, y: 31, w: 10, h: 11}
-      - {chart: db06_target, x: 0, y: 42, w: 20, h: 18}
-      - {text: "<p><b>Partial data:</b> prep and order-to-serve times come from kitchen screen taps. On this demo site the taps are seeded milliseconds apart, so per-dish prep shows as zero and the stage chart is not realistic; on a live kitchen they fill in on their own. Queue wait needs a queued-at time.</p>", x: 0, y: 60, w: 20, h: 3}
+      - {chart: db06_by_hour, x: 0, y: 7, w: 20, h: 9}
+      - {chart: db06_stage_time, x: 0, y: 16, w: 10, h: 8}
+      - {chart: db06_funnel, x: 10, y: 16, w: 10, h: 8}
+      - {chart: db06_cancel_stage, x: 0, y: 24, w: 10, h: 8}
+      - {chart: db06_item_speed, x: 10, y: 24, w: 10, h: 8}
+      - {chart: db06_target, x: 0, y: 32, w: 20, h: 8}
+      - {text: "<p><b>Partial data:</b> prep and order-to-serve times come from kitchen screen taps. On this demo site the taps are seeded milliseconds apart, so per-dish prep shows as zero and the stage chart is not realistic; on a live kitchen they fill in on their own. Queue wait needs a queued-at time.</p>", x: 0, y: 40, w: 20, h: 3}

@@ -30,34 +30,45 @@ queries:
     mutate: [{as: line_margin_pct, type: Decimal, expr: "est_margin / costed_net_amount"}]
 
 charts:
-  # S1 KPIs (SAL-001, MNU-002). No date on a Number chart: shows the TOTAL for the filtered rows.
+  # S1 KPIs (SAL-001, MNU-002). date (month) + comparison set in the Insights UI 2026-11-15: each card shows the
+  # LATEST month in the filtered range and % change vs the previous month.
   # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
-  - {id: db04_net_sales_kpi, title: "Net sales (₹)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db04_net_sales_kpi, title: "Net sales (₹)", query: fact_sales_lines_enriched, type: Number, comparison: true, shorten_numbers: false,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)", format: currency}]}
-  - {id: db04_items_sold_kpi, title: "Items sold", query: fact_sales_lines_enriched, type: Number,
+  - {id: db04_items_sold_kpi, title: "Items sold", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(qty).round(0)", as: "Items sold"}]}
-  - {id: db04_dishes_kpi, title: "Dishes sold (distinct)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db04_dishes_kpi, title: "Dishes sold (distinct)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: item_code, agg: count_distinct, as: "Dishes sold (distinct)"}]}
-  - {id: db04_avg_price_kpi, title: "Avg price per item (₹)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db04_avg_price_kpi, title: "Avg price per item (₹)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_amount) / sum(qty)).round(0)", as: "Avg price per item (₹)", format: currency}]}
   # S2 Category (MNU-005, MNU-006, DQ-003, MNU-010). Unassigned and Non-menu are excluded from the ranking.
   - {id: db04_cat_rev, title: "Net sales by menu category (₹)", query: fact_sales_lines_enriched, type: Row, limit: 15,
+     color: "#b5922a", stack: true,
      filters: [{column: menu_category, op: "!=", value: Unassigned}, {column: menu_category, op: "!=", value: Non-menu}],
      x: menu_category, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
-  - {id: db04_unassigned, title: "Unassigned sales (₹)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db04_unassigned, title: "Unassigned sales (₹)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      filters: [{column: menu_category, op: "=", value: Unassigned}],
      y: [{expr: "sum(net_amount).round(0)", as: "Unassigned sales (₹)", format: currency}]}
-  # S3 Items (MNU-001 item revenue, MNU-003, MNU-004)
+  # S3 Items (MNU-001 item revenue, MNU-003, MNU-004). Colour/measure set in the Insights UI 2026-11-15.
   - {id: db04_top, title: "Top 10 dishes by net sales (₹)", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     color: "#ab1eb3", stack: true, label_rotation: 0,
      filters: [{column: category_family, op: "!=", value: Non-menu}, {column: category_family, op: "!=", value: Unassigned}],
-     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+     x: item_name, y: [{column: net_amount, agg: sum, as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
   # Bottom: excludes Non-menu, Unassigned, Accompaniments (add-ons, not dishes) and zero-sale lines.
   - {id: db04_bottom, title: "Bottom 10 dishes by net sales (₹)", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     stack: true,
      filters: [{column: category_family, op: "!=", value: Non-menu}, {column: category_family, op: "!=", value: Unassigned},
                {column: menu_category, op: "!=", value: Accompaniments}, {column: net_amount, op: ">", value: 0}],
      x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: asc}]}
   # S4 Detail (MNU-009)
+  # Table display options set in the Insights UI 2026-11-15.
   - {id: db04_item_table, title: "Dish sales table", query: fact_sales_lines_enriched, type: Table, limit: 15,
+     show_filter_row: true, compact_numbers: true,
      rows: [menu_category, item_name],
      y: [{expr: "sum(qty).round(0)", as: Qty}, {expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
   # S5 Margin view, estimate (MNU-012, MAR-007): ratios of sums over costed lines only; margin under -100% excluded.
@@ -70,6 +81,7 @@ charts:
      order: [{by: Qty, dir: desc}]}
   # S6 Non-selling, T2 (MNU-011): sellable, enabled, never sold on a submitted bill
   - {id: db04_nonselling, title: "Non-Selling Items", query: dim_item, type: Table, limit: 100,
+     enable_color_scale: false, compact_numbers: false,
      filters: [{column: is_sales_item, op: "=", value: 1}, {column: is_sold, op: "=", value: 0},
                {column: disabled, op: "=", value: 0}, {column: category_family, op: "!=", value: Non-menu}],
      rows: [menu_category, item_name], y: [{column: item_code, agg: count, as: Items}]}
@@ -90,13 +102,12 @@ dashboards:
       - {chart: db04_avg_price_kpi, x: 15, y: 3, w: 5, h: 3}
       - {text: "<p><b>Categories</b> - which menu categories earn the most</p>", x: 0, y: 6, w: 20, h: 1}
       - {chart: db04_unassigned, x: 0, y: 7, w: 20, h: 3}
-      - {chart: db04_cat_rev, x: 0, y: 10, w: 20, h: 14}
-      - {text: "<p><b>Fix in setup:</b> these items sit in All Item Groups; move them to a menu Item Group to rank them.</p>", x: 0, y: 24, w: 20, h: 1}
-      - {text: "<p><b>Dishes</b> - what sells best and worst</p>", x: 0, y: 25, w: 20, h: 1}
-      - {chart: db04_top, x: 0, y: 26, w: 10, h: 11}
-      - {chart: db04_bottom, x: 10, y: 26, w: 10, h: 11}
-      - {chart: db04_item_table, x: 0, y: 37, w: 20, h: 15}
-      - {text: "<p><b>Margin and non-sellers</b> - which dishes earn per plate, and which never sold</p>", x: 0, y: 52, w: 20, h: 1}
-      - {chart: db04_menu_eng, x: 0, y: 53, w: 10, h: 22}
-      - {chart: db04_nonselling, x: 10, y: 53, w: 10, h: 22}
-      - {text: "<p><b>Estimate:</b> margin uses recipe (BOM) cost and covers only costed dishes, about 6-8% of sales today. Dishes costing more than their price are left out.</p>", x: 0, y: 75, w: 20, h: 2}
+      - {chart: db04_cat_rev, x: 0, y: 10, w: 20, h: 10}
+      - {text: "<p><b>Fix in setup:</b> these items sit in All Item Groups; move them to a menu Item Group to rank them.</p>", x: 0, y: 20, w: 20, h: 1}
+      - {text: "<p><b>Dishes</b> - what sells best and worst</p>", x: 0, y: 21, w: 20, h: 1}
+      - {chart: db04_top, x: 0, y: 22, w: 10, h: 9}
+      - {chart: db04_bottom, x: 10, y: 22, w: 10, h: 9}
+      - {chart: db04_item_table, x: 0, y: 31, w: 20, h: 10}
+      - {chart: db04_menu_eng, x: 0, y: 41, w: 10, h: 9}
+      - {chart: db04_nonselling, x: 10, y: 41, w: 10, h: 9}
+      - {text: "<p><b>Estimate:</b> margin uses recipe (BOM) cost and covers only costed dishes, about 6-8% of sales today. Dishes costing more than their price are left out.</p>", x: 0, y: 50, w: 20, h: 2}

@@ -117,53 +117,70 @@ queries:
     select: [name, date, branch, gross_sales, net_sales, cogs, cogs_percent, disposables_cost, gross_profit, gross_profit_percent, total_employee_costs, net_profit]
 
 charts:
-  # S1 Headline (T1). No `date` on the KPI: the card shows the TOTAL of the filtered rows (dashboard Date filter applies).
-  # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
-  - {id: db01_net_sales_kpi, title: "Net sales (₹)", query: fact_invoices, type: Number,
+  # S1 Headline (T1). Every KPI has date (month) + comparison: the card shows the LATEST month and % change vs the
+  # previous month (set in the Insights UI 2026-11-13). One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
+  - {id: db01_net_sales_kpi, title: "Net sales (₹)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_total)).round(0)", as: Net sales (₹), format: currency}]}
-  - {id: db01_bills_kpi, title: "Bills", query: fact_invoices, type: Number,
+  - {id: db01_bills_kpi, title: "Bills", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: name, agg: count, as: Bills}]}
   # SAL-004 Average ticket (average bill)
-  - {id: db01_avg_bill_kpi, title: "Average bill (₹)", query: fact_invoices, type: Number,
+  - {id: db01_avg_bill_kpi, title: "Average bill (₹)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_total) / count(name)).round(0)", as: Average bill (₹), format: currency}]}
   # SAL-007: with date+comparison the card shows the LATEST month and % change vs the previous month.
   - {id: db01_mtd_kpi, title: "Net sales month to date (₹)", query: fact_invoices, type: Number, comparison: true,
      date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_total)).round(0)", as: Net sales MTD (₹), format: currency}]}
   # S2 Trend and mix (T1)
-  - {id: db01_daily_sales, title: "Daily net sales (₹)", query: fact_invoices, type: Line, limit: 366,
+  # Styling set in the Insights UI 2026-11-13: smooth area line, x labels rotated 30 degrees, limit 100 days.
+  - {id: db01_daily_sales, title: "Daily net sales (₹)", query: fact_invoices, type: Line, limit: 100,
+     smooth: true, show_area: true, label_rotation: 30,
      x: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_total)).round(0)", as: Net sales (₹)}]}
   - {id: db01_channel, title: "Net sales by order type (₹)", query: fact_invoices, type: Donut, limit: 5,
      x: order_type, y: [{expr: "(sum(net_total)).round(0)", as: Net sales (₹)}], order: [{by: Net sales (₹), dir: desc}]}
   # S3 Where revenue comes from. Line-level net_amount; cleaned category; non-menu groups excluded from the category chart.
+  # Colours set in the Insights UI 2026-11-13 (S3/S4 Row charts).
   - {id: db01_category, title: "Net sales by menu category (₹)", query: fact_sales_lines_enriched, type: Row, limit: 12,
+     color: "#b81ab5", stack: true,
      x: menu_category, y: [{expr: "(sum(net_amount)).round(0)", as: Net sales (₹)}], order: [{by: Net sales (₹), dir: desc}],
      filters: [{column: category_family, op: "!=", value: "Non-menu"}]}
   # T2 partial: Unmapped department excluded from the ranking (Fix-in-setup footnote below the chart).
   - {id: db01_department, title: "Net sales by kitchen department (₹)", query: fact_sales_lines_enriched, type: Row, limit: 12,
+     color: "#923fab", stack: true,
      x: department, y: [{expr: "(sum(net_amount)).round(0)", as: Net sales (₹)}], order: [{by: Net sales (₹), dir: desc}],
      filters: [{column: department, op: "!=", value: "Unmapped"}]}
   - {id: db01_top_items, title: "Top 10 items by net sales (₹)", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     color: "#131aa1", stack: true,
      x: item_name, y: [{expr: "(sum(net_amount)).round(0)", as: Net sales (₹)}], order: [{by: Net sales (₹), dir: desc}]}
-  # S4 Branch (T3): structurally valid with one branch; shrunk to h:4 w:8.
+  # S4 Branch (T3): structurally valid with one branch; full width, h:9 (layout set in the Insights UI 2026-11-13).
   - {id: db01_branch, title: "Net sales by branch (₹)", query: fact_invoices, type: Row, limit: 10,
+     color: "#1aa3b8", stack: true,
      x: branch, y: [{expr: "(sum(net_total)).round(0)", as: Net sales (₹)}], order: [{by: Net sales (₹), dir: desc}]}
   # S4b Margin (T2 estimate, seeded Daily P and L; recipe cost covers ~6-8% of revenue, MAR-005)
-  - {id: db01_gross_profit, title: "Gross profit (₹, est.)", query: fact_daily_pnl, type: Number,
+  - {id: db01_gross_profit, title: "Gross profit (₹, est.)", query: fact_daily_pnl, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{expr: "(sum(gross_profit)).round(0)", as: "Gross profit (₹, est.)", format: currency}]}
-  - {id: db01_gross_margin, title: "Gross margin (%, est.)", query: fact_daily_pnl, type: Number,
+  - {id: db01_gross_margin, title: "Gross margin (%, est.)", query: fact_daily_pnl, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{expr: "sum(gross_profit) / sum(net_sales)", as: "Gross margin (%, est.)", format: percent}]}
   # S5 Control panel
-  - {id: db01_cancels, title: "Cancelled value (₹)", query: fact_cancellations, type: Number,
+  - {id: db01_cancels, title: "Cancelled value (₹)", query: fact_cancellations, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(grand_total)).round(0)", as: Cancelled value (₹), format: currency}]}
-  - {id: db01_sla, title: "KOTs over target (%)", query: fact_kot_headers, type: Number,
+  - {id: db01_sla, title: "KOTs over target (%)", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{expr: "sum(sla_breach) / sum(is_served)", as: KOTs over target (%), format: percent}]}
-  - {id: db01_plan, title: "Plan fulfilled (%)", query: fact_sales_plan_items, type: Number,
+  - {id: db01_plan, title: "Plan fulfilled (%)", query: fact_sales_plan_items, type: Number, comparison: true,
+     date: {column: plan_date, granularity: month},
      y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: Plan fulfilled (%), format: percent}]}
-  - {id: db01_yield, title: "Yield (%)", query: fact_yield_checks, type: Number,
+  - {id: db01_yield, title: "Yield (%)", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      y: [{expr: "sum(output_qty) / sum(input_qty)", as: Yield (%), format: percent}],
      filters: [{column: stock_uom, op: "=", value: "Kg"}]}
-  - {id: db01_shrink, title: "Stock shortage (₹)", query: fact_stock_correction, type: Number,
+  - {id: db01_shrink, title: "Stock shortage (₹)", query: fact_stock_correction, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(-sum(shrink_value)).round(0)", as: Stock shortage (₹), format: currency}]}
 
 dashboards:
@@ -185,18 +202,18 @@ dashboards:
       - {chart: db01_gross_profit, x: 0, y: 6, w: 10, h: 3}
       - {chart: db01_gross_margin, x: 10, y: 6, w: 10, h: 3}
       - {chart: db01_daily_sales, x: 0, y: 9, w: 20, h: 12}
-      - {chart: db01_channel, x: 0, y: 21, w: 10, h: 13}
-      - {chart: db01_category, x: 10, y: 21, w: 10, h: 13}
-      - {chart: db01_department, x: 0, y: 34, w: 10, h: 13}
-      - {chart: db01_top_items, x: 10, y: 34, w: 10, h: 13}
-      - {chart: db01_branch, x: 0, y: 47, w: 20, h: 11}
-      - {text: "<p><b>Fix in setup:</b> sales with no department come from items with no production department; set it in Item Production Configuration.</p>", x: 0, y: 58, w: 20, h: 2}
-      - {text: "<p><b>Control panel</b> - leakage, kitchen, plan and stock for the period</p>", x: 0, y: 60, w: 20, h: 1}
-      - {chart: db01_cancels, x: 0, y: 61, w: 4, h: 3}
-      - {chart: db01_sla, x: 4, y: 61, w: 4, h: 3}
-      - {chart: db01_plan, x: 8, y: 61, w: 4, h: 3}
-      - {chart: db01_yield, x: 12, y: 61, w: 4, h: 3}
-      - {chart: db01_shrink, x: 16, y: 61, w: 4, h: 3}
-      - {text: "<p><b>Estimate:</b> gross profit and margin come from the daily P and L; recipe costs cover only part of sales, so treat margin as indicative.</p>", x: 0, y: 64, w: 20, h: 1}
-      - {text: "<p>Sales against the monthly branch target is on Sales deep-dive. Only branches with a target set appear there.</p>", x: 0, y: 65, w: 20, h: 1}
+      - {chart: db01_channel, x: 0, y: 21, w: 10, h: 8}
+      - {chart: db01_category, x: 10, y: 21, w: 10, h: 8}
+      - {chart: db01_department, x: 0, y: 29, w: 10, h: 9}
+      - {chart: db01_top_items, x: 10, y: 29, w: 10, h: 9}
+      - {chart: db01_branch, x: 0, y: 38, w: 20, h: 9}
+      - {text: "<p><b>Fix in setup:</b> sales with no department come from items with no production department; set it in Item Production Configuration.</p>", x: 0, y: 47, w: 20, h: 2}
+      - {text: "<p><b>Control panel</b> - leakage, kitchen, plan and stock for the period</p>", x: 0, y: 49, w: 20, h: 1}
+      - {chart: db01_cancels, x: 0, y: 50, w: 4, h: 3}
+      - {chart: db01_sla, x: 4, y: 50, w: 4, h: 3}
+      - {chart: db01_plan, x: 8, y: 50, w: 4, h: 3}
+      - {chart: db01_yield, x: 12, y: 50, w: 4, h: 3}
+      - {chart: db01_shrink, x: 16, y: 50, w: 4, h: 3}
+      - {text: "<p><b>Estimate:</b> gross profit and margin come from the daily P and L; recipe costs cover only part of sales, so treat margin as indicative.</p>", x: 0, y: 53, w: 20, h: 1}
+      - {text: "<p>Sales against the monthly branch target is on Sales deep-dive. Only branches with a target set appear there.</p>", x: 0, y: 54, w: 20, h: 1}
 desk: {workspace: "URY", label: "Owner Overview"}

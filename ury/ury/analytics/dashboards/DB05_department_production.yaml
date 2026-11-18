@@ -70,6 +70,7 @@ queries:
       - {as: policy_label, type: String, expr: "if_else(production_policy == 'PRE_PRODUCED', 'Pre-produced', if_else(production_policy == 'MADE_TO_ORDER', 'Made to order', if_else(production_policy == 'DIRECT_RETAIL', 'Direct retail', 'Not set')))"}
 
 charts:
+  # Row chart colours/stacking set in the Insights UI 2026-11-16.
   # S1 KPI row (UX change list DB05 P0-1)
   - {id: db05_kpi_kots, title: "KOTs", query: fact_kot_headers, type: Number,
      filters: [{column: type, op: "!=", value: "Duplicate"}],
@@ -83,15 +84,15 @@ charts:
      filters: [{column: department, op: "=", value: "Unmapped"}],
      y: [{expr: "sum(floor(net_amount + 0.5))", as: Sales with no department, format: currency}]}
   # S2 Work by executed station
-  - {id: db05_kots_unit, title: "KOTs by cooking station (count)", query: fact_kot_headers, type: Row, limit: 15,
+  - {id: db05_kots_unit, title: "KOTs by cooking station (count)", query: fact_kot_headers, type: Row, limit: 15, stack: true,
      filters: [{column: type, op: "!=", value: "Duplicate"}],
      x: production, y: [{column: name, agg: count, as: KOTs}], order: [{by: KOTs, dir: desc}]}
-  - {id: db05_top_dishes, title: "Top 15 dishes made (qty)", query: fact_kot_lines, type: Row, limit: 15,
+  - {id: db05_top_dishes, title: "Top 15 dishes made (qty)", query: fact_kot_lines, type: Row, limit: 15, color: "#5d22b5", stack: true,
      x: item_name, y: [{column: qty_num, agg: sum, as: Quantity}], order: [{by: Quantity, dir: desc}]}
   # S3 Plan vs sales
-  - {id: db05_plan_dept, title: "Plan fulfilled by department (%)", query: fact_sales_plan_items, type: Row, limit: 15,
+  - {id: db05_plan_dept, title: "Plan fulfilled by department (%)", query: fact_sales_plan_items, type: Row, limit: 15, color: "#5a919e", stack: true,
      x: department, y: [{expr: "(100 * sum(fulfilled_qty) / sum(qty)).round(1)", as: Plan fulfilled}], order: [{by: Plan fulfilled, dir: desc}]}
-  - {id: db05_dept_rev, title: "Sales by assigned department (₹)", query: fact_sales_lines_enriched, type: Row, limit: 15,
+  - {id: db05_dept_rev, title: "Sales by assigned department (₹)", query: fact_sales_lines_enriched, type: Row, limit: 15, color: "#43b597", stack: true,
      filters: [{column: department, op: "!=", value: "Unmapped"}],
      x: department, y: [{expr: "sum(floor(net_amount + 0.5))", as: Net sales, format: currency}], order: [{by: Net sales, dir: desc}]}
   # S4 How the sales were produced
@@ -119,11 +120,11 @@ dashboards:
       - {chart: db05_kpi_dishes, x: 5, y: 3, w: 5, h: 3}
       - {chart: db05_kpi_plan, x: 10, y: 3, w: 5, h: 3}
       - {chart: db05_unmapped, x: 15, y: 3, w: 5, h: 3}
-      - {chart: db05_kots_unit, x: 0, y: 6, w: 10, h: 14}
-      - {chart: db05_top_dishes, x: 10, y: 6, w: 10, h: 14}
-      - {chart: db05_plan_dept, x: 0, y: 20, w: 10, h: 14}
-      - {chart: db05_dept_rev, x: 10, y: 20, w: 10, h: 14}
-      - {chart: db05_warehouse, x: 0, y: 34, w: 10, h: 11}
-      - {chart: db05_policy, x: 10, y: 34, w: 10, h: 11}
-      - {text: "<p><b>Two views of the kitchen.</b> Work counts KOTs by the station that cooked them; sales are credited to the department set on the item. They differ on about 1 in 3 KOT lines; that is expected.</p>", x: 0, y: 45, w: 20, h: 2}
-      - {text: "<p>Wastage by department is on Stock count and wastage, and yield by station is on Yield and recipe checks, so they are not repeated here.</p>", x: 0, y: 47, w: 20, h: 2}
+      - {chart: db05_kots_unit, x: 0, y: 6, w: 10, h: 7}
+      - {chart: db05_top_dishes, x: 10, y: 6, w: 10, h: 7}
+      - {chart: db05_plan_dept, x: 0, y: 13, w: 10, h: 8}
+      - {chart: db05_dept_rev, x: 10, y: 13, w: 10, h: 8}
+      - {chart: db05_warehouse, x: 0, y: 21, w: 10, h: 8}
+      - {chart: db05_policy, x: 10, y: 21, w: 10, h: 8}
+      - {text: "<p><b>Two views of the kitchen.</b> Work counts KOTs by the station that cooked them; sales are credited to the department set on the item. They differ on about 1 in 3 KOT lines; that is expected.</p>", x: 0, y: 29, w: 20, h: 2}
+      - {text: "<p>Wastage by department is on Stock count and wastage, and yield by station is on Yield and recipe checks, so they are not repeated here.</p>", x: 0, y: 31, w: 20, h: 2}

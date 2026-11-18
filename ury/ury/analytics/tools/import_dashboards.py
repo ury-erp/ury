@@ -31,11 +31,100 @@ def extract_col_and_agg(y_meas):
         
     return col_name, agg, meas_name
 
+def build_measure(y_meas):
+    """Insights v3 measure for a YAML `y` entry.
+
+    `expr` -> expression measure, evaluated by Insights as an ibis expression over the source query
+    (e.g. "sum(sla_breach) / sum(is_served)"), so ratios and differences keep their full formula.
+    `column` + `agg` -> plain column measure.
+    """
+    col_name, agg, meas_name = extract_col_and_agg(y_meas)
+    if y_meas.get('expr'):
+        return {
+            "measure_name": meas_name,
+            "expression": {"type": "expression", "expression": y_meas['expr']},
+            "data_type": "Decimal",
+        }
+    return {
+        "measure_name": meas_name,
+        "column_name": col_name,
+        "data_type": "Decimal",
+        "aggregation": agg,
+    }
+
+def translate_mutate_expr(expr, joined_cols):
+    """Translate a YAML `mutate` expression (Insights/ibis function names) into SQL.
+
+    The generated SQL runs on MariaDB and, for data-store queries, on DuckDB (Insights transpiles it),
+    so only functions both understand are emitted (IF, COALESCE, CAST, HOUR, DAYNAME, LPAD, LIKE).
+    Any function not handled here would be passed through verbatim and fail at query time.
+    """
+    expr = expr.replace('if_else', 'IF').replace('coalesce', 'COALESCE')
+    expr = expr.replace('==', '=')
+    # x.cast(...) on a text column that may hold '' (blank -> 0). The value is turned into text first so the
+    # same SQL also works when the column is numeric (DuckDB rejects comparing a DECIMAL with '').
+    expr = re.sub(r'(\w+)\.cast\("int64"\)', r"CAST(COALESCE(NULLIF(CAST(\1 AS CHAR), ''), '0') AS SIGNED)", expr)
+    expr = re.sub(r'(\w+)\.cast\("float64"\)', r"CAST(COALESCE(NULLIF(CAST(\1 AS CHAR), ''), '0') AS DECIMAL(10,2))", expr)
+    expr = re.sub(r'hour\((\w+)\)', r'HOUR(\1)', expr)
+    expr = re.sub(r'day_name\((\w+)\)', r'DAYNAME(\1)', expr)
+    # pad_number(x, n) -> zero-padded string, e.g. 7 -> '07'
+    expr = re.sub(r'pad_number\((.+?),\s*(\d+)\)', r"LPAD(CAST(\1 AS CHAR), \2, '0')", expr)
+    # starts_with(col, 'text') -> col LIKE 'text%'
+    expr = re.sub(r"starts_with\((\w+),\s*'([^']*)'\)", r"(\1 LIKE '\2%')", expr)
+    for jc, j_tbl in joined_cols.items():
+        expr = re.sub(rf'\b{jc}\b', f"`tab{j_tbl}`.`{jc}`", expr)
+    return expr
+
+def build_dimension(spec):
+    """Insights v3 dimension from a YAML row/column: "col" or {column: col, as: Label[, type: Date]}."""
+    if isinstance(spec, dict):
+        col = spec['column']
+        return {"column_name": col, "dimension_name": spec.get('as', col), "data_type": spec.get('type', 'String')}
+    return {"column_name": spec, "dimension_name": spec, "data_type": "String"}
+
+def build_where(filters, col_prefix, joined_cols=None):
+    """SQL WHERE clause for YAML query filters.
+
+    col_prefix is the table/CTE the columns belong to. A filter on a column that comes from a joined table
+    (listed in that join's `columns`, e.g. is_return from POS Invoice) is pointed at that table instead.
+    """
+    joined_cols = joined_cols or {}
+    where = []
+    for flt in filters or []:
+        col = flt['column']
+        op = flt['op']
+        val = flt['value']
+        col_ref = f"`tab{joined_cols[col]}`.`{col}`" if col in joined_cols else f"{col_prefix}.`{col}`"
+        op_lower = op.lower() if isinstance(op, str) else ''
+        if op_lower == 'in':
+            vals_str = ", ".join(f"'{v}'" if isinstance(v, str) else str(v) for v in val)
+            where.append(f"{col_ref} IN ({vals_str})")
+        elif op_lower == 'not in':
+            vals_str = ", ".join(f"'{v}'" if isinstance(v, str) else str(v) for v in val)
+            where.append(f"{col_ref} NOT IN ({vals_str})")
+        elif op_lower == 'contains':
+            where.append(f"{col_ref} LIKE '%{val}%'")
+        elif op_lower == 'not_contains':
+            where.append(f"{col_ref} NOT LIKE '%{val}%'")
+        elif op_lower == 'starts_with':
+            where.append(f"{col_ref} LIKE '{val}%'")
+        elif op_lower == 'ends_with':
+            where.append(f"{col_ref} LIKE '%{val}'")
+        elif val is None:
+            where.append(f"{col_ref} IS NULL" if op == '=' else f"{col_ref} IS NOT NULL")
+        elif isinstance(val, str):
+            where.append(f"{col_ref} {op} '{val}'")
+        else:
+            where.append(f"{col_ref} {op} {val}")
+    return f"WHERE {' AND '.join(where)}" if where else ""
+
 def build_query_sql(q, query_dict, sem_queries):
     """Convert YAML query spec to MariaDB SQL"""
     if 'sql' in q and q['sql']:
         raw = q['sql']
         raw = re.sub(r'TIME_TO_SEC\(([^)]+)\)', r'epoch(TRY_CAST(\1 AS TIME))', raw)
+        # MySQL TIMESTAMP(date, time) has no DuckDB equivalent (data-store queries run on DuckDB); build it portably.
+        raw = re.sub(r'\bTIMESTAMP\(\s*([\w.`]+)\s*,\s*([\w.`]+)\s*\)', r"CAST(CONCAT(\1, ' ', \2) AS DATETIME)", raw)
         return raw
     
     if 'source_query' in q:
@@ -71,15 +160,7 @@ def build_query_sql(q, query_dict, sem_queries):
         mutate_map = {}
         for m in q.get('mutate', []):
             as_col = m['as']
-            expr = m['expr'].replace('if_else', 'IF').replace('coalesce', 'COALESCE')
-            expr = expr.replace('==', '=')
-            expr = re.sub(r'(\w+)\.cast\("int64"\)', r'CAST(COALESCE(NULLIF(\1, ""), "0") AS SIGNED)', expr)
-            expr = re.sub(r'(\w+)\.cast\("float64"\)', r'CAST(COALESCE(NULLIF(\1, ""), "0") AS DECIMAL(10,2))', expr)
-            expr = re.sub(r'hour\((\w+)\)', r'HOUR(\1)', expr)
-            expr = re.sub(r'day_name\((\w+)\)', r'DAYNAME(\1)', expr)
-            for jc, j_tbl in joined_cols.items():
-                expr = re.sub(rf'\b{jc}\b', f"`tab{j_tbl}`.`{jc}`", expr)
-            mutate_map[as_col] = expr
+            mutate_map[as_col] = translate_mutate_expr(m['expr'], joined_cols)
             
         select_cols = []
         for s in q.get('select', []):
@@ -91,9 +172,13 @@ def build_query_sql(q, query_dict, sem_queries):
             else:
                 select_cols.append(f"{src_id}.`{s}` AS `{s}`")
                 
-        sel_str = ", ".join(select_cols) if select_cols else "*"
+        if not q.get('select'):
+            # no explicit select: every source column plus every mutate column
+            select_cols = [f"{src_id}.*"] + [f"{expr} AS `{as_col}`" for as_col, expr in mutate_map.items()]
+        sel_str = ", ".join(select_cols)
         join_str = " ".join(joins_sql)
-        return f"{cte} SELECT {sel_str} FROM {src_id} {join_str}"
+        where_str = build_where(q.get('filters', []), src_id, joined_cols)
+        return f"{cte} SELECT {sel_str} FROM {src_id} {join_str} {where_str}"
 
     if 'table' in q and q['table']:
         table = q['table']
@@ -120,47 +205,12 @@ def build_query_sql(q, query_dict, sem_queries):
                     left_ref = f"{table_name}.`{left_col}`"
                 joins_sql.append(f"{j_type} JOIN `tab{j_table}` ON `tab{j_table}`.`{right_col}` = {left_ref}")
 
-        where = []
-        for flt in q.get('filters', []):
-            col = flt['column']
-            op = flt['op']
-            val = flt['value']
-            col_ref = f"{table_name}.`{col}`"
-            op_lower = op.lower() if isinstance(op, str) else ''
-            if op_lower == 'in':
-                vals_str = ", ".join(f"'{v}'" if isinstance(v, str) else str(v) for v in val)
-                where.append(f"{col_ref} IN ({vals_str})")
-            elif op_lower == 'not in':
-                vals_str = ", ".join(f"'{v}'" if isinstance(v, str) else str(v) for v in val)
-                where.append(f"{col_ref} NOT IN ({vals_str})")
-            elif op_lower == 'contains':
-                where.append(f"{col_ref} LIKE '%{val}%'")
-            elif op_lower == 'not_contains':
-                where.append(f"{col_ref} NOT LIKE '%{val}%'")
-            elif op_lower == 'starts_with':
-                where.append(f"{col_ref} LIKE '{val}%'")
-            elif op_lower == 'ends_with':
-                where.append(f"{col_ref} LIKE '%{val}'")
-            elif val is None:
-                where.append(f"{col_ref} IS NULL" if op == '=' else f"{col_ref} IS NOT NULL")
-            elif isinstance(val, str):
-                where.append(f"{col_ref} {op} '{val}'")
-            else:
-                where.append(f"{col_ref} {op} {val}")
-        where_str = f"WHERE {' AND '.join(where)}" if where else ""
+        where_str = build_where(q.get('filters', []), table_name, joined_cols)
 
         mutate_map = {}
         for m in q.get('mutate', []):
             as_col = m['as']
-            expr = m['expr'].replace('if_else', 'IF').replace('coalesce', 'COALESCE')
-            expr = expr.replace('==', '=')
-            expr = re.sub(r'(\w+)\.cast\("int64"\)', r'CAST(COALESCE(NULLIF(\1, ""), "0") AS SIGNED)', expr)
-            expr = re.sub(r'(\w+)\.cast\("float64"\)', r'CAST(COALESCE(NULLIF(\1, ""), "0") AS DECIMAL(10,2))', expr)
-            expr = re.sub(r'hour\((\w+)\)', r'HOUR(\1)', expr)
-            expr = re.sub(r'day_name\((\w+)\)', r'DAYNAME(\1)', expr)
-            for jc, j_tbl in joined_cols.items():
-                expr = re.sub(rf'\b{jc}\b', f"`tab{j_tbl}`.`{jc}`", expr)
-            mutate_map[as_col] = expr
+            mutate_map[as_col] = translate_mutate_expr(m['expr'], joined_cols)
 
         select_cols = []
         for s in q.get('select', []):
@@ -230,17 +280,24 @@ def build_chart_operations(q_docname, ctype, config):
         x_dim = config.get("x_axis", {}).get("dimension", {})
         series = config.get("y_axis", {}).get("series", [])
         measures = [s["measure"] for s in series if s.get("measure", {}).get("measure_name")]
-        ops.append({
-            "type": "summarize",
-            "measures": measures,
-            "dimensions": [x_dim] if x_dim.get("column_name") else []
-        })
-        if config.get("order_by"):
+        split = (config.get("split_by") or {}).get("dimension") or {}
+        if split.get("column_name"):
+            # same as the Insights frontend: split_by -> pivot
             ops.append({
-                "type": "order_by",
-                "column": config["order_by"][0]["column"],
-                "direction": config["order_by"][0].get("direction", "desc")
+                "type": "pivot_wider",
+                "rows": [x_dim],
+                "columns": [split],
+                "values": measures,
+                "max_column_values": config["split_by"].get("max_split_values") or 10
             })
+        else:
+            ops.append({
+                "type": "summarize",
+                "measures": measures,
+                "dimensions": [x_dim] if x_dim.get("column_name") else []
+            })
+        for o in config.get("order_by", []):
+            ops.append({"type": "order_by", "column": o["column"], "direction": o.get("direction", "desc")})
     elif ctype in ('Donut', 'Funnel'):
         lbl = config.get("label_column", {})
         val = config.get("value_column", {})
@@ -257,16 +314,166 @@ def build_chart_operations(q_docname, ctype, config):
             })
     elif ctype == 'Table':
         rows = [r for r in config.get("rows", []) if r.get("column_name")]
+        cols = [cl for cl in config.get("columns", []) if cl.get("column_name")]
         vals = [v for v in config.get("values", []) if v.get("measure_name")]
-        ops.append({
-            "type": "summarize",
-            "measures": vals,
-            "dimensions": rows
-        })
+        if cols:
+            # same as the Insights frontend: columns -> pivot
+            ops.append({
+                "type": "pivot_wider",
+                "rows": rows,
+                "columns": cols,
+                "values": vals,
+                "max_column_values": config.get("max_column_values", 10)
+            })
+        else:
+            ops.append({
+                "type": "summarize",
+                "measures": vals,
+                "dimensions": rows
+            })
+        for o in config.get("order_by", []):
+            ops.append({"type": "order_by", "column": o["column"], "direction": o.get("direction", "desc")})
     return ops
 
-def import_all():
-    """Import all 16 URY YAML dashboards into Frappe Insights"""
+def build_chart_config(c):
+    """Insights v3 chart config for one YAML chart spec (shared by import_all and in-place repairs)."""
+    ctype = c.get('type', 'Number')
+    y_meas = c.get('y', [{}])[0]
+    col_name, agg, meas_name = extract_col_and_agg(y_meas)
+    base_measure = build_measure(y_meas)
+    chart_filters = convert_chart_filters(c.get('filters', []))
+
+    if ctype == 'Number':
+        config = {
+            "number_columns": [
+                {
+                    **base_measure,
+                    "format": y_meas.get('format', 'number'),
+                    "currency_column": "currency" if y_meas.get('format') == 'currency' else None,
+                }
+            ],
+            "comparison": c.get('comparison', False),
+            "sparkline": c.get('sparkline', True),
+            "limit": 100,
+            "filters": chart_filters
+        }
+        if 'date' in c:
+            # Same shape the Insights UI saves (dimension_name/label/value are required for the
+            # summarize dimension and the comparison/sparkline to resolve the date column).
+            dcol = c["date"]["column"]
+            config["date_column"] = {
+                "column_name": dcol,
+                "dimension_name": dcol,
+                "label": dcol,
+                "value": dcol,
+                "data_type": c["date"].get("data_type", "Date"),
+                "granularity": c["date"].get("granularity", "month")
+            }
+        config["order_by"] = []
+        config["number_column_options"] = []
+        # Optional Number display options (same keys the Insights UI saves)
+        for k in ('shorten_numbers', 'decimal', 'negative_is_better'):
+            if k in c:
+                config[k] = c[k]
+    elif ctype in ('Line', 'Row', 'Bar'):
+        x_raw = c.get('x', 'posting_date')
+        x_col = x_raw['column'] if isinstance(x_raw, dict) else x_raw
+        x_gran = x_raw.get('granularity') if isinstance(x_raw, dict) else None
+        config = {
+            "x_axis": {
+                "dimension": {
+                    "dimension_name": x_col,
+                    "column_name": x_col,
+                    "data_type": "Date" if x_gran else "String",
+                    **({"granularity": x_gran} if x_gran else {})
+                }
+            },
+            "y_axis": {
+                # one series per `y` entry (e.g. Net sales and Target side by side)
+                # a `color` on a y entry colours that series; show_area / smooth / show_data_points / align / series_type on a
+                # y entry are per-series line options (same keys the Insights UI saves on the series)
+                "series": [{"measure": build_measure(y),
+                            **({"color": [y['color']]} if y.get('color') else {}),
+                            **{k: y[k] for k in ('show_area', 'smooth', 'show_data_points', 'align') if k in y},
+                            **({"type": y['series_type']} if y.get('series_type') else {})}
+                           for y in (c.get('y') or [{}])]
+            },
+            "order_by": [
+                {
+                    "column": {"type": "column", "column_name": o.get('by', meas_name)},
+                    "direction": o.get('dir', 'desc')
+                }
+                for o in c.get('order', [])
+            ],
+            "limit": c.get('limit', 100),
+            "filters": chart_filters
+        }
+        # Optional styling (same keys the Insights UI saves)
+        if 'label_rotation' in c:
+            config["x_axis"]["label_rotation"] = c['label_rotation']
+        for k in ('smooth', 'show_area', 'stack', 'normalize', 'overlap',
+                  'show_data_labels', 'show_axis_label', 'show_scrollbar'):
+            if k in c:
+                config["y_axis"][k] = c[k]
+        if c.get('color'):
+            config["y_axis"]["series"][0]["color"] = [c['color']]
+        # split_by: {column, max} -> one series per value of that column (e.g. per order type)
+        if c.get('split_by'):
+            sb = c['split_by']
+            sb_col = sb['column'] if isinstance(sb, dict) else sb
+            config["split_by"] = {
+                "dimension": {"column_name": sb_col, "dimension_name": sb_col, "data_type": "String"},
+                "max_split_values": (sb.get('max') if isinstance(sb, dict) else None) or 10,
+            }
+    elif ctype in ('Donut', 'Funnel'):
+        x_col = c.get('x', 'order_type')
+        config = {
+            "label_column": {
+                "dimension_name": x_col,
+                "column_name": x_col,
+                "data_type": "String"
+            },
+            "value_column": dict(base_measure),
+            "legend_position": "bottom",
+            "order_by": [],
+            "limit": c.get('limit', 10),
+            "filters": chart_filters
+        }
+    elif ctype == 'Table':
+        # rows/columns: plain column names or {column, as[, type]}; values: every `y` (or `values`) entry.
+        value_specs = c.get('y') or c.get('values') or [{}]
+        values = []
+        for v in value_specs:
+            m = build_measure(v)
+            if v.get('format'):
+                m["format"] = v['format']
+            values.append(m)
+        config = {
+            "rows": [build_dimension(r) for r in c.get('rows', [])],
+            "columns": [build_dimension(cl) for cl in c.get('columns', [])],
+            "values": values,
+            "order_by": [
+                {"column": {"type": "column", "column_name": o['by']}, "direction": o.get('dir', 'desc')}
+                for o in c.get('order', [])
+            ],
+            "limit": c.get('limit', 50),
+            "filters": chart_filters
+        }
+        # Optional table display options (same keys the Insights UI saves)
+        for k in ('show_filter_row', 'compact_numbers', 'enable_color_scale',
+                  'show_row_totals', 'show_column_totals', 'max_column_values'):
+            if k in c:
+                config[k] = c[k]
+    else:
+        config = {"limit": 100, "filters": chart_filters}
+    return config
+
+def import_all(only=None):
+    """Import the URY YAML dashboards into Frappe Insights.
+
+    only: optional filename prefix(es), e.g. "DB01" or "DB01,DB03", to import just those dashboards.
+    bench --site <site> execute ury.ury.analytics.tools.import_dashboards.import_all --kwargs "{'only': 'DB01'}"
+    """
     analytics_dir = _get_app_path()
     sem_path = os.path.join(analytics_dir, "semantic_layer.yaml")
     dashboards_glob = os.path.join(analytics_dir, "dashboards", "DB*.yaml")
@@ -276,6 +483,11 @@ def import_all():
     sem_queries = {q['id']: q for q in sem_data.get('queries', [])}
 
     yaml_files = sorted(glob.glob(dashboards_glob))
+    if only:
+        prefixes = [p.strip() for p in (only.split(',') if isinstance(only, str) else only) if p.strip()]
+        yaml_files = [f for f in yaml_files if any(os.path.basename(f).startswith(p) for p in prefixes)]
+        if not yaml_files:
+            frappe.throw(f"No dashboard YAML matches {only!r}")
     print(f"Starting import of {len(yaml_files)} URY Dashboards into Insights...")
 
     for fpath in yaml_files:
@@ -340,105 +552,7 @@ def import_all():
             if not q_docname:
                 continue
 
-            y_meas = c.get('y', [{}])[0]
-            col_name, agg, meas_name = extract_col_and_agg(y_meas)
-            chart_filters = convert_chart_filters(c.get('filters', []))
-
-            if ctype == 'Number':
-                config = {
-                    "number_columns": [
-                        {
-                            "measure_name": meas_name,
-                            "column_name": col_name,
-                            "data_type": "Decimal",
-                            "aggregation": agg,
-                            "format": y_meas.get('format', 'number'),
-                            "currency_column": "currency" if y_meas.get('format') == 'currency' else None,
-                        }
-                    ],
-                    "comparison": c.get('comparison', False),
-                    "sparkline": True,
-                    "limit": 100,
-                    "filters": chart_filters
-                }
-                if 'date' in c:
-                    config["date_column"] = {
-                        "column_name": c["date"]["column"],
-                        "data_type": "Date",
-                        "granularity": c["date"].get("granularity", "month")
-                    }
-            elif ctype in ('Line', 'Row', 'Bar'):
-                x_raw = c.get('x', 'posting_date')
-                x_col = x_raw['column'] if isinstance(x_raw, dict) else x_raw
-                x_gran = x_raw.get('granularity') if isinstance(x_raw, dict) else None
-                config = {
-                    "x_axis": {
-                        "dimension": {
-                            "dimension_name": x_col,
-                            "column_name": x_col,
-                            "data_type": "Date" if x_gran else "String",
-                            **({"granularity": x_gran} if x_gran else {})
-                        }
-                    },
-                    "y_axis": {
-                        "series": [
-                            {
-                                "measure": {
-                                    "measure_name": meas_name,
-                                    "column_name": col_name,
-                                    "data_type": "Decimal",
-                                    "aggregation": agg
-                                }
-                            }
-                        ]
-                    },
-                    "order_by": [
-                        {
-                            "column": {"type": "column", "column_name": meas_name},
-                            "direction": "desc"
-                        }
-                    ] if c.get('order') else [],
-                    "limit": c.get('limit', 100),
-                    "filters": chart_filters
-                }
-            elif ctype in ('Donut', 'Funnel'):
-                x_col = c.get('x', 'order_type')
-                config = {
-                    "label_column": {
-                        "dimension_name": x_col,
-                        "column_name": x_col,
-                        "data_type": "String"
-                    },
-                    "value_column": {
-                        "measure_name": meas_name,
-                        "column_name": col_name,
-                        "data_type": "Decimal",
-                        "aggregation": agg
-                    },
-                    "legend_position": "bottom",
-                    "order_by": [],
-                    "limit": c.get('limit', 10),
-                    "filters": chart_filters
-                }
-            elif ctype == 'Table':
-                rows_dim = c.get('rows', [])
-                cols_dim = c.get('columns', [])
-                config = {
-                    "rows": [{"column_name": r, "dimension_name": r} for r in rows_dim],
-                    "columns": [{"column_name": cl, "dimension_name": cl} for cl in cols_dim],
-                    "values": [
-                        {
-                            "measure_name": meas_name,
-                            "column_name": col_name,
-                            "aggregation": agg
-                        }
-                    ],
-                    "order_by": [],
-                    "limit": c.get('limit', 50),
-                    "filters": chart_filters
-                }
-            else:
-                config = {"limit": 100, "filters": chart_filters}
+            config = build_chart_config(c)
 
             chart_doc = frappe.new_doc('Insights Chart v3')
             chart_doc.title = ctitle

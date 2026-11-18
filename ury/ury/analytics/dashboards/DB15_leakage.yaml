@@ -112,47 +112,57 @@ queries:
     select: [name, posting_date, branch, company, order_type, waiter, cashier, grand_total, return_against]
 
 charts:
+  # KPI date (month) + comparison, colours, stacking and the layout were set in the Insights UI 2026-11-16.
   # S1 KPIs (one tile per chart; currency rounded to whole rupees)
-  - {id: db15_cnt, title: "Cancelled bills", query: fact_cancellations, type: Number,
+  - {id: db15_cnt, title: "Cancelled bills", query: fact_cancellations, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: name, agg: count, as: Cancelled bills}]}
-  - {id: db15_val, title: "Cancelled value (₹)", query: fact_cancellations, type: Number,
+  - {id: db15_val, title: "Cancelled value (₹)", query: fact_cancellations, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}]}
-  - {id: db15_net, title: "Net sales (₹)", query: fact_invoices, type: Number,
+  - {id: db15_net, title: "Net sales (₹)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)", format: currency}]}
-  - {id: db15_zero, title: "Zero-value bills", query: fact_invoices, type: Number,
+  - {id: db15_zero, title: "Zero-value bills", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: is_zero_bill, agg: sum, as: Zero-value bills}]}
-  - {id: db15_disc, title: "Discounts given (₹)", query: fact_invoices, type: Number,
+  - {id: db15_disc, title: "Discounts given (₹)", query: fact_invoices, type: Number, comparison: true,
      y: [{expr: "(sum(discount_amount)).round(0)", as: "Discounts given (₹)", format: currency}]}
   # S2 Why and where
-  - {id: db15_reason, title: "Cancelled value by reason (₹)", query: fact_cancellations, type: Row, limit: 15,
+  - {id: db15_reason, title: "Cancelled value by reason (₹)", query: fact_cancellations, type: Row, color: "#bd7a64", stack: true, limit: 15,
      x: cancel_reason, y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}],
      order: [{by: "Cancelled value (₹)", dir: desc}]}
-  - {id: db15_ot, title: "Cancelled bills by order type (count)", query: fact_cancellations, type: Row, limit: 10,
+  - {id: db15_ot, title: "Cancelled bills by order type (count)", query: fact_cancellations, type: Row, color: "#808038", stack: true, limit: 10,
      x: order_type, y: [{column: name, agg: count, as: Cancelled bills}], order: [{by: Cancelled bills, dir: desc}]}
-  - {id: db15_trend, title: "Cancelled bills per week (count)", query: fact_cancellations, type: Bar, limit: 366,
+  - {id: db15_trend, title: "Cancelled bills per week (count)", query: fact_cancellations, type: Bar, color: "#1d8cab", stack: true, limit: 366,
      x: {column: posting_date, granularity: week}, y: [{column: name, agg: count, as: Cancelled bills}]}
   # S3 Who
-  - {id: db15_waiter, title: "Cancelled value by order taker (₹)", query: fact_cancellations_named, type: Row, limit: 15,
+  - {id: db15_waiter, title: "Cancelled value by order taker (₹)", query: fact_cancellations_named, type: Row, color: "#10b387", stack: true, limit: 15,
      x: waiter_name, y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}],
      order: [{by: "Cancelled value (₹)", dir: desc}]}
   # S4 Kitchen side
-  - {id: db15_stage, title: "Kitchen cancellations by stage (count)", query: fact_kot_exec, type: Row, limit: 10,
+  - {id: db15_stage, title: "Kitchen cancellations by stage (count)", query: fact_kot_exec, type: Row, color: "#9a1aba", stack: true, limit: 10,
      filters: [{column: is_cancelled, op: "=", value: 1}],
      x: cancel_stage, y: [{column: name, agg: count, as: Cancelled tickets}]}
-  - {id: db15_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number,
+  - {id: db15_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      filters: [{column: type, op: "=", value: "Order Modified"}],
      y: [{column: name, agg: count, as: Modified KOTs}]}
-  - {id: db15_voids, title: "Voided kitchen quantity (count)", query: fact_kot_lines, type: Number,
+  - {id: db15_voids, title: "Voided kitchen quantity (count)", query: fact_kot_lines, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{column: cancelled_qty_num, agg: sum, as: Voided quantity}]}
   # LKG-003 Cancellation rate (value): cancelled value over submitted plus cancelled value, on one union of both kinds of bill
-  - {id: db15_rate, title: "Cancelled share of sales (%)", query: fact_bills_all, type: Number,
+  - {id: db15_rate, title: "Cancelled share of sales (%)", query: fact_bills_all, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(cancelled_value) / sum(grand_total)", as: "Cancelled share (%)", format: percent}]}
   # LKG-007 Out-of-stock cancellations
-  - {id: db15_oos, title: "Out-of-stock cancels (count)", query: fact_cancellations, type: Number,
+  - {id: db15_oos, title: "Out-of-stock cancels (count)", query: fact_cancellations, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      filters: [{column: cancel_reason, op: "=", value: "Kitchen out of stock"}],
      y: [{column: name, agg: count, as: "Out-of-stock cancels"}]}
   # SAL-018 Returns value
-  - {id: db15_returns, title: "Returned value (₹)", query: fact_returns, type: Number,
+  - {id: db15_returns, title: "Returned value (₹)", query: fact_returns, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(-sum(grand_total)).round(0)", as: "Returned value (₹)", format: currency}]}
 
 dashboards:
@@ -183,12 +193,12 @@ dashboards:
       - {chart: db15_rate, x: 15, y: 6, w: 5, h: 3}
       - {chart: db15_oos, x: 0, y: 9, w: 10, h: 3}
       - {chart: db15_returns, x: 10, y: 9, w: 10, h: 3}
-      - {chart: db15_trend, x: 0, y: 12, w: 20, h: 12}
-      - {chart: db15_reason, x: 0, y: 24, w: 10, h: 14}
-      - {chart: db15_ot, x: 10, y: 24, w: 10, h: 14}
-      - {chart: db15_waiter, x: 0, y: 38, w: 10, h: 14}
-      - {chart: db15_stage, x: 10, y: 38, w: 10, h: 14}
-      - {text: "<p>Discounts by cashier are on Staff performance.</p>", x: 0, y: 52, w: 20, h: 1}
-      - {text: "<p>The person shown took the order, not necessarily the one who cancelled. Cancelled value includes duplicates and re-billed orders, so it is not all lost revenue.</p>", x: 0, y: 53, w: 20, h: 2}
-      - {text: "<p>Cancelled share = cancelled value over submitted plus cancelled value. Returned value is credit notes; it is zero when no returns were billed.</p>", x: 0, y: 55, w: 20, h: 2}
+      - {chart: db15_trend, x: 0, y: 12, w: 20, h: 9}
+      - {chart: db15_reason, x: 0, y: 21, w: 10, h: 9}
+      - {chart: db15_ot, x: 10, y: 21, w: 10, h: 9}
+      - {chart: db15_waiter, x: 0, y: 30, w: 10, h: 9}
+      - {chart: db15_stage, x: 10, y: 30, w: 10, h: 9}
+      - {text: "<p>Discounts by cashier are on Staff performance.</p>", x: 0, y: 39, w: 20, h: 1}
+      - {text: "<p>The person shown took the order, not necessarily the one who cancelled. Cancelled value includes duplicates and re-billed orders, so it is not all lost revenue.</p>", x: 0, y: 40, w: 20, h: 2}
+      - {text: "<p>Cancelled share = cancelled value over submitted plus cancelled value. Returned value is credit notes; it is zero when no returns were billed.</p>", x: 0, y: 42, w: 20, h: 2}
 desk: {workspace: "URY", label: "Leakage"}

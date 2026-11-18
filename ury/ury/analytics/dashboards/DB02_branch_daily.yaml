@@ -72,47 +72,51 @@ queries:
     select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
 
 charts:
-  # S1 Last trading day (Number + date granularity day = latest day inside the filter range). One measure per chart so tiles fill the row.
+  # S1 KPI cards. Date granularity was switched from day to month in the Insights UI 2026-11-18, so these cards now show the LATEST MONTH
+  # in the filter range (titles still say "Last trading day"). One measure per chart so tiles fill the row.
   - {id: db02_day_kpi, title: "Last trading day: net sales (₹)", query: fact_invoices, type: Number, comparison: true, sparkline: true,
-     date: {column: posting_date, granularity: day},
+     date: {column: posting_date, granularity: month},
      y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)", format: currency}]}
-  - {id: db02_bills, title: "Last trading day: bills (count)", query: fact_invoices, type: Number,
-     date: {column: posting_date, granularity: day},
+  - {id: db02_bills, title: "Last trading day: bills (count)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: name, agg: count, as: Bills}]}
-  - {id: db02_covers, title: "Last trading day: covers (count)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: day},
+  - {id: db02_covers, title: "Last trading day: covers (count)", query: fact_invoices, type: Number, sparkline: false,
+     date: {column: posting_date, granularity: month},
      y: [{column: pax, agg: sum, as: Covers}],
      filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
-  - {id: db02_spend_per_cover, title: "Last trading day: spend per cover (₹)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: day},
+  # No date column (set in the Insights UI 2026-11-15): the card shows spend per cover over the whole filtered period.
+  - {id: db02_spend_per_cover, title: "Last trading day: spend per cover (₹)", query: fact_invoices, type: Number, sparkline: false,
      y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: "Spend per cover (₹)", format: currency}],
      filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
-  # S2 Shape of the day (bills by hour lives in DB03)
+  # S2 Shape of the day (bills by hour lives in DB03). Colours/styling set in the Insights UI 2026-11-15.
   - {id: db02_by_hour, title: "Net sales by hour (₹)", query: fact_invoices, type: Bar, limit: 30,
+     color: "#594dd6", stack: true,
      x: hour_of_day, y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)"}]}
   - {id: db02_daily, title: "Net sales by day, selected period (₹)", query: fact_invoices, type: Line, limit: 366,
+     color: "#118a17", smooth: true, show_area: true, label_rotation: 30,
      x: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_total)).round(0)", as: "Net sales (₹)"}]}
   # S3 Kitchen, latest day in the range (was T2 estimate: legacy production_time)
-  - {id: db02_kot_kpi, title: "Last trading day: KOTs (count)", query: fact_kot_headers, type: Number,
-     date: {column: date, granularity: day},
+  - {id: db02_kot_kpi, title: "Last trading day: KOTs (count)", query: fact_kot_headers, type: Number, comparison: true,
+     date: {column: date, granularity: month},
      y: [{column: name, agg: count, as: KOTs}]}
   - {id: db02_kot_unserved, title: "Last trading day: KOTs not yet served (count)", query: fact_kot_headers, type: Number,
-     date: {column: date, granularity: day},
+     date: {column: date, granularity: month},
      y: [{expr: "count(name) - sum(is_served)", as: "KOTs not yet served"}]}
   - {id: db02_kot_prep, title: "Last trading day: avg prep time (min)", query: fact_kot_headers, type: Number,
-     date: {column: date, granularity: day},
+     date: {column: date, granularity: month},
      y: [{column: prod_minutes, agg: avg, as: "Avg prep time (min)"}]}
   - {id: db02_sla, title: "Last trading day: KOTs over target (%)", query: fact_kot_headers, type: Number,
-     date: {column: date, granularity: day},
+     date: {column: date, granularity: month},
      y: [{expr: "sum(sla_breach) / sum(is_served)", as: "KOTs over target (%)", format: percent}]}
   # S4 Floor and leakage
-  - {id: db02_occupied, title: "Tables occupied now (live, not for the period)", query: dim_table, type: Number,
+  - {id: db02_occupied, title: "Tables occupied now (live, not for the period)", query: dim_table, type: Number, sparkline: false,
      y: [{column: occupied, agg: sum, as: Occupied}],
      filters: [{column: is_take_away, op: "=", value: 0}]}
   - {id: db02_tables, title: "Tables in total (count)", query: dim_table, type: Number,
      y: [{column: name, agg: count, as: Tables}],
      filters: [{column: is_take_away, op: "=", value: 0}]}
-  - {id: db02_cancel_count, title: "Cancelled bills (count)", query: fact_cancellations, type: Number,
+  - {id: db02_cancel_count, title: "Cancelled bills (count)", query: fact_cancellations, type: Number, sparkline: false,
+     date: {column: posting_date, granularity: month},
      y: [{column: name, agg: count, as: "Cancelled bills"}]}
   - {id: db02_cancel, title: "Cancelled value (₹)", query: fact_cancellations, type: Number,
      y: [{expr: "(sum(grand_total)).round(0)", as: "Cancelled value (₹)", format: currency}]}
@@ -151,7 +155,7 @@ dashboards:
       - {chart: db02_tables, x: 5, y: 34, w: 5, h: 3}
       - {chart: db02_cancel_count, x: 10, y: 34, w: 5, h: 3}
       - {chart: db02_cancel, x: 15, y: 34, w: 5, h: 3}
-      - {chart: db02_yield_checks, x: 0, y: 37, w: 7, h: 3}
-      - {chart: db02_yield_alert, x: 7, y: 37, w: 7, h: 3}
-      - {chart: db02_oos_cancel, x: 14, y: 37, w: 6, h: 3}
+      - {chart: db02_yield_checks, x: 2, y: 37, w: 5, h: 3}
+      - {chart: db02_yield_alert, x: 8, y: 37, w: 5, h: 3}
+      - {chart: db02_oos_cancel, x: 14, y: 37, w: 5, h: 3}
       - {text: "<p>Yield checks failed = checks more than 5 points under the recipe standard.</p>", x: 0, y: 40, w: 20, h: 1}

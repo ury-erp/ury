@@ -88,35 +88,45 @@ queries:
     sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item), sold AS (SELECT DISTINCT pii.item_code FROM `tabPOS Invoice Item` pii WHERE pii.docstatus = 1) SELECT i.name AS item_code, i.item_name, i.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, ipc.branch, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, ipc.controlled_by_sales_plan, i.is_stock_item, i.is_sales_item, i.disabled, CASE WHEN sold.item_code IS NULL THEN 0 ELSE 1 END AS is_sold, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS has_recipe_cost, i.valuation_rate, i.custom_yield_tracked, i.custom_yield_percent FROM `tabItem` i LEFT JOIN cm ON cm.item_group = i.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = i.name AND ipc.active = 1 LEFT JOIN bc ON bc.item = i.name LEFT JOIN sold ON sold.item_code = i.name"
 
 charts:
+  # KPI date (month) + comparison, colours, stacking, table options and the layout were set in the Insights UI 2026-11-16.
   # ---- Readiness percentages (UX_STANDARD 3.3 / CHANGE_LIST DB14 #3, #5). Codes for reference: DQ-006, DQ-007, DQ-005, DQ-003, DQ-002.
-  - {id: db14_emp_link, title: "Bills with staff (%)", query: fact_invoices, type: Number,
+  - {id: db14_emp_link, title: "Bills with staff (%)", query: fact_invoices, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "count_if(custom_waiter_employee.notnull()) / count(name)", as: "Bills with staff (%)", format: percent}]}
   - {id: db14_recipe, title: "Dishes costed (%)", query: dim_item, type: Number,
      filters: [{column: is_sold, op: "=", value: 1}],
      y: [{expr: "sum(has_recipe_cost) / count(item_code)", as: "Dishes costed (%)", format: percent}]}
-  - {id: db14_dwell, title: "Bills with timing (%)", query: fact_table_sessions, type: Number,
+  - {id: db14_dwell, title: "Bills with timing (%)", query: fact_table_sessions, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(dwell_valid) / count(name)", as: "Bills with timing (%)", format: percent}]}
   - {id: db14_station, title: "Station mapped (%)", query: dim_item, type: Number,
      filters: [{column: branch, op: is_set}],
      y: [{expr: "count_if(config_unit != 'Unmapped') / count(item_code)", as: "Station mapped (%)", format: percent}]}
-  - {id: db14_dept_share, title: "Sales with dept (%)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db14_dept_share, title: "Sales with dept (%)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(if_else(department != 'Unmapped', net_amount, 0)) / sum(net_amount)", as: "Sales with dept (%)", format: percent}]}
-  - {id: db14_cat_share, title: "Sales categorised (%)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db14_cat_share, title: "Sales categorised (%)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{expr: "sum(if_else(menu_category != 'Unassigned', net_amount, 0)) / sum(net_amount)", as: "Sales categorised (%)", format: percent}]}
   # ---- Not recorded yet: zero here means not captured (DQ-008, DQ-009, DQ-010)
-  - {id: db14_actor, title: "Kitchen tickets with a named cook", query: fact_kot_exec, type: Number,
+  - {id: db14_actor, title: "Kitchen tickets with a named cook", query: fact_kot_exec, type: Number, comparison: true,
+     date: {column: exec_date, granularity: month},
      filters: [{column: started_by, op: "!=", value: Administrator}, {column: started_by, op: is_set}],
      y: [{column: name, agg: count, as: "Kitchen tickets with a named cook"}]}
-  - {id: db14_yield_dept, title: "Yield checks with a station", query: fact_yield_checks, type: Number,
+  - {id: db14_yield_dept, title: "Yield checks with a station", query: fact_yield_checks, type: Number, comparison: true,
+     date: {column: checked_on, granularity: month, data_type: Datetime},
      filters: [{column: department, op: is_set}],
      y: [{column: name, agg: count, as: "Yield checks with a station"}]}
-  - {id: db14_waste, title: "Wastage entries logged", query: fact_wastage_lines, type: Number,
+  - {id: db14_waste, title: "Wastage entries logged", query: fact_wastage_lines, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      y: [{column: name, agg: count, as: "Wastage entries logged"}]}
   # ---- Set-up gaps (DQ-002, DQ-003, PLN-011). Whole rupees via round().
-  - {id: db14_unmapped, title: "Sales with no department (₹)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db14_unmapped, title: "Sales with no department (₹)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      filters: [{column: department, op: "=", value: Unmapped}],
      y: [{expr: "sum(net_amount).round(0)", as: "Sales with no department (₹)", format: currency}]}
-  - {id: db14_unassigned, title: "Sales with no menu category (₹)", query: fact_sales_lines_enriched, type: Number,
+  - {id: db14_unassigned, title: "Sales with no menu category (₹)", query: fact_sales_lines_enriched, type: Number, comparison: true,
+     date: {column: posting_date, granularity: month},
      filters: [{column: menu_category, op: "=", value: Unassigned}],
      y: [{expr: "sum(net_amount).round(0)", as: "Sales with no menu category (₹)", format: currency}]}
   # dim_item.branch is set only when the item has an active configuration row, so is_set on branch = configured items.
@@ -128,17 +138,17 @@ charts:
   # ---- Non-selling items (MNU-011)
   # Chart filters use != 1 instead of = 0 (value 0 is falsy in the UI). The Table is a PIVOT (columns: category_family) on purpose: the 3.15.1 dashboard
   # frontend calls config.columns.filter(), and the compiler omits an empty `columns`, so a flat Table renders 'No data' and throws.
-  - {id: db14_nonselling, title: "Dishes never sold (consider removing from POS)", query: dim_item, type: Table, limit: 15,
+  - {id: db14_nonselling, title: "Dishes never sold (consider removing from POS)", query: dim_item, type: Table, enable_color_scale: true, show_filter_row: true, limit: 15,
      filters: [{column: is_sales_item, op: "=", value: 1}, {column: is_sold, op: "!=", value: 1}, {column: disabled, op: "!=", value: 1},
                {column: category_family, op: in, value: [Food, Beverage]}],
      rows: [menu_category], columns: [category_family], y: [{column: item_code, agg: count, as: Dishes}]}
   # ---- Where the data comes from (DQ-001, DQ-004, DQ-011)
   - {id: db14_population, title: "Bills by payment stage (count)", query: fact_invoices, type: Donut, limit: 5, max_slices: 5,
      x: population, y: [{column: name, agg: count, as: Bills}]}
-  - {id: db14_covers_share, title: "Dine-in bills with covers (%)", query: fact_invoices, type: Bar, limit: 5,
+  - {id: db14_covers_share, title: "Dine-in bills with covers (%)", query: fact_invoices, type: Bar, color: "#6b4a5c", stack: true, limit: 5,
      filters: [{column: order_type, op: "=", value: "Dine In"}],
      x: population, y: [{expr: "(100 * count_if(pax > 0) / count(name)).round(1)", as: "Bills with covers (%)"}]}
-  - {id: db14_branches, title: "Branches with data", query: fact_invoices, type: Number,
+  - {id: db14_branches, title: "Branches with data", query: fact_invoices, type: Number, sparkline: false,
      y: [{column: branch, agg: count_distinct, as: "Branches with data"}]}
   - {id: db14_companies, title: "Companies with data", query: fact_invoices, type: Number,
      y: [{column: company, agg: count_distinct, as: "Companies with data"}]}
@@ -167,39 +177,39 @@ dashboards:
         h: 3
       - text: "<p><b>Start recording these</b> (a suggested order)</p><ul><li><b>Wastage:</b> keep logging spoiled and returned food daily. Unlocks true food cost.</li><li><b>Recipe costs:</b> add a costed recipe to each sold dish. Unlocks dish margin.</li><li><b>Staff link:</b> link each POS user to an Employee. Unlocks sales per person.</li><li><b>Cook on tickets:</b> record who cooks each ticket. Unlocks prep time per cook.</li><li><b>Station for every dish:</b> set one per dish. Unlocks station sales.</li></ul>"
         x: 0
-        y: 10
+        y: 9
         w: 20
         h: 6
       - text: "<p><b>Not recorded yet</b> - a zero here means not recorded, not that all is well</p>"
         x: 0
-        y: 17
+        y: 15
         w: 20
         h: 1
-      - {chart: db14_actor, x: 0, y: 18, w: 5, h: 3}
-      - {chart: db14_yield_dept, x: 5, y: 18, w: 5, h: 3}
-      - {chart: db14_waste, x: 10, y: 18, w: 5, h: 3}
-      - {chart: db14_emp_link, x: 15, y: 18, w: 5, h: 3}
+      - {chart: db14_actor, x: 0, y: 16, w: 5, h: 3}
+      - {chart: db14_yield_dept, x: 5, y: 16, w: 5, h: 3}
+      - {chart: db14_waste, x: 10, y: 16, w: 5, h: 3}
+      - {chart: db14_emp_link, x: 15, y: 16, w: 5, h: 3}
       - text: "<p><b>Set-up gaps</b> - sales and dishes that are not mapped yet</p>"
         x: 0
-        y: 22
+        y: 19
         w: 20
         h: 1
-      - {chart: db14_unmapped, x: 0, y: 23, w: 5, h: 3}
-      - {chart: db14_unassigned, x: 5, y: 23, w: 5, h: 3}
-      - {chart: db14_items_nodept, x: 10, y: 23, w: 5, h: 3}
-      - {chart: db14_plan_ctrl, x: 15, y: 23, w: 5, h: 3}
+      - {chart: db14_unmapped, x: 0, y: 20, w: 5, h: 3}
+      - {chart: db14_unassigned, x: 5, y: 20, w: 5, h: 3}
+      - {chart: db14_items_nodept, x: 10, y: 20, w: 5, h: 3}
+      - {chart: db14_plan_ctrl, x: 15, y: 20, w: 5, h: 3}
       - text: "<p><b>Menu clean-up</b> - dishes on the POS that have never been sold</p>"
         x: 0
-        y: 27
+        y: 23
         w: 20
         h: 1
-      - {chart: db14_nonselling, x: 0, y: 28, w: 20, h: 14}
+      - {chart: db14_nonselling, x: 0, y: 24, w: 20, h: 9}
       - text: "<p><b>Where the data comes from</b> - bill mix, covers recorded and sites reporting</p>"
         x: 0
-        y: 42
+        y: 33
         w: 20
         h: 1
-      - {chart: db14_population, x: 0, y: 43, w: 10, h: 11}
-      - {chart: db14_covers_share, x: 10, y: 43, w: 10, h: 11}
-      - {chart: db14_branches, x: 0, y: 54, w: 10, h: 3}
-      - {chart: db14_companies, x: 10, y: 54, w: 10, h: 3}
+      - {chart: db14_population, x: 0, y: 34, w: 10, h: 8}
+      - {chart: db14_covers_share, x: 10, y: 34, w: 10, h: 8}
+      - {chart: db14_branches, x: 0, y: 42, w: 10, h: 3}
+      - {chart: db14_companies, x: 10, y: 42, w: 10, h: 3}
