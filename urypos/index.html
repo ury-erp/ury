@@ -2,13 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/ury.ico" />
+    <link rel="icon" href="{{ (brand.favicon if brand and brand.favicon else '/ury.ico') | e }}" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>URY POS</title>
+    <title>{{ (brand.name if brand and brand.name else 'URY POS') | e }}</title>
   </head>
   <body>
     <div id="app"></div>
-    <script>window.csrf_token = '{{ frappe.session.csrf_token }}';</script>
+    <script>
+      window.csrf_token = '{{ frappe.session.csrf_token }}';
+      if (!window.frappe) window.frappe = {};
+      if (!window.frappe.boot) window.frappe.boot = {};
+      window.frappe.boot.ury_brand = {{ brand_json | safe }};
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

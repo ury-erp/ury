@@ -16,7 +16,7 @@
             "
           >
             <a href="/urypos/Table" class="flex-shrink-0">
-              <img :src="imagePath" alt="URY POS logo" class="w-32 lg:w-44" />
+              <img :src="brand.logo" :alt="brand.name" class="w-32 lg:w-44" />
             </a>
           </template>
           <template v-else>
@@ -102,6 +102,7 @@ import { useAuthStore } from "@/stores/Auth.js";
 import { posOpening } from "@/stores/posOpening.js";
 import { posClosing } from "@/stores/posClosing.js";
 import uriPosImage from "@/assets/logos/URY_POS.jpg";
+import { resolveBrand } from "../../../packages/core/src/brand.ts";
 import { tabFunctions } from "@/stores/bottomTabs.js";
 import { useTableStore } from "@/stores/Table.js";
 
@@ -118,7 +119,7 @@ export default {
   },
   data() {
     return {
-      imagePath: uriPosImage,
+      brand: resolveBrand({ name: "URY POS logo", logo: uriPosImage }),
     };
   },
   methods: {

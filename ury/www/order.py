@@ -4,6 +4,7 @@ import re
 import frappe
 import frappe.sessions
 import frappe.website.utils
+from ury.brand import get_brand_context, json_for_script
 
 no_cache = 1
 
@@ -21,11 +22,13 @@ def get_context(context):
 	rather than frappe.sessions.get()'s full desk boot payload.
 	"""
 	csrf_token = frappe.sessions.get_csrf_token()
+	context.update(get_brand_context())
 	frappe.db.commit()  # nosemgrep
 
 	boot = frappe.website.utils.get_boot_data()
+	boot["ury_brand"] = context["brand"]
 
-	boot_json = frappe.as_json(boot, indent=None, separators=(",", ":"))
+	boot_json = json_for_script(boot)
 	boot_json = SCRIPT_TAG_PATTERN.sub("", boot_json)
 	boot_json = CLOSING_SCRIPT_TAG_PATTERN.sub("", boot_json)
 	boot_json = json.dumps(boot_json)
