@@ -10,7 +10,7 @@ import {
   POSOpeningContext,
   POSOpeningPayment,
 } from '../lib/pos-opening-api';
-import { t } from '../i18n';
+import { getActiveLanguage, t } from '../i18n';
 import POSOpeningPaymentTable from './POSOpeningPaymentTable';
 
 type OpeningBlockingState =
@@ -32,6 +32,7 @@ type BlockingErrorKey =
   | 'no_profiles'
   | 'no_payment_modes'
   | 'no_permission'
+  | 'occupied_till'
   | 'daily_close_pending'
   | 'main_cashier_not_open'
   | 'main_cashier_not_configured';
@@ -105,6 +106,10 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
 
     if (context.allowed_profiles.length === 0) {
       return 'no_profiles';
+    }
+
+    if (context.occupied_entry) {
+      return 'occupied_till';
     }
 
     if (context.payment_modes.length === 0) {
@@ -205,6 +210,25 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
             <p className="text-red-700 text-sm">{t('pos_opening.no_profiles')}</p>
           </div>
         );
+      case 'occupied_till': {
+        const occupied = context?.occupied_entry;
+        return (
+          <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
+            <p className="text-orange-700 text-sm">
+              {t('pos_opening.occupied_till', {
+                profile: context?.selected_profile || '',
+                holder: occupied?.user_full_name && !occupied.user_full_name.includes('@')
+                  ? occupied.user_full_name
+                  : t('pos_opening.another_cashier'),
+                since: occupied?.period_start_date
+                  ? new Date(occupied.period_start_date.replace(' ', 'T')).toLocaleString(getActiveLanguage())
+                  : '',
+              })}
+            </p>
+          </div>
+        );
+      }
       case 'no_payment_modes':
         return (
           <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
