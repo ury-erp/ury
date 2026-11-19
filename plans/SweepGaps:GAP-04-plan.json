@@ -1,0 +1,21 @@
+{
+  "subtasks": [
+    {
+      "objective": "Build a React-based KDS view in the new URY management frontend using @ury/ui and @ury/core, replacing the legacy-only URYMosaic dependency for kitchen display workflows.",
+      "acceptance": "A KDS route/view exists in frontend/src that loads production-unit KOTs through the existing ury_kot_display.py APIs, subscribes to the existing kot_update_{branch}_{production_unit} realtime channel, renders KOT cards with order/table/user/invoice/time/items/comments/status coloring/audio behavior equivalent to URYMosaic, and supports serve/unserve plus cancellation confirmation actions. Shared display primitives or API helpers added under packages/ui or packages/core are covered by typechecks, and the frontend build passes.",
+      "scope": [
+        "frontend/src/**/*",
+        "packages/core/src/**/*",
+        "packages/ui/src/**/*",
+        "frontend/package.json",
+        "packages/core/package.json",
+        "packages/ui/package.json"
+      ],
+      "task_type": "impl",
+      "difficulty": 4,
+      "risk": 4,
+      "uncertainty": 3,
+      "priority": 95
+    }
+  ]
+}
