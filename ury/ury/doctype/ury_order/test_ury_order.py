@@ -15,6 +15,145 @@ from ury.ury.doctype.ury_order.ury_order import get_order_invoice
 from ury.ury.doctype.ury_order.ury_order import get_table_order_context, get_captain_context
 from ury.ury.doctype.ury_order.ury_order import table_transfer, captain_transfer
 
+
+class TestCancelOrder(unittest.TestCase):
+    def setUp(self):
+        from ury.ury.doctype.ury_order import ury_order
+
+        self.order = ury_order
+        self.original_cancel_kot = ury_order.cancel_kot
+        self.invoice = MagicMock()
+        self.invoice.name = "POS-INV-001"
+        self.invoice.branch = "Test Branch"
+        self.invoice.restaurant_table = "T1"
+        self.invoice.docstatus = 0
+        self.framework = MagicMock()
+        self.framework.PermissionError = frappe.PermissionError
+        self.framework.get_doc.return_value = self.invoice
+        self.framework.has_permission.return_value = True
+        self.framework.session.user = "manager@example.com"
+        self.framework.throw.side_effect = lambda message, exception: self.raise_error(exception(message))
+        self.kot = MagicMock()
+        self.release = MagicMock()
+        for target, replacement in (
+            ("frappe", self.framework),
+            ("_", lambda message: message),
+            ("getBranch", lambda: "Test Branch"),
+            ("cancel_kot", self.kot),
+            ("release_merge_cluster_tables", self.release),
+        ):
+            self.enterContext(patch.object(ury_order, target, replacement))
+
+        def cancel():
+            if self.invoice.docstatus == 0:
+                raise frappe.DocstatusTransitionError("Cannot cancel a draft invoice")
+            self.invoice.docstatus = 2
+
+        self.invoice.cancel.side_effect = cancel
+
+    @staticmethod
+    def raise_error(error):
+        raise error
+
+    def test_draft_is_discarded_and_reason_saved_afterwards(self):
+        try:
+            self.order.cancel_order(self.invoice.name, "Duplicate check")
+        except frappe.DocstatusTransitionError as error:
+            self.fail(f"An open draft check must be discarded, not cancelled: {error}")
+        self.invoice.discard.assert_called_once_with()
+        self.invoice.cancel.assert_not_called()
+        self.assertEqual(self.invoice.method_calls, [
+            unittest.mock.call.discard(),
+            unittest.mock.call.db_set("cancel_reason", "Duplicate check"),
+        ])
+        self.framework.db.sql.assert_not_called()
+        self.framework.db.set_value.assert_not_called()
+
+    def test_submitted_is_cancelled_once_without_raw_status_writes(self):
+        self.invoice.docstatus = 1
+        self.order.cancel_order(self.invoice.name, "Wrong order")
+        self.invoice.cancel.assert_called_once_with()
+        self.invoice.discard.assert_not_called()
+        self.assertEqual(self.invoice.method_calls, [
+            unittest.mock.call.cancel(),
+            unittest.mock.call.db_set("cancel_reason", "Wrong order"),
+        ])
+        self.framework.db.sql.assert_not_called()
+        self.framework.db.set_value.assert_not_called()
+
+    def test_cancel_permission_denial_precedes_all_mutation(self):
+        self.framework.has_permission.return_value = False
+        with self.assertRaises(frappe.PermissionError):
+            self.order.cancel_order(self.invoice.name, "Duplicate check")
+        self.framework.has_permission.assert_called_once_with("POS Invoice", "cancel", doc=self.invoice)
+        self.assertEqual(self.invoice.method_calls, [])
+        self.kot.assert_not_called()
+        self.release.assert_not_called()
+
+    def test_other_branch_denial_precedes_all_mutation(self):
+        self.invoice.branch = "Other Branch"
+        with self.assertRaises(frappe.PermissionError):
+            self.order.cancel_order(self.invoice.name, "Duplicate check")
+        self.assertEqual(self.invoice.method_calls, [])
+        self.kot.assert_not_called()
+        self.release.assert_not_called()
+
+    def test_native_discard_enforces_write_permission(self):
+        from frappe.model.document import Document
+        from frappe.model.docstatus import DocStatus
+
+        self.invoice.docstatus = DocStatus.DRAFT
+        self.invoice.discard.side_effect = lambda: Document.discard(self.invoice)
+        self.invoice.check_permission.side_effect = frappe.PermissionError("Write denied")
+        with self.assertRaises(frappe.PermissionError):
+            self.order.cancel_order(self.invoice.name, "Duplicate check")
+        self.invoice.check_permission.assert_called_once_with("write")
+        self.invoice.cancel.assert_not_called()
+        self.invoice.db_set.assert_not_called()
+
+    def test_native_discard_retains_the_cancelled_invoice_and_reason(self):
+        from frappe.model.document import Document
+        from frappe.model.docstatus import DocStatus
+        from erpnext.controllers.status_updater import StatusUpdater
+
+        self.invoice.docstatus = DocStatus.DRAFT
+        self.invoice.discard.side_effect = lambda: Document.discard(self.invoice)
+        self.invoice.db_set.side_effect = lambda field, value: setattr(self.invoice, field, value)
+        self.invoice.run_method.side_effect = lambda method: (
+            StatusUpdater.on_discard(self.invoice) if method == "on_discard" else None
+        )
+        self.order.cancel_order(self.invoice.name, "Duplicate check")
+        self.assertEqual(self.invoice.docstatus, 2)
+        self.assertEqual(self.invoice.status, "Cancelled")
+        self.assertEqual(self.invoice.cancel_reason, "Duplicate check")
+        self.assertEqual(self.invoice.name, "POS-INV-001")
+        self.invoice.delete.assert_not_called()
+        self.invoice.cancel.assert_not_called()
+
+    def test_kot_cancellation_does_not_stale_the_invoice_before_discard(self):
+        from frappe.model.document import Document
+        from frappe.model.docstatus import DocStatus
+
+        self.invoice.docstatus = DocStatus.DRAFT
+        self.invoice.modified = "2026-10-04 12:00:00"
+        self.invoice._original_modified = self.invoice.modified
+        self.invoice._doc_before_save = SimpleNamespace(modified=self.invoice.modified)
+        self.invoice.items = []
+        self.invoice.check_if_latest.side_effect = lambda: Document.check_if_latest(self.invoice)
+        self.invoice.discard.side_effect = lambda: Document.discard(self.invoice)
+        kot = MagicMock()
+        self.framework.db.get_list.return_value = [SimpleNamespace(name="KOT-001")]
+        self.framework.get_doc.side_effect = lambda doctype, name: (
+            kot if doctype == "URY KOT" else self.invoice
+        )
+        # Run the original KOT path, including its separate KOT save.
+        self.kot.side_effect = self.original_cancel_kot
+        with patch.object(self.order, "process_items_for_cancel_kot"):
+            self.order.cancel_order(self.invoice.name, "Duplicate check")
+        kot.save.assert_called_once_with()
+        self.invoice.check_if_latest.assert_called_once_with()
+        self.invoice.reload.assert_not_called()
+
 class TestURYOrderSEC11(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
