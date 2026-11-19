@@ -1,24 +1,10 @@
-import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, call } from '@ury/core';
 import HufLogo from '../components/HufLogo';
-
-// Helper function to format relative time
-function getRelativeTime(creationDate: string): string {
-  const now = new Date();
-  const date = new Date(creationDate);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hr ago`;
-  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-}
+import Notifications from '../components/Notifications';
 
 // Helper to format ETA minutes into readable time
 function formatETA(minutes: number | null): string {
@@ -38,21 +24,18 @@ export default function Dashboard() {
   const [floorLoad, setFloorLoad] = useState<any[]>([]);
   const [runningLow, setRunningLow] = useState<any[]>([]);
   const [needsAttention, setNeedsAttention] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [serviceLineLoading, setServiceLineLoading] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [floorLoadLoading, setFloorLoadLoading] = useState(false);
   const [runningLowLoading, setRunningLowLoading] = useState(false);
   const [needsAttentionLoading, setNeedsAttentionLoading] = useState(false);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [serviceLineError, setServiceLineError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [floorLoadError, setFloorLoadError] = useState<string | null>(null);
   const [runningLowError, setRunningLowError] = useState<string | null>(null);
   const [needsAttentionError, setNeedsAttentionError] = useState<string | null>(null);
-  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!posProfile?.branch) return;
@@ -194,33 +177,6 @@ export default function Dashboard() {
         setNeedsAttentionLoading(false);
       }
 
-      // Fetch recent notifications
-      setNotificationsLoading(true);
-      setNotificationsError(null);
-      try {
-        const params = new URLSearchParams({
-          doctype: 'Notification Log',
-          fields: JSON.stringify(['name', 'subject', 'creation']),
-          order_by: 'creation desc',
-          limit_page_length: '10'
-        });
-        const notificationsRes = await fetch(
-          `/api/method/frappe.client.get_list?${params.toString()}`
-        );
-        if (!notificationsRes.ok) throw new Error('Failed to fetch notifications');
-        const notificationsData = await notificationsRes.json();
-        const processedNotifications = (notificationsData.message || []).map((notif: any) => ({
-          id: notif.name,
-          message: notif.subject,
-          timestamp: getRelativeTime(notif.creation)
-        }));
-        setNotifications(processedNotifications);
-      } catch (err) {
-        setNotificationsError('Failed to load notifications');
-        console.error('Error fetching notifications:', err);
-      } finally {
-        setNotificationsLoading(false);
-      }
     };
 
     fetchDashboardData();
@@ -517,30 +473,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Recent Notifications Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Recent Notifications</h3>
-              </div>
-              <div className="space-y-2">
-                {notificationsError ? (
-                  <p className="text-red-600 text-sm">Failed to load</p>
-                ) : notificationsLoading ? (
-                  <p className="text-gray-600 text-sm">Loading...</p>
-                ) : notifications.length === 0 ? (
-                  <p className="text-gray-600 text-sm">No recent notifications.</p>
-                ) : (
-                  notifications.map((notification) => (
-                    <div key={notification.id} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <p className="text-xs text-gray-700">{notification.message}</p>
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0 whitespace-nowrap">{notification.timestamp}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <Notifications />
         </div>
       </div>
     </div>

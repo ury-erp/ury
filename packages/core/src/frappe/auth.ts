@@ -2,6 +2,17 @@ import { db, auth } from './client';
 
 type LoggedUserResponse = string | null;
 
+export const getSessionUser = (): LoggedUserResponse => {
+  const cookie = document.cookie.split(';').map((part) => part.trim())
+    .find((part) => part.startsWith('user_id='));
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice('user_id='.length)) || null;
+  } catch {
+    return null;
+  }
+};
+
 interface UserDoc {
   name: string;
   full_name: string;
