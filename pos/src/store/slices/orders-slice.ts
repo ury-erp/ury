@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
-import { call } from '@ury/core';
+import { call, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 
@@ -95,7 +95,9 @@ export const createOrdersSlice: StateCreator<
       const { orderSearchQuery, selectedStatus } = get();
       
       // Get POS profile to access paid_limit
-      const posProfile = sessionStorage.getItem('posProfile');
+      sessionStorage.removeItem('posProfile');
+      const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
+      const posProfile = cacheKey ? sessionStorage.getItem(cacheKey) : null;
       const profile = posProfile ? JSON.parse(posProfile) : null;
       const paidLimit = profile?.paid_limit;
       
@@ -226,4 +228,4 @@ export const createOrdersSlice: StateCreator<
   },
 
   setOrderSearchQuery: (query) => set({ orderSearchQuery: query }),
-}); 
+});

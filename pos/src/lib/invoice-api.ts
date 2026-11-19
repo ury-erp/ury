@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from '@ury/core';
+import { call, db, getSessionUser, getUserSessionStorageKey } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -326,8 +326,10 @@ const MERGE_CANDIDATE_FIELDS = [
   'mobile_number',
 ] as const;
 
-function getBranchFromSession(): string {
-  const raw = sessionStorage.getItem('posProfile');
+async function getBranchFromSession(): Promise<string> {
+  sessionStorage.removeItem('posProfile');
+  const cacheKey = getUserSessionStorageKey('posProfile', getSessionUser());
+  const raw = cacheKey ? sessionStorage.getItem(cacheKey) : null;
   if (!raw) {
     throw new Error('POS profile not loaded');
   }
@@ -368,7 +370,7 @@ export async function getMergeBillCandidates({
   pageSize = MERGE_CANDIDATE_PAGE_SIZE,
   linkedSecondaries,
 }: GetMergeBillCandidatesParams): Promise<{ data: MergeBillCandidate[]; hasMore: boolean }> {
-  const branch = getBranchFromSession();
+  const branch = await getBranchFromSession();
   const secondaries = linkedSecondaries ?? (await getLinkedMergeSecondaries());
   const exclude = Array.from(new Set([primaryInvoice, ...secondaries]));
 
@@ -429,4 +431,4 @@ export async function mergeBills(
     throw new Error(result.message || 'Failed to merge bills');
   }
   return result;
-} 
+}
