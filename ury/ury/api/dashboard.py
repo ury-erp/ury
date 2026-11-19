@@ -57,22 +57,18 @@ def get_recent_transactions(branch=None, limit=10):
 
 @frappe.whitelist()
 def get_module_records(doctype, branch=None):
-    if not frappe.db.exists("DocType", doctype):
-        return []
+    if doctype not in (
+        "Branch", "URY Room", "URY Table", "URY Menu", "URY Menu Course",
+        "Item", "Item Group", "URY Production Unit", "User",
+    ):
+        frappe.throw("Not permitted", frappe.PermissionError)
     
     filters = {}
     if branch and branch != 'all':
         meta = frappe.get_meta(doctype)
         if meta.has_field("branch"):
             filters["branch"] = branch
-        elif meta.has_field("custom_branch"):
-            filters["custom_branch"] = branch
-            
-    try:
-        records = frappe.get_all(doctype, filters=filters, fields=["*"])
-        if doctype == "User":
-            for r in records:
-                r["roles"] = frappe.get_all("Has Role", filters={"parent": r.name}, fields=["role"])
-        return records
-    except Exception:
-        return []
+
+    fields = ["name", "full_name", "enabled", "user_type"] if doctype == "User" else ["*"]
+    # Native read and User Permissions apply; permission failures must propagate.
+    return frappe.get_list(doctype, filters=filters, fields=fields, limit_page_length=500)
