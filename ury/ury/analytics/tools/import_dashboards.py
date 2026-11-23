@@ -5,6 +5,62 @@ import json
 import yaml
 import frappe
 
+LATEST_DAY = "__LATEST_DAY__"
+
+
+def latest_sales_day():
+    """The last day with a submitted, non-return POS Invoice (the day the dashboards open on), as YYYY-MM-DD."""
+    d = frappe.db.sql("select max(posting_date) from `tabPOS Invoice` where docstatus = 1 and is_return = 0")[0][0]
+    return str(d) if d else None
+
+
+def resolve_latest_day(value):
+    """Replace the __LATEST_DAY__ placeholder in a YAML filter default with the last day with sales.
+    With no sales at all the default is dropped (None), so the dashboard opens on every date."""
+    if isinstance(value, list) and LATEST_DAY in value:
+        day = latest_sales_day()
+        return [day if v == LATEST_DAY else v for v in value] if day else None
+    if isinstance(value, dict) and value.get("anchor") == LATEST_DAY:
+        day = latest_sales_day()
+        return {**value, "anchor": day} if day else None
+    return value
+
+
+def refresh_latest_day_defaults():
+    """Point every dashboard Date filter that defaults to the latest day (YAML default value [__LATEST_DAY__, __LATEST_DAY__])
+    at the current last day with sales. Scheduled daily (hooks) so the dashboards keep opening on the latest day.
+    bench --site <site> execute ury.ury.analytics.tools.import_dashboards.refresh_latest_day_defaults"""
+    day = latest_sales_day()
+    if not day:
+        return {}
+    done = {}
+    for fpath in sorted(glob.glob(os.path.join(_get_app_path(), "dashboards", "DB*.yaml"))):
+        with open(fpath) as fp:
+            spec = yaml.safe_load(fp)
+        dsh = (spec.get("dashboards") or [{}])[0]
+        title = dsh.get("title")
+        def _latest(v):
+            return (isinstance(v, list) and LATEST_DAY in v) or (isinstance(v, dict) and v.get("anchor") == LATEST_DAY)
+        labels = {f.get("label"): f["default"] for f in dsh.get("filters", []) if _latest((f.get("default") or {}).get("value"))}
+        if not labels:
+            continue
+        for name in frappe.get_all("Insights Dashboard v3", filters={"title": title}, pluck="name"):
+            items = json.loads(frappe.db.get_value("Insights Dashboard v3", name, "items") or "[]")
+            changed = False
+            for it in items:
+                if it.get("type") == "filter" and it.get("filter_name") in labels:
+                    default = labels[it["filter_name"]]
+                    value = resolve_latest_day(default["value"])
+                    if it.get("default_value") != value or it.get("default_operator") != default.get("op"):
+                        it["default_operator"], it["default_value"] = default.get("op"), value
+                        changed = True
+            if changed:
+                frappe.db.set_value("Insights Dashboard v3", name, "items", json.dumps(items), update_modified=False)
+                done[name] = day
+    frappe.db.commit()
+    return done
+
+
 def _get_app_path():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -635,6 +691,8 @@ def import_all(only=None):
                         "h": item.get('h', 2)
                     }
                 })
+
+        dashboard_items = to_current_grid(dashboard_items, wb_name)
 
         dash_doc = frappe.new_doc('Insights Dashboard v3')
         dash_doc.title = dash_title
