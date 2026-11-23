@@ -28,9 +28,14 @@ def set_sales_invoice_commission_attribution(doc, method=None):
     doc.custom_closing_employee = _employee_for_user(doc.cashier) or doc.get("custom_closing_employee")
 
 
+from ury.ury.class_overrides.pos_invoice import set_packed_item_warehouses
+
+
 def validate(doc, method):
     if doc.is_pos:
         doc.update_stock = 1
+    # Runs after ERPNext's own validate has built the packing list.
+    set_packed_item_warehouses(doc)
 
 
 def before_insert(doc, method):
