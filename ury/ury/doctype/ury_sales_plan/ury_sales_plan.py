@@ -21,6 +21,7 @@ from ury.ury.api.ury_sales_plan import (
 	validate_plan_has_demand,
 	validate_plan_items,
 )
+from ury.ury.api.ury_sales_plan_rate import calculate_totals, populate_item_rates
 from ury.ury.api.ury_sales_plan_auto_production_plan import (
 	create_production_plans_on_lock,
 )
@@ -52,6 +53,11 @@ class URYSalesPlan(Document):
 		# see the freshly-populated bom rather than a stale/missing value
 		# supplied by the frontend.
 		populate_item_production_context(self)
+		# Rates are server-resolved from the branch menu price lists while the
+		# plan is still editable; from Approved onward they stay as stored so a
+		# later price change cannot shift an approved plan.
+		if self.get("status") in ("Draft", "Proposed", "Submitted for Approval"):
+			populate_item_rates(self)
 		# Drafts: warn on off-menu items (plan-ahead is legitimate). Approved
 		# re-saves are deliberately NOT re-checked -- a frozen plan must not be
 		# bricked by a later menu change; approval below is the hard gate.
@@ -113,6 +119,9 @@ class URYSalesPlan(Document):
 			if self.status == "Draft":
 				_guard_backward_transition(self, self.status, self.get("cancellation_reason"))
 			self._record_transition(prev_status)
+
+		# Last, so rows pruned on approval are excluded from the total.
+		calculate_totals(self)
 
 	# ------------------------------------------------------------------
 	# Audit coverage for the save paths that never call validate()

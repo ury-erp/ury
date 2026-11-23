@@ -60,6 +60,7 @@ const historyResponse = {
       stock_uom: 'Nos',
       department: 'Indian',
       production_unit: 'Hot Kitchen',
+      rate: 0,
       average_qty: 72,
       sample_days: 3,
       history: [
@@ -73,6 +74,7 @@ const historyResponse = {
       stock_uom: 'Nos',
       department: 'Chinese',
       production_unit: 'Wok',
+      rate: 0,
       average_qty: 44,
       sample_days: 3,
       history: [{ date: '2026-08-08', qty: 40, invoices: 10 }],
@@ -118,6 +120,36 @@ describe('SalesPlanPage', () => {
     await userEvent.type(planInput, '70');
 
     expect(screen.getByText('-2')).toBeInTheDocument();
+  });
+
+  it('shows item rates and a Planned Amount card that follows plan quantity edits', async () => {
+    vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue({
+      ...historyResponse,
+      items: [
+        { ...historyResponse.items[0], rate: 100 },
+        { ...historyResponse.items[1], rate: 50 },
+      ],
+    });
+    render(<SalesPlanPage />);
+
+    await screen.findByText('Chicken Biryani');
+
+    // Rate column sits between Item and History Insight.
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    const first = headers.indexOf('Item');
+    expect(headers[first + 1]).toBe('Rate');
+    expect(headers[first + 2]).toBe('History Insight');
+
+    // 72 x 100 + 44 x 50 = 9,400
+    expect(screen.getByText('Planned Amount')).toBeInTheDocument();
+    expect(screen.getByText(/9,400/)).toBeInTheDocument();
+
+    const planInput = getPlanInputForRow('Chicken Biryani');
+    await userEvent.clear(planInput);
+    await userEvent.type(planInput, '70');
+
+    // 70 x 100 + 44 x 50 = 9,200
+    expect(screen.getByText(/9,200/)).toBeInTheDocument();
   });
 
   it('opens the history drill-down modal from the history insight', async () => {

@@ -618,7 +618,11 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
     else:
         doc.insert()
 
-    return {"name": doc.name, "status": doc.status}
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "expected_sales_amount": doc.expected_sales_amount,
+    }
 
 
 @frappe.whitelist(methods=["POST"])

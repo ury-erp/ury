@@ -4,6 +4,7 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
+import { useCurrency } from '../../context/CurrencyContext';
 import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
 import {
   addManualItemToDraft,
@@ -12,6 +13,7 @@ import {
   buildSalesPlanDraftKey,
   ComparableHistoryItem,
   ComparableHistoryResponse,
+  getPlanAmount,
   getSalesPlanDraftQuantities,
   mergeSavedPlanRows,
   salesPlanService,
@@ -346,6 +348,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId, activeBranch } = useBranchContext();
+  const { format: formatMoney } = useCurrency();
   const { isManager, roles } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   // Tracks the "site today" used for the relative date label. Recomputed on
@@ -559,6 +562,7 @@ export const SalesPlanPage: React.FC = () => {
 
   const totalPlannedQty = items.reduce((total, item) => total + item.planned_qty, 0);
   const totalHistoryQty = items.reduce((total, item) => total + item.average_qty, 0);
+  const totalPlannedAmount = getPlanAmount(items);
 
   // Real, backend-derived blockers: an item with no production unit assigned
   // can't be routed for prep, and an item with zero comparable sample days
@@ -1209,6 +1213,7 @@ export const SalesPlanPage: React.FC = () => {
           ...(blockedItems.length > 0
             ? [{ label: __('Blocked'), value: blockedItems.length, tone: 'warning' as const }]
             : []),
+          { label: __('Planned Amount'), value: formatMoney(totalPlannedAmount) },
         ]}
         />
       </Section>
@@ -1348,7 +1353,7 @@ export const SalesPlanPage: React.FC = () => {
               ? `Plan quantity for ${nextRowAfterTruncation.item_name || nextRowAfterTruncation.item_code}`
               : undefined;
 
-            // Column order: Item / History Insight / Production Unit / Plan
+            // Column order: Item / Rate / History Insight / Production Unit / Plan
             // (inserted via editableColumnIndex below) / Variance.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
@@ -1364,6 +1369,14 @@ export const SalesPlanPage: React.FC = () => {
                     <p className="font-semibold text-foreground">{row.item_name || row.item_code}</p>
                     <p className="mt-0.5 text-xs text-text-tertiary">{row.item_code}</p>
                   </button>
+                ),
+              },
+              {
+                key: 'rate',
+                header: __('Rate'),
+                align: 'right',
+                render: (row) => (
+                  <span className="tabular-nums text-muted-foreground">{formatMoney(row.rate || 0)}</span>
                 ),
               },
               {
@@ -1565,7 +1578,7 @@ export const SalesPlanPage: React.FC = () => {
                         onChange: (row, value) => updatePlannedQty(row._rowKey, value),
                         getAriaLabel: (row) => `Plan quantity for ${row.item_name || row.item_code}`,
                       }}
-                      editableColumnIndex={3}
+                      editableColumnIndex={4}
                       csvContextColumns={[
                         { header: __('Item Code'), get: (row) => row.item_code },
                         { header: __('Item Name'), get: (row) => row.item_name || '' },
