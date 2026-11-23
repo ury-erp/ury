@@ -122,7 +122,7 @@ describe('SalesPlanPage', () => {
     expect(screen.getByText('-2')).toBeInTheDocument();
   });
 
-  it('shows item rates and a Planned Amount card that follows plan quantity edits', async () => {
+  it('shows a Planned Amount card that follows plan quantity edits', async () => {
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue({
       ...historyResponse,
       items: [
@@ -133,12 +133,6 @@ describe('SalesPlanPage', () => {
     render(<SalesPlanPage />);
 
     await screen.findByText('Chicken Biryani');
-
-    // Rate column sits between Item and History Insight.
-    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    const first = headers.indexOf('Item');
-    expect(headers[first + 1]).toBe('Rate');
-    expect(headers[first + 2]).toBe('History Insight');
 
     // 72 x 100 + 44 x 50 = 9,400
     expect(screen.getByText('Planned Amount')).toBeInTheDocument();

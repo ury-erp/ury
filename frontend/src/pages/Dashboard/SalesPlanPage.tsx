@@ -1353,12 +1353,14 @@ export const SalesPlanPage: React.FC = () => {
               ? `Plan quantity for ${nextRowAfterTruncation.item_name || nextRowAfterTruncation.item_code}`
               : undefined;
 
-            // Column order: Item / Rate / History Insight / Production Unit / Plan
+            // Widths are fixed so columns line up across every department table.
+            // Column order: Item / History Insight / Production Unit / Plan
             // (inserted via editableColumnIndex below) / Variance.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
                 key: 'item_code',
                 header: __('Item'),
+                width: '25%',
                 render: (row) => (
                   <button
                     type="button"
@@ -1372,16 +1374,9 @@ export const SalesPlanPage: React.FC = () => {
                 ),
               },
               {
-                key: 'rate',
-                header: __('Rate'),
-                align: 'right',
-                render: (row) => (
-                  <span className="tabular-nums text-muted-foreground">{formatMoney(row.rate || 0)}</span>
-                ),
-              },
-              {
                 key: 'average_qty',
                 header: __('History Insight'),
+                width: '27%',
                 render: (row) => (
                   <button
                     type="button"
@@ -1398,12 +1393,14 @@ export const SalesPlanPage: React.FC = () => {
               {
                 key: 'production_unit',
                 header: __('Production Unit'),
+                width: '18%',
                 render: (row) => <span className="text-muted-foreground">{row.production_unit || __('Unassigned')}</span>,
               },
               {
                 key: 'variance',
                 header: __('Variance'),
                 align: 'right',
+                width: '8%',
                 render: (row) => {
                   const variance = getVariance(row);
                   return (
@@ -1572,13 +1569,14 @@ export const SalesPlanPage: React.FC = () => {
                         key: 'planned_qty',
                         header: __('Plan'),
                         align: 'right',
+                        width: '22%',
                         min: 0,
                         step: 0.01,
                         getValue: (row) => row.planned_qty,
                         onChange: (row, value) => updatePlannedQty(row._rowKey, value),
                         getAriaLabel: (row) => `Plan quantity for ${row.item_name || row.item_code}`,
                       }}
-                      editableColumnIndex={4}
+                      editableColumnIndex={3}
                       csvContextColumns={[
                         { header: __('Item Code'), get: (row) => row.item_code },
                         { header: __('Item Name'), get: (row) => row.item_name || '' },
