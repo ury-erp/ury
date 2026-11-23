@@ -3,6 +3,8 @@ import {
   addManualItemToDraft,
   buildSalesPlanDraft,
   buildSalesPlanDraftKey,
+  getLineAmount,
+  getPlanAmount,
   getSalesPlanDraftQuantities,
   mergeSavedPlanRows,
   normalizeHistoryResponse,
@@ -141,6 +143,7 @@ describe('addManualItemToDraft', () => {
 
   it('prevents duplicate items by item_code', () => {
     const existingItem: SalesPlanItem = {
+      rate: 0,
       _rowKey: 'row-existing',
       item_code: 'ITEM-EXISTING',
       item_name: 'Existing Product',
@@ -168,6 +171,7 @@ describe('addManualItemToDraft', () => {
 
   it('appends new item without mutating original array', () => {
     const existingItem: SalesPlanItem = {
+      rate: 0,
       _rowKey: 'row-001',
       item_code: 'ITEM-001',
       item_name: 'Product 1',
@@ -197,6 +201,7 @@ describe('addManualItemToDraft', () => {
 
 describe('mergeSavedPlanRows', () => {
   const historyItem = (item_code: string, planned_qty: number): SalesPlanItem => ({
+    rate: 0,
     item_code,
     item_name: `Name ${item_code}`,
     stock_uom: 'Nos',
@@ -277,5 +282,40 @@ describe('mergeSavedPlanRows', () => {
     const items = [historyItem('ITEM-001', 7)];
     const merged = mergeSavedPlanRows(items, [{ item_code: 'ITEM-001' }]);
     expect(merged[0].planned_qty).toBe(7);
+  });
+});
+
+describe('salesPlan rate and amount helpers', () => {
+  it('computes line and plan amounts as qty x rate', () => {
+    const rows = [
+      { planned_qty: 3, rate: 10.5 },
+      { planned_qty: 0, rate: 99 },
+      { planned_qty: 2, rate: 0 },
+    ];
+    expect(getLineAmount(rows[0])).toBe(31.5);
+    expect(getPlanAmount(rows)).toBe(31.5);
+    expect(getPlanAmount([])).toBe(0);
+  });
+
+  it('carries rate through history, manual add and saved rows, defaulting to 0', () => {
+    const history = normalizeHistoryResponse({
+      items: [
+        { item_code: 'A', rate: 120, average_qty: 1, history: [] },
+        { item_code: 'B', average_qty: 1, history: [] },
+      ],
+    });
+    expect(history.items.map((i) => i.rate)).toEqual([120, 0]);
+
+    const manual = addManualItemToDraft([], { item_code: 'C', rate: 45 });
+    expect(manual[0].rate).toBe(45);
+    expect(addManualItemToDraft([], { item_code: 'D' })[0].rate).toBe(0);
+
+    const base = buildSalesPlanDraft(history, {}).items;
+    const merged = mergeSavedPlanRows(base, [
+      { item_code: 'A', qty: 2, rate: 130 },
+      { item_code: 'E', qty: 1, rate: 70 },
+    ]);
+    expect(merged.find((i) => i.item_code === 'A')?.rate).toBe(130);
+    expect(merged.find((i) => i.item_code === 'E')?.rate).toBe(70);
   });
 });

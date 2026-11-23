@@ -9,6 +9,8 @@
  "field_order": [
   "item_code",
   "qty",
+  "rate",
+  "amount",
   "stock_uom",
   "column_break_scope",
   "department",
@@ -38,6 +40,20 @@
    "in_list_view": 1,
    "label": "Qty",
    "reqd": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "read_only": 1
   },
   {
    "fieldname": "stock_uom",

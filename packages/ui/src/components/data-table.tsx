@@ -18,6 +18,13 @@ export interface DataTableColumn<T> {
   header: string;
   render?: (row: T) => React.ReactNode;
   align?: "left" | "right";
+  /**
+   * Optional CSS width (e.g. "24%"). When any column sets one, the table uses
+   * a fixed layout driven by a `<colgroup>`, so several tables stacked on one
+   * page (one per department, say) keep their columns aligned instead of each
+   * sizing to its own content. Omit on every column for the default auto layout.
+   */
+  width?: string;
 }
 
 export type DataTableRowTone = "default" | "danger" | "warning" | "selected" | undefined;
@@ -58,9 +65,17 @@ export function DataTable<T>({
   ...rest
 }: DataTableProps<T> & Record<string, any>) {
   const effectiveRows = rows ?? rest.data ?? [];
+  const hasFixedWidths = columns.some((column) => column.width);
   return (
     <div className={cn("relative w-full overflow-auto rounded-lg border", className)}>
-      <table className="w-full caption-bottom text-sm">
+      <table className={cn("w-full caption-bottom text-sm", hasFixedWidths && "table-fixed")}>
+        {hasFixedWidths && (
+          <colgroup>
+            {columns.map((column) => (
+              <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+            ))}
+          </colgroup>
+        )}
         <thead className="border-b border-hair bg-muted/50">
           <tr>
             {columns.map((column) => (

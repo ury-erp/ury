@@ -15,6 +15,8 @@ export interface ComparableHistoryItem {
   production_unit?: string;
   production_policy?: string;
   bom?: string;
+  /** Selling rate resolved server-side from the branch menu price lists (0 when unpriced). */
+  rate: number;
   average_qty: number;
   sample_days: number;
   total_qty?: number;
@@ -40,6 +42,14 @@ export interface SalesPlanItem extends ComparableHistoryItem {
    */
   _rowKey: string;
 }
+
+/** Line amount: planned qty x rate. Mirrors `calculate_totals` in ury_sales_plan_rate.py. */
+export const getLineAmount = (item: Pick<SalesPlanItem, 'planned_qty' | 'rate'>): number =>
+  (Number(item.planned_qty) || 0) * (Number(item.rate) || 0);
+
+/** Expected Sales Amount: sum of line amounts. */
+export const getPlanAmount = (items: Pick<SalesPlanItem, 'planned_qty' | 'rate'>[]): number =>
+  items.reduce((sum, item) => sum + getLineAmount(item), 0);
 
 const generateRowKey = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -81,6 +91,7 @@ export const addManualItemToDraft = (
     production_unit: searchResult.production_unit || 'Unassigned',
     production_policy: searchResult.production_policy,
     bom: searchResult.bom,
+    rate: Number(searchResult.rate) || 0,
     average_qty: 0,
     sample_days: 0,
     history: [],
@@ -121,6 +132,7 @@ export const normalizeHistoryResponse = (payload: unknown): ComparableHistoryRes
       production_unit: item.production_unit || 'Unassigned',
       production_policy: item.production_policy,
       bom: item.bom,
+      rate: Number(item.rate ?? 0) || 0,
       average_qty: Number(item.average_qty ?? item.avg_qty ?? 0),
       sample_days: Number(item.sample_days ?? item.history?.length ?? 0),
       total_qty: Number(item.total_qty ?? 0),
@@ -167,6 +179,7 @@ export interface SalesPlanDocRow {
   production_unit?: string;
   production_policy?: string;
   bom?: string;
+  rate?: number;
 }
 
 /**
@@ -213,6 +226,7 @@ export const mergeSavedPlanRows = (
 
     if (existing) {
       existing.planned_qty = Number.isFinite(qty) ? qty : existing.planned_qty;
+      if (row.rate !== undefined && Number.isFinite(Number(row.rate))) existing.rate = Number(row.rate);
       return;
     }
 
@@ -224,6 +238,7 @@ export const mergeSavedPlanRows = (
       production_unit: row.production_unit,
       production_policy: row.production_policy,
       bom: row.bom,
+      rate: Number(row.rate) || 0,
       average_qty: 0,
       sample_days: 0,
       history: [],
@@ -317,6 +332,7 @@ export interface BranchItemSearchResult {
   production_unit?: string;
   production_policy?: string;
   bom?: string;
+  rate?: number;
 }
 
 export interface SearchBranchItemsParams {

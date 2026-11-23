@@ -4,6 +4,7 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
+import { useCurrency } from '../../context/CurrencyContext';
 import { ItemDetailModal } from '../../components/sales-plan/ItemDetailModal';
 import {
   addManualItemToDraft,
@@ -12,6 +13,7 @@ import {
   buildSalesPlanDraftKey,
   ComparableHistoryItem,
   ComparableHistoryResponse,
+  getPlanAmount,
   getSalesPlanDraftQuantities,
   mergeSavedPlanRows,
   salesPlanService,
@@ -346,6 +348,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId, activeBranch } = useBranchContext();
+  const { format: formatMoney } = useCurrency();
   const { isManager, roles } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   // Tracks the "site today" used for the relative date label. Recomputed on
@@ -559,6 +562,7 @@ export const SalesPlanPage: React.FC = () => {
 
   const totalPlannedQty = items.reduce((total, item) => total + item.planned_qty, 0);
   const totalHistoryQty = items.reduce((total, item) => total + item.average_qty, 0);
+  const totalPlannedAmount = getPlanAmount(items);
 
   // Real, backend-derived blockers: an item with no production unit assigned
   // can't be routed for prep, and an item with zero comparable sample days
@@ -1209,6 +1213,7 @@ export const SalesPlanPage: React.FC = () => {
           ...(blockedItems.length > 0
             ? [{ label: __('Blocked'), value: blockedItems.length, tone: 'warning' as const }]
             : []),
+          { label: __('Planned Amount'), value: formatMoney(totalPlannedAmount) },
         ]}
         />
       </Section>
@@ -1348,12 +1353,14 @@ export const SalesPlanPage: React.FC = () => {
               ? `Plan quantity for ${nextRowAfterTruncation.item_name || nextRowAfterTruncation.item_code}`
               : undefined;
 
+            // Widths are fixed so columns line up across every department table.
             // Column order: Item / History Insight / Production Unit / Plan
             // (inserted via editableColumnIndex below) / Variance.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
                 key: 'item_code',
                 header: __('Item'),
+                width: '25%',
                 render: (row) => (
                   <button
                     type="button"
@@ -1369,6 +1376,7 @@ export const SalesPlanPage: React.FC = () => {
               {
                 key: 'average_qty',
                 header: __('History Insight'),
+                width: '27%',
                 render: (row) => (
                   <button
                     type="button"
@@ -1385,12 +1393,14 @@ export const SalesPlanPage: React.FC = () => {
               {
                 key: 'production_unit',
                 header: __('Production Unit'),
+                width: '18%',
                 render: (row) => <span className="text-muted-foreground">{row.production_unit || __('Unassigned')}</span>,
               },
               {
                 key: 'variance',
                 header: __('Variance'),
                 align: 'right',
+                width: '8%',
                 render: (row) => {
                   const variance = getVariance(row);
                   return (
@@ -1559,6 +1569,7 @@ export const SalesPlanPage: React.FC = () => {
                         key: 'planned_qty',
                         header: __('Plan'),
                         align: 'right',
+                        width: '22%',
                         min: 0,
                         step: 0.01,
                         getValue: (row) => row.planned_qty,

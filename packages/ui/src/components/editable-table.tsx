@@ -52,6 +52,8 @@ export interface EditableDataTableProps<T> {
     key: string;
     header: string;
     align?: "left" | "right";
+    /** Optional CSS width; see `DataTableColumn.width`. */
+    width?: string;
     getValue: (row: T) => number;
     onChange: (row: T, value: number) => void;
     min?: number;
@@ -146,6 +148,7 @@ export function EditableDataTable<T>({
     key: editableColumn.key,
     header: editableColumn.header,
     align: editableColumn.align ?? "right",
+    width: editableColumn.width,
     render: (row: T) => {
       const key = rowKey(row);
       return (

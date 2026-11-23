@@ -135,6 +135,10 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
 			production_config_map[item_key] = cfg
 
+	from ury.ury.api.ury_sales_plan_rate import resolve_item_rates
+
+	rates = resolve_item_rates(item_codes, branch)
+
 	items = []
 	for item_code, entry in items_by_code.items():
 		sample_days = len(entry["history"])
@@ -149,6 +153,7 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			"production_unit": config.get("production_unit"),
 			"production_policy": config.get("production_policy"),
 			"bom": config.get("bom"),
+			"rate": rates.get(item_code, 0),
 			"average_qty": average_qty,
 			"sample_days": sample_days,
 			"total_qty": entry["total_qty"],
@@ -277,6 +282,10 @@ def search_branch_items(branch, company=None, query="", limit=25):
 	if not items:
 		return []
 
+	from ury.ury.api.ury_sales_plan_rate import resolve_item_rates
+
+	rates = resolve_item_rates([item["item_code"] for item in items], branch)
+
 	# Reshape results to include production config (already fetched above,
 	# scoped to this branch).
 	result = []
@@ -291,6 +300,7 @@ def search_branch_items(branch, company=None, query="", limit=25):
 			"production_unit": config.get("production_unit"),
 			"production_policy": config.get("production_policy"),
 			"bom": config.get("bom"),
+			"rate": rates.get(item_code, 0),
 		})
 
 	return result

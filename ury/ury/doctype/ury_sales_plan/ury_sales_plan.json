@@ -19,6 +19,7 @@
   "service_period",
   "section_break_items",
   "items",
+  "expected_sales_amount",
   "tab_audit",
   "section_break_reason",
   "cancellation_reason",
@@ -94,6 +95,13 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "URY Sales Plan Item"
+  },
+  {
+   "fieldname": "expected_sales_amount",
+   "fieldtype": "Currency",
+   "label": "Expected Sales Amount",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "section_break_snapshot",

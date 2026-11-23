@@ -46,8 +46,22 @@ frappe.ui.form.on('URY Sales Plan', {
 });
 
 frappe.ui.form.on('URY Sales Plan Item', {
+	qty: function(frm, cdt, cdn) {
+		let row = frappe.get_doc(cdt, cdn);
+		frappe.model.set_value(cdt, cdn, 'amount', flt(row.qty) * flt(row.rate));
+	},
 	item_code: function(frm, cdt, cdn) {
 		let row = frappe.get_doc(cdt, cdn);
+		if (row.item_code && frm.doc.branch) {
+			frappe.call({
+				method: "ury.ury.api.ury_sales_plan_rate.get_item_rate",
+				args: { item_code: row.item_code, branch: frm.doc.branch },
+				callback: function(r) {
+					frappe.model.set_value(cdt, cdn, 'rate', flt(r.message));
+					frappe.model.set_value(cdt, cdn, 'amount', flt(row.qty) * flt(r.message));
+				}
+			});
+		}
 		if (row.item_code && frm.doc.branch && frm.doc.company) {
 			frappe.call({
 				method: "ury.ury.api.ury_production_context.resolve_production_context",
