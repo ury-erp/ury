@@ -1,124 +1,125 @@
-# DB03 Sales & revenue deep-dive. Audience: owner, finance, branch manager. Levels: branch, company, employee (waiter filter).
-# One base query (fact_invoices, copied verbatim from semantic_layer.yaml); charts aggregate over its rows.
-# Populations: revenue/bills/ATV/channel use BOTH populations (f_population is the split filter). The waiter filter is
-# meaningful for the Paid population only (Consolidated waiter = urycashier on every bill).
+# DB03 Sales deep-dive (redesign, 2026-11-22). Audience: chairman, owner, finance, branch manager, anyone.
+# One "Period" filter drives the page. Default = the LATEST AVAILABLE DAY only. Periods: Latest day, Last 7 days, Last 30 days,
+# This month so far, any single day ("Day: YYYY-MM-DD") or month ("Month: YYYY-MM") of the last ~93 days.
+# How: fact_sales lists every bill once per period it belongs to (period_label) with period_start (the date the period starts), so
+# picking periods just filters period_label; with 2+ periods the charts draw one colour per period (cards then add them up). Clearing the Period filter double counts bills (a bill sits in several periods).
+# Branch / Service / Waiter are global: they apply to every query. The two trend charts (last 14 days, monthly average) show
+# history by design, so they follow Branch / Service / Waiter but not Period.
+# time_of_day labels start with an invisible character (U+200B..U+2061, increasing) so they sort Breakfast..Late night without showing numbers.
+# No currency symbols anywhere. Insights runs these queries on DuckDB: cast before LPAD, no TIME_TO_SEC etc.
 workbook: {id: ury_db03_sales_deep_dive, title: "Sales deep-dive", module: "URY", required_apps: [ury]}
 queries:
-  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
-  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
-  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
-  - id: fact_invoices
-    title: "fact_invoices"
-    table: "POS Invoice"
-    filters:
-      - {column: docstatus, op: "=", value: 1}
-      - {column: is_return, op: "=", value: 0}
-    mutate:
-      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
-      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
-      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
-      - {as: hour_label, type: String, expr: "pad_number(hour(posting_time), 2)"}  # string label: pivot_wider on an Integer column mixes int and string names (IbisTypeError)
-      - {as: weekday, type: String, expr: "day_name(posting_date)"}
-      # weekday_label sorts Mon..Sun as a column header (leading digit = ISO weekday). Same column as the shared semantic layer fact_invoices.
-      - {as: weekday_label, type: String, expr: "if_else(day_name(posting_date) == 'Monday', '1 Mon', if_else(day_name(posting_date) == 'Tuesday', '2 Tue', if_else(day_name(posting_date) == 'Wednesday', '3 Wed', if_else(day_name(posting_date) == 'Thursday', '4 Thu', if_else(day_name(posting_date) == 'Friday', '5 Fri', if_else(day_name(posting_date) == 'Saturday', '6 Sat', '7 Sun'))))))"}
-      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
-      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
-    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+  - id: fact_sales
+    title: "fact_sales"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.name, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, CASE WHEN HOUR(pi.posting_time) < 11 THEN '​Breakfast (before 11 am)' WHEN HOUR(pi.posting_time) < 15 THEN '‌Lunch (11 am to 3 pm)' WHEN HOUR(pi.posting_time) < 19 THEN '‍Snacks (3 to 7 pm)' WHEN HOUR(pi.posting_time) < 23 THEN '⁠Dinner (7 to 11 pm)' ELSE '⁡Late night' END AS time_of_day, CASE WHEN HOUR(pi.posting_time) < 11 THEN 1 WHEN HOUR(pi.posting_time) < 15 THEN 2 WHEN HOUR(pi.posting_time) < 19 THEN 3 WHEN HOUR(pi.posting_time) < 23 THEN 4 ELSE 5 END AS tod_order, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, pi.total_qty, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day, DATE_SUB(l.last_day, INTERVAL (DAYOFMONTH(l.last_day) - 1) DAY) AS m_start FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0) SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, 'Latest day' AS period_label, last_day AS period_start FROM b WHERE posting_date = last_day UNION ALL SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, 'Last 7 days' AS period_label, DATE_SUB(last_day, INTERVAL 6 DAY) AS period_start FROM b WHERE posting_date >= DATE_SUB(last_day, INTERVAL 6 DAY) UNION ALL SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, 'Last 30 days' AS period_label, DATE_SUB(last_day, INTERVAL 29 DAY) AS period_start FROM b WHERE posting_date >= DATE_SUB(last_day, INTERVAL 29 DAY) UNION ALL SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, 'This month so far' AS period_label, m_start AS period_start FROM b WHERE posting_date >= m_start UNION ALL SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, CONCAT('Day: ', DATE_FORMAT(posting_date, '%Y-%m-%d')) AS period_label, posting_date AS period_start FROM b WHERE 1 = 1 UNION ALL SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, CONCAT('Month: ', DATE_FORMAT(posting_date, '%Y-%m')) AS period_label, CAST(DATE_FORMAT(posting_date, '%Y-%m-01') AS DATE) AS period_start FROM b WHERE 1 = 1"
+  - id: fact_daily
+    title: "fact_daily"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATE_FORMAT(pi.posting_date, '%Y-%m') AS month_label, DATEDIFF(l.last_day, pi.posting_date) AS days_ago, pi.branch, pi.order_type, pi.waiter, SUM(pi.net_total) AS net_sales, COUNT(*) AS bills FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 396 DAY) WHERE pi.docstatus = 1 AND pi.is_return = 0 GROUP BY pi.posting_date, DATE_FORMAT(pi.posting_date, '%Y-%m'), DATEDIFF(l.last_day, pi.posting_date), pi.branch, pi.order_type, pi.waiter"
 
-  # fact_ordering_sessions (builder, T4 on demo: 0 rows). Grain: one QR/kiosk ordering session. invoice is set when the session became a bill.
-  # No branch column exists (sessions hang off a table), so only the Date filter can apply. Date column: opened_at.
-  - id: fact_ordering_sessions
-    title: "fact_ordering_sessions"
-    table: "URY Ordering Session"
-    select: [name, source, status, opened_at, invoice, table]
-
-  # fact_sales_target (sql, T1). Grain: one URY Sales Target row (branch x month). actual_net_sales = SUM(POS Invoice.net_total) of the same
-  # branch between period_start and period_end (submitted, non-return; same rule as net sales everywhere). is_current_month = 1 for the month
-  # that contains today (month to date against the full-month target); is_closed = 1 once the month has ended. Why sql: actual comes from a correlated range sum over the target dates,
-  # which the join grammar (one equality pair) cannot express. Date column: period_start. Branches without a target row do not appear.
-  - id: fact_sales_target
-    title: "fact_sales_target"
-    sql: "SELECT t.name, t.branch, t.company, t.period_start, t.period_end, t.target_amount, COALESCE((SELECT SUM(pi.net_total) FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.branch = t.branch AND pi.posting_date BETWEEN t.period_start AND t.period_end), 0) AS actual_net_sales, CASE WHEN CURDATE() BETWEEN t.period_start AND t.period_end THEN 1 ELSE 0 END AS is_current_month, CASE WHEN t.period_end < CURDATE() THEN 1 ELSE 0 END AS is_closed, DATE_FORMAT(t.period_start, '%Y-%m') AS month_label FROM `tabURY Sales Target` t WHERE t.docstatus < 2"
+  # fact_card_days (sql): one row per day x branch x service x waiter, listed once per period label so the Period filter works.
+  # Cards use it: date column posting_date (day) gives "latest day in the period" with % change vs the day before and a trend line.
+  # A period contributes its own days plus enough earlier days (14 min) for the comparison and sparkline.
+  - id: fact_card_days
+    title: "fact_card_days"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.name, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, CASE WHEN HOUR(pi.posting_time) < 11 THEN '​Breakfast (before 11 am)' WHEN HOUR(pi.posting_time) < 15 THEN '‌Lunch (11 am to 3 pm)' WHEN HOUR(pi.posting_time) < 19 THEN '‍Snacks (3 to 7 pm)' WHEN HOUR(pi.posting_time) < 23 THEN '⁠Dinner (7 to 11 pm)' ELSE '⁡Late night' END AS time_of_day, CASE WHEN HOUR(pi.posting_time) < 11 THEN 1 WHEN HOUR(pi.posting_time) < 15 THEN 2 WHEN HOUR(pi.posting_time) < 19 THEN 3 WHEN HOUR(pi.posting_time) < 23 THEN 4 ELSE 5 END AS tod_order, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, pi.total_qty, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day, DATE_SUB(l.last_day, INTERVAL (DAYOFMONTH(l.last_day) - 1) DAY) AS m_start FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0), d AS (SELECT posting_date, branch, order_type, waiter, SUM(net_total) AS net_sales, COUNT(*) AS bills, SUM(total_qty) AS items, SUM(covers) AS covers, SUM(cover_sales) AS cover_sales, SUM(discount_amount) AS discounts, MAX(last_day) AS last_day, MAX(m_start) AS m_start FROM b GROUP BY posting_date, branch, order_type, waiter) SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, 'Latest day' AS period_label FROM d WHERE posting_date BETWEEN DATE_SUB(last_day, INTERVAL 13 DAY) AND last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, 'Last 7 days' AS period_label FROM d WHERE posting_date BETWEEN DATE_SUB(last_day, INTERVAL 13 DAY) AND last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, 'Last 30 days' AS period_label FROM d WHERE posting_date BETWEEN DATE_SUB(last_day, INTERVAL 29 DAY) AND last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, 'This month so far' AS period_label FROM d WHERE posting_date BETWEEN LEAST(m_start, DATE_SUB(last_day, INTERVAL 13 DAY)) AND last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Month: ', DATE_FORMAT(posting_date, '%Y-%m')) AS period_label FROM d WHERE 1 = 1 UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 0 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 0 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 1 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 1 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 2 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 2 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 3 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 3 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 4 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 4 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 5 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 5 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 6 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 6 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 7 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 7 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 8 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 8 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 9 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 9 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 10 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 10 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 11 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 11 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 12 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 12 DAY) <= last_day UNION ALL SELECT posting_date, branch, order_type, waiter, net_sales, bills, items, covers, cover_sales, discounts, CONCAT('Day: ', DATE_FORMAT(DATE_ADD(posting_date, INTERVAL 13 DAY), '%Y-%m-%d')) AS period_label FROM d WHERE DATE_ADD(posting_date, INTERVAL 13 DAY) <= last_day"
+  # fact_hourly_2day (sql): bills of the latest data day and the day before it, for the latest vs previous day line chart.
+  # Follows Branch / Service / Waiter; not Period (it always shows these two days).
+  - id: fact_hourly_2day
+    title: "fact_hourly_2day"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.name, pi.posting_date, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, pi.branch, pi.order_type, pi.waiter, pi.net_total, CASE WHEN pi.posting_date = l.last_day THEN CONCAT('Latest day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) ELSE CONCAT('Previous day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) END AS day_text FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 1 DAY) WHERE pi.docstatus = 1 AND pi.is_return = 0"
 
 charts:
-  # KPIs: date (month) + comparison set in the Insights UI 2026-11-15: each card shows the LATEST month in the
-  # filtered range and % change vs the previous month.
-  # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
-  - {id: db03_net_sales_kpi, title: "Net sales (₹)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: month},
-     y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)", format: currency}]}
-  - {id: db03_bills_kpi, title: "Bills", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: month},
-     y: [{column: name, agg: count, as: Bills}]}
-  # SAL-004 Average ticket (average bill)
-  - {id: db03_avg_bill_kpi, title: "Average bill (₹)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: month},
-     y: [{expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill (₹)", format: currency}]}
-  - {id: db03_items_per_bill_kpi, title: "Items per bill", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: month},
-     y: [{expr: "sum(total_qty) / count(name)", as: "Items per bill"}]}
-  - {id: db03_discounts_kpi, title: "Discounts given (₹)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: day},
-     y: [{expr: "sum(discount_amount).round(0)", as: "Discounts given (₹)", format: currency}]}
-  # Trend: weekly stacked net sales by channel (limit above the bucket count: Line/Bar + asc + limit keeps the oldest).
-  - {id: db03_daily, title: "Weekly net sales by channel (₹)", query: fact_invoices, type: Bar, limit: 1000, stack: true,
-     x: {column: posting_date, granularity: week}, y: [{column: net_total, agg: sum, as: "Net sales"}],
-     split_by: {column: order_type, max: 4}}
-  # Detail: bills by hour (rows) and weekday (columns, Mon..Sun). No heatmap on 3.15.1.
-  - {id: db03_grid, title: "Bills by hour and weekday", query: fact_invoices, type: Table, enable_color_scale: true,
-     rows: [hour_label], columns: [weekday_label], y: [{column: name, agg: count, as: Bills}]}
-  # Channel ranking, one measure.
-  - {id: db03_channel, title: "Net sales by channel (₹)", query: fact_invoices, type: Row, color: "#6a39db", stack: true,
-     x: order_type, y: [{column: net_total, agg: sum, as: "Net sales"}],
-     order: [{by: "Net sales", dir: desc}]}
-  # SAL-020 Self-order (QR/kiosk) share: count of bills that came from a QR or kiosk session (share needs sessions to exist)
-  - {id: db03_self_order, title: "Self-order bills (count)", query: fact_ordering_sessions, type: Number,
-     filters: [{column: invoice, op: is_set}],
-     y: [{column: name, agg: count, as: "Self-order bills"}]}
+  # ---- Key numbers (top). Each card = last day of the selected period, % change vs the day before, and a trend line.
+  - {id: db03_day_sales, title: "Day sales", query: fact_card_days, type: Number, comparison: true, sparkline: true, shorten_numbers: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(net_sales).round(0)", as: "Day sales"}]}
+  - {id: db03_bills, title: "Bills", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(bills)", as: "Bills"}]}
+  - {id: db03_avg_bill, title: "Average bill value", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_sales) / sum(bills)).round(0)", as: "Average bill value"}]}
+  - {id: db03_avg_size, title: "Average bill size (items per bill)", query: fact_card_days, type: Number, comparison: true, sparkline: true, decimal: 1,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(items) / sum(bills)", as: "Average bill size (items per bill)"}]}
+  - {id: db03_avg_cover, title: "Average spend per guest", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "(sum(cover_sales) / sum(covers)).round(0)", as: "Average spend per guest"}]}
+  - {id: db03_guests, title: "Guests served", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(covers)", as: "Guests served"}]}
+  - {id: db03_items, title: "Items sold", query: fact_card_days, type: Number, comparison: true, sparkline: true, shorten_numbers: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(items)", as: "Items sold"}]}
+  - {id: db03_discounts, title: "Discounts given", query: fact_card_days, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(discounts).round(0)", as: "Discounts given"}]}
+  - {id: db03_2day_line, title: "Latest day vs previous day: sales by hour", query: fact_hourly_2day, type: Line, limit: 100, smooth: true, show_area: true, show_data_points: true,
+     x: hour_label, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: day_text, max: 2},
+     order: [{by: hour_label, dir: asc}]}
 
-  # SAL-021 Net sales against the monthly target, months that have ended (a full month of sales against a full-month target)
-  - {id: db03_target_attain, title: "Closed months against target (%)", query: fact_sales_target, type: Number,
-     filters: [{column: is_closed, op: "=", value: 1}],
-     y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Closed months against target (%)", format: percent}]}
-  # SAL-021 Month to date against the full-month target
-  - {id: db03_target_mtd, title: "Month to date vs target (%)", query: fact_sales_target, type: Number,
-     filters: [{column: is_current_month, op: "=", value: 1}],
-     y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Month to date vs target (%)", format: percent}]}
-  # SAL-021 Target for the selected months
-  - {id: db03_target_amount, title: "Sales target, selected months (₹)", query: fact_sales_target, type: Number,
-     y: [{expr: "sum(target_amount).round(0)", as: "Sales target (₹)", format: currency}]}
-  # SAL-021 Net sales in the same months
-  - {id: db03_target_actual, title: "Net sales, target months (₹)", query: fact_sales_target, type: Number,
-     y: [{expr: "sum(actual_net_sales).round(0)", as: "Net sales in target months (₹)", format: currency}]}
-  # SAL-021 Actual against target by month
-  - {id: db03_target_month, title: "Net sales against target by month (₹)", query: fact_sales_target, type: Bar, limit: 24, stack: false,
-     x: month_label, label_rotation: 30,
-     y: [{expr: "sum(actual_net_sales).round(0)", as: "Net sales", color: "#d3d620"}, {expr: "sum(target_amount).round(0)", as: "Target", color: "#9e10a1"}]}
+  # ---- Compare the periods side by side
+  - {id: db03_scorecard, title: "Period scorecard", query: fact_sales, type: Table, limit: 20,
+     rows: [period_label],
+     y: [{expr: "sum(net_total).round(0)", as: "Sales"}, {column: name, agg: count, as: Bills}, {expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill value"}, {expr: "(sum(total_qty) / count(name)).round(1)", as: "Items per bill"}, {expr: "(sum(cover_sales) / sum(covers)).round(0)", as: "Spend per guest"}],
+     order: [{by: period_label, dir: asc}]}
+  - {id: db03_hourly, title: "When do we sell? Sales by hour", query: fact_sales, type: Line, limit: 100, smooth: true, show_area: true,
+     x: hour_label, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: period_label, max: 6},
+     order: [{by: hour_label, dir: asc}]}
+  - {id: db03_timeofday, title: "Sales by time of day", query: fact_sales, type: Bar, limit: 20, stack: false,
+     x: time_of_day, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: period_label, max: 6},
+     order: [{by: time_of_day, dir: asc}]}
+
+  # ---- Service-wise sales
+  - {id: db03_service_compare, title: "Service-wise sales", query: fact_sales, type: Bar, limit: 30, stack: false,
+     x: order_type, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: period_label, max: 6}}
+  - {id: db03_service_share, title: "Share of sales by service", query: fact_sales, type: Donut, limit: 8,
+     x: order_type, y: [{column: net_total, agg: sum, as: "Sales"}]}
+  - {id: db03_service_avg, title: "Average bill value by service", query: fact_sales, type: Row, color: "#f59e0b", limit: 10,
+     x: order_type, y: [{expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill value"}],
+     order: [{by: "Average bill value", dir: desc}]}
+  - {id: db03_waiters, title: "Top waiters by sales", query: fact_sales, type: Row, color: "#10b981", limit: 10,
+     filters: [{column: population, op: "=", value: "Paid"}],
+     x: waiter_name, y: [{column: net_total, agg: sum, as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+
+  # ---- Trends (history; follow Branch / Service / Waiter, not Period)
+  - {id: db03_daily, title: "Sales by day", query: fact_sales, type: Bar, limit: 100, color: "#6a39db", show_data_labels: true,
+     x: {column: posting_date, granularity: day}, y: [{column: net_total, agg: sum, as: "Sales"}]}
+  - {id: db03_monthly_avg, title: "Monthly average sales per day", query: fact_daily, type: Bar, limit: 14, color: "#0ea5e9", show_data_labels: true,
+     x: month_label, y: [{expr: "(sum(net_sales) / distinct_count(posting_date)).round(0)", as: "Average sales per day"}]}
+  - {id: db03_monthly_total, title: "Monthly total sales", query: fact_daily, type: Line, limit: 14, smooth: true, show_area: true, color: "#ec4899",
+     x: month_label, y: [{column: net_sales, agg: sum, as: "Total sales"}]}
+
+  # ---- Detail
+  - {id: db03_grid, title: "Bills by hour", query: fact_sales, type: Table, enable_color_scale: true, limit: 50,
+     rows: [hour_label], columns: [period_label], y: [{column: name, agg: count, as: Bills}],
+     order: [{by: hour_label, dir: asc}]}
+
 dashboards:
   - id: sales_deep_dive
     title: "Sales deep-dive"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, applies_to: {fact_invoices: posting_date, fact_ordering_sessions: opened_at, fact_sales_target: period_start}, layout: {x: 0, y: 2, w: 5, h: 1}}
-      - {id: f_branch, label: Branch, type: string, icon: store, applies_to: {fact_invoices: branch, fact_sales_target: branch}, layout: {x: 5, y: 2, w: 5, h: 1}}
-      - {id: f_order_type, label: "Order type", type: string, icon: utensils, applies_to: {fact_invoices: order_type}, layout: {x: 10, y: 2, w: 5, h: 1}}
-      - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_invoices: waiter}, layout: {x: 15, y: 2, w: 5, h: 1}}
+      - {id: f_period, label: "Period", type: string, icon: calendar, default: {op: "=", value: "Latest day"}, applies_to: {fact_sales: period_label, fact_card_days: period_label}, layout: {x: 0, y: 2, w: 8, h: 1}}
+      - {id: f_branch, label: Branch, type: string, icon: store, applies_to: {fact_sales: branch, fact_daily: branch, fact_card_days: branch, fact_hourly_2day: branch}, layout: {x: 8, y: 2, w: 4, h: 1}}
+      - {id: f_service, label: Service, type: string, icon: utensils, applies_to: {fact_sales: order_type, fact_daily: order_type, fact_card_days: order_type, fact_hourly_2day: order_type}, layout: {x: 12, y: 2, w: 4, h: 1}}
+      - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_sales: waiter, fact_daily: waiter, fact_card_days: waiter, fact_hourly_2day: waiter}, layout: {x: 16, y: 2, w: 4, h: 1}}
     items:
-      - {text: "<p><b>Sales deep-dive.</b> How much we sell, when, and through which channel. For owner, finance and branch manager. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {chart: db03_net_sales_kpi, x: 0, y: 3, w: 4, h: 3}
-      - {chart: db03_bills_kpi, x: 4, y: 3, w: 4, h: 3}
-      - {chart: db03_avg_bill_kpi, x: 8, y: 3, w: 4, h: 3}
-      - {chart: db03_items_per_bill_kpi, x: 12, y: 3, w: 4, h: 3}
-      - {chart: db03_discounts_kpi, x: 16, y: 3, w: 4, h: 3}
-      - {chart: db03_daily, x: 0, y: 6, w: 20, h: 8}
-      - {chart: db03_channel, x: 0, y: 14, w: 20, h: 8}
-      - {chart: db03_grid, x: 0, y: 22, w: 20, h: 12}
-      - {text: "<p>Net sales exclude tax and cancelled bills. Average bill = net sales per bill.</p>", x: 0, y: 34, w: 20, h: 1}
-      - {text: "<p><b>Sales against target</b> - monthly net sales against the branch target</p>", x: 0, y: 35, w: 20, h: 1}
-      - {chart: db03_target_attain, x: 0, y: 36, w: 5, h: 3}
-      - {chart: db03_target_mtd, x: 5, y: 36, w: 5, h: 3}
-      - {chart: db03_target_amount, x: 10, y: 36, w: 5, h: 3}
-      - {chart: db03_target_actual, x: 15, y: 36, w: 5, h: 3}
-      - {chart: db03_target_month, x: 0, y: 39, w: 20, h: 8}
-      - {text: "<p>Closed months compare a full month to its target; the current month is month to date. Only branches with a target appear.</p>", x: 0, y: 47, w: 20, h: 1}
-      - {chart: db03_self_order, x: 0, y: 48, w: 20, h: 3}
-      - {text: "<p>Bills that came from a guest QR or kiosk ordering session. This tile follows the Date filter only; there is no branch on a session.</p>", x: 0, y: 51, w: 20, h: 2}
+      - {text: "<h2>Sales deep-dive</h2><p>Shows the latest day with sales, against the day before. Use <b>Period</b> to pick another day, a week or a month, or pick several to compare. Branch, Service and Waiter filters apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Each card shows the last day of the selected period, the % change against the day before, and a trend line.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db03_day_sales, x: 0, y: 5, w: 5, h: 4}
+      - {chart: db03_bills, x: 5, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_bill, x: 10, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_size, x: 15, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_cover, x: 0, y: 9, w: 5, h: 4}
+      - {chart: db03_guests, x: 5, y: 9, w: 5, h: 4}
+      - {chart: db03_items, x: 10, y: 9, w: 5, h: 4}
+      - {chart: db03_discounts, x: 15, y: 9, w: 5, h: 4}
+      - {chart: db03_2day_line, x: 0, y: 13, w: 20, h: 9}
+      - {chart: db03_scorecard, x: 0, y: 22, w: 20, h: 5}
+      - {text: "<h3>When we sell</h3>", x: 0, y: 27, w: 20, h: 1}
+      - {chart: db03_hourly, x: 0, y: 28, w: 12, h: 9}
+      - {chart: db03_timeofday, x: 12, y: 28, w: 8, h: 9}
+      - {text: "<h3>Service-wise sales</h3>", x: 0, y: 37, w: 20, h: 1}
+      - {chart: db03_service_compare, x: 0, y: 38, w: 10, h: 9}
+      - {chart: db03_service_share, x: 10, y: 38, w: 5, h: 9}
+      - {chart: db03_service_avg, x: 15, y: 38, w: 5, h: 9}
+      - {text: "<h3>Day and month trends</h3><p>Sales by day follows the Period filter. The two monthly charts always show every month, so they follow Branch, Service and Waiter only.</p>", x: 0, y: 47, w: 20, h: 2}
+      - {chart: db03_daily, x: 0, y: 49, w: 20, h: 8}
+      - {chart: db03_monthly_avg, x: 0, y: 57, w: 10, h: 8}
+      - {chart: db03_monthly_total, x: 10, y: 57, w: 10, h: 8}
+      - {text: "<h3>Details</h3>", x: 0, y: 65, w: 20, h: 1}
+      - {chart: db03_waiters, x: 0, y: 66, w: 8, h: 10}
+      - {chart: db03_grid, x: 8, y: 66, w: 12, h: 10}
+      - {text: "<p>Sales are net of tax and exclude cancelled bills. Average bill value = sales per bill. Spend per guest uses bills that recorded the number of guests.</p>", x: 0, y: 76, w: 20, h: 1}
