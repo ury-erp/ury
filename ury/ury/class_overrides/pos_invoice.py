@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import frappe
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 	POSInvoice,
@@ -60,6 +62,53 @@ except ImportError:
 			return get_stock_availability(item_code, warehouse)
 
 
+def get_bundle_component_warehouse(component_item, fallback_warehouse, branch, company):
+	"""Warehouse a Product Bundle component is stocked in.
+
+	Components can belong to different departments, so each one resolves through
+	its own production configuration (same pair the reservation service uses).
+	Falls back to the bundle row's warehouse when none resolves.
+	"""
+	if branch:
+		from ury.ury.doctype.ury_order.ury_order import _department_warehouse_for_item
+
+		warehouse = _department_warehouse_for_item(component_item, branch, company)
+		if warehouse:
+			return warehouse
+	return fallback_warehouse
+
+
+def set_packed_item_warehouses(doc):
+	"""Point each packed item at its component's own department warehouse.
+
+	ERPNext's packing list copies the bundle row's warehouse onto every packed
+	item, so a bundle with components from several departments would issue them
+	all from one warehouse when the consolidated Sales Invoice posts stock.
+	"""
+	branch = doc.get("branch")
+	if not branch and doc.get("pos_profile"):
+		branch = frappe.db.get_value("POS Profile", doc.pos_profile, "branch")
+	if not branch or not doc.get("packed_items"):
+		return
+
+	rows = {d.name: d for d in doc.get("items")}
+	for packed in doc.get("packed_items"):
+		row = rows.get(packed.parent_detail_docname)
+		if not row:
+			continue
+		warehouse = get_bundle_component_warehouse(packed.item_code, row.warehouse, branch, doc.company)
+		if warehouse and warehouse != packed.warehouse:
+			packed.warehouse = warehouse
+			bin_data = frappe.db.get_value(
+				"Bin",
+				{"item_code": packed.item_code, "warehouse": warehouse},
+				["actual_qty", "projected_qty"],
+				as_dict=True,
+			)
+			packed.actual_qty = flt(bin_data.actual_qty) if bin_data else 0
+			packed.projected_qty = flt(bin_data.projected_qty) if bin_data else 0
+
+
 class CustomPOSInvoice(POSInvoice):
 	def validate_stock_availablility(self):
 		if self.is_return or frappe.get_cached_doc("Stock Settings").allow_negative_stock:
@@ -84,7 +133,7 @@ class CustomPOSInvoice(POSInvoice):
 				return
 
 			bundle_items = get_active_bundle_items({d.item_code for d in rows})
-			required_qty = get_required_stock_qty(rows, bundle_items)
+			required_qty = self._get_required_stock_qty(rows, bundle_items, branch)
 			available_qty, reserved_stock_keys = get_available_stock_qty(required_qty)
 			items = get_stock_item_details({item_code for item_code, warehouse in required_qty})
 			keys_to_check = {
@@ -96,7 +145,7 @@ class CustomPOSInvoice(POSInvoice):
 			for d in rows:
 				if d.item_code in bundle_items:
 					self.validate_bundle_stock(
-						d, bundle_items[d.item_code], required_qty, available_qty, keys_to_check
+						d, bundle_items[d.item_code], required_qty, available_qty, keys_to_check, branch
 					)
 				elif (d.item_code, d.warehouse) in keys_to_check:
 					self.validate_item_stock(d, required_qty, available_qty)
@@ -173,6 +222,51 @@ class CustomPOSInvoice(POSInvoice):
 						),
 						title=_("Insufficient Stock"),
 					)
+
+	def _component_warehouse(self, component_item, row, branch):
+		"""Warehouse a bundle component is stocked in.
+
+		Bundle components may belong to different departments, so each is
+		resolved through its own production configuration (the same pair the
+		reservation service uses). Falls back to the bundle row's warehouse.
+		"""
+		return get_bundle_component_warehouse(component_item, row.warehouse, branch, self.company)
+
+	def _get_required_stock_qty(self, rows, bundle_items, branch):
+		required_qty = defaultdict(float)
+		for row in rows:
+			components = bundle_items.get(row.item_code)
+			if not components:
+				required_qty[(row.item_code, row.warehouse)] += flt(row.stock_qty)
+				continue
+			for component in components:
+				warehouse = self._component_warehouse(component.item_code, row, branch)
+				required_qty[(component.item_code, warehouse)] += flt(component.qty) * flt(row.stock_qty)
+		return required_qty
+
+	def validate_bundle_stock(self, row, components, required_qty, available_qty, keys_to_check, branch=None):
+		error_msgs = []
+		for component in components:
+			warehouse = self._component_warehouse(component.item_code, row, branch)
+			key = (component.item_code, warehouse)
+			if key in keys_to_check and available_qty[key] < required_qty[key]:
+				error_msgs.append(
+					_("<li>Packed Item {0}: Required {1}, Available {2} in {3}</li>").format(
+						frappe.bold(component.item_code),
+						frappe.bold(flt(required_qty[key], 2)),
+						frappe.bold(flt(available_qty[key], 2)),
+						frappe.bold(warehouse),
+					)
+				)
+
+		if error_msgs:
+			frappe.throw(
+				_(
+					"<b>Row #{0}:</b> Bundle {1} has insufficient packed items:<br><div style='margin-top: 15px;'><ul style='line-height: 0.8;'>{2}</ul></div>"
+				).format(row.idx, frappe.bold(row.item_code), "<br>".join(error_msgs)),
+				title=_("Insufficient Stock for Product Bundle Items"),
+				exc=ProductBundleStockValidationError,
+			)
 
 	@staticmethod
 	def _is_always_available(item_code, branch):
