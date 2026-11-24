@@ -104,7 +104,7 @@ dashboards:
       - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_sales: waiter_name, fact_daily: waiter_name, fact_card_days: waiter_name, fact_hourly_2day: waiter_name}, layout: {x: 16, y: 2, w: 4, h: 1}}
     items:
       - {text: "<h2>Sales deep-dive</h2><p>Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range (a week, a month), or clear it to see all dates. Branch, Service and Waiter apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the total for the dates picked in <b>Date</b> (the latest day by default). For a day or a last-N-days period it also shows the % change against the period just before it, and a trend line for a week or longer. A custom range or a cleared Date shows the total only. Cards follow Branch, Service and Waiter too.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch, Service and Waiter.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db03_day_sales, x: 0, y: 5, w: 5, h: 4}
       - {chart: db03_bills, x: 5, y: 5, w: 5, h: 4}
       - {chart: db03_avg_bill, x: 10, y: 5, w: 5, h: 4}

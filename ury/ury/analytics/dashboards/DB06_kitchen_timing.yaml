@@ -1,7 +1,11 @@
 # DB06 Kitchen timing & KOT SLA (portfolio section DB06). Audience: kitchen head, floor manager.
-# Durations come only from the native-SQL fact_kot_exec (TIMESTAMPDIFF), never time_diff. On the demo every Execution
-# stamp is milliseconds apart (T3), so the duration section is a banner, not a fake chart.
+# Durations come only from the native-SQL fact_kot_exec (TIMESTAMPDIFF), never time_diff.
+# Demo data: order_kot_seed.py gives every order its KOTs with realistic queue / prep / serve stamps.
 # Chart-level filter order_status = 'Served' on the AVG(prod_minutes) charts is required by the fact_kot_headers comment.
+# Redesign 2026-11-24 (pattern of DB01-DB05): ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
+# __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly), cleared = all dates, or pick a range. Number cards use compare_previous: total for
+# the dates picked, % change vs the previous period for a `within` Date, trend line for week-or-longer periods; a `between` range or cleared Date shows the total only.
+# Demo caveat: none now; the seeded KOTs cover every day with sales, so the default day shows data.
 workbook: {id: ury_db06_kitchen_timing, title: "URY Kitchen Timing", module: "URY", required_apps: [ury]}
 queries:
   # ---------------------------------------------------------------- KITCHEN / KOT
@@ -45,25 +49,22 @@ queries:
     sql: "SELECT ie.name, ie.kot, ie.state, ie.branch, ie.company, ie.production_unit, ki.item_name, DATE(COALESCE(ie.started_at, ie.creation)) AS exec_date, TIMESTAMPDIFF(SECOND, ie.started_at, ie.ready_at) / 60 AS prep_minutes FROM `tabURY KOT Item Execution` ie LEFT JOIN `tabURY KOT Items` ki ON ki.name = ie.kot_item WHERE ie.started_at IS NOT NULL AND ie.ready_at IS NOT NULL"
 
 charts:
-  # S1 KPI row. UX: no metric ids/tier codes in titles. (was T2)
-  # date (month) + comparison set in the Insights UI 2026-11-16: each card shows the LATEST month in the filtered
-  # range and % change vs the previous month.
-  # One Number chart per tile: Insights renders a multi-measure Number at a fixed narrow tile width.
-  - {id: db06_kots_kpi, title: "KOTs", query: fact_kot_headers, type: Number, comparison: true,
-     date: {column: date, granularity: month},
+  # S1 Key numbers. One Number chart per tile. Cards follow Date, Branch and Station: total for the dates picked + % change vs the previous period.
+  - {id: db06_kots_kpi, title: "KOTs", query: fact_kot_headers, type: Number, compare_previous: true,
+     date: {column: date},
      y: [{column: name, agg: count, as: KOTs}]}
-  - {id: db06_over_target_kpi, title: "KOTs over target (%)", query: fact_kot_headers, type: Number, comparison: true,
-     date: {column: date, granularity: month},
+  - {id: db06_over_target_kpi, title: "KOTs over target (%)", query: fact_kot_headers, type: Number, compare_previous: true, negative_is_better: true,
+     date: {column: date},
      y: [{expr: "sum(sla_breach) / sum(is_served)", as: "KOTs over target (%)", format: percent}]}
-  - {id: db06_avg_prep, title: "Avg prep time (min)", query: fact_kot_headers, type: Number, comparison: true,
-     date: {column: date, granularity: month},
+  - {id: db06_avg_prep, title: "Average prep time (min)", query: fact_kot_headers, type: Number, compare_previous: true, negative_is_better: true,
+     date: {column: date},
      filters: [{column: order_status, op: "=", value: "Served"}],
-     y: [{expr: "avg(prod_minutes).round(1)", as: "Avg prep time (min)"}]}
-  - {id: db06_open, title: "KOTs not yet served", query: fact_kot_headers, type: Number, comparison: true,
-     date: {column: date, granularity: month},
+     y: [{expr: "avg(prod_minutes).round(1)", as: "Average prep time (min)"}]}
+  - {id: db06_open, title: "KOTs not yet served", query: fact_kot_headers, type: Number, compare_previous: true, negative_is_better: true,
+     date: {column: date},
      y: [{expr: "count(name) - sum(is_served)", as: "KOTs not yet served"}]}
-  - {id: db06_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number, comparison: true,
-     date: {column: date, granularity: month},
+  - {id: db06_modified, title: "Modified KOTs", query: fact_kot_headers, type: Number, compare_previous: true, negative_is_better: true,
+     date: {column: date},
      filters: [{column: type, op: "=", value: "Order Modified"}],
      y: [{column: name, agg: count, as: "Modified KOTs"}]}
   # S2 Load (T1). db06_unit dropped: duplicate of DB05 KOTs by cooking station (same workspace).
@@ -77,25 +78,25 @@ charts:
      y: [{column: custom_kot_warning_time, agg: max, as: "Target"}, {expr: "avg(prod_minutes).round(1)", as: "Actual"}]}
   - {id: db06_funnel, title: "KOT stages reached (count)", query: fact_kot_stages, type: Funnel, limit: 10,
      x: stage, y: [{column: kot, agg: count, as: KOTs}]}
-  - {id: db06_cancel_stage, title: "Cancelled KOTs by stage (count)", query: fact_kot_exec, type: Row, limit: 10, stack: true,
+  - {id: db06_cancel_stage, title: "Cancelled KOTs by stage (count)", query: fact_kot_exec, type: Row, limit: 10, stack: true, color: "#e11d48",
      filters: [{column: is_cancelled, op: "=", value: 1}],
      x: cancel_stage, y: [{column: name, agg: count, as: Cancelled}]}
   # S4 Time per stage and slow dishes
   # KIT-006 Prep time (start to ready), KIT-009 Queue wait (fired to started), KIT-010 Order-to-serve (guest wait)
   - {id: db06_stage_time, title: "Avg time per stage by station (min)", query: fact_kot_exec, type: Bar, limit: 12,
      x: department,
-     y: [{expr: "(avg(prep_seconds) / 60).round(1)", as: "Prep (min)"},
-         {expr: "(avg(queue_seconds) / 60).round(1)", as: "Queue wait (min)"},
-         {expr: "(avg(order_to_serve_seconds) / 60).round(1)", as: "Order to serve (min)"}]}
+     y: [{expr: "(avg(prep_seconds) / 60).round(1)", as: "Prep (min)", color: "#6a39db"},
+         {expr: "(avg(queue_seconds) / 60).round(1)", as: "Queue wait (min)", color: "#f59e0b"},
+         {expr: "(avg(order_to_serve_seconds) / 60).round(1)", as: "Order to serve (min)", color: "#10b981"}]}
   # KIT-018 Item prep speed
-  - {id: db06_item_speed, title: "Slowest dishes, avg prep time (min)", query: fact_kot_item_exec, type: Row, limit: 10, stack: true,
+  - {id: db06_item_speed, title: "Slowest dishes, avg prep time (min)", query: fact_kot_item_exec, type: Row, limit: 10, stack: true, color: "#ec4899",
      x: item_name, y: [{expr: "avg(prep_minutes).round(1)", as: "Prep time (min)"}], order: [{by: "Prep time (min)", dir: desc}]}
   # db06_voids (Voided Kitchen Qty, always 0) dropped per UX change list.
 dashboards:
   - id: kitchen_timing
     title: "Kitchen timing"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}},
          layout: {x: 0, y: 2, w: 7, h: 1},
          applies_to: {fact_kot_headers: date, fact_kot_exec: exec_date, fact_kot_stages: exec_date, fact_kot_item_exec: exec_date}}
       - {id: f_branch, label: Branch, type: string, icon: building-2,
@@ -105,17 +106,17 @@ dashboards:
          layout: {x: 14, y: 2, w: 6, h: 1},
          applies_to: {fact_kot_headers: production, fact_kot_exec: department, fact_kot_stages: department, fact_kot_item_exec: production_unit}}
     items:
-      - {text: "<p><b>Kitchen timing.</b> How busy is the kitchen, and are KOTs getting out on time? For the kitchen head and floor manager. Default period: last 30 days; every filter applies to every chart.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {chart: db06_kots_kpi, x: 0, y: 3, w: 4, h: 3}
-      - {chart: db06_over_target_kpi, x: 4, y: 3, w: 4, h: 3}
-      - {chart: db06_avg_prep, x: 8, y: 3, w: 4, h: 3}
-      - {chart: db06_open, x: 12, y: 3, w: 4, h: 3}
-      - {chart: db06_modified, x: 16, y: 3, w: 4, h: 3}
-      - {text: "<p>Over target = KOT not served within its branch's warning time. Not yet served = no served time recorded.</p>", x: 0, y: 6, w: 20, h: 1}
-      - {chart: db06_by_hour, x: 0, y: 7, w: 20, h: 9}
-      - {chart: db06_stage_time, x: 0, y: 16, w: 10, h: 8}
-      - {chart: db06_funnel, x: 10, y: 16, w: 10, h: 8}
-      - {chart: db06_cancel_stage, x: 0, y: 24, w: 10, h: 8}
-      - {chart: db06_item_speed, x: 10, y: 24, w: 10, h: 8}
-      - {chart: db06_target, x: 0, y: 32, w: 20, h: 8}
-      - {text: "<p><b>Partial data:</b> prep and order-to-serve times come from kitchen screen taps. On this demo site the taps are seeded milliseconds apart, so per-dish prep shows as zero and the stage chart is not realistic; on a live kitchen they fill in on their own. Queue wait needs a queued-at time.</p>", x: 0, y: 40, w: 20, h: 3}
+      - {text: "<h2>Kitchen timing</h2><p>How busy is the kitchen, and are KOTs getting out on time? For the kitchen head and floor manager. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch and Station apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch and Station.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db06_kots_kpi, x: 0, y: 5, w: 4, h: 4}
+      - {chart: db06_over_target_kpi, x: 4, y: 5, w: 4, h: 4}
+      - {chart: db06_avg_prep, x: 8, y: 5, w: 4, h: 4}
+      - {chart: db06_open, x: 12, y: 5, w: 4, h: 4}
+      - {chart: db06_modified, x: 16, y: 5, w: 4, h: 4}
+      - {text: "<p>Over target = KOT not served within its branch's warning time. Not yet served = no served time recorded.</p>", x: 0, y: 9, w: 20, h: 1}
+      - {chart: db06_by_hour, x: 0, y: 10, w: 20, h: 9}
+      - {chart: db06_stage_time, x: 0, y: 19, w: 10, h: 8}
+      - {chart: db06_funnel, x: 10, y: 19, w: 10, h: 8}
+      - {chart: db06_cancel_stage, x: 0, y: 27, w: 10, h: 8}
+      - {chart: db06_item_speed, x: 10, y: 27, w: 10, h: 8}
+      - {chart: db06_target, x: 0, y: 35, w: 20, h: 8}

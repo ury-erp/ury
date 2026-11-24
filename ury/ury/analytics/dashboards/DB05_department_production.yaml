@@ -118,7 +118,7 @@ dashboards:
          applies_to: {fact_dept_days: department, fact_dept_sales: department, fact_kot_headers: production, fact_kot_lines: production, fact_sales_plan_items: department,}}
     items:
       - {text: "<h2>Kitchen stations and production</h2><p>How much each station made, whether it met the sales plan, and which department the sales belong to. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch and Department apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the total for the dates picked in <b>Date</b> (the latest day with sales by default). For a day or a last-N-days period it also shows the % change against the period just before it, and a trend line for a week or longer. A custom range or a cleared Date shows the total only. Cards follow Branch and Department too.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch and Department.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db05_kpi_kots, x: 0, y: 5, w: 5, h: 4}
       - {chart: db05_kpi_dishes, x: 5, y: 5, w: 5, h: 4}
       - {chart: db05_kpi_plan, x: 10, y: 5, w: 5, h: 4}

@@ -164,7 +164,7 @@ dashboards:
          applies_to: {fact_card_days: branch, fact_sales: branch, fact_hourly_2day: branch, fact_sales_lines_enriched: branch, fact_cancellations: branch, fact_kot_headers: branch, fact_sales_plan_items: branch, fact_stock_correction: branch, fact_yield_checks: branch, fact_daily_pnl: branch}}
     items:
       - {text: "<h2>Owner overview</h2><p>Is revenue growing, where does it come from, and is anything leaking? Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch applies to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the latest day it has records for, the % change against the day before, and a trend line. Cards follow Branch, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Latest day with records, with the % change against the day before. Follows Branch, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db01_net_sales, x: 0, y: 5, w: 5, h: 4}
       - {chart: db01_bills, x: 5, y: 5, w: 5, h: 4}
       - {chart: db01_avg_bill, x: 10, y: 5, w: 5, h: 4}

@@ -100,7 +100,7 @@ dashboards:
       - {id: f_order_type, label: Service, type: string, icon: shopping-bag, applies_to: {fact_items: order_type, fact_card_items: order_type, db04_costed_lines: order_type}, layout: {x: 16, y: 2, w: 4, h: 1}}
     items:
       - {text: "<h2>Menu and category</h2><p>Which dishes and categories earn, and which to promote, reprice or drop. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch, Category and Service apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the total for the dates picked in <b>Date</b> (the latest day by default). For a day or a last-N-days period it also shows the % change against the period just before it, and a trend line for a week or longer. A custom range or a cleared Date shows the total only. Cards follow Branch, Category and Service too.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch, Category and Service.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db04_net_sales_kpi, x: 0, y: 5, w: 4, h: 4}
       - {chart: db04_items_sold_kpi, x: 4, y: 5, w: 4, h: 4}
       - {chart: db04_dishes_kpi, x: 8, y: 5, w: 4, h: 4}

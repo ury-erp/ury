@@ -603,6 +603,27 @@ def _write_execution(kot_name, unit, fired, ctx, env, rng, kot_item_names, waite
 		if frappe.db.exists("URY KOT Item Execution", {"idempotency_key": ikey}):
 			continue
 		s, r = item_stamps(started, ready, rng)
+		# URY KOT's on_submit hook already seeds a QUEUED Item Execution per
+		# line and kot_item is unique, so a submitted KOT gets that row advanced
+		# to SERVED instead of a second one inserted.
+		existing = frappe.db.get_value("URY KOT Item Execution", {"kot_item": item_name}, "name")
+		if existing:
+			frappe.db.set_value(
+				"URY KOT Item Execution",
+				existing,
+				{
+					"state": "SERVED",
+					"started_by": cook,
+					"started_at": s,
+					"ready_by": cook,
+					"ready_at": r,
+					"served_by": waiter or cook,
+					"served_at": served,
+					"creation": fired,
+				},
+				update_modified=False,
+			)
+			continue
 		idoc = frappe.get_doc(
 			{
 				"doctype": "URY KOT Item Execution",
