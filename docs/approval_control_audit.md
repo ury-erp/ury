@@ -52,7 +52,7 @@ Reusable pattern: `Branch-company` already links a branch to its company, and `C
 
 ## Version-15 price-control audit
 
-`upstream/version-15` was inspected read-only through Git object lookups. Its Item hook is materially the same yield/menu hook as v16. Its Item and Branch custom-field fixtures contain no price-control fields. Searches across v15 Python, JavaScript, JSON, and Markdown found no `enable_price_control`, price-control, warning/approval price-limit, or warning/approval percentage-limit implementation. Repository-wide history search for `enable_price_control` also returned no match. `fork/version-15` is not present.
+`upstream/version-15` was inspected read-only through Git object lookups. Its Item hook is materially the same yield/menu hook as v16. Its Item and Branch custom-field fixtures contain no price-control fields. Searches across v15 Python, JavaScript, JSON, and Markdown found no `enable_price_control`, price-control, warning/approval price-limit, or warning/approval percentage-limit implementation. Repository-wide history search for `enable_price_control` also returned no match. `fork/version-15` is not present. The `uryv15.localhost` database was also queried read-only for Item/Item Group price, warning, approval, and control custom fields; it returned no matching rows.
 
 Therefore the requested existing v15 item price-control feature could not be located and cannot be ported from the supplied branches. This is recorded as a blocking open question; no substitute source or Item Group design will be invented.
 
