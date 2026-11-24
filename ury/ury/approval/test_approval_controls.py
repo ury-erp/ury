@@ -13,9 +13,9 @@ from frappe.utils import add_months, getdate, nowdate, random_string
 
 from ury.ury.approval import budget as budget_control
 from ury.ury.approval import payments, periods
-from ury.ury.approval.config import ENABLE_FIELDS, get_payment_levels, validate_branch
+from ury.ury.approval.config import CONTROL_FIELDS, ENABLE_FIELDS, get_payment_levels, validate_branch
 from ury.ury.approval.service import assert_approved, decide_approval, document_hash, request_approval
-from ury.ury.tests.factories import make_branch, make_user
+from ury.ury.tests.factories import make_branch, make_item, make_user
 
 
 class TestApprovalControls(IntegrationTestCase):
@@ -72,7 +72,7 @@ class TestApprovalControls(IntegrationTestCase):
 		if control == "backdated":
 			self.branch.custom_ury_backdated_lock_day = 5
 			self.branch.custom_ury_pnl_finalization_required = 1
-		table = f"custom_ury_{control}_approval_levels"
+		table = CONTROL_FIELDS.get(control, f"custom_ury_{control}_approval_levels")
 		self.branch.set(table, [])
 		self.branch.append(table, {"level": 1, "approver_role": "Restaurant Manager"})
 		self.branch.append(table, {"level": 2, "approver_role": "Finance Head"})
@@ -192,6 +192,94 @@ class TestApprovalControls(IntegrationTestCase):
 		doc.insert(ignore_permissions=True)
 		doc.submit()
 		return doc
+
+	def _price_control_item(self):
+		self._configure("purchase_price")
+		self._original_auto_update_price = frappe.db.get_single_value(
+			"Stock Settings", "update_existing_price_list_rate"
+		)
+		self.addCleanup(self._set_auto_update_item_prices, self._original_auto_update_price)
+		self._set_auto_update_item_prices(0)
+		currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		price_list = frappe.get_doc(
+			{
+				"doctype": "Price List",
+				"price_list_name": f"URY Buying {random_string(8)}",
+				"currency": currency,
+				"buying": 1,
+				"enabled": 1,
+			}
+		).insert(ignore_permissions=True)
+		self.branch.custom_ury_buying_price_list = price_list.name
+		self.branch.save(ignore_permissions=True)
+		item = make_item(is_stock_item=0)
+		item.custom_ury_enable_price_control = 1
+		item.custom_ury_warning_price_limit = 10
+		item.custom_ury_warning_percentage_limit = 10
+		for level, limit in ((1, 20), (2, 30)):
+			item.append(
+				"custom_ury_price_approval_limits",
+				{
+					"level": level,
+					"approval_price_limit": limit,
+					"approval_percentage_limit": limit,
+				},
+			)
+		item.save(ignore_permissions=True)
+		self.item_price = frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": item.name,
+				"price_list": price_list.name,
+				"buying": 1,
+				"currency": currency,
+				"uom": item.stock_uom,
+				"price_list_rate": 100,
+				"valid_from": nowdate(),
+			}
+		).insert(ignore_permissions=True)
+		return item
+
+	def _set_auto_update_item_prices(self, enabled):
+		frappe.db.set_single_value("Stock Settings", "update_existing_price_list_rate", enabled)
+		frappe.clear_cache(doctype="Stock Settings")
+
+	def _purchase_order(self, item, rate):
+		supplier_group = frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
+		supplier = frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": f"URY Supplier {random_string(8)}",
+				"supplier_group": supplier_group,
+			}
+		).insert(ignore_permissions=True)
+		return frappe.get_doc(
+			{
+				"doctype": "Purchase Order",
+				"company": self.company,
+				"supplier": supplier.name,
+				"transaction_date": nowdate(),
+				"schedule_date": nowdate(),
+				"currency": frappe.get_cached_value("Company", self.company, "default_currency"),
+				"conversion_rate": 1,
+				"buying_price_list": self.branch.custom_ury_buying_price_list,
+				"plc_conversion_rate": 1,
+				"custom_ury_branch": self.branch.name,
+				"items": [
+					{
+						"item_code": item.name,
+						"qty": 1,
+						"uom": item.stock_uom,
+						"stock_uom": item.stock_uom,
+						"conversion_factor": 1,
+						"rate": rate,
+						"schedule_date": nowdate(),
+						"expense_account": self.account,
+						"cost_center": self.cost_center,
+					}
+				],
+			}
+		)
 
 	def _advance(self, amount, name=None):
 		return frappe.get_doc(
@@ -319,6 +407,9 @@ class TestApprovalControls(IntegrationTestCase):
 			)
 		}
 		self.assertEqual(set(requests), {"payment", "expense"})
+		self.assertEqual(
+			len(json.loads(frappe.get_doc("URY Approval Request", requests["expense"].name).approval_plan)), 1
+		)
 		with self.assertRaises(frappe.PermissionError):
 			doc.submit()
 		doc.reload()
@@ -441,7 +532,11 @@ class TestApprovalControls(IntegrationTestCase):
 				{"level": level, "payment_type": "Bank", "threshold": threshold, "approver_role": role},
 			)
 		self.branch.save(ignore_permissions=True)
-		for amount, role in ((100000, "Restaurant Manager"), (100001, "Finance Head")):
+		for amount, role in (
+			(99999, "Restaurant Manager"),
+			(100000, "Restaurant Manager"),
+			(100001, "Finance Head"),
+		):
 			doc = self._persisted_bank_payment(amount)
 			request = frappe.get_doc(
 				"URY Approval Request", {"reference_name": doc.name, "control_type": "payment"}
@@ -685,3 +780,202 @@ class TestApprovalControls(IntegrationTestCase):
 		log.reload()
 		with self.assertRaises(frappe.PermissionError):
 			log.delete()
+
+	def test_item_price_control_limits_are_mandatory(self):
+		item = make_item(is_stock_item=0)
+		item.custom_ury_enable_price_control = 1
+		with self.assertRaises(frappe.ValidationError):
+			item.save(ignore_permissions=True)
+		item.reload()
+		item.custom_ury_enable_price_control = 1
+		item.custom_ury_warning_price_limit = 10
+		item.custom_ury_warning_percentage_limit = 10
+		with self.assertRaises(frappe.ValidationError):
+			item.save(ignore_permissions=True)
+		item.reload()
+		item.custom_ury_enable_price_control = 1
+		item.append(
+			"custom_ury_price_approval_limits",
+			{"level": 1, "approval_price_limit": 20, "approval_percentage_limit": None},
+		)
+		with self.assertRaises(frappe.ValidationError):
+			item.save(ignore_permissions=True)
+		item.reload()
+		item.custom_ury_enable_price_control = 1
+		item.append(
+			"custom_ury_price_approval_limits",
+			{"level": 1, "approval_price_limit": 20, "approval_percentage_limit": 20},
+		)
+		item.save(ignore_permissions=True)
+		self.assertTrue(item.custom_ury_enable_price_control)
+
+	def test_purchase_price_warning_and_approval_levels(self):
+		item = self._price_control_item()
+		within_warning = self._purchase_order(item, 105).insert(ignore_permissions=True)
+		self.assertFalse(
+			frappe.db.exists(
+				"URY Approval Request",
+				{"reference_name": within_warning.name, "control_type": "purchase_price"},
+			)
+		)
+		frappe.message_log = []
+		warning = self._purchase_order(item, 115).insert(ignore_permissions=True)
+		self.assertFalse(
+			frappe.db.exists(
+				"URY Approval Request", {"reference_name": warning.name, "control_type": "purchase_price"}
+			)
+		)
+		self.assertIn("exceeds", str(frappe.message_log))
+		approval = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": approval.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(request.current_level, 2)
+		self.assertEqual(json.loads(request.approval_plan)[0]["approver_role"], "Finance Head")
+
+	def test_purchase_price_amount_or_percentage_crossing_routes_higher(self):
+		item = self._price_control_item()
+		first_limit = item.custom_ury_price_approval_limits[0]
+		first_limit.approval_price_limit = 25
+		first_limit.approval_percentage_limit = 15
+		item.save(ignore_permissions=True)
+		percentage_crossing = self._purchase_order(item, 120).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request",
+			{"reference_name": percentage_crossing.name, "control_type": "purchase_price"},
+		)
+		self.assertEqual(request.current_level, 2)
+		first_limit.approval_price_limit = 15
+		first_limit.approval_percentage_limit = 25
+		item.save(ignore_permissions=True)
+		amount_crossing = self._purchase_order(item, 120).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": amount_crossing.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(request.current_level, 2)
+
+	def test_real_purchase_price_approval_blocks_then_allows_submit(self):
+		item = self._price_control_item()
+		self.approver.add_roles("Finance Head")
+		doc = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(request.document_version_hash, document_hash(frappe.get_doc(doc.doctype, doc.name)))
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(request.name, "approve")
+		frappe.set_user("Administrator")
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
+
+	def test_purchase_approval_survives_native_item_price_auto_update(self):
+		item = self._price_control_item()
+		self._set_auto_update_item_prices(1)
+		self.approver.add_roles("Finance Head")
+		doc = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		self.assertEqual(frappe.db.get_value("Item Price", self.item_price.name, "price_list_rate"), 125)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(json.loads(request.details)[0]["reference_rate"], 100)
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(request.name, "approve")
+		frappe.set_user("Administrator")
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
+
+	def test_missing_price_list_price_warns_without_purchase_approval(self):
+		item = self._price_control_item()
+		self.item_price.delete()
+		frappe.message_log = []
+		doc = self._purchase_order(item, 150).insert(ignore_permissions=True)
+		self.assertFalse(
+			frappe.db.exists(
+				"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+			)
+		)
+		self.assertIn("No Price List price", str(frappe.message_log))
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
+
+	def test_changed_purchase_rate_invalidates_price_approval(self):
+		item = self._price_control_item()
+		self.approver.add_roles("Finance Head")
+		doc = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		frappe.set_user(self.approver.name)
+		decide_approval(request.name, "approve")
+		frappe.set_user("Administrator")
+		doc.items[0].rate = 126
+		doc.save(ignore_permissions=True)
+		request.reload()
+		new_request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(request.status, "Invalidated")
+		self.assertEqual(new_request.status, "Pending")
+		self.assertNotEqual(request.name, new_request.name)
+
+	def test_purchase_price_snapshot_cannot_be_forged(self):
+		item = self._price_control_item()
+		doc = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		forged = json.loads(doc.custom_ury_price_control_snapshot)
+		for snapshot in forged.values():
+			snapshot["reference_rate"] = 10000
+		doc.custom_ury_price_control_snapshot = json.dumps(forged)
+		doc.save(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		self.assertEqual(request.status, "Pending")
+		self.assertEqual(json.loads(request.details)[0]["reference_rate"], 100)
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+
+	def test_disabled_purchase_price_control_preserves_pending_request(self):
+		item = self._price_control_item()
+		doc = self._purchase_order(item, 125).insert(ignore_permissions=True)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "purchase_price"}
+		)
+		original_hash = request.document_version_hash
+		self.branch.custom_ury_enable_purchase_approval = 0
+		self.branch.save(ignore_permissions=True)
+		doc.items[0].rate = 150
+		doc.save(ignore_permissions=True)
+		request.reload()
+		self.assertEqual(request.status, "Pending")
+		self.assertEqual(request.document_version_hash, original_hash)
+		self.assertEqual(len(self.branch.custom_ury_purchase_approval_levels), 2)
+
+	def test_real_expense_above_budget_uses_all_configured_levels(self):
+		self._configure("expense")
+		self._budget()
+		self.approver.add_roles("Finance Head")
+		doc = self._persisted_advance(10001)
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "expense"}
+		)
+		self.assertEqual(len(json.loads(request.approval_plan)), 2)
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(request.name, "approve")
+		request.reload()
+		self.assertEqual(request.status, "Pending")
+		self.assertEqual(request.current_level, 2)
+		decide_approval(request.name, "approve")
+		request.reload()
+		self.assertEqual(request.status, "Approved")
+		frappe.set_user("Administrator")
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
