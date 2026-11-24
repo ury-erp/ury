@@ -50,11 +50,13 @@ Reusable pattern: `Branch-company` already links a branch to its company, and `C
 - Native Budget Stop/Warn/Ignore behavior and its exception approver role remain unchanged.
 - Employee Advance and Payment Entry native validation, payment, and ledger behavior must not be overridden.
 
-## Version-15 price-control audit
+## Version-15 and Aggregator price-control audit
 
-`upstream/version-15` was inspected read-only through Git object lookups. Its Item hook is materially the same yield/menu hook as v16. Its Item and Branch custom-field fixtures contain no price-control fields. Searches across v15 Python, JavaScript, JSON, and Markdown found no `enable_price_control`, price-control, warning/approval price-limit, or warning/approval percentage-limit implementation. Repository-wide history search for `enable_price_control` also returned no match. `fork/version-15` is not present. The `uryv15.localhost` database was also queried read-only for Item/Item Group price, warning, approval, and control custom fields; it returned no matching rows.
+`upstream/version-15` was inspected read-only through Git object lookups. Its Item hook is materially the same yield/menu hook as v16. Its Item and Branch custom-field fixtures contain no price-control fields. Searches across v15 Python, JavaScript, JSON, and Markdown found no `enable_price_control`, price-control, warning/approval price-limit, or warning/approval percentage-limit implementation. The `uryv15.localhost` database also returned no matching Item/Item Group custom fields.
 
-Therefore the requested existing v15 item price-control feature could not be located and cannot be ported from the supplied branches. This is recorded as a blocking open question; no substitute source or Item Group design will be invented.
+After the user identified `Aggregator` as the intended source, `upstream/Aggregator` was fetched and inspected at `255de52baf0341192d41fdc6a71f2ddf0d0174d3`. Its Custom Field fixture has no Item Group or Item price-control fields, its hooks have no purchase-price approval logic, and its history contains no matching warning/approval-limit implementation. The user then explicitly directed an Item-wise reimplementation with Item Group excluded.
+
+The v16 implementation therefore follows the requested Item Group architecture conceptually but stores all configuration on Item: an enable flag, warning amount/percentage fields, and a child table of amount/percentage limits for each authority level. It deliberately contains no Item Group fields, lookup, or fallback.
 
 ## What can be reused
 
@@ -64,16 +66,20 @@ Therefore the requested existing v15 item price-control feature could not be loc
 4. Existing Branch-company and Cost Center-branch fields.
 5. Existing role fixtures and URY permission patch patterns.
 
-## What must be ported
+## Price-control port completed
 
-No price-control implementation was found in the available v15 branch. Porting is blocked pending the correct source branch/commit or confirmation that a new implementation is acceptable.
+1. Item now owns Enable Price Control, Warning Price Limit, Warning Percentage Limit, and level-specific Approval Price Limit / Approval Percentage Limit rows through `URY Item Price Approval Limit`.
+2. Purchase Order, Purchase Receipt, and Purchase Invoice compare controlled item rates against valid buying Item Price records from the Branch buying Price List (falling back to the document's native buying Price List). Supplier-specific and row-UOM prices are preferred, with stock-UOM and currency conversion handled.
+3. Crossing either warning measure emits a warning. Crossing either level-one approval measure creates/updates the independent `purchase_price` request and routes to the appropriate configured higher authority; submission remains blocked until that exact document hash is approved.
+4. A server-captured, persisted price snapshot protects the comparison basis from ERPNext's native automatic Item Price update. Client-supplied snapshot changes are ignored in favor of the stored server snapshot.
+5. Item Group is not customized or consulted. Item mandatory validation is server-side and covers Desk, REST, and imports.
 
 ## What must be built new
 
 1. General URY Approval Request, append-only URY Approval Log, approval-level/configuration child DocTypes, URY Period Lock, workflow fixture, server APIs, permissions, version/action hashing, independent control instances, status-change notifications, and self-approval policy.
 2. Branch master/control settings and server-side approver validation, plus branch fields and branch price-list configuration for supported transactions.
-3. Item price-control fields and validation once the missing v15 source question is resolved.
-4. Purchase price evaluation, warnings, request upsert, version invalidation, and submit guards for the confirmed purchase DocTypes.
+3. Purchase/expense/backdated configuration remains branch-owned; purchase-price limits are Item-owned as described above.
+4. Additional purchase price behaviors covered by tests include missing prices, native Item Price auto-update, amount-or-percentage escalation, approval invalidation, disabled controls, and snapshot forgery attempts.
 5. Payment/advance routing and draft/submit/payment guards without changing native payment validation.
 6. Branch-aware expense/budget resolution, available-budget calculation, concurrency-safe reservations and release/adjustment lifecycle for confirmed expense DocTypes.
 7. Monthly P&L finalization/reopen permission, branch period locks, exception approvals, and alerts for confirmed transaction coverage.
