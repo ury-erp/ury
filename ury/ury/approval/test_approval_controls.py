@@ -29,8 +29,12 @@ class TestApprovalControls(IntegrationTestCase):
 			else frappe.db.get_value("Account", {"root_type": "Expense", "is_group": 0}, "company")
 		)
 		suffix = random_string(8)
-		self.requester = make_user(f"ury-requester-{suffix}@example.com", ["Restaurant Manager"])
-		self.approver = make_user(f"ury-approver-{suffix}@example.com", ["Restaurant Manager"])
+		if not hasattr(self.__class__, "_approval_test_users"):
+			self.__class__._approval_test_users = (
+				make_user(f"ury-requester-{suffix}@example.com", ["Restaurant Manager"]),
+				make_user(f"ury-approver-{suffix}@example.com", ["Restaurant Manager"]),
+			)
+		self.requester, self.approver = self.__class__._approval_test_users
 		self.branch = make_branch(branch=f"URY Approval {suffix}", company=self.company)
 		self.branch2 = make_branch(branch=f"URY Approval Other {suffix}", company=self.company)
 		for branch in (self.branch, self.branch2):
@@ -90,6 +94,76 @@ class TestApprovalControls(IntegrationTestCase):
 			return request_approval(doc, control, self.branch.name, levels=levels, amount=doc.base_paid_amount)
 		finally:
 			frappe.set_user("Administrator")
+
+	def _persisted_advance(self, amount=1000):
+		employee = frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"first_name": f"URY {random_string(8)}",
+				"company": self.company,
+				"status": "Active",
+				"gender": "Male",
+				"date_of_birth": "1990-01-01",
+				"date_of_joining": nowdate(),
+			}
+		).insert(ignore_permissions=True)
+		parent_account = frappe.db.get_value(
+			"Account", {"company": self.company, "root_type": "Asset", "is_group": 1}, "name"
+		)
+		advance_account = frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": f"URY Advance {random_string(8)}",
+				"company": self.company,
+				"parent_account": parent_account,
+				"account_type": "Receivable",
+				"is_group": 0,
+			}
+		).insert(ignore_permissions=True)
+		doc = self._advance(amount)
+		doc.update(
+			{
+				"employee": employee.name,
+				"purpose": "URY approval integration test",
+				"currency": frappe.get_cached_value("Company", self.company, "default_currency"),
+				"advance_account": advance_account.name,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc
+
+	def _persisted_bank_payment(self, amount):
+		parent_account = frappe.db.get_value(
+			"Account", {"company": self.company, "root_type": "Asset", "is_group": 1}, "name"
+		)
+		paid_to = frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": f"URY Bank {random_string(8)}",
+				"company": self.company,
+				"parent_account": parent_account,
+				"account_type": "Bank",
+				"is_group": 0,
+			}
+		).insert(ignore_permissions=True)
+		paid_from = frappe.db.get_value(
+			"Account", {"company": self.company, "account_type": "Cash", "is_group": 0}, "name"
+		)
+		doc = frappe.get_doc(
+			{
+				"doctype": "Payment Entry",
+				"company": self.company,
+				"payment_type": "Internal Transfer",
+				"posting_date": nowdate(),
+				"paid_from": paid_from,
+				"paid_to": paid_to.name,
+				"paid_amount": amount,
+				"received_amount": amount,
+				"custom_ury_branch": self.branch.name,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		return doc
 
 	def _budget(self, action="Ignore"):
 		fiscal_year = get_fiscal_year(nowdate(), company=self.company)[0]
@@ -213,6 +287,50 @@ class TestApprovalControls(IntegrationTestCase):
 		expense.reload()
 		self.assertEqual(expense.status, "Pending")
 
+	def test_real_advance_requires_independent_draft_approvals_before_submit(self):
+		self._configure("payment")
+		self._configure("expense")
+		self.branch.set("custom_ury_payment_approval_levels", [])
+		self.branch.append(
+			"custom_ury_payment_approval_levels",
+			{
+				"level": 1,
+				"payment_type": "Employee Advance",
+				"approver_user": self.approver.name,
+			},
+		)
+		self.branch.save(ignore_permissions=True)
+		self._budget()
+		doc = self._persisted_advance(1000)
+		requests = {
+			row.control_type: row
+			for row in frappe.get_all(
+				"URY Approval Request",
+				filters={"reference_doctype": doc.doctype, "reference_name": doc.name},
+				fields=["name", "control_type", "status"],
+			)
+		}
+		self.assertEqual(set(requests), {"payment", "expense"})
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(requests["payment"].name, "approve")
+		frappe.set_user("Administrator")
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(requests["expense"].name, "approve")
+		frappe.set_user("Administrator")
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
+		reservation = frappe.get_doc("URY Budget Reservation", {"reference_name": doc.name})
+		self.assertEqual(reservation.status, "Consumed")
+		doc.cancel()
+		reservation.reload()
+		self.assertEqual(reservation.status, "Released")
+
 	def test_concurrent_expenses_do_not_share_available_budget(self):
 		self._configure("expense")
 		budget = self._budget()
@@ -262,7 +380,6 @@ class TestApprovalControls(IntegrationTestCase):
 		for doctype, names in (
 			("Cost Center", [self.cost_center, self.other_cost_center]),
 			("Branch", [self.branch.name, self.branch2.name]),
-			("User", [self.requester.name, self.approver.name]),
 		):
 			for name in names:
 				if frappe.db.exists(doctype, name):
@@ -300,6 +417,20 @@ class TestApprovalControls(IntegrationTestCase):
 		for amount, role in ((99999, "Restaurant Manager"), (100000, "Restaurant Manager"), (100001, "Finance Head")):
 			doc = self._source(amount)
 			self.assertEqual(get_payment_levels(self.branch, doc)[0]["approver_role"], role)
+
+	def test_real_bank_payment_limit_boundaries(self):
+		self._configure("payment")
+		self.branch.set("custom_ury_payment_approval_levels", [])
+		for level, threshold, role in ((1, 100000, "Restaurant Manager"), (2, 0, "Finance Head")):
+			self.branch.append(
+				"custom_ury_payment_approval_levels",
+				{"level": level, "payment_type": "Bank", "threshold": threshold, "approver_role": role},
+			)
+		self.branch.save(ignore_permissions=True)
+		for amount, role in ((100000, "Restaurant Manager"), (100001, "Finance Head")):
+			doc = self._persisted_bank_payment(amount)
+			request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "payment"})
+			self.assertEqual(json.loads(request.approval_plan)[0]["approver_role"], role)
 
 	def test_mixed_branch_is_blocked_before_request(self):
 		self._configure("payment")
