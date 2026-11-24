@@ -1,14 +1,14 @@
 # DB05 Kitchen stations and production, DAILY view (redesign 2026-11-24). Audience: kitchen head.
 # Same pattern as DB01-DB04: ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
 # __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly). Clear it for all dates, or pick a range.
-# Number cards (the *_cards queries and fact_dept_days) do NOT follow Date: each shows the latest day its source has records for, the % change vs
-# the day before and a trend line, and follows Branch / Department. Charts follow Date, Branch, Department.
+# Number cards and charts all follow Date, Branch and Department (cards use compare_previous: total for the dates picked, % change vs the previous
+# period for a `within` Date, trend line for periods of a week or more; a `between` range or cleared Date shows the total only).
 # Sales by department / warehouse / policy use fact_dept_sales / fact_dept_days (one row per day x branch x department x warehouse x policy; 93 days).
 # Kitchen (KOT) and plan data can stop earlier than sales: then the Date default (latest SALES day) shows empty kitchen charts, pick an earlier day.
 # No currency symbols anywhere. Insights runs these queries on DuckDB.
 workbook: {id: ury_db05_department_production, title: "URY Department Production", module: "URY", required_apps: [ury]}
 queries:
-  # fact_dept_days (sql): not linked to Date. Cards and the latest-vs-previous-day department chart.
+  # fact_dept_days (sql): not linked to Date. The latest-vs-previous-day department chart.
   - id: fact_dept_days
     title: "fact_dept_days"
     sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATEDIFF(MAX(l.last_day), pi.posting_date) AS days_ago, CASE WHEN pi.posting_date = MAX(l.last_day) THEN 'Latest day' ELSE 'Previous day' END AS day_label, pi.branch, COALESCE(NULLIF(ipc.department, ''), 'Unassigned') AS department, pii.warehouse, CASE WHEN ipc.production_policy = 'PRE_PRODUCED' THEN 'Pre-produced' WHEN ipc.production_policy = 'MADE_TO_ORDER' THEN 'Made to order' WHEN ipc.production_policy = 'DIRECT_RETAIL' THEN 'Direct retail' ELSE 'Not set' END AS policy_label, SUM(pii.net_amount) AS net_amount FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 GROUP BY pi.posting_date, pi.branch, COALESCE(NULLIF(ipc.department, ''), 'Unassigned'), pii.warehouse, CASE WHEN ipc.production_policy = 'PRE_PRODUCED' THEN 'Pre-produced' WHEN ipc.production_policy = 'MADE_TO_ORDER' THEN 'Made to order' WHEN ipc.production_policy = 'DIRECT_RETAIL' THEN 'Direct retail' ELSE 'Not set' END"
@@ -16,25 +16,8 @@ queries:
   - id: fact_dept_sales
     title: "fact_dept_sales"
     sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATEDIFF(MAX(l.last_day), pi.posting_date) AS days_ago, CASE WHEN pi.posting_date = MAX(l.last_day) THEN 'Latest day' ELSE 'Previous day' END AS day_label, pi.branch, COALESCE(NULLIF(ipc.department, ''), 'Unassigned') AS department, pii.warehouse, CASE WHEN ipc.production_policy = 'PRE_PRODUCED' THEN 'Pre-produced' WHEN ipc.production_policy = 'MADE_TO_ORDER' THEN 'Made to order' WHEN ipc.production_policy = 'DIRECT_RETAIL' THEN 'Direct retail' ELSE 'Not set' END AS policy_label, SUM(pii.net_amount) AS net_amount FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 GROUP BY pi.posting_date, pi.branch, COALESCE(NULLIF(ipc.department, ''), 'Unassigned'), pii.warehouse, CASE WHEN ipc.production_policy = 'PRE_PRODUCED' THEN 'Pre-produced' WHEN ipc.production_policy = 'MADE_TO_ORDER' THEN 'Made to order' WHEN ipc.production_policy = 'DIRECT_RETAIL' THEN 'Direct retail' ELSE 'Not set' END"
-  # *_cards: copies of the KOT / plan queries that Date does not touch (a Date link applies to every chart on a query), used by the cards.
   - id: fact_kot_headers
     title: fact_kot_headers
-    table: URY KOT
-    joins:
-    - table: POS Profile
-      type: left
-      true: [pos_profile, name]
-      columns: [custom_kot_warning_time, table_attention_time]
-    filters:
-    - {column: docstatus, op: '=', value: 1}
-    mutate:
-    - {as: prod_minutes, type: Decimal, expr: production_time.cast("float64")}
-    - {as: hour_of_day, type: Integer, expr: hour(time)}
-    - {as: is_served, type: Integer, expr: 'if_else(order_status == ''Served'', 1, 0)'}
-    - {as: sla_breach, type: Integer, expr: 'if_else(production_time.cast("float64") > custom_kot_warning_time, 1, 0)'}
-    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
-  - id: fact_kot_headers_cards
-    title: fact_kot_headers_cards
     table: URY KOT
     joins:
     - table: POS Profile
@@ -68,25 +51,6 @@ queries:
     - {as: cancelled_qty_num, type: Decimal, expr: cancelled_qty.cast("float64")}
     - {as: hour_of_day, type: Integer, expr: hour(time)}
     select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
-  - id: fact_kot_lines_cards
-    title: fact_kot_lines_cards
-    table: URY KOT Items
-    joins:
-    - table: URY KOT
-      type: inner
-      true: [parent, name]
-      columns: [date, time, production, branch, type, order_status, invoice, pos_profile]
-    - table: Item
-      type: left
-      true: [item, name]
-      columns: [item_group]
-    filters:
-    - {column: docstatus, op: '=', value: 1}
-    mutate:
-    - {as: qty_num, type: Decimal, expr: quantity.cast("float64")}
-    - {as: cancelled_qty_num, type: Decimal, expr: cancelled_qty.cast("float64")}
-    - {as: hour_of_day, type: Integer, expr: hour(time)}
-    select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
   - id: fact_sales_plan_items
     title: fact_sales_plan_items
     table: URY Sales Plan Item
@@ -101,33 +65,23 @@ queries:
     - {as: under_qty, type: Decimal, expr: 'if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)'}
     - {as: over_qty, type: Decimal, expr: 'if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)'}
     select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
-  - id: fact_plan_cards
-    title: fact_plan_cards
-    table: URY Sales Plan Item
-    joins:
-    - table: URY Sales Plan
-      type: inner
-      true: [parent, name]
-      columns: [plan_date, branch, company, status, service_period, enforcement_mode]
-    filters:
-    - {column: docstatus, op: '=', value: 1}
-    mutate:
-    - {as: under_qty, type: Decimal, expr: 'if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)'}
-    - {as: over_qty, type: Decimal, expr: 'if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)'}
-    select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
 
 charts:
-  # ---- Key numbers: latest day with records, % change vs the day before, trend line
-  - {id: db05_kpi_kots, title: "KOTs", query: fact_kot_headers_cards, type: Number, comparison: true, sparkline: true,
+  # ---- Key numbers: total for the dates picked, % change vs the previous period, trend line
+  - {id: db05_kpi_kots, title: "KOTs", query: fact_kot_headers, type: Number, compare_previous: true,
      filters: [{column: type, op: "!=", value: Duplicate}],
-     date: {column: date, granularity: day}, y: [{column: name, agg: count, as: KOTs}]}
-  - {id: db05_kpi_dishes, title: "Dishes made", query: fact_kot_lines_cards, type: Number, comparison: true, sparkline: true,
-     date: {column: date, granularity: day}, y: [{column: qty_num, agg: sum, as: "Dishes made"}]}
-  - {id: db05_kpi_plan, title: "Plan fulfilled (%)", query: fact_plan_cards, type: Number, comparison: true, sparkline: true,
-     date: {column: plan_date, granularity: day}, y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: "Plan fulfilled (%)", format: percent}]}
-  - {id: db05_unmapped, title: "Sales with no department", query: fact_dept_days, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: date},
+     y: [{column: name, agg: count, as: KOTs}]}
+  - {id: db05_kpi_dishes, title: "Dishes made", query: fact_kot_lines, type: Number, compare_previous: true,
+     date: {column: date},
+     y: [{column: qty_num, agg: sum, as: "Dishes made"}]}
+  - {id: db05_kpi_plan, title: "Plan fulfilled (%)", query: fact_sales_plan_items, type: Number, compare_previous: true,
+     date: {column: plan_date},
+     y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: "Plan fulfilled (%)", format: percent}]}
+  - {id: db05_unmapped, title: "Sales with no department", query: fact_dept_sales, type: Number, compare_previous: true, negative_is_better: true,
      filters: [{column: department, op: "=", value: Unassigned}],
-     date: {column: posting_date, granularity: day}, y: [{expr: "sum(net_amount).round(0)", as: "Sales with no department"}]}
+     date: {column: posting_date},
+     y: [{expr: "sum(net_amount).round(0)", as: "Sales with no department"}]}
 
   # ---- Latest day vs previous day (not linked to Date)
   - {id: db05_dept_2day, title: "Sales by department: latest day vs previous day", query: fact_dept_days, type: Bar, limit: 30, stack: false,
@@ -159,12 +113,12 @@ dashboards:
       - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, layout: {x: 0, y: 2, w: 8, h: 1},
          applies_to: {fact_dept_sales: posting_date, fact_kot_headers: date, fact_kot_lines: date, fact_sales_plan_items: plan_date}}
       - {id: f_branch, label: Branch, type: string, icon: building-2, layout: {x: 8, y: 2, w: 6, h: 1},
-         applies_to: {fact_dept_days: branch, fact_dept_sales: branch, fact_kot_headers: branch, fact_kot_headers_cards: branch, fact_kot_lines: branch, fact_kot_lines_cards: branch, fact_sales_plan_items: branch, fact_plan_cards: branch}}
+         applies_to: {fact_dept_days: branch, fact_dept_sales: branch, fact_kot_headers: branch, fact_kot_lines: branch, fact_sales_plan_items: branch,}}
       - {id: f_department, label: Department, type: string, icon: chef-hat, layout: {x: 14, y: 2, w: 6, h: 1},
-         applies_to: {fact_dept_days: department, fact_dept_sales: department, fact_kot_headers: production, fact_kot_headers_cards: production, fact_kot_lines: production, fact_kot_lines_cards: production, fact_sales_plan_items: department, fact_plan_cards: department}}
+         applies_to: {fact_dept_days: department, fact_dept_sales: department, fact_kot_headers: production, fact_kot_lines: production, fact_sales_plan_items: department,}}
     items:
       - {text: "<h2>Kitchen stations and production</h2><p>How much each station made, whether it met the sales plan, and which department the sales belong to. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch and Department apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the latest day it has records for, the % change against the day before, and a trend line. Cards follow Branch and Department, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Each card shows the total for the dates picked in <b>Date</b> (the latest day with sales by default). For a day or a last-N-days period it also shows the % change against the period just before it, and a trend line for a week or longer. A custom range or a cleared Date shows the total only. Cards follow Branch and Department too.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db05_kpi_kots, x: 0, y: 5, w: 5, h: 4}
       - {chart: db05_kpi_dishes, x: 5, y: 5, w: 5, h: 4}
       - {chart: db05_kpi_plan, x: 10, y: 5, w: 5, h: 4}
