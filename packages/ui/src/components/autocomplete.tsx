@@ -78,6 +78,9 @@ export function Autocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const onSearchRef = useRef(onSearch)
   onSearchRef.current = onSearch
+  // Query the current list was fetched for; never refetch the same query (it would
+  // swap the list for the spinner and back).
+  const lastSearchedRef = useRef<string | null>(null)
 
   const selectedOption = options.find(
     (opt) =>
@@ -95,9 +98,13 @@ export function Autocomplete({
 
   // Debounced search while open.
   useEffect(() => {
+    if (!isOpen) lastSearchedRef.current = null
     if (!isOpen || disabled) return
+    const nextQuery = isTyping ? query : ''
+    if (nextQuery === lastSearchedRef.current) return
     const timer = window.setTimeout(() => {
-      onSearchRef.current(isTyping ? query : '')
+      lastSearchedRef.current = nextQuery
+      onSearchRef.current(nextQuery)
     }, debounceMs)
     return () => window.clearTimeout(timer)
   }, [query, isTyping, isOpen, disabled, debounceMs])
@@ -169,6 +176,7 @@ export function Autocomplete({
     if (disabled) return
     setIsOpen(true)
     if (searchOnFocus && !isTyping) {
+      lastSearchedRef.current = ''
       // Immediate first fetch so the list is not empty for a debounce tick.
       onSearchRef.current('')
     }
@@ -227,7 +235,7 @@ export function Autocomplete({
             }}
             className="z-[9999] overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl"
           >
-            {searching && (
+            {searching && options.length === 0 && (
               <div className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-text-tertiary">
                 <Loader className="h-4 w-4 animate-spin" />
                 {searchingLabel}
@@ -236,8 +244,7 @@ export function Autocomplete({
             {!searching && options.length === 0 && (
               <div className="px-4 py-2 text-sm text-text-tertiary">{noResultsLabel}</div>
             )}
-            {!searching &&
-              options.map((opt, idx) => {
+            {options.map((opt, idx) => {
                 const isSelected =
                   !!value &&
                   (opt.value === value ||

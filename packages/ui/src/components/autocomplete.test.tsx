@@ -59,6 +59,33 @@ describe('Autocomplete', () => {
     })
   })
 
+  it('fetches once on open, not again after the debounce', async () => {
+    const onSearch = vi.fn()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<Harness onSearch={onSearch} />)
+
+    await user.click(screen.getByPlaceholderText('Select BOM'))
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(onSearch).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not refetch when the query is cleared back to what the list already shows', async () => {
+    const onSearch = vi.fn()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<Harness onSearch={onSearch} initial="ABC" />)
+
+    const input = screen.getByPlaceholderText('Select BOM')
+    await user.click(input)
+    expect(onSearch).toHaveBeenCalledTimes(1)
+    await user.clear(input)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(onSearch).toHaveBeenCalledTimes(1)
+  })
+
   it('commits a selected option value', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(
