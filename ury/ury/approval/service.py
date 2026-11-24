@@ -17,6 +17,8 @@ VOLATILE_FIELDS = {
 	"idx",
 	"docstatus",
 	"status",
+	"__islocal",
+	"__unsaved",
 	"_liked_by",
 	"_comments",
 	"_assign",
@@ -31,14 +33,25 @@ LIFECYCLE_FIELDS = {
 		"return_amount",
 	},
 	"Purchase Invoice": {"remarks"},
+	"Payment Entry": {"base_total_allocated_amount", "total_allocated_amount"},
 }
+
+
+def _strip_volatile_fields(value, fieldnames):
+	if isinstance(value, dict):
+		for fieldname in fieldnames:
+			value.pop(fieldname, None)
+		for nested in value.values():
+			_strip_volatile_fields(nested, fieldnames)
+	elif isinstance(value, list):
+		for nested in value:
+			_strip_volatile_fields(nested, fieldnames)
 
 
 def document_hash(doc, action="submit"):
 	data = doc.as_dict()
 	data.pop("doctype", None)
-	for fieldname in VOLATILE_FIELDS | LIFECYCLE_FIELDS.get(doc.doctype, set()):
-		data.pop(fieldname, None)
+	_strip_volatile_fields(data, VOLATILE_FIELDS | LIFECYCLE_FIELDS.get(doc.doctype, set()))
 	payload = json.dumps(
 		{"document": data, "action": action}, sort_keys=True, default=str, separators=(",", ":")
 	)

@@ -14,7 +14,7 @@ from erpnext.accounts.utils import get_fiscal_year
 from ury.ury.approval import budget as budget_control
 from ury.ury.approval import payments, periods
 from ury.ury.approval.config import ENABLE_FIELDS, get_payment_levels, validate_branch
-from ury.ury.approval.service import assert_approved, decide_approval, request_approval
+from ury.ury.approval.service import assert_approved, decide_approval, document_hash, request_approval
 from ury.ury.tests.factories import make_branch, make_user
 
 
@@ -431,6 +431,13 @@ class TestApprovalControls(IntegrationTestCase):
 			doc = self._persisted_bank_payment(amount)
 			request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "payment"})
 			self.assertEqual(json.loads(request.approval_plan)[0]["approver_role"], role)
+			self.assertEqual(request.document_version_hash, document_hash(frappe.get_doc(doc.doctype, doc.name)))
+			if amount == 100000:
+				frappe.set_user(self.approver.name)
+				decide_approval(request.name, "approve")
+				frappe.set_user("Administrator")
+				doc.submit()
+				self.assertEqual(doc.docstatus, 1)
 
 	def test_mixed_branch_is_blocked_before_request(self):
 		self._configure("payment")

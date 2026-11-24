@@ -4,6 +4,11 @@ from frappe.model.document import Document
 
 
 class URYApprovalRequest(Document):
+	def validate_workflow(self):
+		if self.flags.ury_approval_internal:
+			return
+		super().validate_workflow()
+
 	def validate(self):
 		if not self.flags.ury_approval_internal:
 			frappe.throw(
