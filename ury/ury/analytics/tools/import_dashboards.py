@@ -427,6 +427,17 @@ def build_chart_config(c):
             }
         config["order_by"] = []
         config["number_column_options"] = []
+        if c.get('compare_previous'):
+            # Insights develop period comparison: the card's Period is lent by a dashboard `within` filter on date.column
+            # (e.g. {span: "current day", anchor: <latest day>}); the card reads that period and the one before it, with
+            # the % change; the sparkline is cut one grain below the span (none for a single day). No legacy flag, no grain.
+            dcol = c["date"]["column"]
+            config.pop("comparison", None)
+            config["date_column"] = {"column_name": dcol, "dimension_name": dcol, "label": dcol, "value": dcol,
+                                     "data_type": c["date"].get("data_type", "Date")}
+            config["sparkline"] = True
+            config["number_column_options"] = [{"comparison": {"source": "previous"},
+                                                **({"negative_is_better": True} if c.get('negative_is_better') else {})}]
         # Optional Number display options (same keys the Insights UI saves)
         for k in ('shorten_numbers', 'decimal', 'negative_is_better'):
             if k in c:
@@ -609,6 +620,9 @@ def import_all(only=None):
                 continue
 
             config = build_chart_config(c)
+            if c.get('compare_previous'):
+                # a card with a `window` ignores the Period a dashboard `within` filter lends it
+                config.pop('window', None)
 
             chart_doc = frappe.new_doc('Insights Chart v3')
             chart_doc.title = ctitle
@@ -635,6 +649,8 @@ def import_all(only=None):
             ficon = f.get('icon', 'filter')
             layout = f.get('layout', {'x': 0, 'y': 0, 'w': 4, 'h': 1})
             default_val = f.get('default', {})
+            if isinstance(default_val.get('value'), (list, dict)):
+                default_val = {**default_val, 'value': resolve_latest_day(default_val['value'])}
 
             links = {}
             for qid, colname in f.get('applies_to', {}).items():
