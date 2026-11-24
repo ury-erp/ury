@@ -181,6 +181,45 @@ def get_approval_custom_fields():
 		),
 	]
 	fields = {"Branch": branch_fields}
+	fields["Item"] = [
+		_section(
+			"custom_ury_price_control_section",
+			"URY Purchase Price Control",
+			"custom_yield_check_interval_days",
+		),
+		_check(
+			"custom_ury_enable_price_control",
+			"Enable Price Control",
+			"custom_ury_price_control_section",
+		),
+		{
+			"fieldname": "custom_ury_warning_price_limit",
+			"fieldtype": "Currency",
+			"label": "Warning Price Limit",
+			"non_negative": 1,
+			"insert_after": "custom_ury_enable_price_control",
+			"mandatory_depends_on": "eval:doc.custom_ury_enable_price_control",
+			"depends_on": "eval:doc.custom_ury_enable_price_control",
+		},
+		{
+			"fieldname": "custom_ury_warning_percentage_limit",
+			"fieldtype": "Percent",
+			"label": "Warning Percentage Limit",
+			"non_negative": 1,
+			"insert_after": "custom_ury_warning_price_limit",
+			"mandatory_depends_on": "eval:doc.custom_ury_enable_price_control",
+			"depends_on": "eval:doc.custom_ury_enable_price_control",
+		},
+		{
+			"fieldname": "custom_ury_price_approval_limits",
+			"fieldtype": "Table",
+			"label": "Approval Limits by Authority Level",
+			"options": "URY Item Price Approval Limit",
+			"insert_after": "custom_ury_warning_percentage_limit",
+			"mandatory_depends_on": "eval:doc.custom_ury_enable_price_control",
+			"depends_on": "eval:doc.custom_ury_enable_price_control",
+		},
+	]
 	for doctype in (
 		"Purchase Invoice",
 		"Purchase Order",
@@ -198,6 +237,18 @@ def get_approval_custom_fields():
 				"insert_after": "company",
 			}
 		]
+	for doctype in ("Purchase Invoice", "Purchase Order", "Purchase Receipt"):
+		fields[doctype].append(
+			{
+				"fieldname": "custom_ury_price_control_snapshot",
+				"fieldtype": "Long Text",
+				"label": "URY Price Control Snapshot",
+				"hidden": 1,
+				"read_only": 1,
+				"no_copy": 1,
+				"insert_after": "custom_ury_branch",
+			}
+		)
 	fields["Employee Advance"].extend(
 		[
 			{

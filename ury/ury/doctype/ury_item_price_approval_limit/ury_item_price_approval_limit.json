@@ -1,0 +1,27 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["level", "approval_price_limit", "approval_percentage_limit"],
+ "fields": [
+  {"fieldname": "level", "fieldtype": "Int", "label": "Authority Level", "reqd": 1},
+  {
+   "fieldname": "approval_price_limit",
+   "fieldtype": "Currency",
+   "label": "Approval Price Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "approval_percentage_limit",
+   "fieldtype": "Percent",
+   "label": "Approval Percentage Limit",
+   "non_negative": 1,
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "module": "URY",
+ "name": "URY Item Price Approval Limit",
+ "permissions": []
+}

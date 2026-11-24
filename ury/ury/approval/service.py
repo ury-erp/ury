@@ -37,15 +37,17 @@ LIFECYCLE_FIELDS = {
 }
 
 
-def _strip_volatile_fields(value, fieldnames):
+def _strip_volatile_fields(value, fieldnames, root=True):
 	if isinstance(value, dict):
+		if not root:
+			value.pop("name", None)
 		for fieldname in fieldnames:
 			value.pop(fieldname, None)
 		for nested in value.values():
-			_strip_volatile_fields(nested, fieldnames)
+			_strip_volatile_fields(nested, fieldnames, root=False)
 	elif isinstance(value, list):
 		for nested in value:
-			_strip_volatile_fields(nested, fieldnames)
+			_strip_volatile_fields(nested, fieldnames, root=False)
 
 
 def document_hash(doc, action="submit"):
@@ -137,7 +139,7 @@ def assert_approved(doc, control_type, action="submit"):
 	return request_doc
 
 
-def invalidate_requests(doc, control_type=None, action="submit", remarks=None):
+def invalidate_requests(doc, control_type=None, action="submit", remarks=None, force=False):
 	filters = {
 		"reference_doctype": doc.doctype,
 		"reference_name": doc.name,
@@ -149,7 +151,7 @@ def invalidate_requests(doc, control_type=None, action="submit", remarks=None):
 	version_hash = document_hash(doc, action)
 	for row in frappe.get_all("URY Approval Request", filters=filters):
 		request_doc = frappe.get_doc("URY Approval Request", row.name)
-		if request_doc.document_version_hash != version_hash:
+		if force or request_doc.document_version_hash != version_hash:
 			_set_status(request_doc, "Invalidated", "cancel", remarks or "Document version changed")
 
 
