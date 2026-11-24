@@ -35,9 +35,9 @@ def validate(doc, method=None):
 		match = _find_budget(doc, row)
 		if not match:
 			frappe.msgprint(
-				_("No budget was found for {0} against cost center {1}; no expense approval was triggered.").format(
-					row.expense_account, row.cost_center
-				),
+				_(
+					"No budget was found for {0} against cost center {1}; no expense approval was triggered."
+				).format(row.expense_account, row.cost_center),
 				indicator="orange",
 			)
 			continue
@@ -51,7 +51,9 @@ def validate(doc, method=None):
 		return
 	requires_higher_approval = False
 	details = []
-	_release_stale_reservations(doc, {(group["budget"].name, group["distribution"].name) for group in groups.values()})
+	_release_stale_reservations(
+		doc, {(group["budget"].name, group["distribution"].name) for group in groups.values()}
+	)
 	for (budget_name, distribution_name, account, cost_center), group in groups.items():
 		budget = group["budget"]
 		distribution = group["distribution"]
@@ -153,7 +155,9 @@ def expense_rows(doc):
 
 
 def available_budget(budget, distribution, doc, account, cost_center):
-	actual = _actual_expense(budget.company, account, cost_center, distribution.start_date, distribution.end_date)
+	actual = _actual_expense(
+		budget.company, account, cost_center, distribution.start_date, distribution.end_date
+	)
 	commitments = _purchase_order_commitments(
 		budget.company, account, cost_center, distribution.start_date, distribution.end_date
 	) + _material_request_commitments(
@@ -221,7 +225,9 @@ def _purchase_order_commitments(company, account, cost_center, start_date, end_d
 		frappe.qb.from_(po)
 		.inner_join(item)
 		.on(po.name == item.parent)
-		.select(Coalesce(Sum((item.amount - item.billed_amt) * Coalesce(po.conversion_rate, 1)), 0).as_("amount"))
+		.select(
+			Coalesce(Sum((item.amount - item.billed_amt) * Coalesce(po.conversion_rate, 1)), 0).as_("amount")
+		)
 		.where(
 			(po.company == company)
 			& (po.docstatus == 1)
@@ -244,7 +250,9 @@ def _material_request_commitments(company, account, cost_center, start_date, end
 		.inner_join(item)
 		.on(mr.name == item.parent)
 		.select(
-			Coalesce(Sum((item.stock_qty - item.ordered_qty) * item.rate / item.conversion_factor), 0).as_("amount")
+			Coalesce(Sum((item.stock_qty - item.ordered_qty) * item.rate / item.conversion_factor), 0).as_(
+				"amount"
+			)
 		)
 		.where(
 			(mr.company == company)
@@ -281,9 +289,10 @@ def _other_reservations(budget, distribution, doc):
 				continue
 			if row.reference_doctype != "Employee Advance":
 				continue
-		elif row.reference_doctype == "Purchase Order" and frappe.db.get_value(
-			"Purchase Order", row.reference_name, "docstatus"
-		) == 1:
+		elif (
+			row.reference_doctype == "Purchase Order"
+			and frappe.db.get_value("Purchase Order", row.reference_name, "docstatus") == 1
+		):
 			continue
 		reserved += flt(row.amount)
 	return reserved
@@ -319,9 +328,7 @@ def _upsert_reservation(doc, branch, budget, distribution, account, cost_center,
 		reservation = frappe.get_doc("URY Budget Reservation", name)
 		reservation.update(values)
 	else:
-		reservation = frappe.get_doc(
-			{"doctype": "URY Budget Reservation", **filters, **values}
-		)
+		reservation = frappe.get_doc({"doctype": "URY Budget Reservation", **filters, **values})
 	if name:
 		reservation.save(ignore_permissions=True)
 	else:
@@ -332,7 +339,10 @@ def _reservations(doc, status):
 	if isinstance(status, str):
 		status = [status]
 	filters = {"reference_doctype": doc.doctype, "reference_name": doc.name, "status": ["in", status]}
-	return [frappe.get_doc("URY Budget Reservation", row.name) for row in frappe.get_all("URY Budget Reservation", filters=filters)]
+	return [
+		frappe.get_doc("URY Budget Reservation", row.name)
+		for row in frappe.get_all("URY Budget Reservation", filters=filters)
+	]
 
 
 def _lock_budget(budget_name):

@@ -2,15 +2,15 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 import frappe
-from frappe.tests import IntegrationTestCase
-from frappe.utils import add_months, getdate, nowdate, random_string
-
 from erpnext.accounts.doctype.accounting_period.accounting_period import (
 	ClosedAccountingPeriod,
 	validate_accounting_period_on_doc_save,
 )
 from erpnext.accounts.doctype.budget.budget import BudgetError, get_accumulated_monthly_budget
 from erpnext.accounts.utils import get_fiscal_year
+from frappe.tests import IntegrationTestCase
+from frappe.utils import add_months, getdate, nowdate, random_string
+
 from ury.ury.approval import budget as budget_control
 from ury.ury.approval import payments, periods
 from ury.ury.approval.config import ENABLE_FIELDS, get_payment_levels, validate_branch
@@ -25,7 +25,9 @@ class TestApprovalControls(IntegrationTestCase):
 		self.addCleanup(lambda: frappe.set_user("Administrator"))
 		self.company = (
 			"_Test Company"
-			if frappe.db.exists("Account", {"company": "_Test Company", "root_type": "Expense", "is_group": 0})
+			if frappe.db.exists(
+				"Account", {"company": "_Test Company", "root_type": "Expense", "is_group": 0}
+			)
 			else frappe.db.get_value("Account", {"root_type": "Expense", "is_group": 0}, "company")
 		)
 		suffix = random_string(8)
@@ -60,7 +62,9 @@ class TestApprovalControls(IntegrationTestCase):
 		return doc.name
 
 	def _expense_account(self):
-		return frappe.db.get_value("Account", {"company": self.company, "root_type": "Expense", "is_group": 0}, "name")
+		return frappe.db.get_value(
+			"Account", {"company": self.company, "root_type": "Expense", "is_group": 0}, "name"
+		)
 
 	def _configure(self, control="payment"):
 		self.branch.custom_ury_master_approval_control = 1
@@ -91,7 +95,9 @@ class TestApprovalControls(IntegrationTestCase):
 		levels = [{"level": 1, "approver_role": None, "approver_user": (approver or self.approver).name}]
 		frappe.set_user(self.requester.name)
 		try:
-			return request_approval(doc, control, self.branch.name, levels=levels, amount=doc.base_paid_amount)
+			return request_approval(
+				doc, control, self.branch.name, levels=levels, amount=doc.base_paid_amount
+			)
 		finally:
 			frappe.set_user("Administrator")
 
@@ -218,7 +224,9 @@ class TestApprovalControls(IntegrationTestCase):
 		self.assertEqual(again.requester, self.requester.name)
 		self.assertEqual(request.name, again.name)
 		self.assertEqual(frappe.db.count("URY Approval Request", {"reference_name": doc.name}), 1)
-		self.assertEqual(frappe.db.count("Notification Log", {"document_name": request.name}), initial_notifications)
+		self.assertEqual(
+			frappe.db.count("Notification Log", {"document_name": request.name}), initial_notifications
+		)
 
 	def test_unauthorized_and_self_approval_are_blocked(self):
 		doc = self._source()
@@ -396,7 +404,9 @@ class TestApprovalControls(IntegrationTestCase):
 		self.branch.save(ignore_permissions=True)
 		doc = self._source(99999)
 		payments.validate(doc)
-		request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "payment"})
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "payment"}
+		)
 		original_hash = request.document_version_hash
 		self.branch.custom_ury_enable_payment_approval = 0
 		self.branch.save(ignore_permissions=True)
@@ -414,7 +424,11 @@ class TestApprovalControls(IntegrationTestCase):
 				"custom_ury_payment_approval_levels",
 				{"level": level, "payment_type": "Bank", "threshold": threshold, "approver_role": role},
 			)
-		for amount, role in ((99999, "Restaurant Manager"), (100000, "Restaurant Manager"), (100001, "Finance Head")):
+		for amount, role in (
+			(99999, "Restaurant Manager"),
+			(100000, "Restaurant Manager"),
+			(100001, "Finance Head"),
+		):
 			doc = self._source(amount)
 			self.assertEqual(get_payment_levels(self.branch, doc)[0]["approver_role"], role)
 
@@ -429,9 +443,13 @@ class TestApprovalControls(IntegrationTestCase):
 		self.branch.save(ignore_permissions=True)
 		for amount, role in ((100000, "Restaurant Manager"), (100001, "Finance Head")):
 			doc = self._persisted_bank_payment(amount)
-			request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "payment"})
+			request = frappe.get_doc(
+				"URY Approval Request", {"reference_name": doc.name, "control_type": "payment"}
+			)
 			self.assertEqual(json.loads(request.approval_plan)[0]["approver_role"], role)
-			self.assertEqual(request.document_version_hash, document_hash(frappe.get_doc(doc.doctype, doc.name)))
+			self.assertEqual(
+				request.document_version_hash, document_hash(frappe.get_doc(doc.doctype, doc.name))
+			)
 			if amount == 100000:
 				frappe.set_user(self.approver.name)
 				decide_approval(request.name, "approve")
@@ -460,7 +478,9 @@ class TestApprovalControls(IntegrationTestCase):
 		frappe.message_log = []
 		budget_control.validate(doc)
 		self.assertFalse(doc.flags.ury_expense_approval_required)
-		self.assertFalse(frappe.db.exists("URY Approval Request", {"reference_name": doc.name, "control_type": "expense"}))
+		self.assertFalse(
+			frappe.db.exists("URY Approval Request", {"reference_name": doc.name, "control_type": "expense"})
+		)
 		self.assertIn("No budget", str(frappe.message_log))
 
 	def test_budget_reservations_change_routing_and_release(self):
@@ -468,11 +488,15 @@ class TestApprovalControls(IntegrationTestCase):
 		self._budget()
 		first = self._advance(5000)
 		budget_control.validate(first)
-		first_request = frappe.get_doc("URY Approval Request", {"reference_name": first.name, "control_type": "expense"})
+		first_request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": first.name, "control_type": "expense"}
+		)
 		self.assertEqual(len(json.loads(first_request.approval_plan)), 1)
 		second = self._advance(6000)
 		budget_control.validate(second)
-		second_request = frappe.get_doc("URY Approval Request", {"reference_name": second.name, "control_type": "expense"})
+		second_request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": second.name, "control_type": "expense"}
+		)
 		self.assertEqual(len(json.loads(second_request.approval_plan)), 2)
 		reservation = frappe.get_doc("URY Budget Reservation", {"reference_name": second.name})
 		self.assertEqual(reservation.status, "Reserved")
@@ -505,16 +529,12 @@ class TestApprovalControls(IntegrationTestCase):
 		frappe.get_doc(
 			{**base_values, "reference_doctype": "Purchase Order", "reference_name": "NATIVE-PO"}
 		).insert(ignore_permissions=True)
-		available = budget_control.available_budget(
-			budget, distribution, doc, self.account, self.cost_center
-		)
+		available = budget_control.available_budget(budget, distribution, doc, self.account, self.cost_center)
 		self.assertEqual(available, distribution.amount)
 		frappe.get_doc(
 			{**base_values, "reference_doctype": "Employee Advance", "reference_name": "CONSUMED-ADVANCE"}
 		).insert(ignore_permissions=True)
-		available = budget_control.available_budget(
-			budget, distribution, doc, self.account, self.cost_center
-		)
+		available = budget_control.available_budget(budget, distribution, doc, self.account, self.cost_center)
 		self.assertEqual(available, distribution.amount - 5000)
 
 	def test_locked_period_requires_approval_and_alert(self):
@@ -536,9 +556,13 @@ class TestApprovalControls(IntegrationTestCase):
 		doc = self._source()
 		doc.posting_date = previous_month
 		periods.validate(doc)
-		request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "backdated"})
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "backdated"}
+		)
 		self.assertEqual(request.status, "Pending")
-		self.assertTrue(frappe.db.exists("Notification Log", {"document_name": request.name, "type": "Alert"}))
+		self.assertTrue(
+			frappe.db.exists("Notification Log", {"document_name": request.name, "type": "Alert"})
+		)
 		with self.assertRaises(frappe.PermissionError):
 			periods.before_submit(doc)
 		periods.reopen_period(self.branch.name, previous_month.year, previous_month.month)
@@ -556,8 +580,12 @@ class TestApprovalControls(IntegrationTestCase):
 		previous_month = getdate(add_months(nowdate(), -1))
 		periods.finalize_period(self.branch.name, previous_month.year, previous_month.month)
 		doc = self._persisted_bank_payment(1000, posting_date=previous_month)
-		request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "backdated"})
-		self.assertTrue(frappe.db.exists("Notification Log", {"document_name": request.name, "type": "Alert"}))
+		request = frappe.get_doc(
+			"URY Approval Request", {"reference_name": doc.name, "control_type": "backdated"}
+		)
+		self.assertTrue(
+			frappe.db.exists("Notification Log", {"document_name": request.name, "type": "Alert"})
+		)
 		with self.assertRaises(frappe.PermissionError):
 			doc.submit()
 		doc.reload()
@@ -570,7 +598,9 @@ class TestApprovalControls(IntegrationTestCase):
 	def test_native_budget_stop_still_blocks(self):
 		self._configure("backdated")
 		budget = self._budget(action="Stop")
-		bank = frappe.db.get_value("Account", {"company": self.company, "account_type": "Cash", "is_group": 0}, "name")
+		bank = frappe.db.get_value(
+			"Account", {"company": self.company, "account_type": "Cash", "is_group": 0}, "name"
+		)
 		amount = get_accumulated_monthly_budget(budget.name, nowdate()) + 1
 		journal = frappe.get_doc(
 			{
@@ -580,7 +610,11 @@ class TestApprovalControls(IntegrationTestCase):
 				"branch": self.branch.name,
 				"posting_date": nowdate(),
 				"accounts": [
-					{"account": self.account, "debit_in_account_currency": amount, "cost_center": self.cost_center},
+					{
+						"account": self.account,
+						"debit_in_account_currency": amount,
+						"cost_center": self.cost_center,
+					},
 					{"account": bank, "credit_in_account_currency": amount, "cost_center": self.cost_center},
 				],
 			}
@@ -602,7 +636,9 @@ class TestApprovalControls(IntegrationTestCase):
 				"closed_documents": [{"document_type": "Journal Entry", "closed": 1}],
 			}
 		).insert(ignore_permissions=True)
-		doc = frappe.get_doc({"doctype": "Journal Entry", "company": self.company, "posting_date": "2000-01-01"})
+		doc = frappe.get_doc(
+			{"doctype": "Journal Entry", "company": self.company, "posting_date": "2000-01-01"}
+		)
 		with self.assertRaises(ClosedAccountingPeriod):
 			validate_accounting_period_on_doc_save(doc)
 		self.assertTrue(period.name)

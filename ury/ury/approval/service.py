@@ -72,7 +72,9 @@ def request_approval(doc, control_type, branch, action="submit", levels=None, am
 	if existing and existing.status == "Approved" and existing.document_version_hash == version_hash:
 		return existing
 	if existing and existing.status == "Approved":
-		_set_status(existing, "Invalidated", "cancel", "Document version changed after approval", release=False)
+		_set_status(
+			existing, "Invalidated", "cancel", "Document version changed after approval", release=False
+		)
 	request_doc = frappe.get_doc(
 		{
 			"doctype": "URY Approval Request",
@@ -258,7 +260,9 @@ def _notify_status_change(request_doc, old_status, new_status):
 		if level.get("approver_user"):
 			recipients.add(level["approver_user"])
 		if level.get("approver_role"):
-			recipients.update(frappe.get_all("Has Role", filters={"role": level["approver_role"]}, pluck="parent"))
+			recipients.update(
+				frappe.get_all("Has Role", filters={"role": level["approver_role"]}, pluck="parent")
+			)
 	for user in recipients:
 		if not user or not frappe.db.exists("User", user):
 			continue

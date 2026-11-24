@@ -19,9 +19,7 @@ def control_enabled(branch, control_type):
 	if not branch:
 		return False
 	config = frappe.get_cached_doc("Branch", branch)
-	return bool(
-		config.get("custom_ury_master_approval_control") and config.get(ENABLE_FIELDS[control_type])
-	)
+	return bool(config.get("custom_ury_master_approval_control") and config.get(ENABLE_FIELDS[control_type]))
 
 
 def validate_branch(doc, method=None):
@@ -38,7 +36,9 @@ def validate_branch(doc, method=None):
 def _validate_levels(rows, control_type):
 	if not rows:
 		frappe.throw(
-			_("At least one approver is required when {0} is enabled").format(control_type.replace("_", " ").title())
+			_("At least one approver is required when {0} is enabled").format(
+				control_type.replace("_", " ").title()
+			)
 		)
 	seen = set()
 	for row in rows:
@@ -52,7 +52,9 @@ def _validate_levels(rows, control_type):
 			frappe.throw(_("Payment thresholds cannot be negative"))
 		key = (row.payment_type or "", row.mode_of_payment or "", row.level)
 		if key in seen:
-			frappe.throw(_("Duplicate approval level {0} for {1}").format(row.level, row.payment_type or control_type))
+			frappe.throw(
+				_("Duplicate approval level {0} for {1}").format(row.level, row.payment_type or control_type)
+			)
 		seen.add(key)
 
 
@@ -80,7 +82,9 @@ def get_payment_levels(config, doc):
 		)
 		return [{"level": 1, "approver_role": config.get(fieldname), "approver_user": None}]
 	if not rows:
-		frappe.throw(_("No {0} payment approval rule is configured for branch {1}").format(payment_type, config.name))
+		frappe.throw(
+			_("No {0} payment approval rule is configured for branch {1}").format(payment_type, config.name)
+		)
 	amount = _payment_amount(doc)
 	rows = sorted(rows, key=lambda row: row.level)
 	for row in rows:
@@ -109,7 +113,9 @@ def get_payment_type(doc):
 def _payment_amount(doc):
 	from frappe.utils import flt
 
-	return flt(doc.get("advance_amount") if doc.doctype == "Employee Advance" else doc.get("base_paid_amount"))
+	return flt(
+		doc.get("advance_amount") if doc.doctype == "Employee Advance" else doc.get("base_paid_amount")
+	)
 
 
 def _level_dict(row):
