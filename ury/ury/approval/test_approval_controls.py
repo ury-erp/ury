@@ -132,7 +132,7 @@ class TestApprovalControls(IntegrationTestCase):
 		doc.insert(ignore_permissions=True)
 		return doc
 
-	def _persisted_bank_payment(self, amount):
+	def _persisted_bank_payment(self, amount, posting_date=None):
 		parent_account = frappe.db.get_value(
 			"Account", {"company": self.company, "root_type": "Asset", "is_group": 1}, "name"
 		)
@@ -154,7 +154,7 @@ class TestApprovalControls(IntegrationTestCase):
 				"doctype": "Payment Entry",
 				"company": self.company,
 				"payment_type": "Internal Transfer",
-				"posting_date": nowdate(),
+				"posting_date": posting_date or nowdate(),
 				"paid_from": paid_from,
 				"paid_to": paid_to.name,
 				"paid_amount": amount,
@@ -544,6 +544,28 @@ class TestApprovalControls(IntegrationTestCase):
 		periods.reopen_period(self.branch.name, previous_month.year, previous_month.month)
 		self.assertFalse(periods._locked_period(self.branch.name, previous_month))
 		self.assertFalse(periods._locked_period(self.branch.name, older_month))
+
+	def test_real_backdated_payment_requires_exception_approval(self):
+		self._configure("backdated")
+		self.branch.set("custom_ury_backdated_approval_levels", [])
+		self.branch.append(
+			"custom_ury_backdated_approval_levels",
+			{"level": 1, "approver_role": "Restaurant Manager"},
+		)
+		self.branch.save(ignore_permissions=True)
+		previous_month = getdate(add_months(nowdate(), -1))
+		periods.finalize_period(self.branch.name, previous_month.year, previous_month.month)
+		doc = self._persisted_bank_payment(1000, posting_date=previous_month)
+		request = frappe.get_doc("URY Approval Request", {"reference_name": doc.name, "control_type": "backdated"})
+		self.assertTrue(frappe.db.exists("Notification Log", {"document_name": request.name, "type": "Alert"}))
+		with self.assertRaises(frappe.PermissionError):
+			doc.submit()
+		doc.reload()
+		frappe.set_user(self.approver.name)
+		decide_approval(request.name, "approve")
+		frappe.set_user("Administrator")
+		doc.submit()
+		self.assertEqual(doc.docstatus, 1)
 
 	def test_native_budget_stop_still_blocks(self):
 		self._configure("backdated")
