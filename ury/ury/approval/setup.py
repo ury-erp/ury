@@ -108,6 +108,12 @@ def get_approval_custom_fields():
 		fields[doctype] = [
 			{"fieldname": "custom_ury_branch", "fieldtype": "Link", "label": "URY Branch", "options": "Branch", "insert_after": "company"}
 		]
+	fields["Employee Advance"].extend(
+		[
+			{"fieldname": "custom_ury_expense_account", "fieldtype": "Link", "label": "URY Budget Expense Account", "options": "Account", "insert_after": "custom_ury_branch"},
+			{"fieldname": "custom_ury_cost_center", "fieldtype": "Link", "label": "URY Budget Cost Center", "options": "Cost Center", "insert_after": "custom_ury_expense_account"},
+		]
+	)
 	return fields
 
 

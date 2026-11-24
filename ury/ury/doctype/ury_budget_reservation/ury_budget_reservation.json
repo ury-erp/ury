@@ -1,0 +1,32 @@
+{
+ "actions": [],
+ "autoname": "format:URY-BRES-{#####}",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["budget", "budget_distribution", "branch", "company", "expense_account", "cost_center", "period_start", "period_end", "reference_doctype", "reference_name", "amount", "status", "document_version_hash"],
+ "fields": [
+  {"fieldname": "budget", "fieldtype": "Link", "label": "Budget", "options": "Budget", "reqd": 1, "read_only": 1},
+  {"fieldname": "budget_distribution", "fieldtype": "Link", "label": "Budget Distribution", "options": "Budget Distribution", "reqd": 1, "read_only": 1},
+  {"fieldname": "branch", "fieldtype": "Link", "label": "Branch", "options": "Branch", "reqd": 1, "read_only": 1},
+  {"fieldname": "company", "fieldtype": "Link", "label": "Company", "options": "Company", "reqd": 1, "read_only": 1},
+  {"fieldname": "expense_account", "fieldtype": "Link", "label": "Expense Account", "options": "Account", "reqd": 1, "read_only": 1},
+  {"fieldname": "cost_center", "fieldtype": "Link", "label": "Cost Center", "options": "Cost Center", "reqd": 1, "read_only": 1},
+  {"fieldname": "period_start", "fieldtype": "Date", "label": "Period Start", "reqd": 1, "read_only": 1},
+  {"fieldname": "period_end", "fieldtype": "Date", "label": "Period End", "reqd": 1, "read_only": 1},
+  {"fieldname": "reference_doctype", "fieldtype": "Link", "label": "Reference DocType", "options": "DocType", "reqd": 1, "read_only": 1},
+  {"fieldname": "reference_name", "fieldtype": "Data", "label": "Reference Name", "reqd": 1, "read_only": 1, "search_index": 1},
+  {"fieldname": "amount", "fieldtype": "Currency", "label": "Reserved Amount", "default": "0", "read_only": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Reserved\nConsumed\nReleased", "reqd": 1, "read_only": 1},
+  {"fieldname": "document_version_hash", "fieldtype": "Data", "label": "Document Version Hash", "read_only": 1}
+ ],
+ "module": "URY",
+ "name": "URY Budget Reservation",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "report": 1},
+  {"role": "Finance Head", "read": 1, "report": 1},
+  {"role": "Restaurant Manager", "read": 1, "report": 1},
+  {"role": "URY Manager", "read": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

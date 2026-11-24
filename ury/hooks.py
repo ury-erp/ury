@@ -263,23 +263,39 @@ doc_events = {
         ],
         "on_trash": "ury.ury.api.chairman_wa_identity.on_user_trash",
     },
+    "Purchase Receipt": {
+        "validate": "ury.ury.approval.periods.validate",
+        "before_submit": "ury.ury.approval.periods.before_submit",
+        "on_cancel": "ury.ury.approval.periods.on_cancel",
+    },
+    "Material Request": {
+        "validate": "ury.ury.approval.periods.validate",
+        "before_submit": "ury.ury.approval.periods.before_submit",
+        "on_cancel": "ury.ury.approval.periods.on_cancel",
+    },
+    "Journal Entry": {
+        "validate": "ury.ury.approval.periods.validate",
+        "before_submit": "ury.ury.approval.periods.before_submit",
+        "on_cancel": "ury.ury.approval.periods.on_cancel",
+    },
     "POS Invoice": {
         "before_insert": "ury.ury.hooks.ury_pos_invoice.before_insert",
-        "validate": "ury.ury.hooks.ury_pos_invoice.validate",
+        "validate": ["ury.ury.hooks.ury_pos_invoice.validate", "ury.ury.approval.periods.validate"],
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
-        "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
+        "before_submit": ["ury.ury.hooks.ury_pos_invoice.before_submit", "ury.ury.approval.periods.before_submit"],
         "on_submit": [
             "ury.ury.hooks.ury_pos_invoice.on_submit",
             "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "on_cancel": ["ury.ury.hooks.ury_pos_invoice.on_trash", "ury.ury.approval.periods.on_cancel"],
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
     "Sales Invoice": {
-        "validate": "ury.ury.hooks.ury_sales_invoice.validate",
+        "validate": ["ury.ury.hooks.ury_sales_invoice.validate", "ury.ury.approval.periods.validate"],
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
+        "before_submit": "ury.ury.approval.periods.before_submit",
         "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
         "on_submit": [
             "ury.ury.hooks.ury_sales_invoice.round_off_journal_entry",
@@ -289,7 +305,7 @@ doc_events = {
             # is_consolidated; a no-op for ordinary (non-POS) Sales Invoices.
             "ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation",
         ],
-        "on_cancel": "ury.ury.hooks.ury_sales_invoice.journal_entry_cancel",
+        "on_cancel": ["ury.ury.hooks.ury_sales_invoice.journal_entry_cancel", "ury.ury.approval.periods.on_cancel"],
         },
     "Item": {
         "validate": "ury.ury.hooks.ury_item.validate",
@@ -298,18 +314,47 @@ doc_events = {
     "Branch": {
         "validate": "ury.ury.approval.config.validate_branch",
     },
+    "Purchase Invoice": {
+        "validate": ["ury.ury.approval.budget.validate", "ury.ury.approval.periods.validate"],
+        "before_submit": ["ury.ury.approval.budget.before_submit", "ury.ury.approval.periods.before_submit"],
+        "on_submit": "ury.ury.approval.budget.on_submit",
+        "on_cancel": ["ury.ury.approval.budget.on_cancel", "ury.ury.approval.periods.on_cancel"],
+    },
+    "Purchase Order": {
+        "validate": ["ury.ury.approval.budget.validate", "ury.ury.approval.periods.validate"],
+        "before_submit": ["ury.ury.approval.budget.before_submit", "ury.ury.approval.periods.before_submit"],
+        "on_submit": "ury.ury.approval.budget.on_submit",
+        "on_cancel": ["ury.ury.approval.budget.on_cancel", "ury.ury.approval.periods.on_cancel"],
+    },
+    "Expense Claim": {
+        "validate": ["ury.ury.approval.budget.validate", "ury.ury.approval.periods.validate"],
+        "before_submit": ["ury.ury.approval.budget.before_submit", "ury.ury.approval.periods.before_submit"],
+        "on_submit": "ury.ury.approval.budget.on_submit",
+        "on_cancel": ["ury.ury.approval.budget.on_cancel", "ury.ury.approval.periods.on_cancel"],
+    },
     "Payment Entry": {
-        "validate": "ury.ury.approval.payments.validate",
-        "before_submit": "ury.ury.approval.payments.before_submit",
-        "on_cancel": "ury.ury.approval.payments.on_cancel",
+        "validate": ["ury.ury.approval.payments.validate", "ury.ury.approval.periods.validate"],
+        "before_submit": ["ury.ury.approval.payments.before_submit", "ury.ury.approval.periods.before_submit"],
+        "on_cancel": ["ury.ury.approval.payments.on_cancel", "ury.ury.approval.periods.on_cancel"],
     },
     "Employee Advance": {
         "validate": [
             "ury.ury.approval.payments.validate",
             "ury.ury.approval.payments.validate_advance_payment",
+            "ury.ury.approval.budget.validate",
+            "ury.ury.approval.periods.validate",
         ],
-        "before_submit": "ury.ury.approval.payments.before_submit",
-        "on_cancel": "ury.ury.approval.payments.on_cancel",
+        "before_submit": [
+            "ury.ury.approval.payments.before_submit",
+            "ury.ury.approval.budget.before_submit",
+            "ury.ury.approval.periods.before_submit",
+        ],
+        "on_submit": "ury.ury.approval.budget.on_submit",
+        "on_cancel": [
+            "ury.ury.approval.payments.on_cancel",
+            "ury.ury.approval.budget.on_cancel",
+            "ury.ury.approval.periods.on_cancel",
+        ],
     },
     "POS Opening Entry": {
         "validate":[
@@ -359,11 +404,20 @@ doc_events = {
         "on_submit": "ury.ury.api.ury_kot_item_execution_service.seed_kot_item_executions_on_submit",
     },
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
-    "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
+    "Stock Reconciliation": {
+        "validate": ["ury.ury.utils.stock_reconciliation_guards.validate", "ury.ury.approval.periods.validate"],
+        "before_submit": "ury.ury.approval.periods.before_submit",
+        "on_cancel": "ury.ury.approval.periods.on_cancel",
+    },
     "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
     "BOM": {"before_validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
     "Stock Entry": {
-        "validate": "ury.ury.api.ury_manufacture_enforcement.validate_manufacture_requires_work_order",
+        "validate": [
+            "ury.ury.api.ury_manufacture_enforcement.validate_manufacture_requires_work_order",
+            "ury.ury.approval.periods.validate",
+        ],
+        "before_submit": "ury.ury.approval.periods.before_submit",
+        "on_cancel": "ury.ury.approval.periods.on_cancel",
     },
     "Work Order": {
         "validate": "ury.ury.api.ury_work_order_hooks.validate",

@@ -47,7 +47,7 @@ def request_approval(doc, control_type, branch, action="submit", levels=None, am
 	if existing and existing.status == "Approved" and existing.document_version_hash == version_hash:
 		return existing
 	if existing and existing.status == "Approved":
-		_set_status(existing, "Invalidated", "cancel", "Document version changed after approval")
+		_set_status(existing, "Invalidated", "cancel", "Document version changed after approval", release=False)
 	request_doc = frappe.get_doc(
 		{
 			"doctype": "URY Approval Request",
@@ -158,6 +158,10 @@ def decide_approval(request_name, action, remarks=None):
 	_append_log(request_doc, action, remarks)
 	if old_status != request_doc.status:
 		_notify_status_change(request_doc, old_status, request_doc.status)
+	if action == "reject":
+		from ury.ury.approval.budget import release_for_request
+
+		release_for_request(request_doc)
 	return request_doc
 
 
@@ -187,7 +191,7 @@ def _validate_approver(request_doc):
 			frappe.throw(_("Requesters cannot approve their own requests"), frappe.PermissionError)
 
 
-def _set_status(request_doc, status, log_action, remarks=None):
+def _set_status(request_doc, status, log_action, remarks=None, release=True):
 	old_status = request_doc.status
 	if old_status == status:
 		return
@@ -197,6 +201,10 @@ def _set_status(request_doc, status, log_action, remarks=None):
 	request_doc.save(ignore_permissions=True)
 	_append_log(request_doc, log_action, remarks)
 	_notify_status_change(request_doc, old_status, status)
+	if release and status in {"Rejected", "Invalidated"}:
+		from ury.ury.approval.budget import release_for_request
+
+		release_for_request(request_doc)
 
 
 def _append_log(request_doc, action, remarks=None):
