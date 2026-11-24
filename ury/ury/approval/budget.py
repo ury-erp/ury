@@ -261,11 +261,12 @@ def _material_request_commitments(company, account, cost_center, start_date, end
 
 
 def _other_reservations(budget, distribution, doc):
-	rows = frappe.get_all(
+	rows = frappe.qb.get_query(
 		"URY Budget Reservation",
 		filters={"budget": budget, "budget_distribution": distribution, "status": "Reserved"},
 		fields=["reference_doctype", "reference_name", "amount"],
-	)
+		for_update=True,
+	).run(as_dict=True)
 	return sum(
 		flt(row.amount)
 		for row in rows
