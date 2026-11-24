@@ -298,6 +298,19 @@ doc_events = {
     "Branch": {
         "validate": "ury.ury.approval.config.validate_branch",
     },
+    "Payment Entry": {
+        "validate": "ury.ury.approval.payments.validate",
+        "before_submit": "ury.ury.approval.payments.before_submit",
+        "on_cancel": "ury.ury.approval.payments.on_cancel",
+    },
+    "Employee Advance": {
+        "validate": [
+            "ury.ury.approval.payments.validate",
+            "ury.ury.approval.payments.validate_advance_payment",
+        ],
+        "before_submit": "ury.ury.approval.payments.before_submit",
+        "on_cancel": "ury.ury.approval.payments.on_cancel",
+    },
     "POS Opening Entry": {
         "validate":[
             "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
