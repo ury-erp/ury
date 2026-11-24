@@ -1,0 +1,27 @@
+{
+ "actions": [],
+ "autoname": "format:URY-LOCK-{#####}",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["branch", "period_start", "period_end", "status", "finalized_by", "finalized_at", "reopened_by", "reopened_at", "remarks"],
+ "fields": [
+  {"fieldname": "branch", "fieldtype": "Link", "label": "Branch", "options": "Branch", "reqd": 1, "read_only": 1},
+  {"fieldname": "period_start", "fieldtype": "Date", "label": "Period Start", "reqd": 1, "read_only": 1},
+  {"fieldname": "period_end", "fieldtype": "Date", "label": "Period End", "reqd": 1, "read_only": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Finalized\nReopened", "reqd": 1, "read_only": 1},
+  {"fieldname": "finalized_by", "fieldtype": "Link", "label": "Finalized By", "options": "User", "read_only": 1},
+  {"fieldname": "finalized_at", "fieldtype": "Datetime", "label": "Finalized At", "read_only": 1},
+  {"fieldname": "reopened_by", "fieldtype": "Link", "label": "Reopened By", "options": "User", "read_only": 1},
+  {"fieldname": "reopened_at", "fieldtype": "Datetime", "label": "Reopened At", "read_only": 1},
+  {"fieldname": "remarks", "fieldtype": "Small Text", "label": "Remarks"}
+ ],
+ "module": "URY",
+ "name": "URY Period Lock",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "report": 1},
+  {"role": "Finance Head", "read": 1, "write": 1, "create": 1, "report": 1},
+  {"role": "URY Manager", "read": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

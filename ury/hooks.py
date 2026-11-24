@@ -234,6 +234,7 @@ after_migrate = [
     "ury.setup_customizations.hide_setup_sidebar_options",
     "ury.ury.desk_islands.after_migrate",
     "ury.ury.brief_admin.ensure_default",
+    "ury.ury.approval.setup.after_migrate",
 ]
 
 # The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)
@@ -241,7 +242,10 @@ after_migrate = [
 # not seed. `bench migrate` syncs fixtures (frappe.modules.utils.sync_fixtures)
 # BEFORE running after_migrate hooks, so seeding these in after_migrate would be
 # too late on a fresh site -- before_migrate runs first, ahead of fixture sync.
-before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
+before_migrate = [
+    "ury.ury.workflow.ury_sales_plan.install.before_migrate",
+    "ury.ury.approval.setup.before_migrate",
+]
 
 # Document Events
 # ---------------
@@ -290,6 +294,9 @@ doc_events = {
     "Item": {
         "validate": "ury.ury.hooks.ury_item.validate",
         "on_update": "ury.ury.hooks.ury_item.on_update"
+    },
+    "Branch": {
+        "validate": "ury.ury.approval.config.validate_branch",
     },
     "POS Opening Entry": {
         "validate":[

@@ -55,6 +55,9 @@ def after_install():
         from ury.ury.brief_admin import ensure_default
 
         ensure_default()
+        from ury.ury.approval.setup import after_install as approval_after_install
+
+        approval_after_install()
 
         click.secho("Thank you for installing URY App!", fg="green")
 

@@ -1,0 +1,25 @@
+{
+ "actions": [],
+ "autoname": "format:URY-APLOG-{#####}",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["approval_request", "requester", "approver", "action", "action_at", "remarks"],
+ "fields": [
+  {"fieldname": "approval_request", "fieldtype": "Link", "label": "Approval Request", "options": "URY Approval Request", "read_only": 1, "reqd": 1},
+  {"fieldname": "requester", "fieldtype": "Link", "label": "Requester", "options": "User", "read_only": 1},
+  {"fieldname": "approver", "fieldtype": "Link", "label": "Approver", "options": "User", "read_only": 1},
+  {"fieldname": "action", "fieldtype": "Select", "label": "Action", "options": "approve\nreject\nrequest_changes\nsubmit\ncancel", "read_only": 1, "reqd": 1},
+  {"fieldname": "action_at", "fieldtype": "Datetime", "label": "Action At", "read_only": 1, "reqd": 1},
+  {"fieldname": "remarks", "fieldtype": "Small Text", "label": "Remarks", "read_only": 1}
+ ],
+ "module": "URY",
+ "name": "URY Approval Log",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "create": 1, "export": 1, "report": 1},
+  {"role": "URY Manager", "read": 1, "report": 1},
+  {"role": "Restaurant Manager", "read": 1, "report": 1},
+  {"role": "Finance Head", "read": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
