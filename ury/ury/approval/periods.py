@@ -26,9 +26,12 @@ def finalize_period(branch, year, month):
 	if name:
 		doc = frappe.get_doc("URY Period Lock", name)
 		doc.update(values)
+		doc.flags.ury_period_lock_internal = True
 		doc.save()
 	else:
-		doc = frappe.get_doc({"doctype": "URY Period Lock", **values}).insert()
+		doc = frappe.get_doc({"doctype": "URY Period Lock", **values})
+		doc.flags.ury_period_lock_internal = True
+		doc.insert()
 	return doc
 
 
@@ -45,6 +48,7 @@ def reopen_period(branch, year, month, remarks=None):
 	doc.reopened_by = frappe.session.user
 	doc.reopened_at = now_datetime()
 	doc.remarks = remarks
+	doc.flags.ury_period_lock_internal = True
 	doc.save()
 	return doc
 
@@ -89,16 +93,31 @@ def on_cancel(doc, method=None):
 
 def _locked_period(branch, posting_date):
 	config = frappe.get_cached_doc("Branch", branch)
-	if getdate(posting_date) >= get_first_day(getdate(nowdate())):
+	posting_date = getdate(posting_date)
+	if posting_date >= get_first_day(getdate(nowdate())):
 		return None
-	period_start = get_first_day(posting_date)
-	period_end = get_last_day(posting_date)
-	if config.custom_ury_pnl_finalization_required and not frappe.db.exists(
-		"URY Period Lock",
-		{"branch": branch, "period_start": period_start, "period_end": period_end, "status": "Finalized"},
-	):
-		return None
-	activation_date = add_days(add_months(period_start, 1), (config.custom_ury_backdated_lock_day or 5) - 1)
+	if config.custom_ury_pnl_finalization_required:
+		periods = frappe.get_all(
+			"URY Period Lock",
+			filters={
+				"branch": branch,
+				"period_end": [">=", posting_date],
+				"status": "Finalized",
+			},
+			fields=["period_start", "period_end"],
+			order_by="period_end asc",
+			limit=1,
+		)
+		if not periods:
+			return None
+		period_start = getdate(periods[0].period_start)
+		period_end = getdate(periods[0].period_end)
+	else:
+		period_start = get_first_day(posting_date)
+		period_end = get_last_day(posting_date)
+	next_month = get_first_day(add_months(period_start, 1))
+	lock_day = min(config.custom_ury_backdated_lock_day or 5, get_last_day(next_month).day)
+	activation_date = add_days(next_month, lock_day - 1)
 	if getdate(nowdate()) < getdate(activation_date):
 		return None
 	return {"start": period_start, "end": period_end}

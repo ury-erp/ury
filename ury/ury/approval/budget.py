@@ -51,6 +51,7 @@ def validate(doc, method=None):
 		return
 	requires_higher_approval = False
 	details = []
+	_release_stale_reservations(doc, {(group["budget"].name, group["distribution"].name) for group in groups.values()})
 	for (budget_name, distribution_name, account, cost_center), group in groups.items():
 		budget = group["budget"]
 		distribution = group["distribution"]
@@ -263,15 +264,36 @@ def _material_request_commitments(company, account, cost_center, start_date, end
 def _other_reservations(budget, distribution, doc):
 	rows = frappe.qb.get_query(
 		"URY Budget Reservation",
-		filters={"budget": budget, "budget_distribution": distribution, "status": "Reserved"},
-		fields=["reference_doctype", "reference_name", "amount"],
+		filters={
+			"budget": budget,
+			"budget_distribution": distribution,
+			"status": ["in", ["Reserved", "Consumed"]],
+		},
+		fields=["reference_doctype", "reference_name", "amount", "status"],
 		for_update=True,
 	).run(as_dict=True)
-	return sum(
-		flt(row.amount)
-		for row in rows
-		if not (row.reference_doctype == doc.doctype and row.reference_name == doc.name)
-	)
+	reserved = 0
+	for row in rows:
+		if row.reference_doctype == doc.doctype and row.reference_name == doc.name:
+			continue
+		if row.status == "Consumed":
+			if row.reference_doctype == "Purchase Order":
+				continue
+			if row.reference_doctype != "Employee Advance":
+				continue
+		elif row.reference_doctype == "Purchase Order" and frappe.db.get_value(
+			"Purchase Order", row.reference_name, "docstatus"
+		) == 1:
+			continue
+		reserved += flt(row.amount)
+	return reserved
+
+
+def _release_stale_reservations(doc, active_periods):
+	for reservation in _reservations(doc, status=["Reserved", "Consumed"]):
+		if (reservation.budget, reservation.budget_distribution) not in active_periods:
+			reservation.status = "Released"
+			reservation.save(ignore_permissions=True)
 
 
 def _upsert_reservation(doc, branch, budget, distribution, account, cost_center, amount):

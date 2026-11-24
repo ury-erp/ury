@@ -15,17 +15,29 @@ VOLATILE_FIELDS = {
 	"creation",
 	"owner",
 	"idx",
+	"docstatus",
+	"status",
 	"_liked_by",
 	"_comments",
 	"_assign",
 	"_user_tags",
+}
+LIFECYCLE_FIELDS = {
+	"Employee Advance": {
+		"advance_account",
+		"claimed_amount",
+		"paid_amount",
+		"pending_amount",
+		"return_amount",
+	},
+	"Purchase Invoice": {"remarks"},
 }
 
 
 def document_hash(doc, action="submit"):
 	data = doc.as_dict()
 	data.pop("doctype", None)
-	for fieldname in VOLATILE_FIELDS:
+	for fieldname in VOLATILE_FIELDS | LIFECYCLE_FIELDS.get(doc.doctype, set()):
 		data.pop(fieldname, None)
 	payload = json.dumps(
 		{"document": data, "action": action}, sort_keys=True, default=str, separators=(",", ":")
@@ -66,6 +78,7 @@ def request_approval(doc, control_type, branch, action="submit", levels=None, am
 			"created_at": now_datetime(),
 		}
 	)
+	request_doc.flags.ury_approval_internal = True
 	request_doc.insert(ignore_permissions=True)
 	_append_log(request_doc, "submit")
 	_notify_status_change(request_doc, None, "Pending")
@@ -76,7 +89,6 @@ def _update_open_request(request_doc, doc, branch, version_hash, levels, amount,
 	old_status = request_doc.status
 	changed = request_doc.document_version_hash != version_hash
 	request_doc.document_version_hash = version_hash
-	request_doc.requester = frappe.session.user
 	request_doc.branch = branch
 	request_doc.requested_amount = amount
 	request_doc.details = details
@@ -208,7 +220,7 @@ def _set_status(request_doc, status, log_action, remarks=None, release=True):
 
 
 def _append_log(request_doc, action, remarks=None):
-	frappe.get_doc(
+	log_doc = frappe.get_doc(
 		{
 			"doctype": "URY Approval Log",
 			"approval_request": request_doc.name,
@@ -218,7 +230,9 @@ def _append_log(request_doc, action, remarks=None):
 			"action_at": now_datetime(),
 			"remarks": remarks,
 		}
-	).insert(ignore_permissions=True)
+	)
+	log_doc.flags.ury_approval_internal = True
+	log_doc.insert(ignore_permissions=True)
 
 
 def _notify_status_change(request_doc, old_status, new_status):
