@@ -2,9 +2,9 @@
 # Same pattern as DB03: ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
 # __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly). Clear it for all dates (last 93 days), or pick a range.
 # Number cards (fact_card_days and the daily sources below) do NOT follow Date: each shows its latest day with data, the % change vs the
-# day before and a trend line, and follows Branch / Bill type. Charts follow Date, Branch, Bill type. The last-14-days trend and the
+# day before and a trend line, and follows Branch. Charts follow Date, Branch. The last-14-days trend and the
 # latest-vs-previous-day hourly line always show recent days. Every bill is one row per day/branch/service (no duplicates).
-# Bill type = Paid (waiter bills) or Consolidated. No currency symbols anywhere. Insights runs these queries on DuckDB.
+# No Bill type filter (removed 2026-11-24). No currency symbols anywhere. Insights runs these queries on DuckDB.
 workbook: {id: ury_db01_owner_overview, title: "Owner overview", module: "URY", required_apps: [ury]}
 queries:
   # fact_card_days (sql): one row per day x branch x service x bill type (last 93 days before the latest sales day). Cards + 14-day trend. Not linked to Date.
@@ -160,13 +160,11 @@ dashboards:
     filters:
       - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, layout: {x: 0, y: 2, w: 8, h: 1},
          applies_to: {fact_sales: posting_date, fact_sales_lines_enriched: posting_date}}
-      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 8, y: 2, w: 6, h: 1},
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 8, y: 2, w: 12, h: 1},
          applies_to: {fact_card_days: branch, fact_sales: branch, fact_hourly_2day: branch, fact_sales_lines_enriched: branch, fact_cancellations: branch, fact_kot_headers: branch, fact_sales_plan_items: branch, fact_stock_correction: branch, fact_yield_checks: branch, fact_daily_pnl: branch}}
-      - {id: f_population, label: "Bill type", type: string, icon: users, layout: {x: 14, y: 2, w: 6, h: 1},
-         applies_to: {fact_sales: population, fact_card_days: population, fact_hourly_2day: population, fact_sales_lines_enriched: population}}
     items:
-      - {text: "<h2>Owner overview</h2><p>Is revenue growing, where does it come from, and is anything leaking? Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch and Bill type apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the latest day it has records for, the % change against the day before, and a trend line. Cards follow Branch and Bill type, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h2>Owner overview</h2><p>Is revenue growing, where does it come from, and is anything leaking? Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch applies to every report.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Each card shows the latest day it has records for, the % change against the day before, and a trend line. Cards follow Branch, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db01_net_sales, x: 0, y: 5, w: 5, h: 4}
       - {chart: db01_bills, x: 5, y: 5, w: 5, h: 4}
       - {chart: db01_avg_bill, x: 10, y: 5, w: 5, h: 4}
@@ -177,7 +175,7 @@ dashboards:
       - {chart: db01_discounts, x: 15, y: 9, w: 5, h: 4}
       - {text: "<p><b>Estimate:</b> gross profit and margin come from the daily profit and loss, which can be a day or more behind sales; recipe costs cover only part of sales, so treat margin as indicative.</p>", x: 0, y: 13, w: 20, h: 2}
       - {chart: db01_2day_line, x: 0, y: 15, w: 20, h: 9}
-      - {text: "<h3>Is sales growing?</h3><p>The last 14 days. Follows Branch and Bill type, not Date.</p>", x: 0, y: 24, w: 20, h: 2}
+      - {text: "<h3>Is sales growing?</h3><p>The last 14 days. Follows Branch, not Date.</p>", x: 0, y: 24, w: 20, h: 2}
       - {chart: db01_last14, x: 0, y: 26, w: 20, h: 9}
       - {text: "<h3>Where sales come from</h3><p>Follows the Date filter.</p>", x: 0, y: 35, w: 20, h: 2}
       - {chart: db01_channel, x: 0, y: 37, w: 8, h: 9}

@@ -1,17 +1,17 @@
 # DB04 Menu and category, DAILY view (redesign 2026-11-24). Audience: owner, branch manager, kitchen head.
 # Same pattern as DB01 / DB02 / DB03: ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
 # __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly). Clear it for all dates (last 93 days), or pick a range.
-# Number cards (fact_card_items) do NOT follow Date: each shows the latest day with sales, the % change vs the day before and a trend line, and
-# follows Branch / Category / Service. Charts follow Date, Branch, Category, Service. The "latest vs previous day" dish chart always shows those two days.
+# Number cards and charts (fact_items) follow Date, Branch, Category and Service: a card shows the total for the dates picked (latest day by default).
+# Cards use compare_previous: % change vs the previous period (needs a `within` Date) + trend line for periods of a week or more; a `between` range or cleared Date shows the total only. The "latest vs previous day" dish chart (fact_card_items) always shows those two days.
 # fact_card_items / fact_items: one row per day x branch x service x category x dish (no duplicates; last 93 days before the latest sales day).
 # Margin and non-selling tables keep their line-level / item-level queries. No currency symbols anywhere. Insights runs these queries on DuckDB.
 workbook: {id: ury_db04_menu_category, title: "Menu and category", module: "URY", required_apps: [ury]}
 queries:
-  # fact_card_items (sql): cards + latest-vs-previous-day dishes. Not linked to Date.
+  # fact_card_items (sql): latest-vs-previous-day dishes chart only. Not linked to Date.
   - id: fact_card_items
     title: "fact_card_items"
     sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATEDIFF(MAX(l.last_day), pi.posting_date) AS days_ago, CASE WHEN pi.posting_date = MAX(l.last_day) THEN 'Latest day' ELSE 'Previous day' END AS day_label, pi.branch, pi.order_type, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, pii.item_code, pii.item_name, SUM(pii.qty) AS qty, SUM(pii.net_amount) AS net_amount FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN cm ON cm.item_group = pii.item_group GROUP BY pi.posting_date, pi.branch, pi.order_type, COALESCE(cm.menu_category, 'Unassigned'), CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END, pii.item_code, pii.item_name"
-  # fact_items (sql): same rows, linked to the Date filter. Category, dish and table charts.
+  # fact_items (sql): same rows, linked to the Date filter. Cards, category, dish and table charts.
   - id: fact_items
     title: "fact_items"
     sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATEDIFF(MAX(l.last_day), pi.posting_date) AS days_ago, CASE WHEN pi.posting_date = MAX(l.last_day) THEN 'Latest day' ELSE 'Previous day' END AS day_label, pi.branch, pi.order_type, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, pii.item_code, pii.item_name, SUM(pii.qty) AS qty, SUM(pii.net_amount) AS net_amount FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN cm ON cm.item_group = pii.item_group GROUP BY pi.posting_date, pi.branch, pi.order_type, COALESCE(cm.menu_category, 'Unassigned'), CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END, pii.item_code, pii.item_name"
@@ -28,17 +28,23 @@ queries:
 
 charts:
   # ---- Key numbers: latest day with sales, % change vs the day before, trend line
-  - {id: db04_net_sales_kpi, title: "Net sales", query: fact_card_items, type: Number, comparison: true, sparkline: true,
-     date: {column: posting_date, granularity: day}, y: [{expr: "sum(net_amount).round(0)", as: "Net sales"}]}
-  - {id: db04_items_sold_kpi, title: "Items sold", query: fact_card_items, type: Number, comparison: true, sparkline: true,
-     date: {column: posting_date, granularity: day}, y: [{expr: "sum(qty).round(0)", as: "Items sold"}]}
-  - {id: db04_dishes_kpi, title: "Dishes sold", query: fact_card_items, type: Number, comparison: true, sparkline: true,
-     date: {column: posting_date, granularity: day}, y: [{column: item_code, agg: count_distinct, as: "Dishes sold"}]}
-  - {id: db04_avg_price_kpi, title: "Average price per item", query: fact_card_items, type: Number, comparison: true, sparkline: true,
-     date: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_amount) / sum(qty)).round(0)", as: "Average price per item"}]}
-  - {id: db04_unassigned, title: "Sales not in a menu category", query: fact_card_items, type: Number, comparison: true, sparkline: true,
+  - {id: db04_net_sales_kpi, title: "Net sales", query: fact_items, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(net_amount).round(0)", as: "Net sales"}]}
+  - {id: db04_items_sold_kpi, title: "Items sold", query: fact_items, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(qty).round(0)", as: "Items sold"}]}
+  - {id: db04_dishes_kpi, title: "Dishes sold", query: fact_items, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{column: item_code, agg: count_distinct, as: "Dishes sold"}]}
+  - {id: db04_avg_price_kpi, title: "Average price per item", query: fact_items, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "(sum(net_amount) / sum(qty)).round(0)", as: "Average price per item"}]}
+  - {id: db04_unassigned, title: "Sales not in a menu category", query: fact_items, type: Number, compare_previous: true,
+     date: {column: posting_date},
      filters: [{column: menu_category, op: "=", value: Unassigned}],
-     date: {column: posting_date, granularity: day}, y: [{expr: "sum(net_amount).round(0)", as: "Sales not in a menu category"}]}
+     y: [{expr: "sum(net_amount).round(0)", as: "Sales not in a menu category"}]}
+
 
   # ---- Latest day vs previous day: top dishes (not linked to Date)
   - {id: db04_2day, title: "Top dishes: latest day vs previous day", query: fact_card_items, type: Bar, limit: 20, stack: false,
@@ -94,7 +100,7 @@ dashboards:
       - {id: f_order_type, label: Service, type: string, icon: shopping-bag, applies_to: {fact_items: order_type, fact_card_items: order_type, db04_costed_lines: order_type}, layout: {x: 16, y: 2, w: 4, h: 1}}
     items:
       - {text: "<h2>Menu and category</h2><p>Which dishes and categories earn, and which to promote, reprice or drop. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch, Category and Service apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {text: "<h3>Key numbers</h3><p>Each card shows the latest day with sales, the % change against the day before, and a trend line. Cards follow Branch, Category and Service, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Each card shows the total for the dates picked in <b>Date</b> (the latest day by default). For a day or a last-N-days period it also shows the % change against the period just before it, and a trend line for a week or longer. A custom range or a cleared Date shows the total only. Cards follow Branch, Category and Service too.</p>", x: 0, y: 3, w: 20, h: 2}
       - {chart: db04_net_sales_kpi, x: 0, y: 5, w: 4, h: 4}
       - {chart: db04_items_sold_kpi, x: 4, y: 5, w: 4, h: 4}
       - {chart: db04_dishes_kpi, x: 8, y: 5, w: 4, h: 4}
