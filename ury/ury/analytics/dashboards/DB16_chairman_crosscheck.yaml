@@ -1,8 +1,10 @@
 # DB16 Owner brief cross-check. One chart per owner PWA slide (architecture section 10) so each slide number can be
 # reconciled with Insights. The PWA API (ury.ury.api.chairman.get_brief) is not built or called here.
 # Base queries are copied verbatim from semantic_layer.yaml (only the ones this dashboard reads).
-# Date filter default: Last 30 days (UX standard daily-ops default). Demo data ends 2026-10-21, so "yesterday"
-# here = latest day inside the Date filter (clear the filter or set it to 2026-10-21 to reproduce the pinned acceptance date).
+# Redesign 2026-11-24 (pattern of DB01-DB06): ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
+# __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly), cleared = all dates, or pick a range. Number cards use compare_previous: total for
+# the dates picked, % change vs the previous period for a `within` Date, trend line for week-or-longer periods; a `between` range or cleared Date shows the total only.
+# Live cards (a snapshot with no date) show the current value only. No currency symbols; charts use distinct colours.
 workbook: {id: ury_db16_chairman_crosscheck, title: "URY Owner Crosscheck", module: "URY", required_apps: [ury]}
 queries:
   # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
@@ -110,92 +112,89 @@ charts:
   # Numbering follows research/PWA_chairman_app_plan.md (10 slides). Number tiles carry the slide label in the measure
   # alias because Number charts do not render their title. One Number chart per tile (multi-measure tiles render narrow).
   # Slide 1 (T1): latest day in the Date filter vs previous day. PWA compares same weekday last week (SAL-006 caveat).
-  - {id: db16_s1_sales, title: "Slide 1: Last trading day net sales (₹)", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: day},
-     y: [{expr: "sum(net_total).round(0)", as: "Slide 1: Last day net sales (₹)", format: currency}]}
-  - {id: db16_s1_bills, title: "Slide 1: Last trading day bills", query: fact_invoices, type: Number, comparison: true,
-     date: {column: posting_date, granularity: day},
-     y: [{column: name, agg: count, as: "Slide 1: Last day bills"}]}
-  # Slide 2 (T1): month total in the filter. No comparison: previous month is empty on the demo (shows infinity).
-  - {id: db16_s2_mtd, title: "Slide 2: Month to date net sales (₹)", query: fact_invoices, type: Number,
-     y: [{expr: "sum(net_total).round(0)", as: "Slide 2: Month to date net sales (₹)", format: currency}]}
+  - {id: db16_s1_sales, title: "Slide 1: Net sales", query: fact_invoices, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(net_total).round(0)", as: "Slide 1: Net sales"}]}
+  - {id: db16_s1_bills, title: "Slide 1: Bills", query: fact_invoices, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{column: name, agg: count, as: "Slide 1: Bills"}]}
   # Slide 2 SAL-021: month to date against the monthly target (current calendar month; does not follow the Date filter)
-  - {id: db16_s2_target, title: "Slide 2: Month to date vs target (%)", query: fact_sales_target, type: Number,
+  - {id: db16_s2_target, title: "Slide 2: Month to date vs target (%)", query: fact_sales_target, type: Number, sparkline: false,
      filters: [{column: is_current_month, op: "=", value: 1}],
      y: [{expr: "sum(actual_net_sales) / sum(target_amount)", as: "Slide 2: Month to date vs target (%)", format: percent}]}
   # Slide 3 (T3): one branch on this site.
-  - {id: db16_branch_rank, title: "Slide 3: Net sales by branch (₹)", query: fact_invoices, type: Row, limit: 10,
-     x: branch, y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  - {id: db16_branch_rank, title: "Slide 3: Net sales by branch", query: fact_invoices, type: Row, limit: 10,
+     x: branch, y: [{expr: "sum(net_total).round(0)", as: "Net sales", color: "#6a39db"}], order: [{by: "Net sales", dir: desc}]}
   # Slide 4 (T1)
-  - {id: db16_channel, title: "Slide 4: Net sales by order type (₹)", query: fact_invoices, type: Donut, limit: 10, max_slices: 5,
-     x: order_type, y: [{expr: "sum(net_total).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}]}
+  - {id: db16_channel, title: "Slide 4: Net sales by order type", query: fact_invoices, type: Donut, limit: 10, max_slices: 5,
+     x: order_type, y: [{expr: "sum(net_total).round(0)", as: "Net sales"}], order: [{by: "Net sales", dir: desc}]}
   # Slide 5 (T1): top 3 menu items (Non-menu excluded, CATEGORY_MAP v1).
-  - {id: db16_top_items, title: "Slide 5: Top 3 dishes (₹)", query: fact_sales_lines_enriched, type: Row, limit: 3,
-     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: desc}],
-     filters: [{column: category_family, op: "!=", value: "Non-menu"}]}
+  - {id: db16_top_items, title: "Slide 5: Top 3 dishes", query: fact_sales_lines_enriched, type: Row, limit: 3,
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales", color: "#f59e0b"}], order: [{by: "Net sales", dir: desc}],
+     filters: [{column: category_family, op: "!=", value: "Non-menu", color: "#10b981"}]}
   # Slide 5 (T1): bottom 3 menu items. Excludes Non-menu, Unassigned, zero-qty and zero-sale lines.
-  - {id: db16_bottom_items, title: "Slide 5: Bottom 3 dishes (₹)", query: fact_sales_lines_enriched, type: Row, limit: 3,
-     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales (₹)"}], order: [{by: "Net sales (₹)", dir: asc}],
-     filters: [{column: category_family, op: "!=", value: "Non-menu"}, {column: category_family, op: "!=", value: "Unassigned"}, {column: qty, op: ">", value: 0}, {column: net_amount, op: ">", value: 0}]}
+  - {id: db16_bottom_items, title: "Slide 5: Bottom 3 dishes", query: fact_sales_lines_enriched, type: Row, limit: 3,
+     x: item_name, y: [{expr: "sum(net_amount).round(0)", as: "Net sales", color: "#e11d48"}], order: [{by: "Net sales", dir: asc}],
+     filters: [{column: category_family, op: "!=", value: "Non-menu", color: "#0ea5e9"}, {column: category_family, op: "!=", value: "Unassigned", color: "#ec4899"}, {column: qty, op: ">", value: 0, color: "#84cc16"}, {column: net_amount, op: ">", value: 0, color: "#f97316"}]}
   # Slide 6 (T1): Row not Donut, cash is ~99% of tender.
-  - {id: db16_pay_mix, title: "Slide 6: Payment mix (₹)", query: fact_payments, type: Row, limit: 6,
-     x: mode_of_payment, y: [{expr: "sum(amount).round(0)", as: "Tendered (₹)"}], order: [{by: "Tendered (₹)", dir: desc}]}
+  - {id: db16_pay_mix, title: "Slide 6: Payment mix", query: fact_payments, type: Row, limit: 6,
+     x: mode_of_payment, y: [{expr: "sum(amount).round(0)", as: "Tendered", color: "#14b8a6"}], order: [{by: "Tendered", dir: desc}]}
   # Slide 7 (T1): cancelled bills and cancelled value (discounts half of the PWA slide is near-empty, not shown).
-  - {id: db16_s7_bills, title: "Slide 7: Cancelled bills", query: fact_cancellations, type: Number,
+  - {id: db16_s7_bills, title: "Slide 7: Cancelled bills", query: fact_cancellations, type: Number, compare_previous: true, negative_is_better: true, date: {column: posting_date},
      y: [{column: name, agg: count, as: "Slide 7: Cancelled bills"}]}
-  - {id: db16_s7_value, title: "Slide 7: Cancelled value (₹)", query: fact_cancellations, type: Number,
-     y: [{expr: "sum(grand_total).round(0)", as: "Slide 7: Cancelled value (₹)", format: currency}]}
+  - {id: db16_s7_value, title: "Slide 7: Cancelled value", query: fact_cancellations, type: Number, compare_previous: true, negative_is_better: true, date: {column: posting_date},
+     y: [{expr: "sum(grand_total).round(0)", as: "Slide 7: Cancelled value"}]}
   # Slide 8 (T2): served KOTs only; legacy minutes, SLA seeded 10/15 min.
-  - {id: db16_s8_prep, title: "Slide 8: Avg prep time (min)", query: fact_kot_headers, type: Number,
+  - {id: db16_s8_prep, title: "Slide 8: Avg prep time (min)", query: fact_kot_headers, type: Number, compare_previous: true, date: {column: date},
      y: [{expr: "avg(prod_minutes).round(1)", as: "Slide 8: Avg prep time (min)"}],
      filters: [{column: is_served, op: "=", value: 1}]}
-  - {id: db16_s8_over, title: "Slide 8: KOTs over target (%)", query: fact_kot_headers, type: Number,
+  - {id: db16_s8_over, title: "Slide 8: KOTs over target (%)", query: fact_kot_headers, type: Number, compare_previous: true, negative_is_better: true, date: {column: date},
      y: [{expr: "sum(sla_breach) / sum(is_served)", as: "Slide 8: KOTs over target (%)", format: percent}],
      filters: [{column: is_served, op: "=", value: 1}]}
   # Slide 9 (T3): consolidated closings only; demo differences are flat.
-  - {id: db16_s9_diff, title: "Slide 9: Cash-up difference (₹)", query: fact_closing_details, type: Number,
-     y: [{column: difference, agg: sum, as: "Slide 9: Cash-up difference (₹)", format: currency}]}
-  - {id: db16_s9_closings, title: "Slide 9: Closings with a difference", query: fact_closing_details, type: Number,
+  - {id: db16_s9_diff, title: "Slide 9: Cash-up difference", query: fact_closing_details, type: Number, compare_previous: true, date: {column: posting_date},
+     y: [{column: difference, agg: sum, as: "Slide 9: Cash-up difference"}]}
+  - {id: db16_s9_closings, title: "Slide 9: Closings with a difference", query: fact_closing_details, type: Number, compare_previous: true, negative_is_better: true, date: {column: posting_date},
      y: [{column: has_variance, agg: sum, as: "Slide 9: Closings with a difference"}]}
   # Slide 10 (T2): Paid population, Dine In, bills with covers only (architecture section 4).
-  - {id: db16_s10_covers, title: "Slide 10: Covers (estimate)", query: fact_invoices, type: Number,
+  - {id: db16_s10_covers, title: "Slide 10: Covers (estimate)", query: fact_invoices, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: pax, agg: sum, as: "Slide 10: Covers (estimate)"}],
      filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
-  - {id: db16_s10_spend, title: "Slide 10: Spend per cover (₹)", query: fact_invoices, type: Number,
-     y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: "Slide 10: Spend per cover (₹)", format: currency}],
+  - {id: db16_s10_spend, title: "Slide 10: Spend per cover", query: fact_invoices, type: Number, compare_previous: true, date: {column: posting_date},
+     y: [{expr: "(sum(net_total) / sum(pax)).round(0)", as: "Slide 10: Spend per cover"}],
      filters: [{column: order_type, op: "=", value: "Dine In"}, {column: population, op: "=", value: "Paid"}, {column: pax, op: ">", value: 0}]}
   # Extra (not a slide in the PWA plan): seeded Daily P and L.
-  - {id: db16_x_profit, title: "Extra: Gross profit (estimate)", query: fact_daily_pnl, type: Number,
-     y: [{expr: "sum(gross_profit).round(0)", as: "Extra: Gross profit (₹, estimate)", format: currency}]}
-  - {id: db16_x_margin, title: "Extra: Gross margin (estimate)", query: fact_daily_pnl, type: Number,
+  - {id: db16_x_profit, title: "Extra: Gross profit (estimate)", query: fact_daily_pnl, type: Number, compare_previous: true, date: {column: date},
+     y: [{expr: "sum(gross_profit).round(0)", as: "Extra: Gross profit (estimate)"}]}
+  - {id: db16_x_margin, title: "Extra: Gross margin (estimate)", query: fact_daily_pnl, type: Number, compare_previous: true, date: {column: date},
      y: [{expr: "sum(gross_profit) / sum(net_sales)", as: "Extra: Gross margin (%, estimate)", format: percent}]}
 dashboards:
   - id: chairman_crosscheck
     title: "Owner brief check"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 10, h: 1},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, layout: {x: 0, y: 2, w: 10, h: 1},
          applies_to: {fact_invoices: posting_date, fact_sales_lines_enriched: posting_date, fact_payments: posting_date, fact_cancellations: posting_date, fact_closing_details: posting_date, fact_kot_headers: date, fact_daily_pnl: date}}
       - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 10, y: 2, w: 10, h: 1},
          applies_to: {fact_invoices: branch, fact_sales_lines_enriched: branch, fact_payments: branch, fact_cancellations: branch, fact_closing_details: branch, fact_kot_headers: branch, fact_daily_pnl: branch, fact_sales_target: branch}}
     items:
-      - {text: "<p><b>Owner brief check.</b> Each card is one slide of the daily owner brief, in slide order, so you can tick it against the brief. This page compares the last trading day with the day before; the brief uses the same weekday last week.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {chart: db16_s1_sales, x: 0, y: 3, w: 5, h: 3}
-      - {chart: db16_s1_bills, x: 5, y: 3, w: 5, h: 3}
-      - {chart: db16_s2_mtd, x: 10, y: 3, w: 5, h: 3}
-      - {chart: db16_s2_target, x: 15, y: 3, w: 5, h: 3}
-      - {chart: db16_s7_bills, x: 0, y: 6, w: 5, h: 3}
-      - {chart: db16_s7_value, x: 5, y: 6, w: 5, h: 3}
-      - {chart: db16_s8_prep, x: 10, y: 6, w: 5, h: 3}
-      - {chart: db16_s8_over, x: 15, y: 6, w: 5, h: 3}
-      - {chart: db16_s9_diff, x: 0, y: 9, w: 5, h: 3}
-      - {chart: db16_s9_closings, x: 5, y: 9, w: 5, h: 3}
-      - {chart: db16_s10_covers, x: 10, y: 9, w: 5, h: 3}
-      - {chart: db16_s10_spend, x: 15, y: 9, w: 5, h: 3}
-      - {chart: db16_x_profit, x: 0, y: 12, w: 10, h: 3}
-      - {chart: db16_x_margin, x: 10, y: 12, w: 10, h: 3}
-      - {chart: db16_branch_rank, x: 0, y: 15, w: 10, h: 11}
-      - {chart: db16_channel, x: 10, y: 15, w: 10, h: 11}
-      - {chart: db16_top_items, x: 0, y: 26, w: 10, h: 11}
-      - {chart: db16_bottom_items, x: 10, y: 26, w: 10, h: 11}
-      - {chart: db16_pay_mix, x: 0, y: 37, w: 20, h: 11}
-      - {text: "<p><b>Notes.</b> <b>Slide 2 target:</b> current month to date against the full-month target set for the branch; it does not follow the Date filter. <b>Estimates:</b> kitchen speed, covers and the Extra margin tiles (margin comes from the daily P and L). Cash-up counts closed shifts only.</p>", x: 0, y: 48, w: 20, h: 3}
+      - {text: "<h2>Owner brief check</h2><p>Each card is one slide of the daily owner brief, in slide order, so you can tick it against the brief. It follows the <b>Date</b> you pick (opens on the latest day with sales, compared with the day before); the brief compares with the same weekday last week. Pick a range or the month so far in <b>Date</b> if you want totals instead.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch. The Slide 2 target ignores Date and always shows the current month.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db16_s1_sales, x: 0, y: 5, w: 4, h: 4}
+      - {chart: db16_s1_bills, x: 4, y: 5, w: 4, h: 4}
+      - {chart: db16_s2_target, x: 8, y: 5, w: 4, h: 4}
+      - {chart: db16_s7_bills, x: 12, y: 5, w: 4, h: 4}
+      - {chart: db16_s7_value, x: 16, y: 5, w: 4, h: 4}
+      - {chart: db16_s8_prep, x: 0, y: 9, w: 5, h: 4}
+      - {chart: db16_s8_over, x: 5, y: 9, w: 5, h: 4}
+      - {chart: db16_s9_diff, x: 10, y: 9, w: 5, h: 4}
+      - {chart: db16_s9_closings, x: 15, y: 9, w: 5, h: 4}
+      - {chart: db16_s10_covers, x: 0, y: 13, w: 5, h: 4}
+      - {chart: db16_s10_spend, x: 5, y: 13, w: 5, h: 4}
+      - {chart: db16_x_profit, x: 10, y: 13, w: 5, h: 4}
+      - {chart: db16_x_margin, x: 15, y: 13, w: 5, h: 4}
+      - {chart: db16_branch_rank, x: 0, y: 17, w: 10, h: 11}
+      - {chart: db16_channel, x: 10, y: 17, w: 10, h: 11}
+      - {chart: db16_top_items, x: 0, y: 28, w: 10, h: 11}
+      - {chart: db16_bottom_items, x: 10, y: 28, w: 10, h: 11}
+      - {chart: db16_pay_mix, x: 0, y: 39, w: 20, h: 11}
+      - {text: "<p><b>Notes.</b> <b>Slide 2 target:</b> current month to date against the full-month target set for the branch; it does not follow the Date filter. <b>Estimates:</b> kitchen speed, covers and the Extra margin tiles (margin comes from the daily P and L). Cash-up counts closed shifts only.</p>", x: 0, y: 50, w: 20, h: 3}

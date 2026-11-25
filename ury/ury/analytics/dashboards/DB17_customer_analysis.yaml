@@ -1,5 +1,9 @@
 # DB17 Customer analysis (audience: branch manager, owner, marketing).
 # Focus: Guest retention, repeat vs new customer acquisition, phone data collection rates, and customer lifetime value.
+# Redesign 2026-11-24 (pattern of DB01-DB06): ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
+# __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly), cleared = all dates, or pick a range. Number cards use compare_previous: total for
+# the dates picked, % change vs the previous period for a `within` Date, trend line for week-or-longer periods; a `between` range or cleared Date shows the total only.
+# Live cards (a snapshot with no date) show the current value only. No currency symbols; charts use distinct colours.
 workbook: {id: ury_db17_customer_analysis, title: "Customer analysis", module: "URY", required_apps: [ury]}
 queries:
   # fact_customer_visits (sql, T1). Grain: one submitted, non-return POS Invoice.
@@ -16,27 +20,27 @@ queries:
 
 charts:
   # S1 KPI Summary
-  - {id: db17_kpi_total_cust, title: "Total active customers", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_total_cust, title: "Total active customers", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: customer, agg: count_distinct, as: "Active customers"}]}
-  - {id: db17_kpi_new_cust, title: "New customers acquired", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_new_cust, title: "New customers acquired", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: is_new_customer, agg: sum, as: "New customers"}]}
-  - {id: db17_kpi_repeat_visits, title: "Repeat customer visits", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_repeat_visits, title: "Repeat customer visits", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: is_repeat_customer, agg: sum, as: "Repeat visits"}]}
-  - {id: db17_kpi_repeat_rate, title: "Repeat visit rate (%)", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_repeat_rate, title: "Repeat visit rate (%)", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{expr: "sum(is_repeat_customer) / count(invoice)", as: "Repeat visit rate (%)", format: percent}]}
-  - {id: db17_kpi_contacts, title: "Customer contacts collected", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_contacts, title: "Customer contacts collected", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: has_mobile, agg: sum, as: "Contacts collected"}]}
-  - {id: db17_kpi_collection_rate, title: "Data collection rate (%)", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_collection_rate, title: "Data collection rate (%)", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{expr: "sum(has_mobile) / count(invoice)", as: "Data collection rate (%)", format: percent}]}
-  - {id: db17_kpi_sales, title: "Customer net sales (₹)", query: fact_customer_visits, type: Number,
-     y: [{column: net_total, agg: sum, as: "Customer net sales (₹)", format: currency}]}
-  - {id: db17_kpi_avg_dwell, title: "Average customer dwell time (min)", query: fact_customer_visits, type: Number,
+  - {id: db17_kpi_sales, title: "Customer net sales", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
+     y: [{column: net_total, agg: sum, as: "Customer net sales"}]}
+  - {id: db17_kpi_avg_dwell, title: "Average customer dwell time (min)", query: fact_customer_visits, type: Number, compare_previous: true, date: {column: posting_date},
      y: [{column: dwell_minutes, agg: avg, as: "Avg dwell (min)"}]}
 
   # S2 Daily Trends
-  - {id: db17_daily_new, title: "Daily new customers acquired", query: fact_customer_daily, type: Line, limit: 366,
+  - {id: db17_daily_new, title: "Daily new customers acquired", query: fact_customer_daily, type: Line, color: "#6a39db", limit: 366,
      x: {column: posting_date, granularity: day}, y: [{column: new_customers, agg: sum, as: "New customers"}]}
-  - {id: db17_daily_repeat, title: "Daily repeat customers returning", query: fact_customer_daily, type: Line, limit: 366,
+  - {id: db17_daily_repeat, title: "Daily repeat customers returning", query: fact_customer_daily, type: Line, color: "#f59e0b", limit: 366,
      x: {column: posting_date, granularity: day}, y: [{column: repeat_customers, agg: sum, as: "Repeat customers"}]}
 
   # S3 Mix & Share
@@ -48,49 +52,50 @@ charts:
      x: order_type, y: [{column: invoice, agg: count, as: "Visits"}]}
 
   # S4 Branch Breakdown
-  - {id: db17_branch_collection, title: "Customer contacts collected by branch", query: fact_customer_visits, type: Bar, limit: 20, color: "#5c1548", stack: true,
+  - {id: db17_branch_collection, title: "Customer contacts collected by branch", query: fact_customer_visits, type: Bar, color: "#10b981", limit: 20, stack: true,
      x: branch, y: [{column: has_mobile, agg: sum, as: "Contacts collected"}]}
-  - {id: db17_branch_repeat, title: "Repeat customer visits by branch", query: fact_customer_visits, type: Bar, limit: 20, color: "#8c7437", stack: true,
+  - {id: db17_branch_repeat, title: "Repeat customer visits by branch", query: fact_customer_visits, type: Bar, color: "#e11d48", limit: 20, stack: true,
      x: branch, y: [{column: is_repeat_customer, agg: sum, as: "Repeat visits"}]}
 
   # S5 Top Guests
-  - {id: db17_top_revenue, title: "Top 10 customers by net spend (₹)", query: fact_customer_visits, type: Row, limit: 10, color: "#5097ab", stack: true,
-     order: [{by: "Net sales (₹)", dir: desc}], x: customer_name, y: [{column: net_total, agg: sum, as: "Net sales (₹)"}]}
-  - {id: db17_top_visits, title: "Top 10 most frequent guests (visits)", query: fact_customer_visits, type: Row, limit: 10, color: "#baba4c", stack: true,
+  - {id: db17_top_revenue, title: "Top 10 customers by net spend", query: fact_customer_visits, type: Row, color: "#0ea5e9", limit: 10, stack: true,
+     order: [{by: "Net sales", dir: desc}], x: customer_name, y: [{column: net_total, agg: sum, as: "Net sales"}]}
+  - {id: db17_top_visits, title: "Top 10 most frequent guests (visits)", query: fact_customer_visits, type: Row, color: "#ec4899", limit: 10, stack: true,
      order: [{by: "Visits", dir: desc}], x: customer_name, y: [{column: invoice, agg: count, as: "Visits"}]}
 
   # S6 Customer Directory Table
   - {id: db17_customer_directory, title: "Customer directory & spend summary", query: fact_customer_visits, type: Table, limit: 100, show_filter_row: true,
-     rows: [customer_name, mobile_number], values: [{column: invoice, agg: count, as: "Visits"}, {column: net_total, agg: sum, as: "Total Net (₹)"}, {column: dwell_minutes, agg: avg, as: "Avg Dwell (min)"}]}
+     rows: [customer_name, mobile_number], values: [{column: invoice, agg: count, as: "Visits"}, {column: net_total, agg: sum, as: "Total Net"}, {column: dwell_minutes, agg: avg, as: "Avg Dwell (min)"}]}
 
 dashboards:
   - id: customer_analysis
     title: "Customer analysis"
     filters:
-      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: "Last 30 days"}, layout: {x: 0, y: 2, w: 10, h: 1},
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, layout: {x: 0, y: 2, w: 10, h: 1},
          applies_to: {fact_customer_visits: posting_date, fact_customer_daily: posting_date}}
       - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 10, y: 2, w: 10, h: 1},
          applies_to: {fact_customer_visits: branch, fact_customer_daily: branch}}
     items:
-      - {text: "<p><b>Customer Analysis.</b> Guest retention, new customer acquisition, data collection rates, and guest lifetime value. For branch manager and marketing. Default period: last 30 days.</p>", x: 0, y: 0, w: 20, h: 2}
-      - {chart: db17_kpi_total_cust, x: 0, y: 3, w: 5, h: 3}
-      - {chart: db17_kpi_new_cust, x: 5, y: 3, w: 5, h: 3}
-      - {chart: db17_kpi_repeat_visits, x: 10, y: 3, w: 5, h: 3}
-      - {chart: db17_kpi_repeat_rate, x: 15, y: 3, w: 5, h: 3}
-      - {chart: db17_kpi_contacts, x: 0, y: 6, w: 5, h: 3}
-      - {chart: db17_kpi_collection_rate, x: 5, y: 6, w: 5, h: 3}
-      - {chart: db17_kpi_sales, x: 10, y: 6, w: 5, h: 3}
-      - {chart: db17_kpi_avg_dwell, x: 15, y: 6, w: 5, h: 3}
-      - {chart: db17_daily_new, x: 0, y: 9, w: 10, h: 9}
-      - {chart: db17_daily_repeat, x: 10, y: 9, w: 10, h: 9}
-      - {chart: db17_type_donut, x: 0, y: 18, w: 7, h: 8}
-      - {chart: db17_collection_donut, x: 7, y: 18, w: 7, h: 8}
-      - {chart: db17_channel_donut, x: 14, y: 18, w: 6, h: 8}
-      - {chart: db17_branch_collection, x: 0, y: 26, w: 10, h: 10}
-      - {chart: db17_branch_repeat, x: 10, y: 26, w: 10, h: 10}
-      - {chart: db17_top_revenue, x: 0, y: 36, w: 10, h: 9}
-      - {chart: db17_top_visits, x: 10, y: 36, w: 10, h: 9}
-      - {chart: db17_customer_directory, x: 0, y: 45, w: 20, h: 10}
-      - {text: "<p><b>Data Collection Rate:</b> Share of bills where a guest phone number is recorded. Repeat customers identified by historical invoice sequence.</p>", x: 0, y: 55, w: 20, h: 1}
+      - {text: "<h2>Customer analysis</h2><p>Guest retention, new customer acquisition, how often a phone number is collected, and what guests spend. For the branch manager and marketing. Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db17_kpi_total_cust, x: 0, y: 5, w: 5, h: 4}
+      - {chart: db17_kpi_new_cust, x: 5, y: 5, w: 5, h: 4}
+      - {chart: db17_kpi_repeat_visits, x: 10, y: 5, w: 5, h: 4}
+      - {chart: db17_kpi_repeat_rate, x: 15, y: 5, w: 5, h: 4}
+      - {chart: db17_kpi_contacts, x: 0, y: 9, w: 5, h: 4}
+      - {chart: db17_kpi_collection_rate, x: 5, y: 9, w: 5, h: 4}
+      - {chart: db17_kpi_sales, x: 10, y: 9, w: 5, h: 4}
+      - {chart: db17_kpi_avg_dwell, x: 15, y: 9, w: 5, h: 4}
+      - {chart: db17_daily_new, x: 0, y: 13, w: 10, h: 9}
+      - {chart: db17_daily_repeat, x: 10, y: 13, w: 10, h: 9}
+      - {chart: db17_type_donut, x: 0, y: 22, w: 7, h: 8}
+      - {chart: db17_collection_donut, x: 7, y: 22, w: 7, h: 8}
+      - {chart: db17_channel_donut, x: 14, y: 22, w: 6, h: 8}
+      - {chart: db17_branch_collection, x: 0, y: 30, w: 10, h: 10}
+      - {chart: db17_branch_repeat, x: 10, y: 30, w: 10, h: 10}
+      - {chart: db17_top_revenue, x: 0, y: 40, w: 10, h: 9}
+      - {chart: db17_top_visits, x: 10, y: 40, w: 10, h: 9}
+      - {chart: db17_customer_directory, x: 0, y: 49, w: 20, h: 10}
+      - {text: "<p><b>Data Collection Rate:</b> Share of bills where a guest phone number is recorded. Repeat customers identified by historical invoice sequence.</p>", x: 0, y: 59, w: 20, h: 1}
 
 desk: {workspace: "URY", label: "Customer Analysis"}
