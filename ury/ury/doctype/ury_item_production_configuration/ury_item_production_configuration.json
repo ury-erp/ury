@@ -11,6 +11,7 @@
  "field_order": [
   "scope_section",
   "item",
+  "item_name",
   "department",
   "scope_column",
   "branch",
@@ -46,6 +47,14 @@
    "label": "Item",
    "options": "Item",
    "reqd": 1
+  },
+  {
+   "fetch_from": "item.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
   },
   {
    "fieldname": "department",
@@ -183,7 +192,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-23 04:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Item Production Configuration",

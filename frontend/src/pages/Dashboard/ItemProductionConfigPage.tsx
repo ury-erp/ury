@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
 import {
@@ -24,6 +24,7 @@ import { __ } from '../../i18n';
 interface ItemProductionConfigRecord {
   name: string;
   item?: string;
+  item_name?: string;
   branch?: string;
   department?: string;
   production_unit?: string;
@@ -51,6 +52,7 @@ const AVAILABILITY_MODE_OPTIONS = ['Always Available', 'Plan Available', 'Stock 
 const emptyForm = {
   active: true,
   item: '',
+  item_name: '',
   branch: '',
   department: '',
   production_unit: '',
@@ -145,19 +147,29 @@ export const ItemProductionConfigPage: React.FC = () => {
     }));
   };
 
+  // Latest request id per field: a slower, older response must not overwrite newer results
+  // or clear the searching flag of a request that is still running.
+  const searchSeqRef = useRef<Partial<Record<LinkFieldKey, number>>>({});
+
   const runLinkSearch = useCallback(
     async (field: LinkFieldKey, query: string, formSnapshot: typeof emptyForm) => {
+      const seq = (searchSeqRef.current[field] ?? 0) + 1;
+      searchSeqRef.current[field] = seq;
+      const isLatest = () => searchSeqRef.current[field] === seq;
       setLinkSearching((prev) => ({ ...prev, [field]: true }));
       try {
         let options: AutocompleteOption[] = [];
         if (field === 'item') {
-          options = await searchLinkOptions({
-            doctype: 'Item',
-            query,
-            fields: ['name', 'item_name'],
-            labelField: 'item_name',
-            filters: [['disabled', '=', 0]],
-          });
+          // Search matches code and name; the dropdown shows the item code only.
+          options = (
+            await searchLinkOptions({
+              doctype: 'Item',
+              query,
+              fields: ['name', 'item_name'],
+              labelField: 'item_name',
+              filters: [['disabled', '=', 0]],
+            })
+          ).map((opt) => ({ ...opt, label: opt.value }));
         } else if (field === 'branch') {
           options = await searchLinkOptions({ doctype: 'Branch', query });
         } else if (field === 'department') {
@@ -210,11 +222,11 @@ export const ItemProductionConfigPage: React.FC = () => {
             filters: [['disabled', '=', 0]],
           });
         }
-        setFieldOptions(field, options, formSnapshot[field]);
+        if (isLatest()) setFieldOptions(field, options, formSnapshot[field]);
       } catch {
-        setFieldOptions(field, [], formSnapshot[field]);
+        if (isLatest()) setFieldOptions(field, [], formSnapshot[field]);
       } finally {
-        setLinkSearching((prev) => ({ ...prev, [field]: false }));
+        if (isLatest()) setLinkSearching((prev) => ({ ...prev, [field]: false }));
       }
     },
     []
@@ -255,6 +267,7 @@ export const ItemProductionConfigPage: React.FC = () => {
     const nextForm = {
       active: config.active !== 0,
       item: config.item || '',
+      item_name: config.item_name || '',
       branch: config.branch || '',
       department: config.department || '',
       production_unit: config.production_unit || '',
@@ -419,15 +432,42 @@ export const ItemProductionConfigPage: React.FC = () => {
                 setForm((prev) => ({
                   ...prev,
                   item: val,
+                  item_name: '',
                   bom: '',
                   ...(prev.production_policy === 'BUNDLE' && !prev.product_bundle ? { product_bundle: val } : {}),
                 }));
                 setLinkOptions((prev) => ({ ...prev, bom: [], product_bundle: [] }));
+                if (val) {
+                  call<any>('frappe.client.get_value', {
+                    doctype: 'Item',
+                    fieldname: 'item_name',
+                    filters: { name: val },
+                  })
+                    .then((res) => {
+                      const name = (res as any)?.message?.item_name ?? (res as any)?.item_name ?? '';
+                      setForm((prev) => (prev.item === val ? { ...prev, item_name: name } : prev));
+                    })
+                    .catch(() => {});
+                }
               }}
               onSearch={(query) => runLinkSearch('item', query, form)}
               options={linkOptions.item}
               searching={!!linkSearching.item}
               placeholder={__('Search Item')}
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-muted-foreground mb-1" htmlFor="item_name">
+              {__('Item Name')}
+            </label>
+            <input
+              id="item_name"
+              type="text"
+              value={form.item_name}
+              readOnly
+              disabled
+              className="w-full rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-text-secondary"
             />
           </div>
 
