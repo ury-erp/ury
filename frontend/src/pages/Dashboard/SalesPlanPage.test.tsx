@@ -30,6 +30,7 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
       getPlanStatus: vi.fn(),
       transitionPlan: vi.fn(),
       getPlan: vi.fn(),
+      saveDraft: vi.fn(),
     },
   };
 });
@@ -439,6 +440,193 @@ describe('SalesPlanPage', () => {
     const indianHeader = indianToggle.closest('div');
     expect(indianHeader).toHaveTextContent('2 items');
     expect(indianHeader).toHaveTextContent('1 issue');
+  });
+
+  describe('item issues, removal and reload authority', () => {
+    const planItem = (item_code: string, item_name: string, qty: number) => ({ item_code, item_name, qty });
+
+    const mockSavedPlan = (status: string, rows: ReturnType<typeof planItem>[], item_issues: { item_code: string; message: string }[] = []) => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status } as any);
+      vi.mocked(salesPlanService.getPlan).mockResolvedValue({ items: rows, item_issues } as any);
+    };
+
+    const bothRows = [planItem('ITEM-001', 'Chicken Biryani', 72), planItem('ITEM-002', 'Fried Rice', 44)];
+    const issueA = [
+      { item_code: 'ITEM-001', message: 'Not on the menu' },
+      { item_code: 'ITEM-001', message: 'No production unit' },
+    ];
+
+    const expectKpi = (label: string, value: string) => {
+      const labelEl = screen.getByText(label, { selector: 'span, p, div, dt' });
+      expect(labelEl.parentElement).toHaveTextContent(value);
+    };
+
+    const confirmRemove = async () => {
+      const dialog = await screen.findByRole('alertdialog').catch(() => screen.findByRole('dialog'));
+      expect(within(dialog).getByText('Remove item?')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    };
+
+    const expandAttention = async () => {
+      const toggle = await screen.findByRole('button', { name: /Needs Attention/i });
+      await userEvent.click(toggle);
+      return document.getElementById(toggle.getAttribute('aria-controls')!)!;
+    };
+
+    beforeEach(() => {
+      vi.mocked(salesPlanService.saveDraft).mockReset();
+      vi.mocked(salesPlanService.saveDraft).mockResolvedValue({ name: 'PLAN-1', status: 'Draft', item_issues: [] } as any);
+    });
+
+    it('renders only the saved plan items when a plan exists (reload authority)', async () => {
+      mockSavedPlan('Draft', [planItem('ITEM-001', 'Chicken Biryani', 72)]);
+      render(<SalesPlanPage />);
+
+      expect(await screen.findByText('Chicken Biryani')).toBeInTheDocument();
+      expect(screen.queryByText('Fried Rice')).not.toBeInTheDocument();
+    });
+
+    it('lists only backend issues in Needs Attention with all messages and the item code', async () => {
+      const withNoPu = {
+        ...historyResponse,
+        items: [
+          ...historyResponse.items,
+          { item_code: 'ITEM-003', item_name: 'No PU Item', stock_uom: 'Nos', department: 'Indian', average_qty: 5, sample_days: 3, history: [] },
+        ],
+      };
+      vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withNoPu as any);
+      mockSavedPlan('Draft', [...bothRows, planItem('ITEM-003', 'No PU Item', 5)], issueA);
+      render(<SalesPlanPage />);
+
+      const panel = await expandAttention();
+      expect(within(panel).getAllByRole('button', { name: 'View item' })).toHaveLength(1);
+      expect(within(panel).getByText('Chicken Biryani')).toBeInTheDocument();
+      expect(within(panel).getByText('ITEM-001')).toBeInTheDocument();
+      expect(within(panel).getByText('Not on the menu')).toBeInTheDocument();
+      expect(within(panel).getByText('No production unit')).toBeInTheDocument();
+      expect(within(panel).queryByText('No PU Item')).not.toBeInTheDocument();
+    });
+
+    it('hides Needs Attention and the Blocked KPI when there are no issues', async () => {
+      mockSavedPlan('Draft', bothRows);
+      render(<SalesPlanPage />);
+
+      await screen.findByText('Chicken Biryani');
+      expect(screen.queryByRole('button', { name: /Needs Attention/i })).not.toBeInTheDocument();
+      expect(screen.queryByText('Blocked')).not.toBeInTheDocument();
+    });
+
+    it('shows the Blocked KPI matching the issue count when issues exist', async () => {
+      mockSavedPlan('Draft', bothRows, issueA);
+      render(<SalesPlanPage />);
+
+      await screen.findByText('Fried Rice');
+      expectKpi('Blocked', '1');
+    });
+
+    it('hides Needs Attention for an Approved plan even if issues are present', async () => {
+      mockSavedPlan('Approved', bothRows, issueA);
+      render(<SalesPlanPage />);
+
+      await screen.findByText('Fried Rice');
+      expect(screen.queryByRole('button', { name: /Needs Attention/i })).not.toBeInTheDocument();
+    });
+
+    it('removes an item from the table after confirmation and updates totals', async () => {
+      mockSavedPlan('Draft', bothRows);
+      render(<SalesPlanPage />);
+      await screen.findByText('Fried Rice');
+      expectKpi('Items', '2');
+      expectKpi('Planned Qty', '116');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Fried Rice' }));
+      await confirmRemove();
+
+      await waitFor(() => expect(screen.queryByText('Fried Rice')).not.toBeInTheDocument());
+      expect(salesPlanService.saveDraft).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(salesPlanService.saveDraft).mock.calls[0][0].items).toEqual([{ item_code: 'ITEM-001', qty: 72 }]);
+      expect(screen.getByText('Chicken Biryani')).toBeInTheDocument();
+      expectKpi('Items', '1');
+      expectKpi('Planned Qty', '72');
+    });
+
+    it('removes an item from Needs Attention and replaces issues with the save response', async () => {
+      mockSavedPlan('Draft', bothRows, issueA);
+      vi.mocked(salesPlanService.saveDraft).mockResolvedValue({
+        name: 'PLAN-1',
+        status: 'Draft',
+        item_issues: [{ item_code: 'ITEM-002', message: 'Fresh issue from save' }],
+      } as any);
+      render(<SalesPlanPage />);
+
+      const panel = await expandAttention();
+      const row = within(panel).getByText('Chicken Biryani').closest('div[class*="flex"]') as HTMLElement;
+      await userEvent.click(within(row.parentElement as HTMLElement).getAllByRole('button', { name: 'Remove' })[0]);
+      await confirmRemove();
+
+      await waitFor(() => expect(salesPlanService.saveDraft).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(salesPlanService.saveDraft).mock.calls[0][0].items).toEqual([{ item_code: 'ITEM-002', qty: 44 }]);
+      await waitFor(() => expect(screen.queryByText('Chicken Biryani')).not.toBeInTheDocument());
+      const updated = document.getElementById('needs-attention-panel')!;
+      expect(within(updated).getByText('Fresh issue from save')).toBeInTheDocument();
+      expect(within(updated).queryByText('Not on the menu')).not.toBeInTheDocument();
+    });
+
+    it('does nothing when the remove confirmation is cancelled', async () => {
+      mockSavedPlan('Draft', bothRows);
+      render(<SalesPlanPage />);
+      await screen.findByText('Fried Rice');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Fried Rice' }));
+      const dialog = await screen.findByRole('alertdialog').catch(() => screen.findByRole('dialog'));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      expect(salesPlanService.saveDraft).not.toHaveBeenCalled();
+      expect(screen.getByText('Fried Rice')).toBeInTheDocument();
+    });
+
+    it('restores the row and shows an error toast when the removal save fails', async () => {
+      mockSavedPlan('Draft', bothRows);
+      vi.mocked(salesPlanService.saveDraft).mockRejectedValue(new Error('boom'));
+      render(<SalesPlanPage />);
+      await screen.findByText('Fried Rice');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Fried Rice' }));
+      await confirmRemove();
+
+      await waitFor(() => expect(mockShowToastError).toHaveBeenCalled());
+      expect(await screen.findByText('Fried Rice')).toBeInTheDocument();
+      expectKpi('Items', '2');
+    });
+
+    it('offers no Remove controls when the plan is not editable', async () => {
+      mockSavedPlan('Proposed', bothRows, issueA);
+      render(<SalesPlanPage />);
+
+      const panel = await expandAttention();
+      expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
+      expect(within(panel).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+    });
+
+    it('renders the Plan column at 17% and a Remove column when editable', async () => {
+      mockSavedPlan('Draft', bothRows);
+      render(<SalesPlanPage />);
+      await screen.findByText('Fried Rice');
+
+      const table = screen.getByRole('button', { name: 'Remove Fried Rice' }).closest('table')!;
+      const cols = Array.from(table.querySelectorAll('col')) as HTMLElement[];
+      if (cols.length === 0) {
+        // DataTable renders no colgroup; widths live on th styles.
+        const ths = Array.from(table.querySelectorAll('th')) as HTMLElement[];
+        const widths = ths.map((th) => th.style.width);
+        expect(widths).toContain('17%');
+        expect(widths).toContain('5%');
+        return;
+      }
+      const widths = cols.map((c) => c.style.width);
+      expect(widths).toContain('17%');
+      expect(widths).toContain('5%');
+    });
   });
 
   describe('lifecycle stepper summary', () => {
