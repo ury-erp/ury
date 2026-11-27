@@ -188,6 +188,11 @@ POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 POLICY_BUNDLE = "BUNDLE"
 
+# `URY Item Production Configuration.availability_mode` value that waives
+# stock gating: such an item (or bundle child) is never capacity-checked or
+# reserved.
+ALWAYS_AVAILABLE = "Always Available"
+
 RESERVED = "Reserved"
 FULFILLED = "Fulfilled"
 RELEASED = "Released"
@@ -743,7 +748,9 @@ def _resolve_bundle_components(item_code, qty, company, branch=None, default_war
 
 		child_policy = None
 		child_wh = None
+		child_mode = None
 		if child_context:
+			child_mode = child_context.get("availability_mode")
 			child_policy = child_context.get("production_policy")
 			child_wh = child_context.get("warehouse") or child_context.get("direct_retail_warehouse")
 		else:
@@ -751,11 +758,18 @@ def _resolve_bundle_components(item_code, qty, company, branch=None, default_war
 			child_policy_row = frappe.get_all(
 				"URY Item Production Configuration",
 				filters={"item": child_item, "active": 1},
-				fields=["production_policy", "direct_retail_warehouse", "production_unit", "department"],
+				fields=[
+					"production_policy",
+					"direct_retail_warehouse",
+					"production_unit",
+					"department",
+					"availability_mode",
+				],
 				limit=1,
 			)
 			if child_policy_row:
 				row = child_policy_row[0]
+				child_mode = row.get("availability_mode")
 				child_policy = row.get("production_policy")
 				if child_policy == POLICY_DIRECT_RETAIL:
 					child_wh = row.get("direct_retail_warehouse")
@@ -771,6 +785,12 @@ def _resolve_bundle_components(item_code, qty, company, branch=None, default_war
 					child_wh = frappe.db.get_value(
 						"URY Production Department", row["department"], "department_warehouse"
 					)
+
+		# An "Always Available" child is never stock-gated: it contributes no
+		# component to check or reserve. Its siblings still follow their own
+		# modes, so a short strictly-gated child still blocks the bundle.
+		if child_mode == ALWAYS_AVAILABLE:
+			continue
 
 		child_wh = child_wh or default_warehouse
 
@@ -880,9 +900,33 @@ def create_reservation(
 	_require_positive_qty(qty)
 	_require_scope(branch, company, warehouse, item_code, order_ref)
 
+	# Resolve the availability mode up front, before any Bin is locked. Callers
+	# that carry it in `frozen_context` (order reconciliation) supply it
+	# directly; a direct/legacy caller without one resolves it here,
+	# best-effort.
+	commit_department = (frozen_context or {}).get("department")
+	availability_mode = (frozen_context or {}).get("availability_mode")
+	if not availability_mode:
+		cfg = resolve_production_context(
+			item_code, branch, company=company, department=commit_department
+		)
+		if cfg:
+			availability_mode = cfg.get("availability_mode")
+
+	# An "Always Available" item is never stock-gated: no capacity check, no
+	# reservation rows, no Sales Plan commit. Order reconciliation already
+	# skips such lines; this guards direct callers. A BUNDLE is exempt here --
+	# `_resolve_bundle_components` drops its "Always Available" children and
+	# keeps its strictly-gated ones.
+	if availability_mode == ALWAYS_AVAILABLE and policy != POLICY_BUNDLE:
+		return {"reservation_group": None, "reservations": []}
+
 	components = _resolve_components(
 		item_code, qty, company, production_policy=policy, branch=branch, warehouse=warehouse
 	)
+	if not components:
+		# A bundle whose children are all "Always Available": nothing to reserve.
+		return {"reservation_group": None, "reservations": []}
 	components_sorted = sorted(
 		components,
 		key=lambda c: (c["component_item"], c.get("warehouse") or warehouse),
@@ -1002,20 +1046,10 @@ def create_reservation(
 	# component rows, which is not always possible (a MADE_TO_ORDER item's
 	# component rows never equal the top-level item/qty).
 	commit_qty = flt(qty)
-	commit_department = (frozen_context or {}).get("department")
 	# "Stock Available" is an availability mode, not a production policy: it
 	# bypasses Sales Plan gating at the availability layer and must therefore
 	# never touch the Sales Plan committed_qty/fulfilled_qty counters -- there
-	# is no plan commitment to track. Callers that carry the resolved mode in
-	# `frozen_context` (order reconciliation) supply it directly; a direct/
-	# legacy caller without one resolves it here, best-effort.
-	availability_mode = (frozen_context or {}).get("availability_mode")
-	if not availability_mode:
-		cfg = resolve_production_context(
-			item_code, branch, company=company, department=commit_department
-		)
-		if cfg:
-			availability_mode = cfg.get("availability_mode")
+	# is no plan commitment to track. `availability_mode` was resolved above.
 	if availability_mode == "Stock Available":
 		commit_result = None
 	else:

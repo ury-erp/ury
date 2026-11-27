@@ -19,7 +19,9 @@ from frappe.utils import flt
 from ury.ury.api.ury_availability import _resolve_production_config, get_item_availability
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.api.ury_reservation_service import (
+	ALWAYS_AVAILABLE,
 	FULFILLED,
+	POLICY_BUNDLE,
 	RESERVED,
 	create_reservation,
 	release_reservation,
@@ -318,6 +320,19 @@ def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, ac
 
 	for group in _active_groups(order_ref, item_code, reservation_line_key=line_key):
 		release_reservation(group, reason="Order acceptance line quantity reconciliation")
+
+	# An "Always Available" item is never stock-gated, so it holds no
+	# reservation (and therefore no Sales Plan commit): reserving it would
+	# fail on component shortfalls the availability layer deliberately
+	# waives, or consume capacity that strictly-gated items sharing the same
+	# components depend on. Any group left over from before the item was
+	# switched to this mode was released just above. A BUNDLE is exempt: its
+	# children each follow their own mode inside `create_reservation`.
+	if (
+		context.get("availability_mode") == ALWAYS_AVAILABLE
+		and context.production_policy != POLICY_BUNDLE
+	):
+		return None
 
 	frozen_context = {
 		"item_code": item_code,
