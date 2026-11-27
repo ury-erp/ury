@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, Trash2, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
@@ -567,21 +567,24 @@ export const SalesPlanPage: React.FC = () => {
   const totalHistoryQty = items.reduce((total, item) => total + item.average_qty, 0);
   const totalPlannedAmount = getPlanAmount(items);
 
-  // Real, backend-derived blockers: an item with no production unit assigned
-  // can't be routed for prep, and an item with zero comparable sample days
-  // has no history to base the suggested quantity on -- both come straight
-  // off the comparable-history response, nothing fabricated here.
-  const blockedItems = useMemo(() => {
-    const blocked = items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
-    // Blocking-severity items (missing production unit) surface before
-    // warning-severity ones (no comparable history) so the most actionable
-    // gaps show up first when the accordion opens.
-    return [...blocked].sort((a, b) => {
-      const aBlocking = a.production_unit === 'Unassigned' ? 0 : 1;
-      const bBlocking = b.production_unit === 'Unassigned' ? 0 : 1;
-      return aBlocking - bBlocking;
+  // Issues come from the backend (`item_issues` on `save_draft` / `get_plan`)
+  // and list only rows that would fail approval.
+  const issuesByItemCode = useMemo(() => {
+    const map = new Map<string, string[]>();
+    itemIssues.forEach((issue) => {
+      const list = map.get(issue.item_code) ?? [];
+      if (!list.includes(issue.message)) list.push(issue.message);
+      map.set(issue.item_code, list);
     });
-  }, [items]);
+    return map;
+  }, [itemIssues]);
+
+  const attentionRows = useMemo(
+    () => items
+      .filter((item) => issuesByItemCode.has(item.item_code))
+      .map((item) => ({ item, messages: issuesByItemCode.get(item.item_code)! })),
+    [items, issuesByItemCode],
+  );
 
   // Debounced catalog search -- searches ANY item for this branch, regardless
   // of whether it has comparable history, so zero-history items can be added.
@@ -760,7 +763,7 @@ export const SalesPlanPage: React.FC = () => {
   const dateHeading = relativeDateLabel ? `${relativeDateLabel} · ${absoluteDateLabel}` : absoluteDateLabel;
   const isPastPlanDate = dayDiffFromToday < 0;
 
-  const blockedItemCodes = useMemo(() => new Set(blockedItems.map((item) => item.item_code)), [blockedItems]);
+  const attentionRowKeys = useMemo(() => new Set(attentionRows.map((r) => r.item._rowKey)), [attentionRows]);
 
   const jumpToDepartment = (department: string) => {
     setCollapsedDepartments((current) => (current[department] ? { ...current, [department]: false } : current));
@@ -815,6 +818,9 @@ export const SalesPlanPage: React.FC = () => {
   // this. `planStatus === null` covers a plan that hasn't been saved yet at
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
+  const showAttention =
+    attentionRows.length > 0 &&
+    (planStatus === null || ['Draft', 'Proposed', 'Submitted for Approval'].includes(planStatus));
 
   const refreshProductionPlanStates = async (name: string) => {
     try {
@@ -1232,15 +1238,15 @@ export const SalesPlanPage: React.FC = () => {
           { label: __('Planned Qty'), value: formatQty(totalPlannedQty) },
           { label: __('History Avg'), value: formatQty(totalHistoryQty) },
           { label: __('Items'), value: items.length },
-          ...(blockedItems.length > 0
-            ? [{ label: __('Blocked'), value: blockedItems.length, tone: 'warning' as const }]
+          ...(showAttention
+            ? [{ label: __('Blocked'), value: attentionRows.length, tone: 'warning' as const }]
             : []),
           { label: __('Planned Amount'), value: formatMoney(totalPlannedAmount) },
         ]}
         />
       </Section>
 
-      {!loading && !error && blockedItems.length > 0 && (
+      {!loading && !error && showAttention && (
         <Section>
           <Card padding="none" variant="outlined" className="overflow-hidden rounded-[9px] border shadow-none">
             <button
@@ -1254,33 +1260,25 @@ export const SalesPlanPage: React.FC = () => {
                 {attentionExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 <span className="text-[12.5px] font-semibold text-foreground">{__('Needs Attention')}</span>
                 <Badge variant="secondary" size="sm">
-                  {blockedItems.length}
+                  {attentionRows.length}
                 </Badge>
               </span>
             </button>
             <div id="needs-attention-panel" hidden={!attentionExpanded}>
               <div className="divide-y divide-border border-t border-border">
-                {blockedItems.map((item) => {
-                  const missingProductionUnit = item.production_unit === 'Unassigned';
-                  return (
-                    <AttentionItem
-                      key={item.item_code}
-                      severity={missingProductionUnit ? 'blocking' : 'warning'}
-                      title={item.item_name || item.item_code}
-                      detail={
-                        missingProductionUnit
-                          ? 'No production unit assigned'
-                          : 'No comparable sales history for this weekday'
-                      }
-                      action={{
-                        label: __('View item'),
-                        onClick: () => {
-                          setSelectedItemDetailCode(item.item_code);
-                        },
-                      }}
-                    />
-                  );
-                })}
+                {attentionRows.map(({ item, messages }) => (
+                  <AttentionItem
+                    key={item._rowKey}
+                    severity="blocking"
+                    title={item.item_name || item.item_code}
+                    detail={messages.length === 1 ? messages[0] : (
+                      <ul className="list-disc ps-4">{messages.map((m) => <li key={m}>{m}</li>)}</ul>
+                    )}
+                    amount={item.item_code}
+                    action={{ label: __('View item'), onClick: () => setSelectedItemDetailCode(item.item_code) }}
+                    secondaryAction={isEditable ? { label: __('Remove'), onClick: () => requestRemoveItem(item._rowKey) } : undefined}
+                  />
+                ))}
               </div>
             </div>
           </Card>
@@ -1364,7 +1362,7 @@ export const SalesPlanPage: React.FC = () => {
             const shownDepartmentItems = isTruncated
               ? visibleDepartmentItems.slice(0, ROW_TRUNCATE_LIMIT)
               : visibleDepartmentItems;
-            const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
+            const departmentIssueCount = departmentItems.filter((item) => attentionRowKeys.has(item._rowKey)).length;
             const productionState = getDepartmentProductionState(department);
 
             // Next row (in the full filtered set) after the last currently
@@ -1377,7 +1375,7 @@ export const SalesPlanPage: React.FC = () => {
 
             // Widths are fixed so columns line up across every department table.
             // Column order: Item / History Insight / Production Unit / Plan
-            // (inserted via editableColumnIndex below) / Variance.
+            // (inserted via editableColumnIndex below) / Variance / Remove.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
                 key: 'item_code',
@@ -1431,6 +1429,23 @@ export const SalesPlanPage: React.FC = () => {
                     </span>
                   );
                 },
+              },
+              {
+                key: 'remove',
+                header: '',
+                align: 'right',
+                width: '5%',
+                render: (row) => isEditable ? (
+                  <Button
+                    variant="ghost"
+                    size="compactSm"
+                    onClick={() => requestRemoveItem(row._rowKey)}
+                    disabled={saving}
+                    aria-label={__('Remove {0}', [row.item_name || row.item_code])}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null,
               },
             ];
 
@@ -1591,7 +1606,7 @@ export const SalesPlanPage: React.FC = () => {
                         key: 'planned_qty',
                         header: __('Plan'),
                         align: 'right',
-                        width: '22%',
+                        width: '17%',
                         min: 0,
                         step: 0.01,
                         getValue: (row) => row.planned_qty,

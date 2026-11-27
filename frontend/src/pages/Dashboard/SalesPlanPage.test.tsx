@@ -29,6 +29,7 @@ vi.mock('../../services/salesPlan', async (importOriginal) => {
       searchBranchItems: vi.fn(),
       getPlanStatus: vi.fn(),
       transitionPlan: vi.fn(),
+      getPlan: vi.fn(),
     },
   };
 });
@@ -243,6 +244,12 @@ describe('SalesPlanPage', () => {
       ],
     };
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(manyBlocked as any);
+    // Needs Attention is driven by backend `item_issues`, not client-side rules.
+    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+    vi.mocked(salesPlanService.getPlan).mockResolvedValue({
+      items: manyBlocked.items.map((i: any) => ({ item_code: i.item_code, item_name: i.item_name, planned_qty: 5 })),
+      item_issues: ['ITEM-003', 'ITEM-004', 'ITEM-005', 'ITEM-006'].map((item_code) => ({ item_code, message: 'Issue for ' + item_code })),
+    } as any);
 
     render(<SalesPlanPage />);
 
@@ -419,6 +426,11 @@ describe('SalesPlanPage', () => {
       ],
     };
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withBlocked as any);
+    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+    vi.mocked(salesPlanService.getPlan).mockResolvedValue({
+      items: withBlocked.items.map((i: any) => ({ item_code: i.item_code, item_name: i.item_name, planned_qty: 5 })),
+      item_issues: [{ item_code: 'ITEM-900', message: 'Not on the menu' }],
+    } as any);
 
     render(<SalesPlanPage />);
     await screen.findByText('Chicken Biryani');
