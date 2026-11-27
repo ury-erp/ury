@@ -48,3 +48,4 @@ ury.patches.v3_43.add_network_printer_settings_queue_name
 ury.patches.v3_44.backfill_wastage_datetime
 ury.patches.v3_45.backfill_sales_plan_rates
 ury.patches.v3_47.add_department_head_role_permissions
+ury.patches.v3_46.create_auto_manufacture_entry_type

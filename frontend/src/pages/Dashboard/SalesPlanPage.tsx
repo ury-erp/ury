@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, Trash2, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
@@ -13,11 +13,12 @@ import {
   buildSalesPlanDraftKey,
   ComparableHistoryItem,
   ComparableHistoryResponse,
+  buildItemsFromSavedPlan,
   getPlanAmount,
   getSalesPlanDraftQuantities,
-  mergeSavedPlanRows,
   salesPlanService,
   type SalesPlanDocRow,
+  type SalesPlanItemIssue,
   type DepartmentProductionPlanState,
   type SalesPlanProductionStatesResponse,
   SalesPlanItem,
@@ -314,6 +315,9 @@ export const SalesPlanPage: React.FC = () => {
   const [ppSubmitBusyDepartment, setPpSubmitBusyDepartment] = useState<string | null>(null);
   // Prepare Production confirmation — ConfirmDialog instead of window.confirm.
   const [prepareConfirmDepartment, setPrepareConfirmDepartment] = useState<string | null>(null);
+  // Backend-reported problems with saved plan items, and the row pending removal.
+  const [itemIssues, setItemIssues] = useState<SalesPlanItemIssue[]>([]);
+  const [removeConfirmRowKeys, setRemoveConfirmRowKeys] = useState<string[] | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -390,6 +394,7 @@ export const SalesPlanPage: React.FC = () => {
     setTransitionError(null);
     setHistoryScope(null);
     setPlanName(null);
+    setItemIssues([]);
     setPlanStatus(null);
     setSupersededPlanName(null);
 
@@ -438,19 +443,17 @@ export const SalesPlanPage: React.FC = () => {
             }
 
             // Once a plan exists, the plan -- not comparable history -- is
-            // what says which items are being produced and how many. History
-            // only ever supplied the suggestion. A plan can legitimately hold
-            // rows history knows nothing about, and a branch with an empty
-            // history window returns no suggestions at all while its plan is
-            // full; in both cases the grid would otherwise render empty, and
-            // with it every department section and Production Plan panel keyed
-            // off the item list.
+            // what says which items are being produced and how many. The
+            // saved plan replaces the history list (it does not overlay it);
+            // history only supplies figures for rows the plan holds. This
+            // also covers an empty plan: the saved plan is the truth.
             if (status.name && !cancelled) {
               try {
                 const planDoc = await salesPlanService.getPlan(status.name);
                 const planRows = (planDoc?.items as SalesPlanDocRow[] | undefined) || [];
-                if (!cancelled && planRows.length) {
-                  setItems((current) => mergeSavedPlanRows(current, planRows));
+                if (!cancelled) {
+                  setItems(buildItemsFromSavedPlan(history.items, planRows));
+                  setItemIssues((planDoc?.item_issues as SalesPlanItemIssue[] | undefined) || []);
                 }
               } catch (planErr) {
                 // Non-fatal: the history-derived view is still usable, and
@@ -508,21 +511,24 @@ export const SalesPlanPage: React.FC = () => {
   const totalHistoryQty = items.reduce((total, item) => total + item.average_qty, 0);
   const totalPlannedAmount = getPlanAmount(items);
 
-  // Real, backend-derived blockers: an item with no production unit assigned
-  // can't be routed for prep, and an item with zero comparable sample days
-  // has no history to base the suggested quantity on -- both come straight
-  // off the comparable-history response, nothing fabricated here.
-  const blockedItems = useMemo(() => {
-    const blocked = items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
-    // Blocking-severity items (missing production unit) surface before
-    // warning-severity ones (no comparable history) so the most actionable
-    // gaps show up first when the accordion opens.
-    return [...blocked].sort((a, b) => {
-      const aBlocking = a.production_unit === 'Unassigned' ? 0 : 1;
-      const bBlocking = b.production_unit === 'Unassigned' ? 0 : 1;
-      return aBlocking - bBlocking;
+  // Issues come from the backend (`item_issues` on `save_draft` / `get_plan`)
+  // and list only rows that would fail approval.
+  const issuesByItemCode = useMemo(() => {
+    const map = new Map<string, string[]>();
+    itemIssues.forEach((issue) => {
+      const list = map.get(issue.item_code) ?? [];
+      if (!list.includes(issue.message)) list.push(issue.message);
+      map.set(issue.item_code, list);
     });
-  }, [items]);
+    return map;
+  }, [itemIssues]);
+
+  const attentionRows = useMemo(
+    () => items
+      .filter((item) => issuesByItemCode.has(item.item_code))
+      .map((item) => ({ item, messages: issuesByItemCode.get(item.item_code)! })),
+    [items, issuesByItemCode],
+  );
 
   // Debounced catalog search -- searches ANY item for this branch, regardless
   // of whether it has comparable history, so zero-history items can be added.
@@ -633,15 +639,58 @@ export const SalesPlanPage: React.FC = () => {
     )));
   };
 
-  const saveDraft = async () => {
+  const saveDraft = () => {
+    void persistDraft(items);
+  };
+
+  // Ignored while a save is in flight so two removals never race each other.
+  const requestRemoveItems = (rowKeys: string[]) => {
+    if (saving || rowKeys.length === 0) return;
+    setRemoveConfirmRowKeys(rowKeys);
+  };
+
+  const requestRemoveItem = (rowKey: string) => requestRemoveItems([rowKey]);
+
+  const removeItems = async (rowKeys: string[]) => {
+    const previous = items;
+    const keySet = new Set(rowKeys);
+    const targets = previous.filter((item) => keySet.has(item._rowKey));
+    if (targets.length === 0) return;
+    setHighlightedItemCode((current) => (current && keySet.has(current) ? null : current));
+
+    if (isEditable) {
+      const next = previous.filter((item) => !keySet.has(item._rowKey));
+      setItems(next);
+      const ok = await persistDraft(next);
+      if (!ok) setItems(previous);
+      return;
+    }
+
+    // save_draft is Draft-only by design, so later states remove through
+    // remove_plan_items, which matches rows by item code.
+    const codes = new Set(targets.map((item) => item.item_code));
+    setItems(previous.filter((item) => !codes.has(item.item_code)));
+    setSaving(true);
+    try {
+      const result = await salesPlanService.removePlanItems({ name: planName!, item_codes: [...codes] });
+      setItemIssues(result.item_issues || []);
+    } catch (err) {
+      setItems(previous);
+      showToast.error(describeSalesPlanApiError(err, 'Unable to remove items from this Sales Plan.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const persistDraft = async (nextItems: SalesPlanItem[]): Promise<boolean> => {
     setSaving(true);
     // Immediate/offline fallback -- gives instant UI feedback even if the
     // HTTP save below fails or is slow.
-    saveSalesPlanDraftQuantities(draftKey, items);
+    saveSalesPlanDraftQuantities(draftKey, nextItems);
 
     if (!historyScope?.branch || !historyScope?.plan_date) {
       setSaving(false);
-      return;
+      return false;
     }
 
     try {
@@ -649,13 +698,16 @@ export const SalesPlanPage: React.FC = () => {
         plan_date: historyScope.plan_date,
         branch: historyScope.branch,
         company: historyScope.company,
-        items: items.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
+        items: nextItems.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
         enforcement_mode: enforcementMode,
       });
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
+      setItemIssues(result.item_issues || []);
+      return true;
     } catch (err) {
       showToast.error(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -682,7 +734,7 @@ export const SalesPlanPage: React.FC = () => {
   const dateHeading = relativeDateLabel ? `${relativeDateLabel} · ${absoluteDateLabel}` : absoluteDateLabel;
   const isPastPlanDate = dayDiffFromToday < 0;
 
-  const blockedItemCodes = useMemo(() => new Set(blockedItems.map((item) => item.item_code)), [blockedItems]);
+  const attentionRowKeys = useMemo(() => new Set(attentionRows.map((r) => r.item._rowKey)), [attentionRows]);
 
   const jumpToDepartment = (department: string) => {
     setCollapsedDepartments((current) => (current[department] ? { ...current, [department]: false } : current));
@@ -737,6 +789,13 @@ export const SalesPlanPage: React.FC = () => {
   // this. `planStatus === null` covers a plan that hasn't been saved yet at
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
+  // Removal stays open until approval; after Draft only the workflow edit role may remove.
+  const canRemove =
+    isEditable ||
+    ((planStatus === 'Proposed' || planStatus === 'Submitted for Approval') && roles.includes('URY Sales Plan Controller'));
+  const showAttention =
+    attentionRows.length > 0 &&
+    (planStatus === null || ['Draft', 'Proposed', 'Submitted for Approval'].includes(planStatus));
 
   const refreshProductionPlanStates = async (name: string) => {
     try {
@@ -1173,55 +1232,59 @@ export const SalesPlanPage: React.FC = () => {
           { label: __('Planned Qty'), value: formatQty(totalPlannedQty) },
           { label: __('History Avg'), value: formatQty(totalHistoryQty) },
           { label: __('Items'), value: items.length },
-          ...(blockedItems.length > 0
-            ? [{ label: __('Blocked'), value: blockedItems.length, tone: 'warning' as const }]
+          ...(showAttention
+            ? [{ label: __('Blocked'), value: attentionRows.length, tone: 'warning' as const }]
             : []),
           { label: __('Planned Amount'), value: formatMoney(totalPlannedAmount) },
         ]}
         />
       </Section>
 
-      {!loading && !error && blockedItems.length > 0 && (
+      {!loading && !error && showAttention && (
         <Section>
           <Card padding="none" variant="outlined" className="overflow-hidden rounded-[9px] border shadow-none">
-            <button
-              type="button"
-              onClick={() => setAttentionExpanded((current) => !current)}
-              aria-expanded={attentionExpanded}
-              aria-controls="needs-attention-panel"
-              className="flex w-full items-center justify-between gap-2 px-3 py-[9px] text-start hover:bg-muted/60"
-            >
-              <span className="flex items-center gap-2">
+            {/* Remove all is a sibling of the toggle (a button cannot nest a button) so it sits in the header row. */}
+            <div className="flex items-center gap-2 pe-3 hover:bg-muted/60">
+              <button
+                type="button"
+                onClick={() => setAttentionExpanded((current) => !current)}
+                aria-expanded={attentionExpanded}
+                aria-controls="needs-attention-panel"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-[9px] text-start"
+              >
                 {attentionExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 <span className="text-[12.5px] font-semibold text-foreground">{__('Needs Attention')}</span>
                 <Badge variant="secondary" size="sm">
-                  {blockedItems.length}
+                  {attentionRows.length}
                 </Badge>
-              </span>
-            </button>
+              </button>
+              {canRemove && attentionExpanded && (
+                <Button
+                  variant="ghost"
+                  size="compactSm"
+                  className="text-destructive"
+                  onClick={() => requestRemoveItems(attentionRows.map((r) => r.item._rowKey))}
+                  disabled={saving}
+                >
+                  {__('Remove all')}
+                </Button>
+              )}
+            </div>
             <div id="needs-attention-panel" hidden={!attentionExpanded}>
               <div className="divide-y divide-border border-t border-border">
-                {blockedItems.map((item) => {
-                  const missingProductionUnit = item.production_unit === 'Unassigned';
-                  return (
-                    <AttentionItem
-                      key={item.item_code}
-                      severity={missingProductionUnit ? 'blocking' : 'warning'}
-                      title={item.item_name || item.item_code}
-                      detail={
-                        missingProductionUnit
-                          ? 'No production unit assigned'
-                          : 'No comparable sales history for this weekday'
-                      }
-                      action={{
-                        label: __('View item'),
-                        onClick: () => {
-                          setSelectedItemDetailCode(item.item_code);
-                        },
-                      }}
-                    />
-                  );
-                })}
+                {attentionRows.map(({ item, messages }) => (
+                  <AttentionItem
+                    key={item._rowKey}
+                    severity="blocking"
+                    title={item.item_name || item.item_code}
+                    detail={messages.length === 1 ? messages[0] : (
+                      <ul className="list-disc ps-4">{messages.map((m) => <li key={m}>{m}</li>)}</ul>
+                    )}
+                    amount={item.item_code}
+                    action={{ label: __('View item'), onClick: () => setSelectedItemDetailCode(item.item_code) }}
+                    secondaryAction={canRemove ? { label: __('Remove'), onClick: () => requestRemoveItem(item._rowKey) } : undefined}
+                  />
+                ))}
               </div>
             </div>
           </Card>
@@ -1305,7 +1368,7 @@ export const SalesPlanPage: React.FC = () => {
             const shownDepartmentItems = isTruncated
               ? visibleDepartmentItems.slice(0, ROW_TRUNCATE_LIMIT)
               : visibleDepartmentItems;
-            const departmentIssueCount = departmentItems.filter((item) => blockedItemCodes.has(item.item_code)).length;
+            const departmentIssueCount = departmentItems.filter((item) => attentionRowKeys.has(item._rowKey)).length;
             const productionState = getDepartmentProductionState(department);
 
             // Next row (in the full filtered set) after the last currently
@@ -1318,7 +1381,7 @@ export const SalesPlanPage: React.FC = () => {
 
             // Widths are fixed so columns line up across every department table.
             // Column order: Item / History Insight / Production Unit / Plan
-            // (inserted via editableColumnIndex below) / Variance.
+            // (inserted via editableColumnIndex below) / Variance / Remove.
             const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
               {
                 key: 'item_code',
@@ -1372,6 +1435,23 @@ export const SalesPlanPage: React.FC = () => {
                     </span>
                   );
                 },
+              },
+              {
+                key: 'remove',
+                header: '',
+                align: 'right',
+                width: '5%',
+                render: (row) => canRemove ? (
+                  <Button
+                    variant="ghost"
+                    size="compactSm"
+                    onClick={() => requestRemoveItem(row._rowKey)}
+                    disabled={saving}
+                    aria-label={__('Remove {0}', [row.item_name || row.item_code])}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                ) : null,
               },
             ];
 
@@ -1548,7 +1628,7 @@ export const SalesPlanPage: React.FC = () => {
                         key: 'planned_qty',
                         header: __('Plan'),
                         align: 'right',
-                        width: '22%',
+                        width: '17%',
                         min: 0,
                         step: 0.01,
                         getValue: (row) => row.planned_qty,
@@ -1704,6 +1784,31 @@ export const SalesPlanPage: React.FC = () => {
         loadingLabel="Preparing…"
         isSubmitting={ppPrepareBusyDepartment === prepareConfirmDepartment && prepareConfirmDepartment !== null}
         onConfirm={confirmPrepareDepartmentProduction}
+      />
+
+      <ConfirmDialog
+        open={removeConfirmRowKeys !== null}
+        onOpenChange={(open) => {
+          if (!open && !saving) setRemoveConfirmRowKeys(null);
+        }}
+        title={removeConfirmRowKeys && removeConfirmRowKeys.length > 1 ? __('Remove {0} items?', [removeConfirmRowKeys.length]) : __('Remove item?')}
+        description={(() => {
+          const keys = removeConfirmRowKeys ?? [];
+          if (keys.length > 1) {
+            return `Remove all ${keys.length} items listed in Needs Attention from this Sales Plan? The plan is saved immediately.`;
+          }
+          const target = items.find((item) => item._rowKey === keys[0]);
+          return `Remove ${target ? target.item_name || target.item_code : 'this item'} from this Sales Plan? The plan is saved immediately.`;
+        })()}
+        cancelLabel={__('Cancel')}
+        confirmLabel={removeConfirmRowKeys && removeConfirmRowKeys.length > 1 ? __('Remove all') : __('Remove')}
+        loadingLabel="Removing…"
+        isSubmitting={saving}
+        onConfirm={() => {
+          const keys = removeConfirmRowKeys;
+          setRemoveConfirmRowKeys(null);
+          if (keys?.length) void removeItems(keys);
+        }}
       />
     </Page>
   );

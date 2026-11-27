@@ -519,13 +519,30 @@ class TestStockEntryType(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
 			f"{MODULE}._find_existing_stock_entry", return_value=None
-		), patch(f"{MODULE}._service_mutation") as mock_mutation:
+		), patch(f"{MODULE}._service_mutation") as mock_mutation, patch(
+			f"{MODULE}.frappe.db.get_value", return_value="Manufacture"
+		):
 			mock_mutation.return_value.__enter__ = MagicMock()
 			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
 			_submit_stock_entry(intent, payload)
 
-		self.assertEqual(captured["doc"]["stock_entry_type"], "Manufacture")
+		self.assertEqual(captured["doc"]["stock_entry_type"], "Automated Manufacture")
 		self.assertEqual(captured["doc"]["purpose"], "Manufacture")
+
+	def test_auto_manufacture_type_falls_back_when_unavailable(self):
+		from ury.ury.api.ury_fulfilment_posting_service import ensure_auto_manufacture_entry_type
+
+		with patch(f"{MODULE}.frappe.db.get_value", side_effect=Exception("boom")), patch(
+			f"{MODULE}.frappe.log_error"
+		) as log_error:
+			self.assertEqual(ensure_auto_manufacture_entry_type(), "Manufacture")
+		log_error.assert_called_once()
+
+	def test_auto_manufacture_type_falls_back_on_wrong_purpose(self):
+		from ury.ury.api.ury_fulfilment_posting_service import ensure_auto_manufacture_entry_type
+
+		with patch(f"{MODULE}.frappe.db.get_value", return_value="Material Issue"):
+			self.assertEqual(ensure_auto_manufacture_entry_type(), "Manufacture")
 
 	def test_submit_stock_entry_refuses_a_non_made_to_order_payload(self):
 		"""The pipeline only ever emits Manufacture entries. The old
@@ -605,6 +622,8 @@ class TestProcessPostingIntent(FrappeTestCase):
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=lambda doctype, **kwargs: []), patch(
+			f"{MODULE}.ensure_auto_manufacture_entry_type", return_value="Automated Manufacture"
+		), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=None
 		), patch(f"{MODULE}.fulfil_reservation_if_pending") as fulfil, patch(
 			f"{MODULE}.now", return_value="2026-09-04 10:00:00"
@@ -706,6 +725,8 @@ class TestProcessPostingIntent(FrappeTestCase):
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+			f"{MODULE}.ensure_auto_manufacture_entry_type", return_value="Automated Manufacture"
+		), patch(
 			f"{MODULE}.fulfil_reservation_if_pending"
 		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
 			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")

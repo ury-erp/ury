@@ -18,6 +18,11 @@ export interface AttentionItemProps {
     label: string
     onClick: () => void
   }
+  /** Optional second button, rendered before `action` with the same style. */
+  secondaryAction?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 const severityBarColorMap: Record<Severity, string> = {
@@ -27,7 +32,7 @@ const severityBarColorMap: Record<Severity, string> = {
 }
 
 const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
-  ({ severity, title, detail, amount, action }, ref) => {
+  ({ severity, title, detail, amount, action, secondaryAction }, ref) => {
     return (
       <div
         ref={ref}
@@ -64,8 +69,21 @@ const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
               {amount}
             </span>
           )}
+          {secondaryAction && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                secondaryAction.onClick()
+              }}
+              className={buttonVariants({ variant: "chrome", size: "compact" })}
+            >
+              {secondaryAction.label}
+            </button>
+          )}
           {action && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 action.onClick()

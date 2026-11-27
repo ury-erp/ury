@@ -42,10 +42,26 @@ def retry_print_job(print_job_id: str, target_printer: str = None) -> dict:
 
     printer_doc = frappe.get_doc("Network Printer Settings", printer_name)
     extra_meta = {
-        "retry_of": print_job_id,
-        "invoice": invoice,
-        "job_type": job.get("job_type", "BILL"),
+        key: job.get(key)
+        for key in (
+            "reference_doctype",
+            "reference_name",
+            "production",
+            "pos_profile",
+            "job_owner",
+            "restaurant_table",
+            "table",
+            "print_format",
+        )
+        if job.get(key) is not None
     }
+    extra_meta.update(
+        {
+            "retry_of": print_job_id,
+            "invoice": invoice,
+            "job_type": job.get("job_type", "BILL"),
+        }
+    )
 
     result = printer_doc.print_file(
         file_path=file_path,

@@ -15,7 +15,11 @@ from frappe.model.workflow import (
 
 from ury.ury.api.ury_bom_compiler import build_demand_vector
 from ury.ury.api.ury_production_context import resolve_production_context
-from ury.ury.api.ury_production_validation import validate_item_production_configuration
+from ury.ury.api.ury_production_validation import (
+    CONFIG_DOCTYPE,
+    collect_item_production_issue,
+    validate_item_production_configuration,
+)
 
 
 #: Targets that move a plan backward (out of its forward-only approval path)
@@ -248,6 +252,30 @@ def prune_zero_qty_rows(doc):
         doc.set("items", kept)
 
 
+def get_off_menu_items(branch, item_codes):
+    """Return the subset of item_codes not on any enabled URY Menu of branch.
+
+    Empty set when require_active_menu_for_planning is off, branch is empty
+    or item_codes is empty. Shared by validate_items_on_active_menu (approval
+    gate) and collect_plan_item_issues (draft-time reporting) so both apply
+    the same menu rule.
+    """
+    from ury.ury.api.ury_production_settings import require_active_menu_for_planning
+
+    codes = {code for code in (item_codes or []) if code}
+    if not branch or not codes or not require_active_menu_for_planning():
+        return set()
+    menus = frappe.get_all("URY Menu", filters={"branch": branch, "enabled": 1}, pluck="name")
+    on_menu = set(
+        frappe.get_all(
+            "URY Menu Item",
+            filters={"item": ["in", list(codes)], "disabled": 0, "parent": ["in", menus or [""]]},
+            pluck="item",
+        )
+    )
+    return codes - on_menu
+
+
 def validate_items_on_active_menu(doc, strict=True):
     """Sales Plan takes sellable items only. An item's URY Menu membership for
     this branch is the single source of truth for "sellable" here -- it is
@@ -258,23 +286,8 @@ def validate_items_on_active_menu(doc, strict=True):
     "is sub-assembly" flag is needed. Controlled by setting
     require_active_menu_for_planning (default on).
     """
-    from ury.ury.api.ury_production_settings import require_active_menu_for_planning
-
-    if not require_active_menu_for_planning() or not doc.get("branch"):
-        return
     codes = [r.get("item_code") for r in (doc.get("items") or []) if flt(r.get("qty")) > 0 and r.get("item_code")]
-    if not codes:
-        return
-    sellable = set(codes)
-    menus = frappe.get_all("URY Menu", filters={"branch": doc.get("branch"), "enabled": 1}, pluck="name")
-    on_menu = set(
-        frappe.get_all(
-            "URY Menu Item",
-            filters={"item": ["in", list(sellable)], "disabled": 0, "parent": ["in", menus or [""]]},
-            pluck="item",
-        )
-    )
-    missing = sorted(sellable - on_menu)
+    missing = sorted(get_off_menu_items(doc.get("branch"), codes))
     if missing:
         message = _(
             "Not on an active menu for {0}: {1}. Add them to the branch menu or remove them from the plan."
@@ -309,6 +322,49 @@ def validate_plan_items(doc):
         if not row.get("qty"):
             continue
         validate_item_production_configuration(item_code, doc.get("branch"))
+
+
+#: Statuses in which item issues are still actionable (before approval freezes the plan).
+ISSUE_STATUSES = ("Draft", "Proposed", "Submitted for Approval")
+
+
+def collect_plan_item_issues(doc):
+    """List the items that would fail the Approved transition.
+
+    Mirrors the approval checks (validate_items_on_active_menu(strict=True)
+    and validate_plan_items) without raising: only rows with qty > 0 are
+    evaluated, because approval prunes qty 0 rows. Returns a list of
+    {"item_code", "code", "message"} dicts, at most one per item and code.
+    """
+    branch = doc.get("branch")
+    if not branch or (doc.get("status") or "Draft") not in ISSUE_STATUSES:
+        return []
+
+    codes = list(dict.fromkeys(
+        row.get("item_code")
+        for row in (doc.get("items") or [])
+        if row.get("item_code") and flt(row.get("qty")) > 0
+    ))
+    off_menu = get_off_menu_items(branch, codes)
+    # The config validator requires read on its doctype and raises otherwise.
+    # A user who cannot read it must still be able to save and load a Draft;
+    # approval remains the hard gate for them.
+    can_read_config = frappe.has_permission(CONFIG_DOCTYPE, "read")
+
+    issues = []
+    for code in codes:
+        if code in off_menu:
+            issues.append({
+                "item_code": code,
+                "code": "off_menu",
+                "message": _(
+                    "Not on an active menu for {0}. Add it to the branch menu or remove it from the plan."
+                ).format(branch),
+            })
+        message = collect_item_production_issue(code, branch) if can_read_config else None
+        if message:
+            issues.append({"item_code": code, "code": "production_config", "message": message})
+    return issues
 
 
 #: The Workflow states reachable by a forward hop out of "Draft" -- the point
@@ -477,7 +533,7 @@ def snapshot_item(row):
     return {key: row.get(key) for key in ("item_code", "qty", "stock_uom", "department", "production_unit", "production_policy", "bom", "bom_revision")}
 
 
-def append_audit(doc, from_state, to_state, actor, reason=None):
+def append_audit(doc, from_state, to_state, actor, reason=None, details=None):
     audits = doc.get("audit_log") or []
     # audit_log is a Long Text (JSON) field: once a plan has gone through one
     # transition and been saved, the stored value is a JSON string, not a
@@ -496,6 +552,8 @@ def append_audit(doc, from_state, to_state, actor, reason=None):
     }
     if reason:
         entry["reason"] = reason
+    if details:
+        entry.update(details)
     audits.append(entry)
     doc.audit_log = audits
 
@@ -622,6 +680,7 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
         "name": doc.name,
         "status": doc.status,
         "expected_sales_amount": doc.expected_sales_amount,
+        "item_issues": collect_plan_item_issues(doc),
     }
 
 
@@ -661,7 +720,69 @@ def get_plan(name):
     if not frappe.has_permission("URY Sales Plan", "read", doc=name):
         frappe.throw(_("Not permitted to read this Sales Plan"), frappe.PermissionError)
 
-    return frappe.get_doc("URY Sales Plan", name).as_dict()
+    doc = frappe.get_doc("URY Sales Plan", name)
+    data = doc.as_dict()
+    data["item_issues"] = collect_plan_item_issues(doc)
+    return data
+
+
+#: Statuses in which items may still be removed (docstatus 0, before approval freezes the plan).
+REMOVABLE_STATUSES = ("Draft", "Proposed", "Submitted for Approval")
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_plan_items(name, item_codes):
+    """Remove every row for the given item codes from a plan that is not yet approved.
+
+    save_draft is Draft-only by design; this is the one audited edit allowed
+    in Proposed and Submitted for Approval. Rows are matched by item_code
+    because the page does not reload row names after a transition.
+    """
+    codes = set(frappe.parse_json(item_codes) if isinstance(item_codes, str) else (item_codes or []))
+    doc = frappe.get_doc("URY Sales Plan", name)
+    if not frappe.has_permission("URY Sales Plan", "write", doc=doc):
+        frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
+    if doc.status not in REMOVABLE_STATUSES or doc.docstatus != 0:
+        frappe.throw(
+            _("Items can only be removed before the Sales Plan is approved (current status: {0})").format(doc.status),
+            frappe.ValidationError,
+        )
+    _require_state_edit_role(doc)
+
+    removed = sorted({row.item_code for row in doc.items if row.item_code in codes})
+    if not removed:
+        frappe.throw(_("None of these items are on Sales Plan {0}").format(doc.name), frappe.ValidationError)
+
+    doc.set("items", [row for row in doc.items if row.item_code not in codes])
+    append_audit(
+        doc, doc.status, doc.status, frappe.session.user,
+        details={"action": "Remove Items", "items": removed},
+    )
+    # validate() only serialises audit_log on a status change; this save keeps the status.
+    doc.audit_log = json.dumps(doc.audit_log)
+    doc.save()
+
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "expected_sales_amount": doc.expected_sales_amount,
+        "item_issues": collect_plan_item_issues(doc),
+        "removed": removed,
+    }
+
+
+def _require_state_edit_role(doc):
+    """Enforce the workflow's allow_edit role for the plan's current state."""
+    workflow_name = get_workflow_name(doc.doctype)
+    if not workflow_name:
+        return
+    states = frappe.get_doc("Workflow", workflow_name).states
+    allow_edit = next((s.allow_edit for s in states if s.state == doc.status), None)
+    if allow_edit and allow_edit not in frappe.get_roles():
+        frappe.throw(
+            _("Only {0} can remove items from a {1} Sales Plan").format(allow_edit, doc.status),
+            frappe.PermissionError,
+        )
 
 
 @frappe.whitelist(methods=["GET"])
