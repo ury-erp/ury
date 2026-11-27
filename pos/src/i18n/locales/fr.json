@@ -64,6 +64,9 @@
   "order": {
     "select_to_view": "Sélectionnez une commande pour voir les détails",
     "items_title": "Articles de la commande",
+    "change_type_title": "Changer le type de commande ?",
+    "change_type_message": "Passer à {{type}} efface cette commande. Articles dans le panier : {{count}}.",
+    "change_type_confirm": "Effacer et changer",
     "taxes_charges": "Taxes et frais",
     "cancel_order": "Annuler la commande",
     "enter_cancel_reason": "Saisir le motif d'annulation",

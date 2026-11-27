@@ -64,6 +64,9 @@
   "order": {
     "select_to_view": "Selecciona un pedido para ver el detalle",
     "items_title": "Artículos del pedido",
+    "change_type_title": "¿Cambiar el tipo de pedido?",
+    "change_type_message": "Cambiar a {{type}} vacía este pedido. Artículos en el carrito: {{count}}.",
+    "change_type_confirm": "Vaciar y cambiar",
     "taxes_charges": "Impuestos y cargos",
     "cancel_order": "Cancelar pedido",
     "enter_cancel_reason": "Ingresa el motivo de cancelación",
