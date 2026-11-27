@@ -296,6 +296,8 @@ export interface SaveSalesPlanDraftResponse {
   item_issues?: SalesPlanItemIssue[];
 }
 
+export type RemovePlanItemsResponse = SaveSalesPlanDraftResponse & { removed?: string[] };
+
 export interface TransitionSalesPlanParams {
   name: string;
   target_state: string;
@@ -435,6 +437,14 @@ export const salesPlanService = {
       },
     );
     return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
+  async removePlanItems(params: { name: string; item_codes: string[] }): Promise<RemovePlanItemsResponse> {
+    const res = await call.post<RemovePlanItemsResponse>(
+      'ury.ury.api.ury_sales_plan.remove_plan_items',
+      { name: params.name, item_codes: params.item_codes },
+    );
+    return ((res as { message?: RemovePlanItemsResponse } | undefined)?.message ?? res) as RemovePlanItemsResponse;
   },
 
   async transitionPlan(params: TransitionSalesPlanParams): Promise<SaveSalesPlanDraftResponse> {

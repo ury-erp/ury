@@ -373,7 +373,7 @@ export const SalesPlanPage: React.FC = () => {
   const [prepareConfirmDepartment, setPrepareConfirmDepartment] = useState<string | null>(null);
   // Backend-reported problems with saved plan items, and the row pending removal.
   const [itemIssues, setItemIssues] = useState<SalesPlanItemIssue[]>([]);
-  const [removeConfirmRowKey, setRemoveConfirmRowKey] = useState<string | null>(null);
+  const [removeConfirmRowKeys, setRemoveConfirmRowKeys] = useState<string[] | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -700,19 +700,42 @@ export const SalesPlanPage: React.FC = () => {
   };
 
   // Ignored while a save is in flight so two removals never race each other.
-  const requestRemoveItem = (rowKey: string) => {
-    if (saving) return;
-    setRemoveConfirmRowKey(rowKey);
+  const requestRemoveItems = (rowKeys: string[]) => {
+    if (saving || rowKeys.length === 0) return;
+    setRemoveConfirmRowKeys(rowKeys);
   };
 
-  const removeItem = async (rowKey: string) => {
+  const requestRemoveItem = (rowKey: string) => requestRemoveItems([rowKey]);
+
+  const removeItems = async (rowKeys: string[]) => {
     const previous = items;
-    const next = previous.filter((item) => item._rowKey !== rowKey);
-    if (next.length === previous.length) return;
-    setItems(next);
-    setHighlightedItemCode((current) => (current === rowKey ? null : current));
-    const ok = await persistDraft(next);
-    if (!ok) setItems(previous);
+    const keySet = new Set(rowKeys);
+    const targets = previous.filter((item) => keySet.has(item._rowKey));
+    if (targets.length === 0) return;
+    setHighlightedItemCode((current) => (current && keySet.has(current) ? null : current));
+
+    if (isEditable) {
+      const next = previous.filter((item) => !keySet.has(item._rowKey));
+      setItems(next);
+      const ok = await persistDraft(next);
+      if (!ok) setItems(previous);
+      return;
+    }
+
+    // save_draft is Draft-only by design, so later states remove through
+    // remove_plan_items, which matches rows by item code.
+    const codes = new Set(targets.map((item) => item.item_code));
+    setItems(previous.filter((item) => !codes.has(item.item_code)));
+    setSaving(true);
+    try {
+      const result = await salesPlanService.removePlanItems({ name: planName!, item_codes: [...codes] });
+      setItemIssues(result.item_issues || []);
+    } catch (err) {
+      setItems(previous);
+      showToast.error(describeSalesPlanApiError(err, 'Unable to remove items from this Sales Plan.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const persistDraft = async (nextItems: SalesPlanItem[]): Promise<boolean> => {
@@ -822,6 +845,10 @@ export const SalesPlanPage: React.FC = () => {
   // this. `planStatus === null` covers a plan that hasn't been saved yet at
   // all, which is still a fresh Draft in effect.
   const isEditable = planStatus === null || planStatus === 'Draft';
+  // Removal stays open until approval; after Draft only the workflow edit role may remove.
+  const canRemove =
+    isEditable ||
+    ((planStatus === 'Proposed' || planStatus === 'Submitted for Approval') && roles.includes('URY Sales Plan Controller'));
   const showAttention =
     attentionRows.length > 0 &&
     (planStatus === null || ['Draft', 'Proposed', 'Submitted for Approval'].includes(planStatus));
@@ -1269,6 +1296,19 @@ export const SalesPlanPage: React.FC = () => {
               </span>
             </button>
             <div id="needs-attention-panel" hidden={!attentionExpanded}>
+              {canRemove && (
+                <div className="flex justify-end border-t border-border px-[14px] py-2">
+                  <Button
+                    variant="ghost"
+                    size="compactSm"
+                    className="text-destructive"
+                    onClick={() => requestRemoveItems(attentionRows.map((r) => r.item._rowKey))}
+                    disabled={saving}
+                  >
+                    {__('Remove all')}
+                  </Button>
+                </div>
+              )}
               <div className="divide-y divide-border border-t border-border">
                 {attentionRows.map(({ item, messages }) => (
                   <AttentionItem
@@ -1280,7 +1320,7 @@ export const SalesPlanPage: React.FC = () => {
                     )}
                     amount={item.item_code}
                     action={{ label: __('View item'), onClick: () => setSelectedItemDetailCode(item.item_code) }}
-                    secondaryAction={isEditable ? { label: __('Remove'), onClick: () => requestRemoveItem(item._rowKey) } : undefined}
+                    secondaryAction={canRemove ? { label: __('Remove'), onClick: () => requestRemoveItem(item._rowKey) } : undefined}
                   />
                 ))}
               </div>
@@ -1439,7 +1479,7 @@ export const SalesPlanPage: React.FC = () => {
                 header: '',
                 align: 'right',
                 width: '5%',
-                render: (row) => isEditable ? (
+                render: (row) => canRemove ? (
                   <Button
                     variant="ghost"
                     size="compactSm"
@@ -1769,23 +1809,27 @@ export const SalesPlanPage: React.FC = () => {
       />
 
       <ConfirmDialog
-        open={removeConfirmRowKey !== null}
+        open={removeConfirmRowKeys !== null}
         onOpenChange={(open) => {
-          if (!open && !saving) setRemoveConfirmRowKey(null);
+          if (!open && !saving) setRemoveConfirmRowKeys(null);
         }}
-        title={__('Remove item?')}
+        title={removeConfirmRowKeys && removeConfirmRowKeys.length > 1 ? __('Remove {0} items?', [removeConfirmRowKeys.length]) : __('Remove item?')}
         description={(() => {
-          const target = items.find((item) => item._rowKey === removeConfirmRowKey);
+          const keys = removeConfirmRowKeys ?? [];
+          if (keys.length > 1) {
+            return `Remove all ${keys.length} items listed in Needs Attention from this Sales Plan? The plan is saved immediately.`;
+          }
+          const target = items.find((item) => item._rowKey === keys[0]);
           return `Remove ${target ? target.item_name || target.item_code : 'this item'} from this Sales Plan? The plan is saved immediately.`;
         })()}
         cancelLabel={__('Cancel')}
-        confirmLabel={__('Remove')}
+        confirmLabel={removeConfirmRowKeys && removeConfirmRowKeys.length > 1 ? __('Remove all') : __('Remove')}
         loadingLabel="Removing…"
         isSubmitting={saving}
         onConfirm={() => {
-          const key = removeConfirmRowKey;
-          setRemoveConfirmRowKey(null);
-          if (key) void removeItem(key);
+          const keys = removeConfirmRowKeys;
+          setRemoveConfirmRowKeys(null);
+          if (keys?.length) void removeItems(keys);
         }}
       />
     </Page>
