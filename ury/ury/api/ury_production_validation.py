@@ -64,6 +64,27 @@ def validate_item_production_configuration(item, branch):
     }
 
 
+def collect_item_production_issue(item, branch):
+    """Run validate_item_production_configuration without raising.
+
+    Returns None when the item passes, else the validation message. Used for
+    draft-time reporting of items that would fail approval, so the rules stay
+    in one place. Messages are muted so a caught failure does not leak into
+    the response's _server_messages. PermissionError is not swallowed.
+    """
+    previous = frappe.flags.mute_messages
+    frappe.flags.mute_messages = True
+    try:
+        validate_item_production_configuration(item, branch)
+    except frappe.PermissionError:
+        raise
+    except frappe.ValidationError as exc:
+        return str(exc)
+    finally:
+        frappe.flags.mute_messages = previous
+    return None
+
+
 def _resolve_warehouse_for_policy(config, policy):
     """D13: the Department Warehouse is the PRE_PRODUCED stock authority.
 
