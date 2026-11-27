@@ -19,12 +19,17 @@ rather than mocked, since mocking `frappe.get_doc({...}).insert()` here
 would not catch a real Stock Entry validation failure.
 """
 
+import json
+import os
+import unittest
 from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from pypika import Table
 
-from ury.ury.doctype.stock_correction.stock_correction import StockCorrection
+from ury.ury.doctype.stock_correction.correction_type import get_item_codes_for_type
+from ury.ury.doctype.stock_correction.stock_correction import StockCorrection, get_items
 
 MODULE = "ury.ury.doctype.stock_correction.stock_correction"
 
@@ -217,3 +222,142 @@ class TestCreateAndSubmitStockEntry(FrappeTestCase):
 			doc.create_and_submit_stock_entry()
 		mock_make.assert_not_called()
 		mock_db_set.assert_not_called()
+
+
+CORRECTION_TYPE_MODULE = "ury.ury.doctype.stock_correction.correction_type"
+
+
+class TestCorrectionType(unittest.TestCase):
+	def _mock_qb(self, *query_results):
+		"""Return a mocked frappe.qb whose chained from_().select().where().run() yields *query_results*."""
+		mock_qb = MagicMock()
+		mock_qb.DocType = Table
+
+		builders = []
+		for rows in query_results:
+			builder = MagicMock()
+			builder.select.return_value = builder
+			builder.where.return_value = builder
+			builder.run.return_value = [frappe._dict(r) for r in rows]
+			builders.append(builder)
+
+		mock_qb.from_.side_effect = builders
+		return mock_qb
+
+	def test_processed_classification(self):
+		mock_qb = self._mock_qb([{"item": "BURGER-PAT"}, {"item": "SAUCE-BASE"}])
+		with patch(f"{CORRECTION_TYPE_MODULE}.frappe.qb", mock_qb):
+			result = get_item_codes_for_type("Processed", "Branch-A")
+
+		self.assertEqual(result, {"BURGER-PAT", "SAUCE-BASE"})
+		mock_qb.from_.assert_called_once()
+
+		with self.subTest("empty UIPC for processed returns empty set"):
+			empty_qb = self._mock_qb([])
+			with patch(f"{CORRECTION_TYPE_MODULE}.frappe.qb", empty_qb):
+				self.assertEqual(get_item_codes_for_type("Processed", "Branch-A"), set())
+
+		with self.subTest("blank or invalid type returns None without querying"):
+			for invalid_type in ("", None, "Invalid"):
+				no_qb = self._mock_qb()
+				with patch(f"{CORRECTION_TYPE_MODULE}.frappe.qb", no_qb):
+					self.assertIsNone(get_item_codes_for_type(invalid_type, "Branch-A"))
+				no_qb.from_.assert_not_called()
+
+	def test_raw_classification(self):
+		mock_qb = self._mock_qb(
+			[{"item": "BURGER-PAT"}],
+			[{"name": "FLOUR-01"}, {"name": "TOMATO-01"}],
+		)
+		with patch(f"{CORRECTION_TYPE_MODULE}.frappe.qb", mock_qb):
+			result = get_item_codes_for_type("Raw", "Branch-A")
+
+		self.assertEqual(result, {"FLOUR-01", "TOMATO-01"})
+		self.assertEqual(mock_qb.from_.call_count, 2)
+
+		with self.subTest("no UIPC for branch treats all items as raw (returns None)"):
+			no_uipc_qb = self._mock_qb([])
+			with patch(f"{CORRECTION_TYPE_MODULE}.frappe.qb", no_uipc_qb):
+				self.assertIsNone(get_item_codes_for_type("Raw", "Branch-A"))
+			no_uipc_qb.from_.assert_called_once()
+
+	def test_get_items_no_type_unaffected(self):
+		reco_items = [
+			frappe._dict({"item_code": "RAW-1", "item_name": "Raw 1", "warehouse": "WH-1", "has_serial_no": 0}),
+			frappe._dict({"item_code": "PROC-1", "item_name": "Proc 1", "warehouse": "WH-1", "has_serial_no": 0}),
+		]
+		with patch(f"{MODULE}.get_items_for_stock_reco", return_value=reco_items), \
+			patch(f"{MODULE}.get_stock_balance", return_value=(5.0, 10.0, "")), \
+			patch(f"{MODULE}.get_item_data", side_effect=lambda d, q, r, s="": {"item_code": d.item_code, "qty": q, "valuation_rate": r}), \
+			patch(f"{MODULE}.get_item_codes_for_type") as mock_get_codes:
+			result = get_items("WH-1", "2026-01-01", "12:00:00", "Test Co")
+
+		mock_get_codes.assert_not_called()
+		self.assertEqual([r["item_code"] for r in result], ["RAW-1", "PROC-1"])
+
+	def test_get_items_filtered_with_type(self):
+		reco_items = [
+			frappe._dict({"item_code": "RAW-1", "item_name": "Raw 1", "warehouse": "WH-1", "has_serial_no": 0}),
+			frappe._dict({"item_code": "PROC-1", "item_name": "Proc 1", "warehouse": "WH-1", "has_serial_no": 0}),
+		]
+		with patch(f"{MODULE}.get_items_for_stock_reco", return_value=reco_items), \
+			patch(f"{MODULE}.get_stock_balance", return_value=(5.0, 10.0, "")), \
+			patch(f"{MODULE}.get_item_data", side_effect=lambda d, q, r, s="": {"item_code": d.item_code, "qty": q, "valuation_rate": r}), \
+			patch(f"{MODULE}.get_item_codes_for_type", return_value={"PROC-1"}) as mock_get_codes:
+			result = get_items(
+				"WH-1", "2026-01-01", "12:00:00", "Test Co",
+				correction_type="Processed", branch="Branch-A",
+			)
+
+		mock_get_codes.assert_called_once_with("Processed", "Branch-A")
+		self.assertEqual([r["item_code"] for r in result], ["PROC-1"])
+
+	def _doc(self, correction_type="", branch="Branch-A", items=None):
+		doc = StockCorrection.__new__(StockCorrection)
+		doc.correction_type = correction_type
+		doc.branch = branch
+		doc.items = items or []
+		return doc
+
+	def test_validate_rejects_mismatched_row(self):
+		doc = self._doc(
+			correction_type="Processed",
+			branch="Branch-A",
+			items=[frappe._dict({"item_code": "RAW-1", "idx": 1})],
+		)
+		with patch(f"{MODULE}.get_item_codes_for_type", return_value={"PROC-1"}):
+			with self.assertRaises(frappe.ValidationError):
+				doc._validate_correction_type_rows()
+
+		with self.subTest("matching row passes"):
+			doc.items = [frappe._dict({"item_code": "PROC-1", "idx": 1})]
+			with patch(f"{MODULE}.get_item_codes_for_type", return_value={"PROC-1"}):
+				doc._validate_correction_type_rows()
+
+	def test_blank_type_always_valid(self):
+		doc = self._doc(
+			correction_type="",
+			branch="Branch-A",
+			items=[frappe._dict({"item_code": "ANY-ITEM", "idx": 1})],
+		)
+		with patch(f"{MODULE}.get_item_codes_for_type") as mock_get_codes:
+			doc._validate_correction_type_rows()
+		mock_get_codes.assert_not_called()
+
+		with self.subTest("Raw with no UIPC records passes"):
+			doc.correction_type = "Raw"
+			with patch(f"{MODULE}.get_item_codes_for_type", return_value=None):
+				doc._validate_correction_type_rows()
+
+	def test_amend_preserves_type_no_copy_not_set(self):
+		"""correction_type must NOT have no_copy in the DocType JSON."""
+		json_path = os.path.join(os.path.dirname(__file__), "stock_correction.json")
+		with open(json_path) as f:
+			meta = json.load(f)
+		field = next((fd for fd in meta["fields"] if fd["fieldname"] == "correction_type"), None)
+		self.assertIsNotNone(field, "correction_type field not found in JSON")
+		self.assertFalse(
+			field.get("no_copy"),
+			"correction_type must not have no_copy set (amend must copy the type)",
+		)
+

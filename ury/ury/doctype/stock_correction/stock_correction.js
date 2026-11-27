@@ -82,6 +82,18 @@ frappe.ui.form.on("Stock Correction", {
 		transaction_controller.autofill_warehouse(frm.doc.items, "warehouse", frm.doc.set_warehouse);
 	},
 
+	correction_type: function (frm) {
+		if (frm.doc.correction_type && frm.doc.items && frm.doc.items.length > 0) {
+			frappe.confirm(
+				__("Changing Correction Type may make existing rows invalid. Items that do not match the new type will be rejected on save. Do you want to clear the items table now?"),
+				function () {
+					frm.clear_table("items");
+					frm.refresh_field("items");
+				}
+			);
+		}
+	},
+
 	get_items: function (frm) {
 		let fields = [
 			{
@@ -123,6 +135,8 @@ frappe.ui.form.on("Stock Correction", {
 						company: frm.doc.company,
 						item_code: data.item_code,
 						ignore_empty_stock: data.ignore_empty_stock,
+						correction_type: frm.doc.correction_type || "",
+						branch: frm.doc.branch || "",
 					},
 					callback: function (r) {
 						if (r.exc || !r.message || !r.message.length) return;

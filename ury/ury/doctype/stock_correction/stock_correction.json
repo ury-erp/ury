@@ -18,6 +18,7 @@
   "section_break_8",
   "column_break_pr0l",
   "branch",
+  "correction_type",
   "column_break_nlca",
   "set_warehouse",
   "reference_stock_reconciliation",
@@ -110,6 +111,15 @@
    "fieldtype": "Link",
    "label": "Branch",
    "options": "Branch"
+  },
+  {
+   "fieldname": "correction_type",
+   "fieldtype": "Select",
+   "label": "Correction Type",
+   "options": "\nRaw\nProcessed",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only_depends_on": "eval:doc.docstatus == 1"
   },
   {
    "fieldname": "column_break_nlca",

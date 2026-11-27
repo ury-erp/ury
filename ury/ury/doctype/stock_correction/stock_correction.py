@@ -6,6 +6,7 @@ from erpnext.controllers.stock_controller import StockController
 from datetime import datetime, timedelta
 
 from erpnext.stock.utils import get_incoming_rate, get_stock_balance
+from ury.ury.doctype.stock_correction.correction_type import get_item_codes_for_type
 
 class OpeningEntryAccountError(frappe.ValidationError):
 	pass
@@ -26,6 +27,7 @@ class StockCorrection(StockController):
 		if self.edit_posting_date == 0:
 			self.validate_posting_time()
 		self.validate_data()
+		self._validate_correction_type_rows()
 		self.set_total_qty_and_amount()
 		# self.remove_items_with_no_change()
 
@@ -390,7 +392,23 @@ class StockCorrection(StockController):
 		except Exception as e:
 			self.validation_messages.append(_("Row #") + " " + ("%d: " % (row.idx)) + cstr(e))
 
-	
+	def _validate_correction_type_rows(self):
+		"""Reject rows whose item_code does not match the document's correction_type."""
+		if not self.correction_type or not self.branch:
+			return
+
+		allowed = get_item_codes_for_type(self.correction_type, self.branch)
+		if allowed is None:
+			return  # Raw with no UIPC records — all items valid
+
+		offending = []
+		for row in self.items:
+			if row.item_code not in allowed:
+				offending.append(_(f"Row #{row.idx}: Item {bold(row.item_code)} does not belong to type {bold(self.correction_type)}."))
+
+		if offending:
+			frappe.throw("<br>".join(offending), title=_("Correction Type Mismatch"))
+
 	def set_total_qty_and_amount(self):
 		for d in self.get("items"):
 			d.amount = flt(d.qty, d.precision("qty")) * flt(d.valuation_rate, d.precision("valuation_rate"))
@@ -422,7 +440,7 @@ class StockCorrection(StockController):
 
 
 @frappe.whitelist()
-def get_items(warehouse, posting_date, posting_time, company, item_code=None, ignore_empty_stock=False):
+def get_items(warehouse, posting_date, posting_time, company, item_code=None, ignore_empty_stock=False, correction_type=None, branch=None):
 	ignore_empty_stock = cint(ignore_empty_stock)
 	items = []
 	if item_code and warehouse:
@@ -430,6 +448,13 @@ def get_items(warehouse, posting_date, posting_time, company, item_code=None, ig
 
 	if not item_code:
 		items = get_items_for_stock_reco(warehouse, company)
+
+	# Post-filter by correction_type when set.
+	# Existing callers that omit correction_type are unaffected.
+	if correction_type and branch:
+		allowed = get_item_codes_for_type(correction_type, branch)
+		if allowed is not None:
+			items = [d for d in items if d.item_code in allowed]
 
 	res = []
 	
