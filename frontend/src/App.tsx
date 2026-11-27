@@ -27,6 +27,7 @@ import YieldCheckCompliancePage from './pages/Dashboard/YieldCheckCompliancePage
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import RequirementsPage from './pages/Dashboard/RequirementsPage';
+import ProductionBoardPage from './pages/Dashboard/ProductionBoardPage';
 import MenuRoutingPage from './pages/Dashboard/MenuRoutingPage';
 import { ServicePage } from './pages/Dashboard/ServicePage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
@@ -42,6 +43,7 @@ import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { Landing } from './components/Landing';
 import { NoAccess } from './components/NoAccess';
+import { ChefGuard } from './components/ChefGuard';
 import { URY_POS_ROUTES_ENABLED } from './lib/posRouteBlock';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ActiveReportProvider } from './components/chat/ActiveReportContext';
@@ -328,6 +330,25 @@ function AppRoutes() {
             <Route path="daily-pnl" element={<DailyPnl />} />
           </Route>
 
+        </Route>
+
+        {/*
+          Second pathless layout route, same DashboardLayout chrome (header +
+          sidebar) but gated by ChefGuard instead of RoleGuard. RoleGuard
+          admits URY Manager only, so a URY Department Head could never reach
+          a page nested under the layout above. SetupGuard is fine for them:
+          its wizard-status endpoint accepts any logged-in user. ChefGuard is
+          a usability gate; every ury_chef_ui endpoint enforces the role and
+          department scope itself.
+        */}
+        <Route
+          element={
+            <ChefGuard>
+              <DashboardLayout />
+            </ChefGuard>
+          }
+        >
+          <Route path="production-board" element={<ProductionBoardPage />} />
         </Route>
       </Route>
 

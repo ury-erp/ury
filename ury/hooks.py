@@ -350,6 +350,7 @@ doc_events = {
     },
     "Production Plan": {
         "before_cancel": "ury.ury.api.ury_production_plan_cancel_hooks.before_cancel",
+        "on_submit": "ury.ury.api.ury_sales_plan_production_plan.on_submit_generate_material_requests",
     },
 }
 

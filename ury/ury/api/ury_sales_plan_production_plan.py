@@ -38,6 +38,12 @@ import frappe
 from frappe import _
 from frappe.utils import nowdate
 
+from ury.ury.api.ury_production_plan_quantities import (
+	derive_plan_quantities,
+	get_warehouse_stock,
+	is_pure_sub_assembly,
+	target_key,
+)
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
 
 SALES_PLAN = "URY Sales Plan"
@@ -107,9 +113,9 @@ def get_department_production_plan(sales_plan, department):
 	return rows[0] if rows else None
 
 
-def _target_to_production_plan_item(target, plan_date):
+def _target_to_production_plan_item(target, plan_date, planned_qty=None):
 	row = {field: target.get(field) for field in _PRODUCTION_PLAN_ITEM_FIELDS}
-	row["planned_qty"] = target.get("required_qty")
+	row["planned_qty"] = target.get("required_qty") if planned_qty is None else planned_qty
 	row["planned_start_date"] = plan_date
 	row["description"] = None
 	row[PP_DEPARTMENT_FIELD] = target.get("department")
@@ -129,11 +135,27 @@ def _target_to_production_plan_item(target, plan_date):
 	return row
 
 
+def _creation_quantities(targets, warehouse):
+	"""Planned quantity per target at creation: direct targets keep their
+	compiled ``required_qty``; a pure sub-assembly is its parents' demand minus
+	the stock already in the department warehouse."""
+	stock = {}
+	if any(is_pure_sub_assembly(target) for target in targets):
+		stock = get_warehouse_stock(warehouse, [target.get("item_code") for target in targets])
+	return derive_plan_quantities(targets, {}, stock)
+
+
 def _build_department_plan_dict(sales_plan_doc, department, bucket, snapshot_hash):
 	warehouse = bucket.get("warehouse")
 	plan_date = sales_plan_doc.get("plan_date")
+	targets = bucket.get("targets") or []
+	quantities = _creation_quantities(targets, warehouse)
+	# A pure sub-assembly that stock already covers gets no row: ERPNext needs
+	# planned_qty > 0 (see ury_production_plan_quantities).
 	po_items = [
-		_target_to_production_plan_item(target, plan_date) for target in (bucket.get("targets") or [])
+		_target_to_production_plan_item(target, plan_date, quantities[target_key(target)])
+		for target in targets
+		if quantities[target_key(target)] > 0
 	]
 	return {
 		"doctype": PRODUCTION_PLAN,
@@ -219,6 +241,7 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 				"production_plan": existing["name"],
 				"state": existing.get(PP_STATE_FIELD),
 				"created": False,
+				"docstatus": existing.get("docstatus"),
 			})
 			continue
 
@@ -226,15 +249,25 @@ def create_or_get_department_production_plans(sales_plan_doc, submit=False):
 		doc = frappe.get_doc(plan_dict)
 		doc.insert()
 		if submit:
+			# Requests are generated once for the whole batch below, not per
+			# plan by the on_submit hook.
+			doc.flags.ury_defer_material_requests = True
 			doc.submit()
 		results.append({
 			"department": department,
 			"production_plan": doc.name,
 			"state": doc.get(PP_STATE_FIELD),
 			"created": True,
+			"docstatus": 1 if submit else 0,
 		})
 
-	material_requests = _generate_material_requests(sales_plan_doc.name, results)
+	# A Draft plan's quantities may still be edited (Chef UI), so its
+	# requests are generated when it is submitted (on_submit_generate_material_requests).
+	submitted_results = [row for row in results if int(row.get("docstatus") or 0) == 1]
+	if submitted_results:
+		material_requests = _generate_material_requests(sales_plan_doc.name, submitted_results)
+	else:
+		material_requests = {"purchases": [], "transfers": [], "errors": []}
 
 	return {
 		"sales_plan": sales_plan_doc.name,
@@ -374,9 +407,11 @@ def create_department_production_plans(sales_plan):
 	same transition that drives the automatic path when
 	``enable_auto_production_plan`` is on). Calls the same locked, idempotent
 	``create_or_get_department_production_plans`` the automatic path calls,
-	with ``submit=True`` so each department plan is submitted immediately
-	and Prepare Production can run without a Desk submit step. Idempotent:
-	never double-creates for a department that already has a live current plan.
+	with ``submit=False``: each department plan is created as a Draft so its
+	quantities can be reviewed and edited (Chef UI) before it is submitted.
+	Material Requests are generated on submit (``on_submit_generate_material_requests``).
+	The automatic path on Lock still submits immediately. Idempotent: never
+	double-creates for a department that already has a live current plan.
 
 	Returns the same shape as ``create_or_get_department_production_plans``
 	-- see its docstring.
@@ -386,7 +421,26 @@ def create_department_production_plans(sales_plan):
 	doc = frappe.get_doc(SALES_PLAN, sales_plan)
 	if doc.get("status") not in ELIGIBLE_STATUSES:
 		frappe.throw(_("{0} must be Locked for Production before Production Plans can be created.").format(sales_plan))
-	return create_or_get_department_production_plans(doc, submit=True)
+	return create_or_get_department_production_plans(doc, submit=False)
+
+
+def on_submit_generate_material_requests(doc, method=None):
+	"""``Production Plan`` ``on_submit`` hook.
+
+	A department plan created as a Draft gets its Transfer and Purchase
+	Material Requests here, from its (possibly edited) quantities, whether it
+	is submitted from the Chef UI, the Sales Plan page or Desk. Plans
+	submitted by ``create_or_get_department_production_plans`` itself set
+	``flags.ury_defer_material_requests`` because that function generates the
+	requests for the whole batch. Both generators are idempotent, so a repeat
+	never duplicates.
+	"""
+	if not doc.get(PP_SALES_PLAN_FIELD) or doc.flags.get("ury_defer_material_requests"):
+		return
+	_generate_material_requests(
+		doc.get(PP_SALES_PLAN_FIELD),
+		[{"department": doc.get(PP_DEPARTMENT_FIELD), "production_plan": doc.name}],
+	)
 
 
 @frappe.whitelist()

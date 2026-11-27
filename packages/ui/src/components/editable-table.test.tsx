@@ -434,3 +434,21 @@ describe("EditableDataTable — Production-Plan-shaped fixture (distinct field n
     expect(result.unmatched).toHaveLength(0);
   });
 });
+
+describe("buildCsv includeRowKey", () => {
+  const rows = [{ id: "a", name: "Tea", qty: 2 }];
+  const context = [{ header: "Item", get: (r: (typeof rows)[number]) => r.name }];
+  const editable = [{ header: "Qty", field: "qty", get: (r: (typeof rows)[number]) => r.qty }];
+
+  it("keeps the _row_key column by default", () => {
+    expect(buildCsv(rows, (r) => r.id, context, editable).split("\r\n")).toEqual(["_row_key,Item,Qty", "a,Tea,2"]);
+  });
+
+  it("leaves it out when includeRowKey is false", () => {
+    expect(buildCsv(rows, (r) => r.id, context, editable, { includeRowKey: false }).split("\r\n")).toEqual([
+      "Item,Qty",
+      "Tea,2",
+    ]);
+  });
+});
+

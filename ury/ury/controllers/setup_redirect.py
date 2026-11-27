@@ -23,6 +23,8 @@ _CASHIER_ROLES = {"URY Cashier"}
 _CAPTAIN_ROLES = {"URY Captain"}
 _CASHIER_HOME = "/pos"
 _CAPTAIN_HOME = "/ury/serve"
+_DEPARTMENT_HEAD_ROLES = {"URY Department Head"}
+_DEPARTMENT_HEAD_HOME = "/ury/production-board"
 
 # Boots arrive in parallel, and every one of them sees the same stale pair.
 # Without a claim they all attempt the same write and deadlock each other on
@@ -110,7 +112,7 @@ def website_path_resolver(path):
 
 
 def _role_based_home_page():
-    """Return a restricted landing URL for cashier / captain-only users.
+    """Return a restricted landing URL for department-head / cashier / captain-only users.
 
     Returns ``None`` when the user holds an elevated role (URY Manager,
     URY Admin, System Manager) or when no restricted rule applies, so
@@ -121,6 +123,8 @@ def _role_based_home_page():
     roles = set(frappe.get_roles())
     if roles & _ELEVATED_ROLES:
         return None
+    if roles & _DEPARTMENT_HEAD_ROLES:
+        return _DEPARTMENT_HEAD_HOME
     if roles & _CASHIER_ROLES:
         return _CASHIER_HOME
     if roles & _CAPTAIN_ROLES:

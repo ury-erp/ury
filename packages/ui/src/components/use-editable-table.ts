@@ -55,13 +55,21 @@ export function buildCsv<T>(
   rows: T[],
   rowKeyFn: (row: T) => string,
   contextColumns: CsvColumnSpec<T>[],
-  editableColumns: EditableColumnSpec<T>[]
+  editableColumns: EditableColumnSpec<T>[],
+  options: { includeRowKey?: boolean } = {}
 ): string {
-  const headers = ["_row_key", ...contextColumns.map((c) => c.header), ...editableColumns.map((c) => c.header)];
+  // The leading `_row_key` column is what a re-import matches rows on. A
+  // download that is only read (never re-imported) can leave it out.
+  const includeRowKey = options.includeRowKey ?? true;
+  const headers = [
+    ...(includeRowKey ? ["_row_key"] : []),
+    ...contextColumns.map((c) => c.header),
+    ...editableColumns.map((c) => c.header),
+  ];
   const lines = [headers.map(csvEscapeField).join(",")];
   for (const row of rows) {
     const cells = [
-      csvEscapeField(sanitizeCsvCell(rowKeyFn(row))),
+      ...(includeRowKey ? [csvEscapeField(sanitizeCsvCell(rowKeyFn(row)))] : []),
       ...contextColumns.map((c) => csvEscapeField(sanitizeCsvCell(c.get(row)))),
       ...editableColumns.map((c) => csvEscapeField(sanitizeCsvCell(c.get(row)))),
     ];

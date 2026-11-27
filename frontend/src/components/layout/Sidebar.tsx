@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Badge } from '@ury/ui';
 import { useAuth } from '../../store/useAuth';
+import { hasChefUiRole } from '../production/chefRoles';
 import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegistry';
 import { DayStatusCard } from './DayStatusCard';
 import {
@@ -29,6 +30,7 @@ import {
   Network,
   Package,
   ClipboardList,
+  ChefHat,
   ClipboardCheck,
   Lock,
   Trash2,
@@ -103,7 +105,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Plan',
     items: [
       { label: __('Sales Plan'), path: '/sales-plan', icon: Target },
-      { label: __('Requirements'), path: '/requirements', icon: ClipboardList }
+      { label: __('Requirements'), path: '/requirements', icon: ClipboardList },
+      { label: __('Production Board'), path: '/production-board', icon: ChefHat }
     ]
   },
   {
@@ -189,6 +192,7 @@ const getNavLinkClass =
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 const REPORTS_PATH_PREFIX = '/reports';
+const PRODUCTION_BOARD_PATH = '/production-board';
 
 /** Every collapse/expand key this rail tracks, persisted together as one JSON blob. */
 type GroupKey = 'Plan' | 'Operate' | 'Observe' | 'Control' | 'Reports' | 'Setup';
@@ -246,12 +250,22 @@ const GroupHeaderButton: React.FC<{
   </button>
 );
 
-const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
+const MainPanel: React.FC<{ isManager: boolean; isChefOnly: boolean; isCollapsed: boolean }> = ({
   isManager,
+  isChefOnly,
   isCollapsed
 }) => {
   const location = useLocation();
   const linkClass = getNavLinkClass(isCollapsed);
+
+  // A chef-role user who is not a manager (e.g. URY Department Head) cannot open
+  // the RoleGuard-wrapped manager pages, so the rail shows only Production Board.
+  const visibleGroups = isChefOnly
+    ? NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => item.path === PRODUCTION_BOARD_PATH)
+      })).filter((group) => group.items.length > 0)
+    : NAV_GROUPS;
 
   const isSetupPath = SETUP_ITEMS.some((item) => location.pathname.startsWith(item.path));
   const isReportsPath = location.pathname.startsWith(REPORTS_PATH_PREFIX);
@@ -288,9 +302,9 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
-      <DayStatusCard isCollapsed={isCollapsed} />
+      {!isChefOnly && <DayStatusCard isCollapsed={isCollapsed} />}
       <div className={`pb-2 flex-1 space-y-0.5 ${isCollapsed ? 'px-2' : 'px-4'}`}>
-        {NAV_GROUPS.map((group) => {
+        {visibleGroups.map((group) => {
           const key = group.label as GroupKey;
           const isActive = group.items.some((item) => location.pathname.startsWith(item.path));
           const isOpen = isGroupOpen(key);
@@ -386,6 +400,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
         )}
       </div>
 
+      {!isChefOnly && (
       <div className={`shrink-0 pt-2 pb-4 border-t border-hair mt-auto ${isCollapsed ? 'px-2' : 'px-4'}`}>
         {!isCollapsed ? (
           <GroupHeaderButton
@@ -428,12 +443,14 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
 
 export const Sidebar: React.FC = () => {
-  const { isManager } = useAuth();
+  const { isManager, roles } = useAuth();
+  const isChefOnly = !isManager && hasChefUiRole(roles);
 
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
@@ -470,7 +487,7 @@ export const Sidebar: React.FC = () => {
           )}
         </button>
       </div>
-      <MainPanel isManager={isManager} isCollapsed={isCollapsed} />
+      <MainPanel isManager={isManager} isChefOnly={isChefOnly} isCollapsed={isCollapsed} />
     </aside>
   );
 };

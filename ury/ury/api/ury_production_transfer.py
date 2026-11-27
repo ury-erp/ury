@@ -110,6 +110,7 @@ from erpnext.stock.doctype.material_request.material_request import (
 
 from ury.ury.api.ury_production_readiness import compute_readiness, store_shortage_blocker
 from ury.ury.api.ury_production_settings import get_store_warehouse
+from ury.ury.api.ury_production_plan_quantities import apply_production_plan_quantities
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
 from ury.ury.api.ury_sales_plan_production_plan import (
 	PP_DEPARTMENT_FIELD,
@@ -160,7 +161,7 @@ def generate_transfer_material_request_for_production_plan(production_plan):
 	department_warehouse = plan_doc.get(PP_DEPARTMENT_WAREHOUSE_FIELD)
 
 	sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, sales_plan)
-	bucket, blockers = _compile_department_bucket(sales_plan_doc, department)
+	bucket, blockers = _compile_department_bucket(sales_plan_doc, department, production_plan)
 	blockers = list(blockers)
 
 	store_warehouse = get_store_warehouse(plan_doc.get("company"))
@@ -203,7 +204,7 @@ def generate_transfer_material_request_for_production_plan(production_plan):
 	return {"production_plan": production_plan, "material_request": mr_name, "rows": rows, "blockers": blockers}
 
 
-def _compile_department_bucket(sales_plan_doc, department):
+def _compile_department_bucket(sales_plan_doc, department, production_plan=None):
 	"""One department's compiled bucket, in the one-entry-dict shape both
 	``compute_readiness`` and this module's callers need (see that module's
 	docstring). Recompiled fresh on every call -- cheap, read-only, and the
@@ -225,6 +226,10 @@ def _compile_department_bucket(sales_plan_doc, department):
 		"targets": [],
 		"external_receipt_targets": [],
 	}
+	if production_plan:
+		# Act on the Production Plan's own quantities (a Draft plan may have
+		# been edited), never the recompiled ones.
+		bucket = apply_production_plan_quantities(bucket, production_plan)
 	return bucket, blockers
 
 
@@ -396,7 +401,7 @@ def execute_store_to_department_transfer(production_plan):
 	# 1. Preflight -- advisory, no lock, no write (D17: never sufficient on
 	# its own, but still worth doing first so an already-known shortage never
 	# pays for a lock it will not use).
-	blockers, rows = _run_readiness(sales_plan_doc, department, store_warehouse)
+	blockers, rows = _run_readiness(sales_plan_doc, department, store_warehouse, production_plan)
 	shortage_rows = [row for row in rows if row["store_shortage"] > 0]
 	if shortage_rows:
 		return {
@@ -415,7 +420,7 @@ def execute_store_to_department_transfer(production_plan):
 
 	# 3. Revalidate under the locks (D17). A picture that changed since step 1
 	# aborts here, still before any write.
-	blockers, rows = _run_readiness(sales_plan_doc, department, store_warehouse)
+	blockers, rows = _run_readiness(sales_plan_doc, department, store_warehouse, production_plan)
 	shortage_rows = [row for row in rows if row["store_shortage"] > 0]
 	if shortage_rows:
 		return {
@@ -449,7 +454,7 @@ def execute_store_to_department_transfer(production_plan):
 	}
 
 
-def _run_readiness(sales_plan_doc, department, store_warehouse):
+def _run_readiness(sales_plan_doc, department, store_warehouse, production_plan=None):
 	"""Compile + compute readiness for one department, right now. Returns
 	``(blockers, rows)`` -- ``blockers`` is everything the compiler and
 	readiness layers reported; ``rows`` is the readiness engine's per-item
@@ -458,7 +463,7 @@ def _run_readiness(sales_plan_doc, department, store_warehouse):
 	Called twice by the executor -- once before locking, once under the
 	locks (D17) -- so nothing about this helper may cache anything across
 	calls; each call recompiles and re-reads Bin stock fresh."""
-	bucket, blockers = _compile_department_bucket(sales_plan_doc, department)
+	bucket, blockers = _compile_department_bucket(sales_plan_doc, department, production_plan)
 	blockers = list(blockers)
 	readiness = compute_readiness({department: bucket}, store_warehouse=store_warehouse)
 	blockers.extend(readiness["blockers"])

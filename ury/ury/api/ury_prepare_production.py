@@ -107,6 +107,7 @@ from frappe.utils import cint, get_datetime, now_datetime, time_diff_in_seconds
 from frappe.utils.background_jobs import is_job_enqueued
 
 from ury.ury.api.ury_production_plan_auto_work_order import execute_department_targets
+from ury.ury.api.ury_production_plan_quantities import apply_production_plan_quantities
 from ury.ury.api.ury_production_readiness import compute_readiness, store_shortage_blocker
 from ury.ury.api.ury_production_settings import get_store_warehouse, production_job_stale_minutes
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
@@ -216,7 +217,7 @@ def prepare_production(production_plan):
 	sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, plan_doc.get(PP_SALES_PLAN_FIELD))
 	department = plan_doc.get(PP_DEPARTMENT_FIELD)
 
-	bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department)
+	bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department, production_plan)
 	readiness = compute_readiness(
 		{department: bucket}, store_warehouse=get_store_warehouse(plan_doc.get("company"))
 	)
@@ -267,11 +268,15 @@ def prepare_production(production_plan):
 	}
 
 
-def _compile_department_bucket(sales_plan_doc, department):
+def _compile_department_bucket(sales_plan_doc, department, production_plan=None):
 	"""One department's compiled bucket, recompiled fresh on every call --
 	the same self-contained pattern ``ury_production_transfer`` uses, so
 	this module never caches a target collection past the request/job step
-	that computed it."""
+	that computed it.
+
+	When ``production_plan`` is given, targets are scaled to that plan's own
+	``po_items[].planned_qty`` (see ``ury_production_plan_quantities``), so a
+	quantity edited on a Draft plan is what Prepare Production produces."""
 	snapshot = sales_plan_doc.get("approval_snapshot")
 	if not snapshot:
 		frappe.throw(
@@ -284,6 +289,8 @@ def _compile_department_bucket(sales_plan_doc, department):
 	company = sales_plan_doc.get("company")
 	departments, blockers = compile_production_targets(snapshot, branch, company)
 	bucket = departments.get(department) or {"warehouse": None, "targets": [], "external_receipt_targets": []}
+	if production_plan:
+		bucket = apply_production_plan_quantities(bucket, production_plan)
 	return bucket, blockers
 
 
@@ -343,7 +350,7 @@ def run_prepare_production_job(production_plan, attempt):
 
 		_publish_live_progress(production_plan, attempt, STEP_BUILDING_WORK_ORDERS)
 		sales_plan_doc = frappe.get_doc(SALES_PLAN_DOCTYPE, sales_plan)
-		bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department)
+		bucket, compile_blockers = _compile_department_bucket(sales_plan_doc, department, production_plan)
 		if compile_blockers:
 			_finish_blocked(production_plan, compile_blockers, stage="compile", attempt=attempt)
 			return
