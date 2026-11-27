@@ -11,7 +11,6 @@ import {
   saveSalesPlanDraftQuantities,
   type BranchItemSearchResult,
   type ComparableHistoryItem,
-  type SalesPlanDocRow,
   type SalesPlanItem,
 } from './salesPlan';
 
