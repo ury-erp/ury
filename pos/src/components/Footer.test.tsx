@@ -47,6 +47,9 @@ describe("Footer", () => {
     const footer = container.querySelector(".border-t");
     expect(footer).toBeInTheDocument();
     expect(footer?.classList.contains("bg-white")).toBe(true);
+
+    const firstLink = screen.getAllByRole("link")[0];
+    expect(firstLink).toHaveClass("min-w-0", "flex-1", "px-1", "sm:min-w-[4.5rem]", "sm:px-3");
   });
 
   it("renders all links as NavLink components", () => {

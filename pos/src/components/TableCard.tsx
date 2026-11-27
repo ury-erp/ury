@@ -1,5 +1,5 @@
 import { type MouseEvent } from 'react';
-import { AlertTriangle, Eye, Loader2, Printer, Users } from 'lucide-react';
+import { AlertTriangle, Armchair, Building2, Clock3, Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table, TableReservation } from '../lib/table-api';
@@ -58,6 +58,7 @@ const TableCard = ({
   onReserve,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
+  const isMerged = Boolean(mergeGroupLabel && mergeGroupLabel !== table.name);
   const isLockedByReservation =
     isReserved &&
     !!activeReservation &&
@@ -74,7 +75,7 @@ const TableCard = ({
         }
       }}
       className={cn(
-        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-colors',
+        'relative flex h-full min-h-[13rem] min-w-0 flex-col rounded-lg border-2 p-4 transition-colors',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
           : isLockedByReservation
@@ -85,31 +86,46 @@ const TableCard = ({
       )}
     >
       <div className="flex flex-1 flex-col">
-        <div className="mb-3 flex items-start justify-between gap-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="shrink-0">
-              <TableShapeIcon
-                shape={table.table_shape || 'Rectangle'}
-                className={cn(
-                  'h-5 w-5',
-                  isOccupied ? 'text-amber-600' : isLockedByReservation ? 'text-primary-600' : 'text-gray-600'
-                )}
-              />
-            </div>
-            <span className="shrink-0 text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
-              {table.name}
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {isOccupied ? (
+        <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-gray-900/10 pb-3">
+          <TableShapeIcon
+            shape={table.table_shape || 'Rectangle'}
+            className={cn(
+              'h-4 w-4',
+              isOccupied ? 'text-amber-600' : isLockedByReservation ? 'text-primary-600' : 'text-gray-600'
+            )}
+          />
+          <span
+            className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-sm font-semibold text-gray-900"
+            title={mergeGroupLabel ?? table.name}
+          >
+            {table.name}
+          </span>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+            {isMerged ? (
               <>
-                <Badge variant="warning" className="whitespace-nowrap">
+                <Badge variant="info" size="sm" className="whitespace-nowrap">
+                  {t('tables.merged')}
+                </Badge>
+                {isLockedByReservation && (
+                  <Badge
+                    variant="outline"
+                    size="sm"
+                    className="whitespace-nowrap border-primary-200 bg-primary-100 text-xs font-medium text-primary-800"
+                  >
+                    {t('tables.reserved_badge')}
+                  </Badge>
+                )}
+              </>
+            ) : isOccupied ? (
+              <>
+                <Badge variant="warning" size="sm" className="whitespace-nowrap">
                   {t('tables.occupied')}
                 </Badge>
                 {isLockedByReservation && (
                   <Badge
                     variant="outline"
-                    className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+                    size="sm"
+                    className="whitespace-nowrap border-primary-200 bg-primary-100 text-xs font-medium text-primary-800"
                   >
                     {t('tables.reserved_badge')}
                   </Badge>
@@ -118,12 +134,13 @@ const TableCard = ({
             ) : isLockedByReservation ? (
               <Badge
                 variant="outline"
-                className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+                size="sm"
+                className="whitespace-nowrap border-primary-200 bg-primary-100 text-xs font-medium text-primary-800"
               >
                 {t('tables.reserved_badge')}
               </Badge>
             ) : (
-              <Badge variant="success" className="whitespace-nowrap">
+              <Badge variant="success" size="sm" className="whitespace-nowrap">
                 {t('tables.available')}
               </Badge>
             )}
@@ -141,89 +158,91 @@ const TableCard = ({
           </div>
         </div>
 
-        <p
-          className={cn(
-            'mb-2 min-h-[1.25rem] truncate text-xs font-medium',
-            mergeGroupLabel && mergeGroupLabel !== table.name
-              ? 'text-primary-700'
-              : 'invisible'
-          )}
-          title={mergeGroupLabel ?? undefined}
-        >
-          {mergeGroupLabel && mergeGroupLabel !== table.name
-            ? t('tables.merged_with_list', { tables: mergeGroupLabel })
-            : ' '}
-        </p>
+        {isMerged && (
+          <p
+            className="mb-2 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-xs font-medium text-primary-700"
+            title={mergeGroupLabel}
+          >
+            {t('tables.merged_with_list', { tables: mergeGroupLabel })}
+          </p>
+        )}
 
         <div className="space-y-2 text-sm text-gray-700">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{t('tables.room')}</span>
-            <span>{table.restaurant_room}</span>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <span className="flex shrink-0 items-center gap-1.5 font-medium">
+              <Building2 className="h-3.5 w-3.5" />
+              {t('tables.room')}
+            </span>
+            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-right">
+              {table.restaurant_room}
+            </span>
           </div>
-          <div className="flex min-h-[1.25rem] items-center justify-between">
-            <span className="font-medium">{t('tables.started_at')}</span>
-            <span>{isOccupied ? formatInvoiceTime(table.latest_invoice_time) : '—'}</span>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <span className="flex shrink-0 items-center gap-1.5 font-medium">
+              <Clock3 className="h-3.5 w-3.5" />
+              {t('tables.started_at')}
+            </span>
+            <span className="min-w-0 text-right">
+              {isOccupied ? formatInvoiceTime(table.latest_invoice_time) : '—'}
+            </span>
           </div>
           {typeof table.no_of_seats === 'number' && (
-            <div className="flex items-center justify-between">
-              <span className="font-medium">{t('tables.seats')}</span>
-              <span className="flex items-center gap-1">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <span className="flex shrink-0 items-center gap-1.5 font-medium">
+                <Armchair className="h-3.5 w-3.5" />
+                {t('tables.seats')}
+              </span>
+              <span className="flex shrink-0 items-center gap-1">
                 <Users className="h-3 w-3" />
                 {table.no_of_seats}
               </span>
             </div>
           )}
-          {table.is_take_away === 1 && (
-            <Badge variant="pending" className="mt-2">
-              {t('pos_ui.take_away')}
-            </Badge>
-          )}
-          {isLockedByReservation && (
-            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-xs font-medium text-primary-950">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary-600" />
-              <span className="truncate">
-                {t('tables.reserved_for', { time: formatReservationTime(activeReservation?.reserved_at) })}
-              </span>
-            </div>
-          )}
         </div>
+
+        {table.is_take_away === 1 && (
+          <Badge variant="pending" size="sm" className="mt-3 self-start">
+            {t('pos_ui.take_away')}
+          </Badge>
+        )}
+        {isLockedByReservation && (
+          <div className="mt-2 flex items-start gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-xs font-medium text-primary-950">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">
+              {t('tables.reserved_for', { time: formatReservationTime(activeReservation?.reserved_at) })}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div
-        className={cn(
-          'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
-          isOccupied ? 'border-amber-200' : 'border-transparent'
-        )}
-      >
-        {isOccupied ? (
-          <>
-            <button
-              onClick={onPreview}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
-            >
-              <Eye className="h-3 w-3" />
-              {t('pos_ui.preview')}
-            </button>
-            <button
-              onClick={onPrint}
-              disabled={isPrinting}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isPrinting ? (
-                <>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {t('pos_ui.printing')}
-                </>
-              ) : (
-                <>
-                  <Printer className="h-3 w-3" />
-                  {t('pos_ui.print')}
-                </>
-              )}
-            </button>
-          </>
-        ) : null}
-      </div>
+      {isOccupied && (
+        <div className="mt-auto flex gap-2 border-t border-amber-200 pt-3">
+          <button
+            onClick={onPreview}
+            className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
+          >
+            <Eye className="h-3 w-3" />
+            {t('pos_ui.preview')}
+          </button>
+          <button
+            onClick={onPrint}
+            disabled={isPrinting}
+            className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPrinting ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t('pos_ui.printing')}
+              </>
+            ) : (
+              <>
+                <Printer className="h-3 w-3" />
+                {t('pos_ui.print')}
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

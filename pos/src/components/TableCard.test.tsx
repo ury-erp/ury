@@ -56,6 +56,31 @@ describe("TableCard", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
   });
 
+  it("renders complete long table and room names with wrapping", () => {
+    const longTableName = "Table-With-A-Very-Long-Name-That-Must-Wrap-Without-Truncation";
+    const longRoomName = "Shawaya Hub - Malappuram Private Dining Room With A Very Long Name";
+    render(
+      <TableCard
+        table={{ ...mockTable, name: longTableName, restaurant_room: longRoomName }}
+        menuOpen={false}
+        onMenuOpenChange={() => {}}
+        onMerge={() => {}}
+        onUnmerge={() => {}}
+        onNavigate={() => {}}
+        onPreview={() => {}}
+        onPrint={() => {}}
+        isPrinting={false}
+      />
+    );
+
+    const tableName = screen.getByText(longTableName);
+    const roomName = screen.getByText(longRoomName);
+    expect(tableName).toHaveClass("whitespace-normal", "break-words");
+    expect(tableName).not.toHaveClass("truncate");
+    expect(roomName).toHaveClass("whitespace-normal", "break-words");
+    expect(roomName).not.toHaveClass("truncate");
+  });
+
   it("shows available badge for available table", () => {
     render(
       <TableCard
@@ -177,11 +202,12 @@ describe("TableCard", () => {
     expect(handleNavigate).not.toHaveBeenCalled();
   });
 
-  it("renders merge group label when provided", () => {
+  it("renders merged status and complete merge group label when provided", () => {
+    const mergeGroupLabel = "Table-1, Table-2, Table-With-An-Exceptionally-Long-Merged-Name";
     render(
       <TableCard
         table={mockTable}
-        mergeGroupLabel="Table-1, Table-2"
+        mergeGroupLabel={mergeGroupLabel}
         menuOpen={false}
         onMenuOpenChange={() => {}}
         onMerge={() => {}}
@@ -193,7 +219,11 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.getByText(/Merged with Table-1, Table-2/i)).toBeInTheDocument();
+    expect(screen.getByText("tables.merged")).toBeInTheDocument();
+    expect(screen.queryByText("tables.available")).not.toBeInTheDocument();
+    const mergedLabel = screen.getByText(`Merged with ${mergeGroupLabel}`);
+    expect(mergedLabel).toHaveClass("whitespace-normal", "break-words");
+    expect(mergedLabel).not.toHaveClass("truncate");
   });
 
   it("shows printing state in print button", () => {
@@ -231,6 +261,11 @@ describe("TableCard", () => {
       />
     );
 
-    expect(screen.getByText("pos_ui.take_away")).toBeInTheDocument();
+    const takeawayBadge = screen.getByText("pos_ui.take_away");
+    const informationRows = screen.getByText("tables.room").parentElement?.parentElement;
+    expect(takeawayBadge).toBeInTheDocument();
+    expect(informationRows).not.toContainElement(takeawayBadge);
+    expect(informationRows?.nextElementSibling).toBe(takeawayBadge);
+    expect(takeawayBadge).toHaveClass("mt-3", "self-start");
   });
 });

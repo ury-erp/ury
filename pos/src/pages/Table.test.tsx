@@ -253,6 +253,34 @@ describe("Table View", () => {
     });
   });
 
+  it("uses the responsive table grid and merged legend styles", async () => {
+    render(<Table />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("table-T1")).toBeInTheDocument();
+    });
+
+    const grid = screen.getByTestId("table-T1").parentElement;
+    expect(grid).toHaveClass(
+      "grid-cols-1",
+      "gap-4",
+      "pb-40",
+      "sm:grid-cols-2",
+      "lg:grid-cols-3",
+      "xl:grid-cols-4",
+      "2xl:grid-cols-5"
+    );
+    expect(grid?.parentElement).toHaveClass("max-w-screen-2xl");
+
+    const mergedLegend = screen.getByText("tables.merged");
+    expect(mergedLegend).toBeInTheDocument();
+    expect(mergedLegend.previousElementSibling).toHaveClass("bg-primary-tint", "border-primary");
+
+    const layoutAction = screen.getByText("tables.layout_view").parentElement;
+    expect(layoutAction).toHaveClass("self-end", "sm:self-auto");
+    expect(layoutAction?.parentElement).toHaveClass("flex-col", "sm:flex-row");
+  });
+
   it("shows empty state when no tables found", async () => {
     getTablesMock.mockResolvedValueOnce([]);
 

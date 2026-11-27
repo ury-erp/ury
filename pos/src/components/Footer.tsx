@@ -77,8 +77,8 @@ const Footer = () => {
               className={({ isActive }) =>
                 cn(
                   // Same rhythm as the Reports rail: a 28px icon chip carrying
-                  // the active state, a 13px medium label, rounded-md hit area.
-                  'flex min-w-[4.5rem] flex-col items-center gap-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
+                  // the active state, a responsive medium label, rounded-md hit area.
+                  'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors sm:min-w-[4.5rem] sm:flex-none sm:px-3 sm:text-[13px]',
                   isActive
                     ? 'text-primary font-semibold'
                     : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
