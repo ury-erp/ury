@@ -183,71 +183,58 @@ export interface SalesPlanDocRow {
 }
 
 /**
- * Overlay a saved plan's own rows onto the history-derived draft.
+ * Build the item list for a reloaded plan from the saved plan's own rows.
  *
- * The page suggests quantities from comparable weekday history, but once a
- * plan has been saved it is the plan -- not the history -- that says what is
- * being produced. Those two sets do not have to match: an item can be planned
- * with no sales history behind it at all (a new dish, or a kitchen base that
- * is never sold directly), and a branch whose history window is empty returns
- * no suggestions while its plan is full of rows.
+ * Once a plan has been saved, the saved plan is authoritative: it alone says
+ * which items are being produced. Comparable weekday history only seeds a new
+ * Draft (see `buildSalesPlanDraft`); it must not be merged back into an
+ * existing plan, otherwise an item the user removed and saved would reappear
+ * on reload because history still lists it.
  *
- * Without this overlay such a plan renders as an empty grid, which also hides
- * anything keyed off the item list -- the per-department sections, and with
- * them each department's Production Plan panel.
- *
- * A row present in history keeps its history figures and takes the plan's
- * quantity. A row the history does not know about is appended with zeroed
- * history figures, which is the truth about it rather than a placeholder.
+ * One item is produced per saved row with an `item_code`, in row order
+ * (duplicate item codes are kept, each with its own `_rowKey`). History
+ * supplies the figures for an item when it knows it (matched by `item_code`,
+ * first match); an item with no history gets zeroed figures, which is the
+ * truth about it rather than a placeholder. History items absent from the
+ * plan are not included.
  */
-export const mergeSavedPlanRows = (
-  items: SalesPlanItem[],
-  rows: SalesPlanDocRow[],
+export const buildItemsFromSavedPlan = (
+  historyItems: ComparableHistoryItem[],
+  planRows: SalesPlanDocRow[],
 ): SalesPlanItem[] => {
-  if (!Array.isArray(rows) || rows.length === 0) return items;
-
-  const byItemCode = new Map<string, SalesPlanItem>();
-  items.forEach((item) => {
-    if (!byItemCode.has(item.item_code)) byItemCode.set(item.item_code, item);
+  const historyByCode = new Map<string, ComparableHistoryItem>();
+  (Array.isArray(historyItems) ? historyItems : []).forEach((item) => {
+    if (!historyByCode.has(item.item_code)) historyByCode.set(item.item_code, item);
   });
 
-  const merged = items.map((item) => ({ ...item }));
-  const mergedByCode = new Map<string, SalesPlanItem>();
-  merged.forEach((item) => {
-    if (!mergedByCode.has(item.item_code)) mergedByCode.set(item.item_code, item);
-  });
-
-  rows.forEach((row) => {
+  const items: SalesPlanItem[] = [];
+  (Array.isArray(planRows) ? planRows : []).forEach((row) => {
     const itemCode = String(row.item_code || '');
     if (!itemCode) return;
 
+    const hist = historyByCode.get(itemCode);
     const qty = Number(row.qty);
-    const existing = mergedByCode.get(itemCode);
+    const rate = Number(row.rate);
 
-    if (existing) {
-      existing.planned_qty = Number.isFinite(qty) ? qty : existing.planned_qty;
-      if (row.rate !== undefined && Number.isFinite(Number(row.rate))) existing.rate = Number(row.rate);
-      return;
-    }
-
-    merged.push({
+    items.push({
       item_code: itemCode,
-      item_name: itemCode,
-      stock_uom: row.stock_uom || 'Nos',
-      department: row.department,
-      production_unit: row.production_unit,
-      production_policy: row.production_policy,
-      bom: row.bom,
-      rate: Number(row.rate) || 0,
-      average_qty: 0,
-      sample_days: 0,
-      history: [],
+      item_name: hist?.item_name || itemCode,
+      stock_uom: row.stock_uom || hist?.stock_uom || 'Nos',
+      department: row.department || hist?.department,
+      production_unit: row.production_unit || hist?.production_unit,
+      production_policy: row.production_policy || hist?.production_policy,
+      bom: row.bom || hist?.bom,
+      rate: row.rate !== undefined && row.rate !== null && Number.isFinite(rate) ? rate : hist?.rate ?? 0,
+      average_qty: hist?.average_qty ?? 0,
+      sample_days: hist?.sample_days ?? 0,
+      total_qty: hist?.total_qty ?? 0,
+      history: hist?.history ?? [],
       planned_qty: Number.isFinite(qty) ? qty : 0,
       _rowKey: generateRowKey(),
     });
   });
 
-  return merged;
+  return items;
 };
 
 export const getSalesPlanDraftQuantities = (key: string | null): Record<string, number> => {
@@ -295,9 +282,18 @@ export interface SaveSalesPlanDraftParams {
   enforcement_mode?: string;
 }
 
+export interface SalesPlanItemIssue {
+  item_code: string;
+  /** 'off_menu' | 'production_config'; string kept open for future backend codes. */
+  code: string;
+  message: string;
+}
+
 export interface SaveSalesPlanDraftResponse {
   name: string;
   status: string;
+  expected_sales_amount?: number;
+  item_issues?: SalesPlanItemIssue[];
 }
 
 export interface TransitionSalesPlanParams {
