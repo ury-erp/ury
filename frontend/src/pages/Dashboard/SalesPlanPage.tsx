@@ -699,7 +699,11 @@ export const SalesPlanPage: React.FC = () => {
     void persistDraft(items);
   };
 
-  const requestRemoveItem = (rowKey: string) => setRemoveConfirmRowKey(rowKey);
+  // Ignored while a save is in flight so two removals never race each other.
+  const requestRemoveItem = (rowKey: string) => {
+    if (saving) return;
+    setRemoveConfirmRowKey(rowKey);
+  };
 
   const removeItem = async (rowKey: string) => {
     const previous = items;
