@@ -369,6 +369,10 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		],
+		# After Insights' nightly warehouse sync (about 00:25): keep the analytics dashboards' Date filter on the last day with sales.
+		"45 0 * * *":[
+			"ury.ury.analytics.tools.import_dashboards.refresh_latest_day_defaults",
+		],
 		# Backstop only. Reservations are normally closed out at the
 		# consolidated Sales Invoice submit (sale) or on cancellation; this
 		# sweeps rows that reached neither, so capacity is not leaked

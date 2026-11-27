@@ -1,0 +1,132 @@
+# DB03 Sales deep-dive (redesign, 2026-11-22). Audience: chairman, owner, finance, branch manager, anyone.
+# ONE Date filter. It opens on the LATEST DAY WITH SALES (default `within` {span: current day, anchor: __LATEST_DAY__}, resolved to a real date
+# by the importer and moved forward daily by refresh_latest_day_defaults). Clear it to see every date; or pick any range from the same filter.
+# Every bill is ONE row, so numbers are never double counted, with or without filters.
+# The 8 cards (fact_card_days) follow Date, Branch, Service and Waiter: each shows the total for the dates picked (latest day by default; a
+# range, or every date when Date is cleared). Cards use compare_previous: % change vs the previous period (needs a `within` Date) and a trend line for periods of a week or more; a `between` range or cleared Date shows the total only. The latest-vs-previous-day line always shows the
+# latest two days (Branch / Service / Waiter only). The monthly charts follow Branch / Service / Waiter only.
+# time_of_day labels start with an invisible character (U+200B..U+2061, increasing) so they sort Breakfast..Late night without showing numbers.
+# No currency symbols anywhere. Insights runs these queries on DuckDB: cast before LPAD, no TIME_TO_SEC etc.
+workbook: {id: ury_db03_sales_deep_dive, title: "Sales deep-dive", module: "URY", required_apps: [ury]}
+queries:
+  - id: fact_sales
+    title: "fact_sales"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.name, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, CASE WHEN HOUR(pi.posting_time) < 11 THEN '​Breakfast (before 11 am)' WHEN HOUR(pi.posting_time) < 15 THEN '‌Lunch (11 am to 3 pm)' WHEN HOUR(pi.posting_time) < 19 THEN '‍Snacks (3 to 7 pm)' WHEN HOUR(pi.posting_time) < 23 THEN '⁠Dinner (7 to 11 pm)' ELSE '⁡Late night' END AS time_of_day, CASE WHEN HOUR(pi.posting_time) < 11 THEN 1 WHEN HOUR(pi.posting_time) < 15 THEN 2 WHEN HOUR(pi.posting_time) < 19 THEN 3 WHEN HOUR(pi.posting_time) < 23 THEN 4 ELSE 5 END AS tod_order, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, pi.total_qty, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day, DATE_SUB(l.last_day, INTERVAL (DAYOFMONTH(l.last_day) - 1) DAY) AS m_start FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0) SELECT name, posting_date, hour_of_day, hour_label, time_of_day, tod_order, branch, order_type, waiter, waiter_name, population, net_total, discount_amount, total_qty, covers, cover_sales, DATE_FORMAT(posting_date, '%Y-%m-%d') AS day_text FROM b"
+  - id: fact_daily
+    title: "fact_daily"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.posting_date, DATE_FORMAT(pi.posting_date, '%Y-%m') AS month_label, DATEDIFF(l.last_day, pi.posting_date) AS days_ago, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, SUM(pi.net_total) AS net_sales, COUNT(*) AS bills FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 396 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0 GROUP BY pi.posting_date, DATE_FORMAT(pi.posting_date, '%Y-%m'), DATEDIFF(l.last_day, pi.posting_date), pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter)"
+
+  # fact_card_days (sql): one row per day x branch x service x waiter (no duplicates).
+  # Cards use it; linked to the Date filter (total for the dates picked).
+  - id: fact_card_days
+    title: "fact_card_days"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.name, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, CASE WHEN HOUR(pi.posting_time) < 11 THEN '​Breakfast (before 11 am)' WHEN HOUR(pi.posting_time) < 15 THEN '‌Lunch (11 am to 3 pm)' WHEN HOUR(pi.posting_time) < 19 THEN '‍Snacks (3 to 7 pm)' WHEN HOUR(pi.posting_time) < 23 THEN '⁠Dinner (7 to 11 pm)' ELSE '⁡Late night' END AS time_of_day, CASE WHEN HOUR(pi.posting_time) < 11 THEN 1 WHEN HOUR(pi.posting_time) < 15 THEN 2 WHEN HOUR(pi.posting_time) < 19 THEN 3 WHEN HOUR(pi.posting_time) < 23 THEN 4 ELSE 5 END AS tod_order, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, pi.total_qty, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day, DATE_SUB(l.last_day, INTERVAL (DAYOFMONTH(l.last_day) - 1) DAY) AS m_start FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0), d AS (SELECT posting_date, branch, order_type, waiter, waiter_name, SUM(net_total) AS net_sales, COUNT(*) AS bills, SUM(total_qty) AS items, SUM(covers) AS covers, SUM(cover_sales) AS cover_sales, SUM(discount_amount) AS discounts, MAX(last_day) AS last_day, MAX(m_start) AS m_start FROM b GROUP BY posting_date, branch, order_type, waiter, waiter_name) SELECT posting_date, DATEDIFF(last_day, posting_date) AS days_ago, branch, order_type, waiter, waiter_name, net_sales, bills, items, covers, cover_sales, discounts FROM d"
+  # fact_hourly_2day (sql): bills of the latest data day and the day before it, for the latest vs previous day line chart.
+  # Follows Branch / Service / Waiter; not Date (it always shows these two days).
+  - id: fact_hourly_2day
+    title: "fact_hourly_2day"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.name, pi.posting_date, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, pi.branch, pi.order_type, pi.waiter, COALESCE(NULLIF(u.first_name, ''), pi.waiter) AS waiter_name, pi.net_total, CASE WHEN pi.posting_date = l.last_day THEN CONCAT('Latest day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) ELSE CONCAT('Previous day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) END AS day_text FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 1 DAY) LEFT JOIN `tabUser` u ON u.name = pi.waiter WHERE pi.docstatus = 1 AND pi.is_return = 0"
+
+charts:
+  # ---- Key numbers (top). Each card = latest day with sales, % change vs the day before, and a trend line.
+  - {id: db03_day_sales, title: "Day sales", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(net_sales).round(0)", as: "Day sales"}]}
+  - {id: db03_bills, title: "Bills", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(bills)", as: "Bills"}]}
+  - {id: db03_avg_bill, title: "Average bill value", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "(sum(net_sales) / sum(bills)).round(0)", as: "Average bill value"}]}
+  - {id: db03_avg_size, title: "Average bill size (items per bill)", query: fact_card_days, type: Number, decimal: 1, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(items) / sum(bills)", as: "Average bill size (items per bill)"}]}
+  - {id: db03_avg_cover, title: "Average spend per guest", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "(sum(cover_sales) / sum(covers)).round(0)", as: "Average spend per guest"}]}
+  - {id: db03_guests, title: "Guests served", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(covers)", as: "Guests served"}]}
+  - {id: db03_items, title: "Items sold", query: fact_card_days, type: Number, compare_previous: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(items)", as: "Items sold"}]}
+  - {id: db03_discounts, title: "Discounts given", query: fact_card_days, type: Number, compare_previous: true, negative_is_better: true,
+     date: {column: posting_date},
+     y: [{expr: "sum(discounts).round(0)", as: "Discounts given"}]}
+  - {id: db03_2day_line, title: "Latest day vs previous day: sales by hour", query: fact_hourly_2day, type: Line, limit: 100, smooth: true, show_area: true, show_data_points: true,
+     x: hour_label, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: day_text, max: 2},
+     order: [{by: hour_label, dir: asc}]}
+
+  # ---- Compare days side by side
+  - {id: db03_scorecard, title: "Day-by-day scorecard", query: fact_sales, type: Table, limit: 20,
+     rows: [day_text],
+     y: [{expr: "sum(net_total).round(0)", as: "Sales"}, {column: name, agg: count, as: Bills}, {expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill value"}, {expr: "(sum(total_qty) / count(name)).round(1)", as: "Items per bill"}, {expr: "(sum(cover_sales) / sum(covers)).round(0)", as: "Spend per guest"}],
+     order: [{by: day_text, dir: desc}]}
+  - {id: db03_hourly, title: "When do we sell? Sales by hour", query: fact_sales, type: Line, limit: 100, smooth: true, show_area: true,
+     x: hour_label, y: [{column: net_total, agg: sum, as: "Sales"}],
+     order: [{by: hour_label, dir: asc}]}
+  - {id: db03_timeofday, title: "Sales by time of day", query: fact_sales, type: Bar, limit: 20, stack: false,
+     x: time_of_day, y: [{column: net_total, agg: sum, as: "Sales"}],
+     order: [{by: time_of_day, dir: asc}]}
+
+  # ---- Service-wise sales
+  - {id: db03_service_compare, title: "Service-wise sales", query: fact_sales, type: Bar, limit: 30, stack: false,
+     x: order_type, y: [{column: net_total, agg: sum, as: "Sales"}]}
+  - {id: db03_service_share, title: "Share of sales by service", query: fact_sales, type: Donut, limit: 8,
+     x: order_type, y: [{column: net_total, agg: sum, as: "Sales"}]}
+  - {id: db03_service_avg, title: "Average bill value by service", query: fact_sales, type: Row, color: "#f59e0b", limit: 10,
+     x: order_type, y: [{expr: "(sum(net_total) / count(name)).round(0)", as: "Average bill value"}],
+     order: [{by: "Average bill value", dir: desc}]}
+  - {id: db03_waiters, title: "Top waiters by sales", query: fact_sales, type: Row, color: "#10b981", limit: 10,
+     filters: [{column: population, op: "=", value: "Paid"}],
+     x: waiter_name, y: [{column: net_total, agg: sum, as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+
+  # ---- Trends (history; follow Branch / Service / Waiter only)
+  - {id: db03_daily, title: "Sales by day", query: fact_sales, type: Bar, limit: 100, color: "#6a39db", show_data_labels: true,
+     x: {column: posting_date, granularity: day}, y: [{column: net_total, agg: sum, as: "Sales"}]}
+  - {id: db03_monthly_avg, title: "Monthly average sales per day", query: fact_daily, type: Bar, limit: 14, color: "#0ea5e9", show_data_labels: true,
+     x: month_label, y: [{expr: "(sum(net_sales) / distinct_count(posting_date)).round(0)", as: "Average sales per day"}]}
+  - {id: db03_monthly_total, title: "Monthly total sales", query: fact_daily, type: Line, limit: 14, smooth: true, show_area: true, color: "#ec4899",
+     x: month_label, y: [{column: net_sales, agg: sum, as: "Total sales"}]}
+
+  # ---- Detail
+  - {id: db03_grid, title: "Bills by hour", query: fact_sales, type: Table, enable_color_scale: true, limit: 50,
+     rows: [hour_label], y: [{column: name, agg: count, as: Bills}, {expr: "sum(net_total).round(0)", as: Sales}],
+     order: [{by: hour_label, dir: asc}]}
+
+dashboards:
+  - id: sales_deep_dive
+    title: "Sales deep-dive"
+    filters:
+      - {id: f_range, label: "Date", type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, applies_to: {fact_sales: posting_date, fact_card_days: posting_date}, layout: {x: 0, y: 2, w: 8, h: 1}}
+      - {id: f_branch, label: Branch, type: string, icon: store, applies_to: {fact_sales: branch, fact_daily: branch, fact_card_days: branch, fact_hourly_2day: branch}, layout: {x: 8, y: 2, w: 4, h: 1}}
+      - {id: f_service, label: Service, type: string, icon: utensils, applies_to: {fact_sales: order_type, fact_daily: order_type, fact_card_days: order_type, fact_hourly_2day: order_type}, layout: {x: 12, y: 2, w: 4, h: 1}}
+      - {id: f_waiter, label: Waiter, type: string, icon: user, applies_to: {fact_sales: waiter_name, fact_daily: waiter_name, fact_card_days: waiter_name, fact_hourly_2day: waiter_name}, layout: {x: 16, y: 2, w: 4, h: 1}}
+    items:
+      - {text: "<h2>Sales deep-dive</h2><p>Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range (a week, a month), or clear it to see all dates. Branch, Service and Waiter apply to every report.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Totals for the <b>Date</b> picked, with the % change against the period before. Also follows Branch, Service and Waiter.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db03_day_sales, x: 0, y: 5, w: 5, h: 4}
+      - {chart: db03_bills, x: 5, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_bill, x: 10, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_size, x: 15, y: 5, w: 5, h: 4}
+      - {chart: db03_avg_cover, x: 0, y: 9, w: 5, h: 4}
+      - {chart: db03_guests, x: 5, y: 9, w: 5, h: 4}
+      - {chart: db03_items, x: 10, y: 9, w: 5, h: 4}
+      - {chart: db03_discounts, x: 15, y: 9, w: 5, h: 4}
+      - {chart: db03_2day_line, x: 0, y: 13, w: 20, h: 9}
+      - {chart: db03_scorecard, x: 0, y: 22, w: 20, h: 5}
+      - {text: "<h3>When we sell</h3>", x: 0, y: 27, w: 20, h: 1}
+      - {chart: db03_hourly, x: 0, y: 28, w: 12, h: 9}
+      - {chart: db03_timeofday, x: 12, y: 28, w: 8, h: 9}
+      - {text: "<h3>Service-wise sales</h3>", x: 0, y: 37, w: 20, h: 1}
+      - {chart: db03_service_compare, x: 0, y: 38, w: 10, h: 9}
+      - {chart: db03_service_share, x: 10, y: 38, w: 5, h: 9}
+      - {chart: db03_service_avg, x: 15, y: 38, w: 5, h: 9}
+      - {text: "<h3>Day and month trends</h3><p>Sales by day follows the Date filter. The two monthly charts always show every month, so they follow Branch, Service and Waiter only.</p>", x: 0, y: 47, w: 20, h: 2}
+      - {chart: db03_daily, x: 0, y: 49, w: 20, h: 8}
+      - {chart: db03_monthly_avg, x: 0, y: 57, w: 10, h: 8}
+      - {chart: db03_monthly_total, x: 10, y: 57, w: 10, h: 8}
+      - {text: "<h3>Details</h3>", x: 0, y: 65, w: 20, h: 1}
+      - {chart: db03_waiters, x: 0, y: 66, w: 8, h: 10}
+      - {chart: db03_grid, x: 8, y: 66, w: 12, h: 10}
+      - {text: "<p>Sales are net of tax and exclude cancelled bills. Average bill value = sales per bill. Spend per guest uses bills that recorded the number of guests.</p>", x: 0, y: 76, w: 20, h: 1}

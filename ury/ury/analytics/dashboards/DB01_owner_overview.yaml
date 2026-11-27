@@ -1,0 +1,194 @@
+# DB01 Owner overview, DAILY view (redesign 2026-11-23). Audience: the owner / chairman.
+# Same pattern as DB03: ONE Date filter (`within`, default {span: current day, anchor: latest day with sales}; the importer fills the
+# __LATEST_DAY__ anchor and refresh_latest_day_defaults moves it nightly). Clear it for all dates (last 93 days), or pick a range.
+# Number cards (fact_card_days and the daily sources below) do NOT follow Date: each shows its latest day with data, the % change vs the
+# day before and a trend line, and follows Branch. Charts follow Date, Branch. The last-14-days trend and the
+# latest-vs-previous-day hourly line always show recent days. Every bill is one row per day/branch/service (no duplicates).
+# No Bill type filter (removed 2026-11-24). No currency symbols anywhere. Insights runs these queries on DuckDB.
+workbook: {id: ury_db01_owner_overview, title: "Owner overview", module: "URY", required_apps: [ury]}
+queries:
+  # fact_card_days (sql): one row per day x branch x service x bill type (last 93 days before the latest sales day). Cards + 14-day trend. Not linked to Date.
+  - id: fact_card_days
+    title: "fact_card_days"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.posting_date, pi.branch, pi.order_type, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) WHERE pi.docstatus = 1 AND pi.is_return = 0) SELECT posting_date, DATEDIFF(MAX(last_day), posting_date) AS days_ago, branch, order_type, population, SUM(net_total) AS net_sales, COUNT(*) AS bills, SUM(covers) AS covers, SUM(cover_sales) AS cover_sales, SUM(discount_amount) AS discounts FROM b GROUP BY posting_date, branch, order_type, population"
+  # fact_sales (sql): same rows as fact_card_days, linked to the Date filter. Charts by service / branch.
+  - id: fact_sales
+    title: "fact_sales"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0), b AS (SELECT pi.posting_date, pi.branch, pi.order_type, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, pi.discount_amount, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN CAST(pi.no_of_pax AS SIGNED) ELSE 0 END AS covers, CASE WHEN CAST(pi.no_of_pax AS SIGNED) > 0 THEN pi.net_total ELSE 0 END AS cover_sales, l.last_day FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 93 DAY) WHERE pi.docstatus = 1 AND pi.is_return = 0) SELECT posting_date, DATEDIFF(MAX(last_day), posting_date) AS days_ago, branch, order_type, population, SUM(net_total) AS net_sales, COUNT(*) AS bills, SUM(covers) AS covers, SUM(cover_sales) AS cover_sales, SUM(discount_amount) AS discounts FROM b GROUP BY posting_date, branch, order_type, population"
+  # fact_hourly_2day (sql): bills of the latest sales day and the day before, for the latest-vs-previous-day line.
+  - id: fact_hourly_2day
+    title: "fact_hourly_2day"
+    sql: "WITH l AS (SELECT MAX(posting_date) AS last_day FROM `tabPOS Invoice` WHERE docstatus = 1 AND is_return = 0) SELECT pi.name, pi.posting_date, LPAD(CAST(HOUR(pi.posting_time) AS CHAR), 2, '0') AS hour_label, pi.branch, pi.order_type, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.net_total, CASE WHEN pi.posting_date = l.last_day THEN CONCAT('Latest day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) ELSE CONCAT('Previous day ', DATE_FORMAT(pi.posting_date, '%Y-%m-%d')) END AS day_text FROM `tabPOS Invoice` pi JOIN l ON pi.posting_date >= DATE_SUB(l.last_day, INTERVAL 1 DAY) WHERE pi.docstatus = 1 AND pi.is_return = 0"
+
+  - {id: fact_sales_lines_enriched, title: fact_sales_lines_enriched, sql: 'WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN (''Dessert'',''Desserts'',''Pastry'',''Ice cream'') THEN ''Desserts'' WHEN ig.name IN (''Soups'',''Soups&Salads'',''SALADS'',''Salad Chicken'') THEN ''Soups & Salads'' WHEN ig.name IN (''Grills & BBQ'',''CHARCOL GRILLED'',''Grilled Specials'',''Chicken Al Fahams'',''KEBAB'',''Chicken Kebabs'') THEN ''Grills & Kebabs'' WHEN ig.name IN (''RICE'',''Biryani & Rice'',''Special Rice'') THEN ''Rice & Biryani'' WHEN ig.name IN (''Curries'',''GRAVY'',''GARAVIES'',''Main Course'') THEN ''Mains & Curries'' WHEN ig.name IN (''BURGER & WRAPS'',''Burgers & Sandwiches'') THEN ''Burgers & Wraps'' WHEN ig.name IN (''COMBOS'',''COMBO-LULU'',''PLATTER'') THEN ''Combos & Platters'' WHEN ig.name IN (''Soft Drinks'',''Cool Drinks'',''Soft Drink Spl'',''Soft Drink Can'') THEN ''Soft Drinks'' WHEN ig.name IN (''Juices&Mocktails'',''Smoothies'',''Beverages'') THEN ''Juices & Beverages'' WHEN ig.name = ''All Item Groups'' THEN ''Unassigned'' WHEN ig.name IN (''Raw Material'',''Services'',''Sub Assemblies'',''Consumable'',''Central Store'',''Burning Materials'',''Cleaning Material'',''Disposable'',''Chicken'',''Frozen Goods'',''Groceries'',''Milk & Curd'',''FISH'',''Provision'',''Sauces'',''Powder'',''Oil'',''Fruits'',''Kitchen Materials'',''Vegetable'',''VEGETABLES'',''Cleaning'',''Burning'',''GROCERY'',''Disposables'',''Ejt Masalas'',''PROCESSED'',''Rice Raw'',''Grilled Specials Raw'',''Chicken Kebabs Raw'',''Charges'',''MEAT'',''General'',''Raw Meat'',''MASALA PROCESSED'',''Staff Food'') THEN ''Non-menu'' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, pi.cashier, CASE WHEN pi.status = ''Consolidated'' THEN ''Consolidated'' ELSE ''Paid'' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, ''Unassigned'') AS menu_category, CASE WHEN cm.menu_category IN (''Soft Drinks'',''Juices & Beverages'') THEN ''Beverage'' WHEN cm.menu_category IN (''Non-menu'',''Unassigned'') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN ''Unassigned'' ELSE ''Food'' END AS category_family, COALESCE(NULLIF(ipc.department, ''''), ''Unassigned'') AS department, COALESCE(NULLIF(ipc.production_unit, ''''), ''Unassigned'') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code'}
+  - id: fact_cancellations
+    title: fact_cancellations
+    table: POS Invoice
+    filters:
+    - {column: docstatus, op: '=', value: 2}
+    # no Paid / Consolidated split: a cancelled bill's status is 'Cancelled', so its original type is not stored (the Bill type filter does not apply here)
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, status, grand_total, cancel_reason, restaurant_table]
+  - id: fact_kot_headers
+    title: fact_kot_headers
+    table: URY KOT
+    joins:
+    - table: POS Profile
+      type: left
+      true: [pos_profile, name]
+      columns: [custom_kot_warning_time, table_attention_time]
+    filters:
+    - {column: docstatus, op: '=', value: 1}
+    mutate:
+    - {as: prod_minutes, type: Decimal, expr: production_time.cast("float64")}
+    - {as: hour_of_day, type: Integer, expr: hour(time)}
+    - {as: is_served, type: Integer, expr: 'if_else(order_status == ''Served'', 1, 0)'}
+    - {as: sla_breach, type: Integer, expr: 'if_else(production_time.cast("float64") > custom_kot_warning_time, 1, 0)'}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+  - id: fact_sales_plan_items
+    title: fact_sales_plan_items
+    table: URY Sales Plan Item
+    joins:
+    - table: URY Sales Plan
+      type: inner
+      true: [parent, name]
+      columns: [plan_date, branch, company, status, service_period, enforcement_mode]
+    filters:
+    - {column: docstatus, op: '=', value: 1}
+    mutate:
+    - {as: under_qty, type: Decimal, expr: 'if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)'}
+    - {as: over_qty, type: Decimal, expr: 'if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)'}
+    select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
+  - id: fact_stock_correction
+    title: fact_stock_correction
+    table: Stock Correction Item
+    joins:
+    - table: Stock Correction
+      type: inner
+      true: [parent, name]
+      columns: [posting_date, branch, company, reason, period_end_date]
+    filters:
+    - {column: docstatus, op: '=', value: 1}
+    mutate:
+    - {as: shrink_value, type: Decimal, expr: 'if_else(amount_difference < 0, amount_difference, 0)'}
+    - {as: overage_value, type: Decimal, expr: 'if_else(amount_difference > 0, amount_difference, 0)'}
+    - {as: qty_diff, type: Decimal, expr: quantity_difference.cast("float64")}
+    select: [name, parent, posting_date, branch, company, reason, warehouse, item_code, item_name, item_group, uom, qty, current_qty, qty_diff, valuation_rate, amount, current_amount, amount_difference, shrink_value, overage_value]
+  - id: fact_yield_checks
+    title: fact_yield_checks
+    table: URY Yield Check
+    joins:
+    - table: Item
+      type: left
+      true: [item, name]
+      columns: [item_name, item_group]
+    mutate:
+    - {as: expected_output, type: Decimal, expr: input_qty * standard_yield_percent_snapshot / 100}
+    - {as: yield_loss_qty, type: Decimal, expr: input_qty * standard_yield_percent_snapshot / 100 - output_qty}
+    - {as: below_standard, type: Integer, expr: 'if_else(variance_percent < 0, 1, 0)'}
+    - {as: out_of_tolerance, type: Integer, expr: 'if_else(variance_percent < -5, 1, 0)'}
+    select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
+  - id: fact_daily_pnl
+    title: fact_daily_pnl
+    table: URY Daily P and L
+    filters:
+    - {column: docstatus, op: '=', value: 1}
+    select: [name, date, branch, gross_sales, net_sales, cogs, cogs_percent, disposables_cost, gross_profit, gross_profit_percent, total_employee_costs, net_profit]
+
+charts:
+  # ---- Key numbers: latest day with data, % change vs the day before, trend line
+  - {id: db01_net_sales, title: "Net sales", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(net_sales).round(0)", as: "Net sales"}]}
+  - {id: db01_bills, title: "Bills", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(bills)", as: "Bills"}]}
+  - {id: db01_avg_bill, title: "Average bill value", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "(sum(net_sales) / sum(bills)).round(0)", as: "Average bill value"}]}
+  - {id: db01_avg_cover, title: "Average spend per guest", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "(sum(cover_sales) / sum(covers)).round(0)", as: "Average spend per guest"}]}
+  - {id: db01_guests, title: "Guests served", query: fact_card_days, type: Number, comparison: true, sparkline: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(covers)", as: "Guests served"}]}
+  - {id: db01_gross_profit, title: "Gross profit (estimate)", query: fact_daily_pnl, type: Number, comparison: true, sparkline: true,
+     date: {column: date, granularity: day}, y: [{expr: "sum(gross_profit).round(0)", as: "Gross profit (estimate)"}]}
+  - {id: db01_gross_margin, title: "Gross margin (estimate)", query: fact_daily_pnl, type: Number, comparison: true, sparkline: true,
+     date: {column: date, granularity: day}, y: [{expr: "sum(gross_profit) / sum(net_sales)", as: "Gross margin (estimate)", format: percent}]}
+  - {id: db01_discounts, title: "Discounts given", query: fact_card_days, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(discounts).round(0)", as: "Discounts given"}]}
+
+  # ---- Latest day vs previous day, hour by hour
+  - {id: db01_2day_line, title: "Latest day vs previous day: sales by hour", query: fact_hourly_2day, type: Line, limit: 100, smooth: true, show_area: true, show_data_points: true,
+     x: hour_label, y: [{column: net_total, agg: sum, as: "Sales"}], split_by: {column: day_text, max: 2},
+     order: [{by: hour_label, dir: asc}]}
+
+  # ---- Is sales growing? last 14 days (not linked to Date)
+  - {id: db01_last14, title: "Daily sales, last 14 days", query: fact_card_days, type: Line, limit: 30, smooth: true, show_area: true, label_rotation: 30,
+     filters: [{column: days_ago, op: "<=", value: 13}],
+     x: {column: posting_date, granularity: day}, y: [{expr: "sum(net_sales).round(0)", as: "Sales"}]}
+
+  # ---- Where sales come from (follow Date)
+  - {id: db01_channel, title: "Sales by service", query: fact_sales, type: Donut, limit: 5,
+     x: order_type, y: [{expr: "sum(net_sales).round(0)", as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+  - {id: db01_branch, title: "Sales by branch", query: fact_sales, type: Row, limit: 10,
+     color: "#1aa3b8", stack: true,
+     x: branch, y: [{expr: "sum(net_sales).round(0)", as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+  - {id: db01_category, title: "Sales by menu category", query: fact_sales_lines_enriched, type: Row, limit: 12,
+     color: "#b81ab5", stack: true,
+     x: menu_category, y: [{expr: "(sum(net_amount)).round(0)", as: "Sales"}], order: [{by: "Sales", dir: desc}],
+     filters: [{column: category_family, op: "!=", value: "Non-menu"}]}
+  - {id: db01_department, title: "Sales by kitchen department", query: fact_sales_lines_enriched, type: Row, limit: 12,
+     color: "#923fab", stack: true,
+     x: department, y: [{expr: "(sum(net_amount)).round(0)", as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+  - {id: db01_top_items, title: "Top 10 items by sales", query: fact_sales_lines_enriched, type: Row, limit: 10,
+     color: "#131aa1", stack: true,
+     x: item_name, y: [{expr: "(sum(net_amount)).round(0)", as: "Sales"}], order: [{by: "Sales", dir: desc}]}
+
+  # ---- Control panel: latest day each source has, vs the day before (not linked to Date)
+  - {id: db01_cancels, title: "Cancelled bills value", query: fact_cancellations, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "sum(grand_total).round(0)", as: "Cancelled bills value"}]}
+  - {id: db01_sla, title: "Kitchen orders late (%)", query: fact_kot_headers, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: date, granularity: day}, y: [{expr: "sum(sla_breach) / sum(is_served)", as: "Kitchen orders late (%)", format: percent}]}
+  - {id: db01_plan, title: "Plan fulfilled (%)", query: fact_sales_plan_items, type: Number, comparison: true, sparkline: true,
+     date: {column: plan_date, granularity: day}, y: [{expr: "sum(fulfilled_qty) / sum(qty)", as: "Plan fulfilled (%)", format: percent}]}
+  - {id: db01_yield, title: "Yield (%)", query: fact_yield_checks, type: Number, comparison: true, sparkline: true,
+     date: {column: checked_on, granularity: day, data_type: Datetime},
+     y: [{expr: "sum(output_qty) / sum(input_qty)", as: "Yield (%)", format: percent}],
+     filters: [{column: stock_uom, op: "=", value: "Kg"}]}
+  - {id: db01_shrink, title: "Stock shortage", query: fact_stock_correction, type: Number, comparison: true, sparkline: true, negative_is_better: true,
+     date: {column: posting_date, granularity: day}, y: [{expr: "(-sum(shrink_value)).round(0)", as: "Stock shortage"}]}
+
+dashboards:
+  - id: owner_overview
+    title: "Owner overview"
+    filters:
+      - {id: f_date, label: Date, type: date, icon: calendar, default: {op: within, value: {span: "current day", anchor: "__LATEST_DAY__"}}, layout: {x: 0, y: 2, w: 8, h: 1},
+         applies_to: {fact_sales: posting_date, fact_sales_lines_enriched: posting_date}}
+      - {id: f_branch, label: Branch, type: string, icon: store, layout: {x: 8, y: 2, w: 12, h: 1},
+         applies_to: {fact_card_days: branch, fact_sales: branch, fact_hourly_2day: branch, fact_sales_lines_enriched: branch, fact_cancellations: branch, fact_kot_headers: branch, fact_sales_plan_items: branch, fact_stock_correction: branch, fact_yield_checks: branch, fact_daily_pnl: branch}}
+    items:
+      - {text: "<h2>Owner overview</h2><p>Is revenue growing, where does it come from, and is anything leaking? Opens on the latest day with sales. Use <b>Date</b> to pick another day or a range, or clear it for all dates. Branch applies to every report.</p>", x: 0, y: 0, w: 20, h: 2}
+      - {text: "<h3>Key numbers</h3><p>Latest day with records, with the % change against the day before. Follows Branch, not Date.</p>", x: 0, y: 3, w: 20, h: 2}
+      - {chart: db01_net_sales, x: 0, y: 5, w: 5, h: 4}
+      - {chart: db01_bills, x: 5, y: 5, w: 5, h: 4}
+      - {chart: db01_avg_bill, x: 10, y: 5, w: 5, h: 4}
+      - {chart: db01_avg_cover, x: 15, y: 5, w: 5, h: 4}
+      - {chart: db01_guests, x: 0, y: 9, w: 5, h: 4}
+      - {chart: db01_gross_profit, x: 5, y: 9, w: 5, h: 4}
+      - {chart: db01_gross_margin, x: 10, y: 9, w: 5, h: 4}
+      - {chart: db01_discounts, x: 15, y: 9, w: 5, h: 4}
+      - {text: "<p><b>Estimate:</b> gross profit and margin come from the daily profit and loss, which can be a day or more behind sales; recipe costs cover only part of sales, so treat margin as indicative.</p>", x: 0, y: 13, w: 20, h: 2}
+      - {chart: db01_2day_line, x: 0, y: 15, w: 20, h: 9}
+      - {text: "<h3>Is sales growing?</h3><p>The last 14 days. Follows Branch, not Date.</p>", x: 0, y: 24, w: 20, h: 2}
+      - {chart: db01_last14, x: 0, y: 26, w: 20, h: 9}
+      - {text: "<h3>Where sales come from</h3><p>Follows the Date filter.</p>", x: 0, y: 35, w: 20, h: 2}
+      - {chart: db01_channel, x: 0, y: 37, w: 8, h: 9}
+      - {chart: db01_branch, x: 8, y: 37, w: 12, h: 9}
+      - {chart: db01_category, x: 0, y: 46, w: 10, h: 9}
+      - {chart: db01_department, x: 10, y: 46, w: 10, h: 9}
+      - {chart: db01_top_items, x: 0, y: 55, w: 20, h: 9}
+      - {text: "<p>Sales of items with no kitchen department set show as <b>Unassigned</b>. A department can be set in Item Production Configuration.</p>", x: 0, y: 64, w: 20, h: 2}
+      - {text: "<h3>Control panel</h3><p>Leakage, kitchen, plan and stock. Each card shows the latest day that area has records for, against the day before.</p>", x: 0, y: 66, w: 20, h: 2}
+      - {chart: db01_cancels, x: 0, y: 68, w: 4, h: 4}
+      - {chart: db01_sla, x: 4, y: 68, w: 4, h: 4}
+      - {chart: db01_plan, x: 8, y: 68, w: 4, h: 4}
+      - {chart: db01_yield, x: 12, y: 68, w: 4, h: 4}
+      - {chart: db01_shrink, x: 16, y: 68, w: 4, h: 4}
+      - {text: "<p>Sales against the monthly branch target is on Sales deep-dive. Only branches with a target set appear there.</p>", x: 0, y: 72, w: 20, h: 1}
+desk: {workspace: "URY", label: "Owner Overview"}

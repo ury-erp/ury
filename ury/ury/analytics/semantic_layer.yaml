@@ -1,0 +1,479 @@
+# semantic_layer_reference: the shared base queries every URY restaurant dashboard (DB01-DB16) copies.
+# Reference spec only: NEVER apply/ship this workbook. Builders copy the query blocks they need, verbatim,
+# into their own one-dashboard spec (query ids and titles kept, so names stay consistent across workbooks).
+# Validated read-only: finsights catalog (24 tables) -> lint --strict -> compile. Not executed on the site.
+#
+# Conventions (see restaurant_analytics_architecture.md section 8):
+#   * fact_* = row-level fact (one row per business event/line), dim_* = dimension. Charts aggregate; queries never summarize.
+#   * Common column names on every fact so ONE dashboard filter binds everywhere: posting_date (or the fact's own date
+#     column, named in the comment), branch, company, department, item_code, item_group, waiter, population.
+#   * Money facts: docstatus = 1. POS Invoice is the only sales source (never Sales Invoice: consolidated copies).
+#     Sales Invoice Payment: parenttype = 'POS Invoice'. Never filter status = 'Paid'.
+#   * population = 'Consolidated' | 'Paid' (two seeded invoice populations; waiter/covers/dwell metrics are Paid-only).
+#   * Joined docstatus collision (gotcha 14): filter the BASE table docstatus only, never select a joined docstatus.
+#   * `sql:` queries are used ONLY where the grammar cannot express the logic; each says why. Their output columns are
+#     not lint-checked: the builder must run them (finsights verify) before linking filters.
+#   * CATEGORY_MAP v1 (cleaned category) lives in exactly two places: fact_sales_lines_enriched and dim_item.
+#     Keep both CASE blocks byte-identical; acceptance check DQ-CAT in dashboard_portfolio.md compares them.
+#
+# The `charts:` block holds one row-count Number probe per query. They exist only so lint L24 (query used by no chart)
+# passes --strict and so `verify` on a copied query has something to run. Builders do not copy them.
+workbook: {id: semantic_layer_reference, title: "URY Semantic Layer (reference)", module: "URY", required_apps: [ury]}
+queries:
+  # ---------------------------------------------------------------- SALES
+  # fact_sales_lines (builder, T1, the canonical revenue line). Grain: one submitted POS Invoice Item.
+  # Revenue = SUM(net_amount). Header measures (covers, grand_total) must NOT be summed here (line fan-out).
+  # department = CONFIGURED department (URY Item Production Configuration, joined on item only: safe while one config
+  # row per item; with a 2nd branch use fact_sales_lines_enriched, whose join is item AND branch).
+  # Date column: posting_date.
+  - id: fact_sales_lines
+    title: "fact_sales_lines"
+    table: "POS Invoice Item"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, posting_time, branch, company, order_type, waiter, cashier, status, is_return, pos_profile, restaurant_table]}
+      - {table: "URY Item Production Configuration", type: left, on: [item_code, item], columns: [department, production_unit, production_policy]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+    select: [name, parent, posting_date, hour_of_day, branch, company, order_type, waiter, cashier, population, pos_profile, restaurant_table, item_code, item_name, item_group, department, production_unit, production_policy, warehouse, qty, amount, net_amount, discount_amount, price_list_rate]
+
+  # fact_sales_lines_enriched (sql, T1/T2). Same grain as fact_sales_lines plus: cleaned menu_category and
+  # category_family (CATEGORY_MAP v1), branch-safe configured department, BOM-based estimated cost.
+  # Why sql: (1) the cleaned category is a 60-value CASE over Item Group; (2) the config join needs a composite key
+  # (item AND branch), finsights joins take one equality pair; (3) BOM unit cost needs a filtered sub-select
+  # (is_default=1, is_active=1, docstatus=1). Date column: posting_date. est_cost/est_margin are NULL when no recipe cost.
+  # cost_plausible = 0 when no recipe cost OR estimated margin is under -100% of net (a recipe data error); waiter_name/cashier_name = User.full_name.
+  - id: fact_sales_lines_enriched
+    title: "fact_sales_lines_enriched"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item) SELECT pii.name AS line_id, pi.name AS invoice, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, pi.branch, pi.company, pi.order_type, pi.waiter, COALESCE(uw.full_name, pi.waiter) AS waiter_name, pi.cashier, COALESCE(uc.full_name, pi.cashier) AS cashier_name, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pii.item_code, pii.item_name, pii.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, pii.warehouse, pii.qty, pii.amount AS gross_amount, pii.net_amount, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS cost_known, pii.qty * bc.bom_unit_cost AS est_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount END AS costed_net_amount, CASE WHEN bc.bom_unit_cost IS NULL THEN NULL ELSE pii.net_amount - pii.qty * bc.bom_unit_cost END AS est_margin, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 WHEN pii.net_amount - pii.qty * bc.bom_unit_cost < -pii.net_amount THEN 0 ELSE 1 END AS cost_plausible FROM `tabPOS Invoice Item` pii JOIN `tabPOS Invoice` pi ON pi.name = pii.parent AND pi.docstatus = 1 AND pi.is_return = 0 LEFT JOIN cm ON cm.item_group = pii.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = pii.item_code AND ipc.branch = pi.branch AND ipc.active = 1 LEFT JOIN bc ON bc.item = pii.item_code LEFT JOIN `tabUser` uw ON uw.name = pi.waiter LEFT JOIN `tabUser` uc ON uc.name = pi.cashier"
+
+  # fact_invoices (builder, T1). Grain: one submitted, non-return POS Invoice (the bill).
+  # Use for bill counts, ATV, covers (pax, Paid population + Dine In only), order type, waiter, hour/weekday.
+  # pax = no_of_pax cast to int (stored as text). Date column: posting_date.
+  - id: fact_invoices
+    title: "fact_invoices"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+      - {as: pax, type: Integer, expr: "no_of_pax.cast(\"int64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(posting_time)"}
+      - {as: hour_label, type: String, expr: "pad_number(hour(posting_time), 2)"}  # string label: pivot_wider on an Integer column mixes int and string names (IbisTypeError)
+      - {as: weekday, type: String, expr: "day_name(posting_date)"}
+      # weekday_label sorts Mon..Sun as a Table column header (leading digit = ISO weekday); weekday itself sorts alphabetically.
+      - {as: weekday_label, type: String, expr: "if_else(day_name(posting_date) == 'Monday', '1 Mon', if_else(day_name(posting_date) == 'Tuesday', '2 Tue', if_else(day_name(posting_date) == 'Wednesday', '3 Wed', if_else(day_name(posting_date) == 'Thursday', '4 Thu', if_else(day_name(posting_date) == 'Friday', '5 Fri', if_else(day_name(posting_date) == 'Saturday', '6 Sat', '7 Sun'))))))"}
+      - {as: is_zero_bill, type: Integer, expr: "if_else(grand_total == 0, 1, 0)"}
+      - {as: has_discount, type: Integer, expr: "if_else(discount_amount > 0, 1, 0)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount]
+
+  # fact_cancellations (builder, T1). Grain: one cancelled POS Invoice (docstatus = 2). Value lost = SUM(grand_total).
+  # The waiter is the order owner, NOT necessarily the person who cancelled (canceller not stored).
+  - id: fact_cancellations
+    title: "fact_cancellations"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 2}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # fact_invoices_named (builder chain, T1). Same rows and columns as fact_invoices plus waiter_name and cashier_name (User.full_name,
+  # falling back to the login id). Two User joins clash on `full_name` (the second join is prefixed), so each join sits in its own
+  # query, takes the name into a mutate column and drops full_name in select. Use for per-person labels; filters bind to waiter/cashier.
+  - id: fact_invoices_w
+    title: "fact_invoices_w"
+    source_query: fact_invoices
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name]
+  - id: fact_invoices_named
+    title: "fact_invoices_named"
+    source_query: fact_invoices_w
+    joins:
+      - {table: "User", type: left, on: [cashier, name], columns: [full_name]}
+    mutate:
+      - {as: cashier_name, type: String, expr: "coalesce(full_name, cashier)"}
+    select: [name, posting_date, hour_of_day, hour_label, weekday, weekday_label, branch, company, order_type, waiter, cashier, custom_waiter_employee, population, pos_profile, restaurant_table, customer, selling_price_list, total, net_total, grand_total, rounded_total, discount_amount, paid_amount, change_amount, total_qty, pax, is_zero_bill, has_discount, waiter_name, cashier_name]
+
+  # fact_cancellations_named (builder, T1). fact_cancellations plus waiter_name (User.full_name of the order owner).
+  - id: fact_cancellations_named
+    title: "fact_cancellations_named"
+    source_query: fact_cancellations
+    joins:
+      - {table: "User", type: left, on: [waiter, name], columns: [full_name]}
+    mutate:
+      - {as: waiter_name, type: String, expr: "coalesce(full_name, waiter)"}
+    select: [name, posting_date, branch, company, order_type, waiter, waiter_name, cashier, population, grand_total, cancel_reason, restaurant_table]
+
+  # ---------------------------------------------------------------- PAYMENTS / CASH-UP
+  # fact_payments (builder, T1). Grain: one tender line of a submitted POS Invoice. parenttype filter is mandatory.
+  - id: fact_payments
+    title: "fact_payments"
+    table: "Sales Invoice Payment"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, branch, company, order_type, cashier, status]}
+    filters:
+      - {column: parenttype, op: "=", value: "POS Invoice"}
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: population, type: String, expr: "if_else(status == 'Consolidated', 'Consolidated', 'Paid')"}
+    select: [name, parent, posting_date, branch, company, order_type, cashier, population, mode_of_payment, amount]
+
+  # fact_closing_details (builder, T1 structure / demo flat). Grain: one mode-of-payment row of a submitted POS Closing
+  # Entry. branch comes from the POS Opening Entry (POS Closing Entry.branch is NULL on 101/101). Covers only
+  # CONSOLIDATED invoices: the 1075 Paid invoices are in no closing yet.
+  - id: fact_closing_details
+    title: "fact_closing_details"
+    table: "POS Closing Entry Detail"
+    joins:
+      - {table: "POS Closing Entry", type: inner, on: [parent, name], columns: [posting_date, user, pos_profile, pos_opening_entry, company, period_start_date, period_end_date]}
+      - {table: "POS Opening Entry", type: left, on: [pos_opening_entry, name], columns: [branch]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: has_variance, type: Integer, expr: "if_else(difference != 0, 1, 0)"}
+    select: [name, parent, posting_date, user, pos_profile, branch, company, period_start_date, period_end_date, mode_of_payment, opening_amount, expected_amount, closing_amount, difference, has_variance]
+
+  # ---------------------------------------------------------------- KITCHEN / KOT
+  # fact_kot_headers (builder, T2). Grain: one submitted URY KOT. The SLA target is joined from POS Profile
+  # (custom_kot_warning_time: 15 'URY', 10 'URY Branch'). prod_minutes = legacy production_time (MINUTES, text);
+  # only meaningful when order_status = 'Served' (charts must add that chart filter). Date column: date.
+  # department here = EXECUTED production unit (KOT.production); URY Production Department == unit 1:1 today.
+  - id: fact_kot_headers
+    title: "fact_kot_headers"
+    table: "URY KOT"
+    joins:
+      - {table: "POS Profile", type: left, on: [pos_profile, name], columns: [custom_kot_warning_time, table_attention_time]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: prod_minutes, type: Decimal, expr: "production_time.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+      - {as: is_served, type: Integer, expr: "if_else(order_status == 'Served', 1, 0)"}
+      - {as: sla_breach, type: Integer, expr: "if_else(production_time.cast(\"float64\") > custom_kot_warning_time, 1, 0)"}
+    select: [name, date, hour_of_day, branch, production, type, order_status, is_served, invoice, restaurant_table, pos_profile, user, prod_minutes, custom_kot_warning_time, sla_breach]
+
+  # fact_kot_lines (builder, T1 counts). Grain: one URY KOT Items row (kitchen line). quantity/cancelled_qty are text:
+  # cast. Category = raw item_group (Item join); cleaned category is sales-side only. Date column: date.
+  - id: fact_kot_lines
+    title: "fact_kot_lines"
+    table: "URY KOT Items"
+    joins:
+      - {table: "URY KOT", type: inner, on: [parent, name], columns: [date, time, production, branch, type, order_status, invoice, pos_profile]}
+      - {table: "Item", type: left, on: [item, name], columns: [item_group]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: qty_num, type: Decimal, expr: "quantity.cast(\"float64\")"}
+      - {as: cancelled_qty_num, type: Decimal, expr: "cancelled_qty.cast(\"float64\")"}
+      - {as: hour_of_day, type: Integer, expr: "hour(time)"}
+    select: [name, parent, date, hour_of_day, branch, production, type, order_status, invoice, item, item_name, item_group, course, qty_num, cancelled_qty_num, disposition]
+
+  # fact_kot_exec (sql, T3 on demo: structure ready, stamps milliseconds apart). Grain: one URY KOT Execution per
+  # (kot, production_unit), DEDUPED to the latest-modified row (6 KOTs have duplicate QUEUED rows).
+  # cancel_stage = where in the KOT life the cancel happened (short labels: they sit on a narrow Row axis); ready_by_name = cook full name (User.full_name).
+  # Why sql: durations need TIMESTAMPDIFF over Datetime (time_diff casts to TIME, drops dates/fractions, sign
+  # unverified); dedupe needs ROW_NUMBER(); KOT fire time is TIMESTAMP(KOT.date, KOT.time).
+  # TIMESTAMPDIFF(SECOND, a, b) = b - a (MariaDB). Date column: exec_date. department = executed unit's department.
+  - id: fact_kot_exec
+    title: "fact_kot_exec"
+    sql: "WITH ex AS (SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.kot, e.production_unit ORDER BY e.modified DESC) AS rn FROM `tabURY KOT Execution` e) SELECT ex.name, ex.kot, ex.state, ex.production_unit, COALESCE(NULLIF(pu.department, ''), ex.production_unit) AS department, ex.branch, ex.company, DATE(COALESCE(ex.started_at, ex.creation)) AS exec_date, HOUR(k.time) AS hour_of_day, k.type AS kot_type, ex.started_by, ex.ready_by, COALESCE(ur.full_name, ex.ready_by) AS ready_by_name, ex.served_by, ex.cancelled_by, pp.custom_kot_warning_time AS target_minutes, TIMESTAMPDIFF(SECOND, ex.creation, ex.started_at) AS queue_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.ready_at) AS prep_seconds, TIMESTAMPDIFF(SECOND, ex.ready_at, ex.served_at) AS pass_seconds, TIMESTAMPDIFF(SECOND, ex.started_at, ex.served_at) AS cycle_seconds, TIMESTAMPDIFF(SECOND, TIMESTAMP(k.date, k.time), ex.served_at) AS order_to_serve_seconds, CASE WHEN ex.state LIKE 'CANCELLED%' THEN 1 ELSE 0 END AS is_cancelled, CASE WHEN ex.state = 'CANCELLED_AFTER_START' THEN 'While cooking' WHEN ex.state = 'CANCELLED_AFTER_READY' THEN 'After ready' WHEN ex.state LIKE 'CANCELLED%' THEN 'Before start' END AS cancel_stage, CASE WHEN ex.state IN ('CANCELLED_AFTER_START','CANCELLED_AFTER_READY') THEN 1 ELSE 0 END AS wasted_prep, CASE WHEN ex.started_at IS NOT NULL THEN 1 ELSE 0 END AS was_started, CASE WHEN ex.ready_at IS NOT NULL THEN 1 ELSE 0 END AS was_ready, CASE WHEN ex.served_at IS NOT NULL THEN 1 ELSE 0 END AS was_served FROM ex JOIN `tabURY KOT` k ON k.name = ex.kot LEFT JOIN `tabURY Production Unit` pu ON pu.name = ex.production_unit LEFT JOIN `tabPOS Profile` pp ON pp.name = k.pos_profile LEFT JOIN `tabUser` ur ON ur.name = ex.ready_by WHERE ex.rn = 1 AND k.docstatus IN (1, 2)"
+
+  # fact_kot_stages (sql, T3 on demo). Grain: one row per KOT per stage reached (1 Sent, 2 Started, 3 Ready, 4 Served), from the same
+  # deduped Execution rows as fact_kot_exec. Feeds the stage Funnel (numbered labels sort in order). Date column: exec_date.
+  - id: fact_kot_stages
+    title: "fact_kot_stages"
+    sql: "WITH ex AS (SELECT e.*, ROW_NUMBER() OVER (PARTITION BY e.kot, e.production_unit ORDER BY e.modified DESC) AS rn FROM `tabURY KOT Execution` e) , b AS (SELECT ex.kot, ex.branch, COALESCE(NULLIF(pu.department, ''), ex.production_unit) AS department, DATE(COALESCE(ex.started_at, ex.creation)) AS exec_date, ex.started_at, ex.ready_at, ex.served_at FROM ex JOIN `tabURY KOT` k ON k.name = ex.kot LEFT JOIN `tabURY Production Unit` pu ON pu.name = ex.production_unit WHERE ex.rn = 1 AND k.docstatus IN (1, 2)) SELECT '1 Sent to kitchen' AS stage, kot, branch, department, exec_date FROM b UNION ALL SELECT '2 Started' AS stage, kot, branch, department, exec_date FROM b WHERE started_at IS NOT NULL UNION ALL SELECT '3 Ready' AS stage, kot, branch, department, exec_date FROM b WHERE ready_at IS NOT NULL UNION ALL SELECT '4 Served' AS stage, kot, branch, department, exec_date FROM b WHERE served_at IS NOT NULL"
+
+  # ---------------------------------------------------------------- TABLES / FLOOR
+  # fact_table_sessions (sql, T2/T3). Grain: one submitted Dine In POS Invoice with its table, room and seats.
+  # dwell_minutes = total_spend_time ('HH:MM:SS' text, = invoice creation -> submit, NOT seat -> clear).
+  # dwell_valid = 1 only for 0 < dwell <= 480 min. Why sql: TIME_TO_SEC on a text duration, and room/seats come from
+  # URY Table while the invoice room field is half empty. Date column: posting_date.
+  - id: fact_table_sessions
+    title: "fact_table_sessions"
+    sql: "SELECT pi.name, pi.posting_date, HOUR(pi.posting_time) AS hour_of_day, DAYNAME(pi.posting_date) AS weekday, pi.branch, pi.company, pi.waiter, CASE WHEN pi.status = 'Consolidated' THEN 'Consolidated' ELSE 'Paid' END AS population, pi.restaurant_table, COALESCE(t.restaurant_room, 'No room') AS room, t.no_of_seats, COALESCE(t.is_take_away, 0) AS is_take_away, pi.net_total, CAST(COALESCE(NULLIF(pi.no_of_pax, ''), '0') AS UNSIGNED) AS pax, TIME_TO_SEC(pi.total_spend_time) / 60 AS dwell_minutes, CASE WHEN TIME_TO_SEC(pi.total_spend_time) > 0 AND TIME_TO_SEC(pi.total_spend_time) <= 28800 THEN 1 ELSE 0 END AS dwell_valid, CASE WHEN CAST(COALESCE(NULLIF(pi.no_of_pax, ''), '0') AS UNSIGNED) > t.no_of_seats THEN 1 ELSE 0 END AS over_capacity FROM `tabPOS Invoice` pi LEFT JOIN `tabURY Table` t ON t.name = pi.restaurant_table WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.order_type = 'Dine In'"
+
+  # dim_table (builder, T1 snapshot). Grain: one URY Table. occupied is a LIVE flag (no history).
+  - id: dim_table
+    title: "dim_table"
+    table: "URY Table"
+    select: [name, branch, restaurant, restaurant_room, no_of_seats, minimum_seating, is_take_away, occupied, latest_invoice_time]
+
+
+  # ---------------------------------------------------------------- STOCK / YIELD / WASTE / PLAN
+  # fact_stock_correction (builder, T1 on child rows). Grain: one Stock Correction Item of a submitted correction.
+  # Use child amount_difference (header difference_amount is 0 on 20/20: never use it). Negative = shrink.
+  - id: fact_stock_correction
+    title: "fact_stock_correction"
+    table: "Stock Correction Item"
+    joins:
+      - {table: "Stock Correction", type: inner, on: [parent, name], columns: [posting_date, branch, company, reason, period_end_date]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: shrink_value, type: Decimal, expr: "if_else(amount_difference < 0, amount_difference, 0)"}
+      - {as: overage_value, type: Decimal, expr: "if_else(amount_difference > 0, amount_difference, 0)"}
+      - {as: qty_diff, type: Decimal, expr: "quantity_difference.cast(\"float64\")"}
+    select: [name, parent, posting_date, branch, company, reason, warehouse, item_code, item_name, item_group, uom, qty, current_qty, qty_diff, valuation_rate, amount, current_amount, amount_difference, shrink_value, overage_value]
+
+  # fact_yield_checks (builder, T1 item level; department EMPTY). Grain: one URY Yield Check (not submittable).
+  # Weighted yield % = SUM(output_qty)/SUM(input_qty)*100 per UOM; never AVG(actual_yield_percent), never mix Kg/Litre.
+  # variance_percent is in percentage POINTS. Tolerance for out_of_tolerance = 5 points (architecture decision).
+  # Date column: checked_on (Datetime).
+  - id: fact_yield_checks
+    title: "fact_yield_checks"
+    table: "URY Yield Check"
+    joins:
+      - {table: "Item", type: left, on: [item, name], columns: [item_name, item_group, valuation_rate]}
+    mutate:
+      - {as: expected_output, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100"}
+      - {as: yield_loss_qty, type: Decimal, expr: "input_qty * standard_yield_percent_snapshot / 100 - output_qty"}
+      - {as: yield_loss_value, type: Decimal, expr: "(input_qty * standard_yield_percent_snapshot / 100 - output_qty) * valuation_rate"}
+      - {as: below_standard, type: Integer, expr: "if_else(variance_percent < 0, 1, 0)"}
+      - {as: out_of_tolerance, type: Integer, expr: "if_else(variance_percent < -5, 1, 0)"}
+    select: [name, checked_on, branch, company, department, production_unit, item, item_name, item_group, stock_uom, check_type, checked_by, input_qty, output_qty, expected_output, yield_loss_qty, yield_loss_value, actual_yield_percent, standard_yield_percent_snapshot, variance_percent, below_standard, out_of_tolerance]
+
+  # fact_sales_plan_items (builder, T1). Grain: one URY Sales Plan Item of a submitted plan (Locked for Production).
+  # Attainment = SUM(fulfilled_qty)/SUM(qty). under/over split per line BEFORE aggregation. Date column: plan_date.
+  - id: fact_sales_plan_items
+    title: "fact_sales_plan_items"
+    table: "URY Sales Plan Item"
+    joins:
+      - {table: "URY Sales Plan", type: inner, on: [parent, name], columns: [plan_date, branch, company, status, service_period, enforcement_mode]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    mutate:
+      - {as: under_qty, type: Decimal, expr: "if_else(qty > fulfilled_qty, qty - fulfilled_qty, 0)"}
+      - {as: over_qty, type: Decimal, expr: "if_else(fulfilled_qty > qty, fulfilled_qty - qty, 0)"}
+    select: [name, parent, plan_date, branch, company, status, service_period, enforcement_mode, item_code, department, production_unit, production_policy, stock_uom, qty, committed_qty, fulfilled_qty, under_qty, over_qty]
+
+  # fact_wastage_lines (builder, T2: 57 wastage entries on the re-seeded demo). Grain: one Wastage Item of a submitted URY Wastage.
+  # Dashboards show an empty-state text block until rows exist (verify --min-rows 0 for this query only).
+  - id: fact_wastage_lines
+    title: "fact_wastage_lines"
+    table: "Wastage Item"
+    joins:
+      - {table: "URY Wastage", type: inner, on: [parent, name], columns: [posting_date, branch, company, department, production_unit, reason_category, status, captured_by, approved_by]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, parent, posting_date, branch, company, department, production_unit, reason_category, status, captured_by, approved_by, item_code, item_name, uom, qty, rate, amount]
+
+  # fact_daily_pnl (builder, T2: seeded, recipe cost covers ~6-8% of revenue). Grain: one submitted URY Daily P and L
+  # (branch x date). Date column: date.
+  - id: fact_daily_pnl
+    title: "fact_daily_pnl"
+    table: "URY Daily P and L"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, date, branch, gross_sales, net_sales, cogs, cogs_percent, disposables_cost, gross_profit, gross_profit_percent, total_employee_costs, net_profit]
+
+  # ---------------------------------------------------------------- ADDED FOR FULL METRIC COVERAGE (bills with cancels, returns, charges,
+  # sessions, service requests, item prep, waste vs sales, cost variance, GL, stock ledger, stock cover, bulk production, policy label)
+  # cancelled and submitted value on the same rows: cancellation rate = SUM(cancelled_value) / SUM(grand_total). Date column: posting_date.
+  - id: fact_bills_all
+    title: "fact_bills_all"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: in, value: [1, 2]}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: cancelled_value, type: Decimal, expr: "if_else(docstatus == 2, grand_total, 0)"}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, grand_total, cancelled_value]
+
+  # fact_returns (builder, T1). Grain: one submitted return (credit note) POS Invoice; grand_total is negative. Date column: posting_date.
+  - id: fact_returns
+    title: "fact_returns"
+    table: "POS Invoice"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 1}
+    select: [name, posting_date, branch, company, order_type, waiter, cashier, grand_total, return_against]
+
+  # fact_service_charges (builder, T2 on the re-seeded demo). Grain: one tax/charge row of a submitted POS Invoice whose
+  # account head contains 'Service'. tax_amount = service charge income. There is no tip field anywhere. Date column: posting_date.
+  - id: fact_service_charges
+    title: "fact_service_charges"
+    table: "Sales Taxes and Charges"
+    joins:
+      - {table: "POS Invoice", type: inner, on: [parent, name], columns: [posting_date, branch, company]}
+    filters:
+      - {column: parenttype, op: "=", value: "POS Invoice"}
+      - {column: docstatus, op: "=", value: 1}
+      - {column: account_head, op: contains, value: "Service"}
+    select: [name, parent, posting_date, branch, company, account_head, tax_amount]
+
+  # fact_ordering_sessions (builder, T2: 18 sessions on the re-seeded demo). Grain: one QR/kiosk ordering session. invoice is set when the session became a bill.
+  # No branch column exists (sessions hang off a table), so only the Date filter can apply. Date column: opened_at.
+  - id: fact_ordering_sessions
+    title: "fact_ordering_sessions"
+    table: "URY Ordering Session"
+    select: [name, source, status, opened_at, invoice, table]
+
+  # fact_service_requests (sql, T3: 4 rows). Grain: one guest Bill/Assistance call. response_minutes = requested -> resolved
+  # (TIMESTAMPDIFF, NULL while unresolved). Why sql: datetime difference. Date column: requested_at (Datetime).
+  - id: fact_service_requests
+    title: "fact_service_requests"
+    sql: "SELECT sr.name, sr.request_type, sr.status, sr.`table`, sr.invoice, sr.requested_at, sr.resolved_at, sr.resolved_by, TIMESTAMPDIFF(SECOND, sr.requested_at, sr.resolved_at) / 60 AS response_minutes FROM `tabURY Service Request` sr"
+
+  # fact_kot_item_exec (sql, T3 on demo: stamps are test data). Grain: one URY KOT Item Execution (one dish line of a KOT).
+  # prep_minutes = started -> ready. Why sql: datetime difference plus the dish name from URY KOT Items. Date column: exec_date.
+  - id: fact_kot_item_exec
+    title: "fact_kot_item_exec"
+    sql: "SELECT ie.name, ie.kot, ie.state, ie.branch, ie.company, ie.production_unit, ki.item_name, DATE(COALESCE(ie.started_at, ie.creation)) AS exec_date, TIMESTAMPDIFF(SECOND, ie.started_at, ie.ready_at) / 60 AS prep_minutes FROM `tabURY KOT Item Execution` ie LEFT JOIN `tabURY KOT Items` ki ON ki.name = ie.kot_item WHERE ie.started_at IS NOT NULL AND ie.ready_at IS NOT NULL"
+
+  # fact_waste_vs_sales (sql, T2 on the re-seeded demo). Grain: one authorised wastage line (waste_value) UNION ALL one bill (sales_value); the other
+  # measure is 0 on each row so SUM(waste_value) / SUM(sales_value) honours the same date and branch filters (two facts cannot be joined
+  # row-level). Date column: posting_date.
+  - id: fact_waste_vs_sales
+    title: "fact_waste_vs_sales"
+    sql: "SELECT w.posting_date, w.branch, w.company, wi.amount AS waste_value, 0 AS sales_value FROM `tabWastage Item` wi JOIN `tabURY Wastage` w ON w.name = wi.parent WHERE w.docstatus = 1 AND w.status = 'Authorized' UNION ALL SELECT pi.posting_date, pi.branch, pi.company, 0 AS waste_value, pi.net_total AS sales_value FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0"
+
+  # fact_cost_variance (builder, T3: 16 rows). Grain: one URY Cost Variance Snapshot (item, company, computed_at).
+  # theoretical = BOM cost, counted = stock-count cost. Date column: computed_at (Datetime).
+  - id: fact_cost_variance
+    title: "fact_cost_variance"
+    table: "URY Cost Variance Snapshot"
+    select: [name, item_code, company, computed_at, qty, counted_qty, theoretical_cost, posted_cost, counted_cost, variance_vs_theoretical, variance_vs_counted]
+
+  # fact_gl_pnl (builder, T2). Grain: one non-cancelled GL Entry. cogs_debit = debit on Cost of Goods Sold accounts, sales_credit = credit on
+  # Sales accounts; accounting food cost % = SUM(cogs_debit) / SUM(sales_credit). Today COGS posts only from purchases, so it is indicative.
+  # Date column: posting_date.
+  - id: fact_gl_pnl
+    title: "fact_gl_pnl"
+    table: "GL Entry"
+    filters:
+      - {column: is_cancelled, op: "=", value: 0}
+    mutate:
+      - {as: cogs_debit, type: Decimal, expr: "if_else(starts_with(account, 'Cost of Goods Sold'), debit, 0)"}
+      - {as: sales_credit, type: Decimal, expr: "if_else(starts_with(account, 'Sales'), credit, 0)"}
+    select: [name, posting_date, company, account, voucher_type, debit, credit, cogs_debit, sales_credit]
+
+  # fact_stock_outflow (builder, T2). Grain: one non-cancelled Stock Ledger Entry that takes stock OUT (actual_qty < 0).
+  # outflow_value = -stock_value_difference (positive cost of stock consumed by sales, issues and transfers). Date column: posting_date.
+  - id: fact_stock_outflow
+    title: "fact_stock_outflow"
+    table: "Stock Ledger Entry"
+    filters:
+      - {column: is_cancelled, op: "=", value: 0}
+      - {column: actual_qty, op: "<", value: 0}
+    mutate:
+      - {as: outflow_value, type: Decimal, expr: "-stock_value_difference"}
+    select: [name, posting_date, company, item_code, warehouse, voucher_type, actual_qty, outflow_value]
+
+  # fact_stock_cover (sql, T2). Grain: one item. days_of_cover = Bin stock on hand / average daily outflow over the LAST 30 DAYS (fixed
+  # window, so the dashboard Date filter does not apply). NULL when nothing left the item in 30 days. No date or branch column.
+  - id: fact_stock_cover
+    title: "fact_stock_cover"
+    sql: "SELECT b.item_code, SUM(b.actual_qty) AS on_hand_qty, COALESCE(o.out_30d, 0) / 30 AS daily_outflow_qty, CASE WHEN COALESCE(o.out_30d, 0) > 0 THEN SUM(b.actual_qty) / (o.out_30d / 30) END AS days_of_cover FROM `tabBin` b LEFT JOIN (SELECT item_code, SUM(-actual_qty) AS out_30d FROM `tabStock Ledger Entry` WHERE is_cancelled = 0 AND actual_qty < 0 AND posting_date >= CURDATE() - INTERVAL 30 DAY GROUP BY item_code) o ON o.item_code = b.item_code GROUP BY b.item_code, o.out_30d HAVING SUM(b.actual_qty) > 0"
+
+  # fact_bulk_production (builder, T2: 14 runs on the re-seeded demo). Grain: one submitted Bulk Production run. total_cost = cost of the batch.
+  - id: fact_bulk_production
+    title: "fact_bulk_production"
+    table: "Bulk Production"
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+    select: [name, posting_date, branch, company, warehouse, total_cost, status]
+
+  # fact_sales_lines_policy (builder chain, T2). fact_sales_lines_enriched plus policy_label (production policy in plain words).
+  - id: fact_sales_lines_policy
+    title: "fact_sales_lines_policy"
+    source_query: fact_sales_lines_enriched
+    mutate:
+      - {as: policy_label, type: String, expr: "if_else(production_policy == 'PRE_PRODUCED', 'Pre-produced', if_else(production_policy == 'MADE_TO_ORDER', 'Made to order', if_else(production_policy == 'DIRECT_RETAIL', 'Direct retail', 'Not set')))"}
+
+  # ---------------------------------------------------------------- DIMENSIONS
+  # dim_item (sql). Grain: one Item x configured branch (one row per item while single-branch). Carries CATEGORY_MAP v1
+  # (identical CASE to fact_sales_lines_enriched), configured department/unit/policy, recipe-cost coverage and yield
+  # standard. Why sql: same CASE + composite/filtered joins as above. Use for coverage and data-quality charts.
+  - id: dim_item
+    title: "dim_item"
+    sql: "WITH cm AS (SELECT ig.name AS item_group, CASE WHEN ig.name IN ('Dessert','Desserts','Pastry','Ice cream') THEN 'Desserts' WHEN ig.name IN ('Soups','Soups&Salads','SALADS','Salad Chicken') THEN 'Soups & Salads' WHEN ig.name IN ('Grills & BBQ','CHARCOL GRILLED','Grilled Specials','Chicken Al Fahams','KEBAB','Chicken Kebabs') THEN 'Grills & Kebabs' WHEN ig.name IN ('RICE','Biryani & Rice','Special Rice') THEN 'Rice & Biryani' WHEN ig.name IN ('Curries','GRAVY','GARAVIES','Main Course') THEN 'Mains & Curries' WHEN ig.name IN ('BURGER & WRAPS','Burgers & Sandwiches') THEN 'Burgers & Wraps' WHEN ig.name IN ('COMBOS','COMBO-LULU','PLATTER') THEN 'Combos & Platters' WHEN ig.name IN ('Soft Drinks','Cool Drinks','Soft Drink Spl','Soft Drink Can') THEN 'Soft Drinks' WHEN ig.name IN ('Juices&Mocktails','Smoothies','Beverages') THEN 'Juices & Beverages' WHEN ig.name = 'All Item Groups' THEN 'Unassigned' WHEN ig.name IN ('Raw Material','Services','Sub Assemblies','Consumable','Central Store','Burning Materials','Cleaning Material','Disposable','Chicken','Frozen Goods','Groceries','Milk & Curd','FISH','Provision','Sauces','Powder','Oil','Fruits','Kitchen Materials','Vegetable','VEGETABLES','Cleaning','Burning','GROCERY','Disposables','Ejt Masalas','PROCESSED','Rice Raw','Grilled Specials Raw','Chicken Kebabs Raw','Charges','MEAT','General','Raw Meat','MASALA PROCESSED','Staff Food') THEN 'Non-menu' ELSE ig.name END AS menu_category FROM `tabItem Group` ig), bc AS (SELECT b.item, MAX(b.raw_material_cost / NULLIF(b.quantity, 0)) AS bom_unit_cost FROM `tabBOM` b WHERE b.is_default = 1 AND b.is_active = 1 AND b.docstatus = 1 AND b.raw_material_cost > 0 GROUP BY b.item), sold AS (SELECT DISTINCT pii.item_code FROM `tabPOS Invoice Item` pii WHERE pii.docstatus = 1) SELECT i.name AS item_code, i.item_name, i.item_group, COALESCE(cm.menu_category, 'Unassigned') AS menu_category, CASE WHEN cm.menu_category IN ('Soft Drinks','Juices & Beverages') THEN 'Beverage' WHEN cm.menu_category IN ('Non-menu','Unassigned') THEN cm.menu_category WHEN cm.menu_category IS NULL THEN 'Unassigned' ELSE 'Food' END AS category_family, ipc.branch, COALESCE(NULLIF(ipc.department, ''), 'Unmapped') AS department, COALESCE(NULLIF(ipc.production_unit, ''), 'Unmapped') AS config_unit, ipc.production_policy, ipc.controlled_by_sales_plan, i.is_stock_item, i.is_sales_item, i.disabled, CASE WHEN sold.item_code IS NULL THEN 0 ELSE 1 END AS is_sold, bc.bom_unit_cost, CASE WHEN bc.bom_unit_cost IS NULL THEN 0 ELSE 1 END AS has_recipe_cost, i.valuation_rate, i.custom_yield_tracked, i.custom_yield_percent FROM `tabItem` i LEFT JOIN cm ON cm.item_group = i.item_group LEFT JOIN `tabURY Item Production Configuration` ipc ON ipc.item = i.name AND ipc.active = 1 LEFT JOIN bc ON bc.item = i.name LEFT JOIN sold ON sold.item_code = i.name"
+
+  # fact_sales_target (sql, T1). Grain: one URY Sales Target row (branch x month). actual_net_sales = SUM(POS Invoice.net_total) of the same
+  # branch between period_start and period_end (submitted, non-return; same rule as net sales everywhere). is_current_month = 1 for the month
+  # that contains today (month to date against the full-month target); is_closed = 1 once the month has ended. Why sql: actual comes from a correlated range sum over the target dates,
+  # which the join grammar (one equality pair) cannot express. Date column: period_start. Branches without a target row do not appear.
+  - id: fact_sales_target
+    title: "fact_sales_target"
+    sql: "SELECT t.name, t.branch, t.company, t.period_start, t.period_end, t.target_amount, COALESCE((SELECT SUM(pi.net_total) FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.branch = t.branch AND pi.posting_date BETWEEN t.period_start AND t.period_end), 0) AS actual_net_sales, CASE WHEN CURDATE() BETWEEN t.period_start AND t.period_end THEN 1 ELSE 0 END AS is_current_month, CASE WHEN t.period_end < CURDATE() THEN 1 ELSE 0 END AS is_closed, DATE_FORMAT(t.period_start, '%Y-%m') AS month_label FROM `tabURY Sales Target` t WHERE t.docstatus < 2"
+
+  # fact_labour_hours (sql, T2). Grain: one branch x day that has BOTH POS sales and attendance. net_sales = SUM(POS Invoice.net_total) of the branch
+  # that day; labour_hours = SUM(Attendance.working_hours) of submitted Present attendance whose Employee.branch is that branch. Days with sales but
+  # no attendance (or the reverse) are left out so the ratio never mixes a full day of sales with no hours. Why sql: two aggregates joined on
+  # (branch, date), with Attendance branch coming from Employee. Date column: posting_date.
+  - id: fact_labour_hours
+    title: "fact_labour_hours"
+    sql: "SELECT s.branch, s.company, s.posting_date, s.net_sales, a.labour_hours, a.staff_present FROM (SELECT pi.branch, pi.company, pi.posting_date, SUM(pi.net_total) AS net_sales FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 GROUP BY pi.branch, pi.company, pi.posting_date) s JOIN (SELECT e.branch, att.attendance_date, SUM(att.working_hours) AS labour_hours, COUNT(DISTINCT att.employee) AS staff_present FROM `tabAttendance` att JOIN `tabEmployee` e ON e.name = att.employee WHERE att.docstatus = 1 AND att.status = 'Present' AND att.working_hours > 0 GROUP BY e.branch, att.attendance_date) a ON a.branch = s.branch AND a.attendance_date = s.posting_date"
+
+  # fact_tips (builder, T2). Grain: one submitted, non-return POS Invoice with the tip entered at billing (custom_tip_amount, custom field on POS Invoice)
+  # and the waiter's Employee name (custom_waiter_employee -> Employee.employee_name). Tips only: commission is calculated by the Commission report in
+  # the app and is not stored on any table, so it cannot be charted here. Date column: posting_date.
+  - id: fact_tips
+    title: "fact_tips"
+    table: "POS Invoice"
+    joins:
+      - {table: "Employee", type: left, on: [custom_waiter_employee, name], columns: [employee_name]}
+    filters:
+      - {column: docstatus, op: "=", value: 1}
+      - {column: is_return, op: "=", value: 0}
+    mutate:
+      - {as: waiter_label, type: String, expr: "coalesce(employee_name, custom_waiter_employee)"}
+    select: [name, posting_date, branch, company, order_type, waiter, custom_waiter_employee, waiter_label, net_total, custom_tip_amount]
+
+  # fact_seat_hours (sql, T2 PROXY). Grain: one branch x day with dine-in trade. Dine-in net sales, covers, bills and time at table
+  # (dwell_hours = SUM(total_spend_time) of bills with 0 < time <= 8 h; it runs bill created -> paid, not seated -> cleared), against capacity:
+  # seats and tables = enabled non-takeaway URY Tables of the branch (names containing 'waiting' excluded), open_hours = that weekday's enabled
+  # service windows in the URY Branch Operating Schedule. seat_hours = seats x open_hours, table_hours = tables x open_hours. Days with no dine-in
+  # bill and branches with no operating schedule are absent. Why sql: weekday-keyed hours from child windows, three aggregates joined. Date column: posting_date.
+  - id: fact_seat_hours
+    title: "fact_seat_hours"
+    sql: "SELECT d.branch, d.company, d.posting_date, d.bills, d.covers, d.net_sales, d.dwell_hours, t.tables_n, t.seats, w.open_hours, t.seats * w.open_hours AS seat_hours, t.tables_n * w.open_hours AS table_hours FROM (SELECT pi.branch, pi.company, pi.posting_date, COUNT(*) AS bills, SUM(CAST(COALESCE(NULLIF(pi.no_of_pax, ''), '0') AS UNSIGNED)) AS covers, SUM(pi.net_total) AS net_sales, SUM(CASE WHEN TIME_TO_SEC(pi.total_spend_time) > 0 AND TIME_TO_SEC(pi.total_spend_time) <= 28800 THEN TIME_TO_SEC(pi.total_spend_time) ELSE 0 END) / 3600 AS dwell_hours FROM `tabPOS Invoice` pi WHERE pi.docstatus = 1 AND pi.is_return = 0 AND pi.order_type = 'Dine In' GROUP BY pi.branch, pi.company, pi.posting_date) d JOIN (SELECT ut.branch, COUNT(*) AS tables_n, SUM(ut.no_of_seats) AS seats FROM `tabURY Table` ut WHERE COALESCE(ut.is_take_away, 0) = 0 AND LOCATE('waiting', ut.name) = 0 AND ut.no_of_seats > 0 GROUP BY ut.branch) t ON t.branch = d.branch JOIN (SELECT sch.branch, sw.parentfield AS weekday_field, SUM(TIME_TO_SEC(sw.close_time) - TIME_TO_SEC(sw.open_time)) / 3600 AS open_hours FROM `tabURY Branch Operating Schedule` sch JOIN `tabURY Branch Service Window` sw ON sw.parent = sch.name AND sw.parenttype = 'URY Branch Operating Schedule' WHERE sch.enabled = 1 AND sw.enabled = 1 GROUP BY sch.branch, sw.parentfield) w ON w.branch = d.branch AND w.weekday_field = LOWER(DAYNAME(d.posting_date))"
+
+# Probe charts: lint L24 anchors and verify smoke tests only (see header). Not part of any dashboard; not copied.
+charts:
+  - {id: p_sales_lines, title: "probe fact_sales_lines", query: fact_sales_lines, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_sales_enriched, title: "probe fact_sales_lines_enriched", query: fact_sales_lines_enriched, type: Number, y: [{column: line_id, agg: count, as: Rows}]}
+  - {id: p_invoices, title: "probe fact_invoices", query: fact_invoices, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_cancellations, title: "probe fact_cancellations", query: fact_cancellations, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_payments, title: "probe fact_payments", query: fact_payments, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_closing, title: "probe fact_closing_details", query: fact_closing_details, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_kot_headers, title: "probe fact_kot_headers", query: fact_kot_headers, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_kot_lines, title: "probe fact_kot_lines", query: fact_kot_lines, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_kot_exec, title: "probe fact_kot_exec", query: fact_kot_exec, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_table_sessions, title: "probe fact_table_sessions", query: fact_table_sessions, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_dim_table, title: "probe dim_table", query: dim_table, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_service_requests, title: "probe fact_service_requests", query: fact_service_requests, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_stock_correction, title: "probe fact_stock_correction", query: fact_stock_correction, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_yield, title: "probe fact_yield_checks", query: fact_yield_checks, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_plan, title: "probe fact_sales_plan_items", query: fact_sales_plan_items, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_wastage, title: "probe fact_wastage_lines", query: fact_wastage_lines, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_pnl, title: "probe fact_daily_pnl", query: fact_daily_pnl, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_dim_item, title: "probe dim_item", query: dim_item, type: Number, y: [{column: item_code, agg: count, as: Rows}]}
+  - {id: p_kot_stages, title: "probe fact_kot_stages", query: fact_kot_stages, type: Number, y: [{column: kot, agg: count, as: Rows}]}
+  - {id: p_invoices_w, title: "probe fact_invoices_w", query: fact_invoices_w, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_invoices_named, title: "probe fact_invoices_named", query: fact_invoices_named, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_cancellations_named, title: "probe fact_cancellations_named", query: fact_cancellations_named, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_bills_all, title: "probe fact_bills_all", query: fact_bills_all, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_returns, title: "probe fact_returns", query: fact_returns, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_service_charges, title: "probe fact_service_charges", query: fact_service_charges, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_ordering_sessions, title: "probe fact_ordering_sessions", query: fact_ordering_sessions, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_kot_item_exec, title: "probe fact_kot_item_exec", query: fact_kot_item_exec, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_waste_vs_sales, title: "probe fact_waste_vs_sales", query: fact_waste_vs_sales, type: Number, y: [{column: branch, agg: count, as: Rows}]}
+  - {id: p_cost_variance, title: "probe fact_cost_variance", query: fact_cost_variance, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_gl_pnl, title: "probe fact_gl_pnl", query: fact_gl_pnl, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_stock_outflow, title: "probe fact_stock_outflow", query: fact_stock_outflow, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_stock_cover, title: "probe fact_stock_cover", query: fact_stock_cover, type: Number, y: [{column: item_code, agg: count, as: Rows}]}
+  - {id: p_bulk_production, title: "probe fact_bulk_production", query: fact_bulk_production, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_sales_lines_policy, title: "probe fact_sales_lines_policy", query: fact_sales_lines_policy, type: Number, y: [{column: line_id, agg: count, as: Rows}]}
+  - {id: p_sales_target, title: "probe fact_sales_target", query: fact_sales_target, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_labour_hours, title: "probe fact_labour_hours", query: fact_labour_hours, type: Number, y: [{column: branch, agg: count, as: Rows}]}
+  - {id: p_tips, title: "probe fact_tips", query: fact_tips, type: Number, y: [{column: name, agg: count, as: Rows}]}
+  - {id: p_seat_hours, title: "probe fact_seat_hours", query: fact_seat_hours, type: Number, y: [{column: branch, agg: count, as: Rows}]}
