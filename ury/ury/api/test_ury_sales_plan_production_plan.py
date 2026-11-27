@@ -113,9 +113,34 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		# Row lock is taken before anything else.
 		mock_lock.assert_called_once_with("URY Sales Plan", "SP-0001", "name", for_update=True)
 
-		# Material Request generation runs once, over the just-created results,
-		# and its return value is surfaced on the response.
+		# Draft plans (submit=False) defer Material Request generation to their
+		# own submit (on_submit_generate_material_requests), so nothing runs here.
+		mock_generate_mr.assert_not_called()
+		self.assertTrue(all(row["docstatus"] == 0 for row in result["production_plans"]))
+		self.assertEqual(result["material_requests"], {"purchases": [], "transfers": [], "errors": []})
+
+	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
+	@patch(f"{MOD}.frappe.get_doc")
+	@patch(f"{MOD}.compile_production_targets", return_value=(DEPARTMENTS_TWO, []))
+	@patch(f"{MOD}.frappe.get_all", return_value=[])
+	@patch(f"{MOD}.frappe.db.get_value", return_value="SP-0001")
+	def test_submitted_plans_generate_material_requests_once(self, mock_lock, mock_get_all, mock_compile, mock_get_doc, mock_generate_mr):
+		def _make_doc(plan_dict):
+			doc = frappe._dict(dict(plan_dict))
+			doc.name = f"MFG-PP-{plan_dict['custom_ury_department']}"
+			doc.flags = frappe._dict()
+			doc.insert = lambda: None
+			doc.submit = lambda: None
+			return doc
+
+		mock_get_doc.side_effect = _make_doc
+
+		result = create_or_get_department_production_plans(_sales_plan_doc(), submit=True)
+
+		# Generation runs once over the whole batch, and its return value is
+		# surfaced on the response.
 		mock_generate_mr.assert_called_once_with("SP-0001", result["production_plans"])
+		self.assertTrue(all(row["docstatus"] == 1 for row in result["production_plans"]))
 		self.assertEqual(result["material_requests"], {"purchases": [], "transfers": [], "errors": []})
 
 	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
@@ -176,10 +201,8 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		result = create_or_get_department_production_plans(doc, submit=False)
 		self.assertEqual(result["production_plans"], [])
 		mock_get_doc.assert_not_called()
-		# Generation still runs (over an empty results list) even when no
-		# department plan was created -- Purchase MRs are per plan, so an
-		# empty results list yields nothing to purchase against.
-		mock_generate_mr.assert_called_once_with("SP-0001", [])
+		# Nothing submitted, so no Material Request generation.
+		mock_generate_mr.assert_not_called()
 
 	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
@@ -221,6 +244,7 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		def _make_doc(plan_dict):
 			doc = frappe._dict(dict(plan_dict))
 			doc.name = f"MFG-PP-{plan_dict['custom_ury_department']}"
+			doc.flags = frappe._dict()
 			doc.insert = lambda: None
 			doc.submit = lambda d=doc: docs.append(d)
 			return doc
@@ -230,6 +254,8 @@ class TestCreateOrGetDepartmentProductionPlans(FrappeTestCase):
 		doc = _sales_plan_doc()
 		create_or_get_department_production_plans(doc, submit=True)
 		self.assertEqual(len(docs), 2)
+		# The on_submit hook must not generate per plan; the batch call does.
+		self.assertTrue(all(d.flags.ury_defer_material_requests for d in docs))
 
 	@patch(f"{MOD}._generate_material_requests", return_value={"purchases": [], "transfers": [], "errors": []})
 	@patch(f"{MOD}.frappe.get_doc")
@@ -327,11 +353,13 @@ class TestCreateDepartmentProductionPlans(FrappeTestCase):
 	@patch(f"{MOD}.create_or_get_department_production_plans", return_value={"sales_plan": "SP-0001", "production_plans": [], "blockers": []})
 	@patch(f"{MOD}.frappe.has_permission", return_value=True)
 	@patch(f"{MOD}.frappe.get_doc")
-	def test_locked_delegates_and_submits(self, mock_get_doc, mock_perm, mock_create):
+	def test_locked_delegates_and_creates_drafts(self, mock_get_doc, mock_perm, mock_create):
+		"""Manual creation leaves plans in Draft so quantities can be edited
+		(Chef UI, track sa-chef-ui-production-queue D6)."""
 		mock_get_doc.return_value = _FakeSalesPlanDoc(status="Locked for Production")
 		create_department_production_plans("SP-0001")
 		mock_create.assert_called_once()
-		self.assertEqual(mock_create.call_args.kwargs.get("submit"), True)
+		self.assertEqual(mock_create.call_args.kwargs.get("submit"), False)
 
 
 class TestOpenDepartmentProductionPlan(FrappeTestCase):
@@ -346,3 +374,43 @@ class TestOpenDepartmentProductionPlan(FrappeTestCase):
 	def test_returns_existing(self, mock_get, mock_perm):
 		result = open_department_production_plan("SP-0001", "Main Kitchen")
 		self.assertEqual(result, {"name": "MFG-PP-1", "docstatus": 1, "department": "Main Kitchen"})
+
+
+class TestCreationNetsSubAssemblies(FrappeTestCase):
+	"""A sub-assembly row is its parents' demand minus the stock already in the
+	department warehouse; a fully covered one gets no row (ERPNext needs > 0)."""
+
+	def _bucket(self):
+		nested = [{"parent_item": "BIRYANI", "required_qty": 8.0, "source_type": "nested_dependency"}]
+		direct = [{"parent_item": None, "required_qty": 10.0, "source_type": "direct_plan_row"}]
+		return {
+			"warehouse": "Kitchen - WH",
+			"targets": [
+				{
+					"item_code": "BASE", "bom_no": "BOM-BASE", "required_qty": 8.0, "stock_uom": "Kg",
+					"warehouse": "Kitchen - WH", "department": "Kitchen", "sources": nested,
+					"component_vector": [], "raw_material_vector": [],
+				},
+				{
+					"item_code": "BIRYANI", "bom_no": "BOM-BIRYANI", "required_qty": 10.0, "stock_uom": "Nos",
+					"warehouse": "Kitchen - WH", "department": "Kitchen", "sources": direct,
+					"component_vector": [{"item_code": "BASE", "required_qty": 8.0}], "raw_material_vector": [],
+				},
+			],
+		}
+
+	def _rows(self, stock):
+		from ury.ury.api.ury_sales_plan_production_plan import _build_department_plan_dict
+
+		with patch(f"{MOD}.get_warehouse_stock", return_value=stock):
+			plan = _build_department_plan_dict(_sales_plan_doc(), "Kitchen", self._bucket(), "hash-1")
+		return {row["item_code"]: row["planned_qty"] for row in plan["po_items"]}
+
+	def test_sub_assembly_is_demand_minus_stock(self):
+		self.assertEqual(self._rows({"BASE": 3.0}), {"BASE": 5.0, "BIRYANI": 10.0})
+
+	def test_no_stock_keeps_the_full_demand(self):
+		self.assertEqual(self._rows({}), {"BASE": 8.0, "BIRYANI": 10.0})
+
+	def test_fully_covered_sub_assembly_gets_no_row(self):
+		self.assertEqual(self._rows({"BASE": 40.0}), {"BIRYANI": 10.0})

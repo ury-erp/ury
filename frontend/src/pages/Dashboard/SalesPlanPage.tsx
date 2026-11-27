@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, CheckCircle2, Factory, History, ListFilter, Lock, Play, Plus, RotateCcw, Save, Search, Send, X } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, messageToPlainText, showToast, type DataTableColumn } from '@ury/ui';
+import { AttentionItem, Badge, Button, Card, ConfirmDialog, DataTable, DatePicker, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EditableDataTable, Input, KpiStrip, Page, PageHeader, Section, Select, Spinner, Textarea, showToast, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import { useCurrency } from '../../context/CurrencyContext';
@@ -24,6 +24,18 @@ import {
   saveSalesPlanDraftQuantities,
 } from '../../services/salesPlan';
 import { __ } from '../../i18n';
+import {
+  CAN_PREPARE_EXECUTION,
+  ERPNEXT_STATUS_BADGE,
+  EXECUTION_STATE_BADGE,
+  EXECUTION_STATE_LABEL,
+  LINK_STATE_BADGE,
+  LINK_STATE_LABEL,
+  PREPARE_POLL_INTERVAL_MS,
+  describeApiError,
+  describeBlocker,
+} from '../../components/production/productionStatus';
+import { chefProductionService } from '../../services/chefProduction';
 
 type PlanStatus =
   | 'Draft'
@@ -56,80 +68,11 @@ type PlanStatus =
  * already parse it the same way.
  */
 export function describeSalesPlanApiError(err: unknown, fallback: string): string {
-  const anyErr = err as { exc_type?: string; _server_messages?: string } | null | undefined;
-
-  if (anyErr?.exc_type === 'frappe.exceptions.PermissionError') {
-    return "You don't have permission to make this change to the Sales Plan.";
-  }
-
-  if (anyErr?._server_messages) {
-    try {
-      const messages = JSON.parse(anyErr._server_messages) as string[];
-      const first = JSON.parse(messages[0]) as { message?: string };
-      if (first?.message) {
-        // Frappe wraps field/doctype names in <strong>; strip to plain text
-        // for toast and any remaining inline setState paths.
-        return messageToPlainText(first.message);
-      }
-    } catch {
-      // Malformed/unexpected shape -- fall through to the generic message
-      // below rather than surfacing a raw JSON parse error to the user.
-    }
-  }
-
-  return fallback;
+  return describeApiError(err, fallback, "You don't have permission to make this change to the Sales Plan.");
 }
 
-// D12 -- label/badge lookups for the two independent Production Plan state
-// axes rendered per department. Kept as flat maps (rather than a switch) so
-// a badge is one lookup, and so link_state and execution_state can never
-// accidentally be rendered from the same map.
-const LINK_STATE_LABEL: Record<DepartmentProductionPlanState['link_state'], string> = {
-  none: 'No Production Plan',
-  live: 'Production Plan',
-  stale: 'Stale (Sales Plan changed)',
-  ineligible: 'Not eligible yet',
-};
-
-const LINK_STATE_BADGE: Record<DepartmentProductionPlanState['link_state'], 'default' | 'tagAccent' | 'tagWarning'> = {
-  none: 'default',
-  live: 'tagAccent',
-  stale: 'tagWarning',
-  ineligible: 'default',
-};
-
-type ExecutionState = NonNullable<DepartmentProductionPlanState['execution_state']>;
-
-const EXECUTION_STATE_LABEL: Record<ExecutionState, string> = {
-  awaiting_materials: 'Awaiting Materials',
-  ready: 'Ready for Production',
-  processing: 'Processing',
-  completed: 'Production Completed',
-  failed: 'Production Failed',
-};
-
-const EXECUTION_STATE_BADGE: Record<ExecutionState, 'tagWarning' | 'tagAccent' | 'tagSuccess' | 'tagDestructive'> = {
-  awaiting_materials: 'tagWarning',
-  ready: 'tagAccent',
-  processing: 'tagAccent',
-  completed: 'tagSuccess',
-  failed: 'tagDestructive',
-};
-
-/** ERPNext Production Plan.status → badge tone for the primary manufacturing signal. */
-const ERPNEXT_STATUS_BADGE: Record<string, 'default' | 'tagAccent' | 'tagWarning' | 'tagSuccess' | 'tagDestructive'> = {
-  Draft: 'default',
-  Submitted: 'tagAccent',
-  'Not Started': 'tagAccent',
-  'Material Requested': 'tagWarning',
-  'In Process': 'tagAccent',
-  Completed: 'tagSuccess',
-  Closed: 'default',
-  Cancelled: 'tagDestructive',
-};
-
-const PREPARE_POLL_INTERVAL_MS = 4000;
-const CAN_PREPARE_EXECUTION: ExecutionState[] = ['awaiting_materials', 'ready', 'failed'];
+// D12 label/badge lookups, the ERPNext status badge and the Prepare polling
+// interval are shared with the Chef page (components/production/productionStatus.ts).
 
 const LIFECYCLE_STEPS: { key: string; label: string; matches: PlanStatus[] }[] = [
   { key: 'draft', label: __('Draft'), matches: ['Draft'] },
@@ -368,6 +311,7 @@ export const SalesPlanPage: React.FC = () => {
   const [ppCreateBusy, setPpCreateBusy] = useState(false);
   const [ppOpenBusyDepartment, setPpOpenBusyDepartment] = useState<string | null>(null);
   const [ppPrepareBusyDepartment, setPpPrepareBusyDepartment] = useState<string | null>(null);
+  const [ppSubmitBusyDepartment, setPpSubmitBusyDepartment] = useState<string | null>(null);
   // Prepare Production confirmation — ConfirmDialog instead of window.confirm.
   const [prepareConfirmDepartment, setPrepareConfirmDepartment] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
@@ -893,6 +837,25 @@ export const SalesPlanPage: React.FC = () => {
       showToast.error(describeSalesPlanApiError(err, `Unable to open the Production Plan for ${department}.`));
     } finally {
       setPpOpenBusyDepartment(null);
+    }
+  };
+
+  // Manually created department plans start as Draft so their quantities can
+  // be reviewed in the Chef UI (track sa-chef-ui-production-queue). Submitting
+  // raises the plan's Material Requests (Production Plan on_submit hook).
+  const submitDepartmentProductionPlan = async (department: string) => {
+    if (!planName) return;
+    const productionPlan = getDepartmentProductionState(department)?.production_plan;
+    if (!productionPlan) return;
+    setPpSubmitBusyDepartment(department);
+    try {
+      await chefProductionService.submitProductionPlan(productionPlan);
+      showToast.success(__('Production Plan submitted.'));
+      await refreshProductionPlanStates(planName);
+    } catch (err) {
+      showToast.error(describeSalesPlanApiError(err, `Unable to submit the Production Plan for ${department}.`));
+    } finally {
+      setPpSubmitBusyDepartment(null);
     }
   };
 
@@ -1476,6 +1439,22 @@ export const SalesPlanPage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {productionState.docstatus === 0 && productionState.link_state === 'live' && (
+                        <Button
+                          onClick={() => submitDepartmentProductionPlan(department)}
+                          disabled={ppSubmitBusyDepartment === department}
+                          variant="default"
+                          size="compactSm"
+                          className="gap-2"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          <span>
+                            {ppSubmitBusyDepartment === department
+                              ? __('Submitting...')
+                              : __('Submit Production Plan')}
+                          </span>
+                        </Button>
+                      )}
                       {productionState.docstatus === 1 &&
                         productionState.execution_state &&
                         CAN_PREPARE_EXECUTION.includes(productionState.execution_state) && (
@@ -1520,7 +1499,7 @@ export const SalesPlanPage: React.FC = () => {
                     <ul className="space-y-1 text-xs text-warning">
                       {productionState.blockers!.map((blocker, index) => (
                         <li key={`${department}-blocker-${index}`}>
-                          {blocker.message || `${blocker.type || 'Blocker'}${blocker.item_code ? `: ${blocker.item_code}` : ''}`}
+                          {describeBlocker(blocker)}
                         </li>
                       ))}
                     </ul>

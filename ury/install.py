@@ -33,9 +33,11 @@ def ensure_role_permissions():
 	"""
 	from ury.patches.v2_0 import default_permissions
 	from ury.patches.v3_26 import grant_item_yield_standard_permlevel
+	from ury.patches.v3_47 import add_department_head_role_permissions
 
 	default_permissions.execute()
 	grant_item_yield_standard_permlevel.execute()
+	add_department_head_role_permissions.execute()
 	frappe.db.commit()
 
 

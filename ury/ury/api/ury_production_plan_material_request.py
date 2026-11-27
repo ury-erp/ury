@@ -76,6 +76,7 @@ from frappe.utils import flt, nowdate
 
 from ury.ury.api.ury_production_readiness import compute_readiness
 from ury.ury.api.ury_production_settings import get_store_warehouse
+from ury.ury.api.ury_production_plan_quantities import apply_production_plan_quantities
 from ury.ury.api.ury_production_target_compiler import compile_production_targets
 from ury.ury.api.ury_sales_plan_production_plan import (
 	PP_DEPARTMENT_FIELD,
@@ -134,6 +135,7 @@ def generate_purchase_material_request_for_sales_plan(sales_plan):
 	blockers = list(blockers)
 
 	plan_by_department = _live_plan_by_department(sales_plan)
+	departments = _apply_department_plan_quantities(departments, plan_by_department)
 
 	store_warehouse = get_store_warehouse(company)
 	readiness = compute_readiness(departments, store_warehouse=store_warehouse)
@@ -217,6 +219,26 @@ def _live_plan_by_department(sales_plan):
 		if department not in plan_by_department:
 			plan_by_department[department] = row
 	return plan_by_department
+
+
+def _apply_department_plan_quantities(departments, plan_by_department):
+	"""Scale each department's targets to its Production Plan's own quantities
+	and leave out departments whose plan is still Draft.
+
+	A Draft plan's quantities may still be edited (Chef UI), so purchasing
+	for it waits until it is submitted; the ``Production Plan`` ``on_submit``
+	hook regenerates requests then, and the netting below creates only the
+	delta.
+	"""
+	scaled = {}
+	for department, bucket in departments.items():
+		plan_row = plan_by_department.get(department)
+		if plan_row and plan_row.get("docstatus") == 0:
+			continue
+		if plan_row:
+			bucket = apply_production_plan_quantities(bucket, plan_row["name"])
+		scaled[department] = bucket
+	return scaled
 
 
 # --- requirement grouping and allocation --------------------------------------

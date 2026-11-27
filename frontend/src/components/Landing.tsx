@@ -3,6 +3,7 @@ import { useAuth } from '../store/useAuth';
 import { __ } from '../i18n';
 import { URY_POS_ROUTES_ENABLED } from '../lib/posRouteBlock';
 import { NoAccess } from './NoAccess';
+import { hasChefUiRole } from './production/chefRoles';
 
 /**
  * Client-side-only role-aware landing redirect for the bare root URL ("/").
@@ -19,7 +20,7 @@ import { NoAccess } from './NoAccess';
  * convenience for whoever lands on "/" without a more specific URL.
  */
 export function Landing() {
-  const { isLoading, isManager } = useAuth();
+  const { isLoading, isManager, roles } = useAuth();
 
   if (isLoading) {
     return (
@@ -34,6 +35,12 @@ export function Landing() {
 
   if (isManager) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // URY Department Head (and other Chef UI roles without manager access) land
+  // on the Production Board.
+  if (hasChefUiRole(roles)) {
+    return <Navigate to="/production-board" replace />;
   }
 
   // BLOCKED FOR NOW: non-managers (e.g. a cashier opening the URY app from /desk) used to be
