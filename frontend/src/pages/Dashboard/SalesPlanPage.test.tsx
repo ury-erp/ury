@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { addDays, differenceInCalendarMonths, format, parseISO } from 'date-fns';
 import SalesPlanPage from './SalesPlanPage';
-import { salesPlanService } from '../../services/salesPlan';
+import { salesPlanService, type SalesPlanItemIssue } from '../../services/salesPlan';
 
 vi.mock('../../context/BranchContext', () => ({
   useBranchContext: () => ({ activeBranchId: 'Kozhikode', activeBranch: { id: 'Kozhikode', name: 'Kozhikode Branch' } }),
@@ -246,11 +246,11 @@ describe('SalesPlanPage', () => {
     };
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(manyBlocked as any);
     // Needs Attention is driven by backend `item_issues`, not client-side rules.
-    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft', enforcement_mode: 'Hard' });
     vi.mocked(salesPlanService.getPlan).mockResolvedValue({
-      items: manyBlocked.items.map((i: any) => ({ item_code: i.item_code, item_name: i.item_name, planned_qty: 5 })),
-      item_issues: ['ITEM-003', 'ITEM-004', 'ITEM-005', 'ITEM-006'].map((item_code) => ({ item_code, message: 'Issue for ' + item_code })),
-    } as any);
+      items: manyBlocked.items.map((i) => ({ item_code: i.item_code, item_name: i.item_name, qty: 5 })),
+      item_issues: ['ITEM-003', 'ITEM-004', 'ITEM-005', 'ITEM-006'].map((item_code) => ({ item_code, code: 'off_menu', message: 'Issue for ' + item_code })),
+    });
 
     render(<SalesPlanPage />);
 
@@ -427,11 +427,11 @@ describe('SalesPlanPage', () => {
       ],
     };
     vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withBlocked as any);
-    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft' } as any);
+    vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status: 'Draft', enforcement_mode: 'Hard' });
     vi.mocked(salesPlanService.getPlan).mockResolvedValue({
-      items: withBlocked.items.map((i: any) => ({ item_code: i.item_code, item_name: i.item_name, planned_qty: 5 })),
-      item_issues: [{ item_code: 'ITEM-900', message: 'Not on the menu' }],
-    } as any);
+      items: withBlocked.items.map((i) => ({ item_code: i.item_code, item_name: i.item_name, qty: 5 })),
+      item_issues: [{ item_code: 'ITEM-900', code: 'off_menu', message: 'Not on the menu' }],
+    });
 
     render(<SalesPlanPage />);
     await screen.findByText('Chicken Biryani');
@@ -445,15 +445,15 @@ describe('SalesPlanPage', () => {
   describe('item issues, removal and reload authority', () => {
     const planItem = (item_code: string, item_name: string, qty: number) => ({ item_code, item_name, qty });
 
-    const mockSavedPlan = (status: string, rows: ReturnType<typeof planItem>[], item_issues: { item_code: string; message: string }[] = []) => {
-      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status } as any);
-      vi.mocked(salesPlanService.getPlan).mockResolvedValue({ items: rows, item_issues } as any);
+    const mockSavedPlan = (status: string, rows: ReturnType<typeof planItem>[], item_issues: SalesPlanItemIssue[] = []) => {
+      vi.mocked(salesPlanService.getPlanStatus).mockResolvedValue({ name: 'PLAN-1', status, enforcement_mode: 'Hard' });
+      vi.mocked(salesPlanService.getPlan).mockResolvedValue({ items: rows, item_issues });
     };
 
     const bothRows = [planItem('ITEM-001', 'Chicken Biryani', 72), planItem('ITEM-002', 'Fried Rice', 44)];
-    const issueA = [
-      { item_code: 'ITEM-001', message: 'Not on the menu' },
-      { item_code: 'ITEM-001', message: 'No production unit' },
+    const issueA: SalesPlanItemIssue[] = [
+      { item_code: 'ITEM-001', code: 'off_menu', message: 'Not on the menu' },
+      { item_code: 'ITEM-001', code: 'production_config', message: 'No production unit' },
     ];
 
     const expectKpi = (label: string, value: string) => {
@@ -475,7 +475,7 @@ describe('SalesPlanPage', () => {
 
     beforeEach(() => {
       vi.mocked(salesPlanService.saveDraft).mockReset();
-      vi.mocked(salesPlanService.saveDraft).mockResolvedValue({ name: 'PLAN-1', status: 'Draft', item_issues: [] } as any);
+      vi.mocked(salesPlanService.saveDraft).mockResolvedValue({ name: 'PLAN-1', status: 'Draft', item_issues: [] });
     });
 
     it('renders only the saved plan items when a plan exists (reload authority)', async () => {
@@ -491,10 +491,10 @@ describe('SalesPlanPage', () => {
         ...historyResponse,
         items: [
           ...historyResponse.items,
-          { item_code: 'ITEM-003', item_name: 'No PU Item', stock_uom: 'Nos', department: 'Indian', average_qty: 5, sample_days: 3, history: [] },
+          { item_code: 'ITEM-003', item_name: 'No PU Item', stock_uom: 'Nos', department: 'Indian', rate: 0, average_qty: 5, sample_days: 3, history: [] },
         ],
       };
-      vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withNoPu as any);
+      vi.mocked(salesPlanService.getComparableHistory).mockResolvedValue(withNoPu);
       mockSavedPlan('Draft', [...bothRows, planItem('ITEM-003', 'No PU Item', 5)], issueA);
       render(<SalesPlanPage />);
 
@@ -555,8 +555,8 @@ describe('SalesPlanPage', () => {
       vi.mocked(salesPlanService.saveDraft).mockResolvedValue({
         name: 'PLAN-1',
         status: 'Draft',
-        item_issues: [{ item_code: 'ITEM-002', message: 'Fresh issue from save' }],
-      } as any);
+        item_issues: [{ item_code: 'ITEM-002', code: 'off_menu', message: 'Fresh issue from save' }],
+      });
       render(<SalesPlanPage />);
 
       const panel = await expandAttention();
