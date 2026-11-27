@@ -16,6 +16,7 @@ from ury.ury.api.ury_sales_plan import (
     validate_items_on_active_menu,
     flag_stale_bom_revisions,
     get_off_menu_items,
+    collect_plan_item_issues,
 )
 from ury.ury.api.ury_production_validation import collect_item_production_issue
 
@@ -371,6 +372,56 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
         self.assertEqual(len(doc.items), 1)
         self.assertEqual(doc.items[0].qty, 9)
 
+    def test_save_draft_returns_item_issues(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        result = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        self.assertIsInstance(result["item_issues"], list)
+        # MTPL has no production configuration for this branch.
+        codes = {(i["item_code"], i["code"]) for i in result["item_issues"]}
+        self.assertIn(("MTPL", "production_config"), codes)
+
+    def test_save_draft_omitting_a_row_removes_it_and_recalculates_total(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        self._ensure_item("MTPL-2")
+        first = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}, {"item_code": "MTPL-2", "qty": 3}],
+        )
+        second = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        self.assertEqual(first["name"], second["name"])
+        doc = frappe.get_doc("URY Sales Plan", second["name"])
+        self.assertEqual([row.item_code for row in doc.items], ["MTPL"])
+        self.assertEqual(
+            frappe.utils.flt(second["expected_sales_amount"]),
+            sum(frappe.utils.flt(row.amount) for row in doc.items),
+        )
+
+    def test_get_plan_returns_item_issues(self):
+        from ury.ury.api.ury_sales_plan import get_plan, save_draft
+
+        result = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        data = get_plan(result["name"])
+        self.assertEqual(data["item_issues"], result["item_issues"])
+
     def test_save_draft_rejects_mismatched_branch_company(self):
         from ury.ury.api.ury_sales_plan import save_draft
 
@@ -583,6 +634,53 @@ class TestValidateItemsOnActiveMenu(FrappeTestCase):
     def test_get_off_menu_items_empty_input(self):
         self.assertEqual(get_off_menu_items(self.branch.name, []), set())
         self.assertEqual(get_off_menu_items(None, [self.off_menu_item.name]), set())
+
+
+class TestCollectPlanItemIssues(FrappeTestCase):
+    MENU = "ury.ury.api.ury_sales_plan.get_off_menu_items"
+    CONFIG = "ury.ury.api.ury_sales_plan.collect_item_production_issue"
+
+    def _doc(self, rows, status="Draft"):
+        return frappe._dict(branch="Branch-1", status=status, items=[frappe._dict(r) for r in rows])
+
+    def test_zero_qty_rows_are_never_evaluated(self):
+        with patch(self.MENU, return_value=set()) as menu, patch(self.CONFIG, return_value=None) as config:
+            issues = collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 0}, {"item_code": "B", "qty": 2}]))
+        self.assertEqual(issues, [])
+        menu.assert_called_once_with("Branch-1", ["B"])
+        config.assert_called_once_with("B", "Branch-1")
+
+    def test_reports_off_menu_before_config_for_same_item(self):
+        with patch(self.MENU, return_value={"A"}), patch(self.CONFIG, return_value="BOM is required"):
+            issues = collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 1}]))
+        self.assertEqual([i["code"] for i in issues], ["off_menu", "production_config"])
+        self.assertEqual(issues[1]["message"], "BOM is required")
+        self.assertTrue(all(i["item_code"] == "A" for i in issues))
+
+    def test_duplicate_rows_report_once_per_code(self):
+        with patch(self.MENU, return_value={"A"}), patch(self.CONFIG, return_value="No config") as config:
+            issues = collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 1}, {"item_code": "A", "qty": 4}]))
+        self.assertEqual(len(issues), 2)
+        config.assert_called_once()
+
+    def test_frozen_statuses_return_nothing_without_checks(self):
+        for status in ("Approved", "Locked for Production", "Superseded/Cancelled"):
+            with patch(self.MENU) as menu, patch(self.CONFIG) as config:
+                self.assertEqual(collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 1}], status)), [])
+            menu.assert_not_called()
+            config.assert_not_called()
+
+    def test_clean_items_return_empty(self):
+        with patch(self.MENU, return_value=set()), patch(self.CONFIG, return_value=None):
+            self.assertEqual(collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 1}])), [])
+
+    def test_config_check_skipped_without_read_permission(self):
+        with patch(self.MENU, return_value={"A"}), patch(self.CONFIG) as config, patch(
+            "ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=False
+        ):
+            issues = collect_plan_item_issues(self._doc([{"item_code": "A", "qty": 1}]))
+        config.assert_not_called()
+        self.assertEqual([i["code"] for i in issues], ["off_menu"])
 
 
 class TestCollectItemProductionIssue(FrappeTestCase):

@@ -15,7 +15,11 @@ from frappe.model.workflow import (
 
 from ury.ury.api.ury_bom_compiler import build_demand_vector
 from ury.ury.api.ury_production_context import resolve_production_context
-from ury.ury.api.ury_production_validation import validate_item_production_configuration
+from ury.ury.api.ury_production_validation import (
+    CONFIG_DOCTYPE,
+    collect_item_production_issue,
+    validate_item_production_configuration,
+)
 
 
 #: Targets that move a plan backward (out of its forward-only approval path)
@@ -318,6 +322,49 @@ def validate_plan_items(doc):
         if not row.get("qty"):
             continue
         validate_item_production_configuration(item_code, doc.get("branch"))
+
+
+#: Statuses in which item issues are still actionable (before approval freezes the plan).
+ISSUE_STATUSES = ("Draft", "Proposed", "Submitted for Approval")
+
+
+def collect_plan_item_issues(doc):
+    """List the items that would fail the Approved transition.
+
+    Mirrors the approval checks (validate_items_on_active_menu(strict=True)
+    and validate_plan_items) without raising: only rows with qty > 0 are
+    evaluated, because approval prunes qty 0 rows. Returns a list of
+    {"item_code", "code", "message"} dicts, at most one per item and code.
+    """
+    branch = doc.get("branch")
+    if not branch or (doc.get("status") or "Draft") not in ISSUE_STATUSES:
+        return []
+
+    codes = list(dict.fromkeys(
+        row.get("item_code")
+        for row in (doc.get("items") or [])
+        if row.get("item_code") and flt(row.get("qty")) > 0
+    ))
+    off_menu = get_off_menu_items(branch, codes)
+    # The config validator requires read on its doctype and raises otherwise.
+    # A user who cannot read it must still be able to save and load a Draft;
+    # approval remains the hard gate for them.
+    can_read_config = frappe.has_permission(CONFIG_DOCTYPE, "read")
+
+    issues = []
+    for code in codes:
+        if code in off_menu:
+            issues.append({
+                "item_code": code,
+                "code": "off_menu",
+                "message": _(
+                    "Not on an active menu for {0}. Add it to the branch menu or remove it from the plan."
+                ).format(branch),
+            })
+        message = collect_item_production_issue(code, branch) if can_read_config else None
+        if message:
+            issues.append({"item_code": code, "code": "production_config", "message": message})
+    return issues
 
 
 #: The Workflow states reachable by a forward hop out of "Draft" -- the point
@@ -631,6 +678,7 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None,
         "name": doc.name,
         "status": doc.status,
         "expected_sales_amount": doc.expected_sales_amount,
+        "item_issues": collect_plan_item_issues(doc),
     }
 
 
@@ -670,7 +718,10 @@ def get_plan(name):
     if not frappe.has_permission("URY Sales Plan", "read", doc=name):
         frappe.throw(_("Not permitted to read this Sales Plan"), frappe.PermissionError)
 
-    return frappe.get_doc("URY Sales Plan", name).as_dict()
+    doc = frappe.get_doc("URY Sales Plan", name)
+    data = doc.as_dict()
+    data["item_issues"] = collect_plan_item_issues(doc)
+    return data
 
 
 @frappe.whitelist(methods=["GET"])
