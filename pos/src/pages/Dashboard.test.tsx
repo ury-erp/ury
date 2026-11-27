@@ -79,4 +79,15 @@ describe("Dashboard", () => {
     const { container } = render(<Dashboard />);
     expect(container.querySelector("div")).toBeTruthy();
   });
+
+  // No shift-summary source is connected, so no placeholder card (refs #616).
+  // SAP Fiori overview pages: each card is bound to a data source.
+  it("shows no Shift Brief placeholder card without a summary source", async () => {
+    render(<Dashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("InsightFeed")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("dashboard.shift_brief_title")).toBeNull();
+    expect(screen.queryByText("dashboard.shift_brief_placeholder")).toBeNull();
+  });
 });
