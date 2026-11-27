@@ -15,7 +15,9 @@ from ury.ury.api.ury_sales_plan import (
     validate_plan_items,
     validate_items_on_active_menu,
     flag_stale_bom_revisions,
+    get_off_menu_items,
 )
+from ury.ury.api.ury_production_validation import collect_item_production_issue
 
 
 class TestURYSalesPlanContract(FrappeTestCase):
@@ -569,6 +571,53 @@ class TestValidateItemsOnActiveMenu(FrappeTestCase):
     def test_setting_off_disables_check(self):
         frappe.db.set_single_value("URY Production Settings", "require_active_menu_for_planning", 0)
         validate_items_on_active_menu(self._doc(self.off_menu_item.name, 1), strict=True)
+
+    def test_get_off_menu_items_returns_only_off_menu_codes(self):
+        result = get_off_menu_items(self.branch.name, [self.on_menu_item.name, self.off_menu_item.name])
+        self.assertEqual(result, {self.off_menu_item.name})
+
+    def test_get_off_menu_items_empty_when_setting_off(self):
+        frappe.db.set_single_value("URY Production Settings", "require_active_menu_for_planning", 0)
+        self.assertEqual(get_off_menu_items(self.branch.name, [self.off_menu_item.name]), set())
+
+    def test_get_off_menu_items_empty_input(self):
+        self.assertEqual(get_off_menu_items(self.branch.name, []), set())
+        self.assertEqual(get_off_menu_items(None, [self.off_menu_item.name]), set())
+
+
+class TestCollectItemProductionIssue(FrappeTestCase):
+    TARGET = "ury.ury.api.ury_production_validation.validate_item_production_configuration"
+
+    def setUp(self):
+        self.previous_mute = frappe.flags.mute_messages
+
+    def test_returns_none_when_item_passes(self):
+        with patch(self.TARGET, return_value={}):
+            self.assertIsNone(collect_item_production_issue("ITEM-1", "Branch-1"))
+        self.assertEqual(frappe.flags.mute_messages, self.previous_mute)
+
+    def test_returns_message_on_validation_error(self):
+        with patch(self.TARGET, side_effect=frappe.ValidationError("BOM is required for manufactured Item ITEM-1")):
+            message = collect_item_production_issue("ITEM-1", "Branch-1")
+        self.assertEqual(message, "BOM is required for manufactured Item ITEM-1")
+        self.assertEqual(frappe.flags.mute_messages, self.previous_mute)
+
+    def test_reraises_permission_error(self):
+        with patch(self.TARGET, side_effect=frappe.PermissionError("Not permitted")):
+            with self.assertRaises(frappe.PermissionError):
+                collect_item_production_issue("ITEM-1", "Branch-1")
+        self.assertEqual(frappe.flags.mute_messages, self.previous_mute)
+
+    def test_real_throw_does_not_leak_into_message_log(self):
+        frappe.clear_messages()
+
+        def fail(*_args):
+            frappe.throw("Production policy is not set", frappe.ValidationError)
+
+        with patch(self.TARGET, side_effect=fail):
+            message = collect_item_production_issue("ITEM-1", "Branch-1")
+        self.assertEqual(message, "Production policy is not set")
+        self.assertEqual(frappe.local.message_log, [])
 
 
 class TestPopulateItemProductionContext(FrappeTestCase):

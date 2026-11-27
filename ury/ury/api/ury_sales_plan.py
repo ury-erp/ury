@@ -248,6 +248,30 @@ def prune_zero_qty_rows(doc):
         doc.set("items", kept)
 
 
+def get_off_menu_items(branch, item_codes):
+    """Return the subset of item_codes not on any enabled URY Menu of branch.
+
+    Empty set when require_active_menu_for_planning is off, branch is empty
+    or item_codes is empty. Shared by validate_items_on_active_menu (approval
+    gate) and collect_plan_item_issues (draft-time reporting) so both apply
+    the same menu rule.
+    """
+    from ury.ury.api.ury_production_settings import require_active_menu_for_planning
+
+    codes = {code for code in (item_codes or []) if code}
+    if not branch or not codes or not require_active_menu_for_planning():
+        return set()
+    menus = frappe.get_all("URY Menu", filters={"branch": branch, "enabled": 1}, pluck="name")
+    on_menu = set(
+        frappe.get_all(
+            "URY Menu Item",
+            filters={"item": ["in", list(codes)], "disabled": 0, "parent": ["in", menus or [""]]},
+            pluck="item",
+        )
+    )
+    return codes - on_menu
+
+
 def validate_items_on_active_menu(doc, strict=True):
     """Sales Plan takes sellable items only. An item's URY Menu membership for
     this branch is the single source of truth for "sellable" here -- it is
@@ -258,23 +282,8 @@ def validate_items_on_active_menu(doc, strict=True):
     "is sub-assembly" flag is needed. Controlled by setting
     require_active_menu_for_planning (default on).
     """
-    from ury.ury.api.ury_production_settings import require_active_menu_for_planning
-
-    if not require_active_menu_for_planning() or not doc.get("branch"):
-        return
     codes = [r.get("item_code") for r in (doc.get("items") or []) if flt(r.get("qty")) > 0 and r.get("item_code")]
-    if not codes:
-        return
-    sellable = set(codes)
-    menus = frappe.get_all("URY Menu", filters={"branch": doc.get("branch"), "enabled": 1}, pluck="name")
-    on_menu = set(
-        frappe.get_all(
-            "URY Menu Item",
-            filters={"item": ["in", list(sellable)], "disabled": 0, "parent": ["in", menus or [""]]},
-            pluck="item",
-        )
-    )
-    missing = sorted(sellable - on_menu)
+    missing = sorted(get_off_menu_items(doc.get("branch"), codes))
     if missing:
         message = _(
             "Not on an active menu for {0}: {1}. Add them to the branch menu or remove them from the plan."
