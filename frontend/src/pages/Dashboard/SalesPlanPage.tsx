@@ -1280,35 +1280,34 @@ export const SalesPlanPage: React.FC = () => {
       {!loading && !error && showAttention && (
         <Section>
           <Card padding="none" variant="outlined" className="overflow-hidden rounded-[9px] border shadow-none">
-            <button
-              type="button"
-              onClick={() => setAttentionExpanded((current) => !current)}
-              aria-expanded={attentionExpanded}
-              aria-controls="needs-attention-panel"
-              className="flex w-full items-center justify-between gap-2 px-3 py-[9px] text-start hover:bg-muted/60"
-            >
-              <span className="flex items-center gap-2">
+            {/* Remove all is a sibling of the toggle (a button cannot nest a button) so it sits in the header row. */}
+            <div className="flex items-center gap-2 pe-3 hover:bg-muted/60">
+              <button
+                type="button"
+                onClick={() => setAttentionExpanded((current) => !current)}
+                aria-expanded={attentionExpanded}
+                aria-controls="needs-attention-panel"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-[9px] text-start"
+              >
                 {attentionExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                 <span className="text-[12.5px] font-semibold text-foreground">{__('Needs Attention')}</span>
                 <Badge variant="secondary" size="sm">
                   {attentionRows.length}
                 </Badge>
-              </span>
-            </button>
-            <div id="needs-attention-panel" hidden={!attentionExpanded}>
-              {canRemove && (
-                <div className="flex justify-end border-t border-border px-[14px] py-2">
-                  <Button
-                    variant="ghost"
-                    size="compactSm"
-                    className="text-destructive"
-                    onClick={() => requestRemoveItems(attentionRows.map((r) => r.item._rowKey))}
-                    disabled={saving}
-                  >
-                    {__('Remove all')}
-                  </Button>
-                </div>
+              </button>
+              {canRemove && attentionExpanded && (
+                <Button
+                  variant="ghost"
+                  size="compactSm"
+                  className="text-destructive"
+                  onClick={() => requestRemoveItems(attentionRows.map((r) => r.item._rowKey))}
+                  disabled={saving}
+                >
+                  {__('Remove all')}
+                </Button>
               )}
+            </div>
+            <div id="needs-attention-panel" hidden={!attentionExpanded}>
               <div className="divide-y divide-border border-t border-border">
                 {attentionRows.map(({ item, messages }) => (
                   <AttentionItem

@@ -620,7 +620,7 @@ describe('SalesPlanPage', () => {
       const panel = await expandAttention();
       expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
       expect(within(panel).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
-      expect(within(panel).queryByRole('button', { name: 'Remove all' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove all' })).not.toBeInTheDocument();
     });
 
     it('offers no Remove controls once Approved, even for the Controller role', async () => {
@@ -637,8 +637,16 @@ describe('SalesPlanPage', () => {
       mockSavedPlan('Draft', bothRows, issueBoth);
       render(<SalesPlanPage />);
 
+      const toggle = await screen.findByRole('button', { name: /Needs Attention/i });
+      expect(screen.queryByRole('button', { name: 'Remove all' })).not.toBeInTheDocument();
+
       const panel = await expandAttention();
-      await userEvent.click(within(panel).getByRole('button', { name: 'Remove all' }));
+      const removeAll = screen.getByRole('button', { name: 'Remove all' });
+      // Same header row as the toggle, not a separate row inside the panel.
+      expect(panel.contains(removeAll)).toBe(false);
+      expect(removeAll.parentElement).toBe(toggle.parentElement);
+
+      await userEvent.click(removeAll);
       await confirmRemoveAll(2);
 
       await waitFor(() => expect(salesPlanService.saveDraft).toHaveBeenCalledTimes(1));
@@ -679,8 +687,8 @@ describe('SalesPlanPage', () => {
         mockSavedPlan('Submitted for Approval', bothRows, issueBoth);
         render(<SalesPlanPage />);
 
-        const panel = await expandAttention();
-        await userEvent.click(within(panel).getByRole('button', { name: 'Remove all' }));
+        await expandAttention();
+        await userEvent.click(screen.getByRole('button', { name: 'Remove all' }));
         await confirmRemoveAll(2);
 
         await waitFor(() => expect(salesPlanService.removePlanItems).toHaveBeenCalledTimes(1));
