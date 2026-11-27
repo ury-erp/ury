@@ -445,6 +445,75 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
         result = transition_plan(name=created["name"], target_state="Proposed")
         self.assertEqual(result["status"], "Proposed")
 
+    def _proposed_plan_with_two_items(self):
+        from ury.ury.api.ury_sales_plan import save_draft, transition_plan
+
+        self._ensure_item("MTPL-2")
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}, {"item_code": "MTPL-2", "qty": 3}],
+        )
+        transition_plan(name=created["name"], target_state="Proposed")
+        return created["name"]
+
+    def test_remove_plan_items_in_proposed_removes_rows_and_audits(self):
+        from ury.ury.api.ury_sales_plan import remove_plan_items
+
+        name = self._proposed_plan_with_two_items()
+        result = remove_plan_items(name=name, item_codes=["MTPL-2"])
+
+        doc = frappe.get_doc("URY Sales Plan", name)
+        self.assertEqual(result["status"], "Proposed")
+        self.assertEqual(doc.status, "Proposed")
+        self.assertEqual(result["removed"], ["MTPL-2"])
+        self.assertEqual([row.item_code for row in doc.items], ["MTPL"])
+        self.assertIsInstance(result["item_issues"], list)
+        self.assertEqual(
+            frappe.utils.flt(result["expected_sales_amount"]),
+            sum(frappe.utils.flt(row.amount) for row in doc.items),
+        )
+        last_audit = json.loads(doc.audit_log)[-1]
+        self.assertEqual(last_audit["action"], "Remove Items")
+        self.assertEqual(last_audit["items"], ["MTPL-2"])
+        self.assertEqual(last_audit["from_state"], "Proposed")
+        self.assertEqual(last_audit["to_state"], "Proposed")
+
+    def test_remove_plan_items_accepts_json_string_codes(self):
+        from ury.ury.api.ury_sales_plan import remove_plan_items
+
+        name = self._proposed_plan_with_two_items()
+        result = remove_plan_items(name=name, item_codes=json.dumps(["MTPL"]))
+        self.assertEqual(result["removed"], ["MTPL"])
+
+    def test_remove_plan_items_rejects_after_approval(self):
+        from ury.ury.api.ury_sales_plan import remove_plan_items
+
+        name = self._proposed_plan_with_two_items()
+        frappe.db.set_value("URY Sales Plan", name, "status", "Approved")
+        with self.assertRaises(frappe.ValidationError):
+            remove_plan_items(name=name, item_codes=["MTPL"])
+
+    def test_remove_plan_items_requires_workflow_edit_role(self):
+        from ury.ury.api.ury_sales_plan import remove_plan_items
+
+        name = self._proposed_plan_with_two_items()
+        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True), patch(
+            "ury.ury.api.ury_sales_plan.frappe.get_roles", return_value=["URY Manager"]
+        ):
+            with self.assertRaises(frappe.PermissionError):
+                remove_plan_items(name=name, item_codes=["MTPL"])
+        doc = frappe.get_doc("URY Sales Plan", name)
+        self.assertEqual(len(doc.items), 2)
+
+    def test_remove_plan_items_rejects_codes_not_on_plan(self):
+        from ury.ury.api.ury_sales_plan import remove_plan_items
+
+        name = self._proposed_plan_with_two_items()
+        with self.assertRaises(frappe.ValidationError):
+            remove_plan_items(name=name, item_codes=["NOT-ON-PLAN"])
+
     def test_transition_plan_rejects_illegal_jump(self):
         from ury.ury.api.ury_sales_plan import save_draft, transition_plan
 

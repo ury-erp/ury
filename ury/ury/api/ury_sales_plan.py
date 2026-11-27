@@ -533,7 +533,7 @@ def snapshot_item(row):
     return {key: row.get(key) for key in ("item_code", "qty", "stock_uom", "department", "production_unit", "production_policy", "bom", "bom_revision")}
 
 
-def append_audit(doc, from_state, to_state, actor, reason=None):
+def append_audit(doc, from_state, to_state, actor, reason=None, details=None):
     audits = doc.get("audit_log") or []
     # audit_log is a Long Text (JSON) field: once a plan has gone through one
     # transition and been saved, the stored value is a JSON string, not a
@@ -552,6 +552,8 @@ def append_audit(doc, from_state, to_state, actor, reason=None):
     }
     if reason:
         entry["reason"] = reason
+    if details:
+        entry.update(details)
     audits.append(entry)
     doc.audit_log = audits
 
@@ -722,6 +724,65 @@ def get_plan(name):
     data = doc.as_dict()
     data["item_issues"] = collect_plan_item_issues(doc)
     return data
+
+
+#: Statuses in which items may still be removed (docstatus 0, before approval freezes the plan).
+REMOVABLE_STATUSES = ("Draft", "Proposed", "Submitted for Approval")
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_plan_items(name, item_codes):
+    """Remove every row for the given item codes from a plan that is not yet approved.
+
+    save_draft is Draft-only by design; this is the one audited edit allowed
+    in Proposed and Submitted for Approval. Rows are matched by item_code
+    because the page does not reload row names after a transition.
+    """
+    codes = set(frappe.parse_json(item_codes) if isinstance(item_codes, str) else (item_codes or []))
+    doc = frappe.get_doc("URY Sales Plan", name)
+    if not frappe.has_permission("URY Sales Plan", "write", doc=doc):
+        frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
+    if doc.status not in REMOVABLE_STATUSES or doc.docstatus != 0:
+        frappe.throw(
+            _("Items can only be removed before the Sales Plan is approved (current status: {0})").format(doc.status),
+            frappe.ValidationError,
+        )
+    _require_state_edit_role(doc)
+
+    removed = sorted({row.item_code for row in doc.items if row.item_code in codes})
+    if not removed:
+        frappe.throw(_("None of these items are on Sales Plan {0}").format(doc.name), frappe.ValidationError)
+
+    doc.set("items", [row for row in doc.items if row.item_code not in codes])
+    append_audit(
+        doc, doc.status, doc.status, frappe.session.user,
+        details={"action": "Remove Items", "items": removed},
+    )
+    # validate() only serialises audit_log on a status change; this save keeps the status.
+    doc.audit_log = json.dumps(doc.audit_log)
+    doc.save()
+
+    return {
+        "name": doc.name,
+        "status": doc.status,
+        "expected_sales_amount": doc.expected_sales_amount,
+        "item_issues": collect_plan_item_issues(doc),
+        "removed": removed,
+    }
+
+
+def _require_state_edit_role(doc):
+    """Enforce the workflow's allow_edit role for the plan's current state."""
+    workflow_name = get_workflow_name(doc.doctype)
+    if not workflow_name:
+        return
+    states = frappe.get_doc("Workflow", workflow_name).states
+    allow_edit = next((s.allow_edit for s in states if s.state == doc.status), None)
+    if allow_edit and allow_edit not in frappe.get_roles():
+        frappe.throw(
+            _("Only {0} can remove items from a {1} Sales Plan").format(allow_edit, doc.status),
+            frappe.PermissionError,
+        )
 
 
 @frappe.whitelist(methods=["GET"])
