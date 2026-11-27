@@ -493,3 +493,61 @@ class TestPlanExhaustedEnforcementMode(unittest.TestCase):
 		notified_users = {call.args[1] for call in create_notification.call_args_list}
 		self.assertEqual(notified_users, {"pm@example.com", "mgr@example.com"})
 		self.assertEqual(create_notification.call_count, 2)
+
+
+class TestAlwaysAvailableLineSkipsReservation(unittest.TestCase):
+	"""A non-bundle "Always Available" line is never reserved; a bundle line
+	still goes to create_reservation, where its children follow their own
+	modes."""
+
+	def _context(self, policy):
+		return service.frappe._dict(
+			{
+				"name": "UIPC-1",
+				"production_policy": policy,
+				"production_unit": "Kitchen",
+				"department": "Hot Line",
+				"warehouse": "WH-FG",
+				"availability_mode": "Always Available",
+			}
+		)
+
+	def _run(self, policy, active_groups=()):
+		line = {"item_code": "ITEM-1", "qty": 2, "source_line_ref": "POS-LINE-1", "source_context": {}}
+		with patch.object(
+			service, "resolve_production_context", return_value=self._context(policy)
+		), patch.object(service, "_active_groups", return_value=list(active_groups)), patch.object(
+			service, "release_reservation"
+		) as release_reservation, patch.object(
+			service, "create_reservation", return_value={"reservation_group": "GROUP-NEW"}
+		) as create_reservation, patch.object(
+			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
+		):
+			result = service._reconcile_line(
+				"INV-1", "ref:ITEM-1:POS-LINE-1", line, 0, "BR-1", "COMP-1", "user@example.com"
+			)
+		return result, release_reservation, create_reservation
+
+	def test_made_to_order_always_available_creates_no_reservation(self):
+		result, _release, create_reservation = self._run("MADE_TO_ORDER")
+
+		self.assertIsNone(result)
+		create_reservation.assert_not_called()
+
+	def test_stale_group_is_released_when_item_became_always_available(self):
+		result, release_reservation, create_reservation = self._run(
+			"PRE_PRODUCED", active_groups=["GROUP-OLD"]
+		)
+
+		self.assertIsNone(result)
+		release_reservation.assert_called_once_with(
+			"GROUP-OLD", reason="Order acceptance line quantity reconciliation"
+		)
+		create_reservation.assert_not_called()
+
+	def test_always_available_bundle_still_reserves_strict_children(self):
+		result, _release, create_reservation = self._run("BUNDLE")
+
+		self.assertEqual(result, {"reservation_group": "GROUP-NEW"})
+		create_reservation.assert_called_once()
+		self.assertEqual(create_reservation.call_args.kwargs["policy"], "BUNDLE")

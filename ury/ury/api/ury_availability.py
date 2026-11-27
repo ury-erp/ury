@@ -122,6 +122,10 @@ POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
 POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 POLICY_BUNDLE = "BUNDLE"
 
+# `URY Item Production Configuration.availability_mode` value that waives
+# stock/plan gating for the item (see `get_item_availability`).
+ALWAYS_AVAILABLE = "Always Available"
+
 
 def _verify_branch_scope(user, branch, company):
 	"""Fail closed unless `branch`/`company` are present, then verify the
@@ -379,8 +383,18 @@ def get_item_availability(item_code, branch, company, department=None):
 		"PRODUCTION_UNIT_DISABLED",
 		"MISSING_PRODUCTION_UNIT",
 	}
+	#
+	# A BUNDLE is exempt from this parent-level override: its sellability is
+	# decided by its children, each by its own `availability_mode` (see
+	# `_fill_bundle`). Overriding here would let an "Always Available" parent
+	# mask a short "Stock Available"/"Plan Available" child, which order
+	# reservation would then (correctly) reject.
 	availability_mode = config.get("availability_mode") if config else None
-	if availability_mode == "Always Available" and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES:
+	if (
+		availability_mode == ALWAYS_AVAILABLE
+		and production_policy != POLICY_BUNDLE
+		and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES
+	):
 		response["reason_code"] = "AVAILABLE"
 		response["sellable"] = True
 		# The override makes the item unconditionally sellable, so its computed
@@ -676,6 +690,10 @@ def _fill_bundle(response, item_code, branch, company):
 	  - DIRECT_RETAIL child: ``get_allocatable_qty`` on its warehouse.
 
 	A child without a resolvable config fails the whole bundle (fail closed).
+	A child whose own ``availability_mode`` is "Always Available" places no
+	constraint and is skipped; if every child is skipped the bundle is
+	unconstrained (``available_qty`` None, same shape as the parent-level
+	"Always Available" override in ``get_item_availability``).
 	The ``blocking_component`` field identifies the tightest child.
 	"""
 	children = _fetch_bundle_children(item_code, branch, company)
@@ -700,6 +718,9 @@ def _fill_bundle(response, item_code, branch, company):
 			response["sellable"] = False
 			response["available_qty"] = 0
 			return
+
+		if child_config.get("availability_mode") == ALWAYS_AVAILABLE:
+			continue
 
 		child_policy = child_config.get("production_policy")
 		child_warehouse = child_config.get("warehouse") or child_config.get("direct_retail_warehouse")
@@ -761,7 +782,16 @@ def _fill_bundle(response, item_code, branch, company):
 			min_capacity = capacity
 			blocking = child_item
 
-	available = min_capacity if min_capacity is not None else 0
+	if min_capacity is None:
+		# Every child is "Always Available": nothing constrains the bundle.
+		response["reason_code"] = "AVAILABLE"
+		response["sellable"] = True
+		response["available_qty"] = None
+		response["max_producible"] = None
+		response["blocking_component"] = None
+		return
+
+	available = min_capacity
 	response["available_qty"] = available
 	response["max_producible"] = available
 	response["blocking_component"] = blocking if available <= 0 else None

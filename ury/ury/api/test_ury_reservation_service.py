@@ -1985,3 +1985,82 @@ class TestCreateReservationRealPermissionBoundary(FrappeTestCase):
 				company=None,
 				order_ref=None,
 			)
+
+
+class TestAlwaysAvailableReservation(FrappeTestCase):
+	"""create_reservation never capacity-checks or reserves an "Always
+	Available" item, and a bundle reserves only its strictly-gated children."""
+
+	def test_always_available_item_returns_empty_without_locking(self):
+		with patch(f"{MODULE}._require_create_permission"), patch(
+			f"{MODULE}._lock_bin_row"
+		) as lock_bin_row, patch(f"{MODULE}._resolve_components") as resolve_components, patch(
+			f"{MODULE}.apply_commit_delta"
+		) as apply_commit_delta:
+			result = create_reservation(
+				item_code="QPC",
+				qty=1,
+				warehouse="WH-FG",
+				branch="BR-1",
+				company="COMP-1",
+				order_ref="INV-1",
+				policy="MADE_TO_ORDER",
+				frozen_context={"availability_mode": "Always Available"},
+			)
+
+		self.assertEqual(result, {"reservation_group": None, "reservations": []})
+		lock_bin_row.assert_not_called()
+		resolve_components.assert_not_called()
+		apply_commit_delta.assert_not_called()
+
+	def test_bundle_with_only_always_available_children_reserves_nothing(self):
+		with patch(f"{MODULE}._require_create_permission"), patch(
+			f"{MODULE}._lock_bin_row"
+		) as lock_bin_row, patch(f"{MODULE}._resolve_components", return_value=[]):
+			result = create_reservation(
+				item_code="COMBO",
+				qty=1,
+				warehouse="WH-FG",
+				branch="BR-1",
+				company="COMP-1",
+				order_ref="INV-1",
+				policy="BUNDLE",
+				frozen_context={"availability_mode": "Always Available"},
+			)
+
+		self.assertEqual(result, {"reservation_group": None, "reservations": []})
+		lock_bin_row.assert_not_called()
+
+	def test_bundle_components_skip_always_available_children(self):
+		from ury.ury.api.ury_reservation_service import _resolve_bundle_components
+
+		children = [
+			{"item_code": "AA-1", "qty": 1},
+			{"item_code": "AA-2", "qty": 1},
+			{"item_code": "STRICT", "qty": 2},
+		]
+		contexts = {
+			"AA-1": {"production_policy": "PRE_PRODUCED", "warehouse": "WH-1", "availability_mode": "Always Available"},
+			"AA-2": {"production_policy": "PRE_PRODUCED", "warehouse": "WH-1", "availability_mode": "Always Available"},
+			"STRICT": {"production_policy": "PRE_PRODUCED", "warehouse": "WH-2", "availability_mode": "Stock Available"},
+		}
+
+		def fake_get_all(doctype, **kwargs):
+			if doctype == "URY Item Production Configuration":
+				return [{"product_bundle": "PB-COMBO"}]
+			if doctype == "Product Bundle Item":
+				return children
+			raise AssertionError(f"unexpected get_all({doctype})")
+
+		with patch(f"{MODULE}.frappe.get_all", side_effect=fake_get_all), patch(
+			f"{MODULE}.resolve_production_context",
+			side_effect=lambda item, branch, company=None: contexts[item],
+		):
+			components = _resolve_bundle_components(
+				"COMBO", 3, "COMP-1", branch="BR-1", default_warehouse="WH-FG"
+			)
+
+		self.assertEqual(
+			components,
+			[{"component_item": "STRICT", "warehouse": "WH-2", "policy": "PRE_PRODUCED", "qty": 6.0}],
+		)

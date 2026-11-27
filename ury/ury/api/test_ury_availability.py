@@ -440,6 +440,99 @@ class TestGetItemAvailabilityBundle(FrappeTestCase):
         self.assertEqual(result["blocking_component"], "ITEM-CHILD-2")
 
 
+class TestBundleAlwaysAvailableChildren(FrappeTestCase):
+    """Each bundle child follows its own availability_mode: "Always Available"
+    children place no constraint, strictly-gated children still do, and an
+    "Always Available" parent never masks a short strict child."""
+
+    def _children(self, strict_mode="Stock Available"):
+        return [
+            {
+                "child_item": "ITEM-AA-1",
+                "qty_of": 1,
+                "child_config": _config(
+                    production_policy="PRE_PRODUCED",
+                    warehouse="Kitchen Warehouse - URY",
+                    availability_mode="Always Available",
+                ),
+            },
+            {
+                "child_item": "ITEM-AA-2",
+                "qty_of": 1,
+                "child_config": _config(
+                    production_policy="PRE_PRODUCED",
+                    warehouse="Kitchen Warehouse - URY",
+                    availability_mode="Always Available",
+                ),
+            },
+            {
+                "child_item": "ITEM-STRICT",
+                "qty_of": 1,
+                "child_config": _config(
+                    production_policy="PRE_PRODUCED",
+                    warehouse="Kitchen Warehouse - URY",
+                    availability_mode=strict_mode,
+                ),
+            },
+        ]
+
+    def _bundle_config(self):
+        return _config(
+            production_policy="BUNDLE",
+            product_bundle="BUNDLE-001",
+            warehouse=None,
+            availability_mode="Always Available",
+        )
+
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._fetch_bundle_children")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_strict_child_out_of_stock_blocks_always_available_bundle(
+        self, mock_config, mock_fetch_children, mock_fg
+    ):
+        mock_config.return_value = self._bundle_config()
+        mock_fetch_children.return_value = self._children()
+        mock_fg.return_value = {"allocatable_qty": 0}
+
+        result = get_item_availability("ITEM-BUNDLE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "BLOCKING_COMPONENT")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["blocking_component"], "ITEM-STRICT")
+        # Only the strict child's stock is consulted.
+        self.assertEqual([c.args[0] for c in mock_fg.call_args_list], ["ITEM-STRICT"])
+
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._fetch_bundle_children")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_capacity_comes_from_strict_child_only(self, mock_config, mock_fetch_children, mock_fg):
+        mock_config.return_value = self._bundle_config()
+        mock_fetch_children.return_value = self._children()
+        mock_fg.return_value = {"allocatable_qty": 7}
+
+        result = get_item_availability("ITEM-BUNDLE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 7)
+
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._fetch_bundle_children")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_all_children_always_available_is_unconstrained(
+        self, mock_config, mock_fetch_children, mock_fg
+    ):
+        mock_config.return_value = self._bundle_config()
+        mock_fetch_children.return_value = self._children(strict_mode="Always Available")
+
+        result = get_item_availability("ITEM-BUNDLE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertIsNone(result["available_qty"])
+        mock_fg.assert_not_called()
+
+
 class TestAvailabilityProductionContextIntegration(FrappeTestCase):
     @patch(f"{MODULE}.project_fg_allocatable")
     @patch(f"{MODULE}._resolve_plan_remaining")
