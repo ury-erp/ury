@@ -13,11 +13,12 @@ import {
   buildSalesPlanDraftKey,
   ComparableHistoryItem,
   ComparableHistoryResponse,
+  buildItemsFromSavedPlan,
   getPlanAmount,
   getSalesPlanDraftQuantities,
-  mergeSavedPlanRows,
   salesPlanService,
   type SalesPlanDocRow,
+  type SalesPlanItemIssue,
   type DepartmentProductionPlanState,
   type SalesPlanProductionStatesResponse,
   SalesPlanItem,
@@ -370,6 +371,9 @@ export const SalesPlanPage: React.FC = () => {
   const [ppPrepareBusyDepartment, setPpPrepareBusyDepartment] = useState<string | null>(null);
   // Prepare Production confirmation — ConfirmDialog instead of window.confirm.
   const [prepareConfirmDepartment, setPrepareConfirmDepartment] = useState<string | null>(null);
+  // Backend-reported problems with saved plan items, and the row pending removal.
+  const [itemIssues, setItemIssues] = useState<SalesPlanItemIssue[]>([]);
+  const [removeConfirmRowKey, setRemoveConfirmRowKey] = useState<string | null>(null);
   // Name of a prior Superseded/Cancelled plan for the current branch+date,
   // when that's why planStatus/planName are null and a fresh Draft is
   // starting instead -- see get_plan_status()'s docstring for why a
@@ -446,6 +450,7 @@ export const SalesPlanPage: React.FC = () => {
     setTransitionError(null);
     setHistoryScope(null);
     setPlanName(null);
+    setItemIssues([]);
     setPlanStatus(null);
     setSupersededPlanName(null);
 
@@ -494,19 +499,17 @@ export const SalesPlanPage: React.FC = () => {
             }
 
             // Once a plan exists, the plan -- not comparable history -- is
-            // what says which items are being produced and how many. History
-            // only ever supplied the suggestion. A plan can legitimately hold
-            // rows history knows nothing about, and a branch with an empty
-            // history window returns no suggestions at all while its plan is
-            // full; in both cases the grid would otherwise render empty, and
-            // with it every department section and Production Plan panel keyed
-            // off the item list.
+            // what says which items are being produced and how many. The
+            // saved plan replaces the history list (it does not overlay it);
+            // history only supplies figures for rows the plan holds. This
+            // also covers an empty plan: the saved plan is the truth.
             if (status.name && !cancelled) {
               try {
                 const planDoc = await salesPlanService.getPlan(status.name);
                 const planRows = (planDoc?.items as SalesPlanDocRow[] | undefined) || [];
-                if (!cancelled && planRows.length) {
-                  setItems((current) => mergeSavedPlanRows(current, planRows));
+                if (!cancelled) {
+                  setItems(buildItemsFromSavedPlan(history.items, planRows));
+                  setItemIssues((planDoc?.item_issues as SalesPlanItemIssue[] | undefined) || []);
                 }
               } catch (planErr) {
                 // Non-fatal: the history-derived view is still usable, and
@@ -689,15 +692,31 @@ export const SalesPlanPage: React.FC = () => {
     )));
   };
 
-  const saveDraft = async () => {
+  const saveDraft = () => {
+    void persistDraft(items);
+  };
+
+  const requestRemoveItem = (rowKey: string) => setRemoveConfirmRowKey(rowKey);
+
+  const removeItem = async (rowKey: string) => {
+    const previous = items;
+    const next = previous.filter((item) => item._rowKey !== rowKey);
+    if (next.length === previous.length) return;
+    setItems(next);
+    setHighlightedItemCode((current) => (current === rowKey ? null : current));
+    const ok = await persistDraft(next);
+    if (!ok) setItems(previous);
+  };
+
+  const persistDraft = async (nextItems: SalesPlanItem[]): Promise<boolean> => {
     setSaving(true);
     // Immediate/offline fallback -- gives instant UI feedback even if the
     // HTTP save below fails or is slow.
-    saveSalesPlanDraftQuantities(draftKey, items);
+    saveSalesPlanDraftQuantities(draftKey, nextItems);
 
     if (!historyScope?.branch || !historyScope?.plan_date) {
       setSaving(false);
-      return;
+      return false;
     }
 
     try {
@@ -705,13 +724,16 @@ export const SalesPlanPage: React.FC = () => {
         plan_date: historyScope.plan_date,
         branch: historyScope.branch,
         company: historyScope.company,
-        items: items.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
+        items: nextItems.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
         enforcement_mode: enforcementMode,
       });
       setPlanName(result.name);
       setPlanStatus((result.status as PlanStatus) || 'Draft');
+      setItemIssues(result.item_issues || []);
+      return true;
     } catch (err) {
       showToast.error(describeSalesPlanApiError(err, 'Unable to save this Sales Plan draft.'));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1725,6 +1747,27 @@ export const SalesPlanPage: React.FC = () => {
         loadingLabel="Preparing…"
         isSubmitting={ppPrepareBusyDepartment === prepareConfirmDepartment && prepareConfirmDepartment !== null}
         onConfirm={confirmPrepareDepartmentProduction}
+      />
+
+      <ConfirmDialog
+        open={removeConfirmRowKey !== null}
+        onOpenChange={(open) => {
+          if (!open && !saving) setRemoveConfirmRowKey(null);
+        }}
+        title={__('Remove item?')}
+        description={(() => {
+          const target = items.find((item) => item._rowKey === removeConfirmRowKey);
+          return `Remove ${target ? target.item_name || target.item_code : 'this item'} from this Sales Plan? The plan is saved immediately.`;
+        })()}
+        cancelLabel={__('Cancel')}
+        confirmLabel={__('Remove')}
+        loadingLabel="Removing…"
+        isSubmitting={saving}
+        onConfirm={() => {
+          const key = removeConfirmRowKey;
+          setRemoveConfirmRowKey(null);
+          if (key) void removeItem(key);
+        }}
       />
     </Page>
   );
